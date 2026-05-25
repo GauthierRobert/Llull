@@ -125,11 +125,10 @@ body,
   width: 100%;
   height: 100%;
   /*
-   * Row 0: toolbar
-   * Row 1: content (viewport + side panels)
-   * Row 2: status bar
+   * Row 0: content (viewport + side panels)
+   * Row 1: status bar
    */
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: 1fr auto;
   grid-template-columns: 1fr;
 }
 
@@ -146,57 +145,6 @@ body,
   min-width: 0;
   height: 100%;
   overflow: hidden;
-}
-
-/* ==========================================================================
-   Toolbar
-   ========================================================================== */
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 8px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
-  user-select: none;
-}
-
-.toolbar-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
-  white-space: nowrap;
-}
-
-.toolbar-btn:hover {
-  background: var(--bg-input);
-  border-color: var(--border-medium);
-  color: var(--text-primary);
-}
-
-.toolbar-btn:active {
-  background: var(--border-light);
-}
-
-.toolbar-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 /* ==========================================================================
@@ -411,143 +359,6 @@ body,
   margin-right: 5px;
 }
 
-.props-cmd-description {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-  font-style: italic;
-  line-height: 1.4;
-}
-
-/* ==========================================================================
-   Param form (shared by PropertiesPanel)
-   ========================================================================== */
-
-.param-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.param-field {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.param-label {
-  font-size: 11px;
-  color: var(--text-label);
-  font-weight: 500;
-  cursor: default;
-  user-select: none;
-}
-
-.param-required {
-  color: var(--color-error);
-}
-
-.param-input {
-  width: 100%;
-  padding: 5px 8px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-light);
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 12px;
-  outline: none;
-  transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
-  -moz-appearance: textfield;
-}
-
-.param-input::-webkit-outer-spin-button,
-.param-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.param-input:focus {
-  border-color: var(--accent);
-  background: var(--bg-input-focus);
-}
-
-.param-input::placeholder {
-  color: var(--text-faint);
-  font-size: 11px;
-}
-
-.param-checkbox {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.param-select {
-  width: 100%;
-  padding: 5px 8px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-light);
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 12px;
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-}
-
-.param-select:focus {
-  border-color: var(--accent);
-}
-
-.param-select option {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-}
-
-.param-error {
-  font-size: 10px;
-  color: var(--color-error);
-  line-height: 1.3;
-}
-
-.param-submit {
-  margin-top: 4px;
-  width: 100%;
-  padding: 6px 12px;
-  background: var(--color-submit);
-  border: 1px solid var(--color-submit-border);
-  border-radius: 5px;
-  color: var(--color-submit-text);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease;
-}
-
-.param-submit:hover {
-  background: var(--color-submit-hover);
-  border-color: var(--accent);
-  color: var(--text-primary);
-}
-
-.param-submit:active {
-  opacity: 0.85;
-}
-
-.param-submit:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 /* ==========================================================================
    2D / 3D view-mode toggle
    ========================================================================== */
@@ -714,202 +525,91 @@ body,
 }
 
 /* ==========================================================================
-   Command palette (V2)
+   2D modify tool palette
    ========================================================================== */
 
-.palette-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 15vh;
-}
-
-.palette-dialog {
-  width: 540px;
-  max-width: calc(100vw - 32px);
-  max-height: 60vh;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-medium);
-  border-radius: 10px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.45),
-    0 2px 8px rgba(0, 0, 0, 0.25);
+.modify-tools {
+  position: absolute;
+  top: 50%;
+  left: 88px; /* right of the draw-tools panel (64px min-width + 12px left + 12px gap) */
+  transform: translateY(-50%);
+  z-index: 10;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  pointer-events: all;
+  user-select: none;
+  min-width: 68px;
 }
 
-.palette-search-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
-.palette-search-icon {
-  color: var(--text-faint);
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.palette-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  caret-color: var(--accent);
-  min-width: 0;
-}
-
-.palette-input::placeholder {
-  color: var(--text-faint);
-}
-
-.palette-esc-hint {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-faint);
-  background: var(--bg-input);
-  border: 1px solid var(--border-light);
-  border-radius: 3px;
-  padding: 1px 5px;
-}
-
-.palette-list {
-  list-style: none;
-  overflow-y: auto;
-  flex: 1;
-  padding: 4px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-light) transparent;
-}
-
-.palette-item {
+/* Numeric input row shown when a value (distance/radius) is needed */
+.modify-tool-input-row {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 8px 14px;
-  cursor: pointer;
-  border-left: 2px solid transparent;
-  transition: background 0.08s ease;
-}
-
-.palette-item:hover,
-.palette-item--highlighted {
-  background: var(--bg-input);
-  border-left-color: var(--accent);
-}
-
-.palette-item__name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.palette-item__desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.palette-empty {
-  padding: 20px 14px;
-  font-size: 13px;
-  color: var(--text-faint);
-  font-style: italic;
-  text-align: center;
-}
-
-.palette-footer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 14px;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-base);
-  flex-shrink: 0;
-}
-
-.palette-hint {
-  font-size: 10px;
-  color: var(--text-faint);
-  display: flex;
-  align-items: center;
   gap: 3px;
+  padding: 4px 2px 2px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 2px;
 }
 
-.palette-hint kbd {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-light);
-  border-radius: 3px;
-  padding: 0 4px;
+.modify-tool-input-label {
+  font-size: 9px;
   color: var(--text-muted);
+  letter-spacing: 0.04em;
 }
 
-.palette-form-view {
-  padding: 14px;
-  overflow-y: auto;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.palette-form-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.palette-back-btn {
-  background: transparent;
-  border: 1px solid var(--border-light);
+.modify-tool-input {
+  width: 100%;
+  padding: 3px 5px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-medium);
   border-radius: 4px;
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: 11px;
-  padding: 3px 8px;
-  cursor: pointer;
-  transition: background 0.1s ease, color 0.1s ease;
-}
-
-.palette-back-btn:hover {
-  background: var(--bg-input);
   color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.12s ease;
 }
 
-.palette-back-btn:focus-visible {
+.modify-tool-input:focus {
+  border-color: var(--border-accent);
+  background: var(--bg-input-focus);
+}
+
+/* Remove number input spinners (they crowd the tiny input) */
+.modify-tool-input::-webkit-outer-spin-button,
+.modify-tool-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.modify-tool-commit-btn {
+  padding: 3px 6px;
+  background: var(--color-submit);
+  border: 1px solid var(--color-submit-border);
+  border-radius: 4px;
+  color: var(--color-submit-text);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.modify-tool-commit-btn:hover {
+  background: var(--color-submit-hover);
+}
+
+.modify-tool-commit-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-.palette-form-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.palette-form-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-style: italic;
-  line-height: 1.4;
 }
 
 /* ==========================================================================
@@ -1531,4 +1231,554 @@ body,
 .props-visibility-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Layers panel (L2)
+   ========================================================================== */
+
+/* When mounted as the right dock in the app shell, .app-layers overrides flex-basis. */
+.app-layers {
+  order: 3; /* ensures it renders after the viewport in flex flow */
+}
+
+.layers-panel {
+  flex: 0 0 220px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+/* Panel header: title + undo/redo */
+.layers-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.layers-panel-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Undo / redo button group */
+.layers-undoredo {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.layers-undoredo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+  white-space: nowrap;
+}
+
+.layers-undoredo-btn:hover:not(:disabled) {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.layers-undoredo-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.layers-undoredo-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Layer list */
+.layer-list {
+  list-style: none;
+  flex: 1;
+  padding: 4px 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+/* Individual layer row */
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 30px;
+  transition: background 0.08s ease;
+}
+
+.layer-row:hover {
+  background: var(--bg-input);
+}
+
+/* Generic icon button within a row */
+.layer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+}
+
+.layer-btn:hover:not(:disabled) {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.layer-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.layer-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Visibility button: muted when hidden */
+.layer-visibility-btn--hidden {
+  color: var(--text-faint);
+  opacity: 0.5;
+}
+
+/* Lock button: accent when locked */
+.layer-lock-btn--locked {
+  color: var(--accent-text);
+  border-color: var(--border-accent);
+  background: var(--accent-bg);
+}
+
+/* Delete button: red on hover */
+.layer-delete-btn:hover:not(:disabled) {
+  background: rgba(224, 92, 92, 0.12);
+  border-color: rgba(224, 92, 92, 0.35);
+  color: var(--color-error);
+}
+
+/* Color swatch */
+.layer-color-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border-medium);
+}
+
+.layer-color-swatch--none {
+  border-color: var(--border-subtle);
+  background: transparent;
+}
+
+/* Layer name cell */
+.layer-name-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Name display button (click to edit) */
+.layer-name-btn {
+  flex: 1;
+  text-align: left;
+  padding: 2px 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.08s ease, border-color 0.08s ease;
+}
+
+.layer-name-btn:hover {
+  background: var(--bg-input-focus);
+  border-color: var(--border-accent);
+}
+
+.layer-name-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Inline rename input */
+.layer-name-input {
+  flex: 1;
+  padding: 2px 4px;
+  background: var(--bg-input-focus);
+  border: 1px solid var(--border-accent);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Entity count badge */
+.layer-entity-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  min-width: 14px;
+  text-align: right;
+}
+
+/* Panel footer (add-layer form) */
+.layers-panel-footer {
+  flex-shrink: 0;
+  padding: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Add-layer form */
+.layer-add-form {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.layer-add-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.layer-add-input:focus {
+  border-color: var(--border-accent);
+  background: var(--bg-input-focus);
+}
+
+.layer-add-input::placeholder {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.layer-add-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  background: var(--color-submit);
+  border: 1px solid var(--color-submit-border);
+  border-radius: 4px;
+  color: var(--color-submit-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  white-space: nowrap;
+}
+
+.layer-add-btn:hover:not(:disabled) {
+  background: var(--color-submit-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.layer-add-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.layer-add-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Status bar — right cluster (V4)
+   ========================================================================== */
+
+.status-bar-bottom__right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Empty-state overlay (V4)
+   ========================================================================== */
+
+/**
+ * Centered, pointer-events-none backdrop inside .app-viewport.
+ * Does NOT block clicks on the three.js canvas beneath it.
+ */
+.empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.empty-state__card {
+  position: relative;
+  pointer-events: all;
+  max-width: 420px;
+  width: calc(100% - 48px);
+  background: var(--bg-overlay);
+  backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  padding: 28px 28px 24px;
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.40),
+    0 2px 8px rgba(0, 0, 0, 0.20);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.empty-state__dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.empty-state__dismiss:hover {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.empty-state__dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.empty-state__icon {
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.empty-state__heading {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.empty-state__subheading {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.empty-state__kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text-muted);
+}
+
+.empty-state__tips {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.empty-state__tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.empty-state__tip-icon {
+  flex-shrink: 0;
+  min-width: 22px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-bg);
+  border: 1px solid var(--border-accent);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent-text);
+  padding: 0 4px;
+  margin-top: 1px;
+}
+
+/* ==========================================================================
+   Live connection indicator (status bar)
+   ========================================================================== */
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  height: 22px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.live-indicator--connected {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.30);
+  color: #22c55e;
+}
+
+.live-indicator--connecting {
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+  color: var(--accent-text);
+}
+
+.live-indicator--disconnected {
+  background: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.28);
+  color: #ef4444;
+}
+
+[data-theme="light"] .live-indicator--connected {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.10);
+  border-color: rgba(22, 163, 74, 0.28);
+}
+
+[data-theme="light"] .live-indicator--disconnected {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.24);
+}
+
+.live-indicator__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.live-indicator--connected .live-indicator__dot {
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Lock indicator in LayersPanel (read-only, non-interactive) */
+.layer-lock-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.layer-lock-indicator.layer-lock-btn--locked {
+  color: var(--text-secondary);
+}
+
+/* Layer name label (non-editable in viewer mode) */
+.layer-name-label {
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

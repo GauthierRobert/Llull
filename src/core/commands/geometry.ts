@@ -254,6 +254,307 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
   },
 };
 
+/**
+ * @command add_cone
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 cone entity with given radius and height
+ * @invariant radius > 0; height > 0
+ * @failure radius <= 0 or height <= 0 -> no-op, affected:[]
+ */
+interface AddConeParams {
+  radius: number;
+  height: number;
+  position?: Vec3;
+  color?: string;
+}
+
+export const addCone: CommandDefinition<AddConeParams> = {
+  name: 'add_cone',
+  description:
+    'Create a cone solid. The circular base is centered at position in the XY plane; the apex ' +
+    'is directly above the base center along +Z by height units.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      radius: {
+        type: 'number',
+        description: 'Radius of the circular base. Must be greater than 0.',
+      },
+      height: {
+        type: 'number',
+        description: 'Height from the base center to the apex along the local +Z axis. Must be greater than 0.',
+      },
+      position: {
+        type: 'array',
+        description: 'World-space center of the cone base [x, y, z]. Defaults to [0, 0, 0].',
+        items: { type: 'number' },
+      },
+      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+    },
+    required: ['radius', 'height'],
+  },
+  run: (doc, { radius, height, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
+    if (radius <= 0) {
+      return { document: doc, summary: `add_cone failed: radius must be > 0, got ${radius}.`, affected: [] };
+    }
+    if (height <= 0) {
+      return { document: doc, summary: `add_cone failed: height must be > 0, got ${height}.`, affected: [] };
+    }
+    const id = nextId('cone');
+    const entity: Entity = {
+      id,
+      kind: 'cone',
+      radius,
+      height,
+      position,
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color,
+    };
+    return {
+      document: withEntity(doc, entity),
+      summary: `Added cone ${id} with base radius ${radius} and height ${height}.`,
+      affected: [id],
+    };
+  },
+};
+
+/**
+ * @command add_torus
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 torus entity with given ringRadius and tubeRadius
+ * @invariant ringRadius > 0; tubeRadius > 0
+ * @failure ringRadius <= 0 or tubeRadius <= 0 -> no-op, affected:[]
+ */
+interface AddTorusParams {
+  ringRadius: number;
+  tubeRadius: number;
+  position?: Vec3;
+  color?: string;
+}
+
+export const addTorus: CommandDefinition<AddTorusParams> = {
+  name: 'add_torus',
+  description:
+    'Create a torus (donut) solid centered at position. ringRadius is the distance from the torus ' +
+    'center to the center of the tube (major radius); tubeRadius is the radius of the tube cross-section ' +
+    '(minor radius). For a valid non-self-intersecting torus, tubeRadius should be less than ringRadius.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      ringRadius: {
+        type: 'number',
+        description:
+          'Distance from the torus center to the center of the tube (major radius). Must be greater than 0.',
+      },
+      tubeRadius: {
+        type: 'number',
+        description:
+          'Radius of the circular tube cross-section (minor radius). Must be greater than 0. ' +
+          'Should be less than ringRadius for a non-self-intersecting torus.',
+      },
+      position: {
+        type: 'array',
+        description: 'World-space center of the torus [x, y, z]. Defaults to [0, 0, 0].',
+        items: { type: 'number' },
+      },
+      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+    },
+    required: ['ringRadius', 'tubeRadius'],
+  },
+  run: (doc, { ringRadius, tubeRadius, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
+    if (ringRadius <= 0) {
+      return {
+        document: doc,
+        summary: `add_torus failed: ringRadius must be > 0, got ${ringRadius}.`,
+        affected: [],
+      };
+    }
+    if (tubeRadius <= 0) {
+      return {
+        document: doc,
+        summary: `add_torus failed: tubeRadius must be > 0, got ${tubeRadius}.`,
+        affected: [],
+      };
+    }
+    const id = nextId('tor');
+    const entity: Entity = {
+      id,
+      kind: 'torus',
+      ringRadius,
+      tubeRadius,
+      position,
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color,
+    };
+    return {
+      document: withEntity(doc, entity),
+      summary: `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}.`,
+      affected: [id],
+    };
+  },
+};
+
+/**
+ * @command add_wedge
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 wedge entity with given size [width, height, depth]
+ * @invariant all size components > 0
+ * @failure any size component <= 0 -> no-op, affected:[]
+ */
+interface AddWedgeParams {
+  size: Vec3;
+  position?: Vec3;
+  color?: string;
+}
+
+export const addWedge: CommandDefinition<AddWedgeParams> = {
+  name: 'add_wedge',
+  description:
+    'Create a wedge solid — a right-triangular prism (ramp shape). size is [width, height, depth]: ' +
+    'width is the extent along X; height is the full height of the front face (at z=0, local space); ' +
+    'depth is the extent along Z (the ramp direction). The slope cuts the top-rear corner: ' +
+    'the front face (z=0) is a full rectangle and the back edge (z=depth) tapers to zero height. ' +
+    'position is at the lower-front-left corner. All size components must be greater than 0.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      size: {
+        type: 'array',
+        description:
+          'Bounding dimensions [width, height, depth]. width=X extent; height=full height at front face (z=0); ' +
+          'depth=Z extent (ramp direction). All must be > 0.',
+        items: { type: 'number' },
+      },
+      position: {
+        type: 'array',
+        description: 'World-space position of the lower-front-left corner [x, y, z]. Defaults to [0, 0, 0].',
+        items: { type: 'number' },
+      },
+      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+    },
+    required: ['size'],
+  },
+  run: (doc, { size, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
+    const [w, h, d] = size;
+    if (w <= 0 || h <= 0 || d <= 0) {
+      return {
+        document: doc,
+        summary: `add_wedge failed: all size components must be > 0, got [${size.join(', ')}].`,
+        affected: [],
+      };
+    }
+    const id = nextId('wdg');
+    const entity: Entity = {
+      id,
+      kind: 'wedge',
+      size,
+      position,
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color,
+    };
+    return {
+      document: withEntity(doc, entity),
+      summary: `Added wedge ${id} of size ${size.join('×')}.`,
+      affected: [id],
+    };
+  },
+};
+
+/**
+ * @command add_pyramid
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 pyramid entity with given baseWidth, baseDepth, and height
+ * @invariant baseWidth > 0; baseDepth > 0; height > 0
+ * @failure any dimension <= 0 -> no-op, affected:[]
+ */
+interface AddPyramidParams {
+  baseWidth: number;
+  baseDepth: number;
+  height: number;
+  position?: Vec3;
+  color?: string;
+}
+
+export const addPyramid: CommandDefinition<AddPyramidParams> = {
+  name: 'add_pyramid',
+  description:
+    'Create a pyramid solid with a rectangular base and a single apex above the base center. ' +
+    'position is the world-space center of the rectangular base. The base extends ±baseWidth/2 in X ' +
+    'and ±baseDepth/2 in Y from position. The apex is at position + [0, 0, height]. ' +
+    'All three dimensions must be greater than 0.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      baseWidth: {
+        type: 'number',
+        description: 'Width of the rectangular base along the X axis (full extent). Must be greater than 0.',
+      },
+      baseDepth: {
+        type: 'number',
+        description: 'Depth of the rectangular base along the Y axis (full extent). Must be greater than 0.',
+      },
+      height: {
+        type: 'number',
+        description: 'Height from the base center to the apex along the local +Z axis. Must be greater than 0.',
+      },
+      position: {
+        type: 'array',
+        description: 'World-space center of the pyramid base [x, y, z]. Defaults to [0, 0, 0].',
+        items: { type: 'number' },
+      },
+      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+    },
+    required: ['baseWidth', 'baseDepth', 'height'],
+  },
+  run: (doc, { baseWidth, baseDepth, height, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
+    if (baseWidth <= 0) {
+      return {
+        document: doc,
+        summary: `add_pyramid failed: baseWidth must be > 0, got ${baseWidth}.`,
+        affected: [],
+      };
+    }
+    if (baseDepth <= 0) {
+      return {
+        document: doc,
+        summary: `add_pyramid failed: baseDepth must be > 0, got ${baseDepth}.`,
+        affected: [],
+      };
+    }
+    if (height <= 0) {
+      return {
+        document: doc,
+        summary: `add_pyramid failed: height must be > 0, got ${height}.`,
+        affected: [],
+      };
+    }
+    const id = nextId('pyr');
+    const entity: Entity = {
+      id,
+      kind: 'pyramid',
+      baseWidth,
+      baseDepth,
+      height,
+      position,
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color,
+    };
+    return {
+      document: withEntity(doc, entity),
+      summary: `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}.`,
+      affected: [id],
+    };
+  },
+};
+
 interface DeleteParams {
   id: string;
 }

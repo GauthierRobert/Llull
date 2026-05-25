@@ -1011,4 +1011,325 @@ describe('scale_entity — ellipse and spline', () => {
     execute(doc, 'scale_entity', { id, factor: 0.5 });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
+
+  // ── add_cone ──────────────────────────────────────────────────────────────
+
+  it('add_cone creates one cone entity with the given radius and height', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cone', { radius: 3, height: 7 });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(entity.kind).toBe('cone');
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.radius).toBe(3);
+    // @ts-expect-error same
+    expect(entity.height).toBe(7);
+    expect(result.summary).toContain(id);
+    expect(result.summary).toContain('3');
+    expect(result.summary).toContain('7');
+  });
+
+  it('add_cone is pure — input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_cone', { radius: 2, height: 5 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('add_cone with radius <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cone', { radius: 0, height: 5 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('radius');
+  });
+
+  it('add_cone with height <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cone', { radius: 3, height: -1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('height');
+  });
+
+  it('scale_entity on cone scales radius and height', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_cone', { radius: 2, height: 4 });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const result = execute(doc, 'scale_entity', { id, factor: 3 });
+    const entity = result.document.entities[id]!;
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.radius).toBeCloseTo(6);
+    // @ts-expect-error same
+    expect(entity.height).toBeCloseTo(12);
+    expect(result.summary).toContain(id);
+  });
+
+  it('scale_entity on cone is pure', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_cone', { radius: 1, height: 2 }).document;
+    const id = Object.keys(doc.entities)[0]!;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'scale_entity', { id, factor: 2 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('measure_volume for cone = π r² h / 3', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_cone', { radius: 3, height: 4 });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const result = execute(doc, 'measure_volume', { entityId: id });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    const data = result.data as { volume: number; unit: string };
+    const expected = (Math.PI * 3 * 3 * 4) / 3;
+    expect(data.volume).toBeCloseTo(expected, 6);
+    expect(data.unit).toContain('mm');
+  });
+
+  // ── add_torus ─────────────────────────────────────────────────────────────
+
+  it('add_torus creates one torus entity with the given dimensions', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_torus', { ringRadius: 5, tubeRadius: 1.5 });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(entity.kind).toBe('torus');
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.ringRadius).toBe(5);
+    // @ts-expect-error same
+    expect(entity.tubeRadius).toBe(1.5);
+    expect(result.summary).toContain(id);
+  });
+
+  it('add_torus is pure — input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('add_torus with ringRadius <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_torus', { ringRadius: 0, tubeRadius: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ringRadius');
+  });
+
+  it('add_torus with tubeRadius <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_torus', { ringRadius: 3, tubeRadius: -0.5 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('tubeRadius');
+  });
+
+  it('scale_entity on torus scales ringRadius and tubeRadius', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const result = execute(doc, 'scale_entity', { id, factor: 2 });
+    const entity = result.document.entities[id]!;
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.ringRadius).toBeCloseTo(8);
+    // @ts-expect-error same
+    expect(entity.tubeRadius).toBeCloseTo(2);
+  });
+
+  it('scale_entity on torus is pure', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_torus', { ringRadius: 3, tubeRadius: 1 }).document;
+    const id = Object.keys(doc.entities)[0]!;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'scale_entity', { id, factor: 2 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('measure_volume for torus = 2 π² · ringRadius · tubeRadius²', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const result = execute(doc, 'measure_volume', { entityId: id });
+    const data = result.data as { volume: number; unit: string };
+    const expected = 2 * Math.PI * Math.PI * 4 * 1 * 1;
+    expect(data.volume).toBeCloseTo(expected, 6);
+  });
+
+  // ── add_wedge ─────────────────────────────────────────────────────────────
+
+  it('add_wedge creates one wedge entity with the given size', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_wedge', { size: [4, 3, 6] });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(entity.kind).toBe('wedge');
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.size).toEqual([4, 3, 6]);
+    expect(result.summary).toContain(id);
+    expect(result.summary).toContain('4×3×6');
+  });
+
+  it('add_wedge is pure — input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_wedge', { size: [2, 2, 2] });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('add_wedge with a zero size component is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_wedge', { size: [0, 3, 5] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('size');
+  });
+
+  it('add_wedge with a negative size component is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_wedge', { size: [2, -1, 5] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('scale_entity on wedge scales all size components', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_wedge', { size: [2, 3, 4] });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const result = execute(doc, 'scale_entity', { id, factor: 2 });
+    const entity = result.document.entities[id]!;
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.size).toEqual([4, 6, 8]);
+  });
+
+  it('scale_entity on wedge is pure', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_wedge', { size: [1, 2, 3] }).document;
+    const id = Object.keys(doc.entities)[0]!;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'scale_entity', { id, factor: 3 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('measure_volume for wedge = w×h×d / 2', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_wedge', { size: [4, 3, 6] });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const result = execute(doc, 'measure_volume', { entityId: id });
+    const data = result.data as { volume: number; unit: string };
+    const expected = (4 * 3 * 6) / 2;
+    expect(data.volume).toBeCloseTo(expected, 6);
+  });
+
+  // ── add_pyramid ───────────────────────────────────────────────────────────
+
+  it('add_pyramid creates one pyramid entity with the given dimensions', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_pyramid', { baseWidth: 6, baseDepth: 4, height: 8 });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(entity.kind).toBe('pyramid');
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.baseWidth).toBe(6);
+    // @ts-expect-error same
+    expect(entity.baseDepth).toBe(4);
+    // @ts-expect-error same
+    expect(entity.height).toBe(8);
+    expect(result.summary).toContain(id);
+    expect(result.summary).toContain('6');
+    expect(result.summary).toContain('4');
+    expect(result.summary).toContain('8');
+  });
+
+  it('add_pyramid is pure — input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 3 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('add_pyramid with baseWidth <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_pyramid', { baseWidth: 0, baseDepth: 3, height: 5 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('baseWidth');
+  });
+
+  it('add_pyramid with baseDepth <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_pyramid', { baseWidth: 3, baseDepth: -2, height: 5 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('baseDepth');
+  });
+
+  it('add_pyramid with height <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_pyramid', { baseWidth: 3, baseDepth: 4, height: 0 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('height');
+  });
+
+  it('scale_entity on pyramid scales baseWidth, baseDepth, and height', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_pyramid', { baseWidth: 3, baseDepth: 4, height: 6 });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const result = execute(doc, 'scale_entity', { id, factor: 2 });
+    const entity = result.document.entities[id]!;
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.baseWidth).toBeCloseTo(6);
+    // @ts-expect-error same
+    expect(entity.baseDepth).toBeCloseTo(8);
+    // @ts-expect-error same
+    expect(entity.height).toBeCloseTo(12);
+  });
+
+  it('scale_entity on pyramid is pure', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_pyramid', { baseWidth: 2, baseDepth: 3, height: 4 }).document;
+    const id = Object.keys(doc.entities)[0]!;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'scale_entity', { id, factor: 2 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('measure_volume for pyramid = baseWidth × baseDepth × height / 3', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_pyramid', { baseWidth: 6, baseDepth: 4, height: 9 });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const result = execute(doc, 'measure_volume', { entityId: id });
+    const data = result.data as { volume: number; unit: string };
+    const expected = (6 * 4 * 9) / 3;
+    expect(data.volume).toBeCloseTo(expected, 6);
+  });
 });

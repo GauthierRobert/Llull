@@ -10,6 +10,8 @@ import { describe, it, expect } from 'vitest';
 import {
   adaptiveGridStep,
   majorGridStep,
+  localGridPatch,
+  pixelsToWorld,
   scaleBarLength,
   shouldRebase2D,
   snapOrigin2D,
@@ -86,6 +88,95 @@ describe('majorGridStep', () => {
     for (const minor of [0.1, 0.5, 1, 2, 5, 10, 100]) {
       expect(majorGridStep(minor)).toBeCloseTo(minor * 10);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pixelsToWorld
+// ---------------------------------------------------------------------------
+
+describe('pixelsToWorld', () => {
+  it('converts pixels to world units as pixels / zoom', () => {
+    expect(pixelsToWorld(12, 50)).toBeCloseTo(0.24);
+    expect(pixelsToWorld(10, 1)).toBeCloseTo(10);
+    expect(pixelsToWorld(100, 1000)).toBeCloseTo(0.1);
+  });
+
+  it('shrinks the world distance as zoom grows (screen-constant)', () => {
+    const zoomedOut = pixelsToWorld(12, 1);
+    const zoomedIn = pixelsToWorld(12, 1000);
+    expect(zoomedIn).toBeLessThan(zoomedOut);
+  });
+
+  it('keeps the on-screen pixel size constant across zoom', () => {
+    for (const zoom of [1, 10, 50, 200, 1000]) {
+      // world × zoom should recover the original pixel count.
+      expect(pixelsToWorld(12, zoom) * zoom).toBeCloseTo(12);
+    }
+  });
+
+  it('falls back to a 1:1 mapping for zero/negative zoom', () => {
+    expect(pixelsToWorld(12, 0)).toBe(12);
+    expect(pixelsToWorld(12, -5)).toBe(12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// localGridPatch
+// ---------------------------------------------------------------------------
+
+describe('localGridPatch', () => {
+  it('returns an even division count ≥ 2', () => {
+    for (const visibleWorld of [1, 10, 100, 1000]) {
+      for (const step of [0.01, 0.1, 1, 10, 100]) {
+        const { divisions } = localGridPatch(visibleWorld, step);
+        expect(divisions % 2).toBe(0);
+        expect(divisions).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it('keeps the cell count BOUNDED even as the step shrinks toward zero', () => {
+    // This is the whole point: a fixed extent would explode here. Because the
+    // patch tracks the viewport, divisions stays bounded for a realistic
+    // (pixel-bounded) step regardless of how far you zoom in.
+    const visibleWorld = 1000; // e.g. 50000 px / zoom 50
+    for (const step of [10, 1, 0.1, 0.01, 0.001]) {
+      const { divisions } = localGridPatch(visibleWorld, step);
+      // With matching pixel-bounded steps the ratio visibleWorld/step is what
+      // bounds divisions; here we just assert it never exceeds the safety cap.
+      expect(divisions).toBeLessThanOrEqual(1000);
+    }
+  });
+
+  it('covers at least the requested margin × viewport', () => {
+    const { extent } = localGridPatch(100, 1, 2.5);
+    expect(extent).toBeGreaterThanOrEqual(100 * 2.5);
+  });
+
+  it('extent is exactly divisions × step (lines align to the world step)', () => {
+    const step = 0.5;
+    const { extent, divisions } = localGridPatch(40, step);
+    expect(extent).toBeCloseTo(divisions * step);
+  });
+
+  it('scales the patch with the margin multiplier', () => {
+    const small = localGridPatch(100, 1, 1).extent;
+    const large = localGridPatch(100, 1, 4).extent;
+    expect(large).toBeGreaterThan(small);
+  });
+
+  it('clamps to an even maxDivisions cap', () => {
+    // Tiny step vs huge viewport would demand a vast division count.
+    const { divisions } = localGridPatch(1e6, 0.001, 2.5, 1000);
+    expect(divisions).toBe(1000);
+    expect(divisions % 2).toBe(0);
+  });
+
+  it('returns a minimal patch for non-positive inputs', () => {
+    expect(localGridPatch(0, 1).divisions).toBe(2);
+    expect(localGridPatch(100, 0).divisions).toBe(2);
+    expect(localGridPatch(100, -1).divisions).toBe(2);
   });
 });
 

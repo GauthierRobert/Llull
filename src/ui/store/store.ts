@@ -3,28 +3,31 @@
  *
  * Single Zustand store — the app's one source of truth.
  *
- * All document mutations flow through `dispatch(name, params)` which routes to
- * `execute()` from the command registry. NO entity is ever built here; the store
- * only orchestrates (architecture L1, L4).
+ * SERVER-AUTHORITATIVE MODEL
+ * ─────────────────────────
+ * The server owns the document. Every mutation goes to the server via `dispatch`
+ * (POST /command), and the resulting document arrives back over the /live SSE stream
+ * via `hydrateLiveDocument`. The store NEVER applies mutations locally — it only
+ * reflects the server echo. This is fully consistent with the PRIME DIRECTIVE:
+ * the UI gathers params and calls dispatch; it never builds or edits an Entity.
  *
- * Undo/redo: `dispatch` captures the prior document snapshot before running
- * `execute`. If the command actually changed the document (non-no-op), the prior
- * snapshot is pushed onto `undoStack` and `redoStack` is cleared. Commands that
- * return the same document reference (graceful no-ops) do NOT pollute the stack.
- * Stack depth is capped at MAX_UNDO_DEPTH to bound memory usage.
+ * Undo/redo history is managed server-side. The store tracks `canUndo`/`canRedo`
+ * booleans returned by every server response; `undo()` and `redo()` are network
+ * calls to POST /undo and POST /redo.
  *
- * `setDocument` (load / reset) clears both stacks — a freshly loaded document
- * has no history.
+ * Local-only state (never sent to the server, never part of CadDocument):
+ *   - selection              — which entity ids the user has clicked
+ *   - renderOrigin           — floating-origin offset for three.js precision
+ *   - liveStatus             — SSE connection health
+ *   - lastSummary            — human-readable feedback from the last server response
+ *   - lastMeasure            — structured result of the last read-only query command
+ *   - canUndo / canRedo      — enabled-state for undo/redo UI, from server responses
  */
 
 import { create } from 'zustand';
 import { createEmptyDocument } from '@core/model/types';
-import { execute } from '@core/commands/registry';
 import type { CadDocument, EntityId } from '@core/model/types';
-import type { CommandResult } from '@core/commands/types';
-
-/** Maximum number of snapshots retained per undo/redo stack. */
-const MAX_UNDO_DEPTH = 100;
+import { postCommand, postUndo, postRedo, ServerCommandError } from './serverCommands';
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -39,7 +42,7 @@ export interface LastMeasure {
 }
 
 export interface CadStoreState {
-  /** The live CAD document — single source of truth. */
+  /** The live CAD document — single source of truth, hydrated by the /live SSE stream. */
   document: CadDocument;
 
   /**
@@ -52,7 +55,7 @@ export interface CadStoreState {
   renderOrigin: [number, number, number];
 
   /**
-   * Summary returned by the most recent `dispatch` call.
+   * Summary returned by the most recent server response.
    * Handy for status bars and other command-feedback surfaces.
    * Null before any dispatch.
    */
@@ -60,7 +63,7 @@ export interface CadStoreState {
 
   /**
    * Structured result of the most recent read-only/query command (one that
-   * returned `result.data`). Replaced on every new measure dispatch; cleared
+   * returned `response.data`). Replaced on every new measure dispatch; cleared
    * to null by `clearLastMeasure`. Mutating commands (those without `data`)
    * do NOT touch this field — so the last measurement stays visible until the
    * user explicitly dismisses it or runs a new measure.
@@ -68,58 +71,66 @@ export interface CadStoreState {
   lastMeasure: LastMeasure | null;
 
   /**
-   * Prior document snapshots, oldest-first. Pop to undo.
-   * Each entry is the full CadDocument returned by a previous dispatch —
-   * no deep-clone is needed because commands are pure and never mutate prior
-   * objects (architecture L3).
+   * Whether the server reports that undo is available.
+   * Updated from every /command, /undo, /redo response.
    */
-  undoStack: CadDocument[];
+  canUndo: boolean;
 
   /**
-   * Documents pushed when undoing, oldest-first. Pop to redo.
-   * Cleared whenever a new command changes the document.
+   * Whether the server reports that redo is available.
+   * Updated from every /command, /undo, /redo response.
    */
-  redoStack: CadDocument[];
+  canRedo: boolean;
+
+  /**
+   * Live connection status to the server-side SSE document stream.
+   * 'connecting' → EventSource opened, not yet confirmed.
+   * 'connected'  → received first onopen / message.
+   * 'disconnected' → EventSource errored; auto-reconnect pending.
+   */
+  liveStatus: 'connecting' | 'connected' | 'disconnected';
 
   // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
 
   /**
-   * Route a command through the registry's `execute()`.
-   * Returns the full `CommandResult` so callers can read `affected` and `summary`.
+   * Send a named command to the server (POST /command).
+   *
+   * Fire-and-forget from the caller's perspective — returns void.
+   * On success: updates lastSummary, lastMeasure (if data present), canUndo/canRedo.
+   * On failure: sets liveStatus to 'disconnected' and lastSummary to an error message.
+   * The document is NEVER mutated here; it arrives via the /live SSE stream.
+   *
    * This is the ONLY way the UI changes the document (PRIME DIRECTIVE).
-   *
-   * Side-effect on history: if the command produces a new document (not a no-op),
-   * the previous document is pushed onto `undoStack` and `redoStack` is cleared.
-   *
-   * @pure  The previous document is never mutated — `execute()` guarantees this.
    */
-  dispatch(name: string, params: unknown): CommandResult;
+  dispatch(name: string, params?: unknown): void;
 
   /**
    * Replace the current document wholesale (load / reset).
-   * Does NOT route through `execute()` — use only for whole-document replacement.
-   * Clears both `undoStack` and `redoStack` because the prior history no longer
-   * applies to the new document.
+   * Does NOT route through the server — use only for initial load or dev resets.
    */
   setDocument(doc: CadDocument): void;
 
   /**
-   * Walk back one step in history. Pushes the current document onto `redoStack`
-   * and replaces it with the top of `undoStack`. No-op when `undoStack` is empty.
+   * Walk back one step in server-side history (POST /undo).
+   * The reverted document arrives via the /live SSE stream.
+   * Updates lastSummary and canUndo/canRedo from the server response.
+   * No-op in the UI when canUndo is false.
    */
   undo(): void;
 
   /**
-   * Walk forward one step in history. Pushes the current document onto `undoStack`
-   * and replaces it with the top of `redoStack`. No-op when `redoStack` is empty.
+   * Walk forward one step in server-side history (POST /redo).
+   * The re-applied document arrives via the /live SSE stream.
+   * Updates lastSummary and canUndo/canRedo from the server response.
+   * No-op in the UI when canRedo is false.
    */
   redo(): void;
 
   /**
    * Replace the current selection with `ids`.
-   * Selection is view state on the document — updated with an immutable spread.
+   * Selection is local view state — updated synchronously, never sent to server.
    */
   select(ids: EntityId[]): void;
 
@@ -145,6 +156,22 @@ export interface CadStoreState {
    * Called by the MeasurementHUD dismiss button.
    */
   clearLastMeasure(): void;
+
+  /**
+   * Replace the document with a snapshot pushed by the server-side SSE stream.
+   * Preserves the current local selection — filtered to entity ids that still
+   * exist in the incoming document — so click-highlights survive a server push.
+   *
+   * @pure  This is display sync, NOT a document mutation routed through execute().
+   *        Allowed by the PRIME DIRECTIVE because it does not originate a CAD command.
+   */
+  hydrateLiveDocument(doc: CadDocument): void;
+
+  /**
+   * Update the live SSE connection status.
+   * Called by useMcpLiveDocument on EventSource lifecycle events.
+   */
+  setLiveStatus(status: 'connecting' | 'connected' | 'disconnected'): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,63 +182,65 @@ export const useStore = create<CadStoreState>()((set, get) => ({
   document: createEmptyDocument(),
   lastSummary: null,
   lastMeasure: null,
-  undoStack: [],
-  redoStack: [],
+  canUndo: false,
+  canRedo: false,
   renderOrigin: [0, 0, 0],
+  liveStatus: 'connecting' as const,
 
-  dispatch(name: string, params: unknown): CommandResult {
-    const prior = get().document;
-    const result = execute(prior, name, params);
-
-    if (result.data !== undefined) {
-      // Read-only/query command (e.g. measure_*) — capture the result, no history push.
-      // These always return the same document reference, so no mutation occurred.
-      set({ lastSummary: result.summary, lastMeasure: { command: name, data: result.data } });
-    } else if (result.document !== prior) {
-      // Mutating command — record history and clear any stale measurement overlay.
-      // A stale bbox wireframe detached from a moved/edited entity is confusing,
-      // so we drop lastMeasure the moment geometry changes.
+  dispatch(name: string, params?: unknown): void {
+    // Fire-and-forget — the document update comes from the /live SSE stream.
+    void postCommand(name, params).then((response) => {
       set((state) => ({
-        document: result.document,
-        lastSummary: result.summary,
-        lastMeasure: null,
-        undoStack: [...state.undoStack, prior].slice(-MAX_UNDO_DEPTH),
-        redoStack: [],
+        lastSummary: response.summary,
+        canUndo: response.canUndo,
+        canRedo: response.canRedo,
+        // Only set lastMeasure when the response carries structured query data.
+        // Mutating commands do not set data so lastMeasure is preserved as-is
+        // (to keep measurement overlays until the user dismisses them).
+        lastMeasure: response.data !== undefined
+          ? { command: name, data: response.data }
+          : state.lastMeasure,
       }));
-    } else {
-      // Graceful no-op (document unchanged, no data) — leave lastMeasure as-is.
-      set({ lastSummary: result.summary });
-    }
-
-    return result;
+    }).catch((err: unknown) => {
+      const message = err instanceof ServerCommandError
+        ? err.message
+        : `Command '${name}' failed: ${String(err)}`;
+      set({ liveStatus: 'disconnected', lastSummary: message });
+    });
   },
 
   setDocument(doc: CadDocument): void {
-    set({ document: doc, lastSummary: null, undoStack: [], redoStack: [] });
+    set({ document: doc, lastSummary: null, canUndo: false, canRedo: false });
   },
 
   undo(): void {
-    const { undoStack, document } = get();
-    if (undoStack.length === 0) return;
-
-    const previous = undoStack[undoStack.length - 1]!;
-    set((state) => ({
-      document: previous,
-      undoStack: state.undoStack.slice(0, -1),
-      redoStack: [...state.redoStack, document].slice(-MAX_UNDO_DEPTH),
-    }));
+    void postUndo().then((response) => {
+      set({
+        lastSummary: response.summary,
+        canUndo: response.canUndo,
+        canRedo: response.canRedo,
+      });
+    }).catch((err: unknown) => {
+      const message = err instanceof ServerCommandError
+        ? err.message
+        : `Undo failed: ${String(err)}`;
+      set({ liveStatus: 'disconnected', lastSummary: message });
+    });
   },
 
   redo(): void {
-    const { redoStack, document } = get();
-    if (redoStack.length === 0) return;
-
-    const next = redoStack[redoStack.length - 1]!;
-    set((state) => ({
-      document: next,
-      redoStack: state.redoStack.slice(0, -1),
-      undoStack: [...state.undoStack, document].slice(-MAX_UNDO_DEPTH),
-    }));
+    void postRedo().then((response) => {
+      set({
+        lastSummary: response.summary,
+        canUndo: response.canUndo,
+        canRedo: response.canRedo,
+      });
+    }).catch((err: unknown) => {
+      const message = err instanceof ServerCommandError
+        ? err.message
+        : `Redo failed: ${String(err)}`;
+      set({ liveStatus: 'disconnected', lastSummary: message });
+    });
   },
 
   select(ids: EntityId[]): void {
@@ -242,5 +271,18 @@ export const useStore = create<CadStoreState>()((set, get) => ({
 
   clearLastMeasure(): void {
     set({ lastMeasure: null });
+  },
+
+  hydrateLiveDocument(doc: CadDocument): void {
+    const currentSelection = get().document.selection;
+    // Preserve ids that still exist in the incoming doc; drop stale ones.
+    const nextSelection = currentSelection.filter((id) => id in doc.entities);
+    set({
+      document: { ...doc, selection: nextSelection },
+    });
+  },
+
+  setLiveStatus(status: 'connecting' | 'connected' | 'disconnected'): void {
+    set({ liveStatus: status });
   },
 }));

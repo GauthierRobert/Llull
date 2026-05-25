@@ -1,7 +1,8 @@
 /**
- * Component tests for <StatusBar /> (V3 — design system + status bar).
+ * Component tests for <StatusBar />.
  *
  * Asserts observable behavior (workflow W3, react R11):
+ *   - Live connection indicator reflects liveStatus from the store.
  *   - Units and displayPrecision from the document are shown.
  *   - Selection count is reflected correctly for 0, 1, and N selections.
  *   - Last command summary is shown when present; absent when null.
@@ -18,21 +19,51 @@ import { useStore } from '@ui/store';
 import { useThemeStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { StatusBar } from '@ui/components/StatusBar';
+import { localDispatch } from '../helpers/storeTestHelpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+  useStore.setState({ document: createEmptyDocument(), lastSummary: null, liveStatus: 'connecting' });
   useThemeStore.setState({ theme: 'dark' });
 }
 
-/** Create a box entity via the store dispatch, return its id. */
+/** Create a box entity via localDispatch (bypasses network), return its id. */
 function createBox(): string {
-  const result = useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+  const result = localDispatch('add_box', { size: [2, 2, 2] });
   return result.affected[0]!;
 }
+
+// ---------------------------------------------------------------------------
+// StatusBar — live indicator
+// ---------------------------------------------------------------------------
+
+describe('StatusBar — live indicator', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    resetStore();
+  });
+
+  it('shows "Live" when liveStatus is connected', () => {
+    useStore.setState({ liveStatus: 'connected' });
+    render(<StatusBar />);
+    expect(screen.getByLabelText(/mcp stream: live/i)).toBeDefined();
+  });
+
+  it('shows "Disconnected" when liveStatus is disconnected', () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    render(<StatusBar />);
+    expect(screen.getByLabelText(/mcp stream: disconnected/i)).toBeDefined();
+  });
+
+  it('shows "Connecting" text when liveStatus is connecting', () => {
+    useStore.setState({ liveStatus: 'connecting' });
+    render(<StatusBar />);
+    expect(screen.getByLabelText(/mcp stream: connecting/i)).toBeDefined();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // StatusBar — units display
@@ -57,7 +88,7 @@ describe('StatusBar — units', () => {
   });
 
   it('reflects a changed unit after set_units dispatch', () => {
-    useStore.getState().dispatch('set_units', { units: 'in', displayPrecision: 2 });
+    localDispatch('set_units', { units: 'in', displayPrecision: 2 });
     render(<StatusBar />);
 
     // The units status item has aria-label "Units: in (2dp)"
@@ -119,17 +150,17 @@ describe('StatusBar — last command summary', () => {
     expect(screen.queryByLabelText(/last command/i)).toBeNull();
   });
 
-  it('shows the last summary string after a command is dispatched', () => {
-    useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
-    const { lastSummary } = useStore.getState();
-    expect(lastSummary).toBeTruthy();
+  it('shows the last summary string when set directly on the store', () => {
+    // lastSummary is now set from the server response after dispatch.
+    // Set it directly to test the rendering behavior.
+    useStore.setState({ lastSummary: 'Box added at origin.' });
 
     render(<StatusBar />);
 
     // The summary span should contain the text
     const summaryEl = screen.getByLabelText(/last command/i);
     expect(summaryEl).toBeDefined();
-    expect(summaryEl.textContent).toContain(lastSummary!);
+    expect(summaryEl.textContent).toContain('Box added at origin.');
   });
 
   it('shows an explicit summary string set directly on the store', () => {

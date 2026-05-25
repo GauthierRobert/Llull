@@ -9,8 +9,8 @@
 export type { McpToolDefinition } from './tools';
 export { buildMcpTools } from './tools';
 
-export type { McpTextContent, McpToolCallResult } from './dispatch';
-export { applyMcpToolCall } from './dispatch';
+export type { McpTextContent, McpShapedResult, McpToolCallResult } from './dispatch';
+export { shapeToolCallContent, applyMcpToolCall } from './dispatch';
 
 export type { McpResourceDescriptor, McpResourceContent, CadResourceUri } from './resources';
 export { listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from './resources';

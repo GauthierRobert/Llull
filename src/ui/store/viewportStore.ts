@@ -55,6 +55,20 @@ export interface ViewportStoreState {
   /** Set of entity ids suppressed from the 3D render. Never touches the document. */
   hiddenEntityIds: ReadonlySet<EntityId>;
 
+  /**
+   * Set of layer ids locally hidden from the viewport.
+   * This is a pure render override — it does NOT dispatch set_layer_visibility
+   * and does NOT touch the server document. A local viewer convenience.
+   */
+  hiddenLayerIds: ReadonlySet<string>;
+
+  /**
+   * Whether 3D object snapping is active during gizmo translate drags.
+   * Render-only flag — never serialised into CadDocument.
+   * Default: true.
+   */
+  snap3dEnabled: boolean;
+
   // ---- Actions ------------------------------------------------------------
 
   /** Set the global display mode ('shaded' | 'wireframe' | 'xray'). */
@@ -75,6 +89,15 @@ export interface ViewportStoreState {
 
   /** Make all hidden entities visible again. */
   showAllEntities(): void;
+
+  /**
+   * Toggle a layer's local viewport visibility.
+   * Does NOT dispatch any command — purely a render-side filter.
+   */
+  toggleLayerVisibility(layerId: string): void;
+
+  /** Toggle 3D object snapping on/off. */
+  toggleSnap3d(): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +119,8 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   displayMode: 'shaded',
   clipPlane: DEFAULT_CLIP_PLANE,
   hiddenEntityIds: new Set<EntityId>(),
+  hiddenLayerIds: new Set<string>(),
+  snap3dEnabled: true,
 
   setDisplayMode(mode: DisplayMode): void {
     set({ displayMode: mode });
@@ -125,5 +150,21 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
 
   showAllEntities(): void {
     set({ hiddenEntityIds: new Set<EntityId>() });
+  },
+
+  toggleLayerVisibility(layerId: string): void {
+    set((state) => {
+      const next = new Set(state.hiddenLayerIds);
+      if (next.has(layerId)) {
+        next.delete(layerId);
+      } else {
+        next.add(layerId);
+      }
+      return { hiddenLayerIds: next };
+    });
+  },
+
+  toggleSnap3d(): void {
+    set((state) => ({ snap3dEnabled: !state.snap3dEnabled }));
   },
 }));

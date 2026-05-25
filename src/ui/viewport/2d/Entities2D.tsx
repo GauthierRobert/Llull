@@ -10,6 +10,7 @@
 
 import type { CadDocument, Entity, EntityId } from '@core/model/types';
 import { is2D } from '@core/model/types';
+import { useViewportStore } from '@ui/store';
 import { LineRenderer } from './entities/LineRenderer';
 import { PolylineRenderer } from './entities/PolylineRenderer';
 import { CircleRenderer } from './entities/CircleRenderer';
@@ -58,6 +59,9 @@ export function Entities2D({ document }: Entities2DProps): React.ReactElement {
   const { order, entities, layers, selection } = document;
   const selectionSet = new Set<EntityId>(selection);
 
+  // Render-only local layer-hide filter — never touches the document (PRIME DIRECTIVE).
+  const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
+
   return (
     <group name="entities-2d">
       {order.map((id) => {
@@ -65,9 +69,10 @@ export function Entities2D({ document }: Entities2DProps): React.ReactElement {
         if (!entity) return null;
         if (!is2D(entity)) return null;
 
-        // Respect layer visibility.
+        // Respect layer visibility (document) and the local layer-hide filter (UI).
         const layer = layers[entity.layerId];
         if (layer && !layer.visible) return null;
+        if (hiddenLayerIds.has(entity.layerId)) return null;
 
         return <Entity2DRenderer key={id} entity={entity} selected={selectionSet.has(id)} />;
       })}

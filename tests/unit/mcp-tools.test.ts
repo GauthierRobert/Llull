@@ -84,15 +84,25 @@ describe('applyMcpToolCall() — known command', () => {
     expect(result.document.order).toContain(result.affected[0]);
   });
 
-  it('add_box: content is a non-empty text array whose text includes summary', () => {
+  it('add_box: first content block is summary text mentioning "box"', () => {
     const doc = createEmptyDocument();
     const result = applyMcpToolCall(doc, 'add_box', { size: [1, 1, 1] });
 
-    expect(result.content).toHaveLength(1);
+    // add_box produces affected ids → content has 2 blocks: summary + affected
+    expect(result.content.length).toBeGreaterThanOrEqual(1);
     expect(result.content[0]!.type).toBe('text');
     expect(result.content[0]!.text.length).toBeGreaterThan(0);
     // The summary from add_box mentions "box"
     expect(result.content[0]!.text).toMatch(/box/i);
+  });
+
+  it('add_box: second content block carries the affected entity id', () => {
+    const doc = createEmptyDocument();
+    const result = applyMcpToolCall(doc, 'add_box', { size: [1, 1, 1] });
+
+    // shapeToolCallContent appends an "Affected entity ids: ..." block when affected is non-empty
+    expect(result.content).toHaveLength(2);
+    expect(result.content[1]!.text).toMatch(/Affected entity ids:/);
   });
 });
 

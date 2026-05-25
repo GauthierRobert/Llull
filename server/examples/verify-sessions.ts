@@ -2,25 +2,31 @@
 /**
  * @layer server/examples
  *
- * Session-isolation verification script.
+ * Session-isolation + idle-TTL eviction verification script.
  *
  * Opens TWO independent MCP client sessions (A and B) concurrently, then:
- *   1. Adds a box in session A.
- *   2. Reads session A's document (describe_scene) — confirms entityCount = 1.
- *   3. Reads session B's document (describe_scene) — asserts entityCount = 0 (isolation).
- *   4. Closes both sessions cleanly.
- *   5. Verifies sessions were removed from the server Map (no transport leak):
- *      a GET with the old session id must return 404 after close.
+ *   1. Both sessions start with empty documents (entityCount = 0).
+ *   2. Adds a box in session A; session B remains at 0 (isolation).
+ *   3. Session B is independently mutable (adds its own entities, A unaffected).
+ *   4. Idle-TTL eviction: abandon both sessions (client.close without DELETE),
+ *      wait past the TTL + one sweep interval, then probe with the stale ids —
+ *      both must return 404 (sessions evicted from the Map by the sweep).
  *
- * This proves that per-session documents do not share state AND that the sessions
- * Map does not leak entries when clients disconnect without sending DELETE.
+ * HTTP cannot reliably detect a vanished client, so eviction is EVENTUAL — it
+ * happens on the next sweep tick after the session's TTL has elapsed.
+ * This test runs with SHORT TTL/sweep values to verify that path in seconds
+ * rather than minutes.  Start the server with matching env vars:
  *
- * Run (server must be started first with `npm --prefix server run dev`):
+ *   MCP_SESSION_TTL_MS=2000 MCP_SESSION_SWEEP_MS=500 npm --prefix server run dev
+ *
+ * Then run this script:
  *   npx tsx server/examples/verify-sessions.ts
  *
- * Optional env vars:
- *   MCP_URL         override server URL (default: http://localhost:3001/mcp)
- *   MCP_AUTH_TOKEN  Bearer token, if the server requires one
+ * Optional env vars (client side):
+ *   MCP_URL              override server URL (default: http://localhost:3001/mcp)
+ *   MCP_AUTH_TOKEN       Bearer token, if the server requires one
+ *   MCP_SESSION_TTL_MS   must match the server value (default: 2000 for this test)
+ *   MCP_SESSION_SWEEP_MS must match the server value (default: 500 for this test)
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -73,6 +79,17 @@ function assert(condition: boolean, label: string, detail?: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Parse a positive integer env var, returning `fallback` when absent/invalid. */
+function parsePosInt(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+// ---------------------------------------------------------------------------
 // Client factory
 // ---------------------------------------------------------------------------
 
@@ -92,7 +109,7 @@ function buildClient(name: string, mcpUrl: string, authToken?: string): {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// MCP helpers
 // ---------------------------------------------------------------------------
 
 /**
@@ -210,17 +227,24 @@ async function main(): Promise<void> {
   assert(countB2 === 2, `session B entityCount is 2 after 2× add_box (got ${countB2})`);
 
   // ---------------------------------------------------------------------------
-  // Test 4: session Map cleanup — no transport leak after client.close()
+  // Test 4: idle-TTL eviction — eventual cleanup after client abandons session
   //
-  // Before KI1 fix, client.close() did NOT trigger onsessionclosed (which only
-  // fires on HTTP DELETE).  The transport.onclose wiring now covers this path.
-  // We verify by: capture the session id, close the client, then probe the
-  // server with a raw GET — the entry must be gone (404), not still alive.
+  // HTTP cannot reliably signal "client gone" — client.close() does NOT send an
+  // HTTP DELETE and `transport.onclose` does not fire over stateless HTTP.
+  // The idle-TTL sweep is the catch-all: it evicts sessions idle longer than
+  // MCP_SESSION_TTL_MS.
+  //
+  // Strategy:
+  //   1. Capture both session ids.
+  //   2. Abandon both clients (close without DELETE) — sessions remain in the Map
+  //      momentarily (this is expected — eviction is eventual).
+  //   3. Wait for TTL + one sweep interval to pass.
+  //   4. Probe with stale ids — the sweep must have removed them → 404.
   // ---------------------------------------------------------------------------
 
-  console.log('\n--- Test 4: sessions Map cleaned up after client disconnect ---');
+  console.log('\n--- Test 4: idle-TTL eviction (eventual cleanup) ---');
 
-  // Capture session ids before closing
+  // Capture session ids before abandoning
   const sessionIdA = getClientSessionId(transportA);
   const sessionIdB = getClientSessionId(transportB);
 
@@ -233,17 +257,27 @@ async function main(): Promise<void> {
     `session B id captured: ${sessionIdB ?? '(none)'}`,
   );
 
-  // Close both clients (this triggers transport.onclose, NOT HTTP DELETE)
-  console.log('\n--- Cleanup ---');
+  // Abandon both sessions — no HTTP DELETE, just close the client transport.
+  // The server does NOT know immediately; it will only learn via the TTL sweep.
+  console.log('\n  Abandoning sessions (no DELETE) ...');
   await clientA.close();
-  console.log('  Session A closed.');
+  console.log('  Session A abandoned (client closed).');
   await clientB.close();
-  console.log('  Session B closed.');
+  console.log('  Session B abandoned (client closed).');
 
-  // Give the server a moment to process the close event
-  await new Promise<void>((resolve) => setTimeout(resolve, 200));
+  // Determine the TTL + sweep values the server is running with.
+  // Default to the SHORT values documented in the script header for fast testing.
+  const ttlMs = parsePosInt(process.env['MCP_SESSION_TTL_MS'], 2_000);
+  const sweepMs = parsePosInt(process.env['MCP_SESSION_SWEEP_MS'], 500);
+  // Wait TTL + one full sweep interval + a small margin for clock jitter.
+  const waitMs = ttlMs + sweepMs + 300;
 
-  // Probe: a GET with the now-stale session id must return 404 (entry removed)
+  console.log(
+    `\n  Waiting ${waitMs} ms for TTL (${ttlMs} ms) + sweep (${sweepMs} ms) to evict sessions ...`,
+  );
+  await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+
+  // Probe: stale ids must now return 404 (sessions evicted by the sweep).
   const baseHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
   if (authToken) baseHeaders['Authorization'] = `Bearer ${authToken}`;
 
@@ -254,8 +288,10 @@ async function main(): Promise<void> {
     });
     assert(
       probeA.status === 404,
-      `session A entry removed from Map after close (probe status ${probeA.status}, want 404)`,
-      probeA.status !== 404 ? 'transport leak — session still in Map after client.close()' : undefined,
+      `session A evicted by TTL sweep (probe status ${probeA.status}, want 404)`,
+      probeA.status !== 404
+        ? 'session still in Map — is the server running with MCP_SESSION_TTL_MS=2000 MCP_SESSION_SWEEP_MS=500?'
+        : undefined,
     );
   }
 
@@ -266,8 +302,10 @@ async function main(): Promise<void> {
     });
     assert(
       probeB.status === 404,
-      `session B entry removed from Map after close (probe status ${probeB.status}, want 404)`,
-      probeB.status !== 404 ? 'transport leak — session still in Map after client.close()' : undefined,
+      `session B evicted by TTL sweep (probe status ${probeB.status}, want 404)`,
+      probeB.status !== 404
+        ? 'session still in Map — is the server running with MCP_SESSION_TTL_MS=2000 MCP_SESSION_SWEEP_MS=500?'
+        : undefined,
     );
   }
 

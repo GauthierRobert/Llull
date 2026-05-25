@@ -10,7 +10,7 @@
 
 import type { CadDocument } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { addBox, addCylinder, addSphere, extrude, move, deleteEntity } from './geometry';
+import { addBox, addCylinder, addSphere, addCone, addTorus, addWedge, addPyramid, extrude, move, deleteEntity } from './geometry';
 import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
 import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint, drawEllipse, drawSpline } from './draw2d';
 import { loadDocument } from './persistence';
@@ -23,6 +23,22 @@ import { buildProject } from './project';
 import { setUnits } from './units';
 import { setParameter, deleteParameter } from './parameters';
 import { checkModel } from './check';
+import {
+  explodePolyline,
+  offset2D,
+  trim,
+  extend,
+  fillet2D,
+  chamfer2D,
+} from './modify2d';
+import {
+  addLayer,
+  renameLayer,
+  setLayerVisibility,
+  setLayerLock,
+  setEntityLayer,
+  deleteLayer,
+} from './layers';
 import {
   measureDistance,
   measureAngle,
@@ -38,6 +54,10 @@ const definitions = [
   addBox,
   addCylinder,
   addSphere,
+  addCone,
+  addTorus,
+  addWedge,
+  addPyramid,
   extrude,
   move,
   deleteEntity,
@@ -78,6 +98,18 @@ const definitions = [
   setParameter,
   deleteParameter,
   checkModel,
+  explodePolyline,
+  offset2D,
+  trim,
+  extend,
+  fillet2D,
+  chamfer2D,
+  addLayer,
+  renameLayer,
+  setLayerVisibility,
+  setLayerLock,
+  setEntityLayer,
+  deleteLayer,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

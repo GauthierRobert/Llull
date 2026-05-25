@@ -85,6 +85,73 @@ export function majorGridStep(minorStep: number): number {
   return minorStep * 10;
 }
 
+export interface GridPatch {
+  /** Total span of the grid patch in world units. */
+  readonly extent: number;
+  /** Number of cells across the patch — always even and ≥ 2. */
+  readonly divisions: number;
+}
+
+/**
+ * Compute a LOCAL grid patch (extent + cell count) for one grid tier.
+ *
+ * The grid must be a local mesh that follows the camera, NOT a fixed huge
+ * extent. With a fixed extent, the cell count = extent/step explodes toward
+ * infinity as you zoom in (step → 0), which is impossible to render. By sizing
+ * the patch to `margin` × the visible viewport, the cell count stays BOUNDED at
+ * every zoom — because `step` is pixel-bounded (adaptiveGridStep keeps cells
+ * 20–120 px), divisions ≈ (viewportPx × margin) / cellPx, a near-constant.
+ *
+ * Divisions are forced EVEN so grid lines land on integer multiples of `step`
+ * (the patch is centered on a step-snapped camera position), keeping lines
+ * aligned to the world grid the snapping uses. `maxDivisions` is a hard safety
+ * cap that is never reached for realistic viewport/zoom combinations.
+ *
+ * @param visibleWorld  Largest visible viewport dimension in world units (px / zoom).
+ * @param step          Grid cell size in world units (minor or major).
+ * @param margin        Patch size as a multiple of the viewport. Default 2.5.
+ * @param maxDivisions  Hard cap on cell count (even). Default 1000.
+ *
+ * @pure deterministic
+ * @invariant divisions even, 2 ≤ divisions ≤ maxDivisions
+ * @failure step <= 0 or visibleWorld <= 0 -> minimal 2-cell patch
+ */
+export function localGridPatch(
+  visibleWorld: number,
+  step: number,
+  margin = 2.5,
+  maxDivisions = 1000,
+): GridPatch {
+  if (step <= 0 || visibleWorld <= 0) {
+    const safeStep = step > 0 ? step : 1;
+    return { extent: safeStep * 2, divisions: 2 };
+  }
+  let divisions = Math.ceil((visibleWorld * margin) / step);
+  if (divisions % 2 !== 0) divisions += 1; // even → lines on world-step multiples
+  if (divisions < 2) divisions = 2;
+  if (divisions > maxDivisions) divisions = maxDivisions - (maxDivisions % 2);
+  return { extent: divisions * step, divisions };
+}
+
+/**
+ * Convert a screen-pixel distance into world units at the current ortho zoom.
+ *
+ * `zoom` is the OrthographicCamera.zoom value (world units × zoom = pixels), so
+ * 1 pixel = 1/zoom world units. Used to keep snap tolerance and snap-glyph size
+ * CONSTANT on screen across the full zoom range — without this, a fixed
+ * world-unit tolerance/size becomes sub-pixel when zoomed out and huge when
+ * zoomed in, defeating the infinite-grid snapping.
+ *
+ * @pure deterministic
+ * @invariant zoom > 0
+ * @invariant result > 0 for pixels > 0
+ * @failure zoom <= 0 -> returns pixels unchanged (1:1 fallback)
+ */
+export function pixelsToWorld(pixels: number, zoom: number): number {
+  if (zoom <= 0) return pixels;
+  return pixels / zoom;
+}
+
 // ---------------------------------------------------------------------------
 // Scale-bar length
 // ---------------------------------------------------------------------------
