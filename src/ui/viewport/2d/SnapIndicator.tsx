@@ -7,11 +7,16 @@
  * (onPointerMove on a large mesh at z=0), computes the snapped position,
  * and renders a small glyph whose shape encodes the snap type:
  *
- *   endpoint    → square (magenta)
- *   midpoint    → triangle (cyan)
- *   center      → circle (yellow)
- *   intersection→ X cross (orange)
- *   grid        → plus (dim white)
+ *   endpoint      → square (magenta)
+ *   midpoint      → triangle (cyan)
+ *   center        → circle (yellow)
+ *   intersection  → X cross (orange)
+ *   perpendicular → right-angle symbol (green)
+ *   tangent       → T-mark (lime)
+ *   extension     → dashed line cap (teal)
+ *   nearest       → dot with ring (blue)
+ *   osnap-tracking→ diamond (purple)
+ *   grid          → plus (dim white)
  *
  * Presentation only — reads the document via useSnap; NEVER mutates it (R1).
  * Geometries/materials are memoized and disposed on unmount (R9).
@@ -29,11 +34,16 @@ import type { SnapType } from './snapping';
 // ---------------------------------------------------------------------------
 
 const SNAP_COLORS: Record<SnapType, string> = {
-  endpoint: '#e040fb',      // magenta
-  midpoint: '#00e5ff',      // cyan
-  center: '#ffee58',        // yellow
-  intersection: '#ff9800',  // orange
-  grid: '#546e7a',          // muted blue-grey
+  endpoint: '#e040fb',          // magenta
+  midpoint: '#00e5ff',          // cyan
+  center: '#ffee58',            // yellow
+  intersection: '#ff9800',      // orange
+  perpendicular: '#69f0ae',     // green
+  tangent: '#b9f6ca',           // lime
+  extension: '#26c6da',         // teal
+  nearest: '#40c4ff',           // blue
+  'osnap-tracking': '#b388ff',  // purple
+  grid: '#546e7a',              // muted blue-grey
 };
 
 const GLYPH_SIZE = 0.22; // world units
@@ -91,6 +101,72 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       const v = new Float32Array([
         -s, -s, 0,  s,  s, 0,
         -s,  s, 0,  s, -s, 0,
+      ]);
+      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+      return geo;
+    }
+    case 'perpendicular': {
+      // Right-angle symbol: two segments forming an L-shape with a corner tick.
+      const geo = new THREE.BufferGeometry();
+      const v = new Float32Array([
+        0, -s, 0,  0,  0, 0,   // vertical leg
+        0,  0, 0,  s,  0, 0,   // horizontal leg
+        // small corner square tick
+        s * 0.35, 0, 0,  s * 0.35, s * 0.35, 0,
+        s * 0.35, s * 0.35, 0,  0, s * 0.35, 0,
+      ]);
+      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+      return geo;
+    }
+    case 'tangent': {
+      // T-mark: horizontal bar with vertical stem.
+      const geo = new THREE.BufferGeometry();
+      const v = new Float32Array([
+        -s, s * 0.5, 0,   s, s * 0.5, 0,   // top bar
+         0, s * 0.5, 0,   0,     -s, 0,   // stem
+      ]);
+      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+      return geo;
+    }
+    case 'extension': {
+      // Dashed line cap: short horizontal line with a gap-mark (two lines).
+      const geo = new THREE.BufferGeometry();
+      const v = new Float32Array([
+        -s,       0, 0,  -s * 0.3, 0, 0,   // left segment
+         s * 0.3, 0, 0,         s, 0, 0,   // right segment (gap in middle)
+        -s * 0.1, -s * 0.4, 0,  -s * 0.1, s * 0.4, 0,  // vertical tick at gap
+      ]);
+      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+      return geo;
+    }
+    case 'nearest': {
+      // Small dot (tiny circle) inside a larger circle ring.
+      const inner = 4;
+      const outer = 10;
+      const verts: number[] = [];
+      for (let i = 0; i < outer; i++) {
+        const a0 = (i / outer) * Math.PI * 2;
+        const a1 = ((i + 1) / outer) * Math.PI * 2;
+        verts.push(s * Math.cos(a0), s * Math.sin(a0), 0, s * Math.cos(a1), s * Math.sin(a1), 0);
+      }
+      for (let i = 0; i < inner; i++) {
+        const a0 = (i / inner) * Math.PI * 2;
+        const a1 = ((i + 1) / inner) * Math.PI * 2;
+        const r2 = s * 0.3;
+        verts.push(r2 * Math.cos(a0), r2 * Math.sin(a0), 0, r2 * Math.cos(a1), r2 * Math.sin(a1), 0);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+      return geo;
+    }
+    case 'osnap-tracking': {
+      // Diamond: four line segments forming a rotated square.
+      const geo = new THREE.BufferGeometry();
+      const v = new Float32Array([
+        0, -s, 0,   s, 0, 0,
+        s,  0, 0,   0, s, 0,
+        0,  s, 0,  -s, 0, 0,
+       -s,  0, 0,   0, -s, 0,
       ]);
       geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
