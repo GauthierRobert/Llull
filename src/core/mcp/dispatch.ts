@@ -40,12 +40,16 @@ export interface McpTextContent {
  *                its explanatory summary is normal feedback.
  * - `document` — the next document state (new object if a change was made,
  *                the SAME reference as the input if the command was a no-op).
+ * - `data`     — present ONLY when the underlying command set `CommandResult.data`
+ *                (read-only/query commands); structured output an agent can read
+ *                without parsing `summary`.
  */
 export interface McpToolCallResult {
   content: McpTextContent[];
   affected: string[];
   isError: boolean;
   document: CadDocument;
+  data?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,10 +80,13 @@ export function applyMcpToolCall(
   const isUnknown = getCommand(toolName) === undefined;
   const result = execute(doc, toolName, args);
 
-  return {
+  const payload: McpToolCallResult = {
     content: [{ type: 'text', text: result.summary }],
     affected: result.affected,
     isError: isUnknown,
     document: result.document,
   };
+  // Only surface `data` when the command produced it (exactOptionalPropertyTypes).
+  if (result.data !== undefined) payload.data = result.data;
+  return payload;
 }

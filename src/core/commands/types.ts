@@ -21,6 +21,13 @@ export interface CommandResult {
   summary: string;
   /** Ids of entities created or affected — lets the caller select/highlight them. */
   affected: string[];
+  /**
+   * Structured result for read-only/query commands (e.g. measure_distance,
+   * mass_properties). Absent on mutating commands; lets a programmatic agent read
+   * a value instead of parsing `summary`. Passes through `execute` and the MCP layer.
+   * @example { distance: 42, unit: 'mm' }
+   */
+  data?: unknown;
 }
 
 export type Command<P> = (doc: CadDocument, params: P) => CommandResult;
@@ -48,8 +55,31 @@ export interface ParamsSchema {
   required: string[];
 }
 
+/** The JSON-schema value kinds a parameter (or nested element) may take. */
+export type ParamType = 'number' | 'string' | 'boolean' | 'array' | 'object';
+
 export interface ParamSpec {
-  type: 'number' | 'string' | 'boolean' | 'array';
+  type: ParamType;
   description: string;
-  items?: { type: string };
+  /**
+   * Constrained value set (JSON Schema `enum`). Emitted verbatim into the tool
+   * schema so agents see the allowed choices.
+   */
+  enum?: readonly (string | number)[];
+  /** For `type: 'array'`: the schema of each element. */
+  items?: ParamItemSpec;
+  /** For `type: 'object'`: named child properties, each a full `ParamSpec`. */
+  properties?: Record<string, ParamSpec>;
+}
+
+/**
+ * Element/nested schema (array items). Same shape as `ParamSpec` but `description`
+ * is optional — a primitive array element (`items: { type: 'number' }`) needs none.
+ */
+export interface ParamItemSpec {
+  type: ParamType;
+  description?: string;
+  enum?: readonly (string | number)[];
+  items?: ParamItemSpec;
+  properties?: Record<string, ParamSpec>;
 }
