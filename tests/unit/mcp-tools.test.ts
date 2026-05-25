@@ -1,5 +1,5 @@
 /**
- * Unit tests for core/mcp — MCP tool definitions + dispatcher.
+ * Unit tests for core/mcp — MCP tool definitions + dispatcher + resource builders.
  *
  * All tests are pure: no network, no DOM, no SDK. A fake document is built
  * with `createEmptyDocument()` and ids are reset between tests.
@@ -9,7 +9,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { listCommands } from '@core/commands/registry';
 import { __resetIdCounter } from '@lib/id';
-import { buildMcpTools, applyMcpToolCall } from '@core/mcp';
+import {
+  buildMcpTools,
+  applyMcpToolCall,
+  listMcpResources,
+  readMcpResource,
+  CAD_RESOURCE_URIS,
+} from '@core/mcp';
 
 // ---------------------------------------------------------------------------
 // buildMcpTools
@@ -141,5 +147,166 @@ describe('applyMcpToolCall() — purity', () => {
     const snapshot = JSON.stringify(doc);
     applyMcpToolCall(doc, 'unknown_xyz', {});
     expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listMcpResources
+// ---------------------------------------------------------------------------
+
+describe('listMcpResources()', () => {
+  it('returns exactly three resource descriptors', () => {
+    expect(listMcpResources()).toHaveLength(3);
+  });
+
+  it('includes all three expected URIs', () => {
+    const uris = listMcpResources().map((r) => r.uri);
+    expect(uris).toContain(CAD_RESOURCE_URIS.document);
+    expect(uris).toContain(CAD_RESOURCE_URIS.scene);
+    expect(uris).toContain(CAD_RESOURCE_URIS.selection);
+  });
+
+  it('every descriptor has a non-empty name, description, and mimeType', () => {
+    for (const r of listMcpResources()) {
+      expect(r.name.length).toBeGreaterThan(0);
+      expect(r.description.length).toBeGreaterThan(0);
+      expect(r.mimeType).toBe('application/json');
+    }
+  });
+
+  it('CAD_RESOURCE_URIS.document is cad://document', () => {
+    expect(CAD_RESOURCE_URIS.document).toBe('cad://document');
+  });
+
+  it('CAD_RESOURCE_URIS.scene is cad://scene', () => {
+    expect(CAD_RESOURCE_URIS.scene).toBe('cad://scene');
+  });
+
+  it('CAD_RESOURCE_URIS.selection is cad://selection', () => {
+    expect(CAD_RESOURCE_URIS.selection).toBe('cad://selection');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readMcpResource — cad://document
+// ---------------------------------------------------------------------------
+
+describe('readMcpResource() — cad://document', () => {
+  it('returns non-null content for an empty document', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://document');
+    expect(content).not.toBeNull();
+  });
+
+  it('content uri matches the requested URI', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://document');
+    expect(content!.uri).toBe('cad://document');
+  });
+
+  it('text is valid JSON containing the llull-document envelope', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://document');
+    const parsed = JSON.parse(content!.text) as Record<string, unknown>;
+    expect(parsed['format']).toBe('llull-document');
+    expect(parsed['version']).toBe(1);
+    expect(parsed['document']).toBeDefined();
+  });
+
+  it('does not mutate the input document', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    readMcpResource(doc, 'cad://document');
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readMcpResource — cad://scene
+// ---------------------------------------------------------------------------
+
+describe('readMcpResource() — cad://scene', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('returns non-null content for an empty document', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://scene');
+    expect(content).not.toBeNull();
+  });
+
+  it('content uri matches cad://scene', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://scene');
+    expect(content!.uri).toBe('cad://scene');
+  });
+
+  it('text is valid JSON with entityCount=0 for empty document', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://scene');
+    const parsed = JSON.parse(content!.text) as Record<string, unknown>;
+    expect(parsed['entityCount']).toBe(0);
+    expect(Array.isArray(parsed['entities'])).toBe(true);
+    expect(Array.isArray(parsed['layers'])).toBe(true);
+  });
+
+  it('reflects the entity count after a box is added', () => {
+    const doc = createEmptyDocument();
+    const afterAdd = applyMcpToolCall(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const content = readMcpResource(afterAdd, 'cad://scene');
+    const parsed = JSON.parse(content!.text) as Record<string, unknown>;
+    expect(parsed['entityCount']).toBe(1);
+  });
+
+  it('does not mutate the input document', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    readMcpResource(doc, 'cad://scene');
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readMcpResource — cad://selection
+// ---------------------------------------------------------------------------
+
+describe('readMcpResource() — cad://selection', () => {
+  it('returns non-null content', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://selection');
+    expect(content).not.toBeNull();
+  });
+
+  it('content uri matches cad://selection', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://selection');
+    expect(content!.uri).toBe('cad://selection');
+  });
+
+  it('count is 0 and entities is empty array when nothing is selected', () => {
+    const doc = createEmptyDocument();
+    const content = readMcpResource(doc, 'cad://selection');
+    const parsed = JSON.parse(content!.text) as { count: number; entities: unknown[] };
+    expect(parsed.count).toBe(0);
+    expect(parsed.entities).toHaveLength(0);
+  });
+
+  it('does not mutate the input document', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    readMcpResource(doc, 'cad://selection');
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readMcpResource — unknown URI
+// ---------------------------------------------------------------------------
+
+describe('readMcpResource() — unknown URI', () => {
+  it('returns null for an unknown URI', () => {
+    const doc = createEmptyDocument();
+    expect(readMcpResource(doc, 'cad://unknown')).toBeNull();
+    expect(readMcpResource(doc, 'http://example.com')).toBeNull();
+    expect(readMcpResource(doc, '')).toBeNull();
   });
 });

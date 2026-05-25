@@ -25,9 +25,11 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
   type CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
-import { buildMcpTools, applyMcpToolCall } from '@core/mcp';
+import { buildMcpTools, applyMcpToolCall, listMcpResources, readMcpResource } from '@core/mcp';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 
@@ -111,7 +113,7 @@ function buildRateLimiter(): ReturnType<typeof rateLimit> {
 function buildMcpServer(): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, resources: {} } },
   );
 
   // tools/list — return the full registry as MCP tool definitions
@@ -146,6 +148,21 @@ function buildMcpServer(): Server {
     }
 
     return { content, isError: result.isError };
+  });
+
+  // resources/list — enumerate the three read-only CAD resources
+  server.setRequestHandler(ListResourcesRequestSchema, () => {
+    return { resources: listMcpResources() };
+  });
+
+  // resources/read — return the requested resource's current content
+  server.setRequestHandler(ReadResourceRequestSchema, (req) => {
+    const { uri } = req.params;
+    const content = readMcpResource(workingDoc, uri);
+    if (content === null) {
+      throw new Error(`Unknown resource URI: ${uri}`);
+    }
+    return { contents: [content] };
   });
 
   return server;
