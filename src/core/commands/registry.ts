@@ -17,6 +17,8 @@ import { loadDocument } from './persistence';
 import { extrudeSketch, revolveProfile } from './profile';
 import { duplicateEntity, groupEntities, ungroupEntities } from './edit';
 import { booleanUnion, booleanSubtract, booleanIntersect } from './boolean';
+import { describeScene } from './scene';
+import { buildProject } from './project';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -46,6 +48,8 @@ const definitions = [
   booleanUnion,
   booleanSubtract,
   booleanIntersect,
+  describeScene,
+  buildProject,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

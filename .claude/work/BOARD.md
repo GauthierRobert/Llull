@@ -177,8 +177,18 @@ is unchanged, so themes interleave freely across the 4 lanes.
 
 ## J — MCP enhancements (Lane 4, `mcp-engineer`)
 - `[TODO]` **J1** Expose the document as an MCP **resource** (read-only): list entities, read full document / selection. _deps: G2._
-- `[TODO]` **J2** Batch/transaction tool: apply an ordered list of commands atomically with a combined summary (one round-trip for multi-step agent edits). _deps: G1._
-- `[REVIEW]` **J3** `describe_scene` MCP tool: structured snapshot (entity ids, kinds, bounds, layers) so an agent can orient before editing. _deps: G1. Done in `worktree-agent-abf2804025b910539` (`219d3d7`, green 283): pure `describeScene(doc)→SceneSnapshot` in `core/mcp/scene.ts`, surfaced as a read-only built-in via `buildMcpTools()` (len+1), handled in `applyMcpToolCall` returning snapshot in `data`. **Branched pre-W1 → `dispatch.ts` MERGE CONFLICT expected** (re-adds `data?`); resolve keeping W1 passthrough + describe_scene branch. Under `cad-reviewer` → then merge._
+- `[DONE]` **J2** Batch/transaction tool → superseded by `build_project` (see AI theme below). Applies an ordered action list atomically with cross-step aliasing, abort/continue policy, validate dry-run, and a combined report. _Implemented as a registry command (`core/commands/project.ts`), not an MCP-only helper → UI + MCP both gain it._
+- `[DONE]` **J3** `describe_scene`: structured read-only snapshot (entity ids, kinds, world bounds, layers, groups, selection) so an agent can orient before editing. _Re-implemented (the stale pre-W1 worktree is gone) as a proper **registry command** in `core/commands/scene.ts` returning the snapshot in `CommandResult.data` (uses W1). 19 tests; document untouched, affected:[]. Cleaner than the old MCP-only built-in: it is a command, so UI + MCP both get it (L1/L5)._
+
+---
+
+## AI — AI-assisted conception (the headline theme; Lane 1 cmd + Lane 4 MCP + Lane 2 UI)
+- `[DONE]` **AI1** `build_project`: one tool, a whole project from an AI action plan. Ordered `{command, params, as?}` list run through `execute()`; cross-step `$alias`/`$alias[N]` refs; `onError:'abort'`(full rollback via purity)|`'continue'`; `validate:true` dry-run; per-step report + final scene snapshot in `data`. _Lane 1. `core/commands/project.ts` (+ `scene.ts` reused for the report). 18 tests; commands/** gate held (project.ts 100/93/100/100). Intentional registry↔project circular import is call-time-only (safe)._
+- `[TODO]` **AI2** `render_view` (server-side, Lane 4/`server`): headless offscreen render of the current document (front/top/iso) → PNG so a vision agent can SEE its result and self-correct. Lives in `server/` (needs a GL context — forbidden in `core/`); drives the same scene. _deps: G2. Highest-wow AI feedback unlock._
+- `[TODO]` **AI3** Named/tagged entities + `find_entities` query: add optional `name`/`tags` to `BaseEntity`; `set_entity_name`/`find_entities` (by kind/layer/name/tag/bbox) returning `data`. Lets a plan say "fillet base_plate" instead of juggling generated ids — makes `build_project` plans far more robust. _Lane 1. deps: W1. PAIR with a small UI rename affordance._
+- `[TODO]` **AI4** `check_model` validator (read-only): flags open profiles, degenerate sizes, non-manifold mesh, entities far from origin, empty layers → `data`. The agent's lint pass before/after a `build_project`. _Lane 1. deps: W1._
+- `[TODO]` **AI5** Parametric templates/generators: `instantiate_template` for common parts (gear, flange, bracket, bolt-hole pattern) with params → collapses a long plan into one semantic call. _Lane 1. deps: Q1 (parameters)._
+- `[TODO]` **AI6** Persist a `build_project` plan as a named, editable recipe → bridges into feature history (`Q3`): a saved plan IS the regenerable feature tree. _Lane 1. deps: AI1, Q3._
 
 ---
 
