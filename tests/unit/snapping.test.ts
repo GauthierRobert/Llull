@@ -26,7 +26,6 @@ import {
   snapExtension,
   nearestOnSegment,
   nearestOnArc,
-  collectOsnapTracking,
 } from '../../src/ui/viewport/2d/snapping';
 
 // ---------------------------------------------------------------------------
@@ -756,54 +755,6 @@ describe('nearestOnArc', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// collectOsnapTracking
-// ---------------------------------------------------------------------------
-
-describe('collectOsnapTracking', () => {
-  it('returns empty array when no acquired points', () => {
-    const result = collectOsnapTracking([5, 5], [], {
-      acquiredPoints: [],
-    });
-    expect(result).toHaveLength(0);
-  });
-
-  it('projects cursor onto tracking line from a single acquired point (ortho)', () => {
-    // Acquired point at [0,0], cursor at [3, 1] → closest ortho direction is horizontal (0°)
-    // → tracking foot at [3, 0]
-    const result = collectOsnapTracking([3, 1], [{ x: 0, y: 0 }], {
-      acquiredPoints: [{ x: 0, y: 0 }],
-      orthoOnly: true,
-    });
-    expect(result.length).toBeGreaterThan(0);
-    const horiz = result.find((p) => Math.abs(p.y) < 0.1 && Math.abs(p.x - 3) < 0.1);
-    expect(horiz).toBeDefined();
-    expect(horiz!.type).toBe('osnap-tracking');
-  });
-
-  it('returns intersection of two tracking lines from two acquired points', () => {
-    // Acquired: [0,0] with horizontal tracking, [0,5] with horizontal tracking.
-    // Their tracking lines both horizontal (y=0 and y=5) — parallel, no intersection.
-    // Use orthogonal acquired points: A=[0,0] cursor→right, B=[5,0] cursor→up.
-    // Cursor somewhere around [5,5].
-    // Tracking from A=[0,0]: horizontal → y=0 line
-    // Tracking from B=[5,0]: vertical → x=5 line
-    // Intersection: [5, 0] ... wait, let me use a clear case:
-    // A at [0,0], cursor=[5,5], angle=45° → snapped to 45° (polar)
-    // B at [10,0], cursor=[5,5], angle=135° → snapped to 135°
-    // Intersection of lines at 45° from [0,0] and 135° from [10,0] → [5,5]
-    const result = collectOsnapTracking([5, 5], [{ x: 0, y: 0 }, { x: 10, y: 0 }], {
-      acquiredPoints: [{ x: 0, y: 0 }, { x: 10, y: 0 }],
-      polarIncrement: Math.PI / 4, // 45° increments
-    });
-    // Should contain a candidate near [5, 5]
-    const intersection = result.find(
-      (p) => Math.abs(p.x - 5) < 0.5 && Math.abs(p.y - 5) < 0.5,
-    );
-    expect(intersection).toBeDefined();
-    expect(intersection!.type).toBe('osnap-tracking');
-  });
-});
 
 // ---------------------------------------------------------------------------
 // collectSnapCandidates — advanced snaps wired in
@@ -844,24 +795,36 @@ describe('collectSnapCandidates — advanced snaps', () => {
     expect(tangents).toHaveLength(0);
   });
 
-  it('emits extension snap beyond segment when cursorPoint is provided', () => {
+  it('emits extension snap beyond segment when cursorPoint is provided and extensions:true', () => {
     const doc = docWithLine([0, 0], [10, 0]);
     // cursor=[12, 0] → t=1.2 > 1 → extension
-    const candidates = collectSnapCandidates(doc, {}, null, [12, 0]);
+    const candidates = collectSnapCandidates(doc, { extensions: true }, null, [12, 0]);
     const extensions = candidates.filter((c) => c.type === 'extension');
     expect(extensions.length).toBeGreaterThan(0);
     expect(extensions[0]!.x).toBeCloseTo(12);
     expect(extensions[0]!.y).toBeCloseTo(0);
   });
 
-  it('emits nearest snap on segment when cursorPoint is provided', () => {
+  it('does not emit extension snap when extensions is not enabled (default off)', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    const candidates = collectSnapCandidates(doc, {}, null, [12, 0]);
+    expect(candidates.filter((c) => c.type === 'extension')).toHaveLength(0);
+  });
+
+  it('emits nearest snap on segment when cursorPoint is provided and nearest:true', () => {
     const doc = docWithLine([0, 0], [10, 0]);
     // cursor=[5, 3] → nearest on segment = [5, 0]
-    const candidates = collectSnapCandidates(doc, {}, null, [5, 3]);
+    const candidates = collectSnapCandidates(doc, { nearest: true }, null, [5, 3]);
     const nearbys = candidates.filter((c) => c.type === 'nearest');
     expect(nearbys.length).toBeGreaterThan(0);
     const pt = nearbys.find((p) => Math.abs(p.x - 5) < 1e-6 && Math.abs(p.y) < 1e-6);
     expect(pt).toBeDefined();
+  });
+
+  it('does not emit nearest snap when nearest is not enabled (default off)', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    const candidates = collectSnapCandidates(doc, {}, null, [5, 3]);
+    expect(candidates.filter((c) => c.type === 'nearest')).toHaveLength(0);
   });
 
   it('respects CollectOpts — can disable perpendiculars', () => {
@@ -939,19 +902,4 @@ describe('snap priority — advanced types', () => {
     expect(result.type).toBe('extension');
   });
 
-  it('prefers nearest over osnap-tracking at equal distance', () => {
-    const candidates = [
-      { x: 5, y: 0, type: 'osnap-tracking' as const },
-      { x: 5, y: 0, type: 'nearest' as const },
-    ];
-    const result = snap([5, 0], candidates, 1, 0.5);
-    expect(result.type).toBe('nearest');
-  });
-
-  it('prefers osnap-tracking over grid', () => {
-    // cursor at [5.1, 0.1] — within tolerance of tracking point at [5, 0]
-    const candidates = [{ x: 5, y: 0, type: 'osnap-tracking' as const }];
-    const result = snap([5.1, 0.1], candidates, 1, 0.5);
-    expect(result.type).toBe('osnap-tracking');
-  });
 });

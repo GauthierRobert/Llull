@@ -26,8 +26,7 @@ export type SnapType =
   | 'perpendicular'
   | 'tangent'
   | 'extension'
-  | 'nearest'
-  | 'osnap-tracking';
+  | 'nearest';
 
 export interface SnapPoint {
   readonly x: number;
@@ -58,9 +57,9 @@ export interface CollectOpts {
   perpendiculars?: boolean;
   /** Include tangent snaps (tangent point from reference to circles/arcs). Default true. */
   tangents?: boolean;
-  /** Include extension snaps (along imaginary line extension beyond endpoints). Default true. */
+  /** Include extension snaps (along imaginary line extension beyond endpoints). Default false. */
   extensions?: boolean;
-  /** Include nearest snaps (closest point on any entity geometry). Default true. */
+  /** Include nearest snaps (closest point on any entity geometry). Default false. */
   nearest?: boolean;
 }
 
@@ -74,25 +73,6 @@ export interface OrthoPolarOpts {
   polar: boolean;
   /** Polar angle increment in radians. Default Math.PI / 12 (15°). */
   polarIncrement?: number;
-}
-
-/**
- * An acquired snap point for osnap tracking.
- * The user hovers over a snap candidate to "acquire" it; the system then
- * shows tracking lines along ortho/polar directions from that point.
- */
-export interface AcquiredSnapPoint {
-  readonly x: number;
-  readonly y: number;
-}
-
-export interface OsnapTrackingOpts {
-  /** Previously acquired snap points to track along. */
-  acquiredPoints: readonly AcquiredSnapPoint[];
-  /** Polar angle increment in radians (default Math.PI / 12 = 15°). */
-  polarIncrement?: number;
-  /** Whether to use only horizontal/vertical (true) or all polar angles (false). Default false. */
-  orthoOnly?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -377,84 +357,6 @@ export function nearestOnArc(
   return [cx + r * Math.cos(clampedAngle), cy + r * Math.sin(clampedAngle)];
 }
 
-/**
- * Compute osnap-tracking intersection candidates.
- *
- * For each acquired snap point, project polar/ortho tracking lines through it
- * and compute their intersections with the same set of tracking lines from all
- * other acquired points plus the cursor.
- *
- * Returns snap candidates of type 'osnap-tracking' at each intersection.
- *
- * @pure
- */
-export function collectOsnapTracking(
-  cursor: Vec2,
-  acquired: readonly AcquiredSnapPoint[],
-  opts: OsnapTrackingOpts,
-): SnapPoint[] {
-  if (acquired.length === 0) return [];
-
-  const increment =
-    opts.polarIncrement && opts.polarIncrement > 0 ? opts.polarIncrement : Math.PI / 12;
-  const orthoOnly = opts.orthoOnly === true;
-
-  /** Snap raw angle to nearest ortho or polar increment toward cursor. */
-  function trackingAngle(ox: number, oy: number): number {
-    const dx = cursor[0] - ox;
-    const dy = cursor[1] - oy;
-    const raw = Math.atan2(dy, dx);
-    if (orthoOnly) {
-      const steps = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
-      let best = steps[0]!;
-      let bestDelta = Math.abs(raw - best);
-      for (const s of steps) {
-        const delta = Math.abs(((raw - s + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-        if (delta < bestDelta) {
-          bestDelta = delta;
-          best = s;
-        }
-      }
-      return best;
-    }
-    return Math.round(raw / increment) * increment;
-  }
-
-  const candidates: SnapPoint[] = [];
-
-  for (let i = 0; i < acquired.length; i++) {
-    const a = acquired[i]!;
-    const angleA = trackingAngle(a.x, a.y);
-    const dax = Math.cos(angleA);
-    const day = Math.sin(angleA);
-
-    for (let j = i + 1; j < acquired.length; j++) {
-      const b = acquired[j]!;
-      const angleB = trackingAngle(b.x, b.y);
-      const dbx = Math.cos(angleB);
-      const dby = Math.sin(angleB);
-      // Intersect infinite lines: a + t*da vs b + s*db
-      const pt = segmentIntersection(
-        a.x - dax * 1e6, a.y - day * 1e6,
-        a.x + dax * 1e6, a.y + day * 1e6,
-        b.x - dbx * 1e6, b.y - dby * 1e6,
-        b.x + dbx * 1e6, b.y + dby * 1e6,
-      );
-      if (pt) {
-        candidates.push({ x: pt[0], y: pt[1], type: 'osnap-tracking' });
-      }
-    }
-
-    // Project cursor onto A's tracking line (snaps cursor to the tracking line).
-    const foot = perpendicularFoot(cursor[0], cursor[1], a.x, a.y, a.x + dax, a.y + day);
-    if (foot) {
-      candidates.push({ x: foot[0], y: foot[1], type: 'osnap-tracking' });
-    }
-  }
-
-  return candidates;
-}
-
 // ---------------------------------------------------------------------------
 // collectSnapCandidates
 // ---------------------------------------------------------------------------
@@ -480,8 +382,8 @@ export function collectSnapCandidates(
   const doIntersections = opts.intersections !== false;
   const doPerpendiculars = opts.perpendiculars !== false;
   const doTangents = opts.tangents !== false;
-  const doExtensions = opts.extensions !== false;
-  const doNearest = opts.nearest !== false;
+  const doExtensions = opts.extensions === true;
+  const doNearest = opts.nearest === true;
 
   const from = fromPoint ?? null;
   const cursor = cursorPoint ?? null;
@@ -721,7 +623,7 @@ export function collectSnapCandidates(
 /**
  * Snap type priority order — geometric snaps beat grid.
  * Lower index = higher priority when distances are equal.
- * Priority: endpoint > midpoint > center > intersection > perpendicular > tangent > extension > nearest > osnap-tracking > grid
+ * Priority: endpoint > midpoint > center > intersection > perpendicular > tangent > extension > nearest > grid
  */
 const SNAP_TYPE_PRIORITY: Record<SnapType, number> = {
   endpoint: 0,
@@ -732,8 +634,7 @@ const SNAP_TYPE_PRIORITY: Record<SnapType, number> = {
   tangent: 5,
   extension: 6,
   nearest: 7,
-  'osnap-tracking': 8,
-  grid: 9,
+  grid: 8,
 };
 
 /**

@@ -63,6 +63,10 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
       return applyOrthoPolar(drawOrigin, cursor, orthoPolar);
     }
     return cursor;
+  // orthoPolar is typically a stable literal object from the draw-tool component;
+  // depending on object identity is intentional — callers must memoise it or accept
+  // the extra (cheap) recompute. Primitive-field deps would require spreading the
+  // object here and would be noisier without measurable benefit.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, orthoPolar, drawOrigin]);
 

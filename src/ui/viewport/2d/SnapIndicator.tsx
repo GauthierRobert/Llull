@@ -15,7 +15,6 @@
  *   tangent       → T-mark (lime)
  *   extension     → dashed line cap (teal)
  *   nearest       → dot with ring (blue)
- *   osnap-tracking→ diamond (purple)
  *   grid          → plus (dim white)
  *
  * Presentation only — reads the document via useSnap; NEVER mutates it (R1).
@@ -34,16 +33,15 @@ import type { SnapType } from './snapping';
 // ---------------------------------------------------------------------------
 
 const SNAP_COLORS: Record<SnapType, string> = {
-  endpoint: '#e040fb',          // magenta
-  midpoint: '#00e5ff',          // cyan
-  center: '#ffee58',            // yellow
-  intersection: '#ff9800',      // orange
-  perpendicular: '#69f0ae',     // green
-  tangent: '#b9f6ca',           // lime
-  extension: '#26c6da',         // teal
-  nearest: '#40c4ff',           // blue
-  'osnap-tracking': '#b388ff',  // purple
-  grid: '#546e7a',              // muted blue-grey
+  endpoint: '#e040fb',      // magenta
+  midpoint: '#00e5ff',      // cyan
+  center: '#ffee58',        // yellow
+  intersection: '#ff9800',  // orange
+  perpendicular: '#69f0ae', // green
+  tangent: '#b9f6ca',       // lime
+  extension: '#26c6da',     // teal
+  nearest: '#40c4ff',       // blue
+  grid: '#546e7a',          // muted blue-grey
 };
 
 const GLYPH_SIZE = 0.22; // world units
@@ -157,18 +155,6 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-      return geo;
-    }
-    case 'osnap-tracking': {
-      // Diamond: four line segments forming a rotated square.
-      const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([
-        0, -s, 0,   s, 0, 0,
-        s,  0, 0,   0, s, 0,
-        0,  s, 0,  -s, 0, 0,
-       -s,  0, 0,   0, -s, 0,
-      ]);
-      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
     }
     case 'grid': {
