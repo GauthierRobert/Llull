@@ -1,0 +1,27 @@
+{
+  "name": "llull-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Express MCP host for llull",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --project tsconfig.json --outDir dist",
+    "start": "node dist/src/index.js",
+    "typecheck": "tsc --noEmit",
+    "agent:example": "tsx examples/mcp-agent.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.5.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

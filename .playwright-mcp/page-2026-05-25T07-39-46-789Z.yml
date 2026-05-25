@@ -1,0 +1,78 @@
+- generic [ref=e3]:
+  - navigation "CAD commands" [ref=e4]:
+    - button "Create a rectangular box solid at a position with a given size." [ref=e5] [cursor=pointer]: Add Box
+    - button "Extrude a closed 2D polygon profile along Z into a solid." [ref=e6] [cursor=pointer]: Extrude Profile
+    - button "Translate an entity by a delta vector." [ref=e7] [cursor=pointer]: Move Entity
+    - button "Permanently remove an entity from the document, including from any groups it belongs to. Groups that drop below 2 members are dissolved automatically." [ref=e8] [cursor=pointer]: Delete Entity
+    - button "Add Euler-angle deltas (radians) to an entity rotation. Modifies only the rotation field; position and geometry are unchanged." [ref=e9] [cursor=pointer]: Rotate Entity
+    - 'button "Uniformly scale an entity by a positive factor. Scales geometry in-place: box size, cylinder radius and height, sphere radius, extrusion profile points and depth. Position is unchanged." [ref=e10] [cursor=pointer]': Scale Entity
+    - button "Mirror an entity across the origin along a world axis by negating that axis component of its position. axis must be 'x', 'y', or 'z'." [ref=e11] [cursor=pointer]: Mirror Entity
+    - button "Duplicate an entity into a linear pattern. Creates count-1 new copies spaced by offset (a world-space vector [dx,dy,dz]). The original stays at instance 0; copy k is placed at original.position + k*offset (k = 1..count-1). count must be an integer >= 2." [ref=e12] [cursor=pointer]: Array Linear
+    - button "Duplicate an entity into a polar (circular) pattern around the Z axis through center. The original counts as instance 0; count-1 new copies are created. Copy k is rotated by k*(angle/count) radians around center (XY plane). angle defaults to 2*PI (full circle). Each copy also has rotation[2] incremented by the same step so the part faces outward consistently. Z position and other rotation components are unchanged. count must be >= 2." [ref=e13] [cursor=pointer]: Array Polar
+    - button "Draw a straight line segment defined by start and end points in the local 2D work plane. position places the work-plane origin in 3D space (default [0,0,0])." [ref=e14] [cursor=pointer]: Draw Line
+    - button "Draw a connected sequence of line segments through an ordered list of 2D points in the local work plane. Requires at least 2 points. When closed=true the last point connects back to the first. A closed polyline can be fed to extrude_sketch to become a 3D solid." [ref=e15] [cursor=pointer]: Draw Polyline
+    - button "Draw a circular arc in the local 2D work plane, defined by center, radius, and start/end angles in radians. Angles are measured counter-clockwise from the +X axis. radius must be > 0." [ref=e16] [cursor=pointer]: Draw Arc
+    - button "Draw a full circle in the local 2D work plane, defined by center and radius. radius must be > 0." [ref=e17] [cursor=pointer]: Draw Circle
+    - button "Draw an axis-aligned rectangle in the local 2D work plane. The origin is at the lower-left corner; width extends along +X, height along +Y. position places the work-plane origin in 3D space. Both width and height must be > 0." [ref=e18] [cursor=pointer]: Draw Rectangle
+    - button "Place a point marker at the given 3D world position. The point entity has no local 2D geometry — its position is the point location." [ref=e19] [cursor=pointer]: Draw Point
+    - 'button "Replace the current document with one parsed from a serialized JSON string produced by serializeDocument (envelope format: llull-document v1). On parse or validation failure the document is left unchanged." [ref=e20] [cursor=pointer]': Load Document
+    - button "Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. Keeps the source entity. depth must be > 0." [ref=e21] [cursor=pointer]: Extrude Sketch
+    - 'button "PLANNED: revolve a closed 2D profile entity around the Y axis to produce a solid of revolution. Currently a stub — registers the tool name for UI/AI/MCP discovery but does not yet produce geometry (requires a surface-of-revolution kernel)." [ref=e22] [cursor=pointer]': Revolve Profile
+    - button "Clone an existing entity to a new id, placing the copy at original.position + offset. Returns the new entity id in affected. Original is untouched." [ref=e23] [cursor=pointer]: Duplicate Entity
+    - button "Create a named group containing >= 2 existing entities. The group id is returned in affected. Entities are not moved or changed." [ref=e24] [cursor=pointer]: Group Entities
+    - button "Dissolve a group, removing it from the document. Member entities are NOT deleted; they remain in the document. Returns the freed member ids in affected." [ref=e25] [cursor=pointer]: Ungroup Entities
+    - button "Merge two 3D solid entities into a single mesh entity using a CSG union operation. Both operand entities are consumed (removed) and replaced by the union mesh. Requires a geometry kernel to be injected (available after app initialization). Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh)." [ref=e26] [cursor=pointer]: Boolean Union
+    - 'button "Subtract the volume of 3D solid b from 3D solid a, producing a mesh entity. Order matters: result = a minus b. Both operand entities are consumed (removed) and replaced by the result mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh)." [ref=e27] [cursor=pointer]': Boolean Subtract
+    - button "Compute the intersection of two 3D solid entities, producing a mesh entity that covers only the volume shared by both solids. Both operand entities are consumed (removed) and replaced by the intersection mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh)." [ref=e28] [cursor=pointer]: Boolean Intersect
+  - generic [ref=e29]:
+    - complementary "Properties" [ref=e30]:
+      - region "Selection" [ref=e31]:
+        - heading "Selection" [level=2] [ref=e32]
+        - paragraph [ref=e33]: No entity selected.
+      - region "Run command" [ref=e35]:
+        - heading "Run Command" [level=2] [ref=e36]
+        - generic [ref=e37]:
+          - generic [ref=e38]: Command
+          - combobox "Command" [ref=e39] [cursor=pointer]:
+            - option "Add Box" [selected]
+            - option "Extrude Profile"
+            - option "Move Entity"
+            - option "Delete Entity"
+            - option "Rotate Entity"
+            - option "Scale Entity"
+            - option "Mirror Entity"
+            - option "Array Linear"
+            - option "Array Polar"
+            - option "Draw Line"
+            - option "Draw Polyline"
+            - option "Draw Arc"
+            - option "Draw Circle"
+            - option "Draw Rectangle"
+            - option "Draw Point"
+            - option "Load Document"
+            - option "Extrude Sketch"
+            - option "Revolve Profile"
+            - option "Duplicate Entity"
+            - option "Group Entities"
+            - option "Ungroup Entities"
+            - option "Boolean Union"
+            - option "Boolean Subtract"
+            - option "Boolean Intersect"
+        - paragraph [ref=e40]: Create a rectangular box solid at a position with a given size.
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - generic [ref=e43]: Size *
+            - textbox "Size" [ref=e44]:
+              - /placeholder: Width, height, depth (e.g. 2,2,2)
+          - generic [ref=e45]:
+            - generic [ref=e46]: Position
+            - textbox "Position" [ref=e47]:
+              - /placeholder: World position [x,y,z] (e.g. 2,2,2)
+          - generic [ref=e48]:
+            - generic [ref=e49]: Color
+            - textbox "Color" [ref=e50]:
+              - /placeholder: "Hex color like #c8553d"
+          - button "Run Add Box" [ref=e51] [cursor=pointer]
+    - group "View mode" [ref=e53]:
+      - button "3D" [pressed] [ref=e54] [cursor=pointer]
+      - button "2D" [ref=e55] [cursor=pointer]
