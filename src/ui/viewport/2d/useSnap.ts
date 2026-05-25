@@ -26,8 +26,9 @@ export interface UseSnapOpts {
   /** Ortho / polar options for the current drawing operation. */
   orthoPolar?: OrthoPolarOpts;
   /**
-   * When drawing, the "last placed point" — used as the ortho/polar origin.
-   * If not provided, ortho/polar tracking is skipped even when enabled.
+   * When drawing, the "last placed point" — used as the ortho/polar origin
+   * and as the reference point for perpendicular/tangent snaps.
+   * If not provided, ortho/polar tracking and perpendicular/tangent snaps are skipped.
    */
   drawOrigin?: Vec2 | null;
   /** Override which snap types are collected. All enabled by default. */
@@ -39,6 +40,9 @@ export interface UseSnapOpts {
  *
  * Memoizes the candidate list on document.order + document.entities identity
  * (changes only when the document entity bag changes).
+ *
+ * Advanced snaps (perpendicular, tangent) use `drawOrigin` as the reference
+ * point; extension and nearest snaps use the adjusted cursor position.
  */
 export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
   const document = useStore((s) => s.document);
@@ -51,20 +55,33 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
     collectOpts,
   } = opts;
 
-  // Recompute snap candidates only when entities change.
+  // Apply ortho/polar tracking first (constrains the cursor direction from origin).
+  // We need the adjusted cursor before computing advanced snap candidates.
+  const adjustedCursor: Vec2 | null = useMemo(() => {
+    if (cursor === null) return null;
+    if (orthoPolar && drawOrigin != null) {
+      return applyOrthoPolar(drawOrigin, cursor, orthoPolar);
+    }
+    return cursor;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, orthoPolar, drawOrigin]);
+
+  // Recompute snap candidates only when entities, fromPoint, or cursor change.
+  // fromPoint (drawOrigin) is needed for perpendicular/tangent snaps.
+  // cursorPoint is needed for extension/nearest snaps.
   const candidates = useMemo(
-    () => collectSnapCandidates(document, collectOpts ?? {}),
+    () =>
+      collectSnapCandidates(
+        document,
+        collectOpts ?? {},
+        drawOrigin ?? null,
+        adjustedCursor,
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [document.entities, document.order, collectOpts],
+    [document.entities, document.order, collectOpts, drawOrigin, adjustedCursor],
   );
 
-  if (cursor === null) return null;
-
-  // Apply ortho/polar tracking first (constrains the cursor direction from origin).
-  let adjustedCursor: Vec2 = cursor;
-  if (orthoPolar && drawOrigin != null) {
-    adjustedCursor = applyOrthoPolar(drawOrigin, cursor, orthoPolar);
-  }
+  if (adjustedCursor === null) return null;
 
   return snap(adjustedCursor, candidates, gridSize, tolerance);
 }
