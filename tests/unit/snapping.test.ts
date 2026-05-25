@@ -19,6 +19,13 @@ import {
   collectSnapCandidates,
   snap,
   applyOrthoPolar,
+  snapPerpendicular,
+  perpendicularFoot,
+  tangentPointsToCircle,
+  snapTangentToCircle,
+  snapExtension,
+  nearestOnSegment,
+  nearestOnArc,
 } from '../../src/ui/viewport/2d/snapping';
 
 // ---------------------------------------------------------------------------
@@ -512,4 +519,387 @@ describe('applyOrthoPolar', () => {
     expect(result[0]).toBeCloseTo(length * Math.cos(expected));
     expect(result[1]).toBeCloseTo(length * Math.sin(expected));
   });
+});
+
+// ---------------------------------------------------------------------------
+// perpendicularFoot
+// ---------------------------------------------------------------------------
+
+describe('perpendicularFoot', () => {
+  it('returns the foot on a horizontal segment', () => {
+    // Segment [0,0]→[10,0], point [5, 3] → foot at [5, 0]
+    const result = perpendicularFoot(5, 3, 0, 0, 10, 0);
+    expect(result).not.toBeNull();
+    expect(result![0]).toBeCloseTo(5);
+    expect(result![1]).toBeCloseTo(0);
+  });
+
+  it('returns the foot outside the segment when t < 0', () => {
+    // Segment [0,0]→[10,0], point [-2, 3] → foot at [-2, 0] (outside segment)
+    const result = perpendicularFoot(-2, 3, 0, 0, 10, 0);
+    expect(result).not.toBeNull();
+    expect(result![0]).toBeCloseTo(-2);
+    expect(result![1]).toBeCloseTo(0);
+  });
+
+  it('returns null for a degenerate zero-length segment', () => {
+    expect(perpendicularFoot(5, 5, 3, 3, 3, 3)).toBeNull();
+  });
+
+  it('returns the foot on a diagonal segment', () => {
+    // Segment [0,0]→[4,4], point [4, 0] → foot at [2, 2]
+    const result = perpendicularFoot(4, 0, 0, 0, 4, 4);
+    expect(result).not.toBeNull();
+    expect(result![0]).toBeCloseTo(2);
+    expect(result![1]).toBeCloseTo(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// snapPerpendicular
+// ---------------------------------------------------------------------------
+
+describe('snapPerpendicular', () => {
+  it('returns foot within segment (happy path)', () => {
+    // from=[5,3], segment [0,0]→[10,0] → foot at [5,0], t=0.5 ∈ [0,1]
+    const result = snapPerpendicular([5, 3], 0, 0, 10, 0);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe('perpendicular');
+    expect(result!.x).toBeCloseTo(5);
+    expect(result!.y).toBeCloseTo(0);
+  });
+
+  it('returns null when foot is outside segment (t < 0)', () => {
+    // from=[-2, 3], segment [0,0]→[10,0] → t = -0.2 → outside
+    const result = snapPerpendicular([-2, 3], 0, 0, 10, 0);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when foot is outside segment (t > 1)', () => {
+    // from=[12, 3], segment [0,0]→[10,0] → t = 1.2 → outside
+    const result = snapPerpendicular([12, 3], 0, 0, 10, 0);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when from is null (no previous point)', () => {
+    expect(snapPerpendicular(null, 0, 0, 10, 0)).toBeNull();
+  });
+
+  it('returns null for a degenerate zero-length segment', () => {
+    expect(snapPerpendicular([5, 5], 3, 3, 3, 3)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tangentPointsToCircle
+// ---------------------------------------------------------------------------
+
+describe('tangentPointsToCircle', () => {
+  it('returns 2 tangent points from an external point', () => {
+    // Circle at origin r=1, point at (2, 0). d=2, alpha=acos(0.5)=60°
+    // T1 = [cos(60°), sin(60°)] = [0.5, √3/2]
+    // T2 = [cos(-60°), sin(-60°)] = [0.5, -√3/2]
+    const pts = tangentPointsToCircle(2, 0, 0, 0, 1);
+    expect(pts).toHaveLength(2);
+    expect(pts[0]![0]).toBeCloseTo(0.5);
+    expect(Math.abs(pts[0]![1])).toBeCloseTo(Math.sqrt(3) / 2);
+    expect(pts[1]![0]).toBeCloseTo(0.5);
+    expect(Math.abs(pts[1]![1])).toBeCloseTo(Math.sqrt(3) / 2);
+    // Verify tangent: (T-C)·(P-T) = 0
+    for (const [tx, ty] of pts) {
+      const dot = tx * (2 - tx) + ty * (0 - ty);
+      expect(dot).toBeCloseTo(0);
+    }
+  });
+
+  it('returns [] when point is strictly inside the circle', () => {
+    // Circle at origin r=5, point at (2, 0) — d=2 < r=5
+    expect(tangentPointsToCircle(2, 0, 0, 0, 5)).toHaveLength(0);
+  });
+
+  it('returns 2 points when point is exactly on the circle edge (d ≈ r)', () => {
+    // d == r within tolerance → still returns 2 (alpha ≈ 0 → both points collapse to same)
+    const pts = tangentPointsToCircle(1, 0, 0, 0, 1);
+    // d = 1 = r, acos(1) = 0, so both points = [1, 0] = the external point itself
+    expect(pts).toHaveLength(2);
+    expect(pts[0]![0]).toBeCloseTo(1);
+    expect(pts[0]![1]).toBeCloseTo(0);
+  });
+
+  it('returns [] when point is at the center (degenerate)', () => {
+    expect(tangentPointsToCircle(0, 0, 0, 0, 3)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// snapTangentToCircle
+// ---------------------------------------------------------------------------
+
+describe('snapTangentToCircle', () => {
+  it('returns 2 SnapPoints from an external point', () => {
+    const snaps = snapTangentToCircle([2, 0], 0, 0, 1);
+    expect(snaps).toHaveLength(2);
+    expect(snaps[0]!.type).toBe('tangent');
+    expect(snaps[1]!.type).toBe('tangent');
+  });
+
+  it('returns [] when from is null', () => {
+    expect(snapTangentToCircle(null, 0, 0, 1)).toHaveLength(0);
+  });
+
+  it('returns [] when from is inside the circle', () => {
+    expect(snapTangentToCircle([1, 0], 0, 0, 5)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// snapExtension
+// ---------------------------------------------------------------------------
+
+describe('snapExtension', () => {
+  it('returns extension snap beyond the end of segment (t > 1)', () => {
+    // Segment [0,0]→[10,0], cursor at [12,0] → t=1.2 → foot at [12,0]
+    const result = snapExtension(12, 0, 0, 0, 10, 0);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe('extension');
+    expect(result!.x).toBeCloseTo(12);
+    expect(result!.y).toBeCloseTo(0);
+  });
+
+  it('returns extension snap before the start of segment (t < 0)', () => {
+    // Segment [0,0]→[10,0], cursor at [-3, 0] → t=-0.3 → foot at [-3, 0]
+    const result = snapExtension(-3, 0, 0, 0, 10, 0);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe('extension');
+    expect(result!.x).toBeCloseTo(-3);
+    expect(result!.y).toBeCloseTo(0);
+  });
+
+  it('returns null when cursor projects onto the segment (t in [0,1])', () => {
+    // Segment [0,0]→[10,0], cursor at [5, 2] → t=0.5 → within segment
+    const result = snapExtension(5, 2, 0, 0, 10, 0);
+    expect(result).toBeNull();
+  });
+
+  it('returns null for a degenerate zero-length segment', () => {
+    expect(snapExtension(5, 5, 3, 3, 3, 3)).toBeNull();
+  });
+
+  it('returns extension point on diagonal segment', () => {
+    // Segment [0,0]→[4,4], cursor at [6, 6] → t=1.5, foot at [6, 6]
+    const result = snapExtension(6, 6, 0, 0, 4, 4);
+    expect(result).not.toBeNull();
+    expect(result!.x).toBeCloseTo(6);
+    expect(result!.y).toBeCloseTo(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// nearestOnSegment
+// ---------------------------------------------------------------------------
+
+describe('nearestOnSegment', () => {
+  it('returns the projected foot when cursor is perpendicular to middle of segment', () => {
+    // Segment [0,0]→[10,0], cursor [5, 3] → [5, 0]
+    const [x, y] = nearestOnSegment(5, 3, 0, 0, 10, 0);
+    expect(x).toBeCloseTo(5);
+    expect(y).toBeCloseTo(0);
+  });
+
+  it('clamps to start when cursor is before the segment', () => {
+    const [x, y] = nearestOnSegment(-3, 2, 0, 0, 10, 0);
+    expect(x).toBeCloseTo(0);
+    expect(y).toBeCloseTo(0);
+  });
+
+  it('clamps to end when cursor is beyond the segment', () => {
+    const [x, y] = nearestOnSegment(15, 2, 0, 0, 10, 0);
+    expect(x).toBeCloseTo(10);
+    expect(y).toBeCloseTo(0);
+  });
+
+  it('returns segment start for a degenerate zero-length segment', () => {
+    const [x, y] = nearestOnSegment(5, 5, 3, 3, 3, 3);
+    expect(x).toBeCloseTo(3);
+    expect(y).toBeCloseTo(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// nearestOnArc
+// ---------------------------------------------------------------------------
+
+describe('nearestOnArc', () => {
+  it('returns radial foot for a full circle', () => {
+    // Circle at origin r=5, cursor at [3, 4] → d=5 → foot at [3, 4]
+    const [x, y] = nearestOnArc(3, 4, 0, 0, 5, 0, 0, true);
+    expect(x).toBeCloseTo(3);
+    expect(y).toBeCloseTo(4);
+  });
+
+  it('returns radial foot within arc sweep', () => {
+    // Arc at origin r=5, from 0 to π (upper half). Cursor at [3, 4] → angle≈53° → within [0,π]
+    const [x, y] = nearestOnArc(3, 4, 0, 0, 5, 0, Math.PI, false);
+    expect(x).toBeCloseTo(3);
+    expect(y).toBeCloseTo(4);
+  });
+
+  it('clamps to nearest arc endpoint when cursor angle is outside the sweep', () => {
+    // Arc from π/4 to 3π/4 (sweep = π/2, upper half).
+    // Cursor directly below at [0,-5] → rawAngle = -π/2.
+    // Offset from startAngle (π/4): (-π/2 - π/4 + 2π) % 2π = 5π/4.
+    // 5π/4 > sweep(π/2) → clamp to π/2 → clamped angle = π/4 + π/2 = 3π/4 (the end).
+    const [x, y] = nearestOnArc(0, -5, 0, 0, 5, Math.PI / 4, (3 * Math.PI) / 4, false);
+    expect(x).toBeCloseTo(5 * Math.cos((3 * Math.PI) / 4));
+    expect(y).toBeCloseTo(5 * Math.sin((3 * Math.PI) / 4));
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// collectSnapCandidates — advanced snaps wired in
+// ---------------------------------------------------------------------------
+
+describe('collectSnapCandidates — advanced snaps', () => {
+  it('emits perpendicular snap for a line when fromPoint is provided', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    // from=[5, 3] → foot on [0,0]→[10,0] is at [5, 0], t=0.5 ∈ [0,1]
+    const candidates = collectSnapCandidates(doc, {}, [5, 3]);
+    const perps = candidates.filter((c) => c.type === 'perpendicular');
+    expect(perps.length).toBeGreaterThan(0);
+    const foot = perps.find((p) => Math.abs(p.x - 5) < 1e-6 && Math.abs(p.y) < 1e-6);
+    expect(foot).toBeDefined();
+  });
+
+  it('does not emit perpendicular snap when foot is outside the segment', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    // from=[-5, 3] → t = -0.5 → outside segment → no perpendicular
+    const candidates = collectSnapCandidates(doc, {}, [-5, 3]);
+    const perps = candidates.filter((c) => c.type === 'perpendicular');
+    expect(perps).toHaveLength(0);
+  });
+
+  it('emits tangent snaps for a circle when fromPoint is provided outside', () => {
+    const doc = docWithCircle([0, 0], 1);
+    // from=[2, 0] → external → 2 tangent points
+    const candidates = collectSnapCandidates(doc, {}, [2, 0]);
+    const tangents = candidates.filter((c) => c.type === 'tangent');
+    expect(tangents).toHaveLength(2);
+  });
+
+  it('does not emit tangent snaps when fromPoint is inside circle', () => {
+    const doc = docWithCircle([0, 0], 5);
+    // from=[2, 0] → inside circle (d=2 < r=5) → no tangents
+    const candidates = collectSnapCandidates(doc, {}, [2, 0]);
+    const tangents = candidates.filter((c) => c.type === 'tangent');
+    expect(tangents).toHaveLength(0);
+  });
+
+  it('emits extension snap beyond segment when cursorPoint is provided and extensions:true', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    // cursor=[12, 0] → t=1.2 > 1 → extension
+    const candidates = collectSnapCandidates(doc, { extensions: true }, null, [12, 0]);
+    const extensions = candidates.filter((c) => c.type === 'extension');
+    expect(extensions.length).toBeGreaterThan(0);
+    expect(extensions[0]!.x).toBeCloseTo(12);
+    expect(extensions[0]!.y).toBeCloseTo(0);
+  });
+
+  it('does not emit extension snap when extensions is not enabled (default off)', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    const candidates = collectSnapCandidates(doc, {}, null, [12, 0]);
+    expect(candidates.filter((c) => c.type === 'extension')).toHaveLength(0);
+  });
+
+  it('emits nearest snap on segment when cursorPoint is provided and nearest:true', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    // cursor=[5, 3] → nearest on segment = [5, 0]
+    const candidates = collectSnapCandidates(doc, { nearest: true }, null, [5, 3]);
+    const nearbys = candidates.filter((c) => c.type === 'nearest');
+    expect(nearbys.length).toBeGreaterThan(0);
+    const pt = nearbys.find((p) => Math.abs(p.x - 5) < 1e-6 && Math.abs(p.y) < 1e-6);
+    expect(pt).toBeDefined();
+  });
+
+  it('does not emit nearest snap when nearest is not enabled (default off)', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    const candidates = collectSnapCandidates(doc, {}, null, [5, 3]);
+    expect(candidates.filter((c) => c.type === 'nearest')).toHaveLength(0);
+  });
+
+  it('respects CollectOpts — can disable perpendiculars', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    const candidates = collectSnapCandidates(doc, { perpendiculars: false }, [5, 3]);
+    expect(candidates.filter((c) => c.type === 'perpendicular')).toHaveLength(0);
+  });
+
+  it('respects CollectOpts — can disable tangents', () => {
+    const doc = docWithCircle([0, 0], 1);
+    const candidates = collectSnapCandidates(doc, { tangents: false }, [2, 0]);
+    expect(candidates.filter((c) => c.type === 'tangent')).toHaveLength(0);
+  });
+
+  it('respects CollectOpts — can disable extensions', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    const candidates = collectSnapCandidates(doc, { extensions: false }, null, [12, 0]);
+    expect(candidates.filter((c) => c.type === 'extension')).toHaveLength(0);
+  });
+
+  it('respects CollectOpts — can disable nearest', () => {
+    const doc = docWithLine([0, 0], [10, 0]);
+    const candidates = collectSnapCandidates(doc, { nearest: false }, null, [5, 3]);
+    expect(candidates.filter((c) => c.type === 'nearest')).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// snap priority — new types lower priority than classic ones
+// ---------------------------------------------------------------------------
+
+describe('snap priority — advanced types', () => {
+  it('prefers endpoint over perpendicular at equal distance', () => {
+    const candidates = [
+      { x: 5, y: 0, type: 'perpendicular' as const },
+      { x: 5, y: 0, type: 'endpoint' as const },
+    ];
+    const result = snap([5, 0], candidates, 1, 0.5);
+    expect(result.type).toBe('endpoint');
+  });
+
+  it('prefers intersection over perpendicular at equal distance', () => {
+    const candidates = [
+      { x: 0, y: 0, type: 'perpendicular' as const },
+      { x: 0, y: 0, type: 'intersection' as const },
+    ];
+    const result = snap([0, 0], candidates, 1, 0.5);
+    expect(result.type).toBe('intersection');
+  });
+
+  it('prefers perpendicular over tangent at equal distance', () => {
+    const candidates = [
+      { x: 5, y: 0, type: 'tangent' as const },
+      { x: 5, y: 0, type: 'perpendicular' as const },
+    ];
+    const result = snap([5, 0], candidates, 1, 0.5);
+    expect(result.type).toBe('perpendicular');
+  });
+
+  it('prefers tangent over extension at equal distance', () => {
+    const candidates = [
+      { x: 5, y: 0, type: 'extension' as const },
+      { x: 5, y: 0, type: 'tangent' as const },
+    ];
+    const result = snap([5, 0], candidates, 1, 0.5);
+    expect(result.type).toBe('tangent');
+  });
+
+  it('prefers extension over nearest at equal distance', () => {
+    const candidates = [
+      { x: 5, y: 0, type: 'nearest' as const },
+      { x: 5, y: 0, type: 'extension' as const },
+    ];
+    const result = snap([5, 0], candidates, 1, 0.5);
+    expect(result.type).toBe('extension');
+  });
+
 });

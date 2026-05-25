@@ -13,6 +13,9 @@ export type EntityId = string;
 
 export type Vec3 = readonly [number, number, number];
 
+/** Units of length used for display and measurement throughout the document. */
+export type DocumentUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
+
 /** 2D coordinate in a local work plane. */
 export type Vec2 = readonly [number, number];
 
@@ -211,6 +214,10 @@ export interface CadDocument {
   camera: CameraState;
   /** Named entity groups. Keyed by group id. Initialized as {} in createEmptyDocument. */
   groups: Record<string, EntityGroup>;
+  /** Unit of length for all geometry values in this document. Default: 'mm'. */
+  units: DocumentUnit;
+  /** Number of decimal places used when displaying/formatting length values. Default: 3. */
+  displayPrecision: number;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';
@@ -236,5 +243,7 @@ export function createEmptyDocument(): CadDocument {
       distance: 12,
     },
     groups: {},
+    units: 'mm',
+    displayPrecision: 3,
   };
 }

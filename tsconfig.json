@@ -21,12 +21,11 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
 
-    /* Path aliases so imports read cleanly */
-    "baseUrl": ".",
+    /* Path aliases so imports read cleanly (resolved relative to this tsconfig) */
     "paths": {
-      "@core/*": ["src/core/*"],
-      "@ui/*": ["src/ui/*"],
-      "@lib/*": ["src/lib/*"]
+      "@core/*": ["./src/core/*"],
+      "@ui/*": ["./src/ui/*"],
+      "@lib/*": ["./src/lib/*"]
     }
   },
   "include": ["src", "tests"]
