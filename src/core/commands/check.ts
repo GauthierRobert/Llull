@@ -159,6 +159,83 @@ function checkDegenerateGeometry(e: Entity): Issue[] {
       }
       break;
     }
+    case 'cone': {
+      if (e.radius <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Cone entity '${e.id}' has radius ${e.radius} ≤ 0. Radius must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      if (e.height <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Cone entity '${e.id}' has height ${e.height} ≤ 0. Height must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      break;
+    }
+    case 'torus': {
+      if (e.ringRadius <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Torus entity '${e.id}' has ringRadius ${e.ringRadius} ≤ 0. ringRadius must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      if (e.tubeRadius <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Torus entity '${e.id}' has tubeRadius ${e.tubeRadius} ≤ 0. tubeRadius must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      break;
+    }
+    case 'wedge': {
+      const [ww, wh, wd] = e.size;
+      if (ww <= 0 || wh <= 0 || wd <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Wedge entity '${e.id}' has a zero or negative size component [${ww}, ${wh}, ${wd}]. All dimensions must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      break;
+    }
+    case 'pyramid': {
+      if (e.baseWidth <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Pyramid entity '${e.id}' has baseWidth ${e.baseWidth} ≤ 0. baseWidth must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      if (e.baseDepth <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Pyramid entity '${e.id}' has baseDepth ${e.baseDepth} ≤ 0. baseDepth must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      if (e.height <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Pyramid entity '${e.id}' has height ${e.height} ≤ 0. Height must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      break;
+    }
     // 'line', 'polyline', 'rectangle', 'point', 'spline', 'mesh' handled elsewhere or N/A
   }
 
@@ -341,7 +418,7 @@ export const checkModel: CommandDefinition<CheckModelParams> = {
     'Returns a structured issue list in `data` ({ ok: boolean, issues: Issue[] }) — ' +
     '`ok` is true when there are no error-severity issues. ' +
     'Does NOT mutate the document. Useful as a lint pass before or after build_project. ' +
-    'Issue codes: degenerate_size (zero/negative box/cylinder/sphere/extrusion/circle/arc/ellipse dimension), ' +
+    'Issue codes: degenerate_size (zero/negative box/cylinder/sphere/extrusion/circle/arc/ellipse/cone/torus/wedge/pyramid dimension), ' +
     'open_profile (polyline not closed), insufficient_points (polyline/spline < 2 points), ' +
     'far_from_origin (entity center > farThreshold units from world origin), ' +
     'empty_layer (layer with no entities), orphaned_group_member (group references missing entity id), ' +

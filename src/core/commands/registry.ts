@@ -10,7 +10,7 @@
 
 import type { CadDocument } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { addBox, addCylinder, addSphere, extrude, move, deleteEntity } from './geometry';
+import { addBox, addCylinder, addSphere, addCone, addTorus, addWedge, addPyramid, extrude, move, deleteEntity } from './geometry';
 import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
 import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint, drawEllipse, drawSpline } from './draw2d';
 import { loadDocument } from './persistence';
@@ -54,6 +54,10 @@ const definitions = [
   addBox,
   addCylinder,
   addSphere,
+  addCone,
+  addTorus,
+  addWedge,
+  addPyramid,
   extrude,
   move,
   deleteEntity,

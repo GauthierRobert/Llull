@@ -27,6 +27,7 @@ import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { LayersPanel } from '@ui/panels/LayersPanel';
 import { CommandPalette } from '@ui/components/CommandPalette';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
+import { EmptyState } from '@ui/components/EmptyState';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 
 type ViewMode = '3d' | '2d';
@@ -60,6 +61,9 @@ export function App(): React.ReactElement {
         <div className="app-viewport">
           {/* Measurement HUD — overlays both 2D and 3D viewports; positioned bottom-left */}
           <MeasurementHUD />
+
+          {/* Empty-state hint — shown when the document has no entities */}
+          <EmptyState />
 
           {/* 2D / 3D view mode toggle — positioned over the viewport */}
           <div className="view-mode-toggle" role="group" aria-label="View mode">

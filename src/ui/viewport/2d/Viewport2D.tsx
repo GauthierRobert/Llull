@@ -38,6 +38,10 @@ import { DrawInteraction } from './DrawInteraction';
 import { DrawTools } from './DrawTools';
 import { useDrawTool } from './useDrawTool';
 import type { DrawToolKind } from './useDrawTool';
+import { ModifyTools } from './ModifyTools';
+import { useModifyTool } from './useModifyTool';
+import type { ModifyToolKind, ModifyToolPhase } from './useModifyTool';
+import { ModifyPickInteraction } from './ModifyPickInteraction';
 import { ScaleBar } from './ScaleBar';
 import { adaptiveGridStep, majorGridStep, shouldRebase2D, snapOrigin2D } from './gridHelpers';
 import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
@@ -260,7 +264,9 @@ function ZoomReader({ onZoom }: ZoomReaderProps): null {
   const { camera } = useThree();
   const lastZoomRef = useRef<number>(50); // matches OrthographicCamera zoom default
   const onZoomRef = useRef(onZoom);
-  useEffect(() => { onZoomRef.current = onZoom; }, [onZoom]);
+  useEffect(() => {
+    onZoomRef.current = onZoom;
+  }, [onZoom]);
 
   useFrame(() => {
     const zoom = (camera as THREE.OrthographicCamera).zoom ?? 50;
@@ -283,6 +289,9 @@ interface SceneContents2DProps {
   onClickPoint: (point: Vec2) => void;
   onDoubleClick: () => void;
   onZoom: (zoom: number) => void;
+  activeModifyTool: ModifyToolKind;
+  modifyPhase: ModifyToolPhase;
+  onEntityPick: (entityId: string, worldPoint: Vec2, entityPoints?: ReadonlyArray<Vec2>) => void;
 }
 
 function SceneContents2D({
@@ -291,10 +300,14 @@ function SceneContents2D({
   onClickPoint,
   onDoubleClick,
   onZoom,
+  activeModifyTool,
+  modifyPhase,
+  onEntityPick,
 }: SceneContents2DProps): React.ReactElement {
   const document = useStore((s) => s.document);
   const renderOrigin = useStore((s) => s.renderOrigin);
   const isDrawing = activeTool !== 'none';
+  const isModifying = activeModifyTool !== 'none';
 
   // Offset entity group by -renderOrigin (XY only; Z stays 0 for top-down).
   // Entity world positions are document coords; subtracting renderOrigin keeps
@@ -318,10 +331,10 @@ function SceneContents2D({
         zoom={50}
       />
 
-      {/* ---- Controls: pan + zoom only; disabled while drawing ---- */}
+      {/* ---- Controls: pan + zoom only; disabled while drawing or modifying ---- */}
       <MapControls
         makeDefault
-        enabled={!isDrawing}
+        enabled={!isDrawing && !isModifying}
         enableRotate={false}
         screenSpacePanning={true}
         zoomSpeed={1.2}
@@ -349,8 +362,8 @@ function SceneContents2D({
       <group position={groupOffset}>
         <Entities2D document={document} />
 
-        {/* Snap indicator: shown when no draw tool is active */}
-        {!isDrawing && <SnapIndicator />}
+        {/* Snap indicator: shown when no draw or modify tool is active */}
+        {!isDrawing && !isModifying && <SnapIndicator />}
 
         {/* Draw interaction: click-capture + rubber-band preview */}
         <DrawInteraction
@@ -358,6 +371,13 @@ function SceneContents2D({
           collectedPoints={collectedPoints}
           onClickPoint={onClickPoint}
           onDoubleClick={onDoubleClick}
+        />
+
+        {/* Modify pick interaction: entity-click capture for modify tools */}
+        <ModifyPickInteraction
+          activeTool={activeModifyTool}
+          phase={modifyPhase}
+          onEntityPick={onEntityPick}
         />
 
         {/* Measurement bbox rectangle — shown when measure_bounding_box result is present */}
@@ -375,6 +395,16 @@ export function Viewport2D(): React.ReactElement {
   const { activeTool, collectedPoints, setActiveTool, handleClick, finishPolyline, finishSpline } =
     useDrawTool();
 
+  const {
+    activeTool: activeModifyTool,
+    phase: modifyPhase,
+    pendingValue,
+    setActiveTool: setModifyTool,
+    handleEntityPick,
+    setPendingValue,
+    commitValue,
+  } = useModifyTool();
+
   const document = useStore((s) => s.document);
 
   // Camera zoom state — updated by ZoomReader inside the canvas, displayed by
@@ -391,7 +421,10 @@ export function Viewport2D(): React.ReactElement {
   }, []);
 
   return (
-    <div className="viewport-2d-wrapper" style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div
+      className="viewport-2d-wrapper"
+      style={{ position: 'relative', width: '100%', height: '100%' }}
+    >
       <Canvas
         frameloop="demand"
         gl={{ antialias: true, alpha: false }}
@@ -406,6 +439,9 @@ export function Viewport2D(): React.ReactElement {
             onClickPoint={handleClick}
             onDoubleClick={onDoubleClick}
             onZoom={handleZoom}
+            activeModifyTool={activeModifyTool}
+            modifyPhase={modifyPhase}
+            onEntityPick={handleEntityPick}
           />
         </Suspense>
       </Canvas>
@@ -415,6 +451,16 @@ export function Viewport2D(): React.ReactElement {
 
       {/* HTML tool palette overlaid on top of the canvas */}
       <DrawTools activeTool={activeTool} onSelectTool={setActiveTool} />
+
+      {/* HTML modify tool palette overlaid on the canvas (right of draw tools) */}
+      <ModifyTools
+        activeTool={activeModifyTool}
+        phase={modifyPhase}
+        pendingValue={pendingValue}
+        onSelectTool={setModifyTool}
+        onSetValue={setPendingValue}
+        onCommitValue={commitValue}
+      />
     </div>
   );
 }

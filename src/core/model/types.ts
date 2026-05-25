@@ -20,7 +20,7 @@ export type DocumentUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export type Vec2 = readonly [number, number];
 
 /** Primitive solids supported in v1. Extend this union to add new geometry. */
-export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh';
+export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid';
 
 /** 2D drafting shape kinds. Geometry is LOCAL to the entity work plane; BaseEntity.position places that plane in 3D space. */
 export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline';
@@ -86,6 +86,72 @@ export interface MeshSolidEntity extends BaseEntity {
   readonly kind: 'mesh';
   /** World-space triangle mesh produced by a boolean kernel operation. */
   mesh: MeshData;
+}
+
+/**
+ * A cone solid — circular base in the XY plane, apex above the base center along +Z.
+ * `position` is the world-space center of the base circle.
+ * `radius` is the base radius; `height` is the distance from base center to apex.
+ * Both must be > 0.
+ */
+export interface ConeEntity extends BaseEntity {
+  readonly kind: 'cone';
+  /** Radius of the circular base. Must be > 0. */
+  radius: number;
+  /** Height from the base center to the apex along the local +Z axis. Must be > 0. */
+  height: number;
+}
+
+/**
+ * A torus (donut) solid centered at `position`.
+ * `ringRadius` is the distance from the torus center to the center of the tube (the major radius).
+ * `tubeRadius` is the radius of the circular tube cross-section (the minor radius).
+ * Both must be > 0 and tubeRadius < ringRadius for a valid (non-self-intersecting) torus.
+ */
+export interface TorusEntity extends BaseEntity {
+  readonly kind: 'torus';
+  /** Distance from torus center to tube center (major radius). Must be > 0. */
+  ringRadius: number;
+  /** Radius of the tube cross-section (minor radius). Must be > 0. */
+  tubeRadius: number;
+}
+
+/**
+ * A wedge solid — a right-triangular prism (ramp shape).
+ * `size` is [width, height, depth] of the enclosing box.
+ * The wedge occupies the full box in X (width) and Z (depth) but is sloped in Y:
+ * the front face (at z=0) has full height, the back face (at z=depth) tapers to zero height.
+ * In other words, the slope cuts the top-rear corner: the solid has vertices at
+ * (0,0,0), (width,0,0), (0,height,0), (width,height,0) on the front face and
+ * (0,0,depth), (width,0,depth) on the back edge (height=0 at z=depth).
+ * `position` is at the lower-front-left corner.
+ * All three size components must be > 0.
+ */
+export interface WedgeEntity extends BaseEntity {
+  readonly kind: 'wedge';
+  /**
+   * Bounding dimensions [width, height, depth].
+   * width = extent along X; height = full height at the front face (z=0);
+   * depth = extent along Z (the ramp direction). All must be > 0.
+   */
+  size: Vec3;
+}
+
+/**
+ * A pyramid solid with a rectangular base and apex above the base center.
+ * `position` is the world-space center of the rectangular base.
+ * The base extends ±baseWidth/2 in X and ±baseDepth/2 in Y from `position`.
+ * The apex is at (position[0], position[1], position[2]+height).
+ * All three dimensions must be > 0.
+ */
+export interface PyramidEntity extends BaseEntity {
+  readonly kind: 'pyramid';
+  /** Width of the rectangular base (extent along X). Must be > 0. */
+  baseWidth: number;
+  /** Depth of the rectangular base (extent along Y). Must be > 0. */
+  baseDepth: number;
+  /** Height from the base center to the apex along the local +Z axis. Must be > 0. */
+  height: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +258,10 @@ export type Entity =
   | SphereEntity
   | ExtrusionEntity
   | MeshSolidEntity
+  | ConeEntity
+  | TorusEntity
+  | WedgeEntity
+  | PyramidEntity
   | LineEntity
   | PolylineEntity
   | ArcEntity

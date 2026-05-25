@@ -696,7 +696,10 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
   description:
     "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), " +
     "'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), " +
-    "'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh). " +
+    "'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), " +
+    "'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), " +
+    "'wedge' (w×h×d / 2 — half the enclosing box), " +
+    "'pyramid' (baseWidth × baseDepth × height / 3). " +
     'Returns data: { volume, unit } where unit is the cubed document unit (e.g. "mm³"). ' +
     '2D shape entities are rejected. Does not modify the document.',
   paramsSchema: {
@@ -705,7 +708,8 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
       entityId: {
         type: 'string',
         description:
-          "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh'.",
+          "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', " +
+          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
       },
     },
     required: ['entityId'],
@@ -735,12 +739,28 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
       case 'mesh':
         volume = meshVolume(e.mesh.positions, e.mesh.indices);
         break;
+      case 'cone':
+        // V = π r² h / 3
+        volume = (Math.PI * e.radius * e.radius * e.height) / 3;
+        break;
+      case 'torus':
+        // V = 2 π² · ringRadius · tubeRadius²
+        volume = 2 * Math.PI * Math.PI * e.ringRadius * e.tubeRadius * e.tubeRadius;
+        break;
+      case 'wedge':
+        // Right-triangular prism: half the enclosing box volume
+        volume = (e.size[0] * e.size[1] * e.size[2]) / 2;
+        break;
+      case 'pyramid':
+        // V = baseWidth × baseDepth × height / 3
+        volume = (e.baseWidth * e.baseDepth * e.height) / 3;
+        break;
       default:
         return {
           document: doc,
           summary:
             `measure_volume: entity '${entityId}' is kind '${e.kind}'; ` +
-            "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh'.",
+            "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
           affected: [],
         };
     }

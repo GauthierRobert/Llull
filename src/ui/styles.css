@@ -714,6 +714,94 @@ body,
 }
 
 /* ==========================================================================
+   2D modify tool palette
+   ========================================================================== */
+
+.modify-tools {
+  position: absolute;
+  top: 50%;
+  left: 88px; /* right of the draw-tools panel (64px min-width + 12px left + 12px gap) */
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  pointer-events: all;
+  user-select: none;
+  min-width: 68px;
+}
+
+/* Numeric input row shown when a value (distance/radius) is needed */
+.modify-tool-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 2px 2px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 2px;
+}
+
+.modify-tool-input-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.modify-tool-input {
+  width: 100%;
+  padding: 3px 5px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.12s ease;
+}
+
+.modify-tool-input:focus {
+  border-color: var(--border-accent);
+  background: var(--bg-input-focus);
+}
+
+/* Remove number input spinners (they crowd the tiny input) */
+.modify-tool-input::-webkit-outer-spin-button,
+.modify-tool-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.modify-tool-commit-btn {
+  padding: 3px 6px;
+  background: var(--color-submit);
+  border: 1px solid var(--color-submit-border);
+  border-radius: 4px;
+  color: var(--color-submit-text);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.modify-tool-commit-btn:hover {
+  background: var(--color-submit-hover);
+}
+
+.modify-tool-commit-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
    Command palette (V2)
    ========================================================================== */
 
@@ -1840,6 +1928,493 @@ body,
 }
 
 .layer-add-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Status bar — right cluster (V4)
+   ========================================================================== */
+
+.status-bar-bottom__right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Empty-state overlay (V4)
+   ========================================================================== */
+
+/**
+ * Centered, pointer-events-none backdrop inside .app-viewport.
+ * Does NOT block clicks on the three.js canvas beneath it.
+ */
+.empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.empty-state__card {
+  position: relative;
+  pointer-events: all;
+  max-width: 420px;
+  width: calc(100% - 48px);
+  background: var(--bg-overlay);
+  backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  padding: 28px 28px 24px;
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.40),
+    0 2px 8px rgba(0, 0, 0, 0.20);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.empty-state__dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.empty-state__dismiss:hover {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.empty-state__dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.empty-state__icon {
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.empty-state__heading {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.empty-state__subheading {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.empty-state__kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text-muted);
+}
+
+.empty-state__tips {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.empty-state__tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.empty-state__tip-icon {
+  flex-shrink: 0;
+  min-width: 22px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-bg);
+  border: 1px solid var(--border-accent);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent-text);
+  padding: 0 4px;
+  margin-top: 1px;
+}
+
+/* ==========================================================================
+   MCP connect modal + trigger button (V4)
+   ========================================================================== */
+
+/* Trigger button in the status bar */
+.mcp-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  height: 22px;
+  background: var(--accent-bg);
+  border: 1px solid var(--border-accent);
+  border-radius: 4px;
+  color: var(--accent-text);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+  flex-shrink: 0;
+}
+
+.mcp-trigger-btn:hover {
+  background: var(--accent-bg-hover);
+  border-color: var(--accent);
+  color: var(--accent-text-hover);
+}
+
+.mcp-trigger-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Backdrop */
+.mcp-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.50);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* Dialog */
+.mcp-dialog {
+  width: 520px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.50),
+    0 4px 12px rgba(0, 0, 0, 0.30);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  outline: none;
+}
+
+/* Header */
+.mcp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.mcp-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.mcp-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.mcp-close-btn:hover {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.mcp-close-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Body */
+.mcp-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.mcp-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* Step rows */
+.mcp-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.mcp-step__num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-bg);
+  border: 1px solid var(--border-accent);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-text);
+  margin-top: 1px;
+}
+
+.mcp-step__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mcp-step__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Code rows */
+.mcp-code-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 7px 10px;
+  min-width: 0;
+}
+
+.mcp-code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+
+.mcp-copy-btn {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+  white-space: nowrap;
+}
+
+.mcp-copy-btn:hover {
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+  color: var(--accent-text);
+}
+
+.mcp-copy-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Capabilities section */
+.mcp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mcp-section__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.mcp-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mcp-list__item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* Badges */
+.mcp-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mcp-badge--tools {
+  background: rgba(91, 141, 238, 0.18);
+  color: var(--accent-text);
+  border: 1px solid rgba(91, 141, 238, 0.35);
+}
+
+.mcp-badge--resources {
+  background: rgba(96, 165, 250, 0.14);
+  color: var(--accent2d-text);
+  border: 1px solid rgba(96, 165, 250, 0.30);
+}
+
+.mcp-badge--prompts {
+  background: rgba(167, 139, 250, 0.14);
+  color: #c4b5fd;
+  border: 1px solid rgba(167, 139, 250, 0.30);
+}
+
+[data-theme="light"] .mcp-badge--prompts {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.10);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+.mcp-inline-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--text-secondary);
+}
+
+/* Footer */
+.mcp-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.mcp-done-btn {
+  padding: 7px 20px;
+  background: var(--color-submit);
+  border: 1px solid var(--color-submit-border);
+  border-radius: 6px;
+  color: var(--color-submit-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.mcp-done-btn:hover {
+  background: var(--color-submit-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.mcp-done-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
