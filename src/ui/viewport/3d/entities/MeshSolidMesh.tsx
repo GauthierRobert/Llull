@@ -10,12 +10,14 @@
  *   - Built in `useMemo` keyed on the mesh data reference — rebuilt only when the
  *     mesh itself changes (rare; booleans produce new entities).
  *   - Disposed via `useEffect` cleanup (r3f R9).
+ * Material props reflect the active display mode (shaded/wireframe/xray).
  */
 
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { MeshSolidEntity } from '@core/model/types';
+import { useMaterialProps } from '../useMaterialProps';
 
 interface MeshSolidMeshProps {
   entity: MeshSolidEntity;
@@ -54,8 +56,7 @@ export function MeshSolidMesh({
   // Dispose geometry when it changes or the component unmounts (r3f R9).
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  const emissive = selected ? '#3a7bd5' : '#000000';
-  const emissiveIntensity = selected ? 0.35 : 0;
+  const matProps = useMaterialProps({ color, selected, roughness: 0.5, metalness: 0.15, envMapIntensity: 0.8 });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();
@@ -74,12 +75,17 @@ export function MeshSolidMesh({
       receiveShadow
     >
       <meshStandardMaterial
-        color={color}
-        emissive={emissive}
-        emissiveIntensity={emissiveIntensity}
-        roughness={0.5}
-        metalness={0.15}
-        envMapIntensity={0.8}
+        color={matProps.color}
+        emissive={matProps.emissive}
+        emissiveIntensity={matProps.emissiveIntensity}
+        roughness={matProps.roughness}
+        metalness={matProps.metalness}
+        envMapIntensity={matProps.envMapIntensity}
+        wireframe={matProps.wireframe}
+        transparent={matProps.transparent}
+        opacity={matProps.opacity}
+        depthWrite={matProps.depthWrite}
+        side={matProps.side}
       />
     </mesh>
   );

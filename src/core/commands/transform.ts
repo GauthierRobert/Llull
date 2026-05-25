@@ -81,7 +81,7 @@ interface ScaleEntityParams {
 export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
   name: 'scale_entity',
   description:
-    'Uniformly scale an entity by a positive factor. Scales geometry in-place: box size, cylinder radius and height, sphere radius, extrusion profile points and depth. Position is unchanged.',
+    'Uniformly scale an entity by a positive factor. Scales geometry in-place for all kinds — 3D: box size, cylinder radius & height, sphere radius, extrusion profile & depth; 2D: line/polyline points, arc/circle/ellipse radii, rectangle width & height, spline points (about the local origin). Position is unchanged.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -165,6 +165,20 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
           height: target.height * factor,
         };
         break;
+      case 'ellipse':
+        scaled = {
+          ...target,
+          center: [target.center[0] * factor, target.center[1] * factor] as Vec2,
+          radiusX: target.radiusX * factor,
+          radiusY: target.radiusY * factor,
+        };
+        break;
+      case 'spline':
+        scaled = {
+          ...target,
+          points: target.points.map(([x, y]) => [x * factor, y * factor] as Vec2),
+        };
+        break;
       case 'point':
         // A point has no local geometry beyond position; return it unchanged.
         scaled = { ...target };
@@ -202,7 +216,11 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
                         ? `new center [${scaled.center.join(', ')}] radius ${scaled.radius}`
                         : scaled.kind === 'rectangle'
                           ? `new size ${scaled.width}×${scaled.height}`
-                          : 'point unchanged';
+                          : scaled.kind === 'ellipse'
+                            ? `new center [${scaled.center.join(', ')}] radiusX ${scaled.radiusX} radiusY ${scaled.radiusY}`
+                            : scaled.kind === 'spline'
+                              ? `scaled ${scaled.points.length} points`
+                              : 'point unchanged';
     return {
       document: { ...doc, entities: { ...doc.entities, [id]: scaled } },
       summary: `Scaled ${id} by factor ${factor}; ${dims}.`,

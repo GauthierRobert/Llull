@@ -4,6 +4,7 @@
  * Maps `document.order` → a render branch per entity `kind`.
  * Every kind has exactly one branch (OCP / architecture L7).
  * Hidden layers are not rendered; selection state is passed to each branch.
+ * Hidden-entity override (render-only, UI store) is also respected here.
  *
  * Click wiring: plain click → select([id]); Shift/Ctrl/Meta click → toggleSelection(id).
  * The `onSelect` callback is threaded from the store down to each mesh via EntityRenderer.
@@ -12,6 +13,7 @@
 import { useCallback } from 'react';
 import type { CadDocument, Entity, EntityId } from '@core/model/types';
 import { useStore } from '@ui/store';
+import { useViewportStore } from '@ui/store';
 import { BoxMesh } from './entities/BoxMesh';
 import { CylinderMesh } from './entities/CylinderMesh';
 import { SphereMesh } from './entities/SphereMesh';
@@ -58,6 +60,9 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
   const select = useStore((s) => s.select);
   const toggleSelection = useStore((s) => s.toggleSelection);
 
+  // Render-only visibility override — never touches the document (PRIME DIRECTIVE).
+  const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
+
   /**
    * Called by each mesh on click.
    * Plain click → single-select; Shift/Ctrl/Meta click → toggle (multi-select).
@@ -82,6 +87,9 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
         // Respect layer visibility.
         const layer = layers[entity.layerId];
         if (layer && !layer.visible) return null;
+
+        // Respect render-only UI hide override.
+        if (hiddenEntityIds.has(id)) return null;
 
         return (
           <EntityRenderer

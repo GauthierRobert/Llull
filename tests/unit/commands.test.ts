@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createEmptyDocument } from '@core/model/types';
+import { createEmptyDocument, is2D } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
 import { __resetIdCounter } from '@lib/id';
 
@@ -816,6 +816,199 @@ describe('delete_parameter', () => {
     doc = execute(doc, 'set_parameter', { name: 'w', expression: '10' }).document;
     const snapshot = JSON.stringify(doc);
     execute(doc, 'delete_parameter', { name: 'w' });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// draw_ellipse
+// ---------------------------------------------------------------------------
+
+describe('draw_ellipse', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('creates one ellipse entity with correct geometry', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_ellipse', { center: [1, 2], radiusX: 5, radiusY: 3 });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(entity.kind).toBe('ellipse');
+    if (entity.kind === 'ellipse') {
+      expect(entity.center).toEqual([1, 2]);
+      expect(entity.radiusX).toBe(5);
+      expect(entity.radiusY).toBe(3);
+    }
+    expect(result.summary).toContain(id);
+    expect(result.summary).toContain('5');
+    expect(result.summary).toContain('3');
+  });
+
+  it('is2D returns true for an ellipse entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 2, radiusY: 1 });
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(is2D(entity)).toBe(true);
+  });
+
+  it('no-op when radiusX <= 0', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 0, radiusY: 3 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('radiusX');
+  });
+
+  it('no-op when radiusY <= 0', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 3, radiusY: -1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('radiusY');
+  });
+
+  it('is pure — the input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 4, radiusY: 2 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('uses default position [0,0,0] when not provided', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 1, radiusY: 1 });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.position).toEqual([0, 0, 0]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// draw_spline
+// ---------------------------------------------------------------------------
+
+describe('draw_spline', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('creates one spline entity with correct through-points', () => {
+    const doc = createEmptyDocument();
+    const pts = [[0, 0], [1, 2], [3, 1], [4, 3]];
+    const result = execute(doc, 'draw_spline', { points: pts });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(entity.kind).toBe('spline');
+    if (entity.kind === 'spline') {
+      expect(entity.points).toHaveLength(4);
+      expect(entity.closed).toBe(false);
+      expect(entity.points[0]).toEqual([0, 0]);
+      expect(entity.points[2]).toEqual([3, 1]);
+    }
+    expect(result.summary).toContain(id);
+    expect(result.summary).toContain('4');
+  });
+
+  it('creates a closed spline when closed=true', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_spline', { points: [[0, 0], [1, 1], [2, 0]], closed: true });
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    if (entity.kind === 'spline') {
+      expect(entity.closed).toBe(true);
+    }
+    expect(result.summary).toContain('closed');
+  });
+
+  it('is2D returns true for a spline entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_spline', { points: [[0, 0], [1, 1]] });
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(is2D(entity)).toBe(true);
+  });
+
+  it('no-op when fewer than 2 points are provided', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_spline', { points: [[0, 0]] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('2');
+  });
+
+  it('no-op when points array is empty', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'draw_spline', { points: [] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('is pure — the input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'draw_spline', { points: [[0, 0], [1, 1], [2, 0]] });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scale_entity — ellipse and spline branches
+// ---------------------------------------------------------------------------
+
+describe('scale_entity — ellipse and spline', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('scales ellipse radiusX, radiusY, and center by factor', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'draw_ellipse', { center: [2, 4], radiusX: 3, radiusY: 1 }).document;
+    const id = Object.keys(doc.entities)[0]!;
+
+    const result = execute(doc, 'scale_entity', { id, factor: 2 });
+    expect(result.affected).toEqual([id]);
+    const entity = result.document.entities[id]!;
+    if (entity.kind === 'ellipse') {
+      expect(entity.center).toEqual([4, 8]);
+      expect(entity.radiusX).toBe(6);
+      expect(entity.radiusY).toBe(2);
+    }
+    expect(result.summary).toContain('radiusX');
+    expect(result.summary).toContain('6');
+  });
+
+  it('scales spline points uniformly by factor', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'draw_spline', { points: [[1, 0], [2, 2], [3, 0]] }).document;
+    const id = Object.keys(doc.entities)[0]!;
+
+    const result = execute(doc, 'scale_entity', { id, factor: 3 });
+    expect(result.affected).toEqual([id]);
+    const entity = result.document.entities[id]!;
+    if (entity.kind === 'spline') {
+      expect(entity.points[0]).toEqual([3, 0]);
+      expect(entity.points[1]).toEqual([6, 6]);
+      expect(entity.points[2]).toEqual([9, 0]);
+    }
+    expect(result.summary).toContain('3 points');
+  });
+
+  it('scale_entity on ellipse is pure', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 2, radiusY: 1 }).document;
+    const id = Object.keys(doc.entities)[0]!;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'scale_entity', { id, factor: 2 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('scale_entity on spline is pure', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'draw_spline', { points: [[0, 0], [1, 1]] }).document;
+    const id = Object.keys(doc.entities)[0]!;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'scale_entity', { id, factor: 0.5 });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });

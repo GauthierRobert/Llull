@@ -17,6 +17,7 @@
 import React, { useState, useCallback } from 'react';
 import { listCommands } from '@core/commands/registry';
 import { useStore } from '@ui/store';
+import { useViewportStore } from '@ui/store';
 import { ParamForm } from './ParamForm';
 import type { Entity } from '@core/model/types';
 
@@ -42,6 +43,28 @@ function formatVec(v: readonly number[]): string {
 interface SelectionSectionProps {
   selection: readonly string[];
   entities: Record<string, Entity>;
+}
+
+/**
+ * Small toggle button for the render-only entity visibility override.
+ * Does NOT touch the document — calls useViewportStore directly (PRIME DIRECTIVE).
+ */
+function EntityVisibilityToggle({ entityId }: { entityId: string }): React.ReactElement {
+  const hiddenEntityIds    = useViewportStore((s) => s.hiddenEntityIds);
+  const toggleVisibility   = useViewportStore((s) => s.toggleEntityVisibility);
+  const isHidden = hiddenEntityIds.has(entityId);
+
+  return (
+    <button
+      type="button"
+      className={`props-visibility-btn${isHidden ? ' props-visibility-btn--hidden' : ''}`}
+      aria-pressed={isHidden}
+      title={isHidden ? 'Show entity in viewport' : 'Hide entity in viewport'}
+      onClick={() => toggleVisibility(entityId)}
+    >
+      {isHidden ? 'Show' : 'Hide'}
+    </button>
+  );
 }
 
 function SelectionSection({ selection, entities }: SelectionSectionProps): React.ReactElement {
@@ -85,7 +108,10 @@ function SelectionSection({ selection, entities }: SelectionSectionProps): React
 
   return (
     <section className="props-section" aria-label="Selection">
-      <h2 className="props-section-title">Selection</h2>
+      <div className="props-section-header">
+        <h2 className="props-section-title">Selection</h2>
+        <EntityVisibilityToggle entityId={entity.id} />
+      </div>
       <dl className="props-list">
         <div className="props-row">
           <dt className="props-key">Kind</dt>

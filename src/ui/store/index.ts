@@ -9,3 +9,6 @@ export type { CadStoreState, LastMeasure } from './store';
 
 export { useThemeStore } from './themeStore';
 export type { ThemeStoreState, Theme } from './themeStore';
+
+export { useViewportStore } from './viewportStore';
+export type { ViewportStoreState, DisplayMode, ClipAxis, ClipPlaneState } from './viewportStore';

@@ -23,7 +23,7 @@ export type Vec2 = readonly [number, number];
 export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh';
 
 /** 2D drafting shape kinds. Geometry is LOCAL to the entity work plane; BaseEntity.position places that plane in 3D space. */
-export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point';
+export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline';
 
 /** All entity kinds — 3D solids and 2D shapes. */
 export type EntityKind = SolidKind | Shape2DKind;
@@ -150,6 +150,42 @@ export interface PointEntity extends BaseEntity {
   readonly kind: 'point';
 }
 
+/**
+ * An axis-aligned ellipse in the local work plane.
+ * `center` is the ellipse center in local 2D coordinates.
+ * `radiusX` and `radiusY` are the semi-axes along the local plane's X and Y axes respectively.
+ * The entity `position`/`rotation` places the work plane in 3D space.
+ * Both radii must be > 0.
+ */
+export interface EllipseEntity extends BaseEntity {
+  readonly kind: 'ellipse';
+  /** Center of the ellipse in local 2D work-plane coordinates. */
+  center: Vec2;
+  /** Semi-axis length along the local X axis. Must be > 0. */
+  radiusX: number;
+  /** Semi-axis length along the local Y axis. Must be > 0. */
+  radiusY: number;
+}
+
+/**
+ * A Catmull-Rom interpolating spline in the local work plane.
+ * `points` are the through-points (the spline passes through each one).
+ * Requires at least 2 points.
+ * When `closed` is true, the curve loops back from the last point to the first.
+ *
+ * Convention for renderers (VS1): tessellate as a Catmull-Rom spline with
+ * centripetal parameterization. The control points ARE the through-points;
+ * no separate control polygon is stored. For closed splines, treat the point
+ * array as periodic (wrap the first/last points).
+ */
+export interface SplineEntity extends BaseEntity {
+  readonly kind: 'spline';
+  /** Ordered through-points in local 2D work-plane coordinates. Minimum 2 points. */
+  points: ReadonlyArray<Vec2>;
+  /** When true the spline loops back from the last point to the first. */
+  closed: boolean;
+}
+
 export type Entity =
   | BoxEntity
   | CylinderEntity
@@ -161,7 +197,9 @@ export type Entity =
   | ArcEntity
   | CircleEntity
   | RectangleEntity
-  | PointEntity;
+  | PointEntity
+  | EllipseEntity
+  | SplineEntity;
 
 // ---------------------------------------------------------------------------
 // Kind helpers
@@ -174,6 +212,8 @@ const SHAPE2D_KINDS: ReadonlySet<string> = new Set<Shape2DKind>([
   'circle',
   'rectangle',
   'point',
+  'ellipse',
+  'spline',
 ]);
 
 /** Returns true if the entity is a 2D drafting shape. */

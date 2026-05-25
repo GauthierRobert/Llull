@@ -3,12 +3,14 @@
  *
  * Render branch for `kind:'sphere'` entities.
  * Geometry is memoized on the entity's geometric fields; disposed on unmount.
+ * Material props reflect the active display mode (shaded/wireframe/xray).
  */
 
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { SphereEntity } from '@core/model/types';
+import { useMaterialProps } from '../useMaterialProps';
 
 interface SphereMeshProps {
   entity: SphereEntity;
@@ -29,8 +31,7 @@ export function SphereMesh({ entity, selected, onSelect }: SphereMeshProps): Rea
   // Dispose the previous geometry when it changes or the component unmounts (r3f R9).
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  const emissive = selected ? '#3a7bd5' : '#000000';
-  const emissiveIntensity = selected ? 0.35 : 0;
+  const matProps = useMaterialProps({ color, selected, roughness: 0.35, metalness: 0.12, envMapIntensity: 1.0 });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();
@@ -49,12 +50,17 @@ export function SphereMesh({ entity, selected, onSelect }: SphereMeshProps): Rea
       receiveShadow
     >
       <meshStandardMaterial
-        color={color}
-        emissive={emissive}
-        emissiveIntensity={emissiveIntensity}
-        roughness={0.35}
-        metalness={0.12}
-        envMapIntensity={1.0}
+        color={matProps.color}
+        emissive={matProps.emissive}
+        emissiveIntensity={matProps.emissiveIntensity}
+        roughness={matProps.roughness}
+        metalness={matProps.metalness}
+        envMapIntensity={matProps.envMapIntensity}
+        wireframe={matProps.wireframe}
+        transparent={matProps.transparent}
+        opacity={matProps.opacity}
+        depthWrite={matProps.depthWrite}
+        side={matProps.side}
       />
     </mesh>
   );
