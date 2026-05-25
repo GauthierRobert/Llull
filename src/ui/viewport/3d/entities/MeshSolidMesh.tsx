@@ -70,6 +70,8 @@ export function MeshSolidMesh({
       position={[position[0], position[1], position[2]]}
       rotation={[rotation[0], rotation[1], rotation[2]]}
       onClick={handleClick}
+      castShadow
+      receiveShadow
     >
       <meshStandardMaterial
         color={color}
@@ -77,6 +79,7 @@ export function MeshSolidMesh({
         emissiveIntensity={emissiveIntensity}
         roughness={0.5}
         metalness={0.15}
+        envMapIntensity={0.8}
       />
     </mesh>
   );
