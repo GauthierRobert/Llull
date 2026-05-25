@@ -1532,3 +1532,314 @@ body,
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ==========================================================================
+   Layers panel (L2)
+   ========================================================================== */
+
+/* When mounted as the right dock in the app shell, .app-layers overrides flex-basis. */
+.app-layers {
+  order: 3; /* ensures it renders after the viewport in flex flow */
+}
+
+.layers-panel {
+  flex: 0 0 220px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+/* Panel header: title + undo/redo */
+.layers-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.layers-panel-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Undo / redo button group */
+.layers-undoredo {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.layers-undoredo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+  white-space: nowrap;
+}
+
+.layers-undoredo-btn:hover:not(:disabled) {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.layers-undoredo-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.layers-undoredo-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Layer list */
+.layer-list {
+  list-style: none;
+  flex: 1;
+  padding: 4px 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+/* Individual layer row */
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 30px;
+  transition: background 0.08s ease;
+}
+
+.layer-row:hover {
+  background: var(--bg-input);
+}
+
+/* Generic icon button within a row */
+.layer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+}
+
+.layer-btn:hover:not(:disabled) {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.layer-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.layer-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Visibility button: muted when hidden */
+.layer-visibility-btn--hidden {
+  color: var(--text-faint);
+  opacity: 0.5;
+}
+
+/* Lock button: accent when locked */
+.layer-lock-btn--locked {
+  color: var(--accent-text);
+  border-color: var(--border-accent);
+  background: var(--accent-bg);
+}
+
+/* Delete button: red on hover */
+.layer-delete-btn:hover:not(:disabled) {
+  background: rgba(224, 92, 92, 0.12);
+  border-color: rgba(224, 92, 92, 0.35);
+  color: var(--color-error);
+}
+
+/* Color swatch */
+.layer-color-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border-medium);
+}
+
+.layer-color-swatch--none {
+  border-color: var(--border-subtle);
+  background: transparent;
+}
+
+/* Layer name cell */
+.layer-name-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Name display button (click to edit) */
+.layer-name-btn {
+  flex: 1;
+  text-align: left;
+  padding: 2px 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.08s ease, border-color 0.08s ease;
+}
+
+.layer-name-btn:hover {
+  background: var(--bg-input-focus);
+  border-color: var(--border-accent);
+}
+
+.layer-name-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Inline rename input */
+.layer-name-input {
+  flex: 1;
+  padding: 2px 4px;
+  background: var(--bg-input-focus);
+  border: 1px solid var(--border-accent);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Entity count badge */
+.layer-entity-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  min-width: 14px;
+  text-align: right;
+}
+
+/* Panel footer (add-layer form) */
+.layers-panel-footer {
+  flex-shrink: 0;
+  padding: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Add-layer form */
+.layer-add-form {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.layer-add-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.layer-add-input:focus {
+  border-color: var(--border-accent);
+  background: var(--bg-input-focus);
+}
+
+.layer-add-input::placeholder {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.layer-add-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  background: var(--color-submit);
+  border: 1px solid var(--color-submit-border);
+  border-radius: 4px;
+  color: var(--color-submit-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  white-space: nowrap;
+}
+
+.layer-add-btn:hover:not(:disabled) {
+  background: var(--color-submit-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.layer-add-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.layer-add-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

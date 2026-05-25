@@ -24,6 +24,14 @@ import { setUnits } from './units';
 import { setParameter, deleteParameter } from './parameters';
 import { checkModel } from './check';
 import {
+  explodePolyline,
+  offset2D,
+  trim,
+  extend,
+  fillet2D,
+  chamfer2D,
+} from './modify2d';
+import {
   addLayer,
   renameLayer,
   setLayerVisibility,
@@ -86,6 +94,12 @@ const definitions = [
   setParameter,
   deleteParameter,
   checkModel,
+  explodePolyline,
+  offset2D,
+  trim,
+  extend,
+  fillet2D,
+  chamfer2D,
   addLayer,
   renameLayer,
   setLayerVisibility,

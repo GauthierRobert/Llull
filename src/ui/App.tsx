@@ -24,6 +24,7 @@ import { Viewport2D } from '@ui/viewport/2d/Viewport2D';
 import { Toolbar } from '@ui/components/Toolbar';
 import { StatusBar } from '@ui/components/StatusBar';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
+import { LayersPanel } from '@ui/panels/LayersPanel';
 import { CommandPalette } from '@ui/components/CommandPalette';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
@@ -82,6 +83,9 @@ export function App(): React.ReactElement {
             {viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}
           </ViewportErrorBoundary>
         </div>
+
+        {/* Layers panel — right dock */}
+        <LayersPanel className="app-layers" />
       </div>
 
       <StatusBar />
