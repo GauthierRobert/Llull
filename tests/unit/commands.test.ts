@@ -149,6 +149,85 @@ describe('command layer', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
+  // ── add_cylinder ─────────────────────────────────────────────────────────
+
+  it('add_cylinder creates one cylinder entity with the given dimensions', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cylinder', { radius: 2, height: 5 });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(entity.kind).toBe('cylinder');
+    // @ts-expect-error narrowing through discriminated union not needed in test
+    expect(entity.radius).toBe(2);
+    // @ts-expect-error same
+    expect(entity.height).toBe(5);
+    expect(result.summary).toContain(id);
+  });
+
+  it('add_cylinder is pure — input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_cylinder', { radius: 3, height: 4 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('add_cylinder with radius <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cylinder', { radius: 0, height: 5 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('radius');
+  });
+
+  it('add_cylinder with height <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cylinder', { radius: 3, height: -1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('height');
+  });
+
+  // ── add_sphere ───────────────────────────────────────────────────────────
+
+  it('add_sphere creates one sphere entity with the given radius', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_sphere', { radius: 4 });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    expect(entity.kind).toBe('sphere');
+    // @ts-expect-error narrowing through discriminated union not needed in test
+    expect(entity.radius).toBe(4);
+    expect(result.summary).toContain(id);
+  });
+
+  it('add_sphere is pure — input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_sphere', { radius: 2 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('add_sphere with radius <= 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_sphere', { radius: -5 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('radius');
+  });
+
+  it('add_sphere with radius = 0 is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_sphere', { radius: 0 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
   it('unknown commands fail gracefully', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'frobnicate', {});
