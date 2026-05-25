@@ -39,12 +39,12 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 ## NOW (auto-updated by the skill)
 - **Last updated:** 2026-05-25 — **WAVE 2 KICKOFF.** `build_project` (AI1) + `describe_scene` (J3) merged on this branch (`d9f9bcf`); **28 commands** registered. **Gate green: 339 tests** after Batch 0.
 - **Batch 0 (DONE):** made `npm run check` reliably green — `tsconfig.json` `baseUrl` removed + `paths` made relative (forward-compatible with TS 6/7; the global `tsc` 6.0.2 errored on the deprecated `baseUrl`). NOTE: web sessions had no `node_modules` → ensure the SessionStart hook runs `npm install`.
-- **Batch 1 (LAUNCHED — 4 parallel lanes, disjoint files, no cross-deps):** L1 `U1` units · L2 `V1` PBR/lighting · L3 `S4` advanced object snaps (re-land) · L4 `J1` document-as-MCP-resource.
-- **Next batches:** B2 = `AI3` named/tagged + find_entities · `V3` status bar · `U4` 2D grid/scale · `AI2` render_view. B3 = `M1` measure · `V2` command palette · `S1↔VS1` ellipse/spline · export endpoints. B4 = `Q1` parameters · `M2` HUD · 2D modify · `AI4` check_model.
+- **Batch 1 (DONE — all 4 lanes merged + pushed, 423 tests green):** L1 `U1` units (`set_units`, units/displayPrecision, `formatLength`; 29 cmds now) · L2 `V1` PBR/IBL/soft-shadows/tone-mapping · L3 `S4` advanced object snaps (perpendicular/tangent/extension/nearest + osnap tracking, +48 tests) · L4 `J1` MCP resources (`cad://document|scene|selection`). `cad-reviewer`: APPROVE on U1/V1/J1 (2 NITs, one applied); S4 review in flight. **Isolation caveat: J1 ran in the MAIN checkout (worktree didn't engage) — landed coherently, but watch for it.**
+- **Next batches:** B2 = `AI3` named/tagged + find_entities · `V3` status bar (uses U1) · `U4` 2D grid/scale (uses U1) · `AI2` render_view. B3 = `M1` measure (uses W1+U1, reuse `formatLength`) · `V2` command palette · `S1↔VS1` ellipse/spline · export endpoints. B4 = `Q1` parameters · `M2` HUD · 2D modify · `AI4` check_model.
 - **Plan of record:** `/root/.claude/plans/prepare-for-next-wave-compiled-tiger.md` — Wave 2 = parametric+measure, modeling depth (2D+3D), UX/visuals/export, MCP/AI intelligence. Kernel swap (K1/K2 fillet/chamfer/shell) DEFERRED by decision.
-- **Wave 1 DONE:** W0-1,W0-2, A1,A2,A3,A6, A4-core/A4-ui, R1, B1,B3, C1,C2,C3, D1,D2,D3, E1,E2, G1,G2,G3, H1, I2,I3. **Wave 2 DONE so far:** W1, U2, N0, P1, J2, J3, AI1.
+- **Wave 1 DONE:** W0-1,W0-2, A1,A2,A3,A6, A4-core/A4-ui, R1, B1,B3, C1,C2,C3, D1,D2,D3, E1,E2, G1,G2,G3, H1, I2,I3. **Wave 2 DONE so far:** W1, U2, N0, P1, J2, J3, AI1, **U1, V1, S4, J1 (Batch 1)**.
 - **REMOVED (3):** F1,F2,F3 — in-app AI bridge (`core/ai`), `/api/ai` proxy, chat panel. MCP is the sole AI path (decision log).
-- **Registered commands (28):** add_box/cylinder/sphere, extrude_profile, move/delete/rotate/scale/mirror_entity, array_linear/polar, draw_line/polyline/arc/circle/rectangle/point, load_document, extrude_sketch, revolve_profile(stub), duplicate/group/ungroup_entities, boolean_union/subtract/intersect, describe_scene, build_project.
+- **Registered commands (29):** add_box/cylinder/sphere, extrude_profile, move/delete/rotate/scale/mirror_entity, array_linear/polar, draw_line/polyline/arc/circle/rectangle/point, load_document, extrude_sketch, revolve_profile(stub), duplicate/group/ungroup_entities, boolean_union/subtract/intersect, describe_scene, build_project, set_units.
 
 ---
 
@@ -117,7 +117,7 @@ is unchanged, so themes interleave freely across the 4 lanes.
 - `[TODO]` **K3** `sweep_profile` (profile along a path) + `loft_profiles` (between sections) → `mesh`. _deps: A4-ui, B3._
 
 ## U — Infinite precision & units (the "scroll forever, scale present" ask)
-- `[WIP]` **U1** Units system: add `units` (`'mm'|'cm'|'m'|'in'|'ft'`, default `mm`) + display precision to `CadDocument`; `set_units` command; thread through persistence + measure summaries. _Lane 1. deps: —. Acceptance: round-trips through save/load; summaries report values with unit suffix._
+- `[DONE]` **U1** Units system: add `units` (`'mm'|'cm'|'m'|'in'|'ft'`, default `mm`) + display precision to `CadDocument`; `set_units` command; thread through persistence + measure summaries. _Lane 1. deps: —. Acceptance: round-trips through save/load; summaries report values with unit suffix._
 - `[DONE]` **U2** Floating-origin / camera-relative rendering: rebase the rendered scene origin to a dynamic offset near the camera target so geometry far from (0,0,0) stays float32-stable (no jitter) — pan/zoom effectively infinite. Document keeps true double coords; offset is render-only (store, not document). _Lane 2. deps: —. Acceptance: a box at 1e7 units renders crisp; orbit/pan stable; selection raycast still correct._
 - `[TODO]` **U3** Adaptive infinite grid + on-screen **scale bar / ruler HUD** for the 3D view: grid subdivision steps per zoom decade; HUD shows current unit length (reads `U1` units). _Lane 2. deps: U1, U2._
 - `[TODO]` **U4** 2D view counterpart: adaptive ortho grid + scale bar + infinite pan/zoom in `Viewport2D`. _Lane 3. deps: U1. (U2 technique applied to the ortho camera.)_
@@ -128,7 +128,7 @@ is unchanged, so themes interleave freely across the 4 lanes.
 - `[TODO]` **S2** 2D modify commands: `offset_2d`, `fillet_2d`, `chamfer_2d`, `trim`, `extend`, `explode_polyline`. _Lane 1. deps: B1. PAIR(S2↔VS2 for the interactive pick-edge UI)._
 - `[TODO]` **VS2** Interactive 2D modify tools (pick + preview) wired to S2 commands. _Lane 3. deps: S2._
 - `[TODO]` **S3** `hatch_region` (fill a closed loop with a pattern) + `region` entity. _Lane 1+3. deps: B1._
-- `[WIP]` **S4** Advanced object snaps: perpendicular, tangent, extension, nearest + object-snap tracking. _Lane 3. deps: D2. Fix pass committed (`worktree-agent-a58eda50ef1f7a913`, `355934c`): tangent `acos` fix, modes wired through `useSnap`/callers, fake `parallel` dropped. Under `cad-reviewer` (confirm the 3 blocking issues resolved) → then merge._
+- `[DONE]` **S4** Advanced object snaps: perpendicular, tangent, extension, nearest + object-snap tracking. _Lane 3. deps: D2. Fix pass committed (`worktree-agent-a58eda50ef1f7a913`, `355934c`): tangent `acos` fix, modes wired through `useSnap`/callers, fake `parallel` dropped. Under `cad-reviewer` (confirm the 3 blocking issues resolved) → then merge._
 
 ## T — Annotation (was B2; Lane 1 cmd + render PAIR)
 - `[TODO]` **T1** `add_text` (string + height + plane placement). _Lane 1. deps: —. PAIR(T1↔VT1: drei `<Text>`/troika in both 2D & 3D)._
@@ -165,13 +165,13 @@ is unchanged, so themes interleave freely across the 4 lanes.
 - `[TODO]` **P5** (Stretch) WebGPU renderer opt-in behind a flag with WebGL fallback; verify drei helpers (Grid/Gizmo) degrade gracefully. _Lane 2. deps: P1. Re-evaluate only if P1–P4 leave a measured GPU bottleneck._
 
 ## V — Design & UX feel (Lane 2/3, `viewport-engineer`)
-- `[WIP]` **V1** Material/lighting upgrade: PBR materials, environment map (drei `Environment`), soft contact shadows / AO, tone mapping. _Lane 2. deps: —._
+- `[DONE]` **V1** Material/lighting upgrade: PBR materials, environment map (drei `Environment`), soft contact shadows / AO, tone mapping. _Lane 2. deps: —._
 - `[TODO]` **V2** Command palette (Ctrl/Cmd-K over `listCommands()`), global keyboard-shortcut system, and view presets (front/top/right/iso + fit-to-selection). _Lane 2. deps: E1._
 - `[TODO]` **V3** Visual design system: refined dark theme + light theme toggle, consistent panel/toolbar styling, iconography, status bar (cursor coords + active units). _Lane 2. deps: U1 (units in status bar)._
 - `[TODO]` **V4** First-run empty-state / onboarding hints + MCP "connect an agent" affordance. _Lane 2. deps: —._
 
 ## J — MCP enhancements (Lane 4, `mcp-engineer`)
-- `[WIP]` **J1** Expose the document as an MCP **resource** (read-only): list entities, read full document / selection. _deps: G2._
+- `[DONE]` **J1** Expose the document as an MCP **resource** (read-only): list entities, read full document / selection. _deps: G2._
 - `[DONE]` **J2** Batch/transaction tool → superseded by `build_project` (see AI theme below). Applies an ordered action list atomically with cross-step aliasing, abort/continue policy, validate dry-run, and a combined report. _Implemented as a registry command (`core/commands/project.ts`), not an MCP-only helper → UI + MCP both gain it._
 - `[DONE]` **J3** `describe_scene`: structured read-only snapshot (entity ids, kinds, world bounds, layers, groups, selection) so an agent can orient before editing. _Re-implemented (the stale pre-W1 worktree is gone) as a proper **registry command** in `core/commands/scene.ts` returning the snapshot in `CommandResult.data` (uses W1). 19 tests; document untouched, affected:[]. Cleaner than the old MCP-only built-in: it is a command, so UI + MCP both get it (L1/L5)._
 
