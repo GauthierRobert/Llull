@@ -17,8 +17,8 @@ describe('shouldRebase', () => {
     expect(shouldRebase([9999, 0, 0], [0, 0, 0])).toBe(false);
   });
 
-  it('returns true when drift exactly equals the threshold', () => {
-    // distance = 1e4 exactly → 1e4² = 1e8, not strictly greater → false
+  it('returns false when drift exactly equals the threshold (strict >)', () => {
+    // distance = 1e4 exactly → not strictly greater than the threshold → false
     expect(shouldRebase([10000, 0, 0], [0, 0, 0])).toBe(false);
   });
 

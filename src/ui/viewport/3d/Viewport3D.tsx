@@ -25,6 +25,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
@@ -74,8 +75,9 @@ function RenderOriginSyncer(): null {
 
   useFrame(() => {
     if (!controls) return;
-    // OrbitControls exposes a `target` Vector3 on the controls object.
-    const orbitTarget = (controls as unknown as { target?: THREE.Vector3 }).target;
+    // drei's <OrbitControls makeDefault> registers an OrbitControls instance here;
+    // it extends EventDispatcher (the store's `controls` type) and exposes `target`.
+    const orbitTarget = (controls as OrbitControlsImpl).target;
     if (!orbitTarget) return;
 
     const camTarget: [number, number, number] = [orbitTarget.x, orbitTarget.y, orbitTarget.z];

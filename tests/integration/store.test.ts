@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
+import { serializeDocument } from '@core/commands/persistence';
 
 // ---------------------------------------------------------------------------
 // Helpers — access the store's raw API without React
@@ -24,7 +25,7 @@ function getState(): ReturnType<typeof useStore.getState> {
 }
 
 function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+  useStore.setState({ document: createEmptyDocument(), lastSummary: null, renderOrigin: [0, 0, 0] });
 }
 
 // ---------------------------------------------------------------------------
@@ -188,5 +189,34 @@ describe('CadStore', () => {
     expect(getState().document.selection).toEqual([]);
     // and the entities are untouched
     expect(getState().document.entities).toEqual(docBefore.entities);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderOrigin — floating-origin render state (render-only, NOT in document)
+// ---------------------------------------------------------------------------
+
+describe('CadStore — renderOrigin (floating-origin)', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    resetStore();
+  });
+
+  it('setRenderOrigin updates renderOrigin', () => {
+    getState().setRenderOrigin([1e4, 0, -2e4]);
+    expect(getState().renderOrigin).toEqual([1e4, 0, -2e4]);
+  });
+
+  it('setRenderOrigin does NOT change the document reference', () => {
+    const docBefore = getState().document;
+    getState().setRenderOrigin([5e6, 5e6, 5e6]);
+    expect(getState().document).toBe(docBefore);
+  });
+
+  it('renderOrigin never leaks into the serialized document', () => {
+    getState().setRenderOrigin([1234, 5678, 9012]);
+    const serialized = serializeDocument(getState().document);
+    expect(serialized).not.toContain('renderOrigin');
+    expect(serialized).not.toContain('1234');
   });
 });
