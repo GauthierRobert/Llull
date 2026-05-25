@@ -24,6 +24,14 @@ import { setUnits } from './units';
 import { setParameter, deleteParameter } from './parameters';
 import { checkModel } from './check';
 import {
+  addLayer,
+  renameLayer,
+  setLayerVisibility,
+  setLayerLock,
+  setEntityLayer,
+  deleteLayer,
+} from './layers';
+import {
   measureDistance,
   measureAngle,
   measureArea,
@@ -78,6 +86,12 @@ const definitions = [
   setParameter,
   deleteParameter,
   checkModel,
+  addLayer,
+  renameLayer,
+  setLayerVisibility,
+  setLayerLock,
+  setEntityLayer,
+  deleteLayer,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

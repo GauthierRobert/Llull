@@ -55,6 +55,13 @@ export interface ViewportStoreState {
   /** Set of entity ids suppressed from the 3D render. Never touches the document. */
   hiddenEntityIds: ReadonlySet<EntityId>;
 
+  /**
+   * Whether 3D object snapping is active during gizmo translate drags.
+   * Render-only flag — never serialised into CadDocument.
+   * Default: true.
+   */
+  snap3dEnabled: boolean;
+
   // ---- Actions ------------------------------------------------------------
 
   /** Set the global display mode ('shaded' | 'wireframe' | 'xray'). */
@@ -75,6 +82,9 @@ export interface ViewportStoreState {
 
   /** Make all hidden entities visible again. */
   showAllEntities(): void;
+
+  /** Toggle 3D object snapping on/off. */
+  toggleSnap3d(): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +106,7 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   displayMode: 'shaded',
   clipPlane: DEFAULT_CLIP_PLANE,
   hiddenEntityIds: new Set<EntityId>(),
+  snap3dEnabled: true,
 
   setDisplayMode(mode: DisplayMode): void {
     set({ displayMode: mode });
@@ -125,5 +136,9 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
 
   showAllEntities(): void {
     set({ hiddenEntityIds: new Set<EntityId>() });
+  },
+
+  toggleSnap3d(): void {
+    set((state) => ({ snap3dEnabled: !state.snap3dEnabled }));
   },
 }));

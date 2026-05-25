@@ -20,6 +20,28 @@ import { useViewportStore } from '@ui/store';
 import type { DisplayMode, ClipAxis } from '@ui/store';
 
 // ---------------------------------------------------------------------------
+// 3D snap toggle
+// ---------------------------------------------------------------------------
+
+function Snap3DToggle(): React.ReactElement {
+  const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
+  const toggleSnap3d  = useViewportStore((s) => s.toggleSnap3d);
+  return (
+    <div className="vp-control-group" role="group" aria-label="3D snap">
+      <button
+        type="button"
+        className={`vp-mode-btn${snap3dEnabled ? ' vp-mode-btn--active' : ''}`}
+        aria-pressed={snap3dEnabled}
+        title={snap3dEnabled ? 'Disable 3D snap (vertex/edge/face-center/grid)' : 'Enable 3D snap'}
+        onClick={toggleSnap3d}
+      >
+        Snap
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Display mode segmented button
 // ---------------------------------------------------------------------------
 
@@ -164,6 +186,7 @@ export function ViewportControls(): React.ReactElement {
     <div className="vp-controls-overlay" aria-label="Viewport controls">
       <DisplayModeControl />
       <ClipPlaneControl />
+      <Snap3DToggle />
     </div>
   );
 }

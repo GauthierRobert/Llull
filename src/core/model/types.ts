@@ -231,6 +231,8 @@ export interface Layer {
   name: string;
   visible: boolean;
   locked: boolean;
+  /** Optional hex color string used by the UI to tint layer contents, e.g. "#ff0000". */
+  color?: string;
 }
 
 export interface CameraState {
