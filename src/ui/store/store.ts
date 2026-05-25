@@ -35,6 +35,15 @@ export interface CadStoreState {
   document: CadDocument;
 
   /**
+   * Floating-origin render offset — render-ONLY, NOT part of the document.
+   * All entity mesh positions are expressed relative to this origin to keep
+   * three.js float32 values small (avoids vertex jitter at large coordinates).
+   * Updated by the 3D viewport when the camera target drifts beyond the rebase
+   * threshold; never serialised into CadDocument.
+   */
+  renderOrigin: [number, number, number];
+
+  /**
    * Summary returned by the most recent `dispatch` call.
    * Handy for status bars and other command-feedback surfaces.
    * Null before any dispatch.
@@ -106,6 +115,13 @@ export interface CadStoreState {
    * Clear all selected entities.
    */
   clearSelection(): void;
+
+  /**
+   * Update the floating render origin.
+   * Called by the 3D viewport when the camera target drifts beyond the rebase
+   * threshold. This is a render-only concern and MUST NOT touch the document.
+   */
+  setRenderOrigin(origin: [number, number, number]): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +133,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
   lastSummary: null,
   undoStack: [],
   redoStack: [],
+  renderOrigin: [0, 0, 0],
 
   dispatch(name: string, params: unknown): CommandResult {
     const prior = get().document;
@@ -186,5 +203,9 @@ export const useStore = create<CadStoreState>()((set, get) => ({
     set((state) => ({
       document: { ...state.document, selection: [] },
     }));
+  },
+
+  setRenderOrigin(origin: [number, number, number]): void {
+    set({ renderOrigin: origin });
   },
 }));

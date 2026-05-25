@@ -13,18 +13,22 @@
  * - <TransformGizmo> appears when exactly one entity is selected and lets the
  *   user translate/rotate/scale by dispatching the matching command on drag end.
  *   <GizmoModeToggle> is an overlay outside the Canvas sharing the same mode.
+ * - Floating-origin rendering: entities + gizmo are wrapped in a group offset by
+ *   -renderOrigin so that float32 vertex positions stay small regardless of true
+ *   world coordinates (avoids jitter for geometry far from world origin).
  *
  * This component is purely presentational: it reads from the store and never
  * mutates the document (PRIME DIRECTIVE). All changes go through dispatch.
  */
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
+import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
 import type { GizmoMode } from './TransformGizmo';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +51,45 @@ function sphericalToCartesian(
 }
 
 // ---------------------------------------------------------------------------
+// RenderOriginSyncer — per-frame rebase check (inside Canvas, no setState/frame)
+// ---------------------------------------------------------------------------
+
+/**
+ * Checks the OrbitControls target each frame. When the camera target drifts
+ * beyond the rebase threshold from the current renderOrigin, calls
+ * setRenderOrigin once. Uses a ref to gate calls — only fires when the
+ * threshold is newly crossed, not every frame (react.md R6/R9).
+ */
+function RenderOriginSyncer(): null {
+  const { controls } = useThree();
+  const renderOrigin = useStore((s) => s.renderOrigin);
+  const setRenderOrigin = useStore((s) => s.setRenderOrigin);
+
+  // Mirror renderOrigin into a ref so useFrame can read the latest value without
+  // being in useFrame's dependency closure (per-frame closure capture avoidance).
+  const originRef = useRef<[number, number, number]>(renderOrigin);
+  useEffect(() => {
+    originRef.current = renderOrigin;
+  }, [renderOrigin]);
+
+  useFrame(() => {
+    if (!controls) return;
+    // OrbitControls exposes a `target` Vector3 on the controls object.
+    const orbitTarget = (controls as unknown as { target?: THREE.Vector3 }).target;
+    if (!orbitTarget) return;
+
+    const camTarget: [number, number, number] = [orbitTarget.x, orbitTarget.y, orbitTarget.z];
+    if (shouldRebase(camTarget, originRef.current)) {
+      const newOrigin = snapOriginToTarget(camTarget);
+      originRef.current = newOrigin; // update ref immediately to prevent repeat calls
+      setRenderOrigin(newOrigin);
+    }
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Scene contents (inside Canvas)
 // ---------------------------------------------------------------------------
 
@@ -59,6 +102,7 @@ interface SceneContentsProps {
 
 function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
   const document = useStore((s) => s.document);
+  const renderOrigin = useStore((s) => s.renderOrigin);
   const { camera: cam } = document;
 
   const initialPosition = useMemo(
@@ -75,20 +119,34 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
     [],
   );
 
+  // The entities + gizmo group is offset by -renderOrigin so that all entity
+  // positions (expressed in document world coords) become relative to the
+  // render origin — keeping float32 mesh positions small (avoids jitter).
+  // Raycasting is automatically correct: three.js resolves click events in
+  // world space using the mesh's matrixWorld, which accounts for the group offset.
+  const groupOffset = useMemo(
+    () =>
+      new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]),
+    [renderOrigin],
+  );
+
   return (
     <>
       {/* ---- Camera + controls ---- */}
-      <PerspectiveCamera makeDefault fov={45} near={0.01} far={10000} position={initialPosition} />
+      <PerspectiveCamera makeDefault fov={45} near={0.01} far={1e8} position={initialPosition} />
       <OrbitControls
         makeDefault
         target={targetVec}
         minDistance={0.1}
-        maxDistance={2000}
+        maxDistance={5e6}
         enableDamping
         dampingFactor={0.06}
         screenSpacePanning={false}
         enabled={orbitEnabled}
       />
+
+      {/* ---- Per-frame rebase check — no setState per frame ---- */}
+      <RenderOriginSyncer />
 
       {/* ---- Lighting ---- */}
       <ambientLight intensity={0.6} />
@@ -114,11 +172,15 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         infiniteGrid
       />
 
-      {/* ---- Entities ---- */}
-      <Entities document={document} />
-
-      {/* ---- Transform gizmo (shown for single-entity selection) ---- */}
-      <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+      {/* ---- Entities + gizmo, offset by -renderOrigin ----
+           Entity positions are document world coords; the group subtracts
+           renderOrigin so three.js sees float32-safe local values.
+           Raycasts work correctly: three.js resolves hits via matrixWorld which
+           includes the group transform. */}
+      <group position={groupOffset}>
+        <Entities document={document} />
+        <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+      </group>
 
       {/* ---- Orientation gizmo (bottom-right corner) ---- */}
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
