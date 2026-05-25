@@ -37,9 +37,9 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 ---
 
 ## NOW (auto-updated by the skill)
-- **Last updated:** 2026-05-25 — **Wave 2 batch 1 launched** (W1 + U2 + S4 in parallel). Baseline repaired this session: fresh container had **no root `node_modules`** → `npm run typecheck` fell back to a global TS 6.0.2 that hard-errors on `baseUrl`; ran `npm install` (root 324 pkgs) + `npm --prefix server install` → root `npm run check` GREEN (270 tests), server `tsc` clean. tsconfig files left unchanged (the pinned local TS 5.9.3 handles `baseUrl` fine). Removed a stray `server/server/` dir from a cwd-contaminated install.
-- **WIP now:** W1 (Lane 1, foundation — owns the `core/mcp/dispatch.ts` data passthrough this round since no Lane 4 task runs concurrently), U2 (Lane 2, floating-origin), S4 (Lane 3, advanced object snaps).
-- **Next up after W1 DONE:** Lane 4 J3 (`describe_scene`) + Lane 1 N0 (`add_cylinder`/`add_sphere`) → then M1, Q1, T2 unblocked by W1.
+- **Last updated:** 2026-05-25 — **W1 + U2 DONE & merged to main (294 tests green).** S4 sent back for a blocking-fix pass (wrong tangent formula + new snap modes not wired into `useSnap`/callers). Baseline repaired this session: fresh container had no root `node_modules` → typecheck fell back to a global TS 6.0.2 that errors on `baseUrl`; `npm install` (root) + server install fixed it. Added `.claude/worktrees/**` to vitest `exclude`.
+- **DONE this batch:** W1 (`c231eb2`), U2 (merged `--no-ff`). **WIP:** S4 fix pass in worktree `worktree-agent-a58eda50ef1f7a913` (viewport-engineer; tangent acos fix + wire modes through useSnap + drop fake `parallel` + dedup tracking lines).
+- **Next up after S4 merges:** Lane 1 N0 (`add_cylinder`/`add_sphere`, author cleanly — discard the stray worktree draft), Lane 4 J3 (`describe_scene`) + J2 (batch tool); then M1, Q1, T2 (gated on W1, now DONE).
 - **Wave 1 DONE:** W0-1,W0-2, A1,A2,A3,A6, A4-core, R1, B1,B3, C1,C2,C3, D1,D2,D3, E1,E2, G1,G2,G3, H1, I2,I3. (I1/I4 = continuous gate+review.)
 - **REMOVED (3):** F1,F2,F3 — in-app AI bridge (`core/ai`), `/api/ai` proxy, chat panel. MCP is the sole AI path (decision log).
 - **Wave 1 carry-over WIP:** `A4-ui` Manifold WASM kernel + `mesh` render branch (Lane 2). _manifold-3d is a dep already; `Entities.tsx` still has no `case 'mesh'` → boolean results invisible until this lands._
@@ -109,7 +109,7 @@ land together — schedule them adjacent; the render task deps the command task.
 is unchanged, so themes interleave freely across the 4 lanes.
 
 ## W — Foundations (Lane 1, `command-author`) — gate downstream themes
-- `[WIP]` **W1** Extend the command contract for read-only + richer tools: add optional `data?: unknown` to `CommandResult` (query channel; `execute`/MCP pass it through) and add `enum?` + nested-object support to `ParamSpec`. _deps: —. Acceptance: existing 24 commands unchanged; `data` round-trips through `execute()` and `applyMcpToolCall`; schema additions are backward-compatible; gate held. **Gates `M*`, `Q*`, and richer schemas.**_
+- `[DONE]` **W1** Extend the command contract for read-only + richer tools: add optional `data?: unknown` to `CommandResult` (query channel; `execute`/MCP pass it through) and add `enum?` + nested-object support to `ParamSpec`. _deps: —. Reviewed APPROVE (`c231eb2`); gate 99.57/92.71/100/99.57. `CommandResult.data` threads through `applyMcpToolCall` (only when present). `ParamSpec` gains `enum`, `type:'object'`+`properties`, recursive `items` via `ParamItemSpec` (optional description → 24 existing commands unchanged). 6 new contract tests. **FOLLOW-UP (M1):** `server/src/mcp.ts` transport drops `result.data` — surface it when the first query command lands._
 
 ## N/K — 3D solids & features (Lane 1 cmd + Lane 2 render)
 - `[TODO]` **N0** `add_cylinder` + `add_sphere` commands (`geometry.ts`). _deps: —. Near-free: types + `CylinderMesh`/`SphereMesh` renderers already exist; just author the create-commands + register + tests. Acceptance: both appear in toolbar/MCP and render._
@@ -123,7 +123,7 @@ is unchanged, so themes interleave freely across the 4 lanes.
 
 ## U — Infinite precision & units (the "scroll forever, scale present" ask)
 - `[TODO]` **U1** Units system: add `units` (`'mm'|'cm'|'m'|'in'|'ft'`, default `mm`) + display precision to `CadDocument`; `set_units` command; thread through persistence + measure summaries. _Lane 1. deps: —. Acceptance: round-trips through save/load; summaries report values with unit suffix._
-- `[WIP]` **U2** Floating-origin / camera-relative rendering: rebase the rendered scene origin to a dynamic offset near the camera target so geometry far from (0,0,0) stays float32-stable (no jitter) — pan/zoom effectively infinite. Document keeps true double coords; offset is render-only (store, not document). _Lane 2. deps: —. Acceptance: a box at 1e7 units renders crisp; orbit/pan stable; selection raycast still correct._
+- `[DONE]` **U2** Floating-origin / camera-relative rendering: rebase the rendered scene origin to a dynamic offset near the camera target so geometry far from (0,0,0) stays float32-stable (no jitter) — pan/zoom effectively infinite. Document keeps true double coords; offset is render-only (store, not document). _Lane 2. deps: —. Acceptance: a box at 1e7 units renders crisp; orbit/pan stable; selection raycast still correct._
 - `[TODO]` **U3** Adaptive infinite grid + on-screen **scale bar / ruler HUD** for the 3D view: grid subdivision steps per zoom decade; HUD shows current unit length (reads `U1` units). _Lane 2. deps: U1, U2._
 - `[TODO]` **U4** 2D view counterpart: adaptive ortho grid + scale bar + infinite pan/zoom in `Viewport2D`. _Lane 3. deps: U1. (U2 technique applied to the ortho camera.)_
 
