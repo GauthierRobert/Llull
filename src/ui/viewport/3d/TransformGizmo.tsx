@@ -39,6 +39,7 @@ import * as THREE from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
 import type { Entity } from '@core/model/types';
+import { toRenderPosition } from './floatingOrigin';
 
 // TransformControlsImpl fires a 'dragging-changed' event that is not in
 // three.js's Object3DEventMap. We cast the ref to a minimal interface to
@@ -98,6 +99,7 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
   const selection = useStore((s) => s.document.selection);
   const entities = useStore((s) => s.document.entities);
   const dispatch = useStore((s) => s.dispatch);
+  const renderOrigin = useStore((s) => s.renderOrigin);
 
   // Single-entity selection only; gizmo hidden for 0 or multi-select (v1).
   const selectedId = selection.length === 1 ? selection[0] : undefined;
@@ -120,10 +122,13 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
   // ---- Sync target from entity on id change ----
   // Re-sync whenever the entity id changes (new selection). This initialises
   // the gizmo position to the entity's current location.
+  // Position is expressed in the render-origin group's LOCAL space (entity world
+  // pos minus renderOrigin) so the gizmo aligns with the rendered mesh.
   useEffect(() => {
     if (!entity) return;
     const t = targetRef.current;
-    t.position.set(entity.position[0], entity.position[1], entity.position[2]);
+    const rp = toRenderPosition(entity.position, renderOrigin);
+    t.position.set(rp[0], rp[1], rp[2]);
     t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
     t.scale.set(1, 1, 1);
     t.updateMatrixWorld(true);
@@ -139,11 +144,12 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
   useEffect(() => {
     if (!entity) return;
     const t = targetRef.current;
-    t.position.set(entity.position[0], entity.position[1], entity.position[2]);
+    const rp = toRenderPosition(entity.position, renderOrigin);
+    t.position.set(rp[0], rp[1], rp[2]);
     t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
     t.scale.set(1, 1, 1);
     t.updateMatrixWorld(true);
-  }, [entity]);
+  }, [entity, renderOrigin]);
 
   // ---- dragging-changed handler ----
   const handleDraggingChanged = useCallback(
