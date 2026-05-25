@@ -18,6 +18,7 @@ import { extrudeSketch, revolveProfile } from './profile';
 import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit';
 import { booleanUnion, booleanSubtract, booleanIntersect } from './boolean';
 import { describeScene } from './scene';
+import { animateSpin, animateOscillate, stopAnimation } from './animation';
 import { findEntities } from './query';
 import { buildProject } from './project';
 import { setUnits } from './units';
@@ -110,6 +111,9 @@ const definitions = [
   setLayerLock,
   setEntityLayer,
   deleteLayer,
+  animateSpin,
+  animateOscillate,
+  stopAnimation,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

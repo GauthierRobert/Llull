@@ -1,7 +1,9 @@
 /**
  * @layer ui/viewport/3d
  *
- * Render branch for `kind:'sphere'` entities.
+ * Render branch for `kind:'torus'` entities.
+ * Uses THREE.TorusGeometry — torus ring lies in the XY plane (hole faces +Z),
+ * centered on position. Consistent with the Y-up viewport convention.
  * Geometry is memoized on the entity's geometric fields; disposed on unmount.
  * Material props reflect the active display mode (shaded/wireframe/xray).
  */
@@ -9,29 +11,30 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
-import type { SphereEntity } from '@core/model/types';
+import type { TorusEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
 
-interface SphereMeshProps {
-  entity: SphereEntity;
+interface TorusMeshProps {
+  entity: TorusEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
 }
 
-export function SphereMesh({ entity, selected, onSelect }: SphereMeshProps): React.ReactElement {
-  const { radius, position, rotation, color } = entity;
+export function TorusMesh({ entity, selected, onSelect }: TorusMeshProps): React.ReactElement {
+  const { ringRadius, tubeRadius, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
-    const geo = new THREE.SphereGeometry(radius, 32, 16);
+    // TorusGeometry(radius, tube, radialSegments, tubularSegments)
+    const geo = new THREE.TorusGeometry(ringRadius, tubeRadius, 20, 48);
     return geo;
-  }, [radius]);
+  }, [ringRadius, tubeRadius]);
 
   const meshRef = useRef<THREE.Mesh>(null);
 
   // Dispose the previous geometry when it changes or the component unmounts (r3f R9).
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.35, metalness: 0.12, envMapIntensity: 1.0 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.4, metalness: 0.1, envMapIntensity: 0.9 });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

@@ -1,7 +1,8 @@
 /**
  * @layer ui/viewport/3d
  *
- * Render branch for `kind:'sphere'` entities.
+ * Render branch for `kind:'cone'` entities.
+ * Uses THREE.ConeGeometry — apex at +Y, base centered on position (Y-up, consistent with CylinderMesh).
  * Geometry is memoized on the entity's geometric fields; disposed on unmount.
  * Material props reflect the active display mode (shaded/wireframe/xray).
  */
@@ -9,29 +10,30 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
-import type { SphereEntity } from '@core/model/types';
+import type { ConeEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
 
-interface SphereMeshProps {
-  entity: SphereEntity;
+interface ConeMeshProps {
+  entity: ConeEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
 }
 
-export function SphereMesh({ entity, selected, onSelect }: SphereMeshProps): React.ReactElement {
-  const { radius, position, rotation, color } = entity;
+export function ConeMesh({ entity, selected, onSelect }: ConeMeshProps): React.ReactElement {
+  const { radius, height, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
-    const geo = new THREE.SphereGeometry(radius, 32, 16);
+    // radiusTop=0, radiusBottom=radius, height, radialSegments — apex along +Y (three.js default).
+    const geo = new THREE.ConeGeometry(radius, height, 32);
     return geo;
-  }, [radius]);
+  }, [radius, height]);
 
   const meshRef = useRef<THREE.Mesh>(null);
 
   // Dispose the previous geometry when it changes or the component unmounts (r3f R9).
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.35, metalness: 0.12, envMapIntensity: 1.0 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8 });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

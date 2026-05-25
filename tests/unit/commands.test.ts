@@ -1332,4 +1332,345 @@ describe('scale_entity — ellipse and spline', () => {
     const expected = (6 * 4 * 9) / 3;
     expect(data.volume).toBeCloseTo(expected, 6);
   });
+
+  // ── animate_spin ─────────────────────────────────────────────────────────
+
+  it('animate_spin on an entity adds one animation record', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    const result = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).not.toBe(doc);
+    const animIds = Object.keys(result.document.animations);
+    expect(animIds).toHaveLength(1);
+    const anim = result.document.animations[animIds[0]!]!;
+    expect(anim.targetId).toBe(entityId);
+    expect(anim.targetKind).toBe('entity');
+    expect(anim.mode).toBe('spin');
+    expect(anim.channel).toBe('rotation');
+    expect(anim.speed).toBe(1.0);
+    expect(anim.amplitude).toBe(0);
+    expect(anim.frequency).toBe(0);
+    expect(anim.trigger).toBe('auto');
+    expect(anim.axis).toEqual([0, 1, 0]);
+    expect(result.summary).toContain(entityId);
+    expect(result.summary).toContain('rad/s');
+  });
+
+  it('animate_spin on a group resolves targetKind as group', () => {
+    let doc = createEmptyDocument();
+    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = a.document;
+    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = b.document;
+    const grouped = execute(doc, 'group_entities', { ids: [a.affected[0]!, b.affected[0]!], name: 'Wheel' });
+    doc = grouped.document;
+    const groupId = grouped.affected[0]!;
+
+    const result = execute(doc, 'animate_spin', { targetId: groupId, speed: 6.283 });
+    const animIds = Object.keys(result.document.animations);
+    expect(animIds).toHaveLength(1);
+    const anim = result.document.animations[animIds[0]!]!;
+    expect(anim.targetKind).toBe('group');
+    expect(anim.targetId).toBe(groupId);
+  });
+
+  it('animate_spin with custom axis, channel, pivot, and trigger', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    const result = execute(doc, 'animate_spin', {
+      targetId: entityId,
+      speed: 2.0,
+      axis: [1, 0, 0],
+      channel: 'position',
+      pivot: [0, 0, 5],
+      trigger: 'click',
+    });
+    const anim = Object.values(result.document.animations)[0]!;
+    expect(anim.axis).toEqual([1, 0, 0]);
+    expect(anim.channel).toBe('position');
+    expect(anim.pivot).toEqual([0, 0, 5]);
+    expect(anim.trigger).toBe('click');
+    expect(result.summary).toContain('units/s');
+  });
+
+  it('animate_spin omits pivot key when not supplied (exactOptionalPropertyTypes safe)', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    const result = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 });
+    const anim = Object.values(result.document.animations)[0]!;
+    expect('pivot' in anim).toBe(false);
+  });
+
+  it('animate_spin on a missing id is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'animate_spin', { targetId: 'no-such-id', speed: 1.0 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(Object.keys(result.document.animations)).toHaveLength(0);
+    expect(result.summary).toContain('no-such-id');
+  });
+
+  it('animate_spin is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'animate_spin', { targetId: entityId, speed: 3.14 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── animate_oscillate ────────────────────────────────────────────────────
+
+  it('animate_oscillate on an entity adds one animation record', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    const result = execute(doc, 'animate_oscillate', {
+      targetId: entityId,
+      amplitude: 0.5,
+      frequency: 2.0,
+    });
+    expect(result.affected).toHaveLength(0);
+    const animIds = Object.keys(result.document.animations);
+    expect(animIds).toHaveLength(1);
+    const anim = result.document.animations[animIds[0]!]!;
+    expect(anim.targetId).toBe(entityId);
+    expect(anim.targetKind).toBe('entity');
+    expect(anim.mode).toBe('oscillate');
+    expect(anim.channel).toBe('rotation');
+    expect(anim.amplitude).toBe(0.5);
+    expect(anim.frequency).toBe(2.0);
+    expect(anim.speed).toBe(0);
+    expect(anim.trigger).toBe('auto');
+    expect(result.summary).toContain(entityId);
+    expect(result.summary).toContain('Hz');
+  });
+
+  it('animate_oscillate with custom axis, channel, pivot, trigger', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    const result = execute(doc, 'animate_oscillate', {
+      targetId: entityId,
+      amplitude: 1.0,
+      frequency: 0.5,
+      axis: [0, 0, 1],
+      channel: 'position',
+      pivot: [1, 2, 3],
+      trigger: 'click',
+    });
+    const anim = Object.values(result.document.animations)[0]!;
+    expect(anim.axis).toEqual([0, 0, 1]);
+    expect(anim.channel).toBe('position');
+    expect(anim.pivot).toEqual([1, 2, 3]);
+    expect(anim.trigger).toBe('click');
+    expect(result.summary).toContain('units');
+  });
+
+  it('animate_oscillate omits pivot key when not supplied', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    const result = execute(doc, 'animate_oscillate', {
+      targetId: entityId,
+      amplitude: 0.3,
+      frequency: 1.0,
+    });
+    const anim = Object.values(result.document.animations)[0]!;
+    expect('pivot' in anim).toBe(false);
+  });
+
+  it('animate_oscillate on a missing id is a safe no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'animate_oscillate', {
+      targetId: 'ghost',
+      amplitude: 1.0,
+      frequency: 1.0,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('animate_oscillate with amplitude <= 0 is a safe no-op', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    const result = execute(doc, 'animate_oscillate', {
+      targetId: entityId,
+      amplitude: 0,
+      frequency: 1.0,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('amplitude');
+  });
+
+  it('animate_oscillate with frequency <= 0 is a safe no-op', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    const result = execute(doc, 'animate_oscillate', {
+      targetId: entityId,
+      amplitude: 1.0,
+      frequency: -1,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('frequency');
+  });
+
+  it('animate_oscillate is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'animate_oscillate', { targetId: entityId, amplitude: 0.5, frequency: 1.0 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── stop_animation ───────────────────────────────────────────────────────
+
+  it('stop_animation by animationId removes only that animation', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
+    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 2.0 }).document;
+    const [animId1, animId2] = Object.keys(doc.animations);
+
+    const result = execute(doc, 'stop_animation', { animationId: animId1 });
+    expect(result.document.animations[animId1!]).toBeUndefined();
+    expect(result.document.animations[animId2!]).toBeDefined();
+    expect(result.summary).toContain(animId1!);
+  });
+
+  it('stop_animation by animationId for a missing id is a no-op with explanatory summary', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'stop_animation', { animationId: 'anim-ghost' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('anim-ghost');
+    expect(result.summary).toContain('not found');
+  });
+
+  it('stop_animation by targetId removes all animations for that target', () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxA.document;
+    const boxB = execute(doc, 'add_box', { size: [2, 2, 2] });
+    doc = boxB.document;
+    const idA = boxA.affected[0]!;
+    const idB = boxB.affected[0]!;
+
+    doc = execute(doc, 'animate_spin', { targetId: idA, speed: 1.0 }).document;
+    doc = execute(doc, 'animate_spin', { targetId: idA, speed: 2.0 }).document;
+    doc = execute(doc, 'animate_spin', { targetId: idB, speed: 3.0 }).document;
+    expect(Object.keys(doc.animations)).toHaveLength(3);
+
+    const result = execute(doc, 'stop_animation', { targetId: idA });
+    const remaining = Object.values(result.document.animations);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]!.targetId).toBe(idB);
+    expect(result.summary).toContain('2');
+    expect(result.summary).toContain(idA);
+  });
+
+  it('stop_animation by targetId with no matches is a no-op with explanatory summary', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
+
+    const result = execute(doc, 'stop_animation', { targetId: 'other-entity' });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('other-entity');
+  });
+
+  it('stop_animation with no params clears ALL animations', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
+    doc = execute(doc, 'animate_oscillate', { targetId: entityId, amplitude: 0.5, frequency: 1.0 }).document;
+    expect(Object.keys(doc.animations)).toHaveLength(2);
+
+    const result = execute(doc, 'stop_animation', {});
+    expect(Object.keys(result.document.animations)).toHaveLength(0);
+    expect(result.summary).toContain('2');
+    expect(result.summary).toContain('cleared');
+  });
+
+  it('stop_animation clear-all on empty document is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'stop_animation', {});
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('no animations');
+  });
+
+  it('stop_animation is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
+    const snapshot = JSON.stringify(doc);
+
+    const animId = Object.keys(doc.animations)[0]!;
+    execute(doc, 'stop_animation', { animationId: animId });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── describe_scene — animations field ───────────────────────────────────
+
+  it('describe_scene includes animations array and count in summary', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = created.document;
+    const entityId = created.affected[0]!;
+
+    // No animations yet.
+    let result = execute(doc, 'describe_scene', {});
+    const snapshot = result.data as { animations: unknown[] };
+    expect(snapshot.animations).toHaveLength(0);
+    expect(result.summary).toContain('0 animation');
+
+    // Add one spin animation.
+    doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 2.0 }).document;
+    result = execute(doc, 'describe_scene', {});
+    const snapshot2 = result.data as { animations: Array<{ id: string; targetId: string; targetKind: string; channel: string; mode: string }> };
+    expect(snapshot2.animations).toHaveLength(1);
+    expect(snapshot2.animations[0]!.targetId).toBe(entityId);
+    expect(snapshot2.animations[0]!.targetKind).toBe('entity');
+    expect(snapshot2.animations[0]!.channel).toBe('rotation');
+    expect(snapshot2.animations[0]!.mode).toBe('spin');
+    expect(result.summary).toContain('1 animation');
+  });
 });

@@ -7,6 +7,9 @@
  *   - `displayMode` — shaded / wireframe / x-ray render mode.
  *   - `clipPlane`   — optional axis-aligned section plane for revealing solid interiors.
  *   - `hiddenEntityIds` — entity ids suppressed from the 3D render (UI-only visibility override).
+ *   - `animationPlaying` — global play/pause for `trigger:'auto'` animations.
+ *   - `activeClickAnimationIds` — set of `trigger:'click'` animation ids currently toggled on.
+ *   - `animationResetNonce` — bumped by `resetAnimations()` to tell the player to zero its phase accumulators.
  *
  * PRIME DIRECTIVE: no document mutations ever happen here.
  * These are pure presentation/render overrides; they are never serialised
@@ -69,6 +72,30 @@ export interface ViewportStoreState {
    */
   snap3dEnabled: boolean;
 
+  // ---- Animation runtime state -------------------------------------------
+
+  /**
+   * Global play/pause for `trigger:'auto'` animations.
+   * `trigger:'click'` animations are controlled independently via `activeClickAnimationIds`.
+   * Default: false.
+   */
+  animationPlaying: boolean;
+
+  /**
+   * Set of animation ids (whose `trigger === 'click'`) that are currently toggled ON.
+   * A click on a target entity adds/removes its animation ids from this set.
+   * Render-only — never serialised into CadDocument.
+   */
+  activeClickAnimationIds: ReadonlySet<string>;
+
+  /**
+   * Bumped by `resetAnimations()` to signal the AnimationPlayer to zero all
+   * phase accumulators on the next frame. An incrementing integer is used so
+   * any subscriber can detect the bump with a simple reference comparison.
+   * Default: 0.
+   */
+  animationResetNonce: number;
+
   // ---- Actions ------------------------------------------------------------
 
   /** Set the global display mode ('shaded' | 'wireframe' | 'xray'). */
@@ -98,6 +125,26 @@ export interface ViewportStoreState {
 
   /** Toggle 3D object snapping on/off. */
   toggleSnap3d(): void;
+
+  // ---- Animation actions -------------------------------------------------
+
+  /** Toggle global animation playback (Play ↔ Pause for `trigger:'auto'` animations). */
+  toggleAnimationPlaying(): void;
+
+  /** Explicitly set global animation playback state. */
+  setAnimationPlaying(playing: boolean): void;
+
+  /**
+   * Stop playback, clear all active click animations, and bump the reset nonce
+   * so the AnimationPlayer zeroes all phase accumulators on the next frame.
+   */
+  resetAnimations(): void;
+
+  /**
+   * Add or remove an animation id from `activeClickAnimationIds`.
+   * If the id is already in the set it is removed (toggle off); otherwise it is added (toggle on).
+   */
+  toggleClickAnimation(animId: string): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +168,11 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   hiddenEntityIds: new Set<EntityId>(),
   hiddenLayerIds: new Set<string>(),
   snap3dEnabled: true,
+
+  // Animation runtime defaults
+  animationPlaying: false,
+  activeClickAnimationIds: new Set<string>(),
+  animationResetNonce: 0,
 
   setDisplayMode(mode: DisplayMode): void {
     set({ displayMode: mode });
@@ -166,5 +218,35 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
 
   toggleSnap3d(): void {
     set((state) => ({ snap3dEnabled: !state.snap3dEnabled }));
+  },
+
+  // ---- Animation actions -------------------------------------------------
+
+  toggleAnimationPlaying(): void {
+    set((state) => ({ animationPlaying: !state.animationPlaying }));
+  },
+
+  setAnimationPlaying(playing: boolean): void {
+    set({ animationPlaying: playing });
+  },
+
+  resetAnimations(): void {
+    set((state) => ({
+      animationPlaying: false,
+      activeClickAnimationIds: new Set<string>(),
+      animationResetNonce: state.animationResetNonce + 1,
+    }));
+  },
+
+  toggleClickAnimation(animId: string): void {
+    set((state) => {
+      const next = new Set(state.activeClickAnimationIds);
+      if (next.has(animId)) {
+        next.delete(animId);
+      } else {
+        next.add(animId);
+      }
+      return { activeClickAnimationIds: next };
+    });
   },
 }));

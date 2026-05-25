@@ -33,10 +33,28 @@ interface BoundingBox {
 }
 
 /**
- * Compute a bounding sphere around all entity positions.
- * Uses position only (not actual mesh extents) — sufficient for camera framing.
+ * Compute a bounding sphere around all entity positions and derive a camera
+ * distance that comfortably frames the whole model.
+ *
+ * Uses entity positions as proxy for mesh extents (sufficient; mesh half-size
+ * is accounted for by the `MESH_HALF_SIZE_ESTIMATE` addend). The final
+ * distance is computed as:
+ *
+ *   distance = (positionSpreadRadius + MESH_HALF_SIZE_ESTIMATE) / tan(halfFov) * margin
+ *
+ * where halfFov = 37.5° (half of the 75° default PerspectiveCamera fov).
+ * This ensures the bounding sphere fits inside the frustum with room to spare.
+ *
  * Returns null when there are no entities to frame.
  */
+
+/** Rough estimate of each entity's mesh half-size to add to the position-only radius. */
+const MESH_HALF_SIZE_ESTIMATE = 3;
+/** Half the default three.js PerspectiveCamera FOV (75°). */
+const HALF_FOV_TAN = Math.tan((75 / 2) * (Math.PI / 180)); // tan(37.5°) ≈ 0.767
+/** Margin applied on top of the exact fit distance. */
+const FIT_MARGIN = 1.35;
+
 function computeSceneBounds(
   entities: Record<string, { position: readonly [number, number, number] }>,
   ids: string[],
@@ -60,14 +78,18 @@ function computeSceneBounds(
     sum[2] / positions.length,
   );
 
-  // Compute bounding radius from centroid.
-  const radius =
-    Math.max(
-      4, // minimum radius so single-point scenes still frame reasonably
-      ...positions.map((p) =>
-        new THREE.Vector3(p[0], p[1], p[2]).distanceTo(center),
-      ),
-    ) * 1.5; // add padding
+  // Max spread of positions from centroid, with a mesh-half-size addend so
+  // a single entity never collapses to radius=0.
+  const positionSpread = Math.max(
+    0,
+    ...positions.map((p) => new THREE.Vector3(p[0], p[1], p[2]).distanceTo(center)),
+  );
+
+  const boundingSphereRadius = positionSpread + MESH_HALF_SIZE_ESTIMATE;
+
+  // Camera distance needed to fit the bounding sphere inside the view frustum,
+  // accounting for the camera FOV and applying a comfortable margin.
+  const radius = (boundingSphereRadius / HALF_FOV_TAN) * FIT_MARGIN;
 
   return { center, radius };
 }

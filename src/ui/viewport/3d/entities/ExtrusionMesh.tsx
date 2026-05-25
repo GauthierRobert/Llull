@@ -67,6 +67,7 @@ export function ExtrusionMesh({ entity, selected, onSelect }: ExtrusionMeshProps
   return (
     <mesh
       ref={meshRef}
+      name={entity.id}
       geometry={geometry}
       position={[position[0], position[1], position[2]]}
       rotation={[rotation[0], rotation[1], rotation[2]]}

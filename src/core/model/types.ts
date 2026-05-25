@@ -349,6 +349,62 @@ export interface Parameter {
   error?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Animation — declarative movement clips (no physics). The document DECLARES
+// motion (L8: the document is the recipe); the viewport player EVALUATES it
+// per-frame (derived, not stored). Two profiles cover bike-mechanics motion:
+//   - spin:      constant velocity (wheels, pedals, crank, gears)
+//   - oscillate: sinusoidal back-and-forth (steering wobble, piston bob)
+// Either an `entity` or a `group` can be the target, so a whole sub-assembly
+// (e.g. a wheel + spokes) moves rigidly about a shared pivot.
+// ---------------------------------------------------------------------------
+
+/** Transform channel an animation drives. */
+export type AnimationChannel = 'rotation' | 'position';
+
+/** Motion profile: constant-velocity spin, or sinusoidal oscillation. */
+export type AnimationMode = 'spin' | 'oscillate';
+
+/** What runs the clip: global Play, or clicking the target in the viewport. */
+export type AnimationTrigger = 'auto' | 'click';
+
+/** Whether `targetId` names a single entity or a group of entities. */
+export type AnimationTargetKind = 'entity' | 'group';
+
+/**
+ * A declarative movement clip. Pure JSON-serializable document data; the
+ * viewport `AnimationPlayer` reads these and mutates three.js transforms each
+ * frame (the document transform is never touched — animation is a render-time
+ * overlay, like selection).
+ */
+export interface Animation {
+  readonly id: string;
+  /** Id of the entity or group to animate. */
+  targetId: EntityId;
+  /** Whether `targetId` names an entity or a group. */
+  targetKind: AnimationTargetKind;
+  /** Which transform channel to drive. */
+  channel: AnimationChannel;
+  /**
+   * Direction the animation acts along: the rotation axle for `rotation`, or the
+   * translation direction for `position`. Need not be unit-length — the player
+   * normalizes it. e.g. [0,1,0] spins about the world Y axis.
+   */
+  axis: Vec3;
+  /** 'spin' = constant velocity; 'oscillate' = sinusoidal back-and-forth. */
+  mode: AnimationMode;
+  /** spin only: angular velocity (rad/s) for rotation, or linear velocity (units/s) for position. */
+  speed: number;
+  /** oscillate only: peak amplitude — radians for rotation, units for position. */
+  amplitude: number;
+  /** oscillate only: cycles per second (Hz). */
+  frequency: number;
+  /** rotation only: world-space pivot; defaults to the target's position when omitted. */
+  pivot?: Vec3;
+  /** 'auto' runs under global Play; 'click' toggles when the target is clicked. */
+  trigger: AnimationTrigger;
+}
+
 export interface CadDocument {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
@@ -370,6 +426,12 @@ export interface CadDocument {
    * Initialized as {} in createEmptyDocument.
    */
   parameters: Record<string, Parameter>;
+  /**
+   * Declarative movement animations. Keyed by animation id.
+   * The document only DECLARES motion; the viewport player evaluates it per
+   * frame (no physics). Initialized as {} in createEmptyDocument.
+   */
+  animations: Record<string, Animation>;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';
@@ -398,5 +460,6 @@ export function createEmptyDocument(): CadDocument {
     units: 'mm',
     displayPrecision: 3,
     parameters: {},
+    animations: {},
   };
 }

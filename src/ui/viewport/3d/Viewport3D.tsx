@@ -59,6 +59,7 @@ import { NamedViewsInner, NamedViewsOverlay } from './NamedViews';
 import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
 import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
+import { AnimationPlayer } from './AnimationPlayer';
 
 // ---------------------------------------------------------------------------
 // StoreInvalidator — calls r3f invalidate() when the CAD store changes
@@ -272,6 +273,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* ---- Section / clipping plane sync ---- */}
       <ClippingPlane />
+
+      {/* ---- Animation player — evaluates document.animations per-frame ---- */}
+      <AnimationPlayer />
 
       {/* ---- IBL environment: studio preset for reflections/ambient; no background ---- */}
       <Environment preset="studio" background={false} />

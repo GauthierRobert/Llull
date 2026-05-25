@@ -16,7 +16,7 @@
  */
 
 import React, { useCallback, useId } from 'react';
-import { useViewportStore } from '@ui/store';
+import { useViewportStore, useStore } from '@ui/store';
 import type { DisplayMode, ClipAxis } from '@ui/store';
 
 // ---------------------------------------------------------------------------
@@ -178,6 +178,44 @@ function ClipPlaneControl(): React.ReactElement {
 }
 
 // ---------------------------------------------------------------------------
+// Animation transport controls — Play/Pause + Reset
+// Only rendered when the document declares at least one animation.
+// ---------------------------------------------------------------------------
+
+function AnimationTransportControls(): React.ReactElement | null {
+  const animations = useStore((s) => s.document.animations);
+  const animationPlaying    = useViewportStore((s) => s.animationPlaying);
+  const toggleAnimationPlaying = useViewportStore((s) => s.toggleAnimationPlaying);
+  const resetAnimations     = useViewportStore((s) => s.resetAnimations);
+
+  if (Object.keys(animations).length === 0) return null;
+
+  return (
+    <div className="vp-control-group" role="group" aria-label="Animation transport">
+      <button
+        type="button"
+        className={`vp-mode-btn${animationPlaying ? ' vp-mode-btn--active' : ''}`}
+        aria-label={animationPlaying ? 'Pause animations' : 'Play animations'}
+        aria-pressed={animationPlaying}
+        title={animationPlaying ? 'Pause animations' : 'Play animations'}
+        onClick={toggleAnimationPlaying}
+      >
+        {animationPlaying ? '⏸' : '▶'}
+      </button>
+      <button
+        type="button"
+        className="vp-mode-btn"
+        aria-label="Reset animations"
+        title="Reset animations to initial pose"
+        onClick={resetAnimations}
+      >
+        ⟲
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Exported overlay
 // ---------------------------------------------------------------------------
 
@@ -187,6 +225,7 @@ export function ViewportControls(): React.ReactElement {
       <DisplayModeControl />
       <ClipPlaneControl />
       <Snap3DToggle />
+      <AnimationTransportControls />
     </div>
   );
 }

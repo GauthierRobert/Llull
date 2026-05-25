@@ -14,7 +14,7 @@
  * orientation aid, not an exact oriented bounding box.
  */
 
-import type { CadDocument, Entity, EntityKind, Vec3 } from '../model/types';
+import type { AnimationChannel, AnimationMode, CadDocument, Entity, EntityKind, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 
 // ---------------------------------------------------------------------------
@@ -51,6 +51,14 @@ export interface GroupSummary {
   memberIds: string[];
 }
 
+export interface AnimationSummary {
+  id: string;
+  targetId: string;
+  targetKind: 'entity' | 'group';
+  channel: AnimationChannel;
+  mode: AnimationMode;
+}
+
 /** Structured, AI-readable snapshot of the whole document. */
 export interface SceneSnapshot {
   entityCount: number;
@@ -60,6 +68,8 @@ export interface SceneSnapshot {
   /** Combined bounds of all entities, or null when the document is empty. */
   bounds: Bounds | null;
   selection: string[];
+  /** All declared animation clips in the document. */
+  animations: AnimationSummary[];
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +242,14 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     memberIds: [...g.memberIds],
   }));
 
+  const animations: AnimationSummary[] = Object.values(doc.animations ?? {}).map((a) => ({
+    id: a.id,
+    targetId: a.targetId,
+    targetKind: a.targetKind,
+    channel: a.channel,
+    mode: a.mode,
+  }));
+
   return {
     entityCount: entities.length,
     entities,
@@ -239,6 +257,7 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     groups,
     bounds: sceneBounds,
     selection: [...doc.selection],
+    animations,
   };
 }
 
@@ -264,7 +283,7 @@ export const describeScene: CommandDefinition<Record<string, never>> = {
     const snapshot = computeSceneSnapshot(doc);
     return {
       document: doc,
-      summary: `Scene: ${snapshot.entityCount} entit${snapshot.entityCount === 1 ? 'y' : 'ies'}, ${snapshot.layers.length} layer(s), ${snapshot.groups.length} group(s).`,
+      summary: `Scene: ${snapshot.entityCount} entit${snapshot.entityCount === 1 ? 'y' : 'ies'}, ${snapshot.layers.length} layer(s), ${snapshot.groups.length} group(s), ${snapshot.animations.length} animation(s).`,
       affected: [],
       data: snapshot,
     };

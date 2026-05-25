@@ -7,7 +7,16 @@
  * @failure invalid JSON / wrong format or version / missing required fields -> no-op, affected:[]
  */
 
-import type { CadDocument, DocumentUnit, Entity, Layer, CameraState, Vec3, Parameter } from '../model/types';
+import type {
+  CadDocument,
+  DocumentUnit,
+  Entity,
+  Layer,
+  CameraState,
+  Vec3,
+  Parameter,
+  Animation,
+} from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 
 // ---------------------------------------------------------------------------
@@ -174,8 +183,11 @@ export function deserializeDocument(json: string): CadDocument {
   const parameters: Record<string, Parameter> = isRecord(doc.parameters)
     ? (doc.parameters as Record<string, Parameter>)
     : {};
+  const animations: Record<string, Animation> = isRecord(doc.animations)
+    ? (doc.animations as Record<string, Animation>)
+    : {};
 
-  return { ...doc, units, displayPrecision, parameters };
+  return { ...doc, units, displayPrecision, parameters, animations };
 }
 
 // ---------------------------------------------------------------------------
