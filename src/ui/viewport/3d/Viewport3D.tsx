@@ -3,8 +3,11 @@
  *
  * The 3D perspective viewport.
  *
- * - A single r3f <Canvas> with a perspective camera initialised from
- *   `document.camera` (spherical: target, azimuth, polar, distance).
+ * - A single r3f <Canvas frameloop="demand"> — renders only when invalidated,
+ *   so idle scenes consume no GPU/CPU. Invalidation sources:
+ *     • OrbitControls / TransformControls: drei calls invalidate() on 'change'.
+ *     • Document / selection / renderOrigin: StoreInvalidator subscribes to the
+ *       Zustand store and calls invalidate() whenever those slices change.
  * - OrbitControls (drei) for pan/orbit/zoom — disabled while a TransformGizmo
  *   drag is in progress so the camera does not fight the gizmo.
  * - Ground grid + axes for spatial reference.
@@ -16,6 +19,9 @@
  * - Floating-origin rendering: entities + gizmo are wrapped in a group offset by
  *   -renderOrigin so that float32 vertex positions stay small regardless of true
  *   world coordinates (avoids jitter for geometry far from world origin).
+ *   RenderOriginSyncer runs inside useFrame; because OrbitControls already calls
+ *   invalidate() on every camera change event, useFrame fires on each orbit frame
+ *   and the rebase check continues to work correctly under demand mode.
  *
  * This component is purely presentational: it reads from the store and never
  * mutates the document (PRIME DIRECTIVE). All changes go through dispatch.
@@ -31,6 +37,43 @@ import { Entities } from './Entities';
 import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
 import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
 import type { GizmoMode } from './TransformGizmo';
+
+// ---------------------------------------------------------------------------
+// StoreInvalidator — calls r3f invalidate() when the store changes
+// ---------------------------------------------------------------------------
+
+/**
+ * Subscribes to the Zustand store OUTSIDE the r3f render loop and calls
+ * invalidate() whenever document or renderOrigin change. This ensures that
+ * entity additions/deletions, selection changes, and render-origin rebases
+ * all produce a fresh render frame under frameloop="demand".
+ *
+ * Must be mounted inside the Canvas so useThree(s => s.invalidate) resolves.
+ * Uses useEffect + useStore.subscribe (not a reactive selector) to avoid
+ * triggering a React re-render — the only effect is queuing an r3f frame.
+ */
+function StoreInvalidator(): null {
+  const invalidate = useThree((s) => s.invalidate);
+
+  useEffect(() => {
+    // Subscribe to the raw Zustand store (Zustand v5 basic subscribe API).
+    // Compare the two slices that require a new render frame by reference;
+    // Object.is() is sufficient because commands are pure (L3) and always
+    // return new document objects when they change anything.
+    let prevDocument = useStore.getState().document;
+    let prevOrigin = useStore.getState().renderOrigin;
+
+    return useStore.subscribe((state) => {
+      if (state.document !== prevDocument || state.renderOrigin !== prevOrigin) {
+        prevDocument = state.document;
+        prevOrigin = state.renderOrigin;
+        invalidate();
+      }
+    });
+  }, [invalidate]);
+
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Camera initializer
@@ -147,6 +190,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         enabled={orbitEnabled}
       />
 
+      {/* ---- Demand-mode invalidation: re-render on store/document changes ---- */}
+      <StoreInvalidator />
+
       {/* ---- Per-frame rebase check — no setState per frame ---- */}
       <RenderOriginSyncer />
 
@@ -236,6 +282,7 @@ export function Viewport3D(): React.ReactElement {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <Canvas
+        frameloop="demand"
         gl={{ antialias: true, alpha: false }}
         dpr={[1, 2]}
         style={{ width: '100%', height: '100%', background: '#141720' }}
