@@ -46,6 +46,7 @@ import { Entities } from './Entities';
 import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
 import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
 import type { GizmoMode } from './TransformGizmo';
+import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
 
 // ---------------------------------------------------------------------------
 // StoreInvalidator — calls r3f invalidate() when the store changes
@@ -129,6 +130,9 @@ function RenderOriginSyncer(): null {
     if (!controls) return;
     // drei's <OrbitControls makeDefault> registers an OrbitControls instance here;
     // it extends EventDispatcher (the store's `controls` type) and exposes `target`.
+    // COUPLING: ViewPresets.applyPreset() must call invalidate() + controls.update()
+    // before returning so that this useFrame fires on the next demand frame and the
+    // rebase check runs against the new target position (P1 carry-forward).
     const orbitTarget = (controls as OrbitControlsImpl).target;
     if (!orbitTarget) return;
 
@@ -157,6 +161,8 @@ interface SceneContentsProps {
 function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
   const document = useStore((s) => s.document);
   const renderOrigin = useStore((s) => s.renderOrigin);
+  const selection = useStore((s) => s.document.selection);
+  const allEntityIds = useStore((s) => s.document.order);
   const { camera: cam } = document;
 
   const initialPosition = useMemo(
@@ -204,6 +210,13 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* ---- Per-frame rebase check — no setState per frame ---- */}
       <RenderOriginSyncer />
+
+      {/* ---- View preset camera driver — reads store via props to avoid Canvas re-render ---- */}
+      <ViewPresetsInner
+        entities={document.entities as Record<string, { position: readonly [number, number, number] }>}
+        selection={selection}
+        allEntityIds={allEntityIds}
+      />
 
       {/* ---- IBL environment: studio preset for reflections/ambient; no background ---- */}
       <Environment preset="studio" background={false} />
@@ -344,6 +357,9 @@ export function Viewport3D(): React.ReactElement {
       {showModeToggle && (
         <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />
       )}
+
+      {/* View preset buttons (top-right) */}
+      <ViewPresetsOverlay />
     </div>
   );
 }

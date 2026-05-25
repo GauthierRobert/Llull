@@ -27,9 +27,19 @@ import {
   CallToolRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   type CallToolResult,
+  type GetPromptResult,
 } from '@modelcontextprotocol/sdk/types.js';
-import { buildMcpTools, applyMcpToolCall, listMcpResources, readMcpResource } from '@core/mcp';
+import {
+  buildMcpTools,
+  applyMcpToolCall,
+  listMcpResources,
+  readMcpResource,
+  listMcpPrompts,
+  getMcpPrompt,
+} from '@core/mcp';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 
@@ -113,7 +123,7 @@ function buildRateLimiter(): ReturnType<typeof rateLimit> {
 function buildMcpServer(): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
-    { capabilities: { tools: {}, resources: {} } },
+    { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
   // tools/list — return the full registry as MCP tool definitions
@@ -147,6 +157,33 @@ function buildMcpServer(): Server {
       });
     }
 
+    // Surface structured data produced by read-only/query commands.
+    // `structuredContent` carries machine-readable output; the JSON text block
+    // ensures text-only clients can still read the payload (MCP spec dual-surface).
+    // Mutating commands that produce no `data` are byte-identical to before.
+    if (result.data !== undefined) {
+      // The JSON text block is the universal surface — valid for primitives,
+      // arrays, and objects alike. `structuredContent` is reserved for spec-valid
+      // records (the MCP/SDK schema types it as an object), so a future query
+      // command returning a primitive or array still surfaces via the text block
+      // without emitting an invalid `structuredContent`.
+      content.push({
+        type: 'text',
+        text: `\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``,
+      });
+      const isRecord =
+        typeof result.data === 'object' &&
+        result.data !== null &&
+        !Array.isArray(result.data);
+      return isRecord
+        ? {
+            content,
+            isError: result.isError,
+            structuredContent: result.data as Record<string, unknown>,
+          }
+        : { content, isError: result.isError };
+    }
+
     return { content, isError: result.isError };
   });
 
@@ -163,6 +200,29 @@ function buildMcpServer(): Server {
       throw new Error(`Unknown resource URI: ${uri}`);
     }
     return { contents: [content] };
+  });
+
+  // prompts/list — enumerate registered prompt templates
+  server.setRequestHandler(ListPromptsRequestSchema, () => {
+    return { prompts: listMcpPrompts() };
+  });
+
+  // prompts/get — resolve a prompt template by name, substituting provided args
+  server.setRequestHandler(GetPromptRequestSchema, (req): GetPromptResult => {
+    const { name, arguments: rawArgs } = req.params;
+    const args: Record<string, string> = {};
+    if (rawArgs && typeof rawArgs === 'object') {
+      for (const [k, v] of Object.entries(rawArgs)) {
+        if (typeof v === 'string') args[k] = v;
+      }
+    }
+    const result = getMcpPrompt(name, args);
+    if (result === null) {
+      throw new Error(`Unknown prompt: ${name}`);
+    }
+    // McpPromptResult is structurally identical to GetPromptResult (description? + messages[])
+    // but lacks the index signature from the SDK's Result base type.
+    return result as GetPromptResult;
   });
 
   return server;

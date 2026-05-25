@@ -6,3 +6,6 @@
 
 export { useStore } from './store';
 export type { CadStoreState } from './store';
+
+export { useThemeStore } from './themeStore';
+export type { ThemeStoreState, Theme } from './themeStore';

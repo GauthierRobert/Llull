@@ -1,3 +1,102 @@
+/* ==========================================================================
+   llull design system
+   --------------------------------------------------------------------------
+   All colors and surfaces are defined as CSS variables on :root (dark default).
+   The [data-theme="light"] selector overrides them for the light theme.
+   Components reference ONLY these variables — never raw color values.
+   ========================================================================== */
+
+/* ---- Dark theme (default) ---------------------------------------- */
+
+:root {
+  /* Background layers */
+  --bg-base:       #0f1117;   /* page / viewport fill */
+  --bg-surface:    #13151d;   /* panels, toolbar */
+  --bg-overlay:    rgba(15, 17, 23, 0.82);   /* floating overlays */
+  --bg-input:      rgba(255, 255, 255, 0.05);
+  --bg-input-focus:rgba(91, 141, 238, 0.08);
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-light:  rgba(255, 255, 255, 0.10);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-accent: rgba(91, 141, 238, 0.45);
+
+  /* Text */
+  --text-primary:  #e8eaed;
+  --text-secondary:rgba(232, 234, 237, 0.75);
+  --text-muted:    rgba(232, 234, 237, 0.45);
+  --text-faint:    rgba(232, 234, 237, 0.35);
+  --text-label:    rgba(232, 234, 237, 0.55);
+
+  /* Accent (blue) */
+  --accent:         #5b8dee;
+  --accent-bg:      rgba(91, 141, 238, 0.18);
+  --accent-bg-hover:rgba(91, 141, 238, 0.26);
+  --accent-text:    #8ab4f8;
+  --accent-text-hover: #aac4fa;
+
+  /* 2D tool accent (lighter blue) */
+  --accent2d:         rgba(96, 165, 250, 0.16);
+  --accent2d-border:  rgba(96, 165, 250, 0.45);
+  --accent2d-text:    #93c5fd;
+
+  /* Semantic */
+  --color-error:  #e05c5c;
+  --color-submit: #2a4a7a;
+  --color-submit-border: #3d67a8;
+  --color-submit-text:   #b8d0f8;
+  --color-submit-hover:  #3358a0;
+
+  /* Typography */
+  --font-sans:  'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:  ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  /* Misc */
+  --backdrop-blur: blur(8px);
+}
+
+/* ---- Light theme overrides --------------------------------------- */
+
+[data-theme="light"] {
+  --bg-base:       #f5f6fa;
+  --bg-surface:    #ffffff;
+  --bg-overlay:    rgba(245, 246, 250, 0.92);
+  --bg-input:      rgba(0, 0, 0, 0.04);
+  --bg-input-focus:rgba(59, 110, 220, 0.06);
+
+  --border-subtle: rgba(0, 0, 0, 0.07);
+  --border-light:  rgba(0, 0, 0, 0.10);
+  --border-medium: rgba(0, 0, 0, 0.15);
+  --border-accent: rgba(59, 110, 220, 0.50);
+
+  --text-primary:  #111318;
+  --text-secondary:rgba(17, 19, 24, 0.75);
+  --text-muted:    rgba(17, 19, 24, 0.50);
+  --text-faint:    rgba(17, 19, 24, 0.40);
+  --text-label:    rgba(17, 19, 24, 0.55);
+
+  --accent:         #3b6edc;
+  --accent-bg:      rgba(59, 110, 220, 0.12);
+  --accent-bg-hover:rgba(59, 110, 220, 0.20);
+  --accent-text:    #2558c4;
+  --accent-text-hover: #1a46a8;
+
+  --accent2d:         rgba(37, 99, 235, 0.10);
+  --accent2d-border:  rgba(37, 99, 235, 0.40);
+  --accent2d-text:    #1d4ed8;
+
+  --color-error:  #c0392b;
+  --color-submit: #3b6edc;
+  --color-submit-border: #2558c4;
+  --color-submit-text:   #ffffff;
+  --color-submit-hover:  #2558c4;
+}
+
+/* ==========================================================================
+   Reset
+   ========================================================================== */
+
 *,
 *::before,
 *::after {
@@ -12,24 +111,25 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #0f1117;
-  font-family:
-    'Inter',
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    sans-serif;
-  color: #e8eaed;
+  background: var(--bg-base);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
 }
 
-/* ---- app layout -------------------------------------------------- */
+/* ==========================================================================
+   App layout
+   ========================================================================== */
 
 .app-layout {
   display: grid;
   width: 100%;
   height: 100%;
-  /* Row 0: toolbar; Row 1: content (viewport + side panels). */
-  grid-template-rows: auto 1fr;
+  /*
+   * Row 0: toolbar
+   * Row 1: content (viewport + side panels)
+   * Row 2: status bar
+   */
+  grid-template-rows: auto 1fr auto;
   grid-template-columns: 1fr;
 }
 
@@ -48,7 +148,9 @@ body,
   overflow: hidden;
 }
 
-/* ---- toolbar ----------------------------------------------------- */
+/* ==========================================================================
+   Toolbar
+   ========================================================================== */
 
 .toolbar {
   display: flex;
@@ -56,9 +158,8 @@ body,
   align-items: center;
   gap: 2px;
   padding: 4px 8px;
-  background: #13151d;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  /* Prevent the toolbar from stealing three.js pointer events */
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
   user-select: none;
 }
 
@@ -70,7 +171,7 @@ body,
   background: transparent;
   border: 1px solid transparent;
   border-radius: 5px;
-  color: rgba(232, 234, 237, 0.75);
+  color: var(--text-secondary);
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
@@ -84,21 +185,23 @@ body,
 }
 
 .toolbar-btn:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #e8eaed;
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
 }
 
 .toolbar-btn:active {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--border-light);
 }
 
 .toolbar-btn:focus-visible {
-  outline: 2px solid #5b8dee;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* ---- status bar -------------------------------------------------- */
+/* ==========================================================================
+   Status bar (floating overlay above the viewport — legacy; kept for snapshots)
+   ========================================================================== */
 
 .status-bar {
   position: absolute;
@@ -106,30 +209,133 @@ body,
   left: 50%;
   transform: translateX(-50%);
   padding: 4px 12px;
-  background: rgba(15, 17, 23, 0.72);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-overlay);
+  backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
   font-size: 11px;
-  color: rgba(232, 234, 237, 0.55);
+  color: var(--text-muted);
   pointer-events: none;
   white-space: nowrap;
 }
 
-/* ---- properties panel (E2) --------------------------------------- */
+/* ==========================================================================
+   Status bar — bottom bar (V3)
+   ========================================================================== */
+
+.status-bar-bottom {
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 26px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-muted);
+  user-select: none;
+  gap: 8px;
+  /* Keep above the canvas; below floating overlays */
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.status-bar-bottom__items {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.status-item__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.status-item__value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.status-divider {
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  background: var(--border-subtle);
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+
+.status-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-label);
+  font-size: 11px;
+  flex: 1;
+}
+
+.status-theme-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.status-theme-toggle:hover {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.status-theme-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Properties panel (E2)
+   ========================================================================== */
 
 .app-properties {
   flex: 0 0 240px;
   height: 100%;
   overflow-y: auto;
-  background: #13151d;
-  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: 0;
-  /* Custom scrollbar — minimal on dark bg */
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: var(--border-light) transparent;
 }
 
 .props-section {
@@ -141,19 +347,19 @@ body,
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(232, 234, 237, 0.4);
+  color: var(--text-faint);
   margin-bottom: 8px;
 }
 
 .props-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--border-subtle);
   flex-shrink: 0;
 }
 
 .props-empty {
   font-size: 12px;
-  color: rgba(232, 234, 237, 0.35);
+  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -173,14 +379,14 @@ body,
 
 .props-key {
   font-size: 11px;
-  color: rgba(232, 234, 237, 0.45);
+  color: var(--text-muted);
   flex: 0 0 60px;
   white-space: nowrap;
 }
 
 .props-value {
   font-size: 11px;
-  color: rgba(232, 234, 237, 0.85);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   min-width: 0;
   overflow: hidden;
@@ -190,7 +396,7 @@ body,
 }
 
 .props-id {
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   opacity: 0.7;
 }
@@ -200,20 +406,22 @@ body,
   width: 10px;
   height: 10px;
   border-radius: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-medium);
   vertical-align: middle;
   margin-right: 5px;
 }
 
 .props-cmd-description {
   font-size: 11px;
-  color: rgba(232, 234, 237, 0.4);
+  color: var(--text-muted);
   margin-bottom: 8px;
   font-style: italic;
   line-height: 1.4;
 }
 
-/* ---- param form (shared by PropertiesPanel) ----------------------- */
+/* ==========================================================================
+   Param form (shared by PropertiesPanel)
+   ========================================================================== */
 
 .param-form {
   display: flex;
@@ -229,30 +437,29 @@ body,
 
 .param-label {
   font-size: 11px;
-  color: rgba(232, 234, 237, 0.55);
+  color: var(--text-label);
   font-weight: 500;
   cursor: default;
   user-select: none;
 }
 
 .param-required {
-  color: #e05c5c;
+  color: var(--color-error);
 }
 
 .param-input {
   width: 100%;
   padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
   border-radius: 4px;
-  color: #e8eaed;
+  color: var(--text-primary);
   font-family: inherit;
   font-size: 12px;
   outline: none;
   transition:
     border-color 0.12s ease,
     background 0.12s ease;
-  /* Remove number input spinners on Webkit */
   -moz-appearance: textfield;
 }
 
@@ -263,29 +470,29 @@ body,
 }
 
 .param-input:focus {
-  border-color: #5b8dee;
-  background: rgba(91, 141, 238, 0.08);
+  border-color: var(--accent);
+  background: var(--bg-input-focus);
 }
 
 .param-input::placeholder {
-  color: rgba(232, 234, 237, 0.2);
+  color: var(--text-faint);
   font-size: 11px;
 }
 
 .param-checkbox {
   width: 15px;
   height: 15px;
-  accent-color: #5b8dee;
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
 .param-select {
   width: 100%;
   padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
   border-radius: 4px;
-  color: #e8eaed;
+  color: var(--text-primary);
   font-family: inherit;
   font-size: 12px;
   outline: none;
@@ -294,17 +501,17 @@ body,
 }
 
 .param-select:focus {
-  border-color: #5b8dee;
+  border-color: var(--accent);
 }
 
 .param-select option {
-  background: #1a1d27;
-  color: #e8eaed;
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 .param-error {
   font-size: 10px;
-  color: #e05c5c;
+  color: var(--color-error);
   line-height: 1.3;
 }
 
@@ -312,10 +519,10 @@ body,
   margin-top: 4px;
   width: 100%;
   padding: 6px 12px;
-  background: #2a4a7a;
-  border: 1px solid #3d67a8;
+  background: var(--color-submit);
+  border: 1px solid var(--color-submit-border);
   border-radius: 5px;
-  color: #b8d0f8;
+  color: var(--color-submit-text);
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -327,21 +534,23 @@ body,
 }
 
 .param-submit:hover {
-  background: #3358a0;
-  border-color: #5b8dee;
-  color: #e8eaed;
+  background: var(--color-submit-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .param-submit:active {
-  background: #1e3b6a;
+  opacity: 0.85;
 }
 
 .param-submit:focus-visible {
-  outline: 2px solid #5b8dee;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* ---- 2D / 3D view-mode toggle ------------------------------------ */
+/* ==========================================================================
+   2D / 3D view-mode toggle
+   ========================================================================== */
 
 .view-mode-toggle {
   position: absolute;
@@ -351,9 +560,9 @@ body,
   z-index: 10;
   display: flex;
   align-items: center;
-  background: rgba(15, 17, 23, 0.82);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-overlay);
+  backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-light);
   border-radius: 7px;
   padding: 3px;
   gap: 2px;
@@ -369,7 +578,7 @@ body,
   background: transparent;
   border: 1px solid transparent;
   border-radius: 5px;
-  color: rgba(232, 234, 237, 0.55);
+  color: var(--text-label);
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -382,29 +591,31 @@ body,
 }
 
 .view-mode-btn:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: rgba(232, 234, 237, 0.85);
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-secondary);
 }
 
 .view-mode-btn--active {
-  background: rgba(91, 141, 238, 0.18);
-  border-color: rgba(91, 141, 238, 0.45);
-  color: #8ab4f8;
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+  color: var(--accent-text);
 }
 
 .view-mode-btn--active:hover {
-  background: rgba(91, 141, 238, 0.26);
-  border-color: rgba(91, 141, 238, 0.65);
-  color: #aac4fa;
+  background: var(--accent-bg-hover);
+  border-color: var(--accent);
+  color: var(--accent-text-hover);
 }
 
 .view-mode-btn:focus-visible {
-  outline: 2px solid #5b8dee;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* ---- 2D draw tool palette ---------------------------------------- */
+/* ==========================================================================
+   2D draw tool palette
+   ========================================================================== */
 
 .draw-tools {
   position: absolute;
@@ -417,9 +628,9 @@ body,
   align-items: stretch;
   gap: 2px;
   padding: 4px;
-  background: rgba(15, 17, 23, 0.88);
+  background: var(--bg-overlay);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   pointer-events: all;
   user-select: none;
@@ -436,7 +647,7 @@ body,
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
-  color: rgba(232, 234, 237, 0.55);
+  color: var(--text-label);
   font-family: inherit;
   font-size: 10px;
   font-weight: 500;
@@ -450,25 +661,26 @@ body,
 }
 
 .draw-tool-btn:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: rgba(232, 234, 237, 0.9);
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-secondary);
 }
 
 .draw-tool-btn--active {
-  background: rgba(96, 165, 250, 0.16);
-  border-color: rgba(96, 165, 250, 0.45);
-  color: #93c5fd;
+  background: var(--accent2d);
+  border-color: var(--accent2d-border);
+  color: var(--accent2d-text);
 }
 
 .draw-tool-btn--active:hover {
-  background: rgba(96, 165, 250, 0.24);
-  border-color: rgba(96, 165, 250, 0.65);
-  color: #bfdbfe;
+  background: var(--accent2d);
+  border-color: var(--accent2d-border);
+  color: var(--accent2d-text);
+  filter: brightness(1.15);
 }
 
 .draw-tool-btn:focus-visible {
-  outline: 2px solid #60a5fa;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -492,11 +704,277 @@ body,
 .draw-tool-hint {
   margin-top: 4px;
   padding: 5px 6px;
-  background: rgba(96, 165, 250, 0.08);
-  border: 1px solid rgba(96, 165, 250, 0.2);
+  background: var(--accent2d);
+  border: 1px solid var(--accent2d-border);
   border-radius: 4px;
   font-size: 9px;
-  color: rgba(147, 197, 253, 0.7);
+  color: var(--accent2d-text);
   line-height: 1.4;
   text-align: center;
+}
+
+/* ==========================================================================
+   Command palette (V2)
+   ========================================================================== */
+
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+}
+
+.palette-dialog {
+  width: 540px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: 10px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.palette-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.palette-search-icon {
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.palette-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  caret-color: var(--accent);
+  min-width: 0;
+}
+
+.palette-input::placeholder {
+  color: var(--text-faint);
+}
+
+.palette-esc-hint {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.palette-list {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.palette-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.08s ease;
+}
+
+.palette-item:hover,
+.palette-item--highlighted {
+  background: var(--bg-input);
+  border-left-color: var(--accent);
+}
+
+.palette-item__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.palette-item__desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-empty {
+  padding: 20px 14px;
+  font-size: 13px;
+  color: var(--text-faint);
+  font-style: italic;
+  text-align: center;
+}
+
+.palette-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  flex-shrink: 0;
+}
+
+.palette-hint {
+  font-size: 10px;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.palette-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--text-muted);
+}
+
+.palette-form-view {
+  padding: 14px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.palette-form-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.palette-back-btn {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.palette-back-btn:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.palette-back-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.palette-form-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.palette-form-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   View presets overlay (V2)
+   ========================================================================== */
+
+.view-presets {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-overlay);
+  backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  pointer-events: all;
+  user-select: none;
+}
+
+.view-preset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-label);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+  white-space: nowrap;
+}
+
+.view-preset-btn:hover:not(:disabled) {
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+  color: var(--accent-text);
+}
+
+.view-preset-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.view-preset-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.view-preset-divider {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background: var(--border-subtle);
+  margin: 0 3px;
+  flex-shrink: 0;
 }

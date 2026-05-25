@@ -1,6 +1,7 @@
 {
   "enabledMcpjsonServers": [
-    "context7"
+    "context7",
+    "llull"
   ],
   "enableAllProjectMcpServers": true
 }

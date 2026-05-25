@@ -39,6 +39,17 @@ export interface BaseEntity {
   layerId: string;
   /** Hex color, e.g. "#c8553d". */
   color: string;
+  /**
+   * Optional human-readable name for the entity, set by `set_entity_name`.
+   * Enables AI/MCP plans to reference entities by meaning rather than generated ids.
+   */
+  name?: string;
+  /**
+   * Optional semantic tags for the entity, set by `set_entity_name`.
+   * Used by `find_entities` to filter by tag.
+   * @example ['structural', 'visible']
+   */
+  tags?: readonly string[];
 }
 
 export interface BoxEntity extends BaseEntity {

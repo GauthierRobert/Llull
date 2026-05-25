@@ -15,11 +15,21 @@ import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from
 import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint } from './draw2d';
 import { loadDocument } from './persistence';
 import { extrudeSketch, revolveProfile } from './profile';
-import { duplicateEntity, groupEntities, ungroupEntities } from './edit';
+import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit';
 import { booleanUnion, booleanSubtract, booleanIntersect } from './boolean';
 import { describeScene } from './scene';
+import { findEntities } from './query';
 import { buildProject } from './project';
 import { setUnits } from './units';
+import {
+  measureDistance,
+  measureAngle,
+  measureArea,
+  measurePerimeter,
+  measureBoundingBox,
+  measureVolume,
+  massProperties,
+} from './measure';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -46,12 +56,21 @@ const definitions = [
   duplicateEntity,
   groupEntities,
   ungroupEntities,
+  setEntityName,
+  findEntities,
   booleanUnion,
   booleanSubtract,
   booleanIntersect,
   describeScene,
   buildProject,
   setUnits,
+  measureDistance,
+  measureAngle,
+  measureArea,
+  measurePerimeter,
+  measureBoundingBox,
+  measureVolume,
+  massProperties,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
