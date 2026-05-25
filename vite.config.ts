@@ -1,5 +1,4 @@
-/// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 
@@ -16,6 +15,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
+    // Isolated agent worktrees (continue-working skill) live under the repo root
+    // and contain full repo copies; never scan them for tests.
+    exclude: [...configDefaults.exclude, '.claude/worktrees/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
