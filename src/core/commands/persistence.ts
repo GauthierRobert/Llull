@@ -7,7 +7,7 @@
  * @failure invalid JSON / wrong format or version / missing required fields -> no-op, affected:[]
  */
 
-import type { CadDocument, Entity, Layer, CameraState, Vec3 } from '../model/types';
+import type { CadDocument, DocumentUnit, Entity, Layer, CameraState, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 
 // ---------------------------------------------------------------------------
@@ -92,6 +92,8 @@ function validateEntity(v: unknown): v is Entity {
   );
 }
 
+const VALID_UNITS: ReadonlySet<string> = new Set<DocumentUnit>(['mm', 'cm', 'm', 'in', 'ft']);
+
 function validateDocument(v: unknown): v is CadDocument {
   if (!isRecord(v)) return false;
 
@@ -160,7 +162,17 @@ export function deserializeDocument(json: string): CadDocument {
     );
   }
 
-  return doc;
+  // Graceful defaults for fields added after v1 (older serialized documents lack them).
+  const units: DocumentUnit =
+    typeof doc.units === 'string' && VALID_UNITS.has(doc.units) ? doc.units : 'mm';
+  const displayPrecision: number =
+    typeof doc.displayPrecision === 'number' &&
+    doc.displayPrecision >= 0 &&
+    Number.isInteger(doc.displayPrecision)
+      ? doc.displayPrecision
+      : 3;
+
+  return { ...doc, units, displayPrecision };
 }
 
 // ---------------------------------------------------------------------------
