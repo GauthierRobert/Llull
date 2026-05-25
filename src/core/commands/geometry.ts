@@ -135,6 +135,125 @@ export const move: CommandDefinition<MoveParams> = {
   },
 };
 
+/**
+ * @command add_cylinder
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 cylinder entity with given radius and height
+ * @invariant radius > 0; height > 0
+ * @failure radius <= 0 or height <= 0 -> no-op, affected:[]
+ */
+interface AddCylinderParams {
+  radius: number;
+  height: number;
+  position?: Vec3;
+  color?: string;
+}
+
+export const addCylinder: CommandDefinition<AddCylinderParams> = {
+  name: 'add_cylinder',
+  description: 'Create a cylinder solid at a position with a given radius and height.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      radius: {
+        type: 'number',
+        description: 'Radius of the cylinder cross-section. Must be greater than 0.',
+      },
+      height: {
+        type: 'number',
+        description: 'Height of the cylinder along the Z axis. Must be greater than 0.',
+      },
+      position: {
+        type: 'array',
+        description: 'World-space origin [x, y, z] of the cylinder base center. Defaults to [0, 0, 0].',
+        items: { type: 'number' },
+      },
+      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+    },
+    required: ['radius', 'height'],
+  },
+  run: (doc, { radius, height, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
+    if (radius <= 0) {
+      return { document: doc, summary: `add_cylinder failed: radius must be > 0, got ${radius}.`, affected: [] };
+    }
+    if (height <= 0) {
+      return { document: doc, summary: `add_cylinder failed: height must be > 0, got ${height}.`, affected: [] };
+    }
+    const id = nextId('cyl');
+    const entity: Entity = {
+      id,
+      kind: 'cylinder',
+      radius,
+      height,
+      position,
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color,
+    };
+    return {
+      document: withEntity(doc, entity),
+      summary: `Added cylinder ${id} with radius ${radius} and height ${height}.`,
+      affected: [id],
+    };
+  },
+};
+
+/**
+ * @command add_sphere
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 sphere entity with given radius
+ * @invariant radius > 0
+ * @failure radius <= 0 -> no-op, affected:[]
+ */
+interface AddSphereParams {
+  radius: number;
+  position?: Vec3;
+  color?: string;
+}
+
+export const addSphere: CommandDefinition<AddSphereParams> = {
+  name: 'add_sphere',
+  description: 'Create a sphere solid at a position with a given radius.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      radius: {
+        type: 'number',
+        description: 'Radius of the sphere. Must be greater than 0.',
+      },
+      position: {
+        type: 'array',
+        description: 'World-space center position [x, y, z] of the sphere. Defaults to [0, 0, 0].',
+        items: { type: 'number' },
+      },
+      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+    },
+    required: ['radius'],
+  },
+  run: (doc, { radius, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
+    if (radius <= 0) {
+      return { document: doc, summary: `add_sphere failed: radius must be > 0, got ${radius}.`, affected: [] };
+    }
+    const id = nextId('sph');
+    const entity: Entity = {
+      id,
+      kind: 'sphere',
+      radius,
+      position,
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color,
+    };
+    return {
+      document: withEntity(doc, entity),
+      summary: `Added sphere ${id} with radius ${radius}.`,
+      affected: [id],
+    };
+  },
+};
+
 interface DeleteParams {
   id: string;
 }

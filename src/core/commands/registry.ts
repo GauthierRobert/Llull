@@ -10,7 +10,7 @@
 
 import type { CadDocument } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { addBox, extrude, move, deleteEntity } from './geometry';
+import { addBox, addCylinder, addSphere, extrude, move, deleteEntity } from './geometry';
 import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
 import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint } from './draw2d';
 import { loadDocument } from './persistence';
@@ -21,6 +21,8 @@ import { booleanUnion, booleanSubtract, booleanIntersect } from './boolean';
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
   addBox,
+  addCylinder,
+  addSphere,
   extrude,
   move,
   deleteEntity,
