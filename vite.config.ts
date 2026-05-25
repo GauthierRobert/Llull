@@ -17,7 +17,9 @@ export default defineConfig({
     setupFiles: './tests/setup.ts',
     // Isolated agent worktrees (continue-working skill) live under the repo root
     // and contain full repo copies; never scan them for tests.
-    exclude: [...configDefaults.exclude, '.claude/worktrees/**'],
+    // `server/**` has its own node-env vitest config — keep it out of the app
+    // (jsdom) suite so the two never cross-contaminate.
+    exclude: [...configDefaults.exclude, '.claude/worktrees/**', 'server/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

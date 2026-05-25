@@ -20,6 +20,6 @@
       "@lib/*": ["../src/lib/*"]
     }
   },
-  "include": ["src", "examples", "../src/core", "../src/lib"],
+  "include": ["src", "examples", "tests", "../src/core", "../src/lib"],
   "exclude": ["node_modules", "dist"]
 }

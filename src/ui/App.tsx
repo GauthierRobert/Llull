@@ -3,10 +3,15 @@
  *
  * App shell — the outermost layout component.
  *
- * Layout grid (3 rows):
- *   - Row 0: Toolbar (generated from the command registry).
- *   - Row 1: Content — properties panel docked left, viewport fills the rest.
- *   - Row 2: StatusBar — units, selection count, last command summary.
+ * Layout grid (2 rows):
+ *   - Row 0: Content — properties panel docked left, viewport fills the rest,
+ *             layers panel docked right.
+ *   - Row 1: StatusBar — live-connection indicator, units, selection count.
+ *
+ * llull is now a LIVE READ-ONLY VIEWER of the MCP-driven document.
+ * Claude drives the model over MCP; the human watches it render and adjusts by
+ * re-instructing Claude. The Toolbar and CommandPalette are removed — document
+ * mutations come exclusively from MCP agents, not UI controls.
  *
  * Theme: reads the active theme from useThemeStore and applies it as
  * `data-theme` on the root <div> so CSS variables cascade to all children.
@@ -16,33 +21,26 @@
  * store (architecture L7: view mode is not document state).
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useThemeStore } from '@ui/store';
 import { ViewportErrorBoundary } from '@ui/viewport/3d/ViewportErrorBoundary';
 import { Viewport3D } from '@ui/viewport/3d/Viewport3D';
 import { Viewport2D } from '@ui/viewport/2d/Viewport2D';
-import { Toolbar } from '@ui/components/Toolbar';
 import { StatusBar } from '@ui/components/StatusBar';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { LayersPanel } from '@ui/panels/LayersPanel';
-import { CommandPalette } from '@ui/components/CommandPalette';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { EmptyState } from '@ui/components/EmptyState';
-import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
+import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
 
 type ViewMode = '3d' | '2d';
 
 export function App(): React.ReactElement {
   const theme = useThemeStore((s) => s.theme);
   const [viewMode, setViewMode] = useState<ViewMode>('3d');
-  const [paletteOpen, setPaletteOpen] = useState(false);
 
-  const openPalette = useCallback(() => setPaletteOpen(true), []);
-  const closePalette = useCallback(() => setPaletteOpen(false), []);
-
-  // Global keyboard shortcuts: Ctrl+Z undo, Ctrl+Shift+Z/Ctrl+Y redo,
-  // Delete → delete_entity, Ctrl/Cmd-K → palette.
-  useKeyboardShortcuts({ onOpenPalette: openPalette });
+  // Mirror the server-authoritative CadDocument into the store via SSE.
+  useMcpLiveDocument();
 
   // Apply the theme as a data attribute on <html> so the CSS variables
   // cascade to the entire document (including portals).
@@ -52,10 +50,8 @@ export function App(): React.ReactElement {
 
   return (
     <div className="app-layout" data-theme={theme}>
-      <Toolbar />
-
       <div className="app-content">
-        {/* Properties panel (E2): left dock — selection + param-form command runner. */}
+        {/* Properties panel: left dock — read-only entity inspector. */}
         <PropertiesPanel className="app-properties" />
 
         <div className="app-viewport">
@@ -93,9 +89,6 @@ export function App(): React.ReactElement {
       </div>
 
       <StatusBar />
-
-      {/* Command palette — rendered at the app root so it overlays everything */}
-      <CommandPalette isOpen={paletteOpen} onClose={closePalette} />
     </div>
   );
 }

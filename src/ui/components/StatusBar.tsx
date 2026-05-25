@@ -4,20 +4,16 @@
  * StatusBar — a bottom bar that surfaces live document state at a glance.
  *
  * Reads (all via narrow Zustand selectors — react R3):
+ *   - liveStatus                              → live connection indicator
  *   - document.units + document.displayPrecision → formatted unit label
  *   - document.selection.length               → selection count
  *   - lastSummary                             → most recent command feedback
  *
  * Presentation ONLY. No document mutations (PRIME DIRECTIVE).
- *
- * TODO (U4): add live cursor coordinates once Lane 3's 2D cursor-tracking
- * hook is in place. The coordinates depend on the 2D pointer-move event
- * stream established by the Viewport2D interaction layer.
  */
 
 import React from 'react';
 import { useStore, useThemeStore } from '@ui/store';
-import { McpConnectButton } from '@ui/components/McpConnect';
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -34,6 +30,28 @@ function StatusItem({ label, value, 'aria-label': ariaLabel }: StatusItemProps):
     <span className="status-item" aria-label={ariaLabel ?? `${label}: ${value}`}>
       <span className="status-item__label">{label}</span>
       <span className="status-item__value">{value}</span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LiveIndicator
+// ---------------------------------------------------------------------------
+
+function LiveIndicator(): React.ReactElement {
+  const liveStatus = useStore((s) => s.liveStatus);
+
+  const isConnected = liveStatus === 'connected';
+  const label = isConnected ? 'Live' : liveStatus === 'connecting' ? 'Connecting…' : 'Disconnected';
+
+  return (
+    <span
+      className={`live-indicator live-indicator--${liveStatus}`}
+      aria-label={`MCP stream: ${label}`}
+      title={`MCP live stream: ${label}`}
+    >
+      <span className="live-indicator__dot" aria-hidden="true" />
+      {label}
     </span>
   );
 }
@@ -79,6 +97,8 @@ export function StatusBar(): React.ReactElement {
   return (
     <footer className="status-bar-bottom" aria-label="Document status">
       <div className="status-bar-bottom__items">
+        <LiveIndicator />
+        <span className="status-divider" aria-hidden="true" />
         <StatusItem label="Units" value={unitLabel} aria-label={`Units: ${unitLabel}`} />
         <span className="status-divider" aria-hidden="true" />
         <StatusItem
@@ -100,7 +120,6 @@ export function StatusBar(): React.ReactElement {
         )}
       </div>
       <div className="status-bar-bottom__right">
-        <McpConnectButton />
         <ThemeToggle />
       </div>
     </footer>

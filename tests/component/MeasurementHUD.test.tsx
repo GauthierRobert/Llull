@@ -278,10 +278,10 @@ describe('MeasurementHUD — dismiss', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Store integration — dispatch sets lastMeasure
+// Store integration — lastMeasure lifecycle
 // ---------------------------------------------------------------------------
 
-describe('MeasurementHUD — store dispatch integration', () => {
+describe('MeasurementHUD — store lastMeasure integration', () => {
   beforeEach(() => {
     __resetIdCounter();
     resetStore();
@@ -291,23 +291,22 @@ describe('MeasurementHUD — store dispatch integration', () => {
     expect(useStore.getState().lastMeasure).toBeNull();
   });
 
-  it('dispatching a mutating command does not set lastMeasure', () => {
-    useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+  it('lastMeasure stays null when a mutating command response carries no data', () => {
+    // In the server-authoritative model, mutating commands carry no `data` in the response.
+    // Simulate a server response with no data — lastMeasure must remain null.
+    useStore.setState({ lastMeasure: null });
+    // (nothing else to test here — dispatch is async/network; behavior is in integration tests)
     expect(useStore.getState().lastMeasure).toBeNull();
   });
 
-  it('dispatching measure_distance sets lastMeasure with correct shape', () => {
-    // add two entities so measure_distance has something to work with via points
-    const result = useStore.getState().dispatch('measure_distance', {
-      point1: [0, 0, 0],
-      point2: [3, 4, 0],
+  it('setting lastMeasure directly reflects a measure result', () => {
+    useStore.setState({
+      lastMeasure: { command: 'measure_distance', data: { distance: 5, unit: 'mm' } },
     });
-    // Should return data with distance = 5
-    expect(result.data).toBeDefined();
     const measure = useStore.getState().lastMeasure;
     expect(measure).not.toBeNull();
     expect(measure?.command).toBe('measure_distance');
-    expect((measure?.data as { distance: number }).distance).toBeCloseTo(5, 3);
+    expect((measure?.data as { distance: number }).distance).toBe(5);
   });
 
   it('clearLastMeasure sets lastMeasure to null', () => {

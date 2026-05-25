@@ -10,6 +10,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
+import type { Entity, LineEntity, PolylineEntity, CircleEntity, RectangleEntity } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Nearest-vertex picking for polylines (fillet / chamfer)
@@ -94,4 +95,91 @@ export function dist2(a: Vec2, b: Vec2): number {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+// ---------------------------------------------------------------------------
+// Entity pick distance (for ModifyPickInteraction)
+// ---------------------------------------------------------------------------
+
+/**
+ * Squared distance from point P to the segment AB.
+ * @pure
+ */
+export function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
+  const abx = b[0] - a[0];
+  const aby = b[1] - a[1];
+  const apx = p[0] - a[0];
+  const apy = p[1] - a[1];
+  const lenSq = abx * abx + aby * aby;
+  let t = lenSq > 0 ? (apx * abx + apy * aby) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = a[0] + t * abx - p[0];
+  const cy = a[1] + t * aby - p[1];
+  return cx * cx + cy * cy;
+}
+
+/**
+ * Minimum squared distance from a world-space pick point to a 2D entity.
+ *
+ * All 2D entity geometry is LOCAL to the entity's work plane; `entity.position`
+ * is the work-plane origin in world space. The world-space pick is shifted into
+ * the entity's local frame and all geometry is compared in that frame.
+ *
+ * Handles: line, polyline, circle, rectangle.
+ * Returns Infinity for unsupported kinds.
+ *
+ * @pure
+ */
+export function entityDistSq(entity: Entity, worldPick: Vec2): number {
+  // Shift pick into local frame — same for every kind.
+  const ox = entity.position[0];
+  const oy = entity.position[1];
+  const pick: Vec2 = [worldPick[0] - ox, worldPick[1] - oy];
+
+  switch (entity.kind) {
+    case 'line': {
+      const l = entity as LineEntity;
+      return pointToSegDistSq(pick, l.start, l.end);
+    }
+    case 'polyline': {
+      const poly = entity as PolylineEntity;
+      let best = Infinity;
+      for (let i = 0; i < poly.points.length - 1; i++) {
+        const d = pointToSegDistSq(pick, poly.points[i]!, poly.points[i + 1]!);
+        if (d < best) best = d;
+      }
+      if (poly.closed && poly.points.length > 1) {
+        const d = pointToSegDistSq(
+          pick,
+          poly.points[poly.points.length - 1]!,
+          poly.points[0]!,
+        );
+        if (d < best) best = d;
+      }
+      return best;
+    }
+    case 'circle': {
+      const c = entity as CircleEntity;
+      const dx = pick[0] - c.center[0];
+      const dy = pick[1] - c.center[1];
+      const d = Math.sqrt(dx * dx + dy * dy) - c.radius;
+      return d * d;
+    }
+    case 'rectangle': {
+      const r = entity as RectangleEntity;
+      // Rectangle corners are in local space (lower-left at local origin).
+      const tl: Vec2 = [0, r.height];
+      const tr: Vec2 = [r.width, r.height];
+      const bl: Vec2 = [0, 0];
+      const br: Vec2 = [r.width, 0];
+      return Math.min(
+        pointToSegDistSq(pick, bl, br),
+        pointToSegDistSq(pick, br, tr),
+        pointToSegDistSq(pick, tr, tl),
+        pointToSegDistSq(pick, tl, bl),
+      );
+    }
+    default:
+      return Infinity;
+  }
 }

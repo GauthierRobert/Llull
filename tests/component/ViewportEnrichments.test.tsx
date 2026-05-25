@@ -20,6 +20,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { __resetIdCounter } from '@lib/id';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
+import { localDispatch } from '../helpers/storeTestHelpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -273,7 +274,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
 
   it('shows a Hide button when a 3D entity is selected', () => {
     // Create a box and select it
-    const result = useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+    const result = localDispatch('add_box', { size: [2, 2, 2] });
     const entityId = result.affected[0]!;
     useStore.getState().select([entityId]);
 
@@ -284,7 +285,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
   });
 
   it('clicking Hide sets the entity as hidden in viewportStore', () => {
-    const result = useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+    const result = localDispatch('add_box', { size: [2, 2, 2] });
     const entityId = result.affected[0]!;
     useStore.getState().select([entityId]);
 
@@ -296,7 +297,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
   });
 
   it('shows Show button when the entity is already hidden', () => {
-    const result = useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+    const result = localDispatch('add_box', { size: [2, 2, 2] });
     const entityId = result.affected[0]!;
     useStore.getState().select([entityId]);
     useViewportStore.getState().toggleEntityVisibility(entityId);
@@ -307,7 +308,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
   });
 
   it('clicking Show unhides the entity in viewportStore', () => {
-    const result = useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+    const result = localDispatch('add_box', { size: [2, 2, 2] });
     const entityId = result.affected[0]!;
     useStore.getState().select([entityId]);
     useViewportStore.getState().toggleEntityVisibility(entityId);
@@ -320,7 +321,7 @@ describe('PropertiesPanel — entity visibility toggle', () => {
   });
 
   it('does NOT mutate the document when hiding an entity', () => {
-    const result = useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+    const result = localDispatch('add_box', { size: [2, 2, 2] });
     const entityId = result.affected[0]!;
     useStore.getState().select([entityId]);
     const docBefore = useStore.getState().document;

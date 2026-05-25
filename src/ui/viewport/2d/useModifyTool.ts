@@ -22,6 +22,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Vec2 } from '@core/model/types';
+import type { LineEntity, PolylineEntity } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { nearestVertex, offsetSideSign } from './modifyHelpers';
 
@@ -86,6 +87,19 @@ export interface UseModifyToolResult extends ModifyToolState {
 }
 
 // ---------------------------------------------------------------------------
+// Keyboard shortcut → tool mapping (O/F/K/T/X/E)
+// ---------------------------------------------------------------------------
+
+const KEY_TO_TOOL: Readonly<Record<string, ModifyToolKind>> = {
+  o: 'offset',
+  f: 'fillet',
+  k: 'chamfer',
+  t: 'trim',
+  x: 'extend',
+  e: 'explode',
+};
+
+// ---------------------------------------------------------------------------
 // Initial state helper
 // ---------------------------------------------------------------------------
 
@@ -105,6 +119,7 @@ function initialState(): Omit<ModifyToolState, 'activeTool'> {
 
 export function useModifyTool(): UseModifyToolResult {
   const dispatch = useStore((s) => s.dispatch);
+  const entities = useStore((s) => s.document.entities);
 
   const [activeTool, setActiveToolState] = useState<ModifyToolKind>('none');
   const [phase, setPhase] = useState<ModifyToolPhase>('idle');
@@ -114,14 +129,12 @@ export function useModifyTool(): UseModifyToolResult {
   const [pendingValue, setPendingValue] = useState<number>(1);
 
   // Ref to store the pick point for the offset side-sign computation.
-  // Not state: it's a transient intermediate used only in commitValue.
+  // Not state: it is a transient intermediate consumed only by commitValue.
   const offsetPickPointRef = useRef<Vec2 | null>(null);
 
-  // Stable ref to the current activeTool so cancel() can read it synchronously.
+  // Stable ref to the current activeTool so cancel() can read it synchronously
+  // without being stale when resetProgress and cancel both batch in one keydown handler.
   const activeToolRef = useRef<ModifyToolKind>('none');
-  useEffect(() => {
-    activeToolRef.current = activeTool;
-  }, [activeTool]);
 
   const resetProgress = useCallback(() => {
     const s = initialState();
@@ -146,27 +159,54 @@ export function useModifyTool(): UseModifyToolResult {
   const cancel = useCallback(() => {
     resetProgress();
     // Re-enter pick-entity phase if a tool is still active.
-    // Read from the ref (not stale phase state) so that when resetProgress and
-    // cancel both fire in the same React batch, we see the correct activeTool
-    // value rather than the just-cleared phase snapshot.
+    // Use the ref (not the stale phase snapshot) so that when resetProgress and
+    // cancel both fire in the same React batch, we still see the correct activeTool
+    // value rather than the just-cleared 'idle' produced by resetProgress.
     setPhase(activeToolRef.current === 'none' ? 'idle' : 'pick-entity');
   }, [resetProgress]);
 
   const commitValue = useCallback(() => {
     if (activeTool === 'offset' && pickedEntityId !== null) {
-      dispatch('offset_2d', { id: pickedEntityId, distance: pendingValue });
+      // Apply side-sign: multiply pendingValue by +1 (left of start→end) or -1 (right).
+      const entity = entities[pickedEntityId];
+      const pickPt = offsetPickPointRef.current;
+      let signedDistance = pendingValue;
+      if (pickPt !== null && entity !== undefined) {
+        const pos = entity.position;
+        // Shift the world-space pick into the entity's local frame.
+        const localPick: Vec2 = [pickPt[0] - pos[0], pickPt[1] - pos[1]];
+        if (entity.kind === 'line') {
+          const line = entity as LineEntity;
+          signedDistance = pendingValue * offsetSideSign(line.start, line.end, localPick);
+        } else if (entity.kind === 'polyline') {
+          const poly = entity as PolylineEntity;
+          if (poly.points.length >= 2) {
+            signedDistance =
+              pendingValue * offsetSideSign(poly.points[0]!, poly.points[1]!, localPick);
+          }
+        }
+      }
+      dispatch('offset_2d', { id: pickedEntityId, distance: signedDistance });
       resetProgress();
       setPhase('pick-entity');
     } else if (activeTool === 'fillet' && pickedEntityId !== null && pickedVertexIndex !== null) {
-      dispatch('fillet_2d', { id: pickedEntityId, vertexIndex: pickedVertexIndex, radius: pendingValue });
+      dispatch('fillet_2d', {
+        id: pickedEntityId,
+        vertexIndex: pickedVertexIndex,
+        radius: pendingValue,
+      });
       resetProgress();
       setPhase('pick-entity');
     } else if (activeTool === 'chamfer' && pickedEntityId !== null && pickedVertexIndex !== null) {
-      dispatch('chamfer_2d', { id: pickedEntityId, vertexIndex: pickedVertexIndex, distance: pendingValue });
+      dispatch('chamfer_2d', {
+        id: pickedEntityId,
+        vertexIndex: pickedVertexIndex,
+        distance: pendingValue,
+      });
       resetProgress();
       setPhase('pick-entity');
     }
-  }, [activeTool, dispatch, pendingValue, pickedEntityId, pickedVertexIndex, resetProgress]);
+  }, [activeTool, dispatch, entities, pendingValue, pickedEntityId, pickedVertexIndex, resetProgress]);
 
   const handleEntityPick = useCallback(
     (entityId: string, worldPoint: Vec2, entityPoints?: ReadonlyArray<Vec2>) => {
@@ -218,7 +258,7 @@ export function useModifyTool(): UseModifyToolResult {
             setPickedEntityId(entityId);
             setPhase('pick-vertex');
           } else if (phase === 'pick-vertex') {
-            // Second pick: the vertex on the same polyline.
+            // Second pick: the vertex on the already-picked polyline.
             // Use nearest-vertex picking if entityPoints is supplied.
             if (entityPoints && entityPoints.length > 0) {
               const nearest = nearestVertex(entityPoints, worldPoint);
@@ -235,18 +275,36 @@ export function useModifyTool(): UseModifyToolResult {
     [activeTool, dispatch, phase, pickedEntityId, resetProgress],
   );
 
-  // Keyboard: Esc cancels; Enter commits (for value phase).
+  // Keyboard: Esc cancels; Enter commits (value phase); O/F/K/T/X/E activate tools.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      // Do not steal keys from text inputs.
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
       if (e.key === 'Escape') {
         cancel();
       } else if (e.key === 'Enter' && phase === 'enter-value') {
         commitValue();
+      } else if (!isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tool = KEY_TO_TOOL[e.key.toLowerCase()];
+        if (tool !== undefined) {
+          e.preventDefault();
+          setActiveTool(activeTool === tool ? 'none' : tool);
+        }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cancel, commitValue, phase]);
+  }, [activeTool, cancel, commitValue, phase, setActiveTool]);
+
+  // Keep activeToolRef in sync for use in cancel().
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+  }, [activeTool]);
 
   return {
     activeTool,

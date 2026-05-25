@@ -43,7 +43,13 @@ import { useModifyTool } from './useModifyTool';
 import type { ModifyToolKind, ModifyToolPhase } from './useModifyTool';
 import { ModifyPickInteraction } from './ModifyPickInteraction';
 import { ScaleBar } from './ScaleBar';
-import { adaptiveGridStep, majorGridStep, shouldRebase2D, snapOrigin2D } from './gridHelpers';
+import {
+  adaptiveGridStep,
+  majorGridStep,
+  localGridPatch,
+  shouldRebase2D,
+  snapOrigin2D,
+} from './gridHelpers';
 import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
 
 // ---------------------------------------------------------------------------
@@ -127,38 +133,41 @@ function RenderOriginSyncer2D(): null {
 // ---------------------------------------------------------------------------
 
 /**
- * Reacts to camera zoom changes each frame and updates the grid geometry.
+ * Reacts to camera zoom + viewport size each frame and updates the grid.
  * Uses useFrame + refs (never setState per frame — R9).
  *
  * Renders TWO line-grid meshes:
  *   - minor: thin lines, step = adaptiveGridStep(zoom)
  *   - major: thicker lines, step = 10 × minor step
  *
- * Both grids are infinite planes rendered as line segments via a custom
- * approach: we re-use THREE.GridHelper but repositioned each frame to stay
- * centered on the camera target so it appears infinite.
+ * The grid is a LOCAL adapted mesh: a finite patch sized to ~GRID_MARGIN× the
+ * visible viewport (localGridPatch), re-centered on the step-snapped camera
+ * position every frame so it APPEARS infinite. A fixed huge extent is not an
+ * option — at high zoom (step → 0) its cell count would explode to millions of
+ * lines and be impossible to render. Sizing to the viewport keeps the line
+ * count bounded at any zoom because the cell step is pixel-bounded.
  *
- * The grid position follows the render origin so it always sits at world Z=0
- * regardless of any floating-origin offset applied to the entities group.
+ * The grid position follows the camera XY so it always covers the view at world
+ * Z=0 regardless of any floating-origin offset applied to the entities group.
  */
 function AdaptiveGrid2D(): React.ReactElement | null {
   const minorRef = useRef<THREE.GridHelper | null>(null);
   const majorRef = useRef<THREE.GridHelper | null>(null);
-  // Initialize to the camera's default zoom (50) and derived step (0.5) so
-  // the first frame doesn't trigger a throwaway geometry rebuild.
-  const lastZoomRef = useRef<number>(50);
-  const lastStepRef = useRef<number>(0.5);
+  // Track the last-built grid params; rebuild geometry only when they change.
+  const lastStepRef = useRef<number>(0);
+  const lastMinorDivRef = useRef<number>(0);
+  const lastMajorDivRef = useRef<number>(0);
 
   // Build initial helpers with placeholder geometry — replaced in useFrame.
   const minorHelper = useMemo(() => {
-    const h = new THREE.GridHelper(2000, 2000, 0x1e2535, 0x1e2535);
+    const h = new THREE.GridHelper(100, 10, 0x1e2535, 0x1e2535);
     h.rotation.x = Math.PI / 2; // lay flat on XY plane
     h.renderOrder = -1;
     return h;
   }, []);
 
   const majorHelper = useMemo(() => {
-    const h = new THREE.GridHelper(2000, 200, 0x2a3350, 0x2a3350);
+    const h = new THREE.GridHelper(100, 10, 0x2a3350, 0x2a3350);
     h.rotation.x = Math.PI / 2;
     h.renderOrder = -1;
     return h;
@@ -173,36 +182,39 @@ function AdaptiveGrid2D(): React.ReactElement | null {
     };
   }, [minorHelper, majorHelper]);
 
-  const { camera } = useThree();
+  const { camera, size } = useThree();
 
   useFrame(() => {
     const ortho = camera as THREE.OrthographicCamera;
-    const zoom = ortho.zoom ?? 50;
+    const zoom = ortho.zoom > 0 ? ortho.zoom : 50;
 
     const step = adaptiveGridStep(zoom);
+    const majorStep = majorGridStep(step);
 
-    // Rebuild grid geometry only when step changes (avoids per-frame allocs).
-    if (step !== lastStepRef.current || zoom !== lastZoomRef.current) {
-      lastZoomRef.current = zoom;
+    // Visible viewport in world units (px / zoom). Size the local patch to it.
+    const visibleWorld = Math.max(size.width, size.height) / zoom;
+    const minorPatch = localGridPatch(visibleWorld, step);
+    const majorPatch = localGridPatch(visibleWorld, majorStep);
+
+    // Rebuild grid geometry only when step or division count changes
+    // (avoids per-frame allocs while panning at a fixed zoom).
+    if (
+      step !== lastStepRef.current ||
+      minorPatch.divisions !== lastMinorDivRef.current ||
+      majorPatch.divisions !== lastMajorDivRef.current
+    ) {
       lastStepRef.current = step;
+      lastMinorDivRef.current = minorPatch.divisions;
+      lastMajorDivRef.current = majorPatch.divisions;
 
-      const majorStep = majorGridStep(step);
-
-      // Grid extent: enough to fill the viewport + some margin.
-      // Use a fixed large extent; GridHelper clips to a box anyway.
-      const extent = 20000;
-
-      const minorDivisions = Math.round(extent / step);
-      const majorDivisions = Math.round(extent / majorStep);
-
-      // Swap geometry in-place: build a scratch helper for the new step,
+      // Swap geometry in-place: build a scratch helper for the new patch,
       // dispose the old geometry, assign the new one, then dispose only the
       // scratch material (the persistent helper owns its own material).
 
       // Rebuild minor
       const scratchMinor = new THREE.GridHelper(
-        extent,
-        Math.max(1, minorDivisions),
+        minorPatch.extent,
+        minorPatch.divisions,
         0x1e2535,
         0x1e2535,
       );
@@ -215,8 +227,8 @@ function AdaptiveGrid2D(): React.ReactElement | null {
 
       // Rebuild major
       const scratchMajor = new THREE.GridHelper(
-        extent,
-        Math.max(1, majorDivisions),
+        majorPatch.extent,
+        majorPatch.divisions,
         0x2a3350,
         0x2a3350,
       );
@@ -228,7 +240,9 @@ function AdaptiveGrid2D(): React.ReactElement | null {
       (scratchMajor.material as THREE.Material).dispose();
     }
 
-    // Follow the camera XY pan so the grid appears infinite.
+    // Follow the camera XY pan, snapped to the step so grid lines stay aligned
+    // to world-step multiples (matching the snap grid). The patch is centered
+    // here, so the even-division patch covers the view in all directions.
     const snapX = Math.round(ortho.position.x / step) * step;
     const snapY = Math.round(ortho.position.y / step) * step;
     if (minorRef.current) {
@@ -289,6 +303,8 @@ interface SceneContents2DProps {
   onClickPoint: (point: Vec2) => void;
   onDoubleClick: () => void;
   onZoom: (zoom: number) => void;
+  /** Current ortho camera zoom — drives the adaptive snap grid + screen-constant glyph. */
+  zoom: number;
   activeModifyTool: ModifyToolKind;
   modifyPhase: ModifyToolPhase;
   onEntityPick: (entityId: string, worldPoint: Vec2, entityPoints?: ReadonlyArray<Vec2>) => void;
@@ -300,6 +316,7 @@ function SceneContents2D({
   onClickPoint,
   onDoubleClick,
   onZoom,
+  zoom,
   activeModifyTool,
   modifyPhase,
   onEntityPick,
@@ -363,7 +380,7 @@ function SceneContents2D({
         <Entities2D document={document} />
 
         {/* Snap indicator: shown when no draw or modify tool is active */}
-        {!isDrawing && !isModifying && <SnapIndicator />}
+        {!isDrawing && !isModifying && <SnapIndicator zoom={zoom} />}
 
         {/* Draw interaction: click-capture + rubber-band preview */}
         <DrawInteraction
@@ -371,6 +388,7 @@ function SceneContents2D({
           collectedPoints={collectedPoints}
           onClickPoint={onClickPoint}
           onDoubleClick={onDoubleClick}
+          zoom={zoom}
         />
 
         {/* Modify pick interaction: entity-click capture for modify tools */}
@@ -392,7 +410,7 @@ function SceneContents2D({
 // ---------------------------------------------------------------------------
 
 export function Viewport2D(): React.ReactElement {
-  const { activeTool, collectedPoints, setActiveTool, handleClick, finishPolyline, finishSpline } =
+  const { activeTool, collectedPoints, setActiveTool: setDrawTool, handleClick, finishPolyline, finishSpline } =
     useDrawTool();
 
   const {
@@ -410,6 +428,24 @@ export function Viewport2D(): React.ReactElement {
   // Camera zoom state — updated by ZoomReader inside the canvas, displayed by
   // ScaleBar outside it. Initial value matches the OrthographicCamera zoom prop.
   const [cameraZoom, setCameraZoom] = useState<number>(50);
+
+  // Mutual exclusion: selecting a draw tool clears any active modify tool.
+  const handleSelectDrawTool = useCallback(
+    (tool: DrawToolKind) => {
+      if (tool !== 'none') setModifyTool('none');
+      setDrawTool(tool);
+    },
+    [setDrawTool, setModifyTool],
+  );
+
+  // Mutual exclusion: selecting a modify tool clears any active draw tool.
+  const handleSelectModifyTool = useCallback(
+    (tool: ModifyToolKind) => {
+      if (tool !== 'none') setDrawTool('none');
+      setModifyTool(tool);
+    },
+    [setDrawTool, setModifyTool],
+  );
 
   const onDoubleClick = useCallback(() => {
     if (activeTool === 'spline') finishSpline(false);
@@ -439,6 +475,7 @@ export function Viewport2D(): React.ReactElement {
             onClickPoint={handleClick}
             onDoubleClick={onDoubleClick}
             onZoom={handleZoom}
+            zoom={cameraZoom}
             activeModifyTool={activeModifyTool}
             modifyPhase={modifyPhase}
             onEntityPick={handleEntityPick}
@@ -450,14 +487,14 @@ export function Viewport2D(): React.ReactElement {
       <ScaleBar zoom={cameraZoom} document={document} />
 
       {/* HTML tool palette overlaid on top of the canvas */}
-      <DrawTools activeTool={activeTool} onSelectTool={setActiveTool} />
+      <DrawTools activeTool={activeTool} onSelectTool={handleSelectDrawTool} />
 
       {/* HTML modify tool palette overlaid on the canvas (right of draw tools) */}
       <ModifyTools
         activeTool={activeModifyTool}
         phase={modifyPhase}
         pendingValue={pendingValue}
-        onSelectTool={setModifyTool}
+        onSelectTool={handleSelectModifyTool}
         onSetValue={setPendingValue}
         onCommitValue={commitValue}
       />

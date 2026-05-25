@@ -9,6 +9,8 @@
     "build": "tsc --project tsconfig.json --outDir dist",
     "start": "node dist/src/index.js",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
     "agent:example": "tsx examples/mcp-agent.ts"
   },
   "dependencies": {
@@ -21,7 +23,10 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.9"
   }
 }

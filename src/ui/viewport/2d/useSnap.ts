@@ -16,7 +16,10 @@ import {
   snap,
   applyOrthoPolar,
 } from './snapping';
-import type { SnapResult, CollectOpts, OrthoPolarOpts } from './snapping';
+import type { SnapResult, SnapPoint, CollectOpts, OrthoPolarOpts } from './snapping';
+
+/** Shared empty result — avoids per-render allocation when no cursor snaps apply. */
+const NO_CANDIDATES: readonly SnapPoint[] = [];
 
 export interface UseSnapOpts {
   /** Grid cell size in world units. Default 1. */
@@ -70,22 +73,62 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, orthoPolar, drawOrigin]);
 
-  // Recompute snap candidates only when entities, fromPoint, or cursor change.
-  // fromPoint (drawOrigin) is needed for perpendicular/tangent snaps.
-  // cursorPoint is needed for extension/nearest snaps.
-  const candidates = useMemo(
+  // Cursor-INDEPENDENT candidates: endpoint / midpoint / center / intersection
+  // (and perpendicular / tangent, which key off drawOrigin, not the cursor).
+  // These change only when the entity bag or the draw origin changes — NOT on
+  // pointer move — so the heavy pass (including the O(segments²) intersection
+  // scan) runs once per document/origin instead of once per mousemove. This is
+  // the hot-path fix: hovering the 2D canvas no longer recomputes candidates.
+  // extension/nearest are forced off here (they are the only cursor-dependent
+  // snap types) and a null cursor is passed so they are skipped entirely.
+  const staticCandidates = useMemo(
     () =>
       collectSnapCandidates(
         document,
-        collectOpts ?? {},
+        { ...collectOpts, extensions: false, nearest: false },
         drawOrigin ?? null,
-        adjustedCursor,
+        null,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [document.entities, document.order, collectOpts, drawOrigin, adjustedCursor],
+    [document.entities, document.order, collectOpts, drawOrigin],
+  );
+
+  // Cursor-DEPENDENT candidates: extension + nearest only. These do follow the
+  // cursor, but the pass is cheap (linear in segments, no intersection scan) and
+  // is skipped entirely unless a caller opts in — no current caller does.
+  const wantExtensions = collectOpts?.extensions === true;
+  const wantNearest = collectOpts?.nearest === true;
+  const cursorCandidates = useMemo(
+    (): readonly SnapPoint[] => {
+      if ((!wantExtensions && !wantNearest) || adjustedCursor === null) return NO_CANDIDATES;
+      return collectSnapCandidates(
+        document,
+        {
+          endpoints: false,
+          midpoints: false,
+          centers: false,
+          intersections: false,
+          perpendiculars: false,
+          tangents: false,
+          extensions: wantExtensions,
+          nearest: wantNearest,
+        },
+        null,
+        adjustedCursor,
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [document.entities, document.order, wantExtensions, wantNearest, adjustedCursor],
   );
 
   if (adjustedCursor === null) return null;
+
+  // snap() is order-independent (it ranks by distance then snap-type priority),
+  // so the union below is equivalent to the single pre-split collectSnapCandidates call.
+  const candidates =
+    cursorCandidates.length === 0
+      ? staticCandidates
+      : [...staticCandidates, ...cursorCandidates];
 
   return snap(adjustedCursor, candidates, gridSize, tolerance);
 }

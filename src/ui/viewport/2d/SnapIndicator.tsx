@@ -26,6 +26,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
 import { useSnap } from './useSnap';
+import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { SnapType } from './snapping';
 
 // ---------------------------------------------------------------------------
@@ -44,7 +45,20 @@ const SNAP_COLORS: Record<SnapType, string> = {
   grid: '#546e7a',          // muted blue-grey
 };
 
-const GLYPH_SIZE = 0.22; // world units
+/**
+ * Base glyph half-size the geometry is built at (world units). The rendered
+ * glyph is rescaled per-frame so its ON-SCREEN size stays ~GLYPH_TARGET_PX
+ * regardless of zoom — otherwise it would be invisible when zoomed out and
+ * enormous when zoomed in. GLYPH_SIZE × default-zoom (50) ≈ GLYPH_TARGET_PX,
+ * so scale is 1 at the default zoom (no distortion of the original look).
+ */
+const GLYPH_SIZE = 0.22; // world units (base; scaled to screen px at render)
+
+/** Target on-screen glyph half-size in pixels (≈ GLYPH_SIZE × default zoom 50). */
+const GLYPH_TARGET_PX = 11;
+
+/** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
+const SNAP_TOLERANCE_PX = 12;
 
 // ---------------------------------------------------------------------------
 // Helper: build glyph geometry for each snap type
@@ -178,9 +192,11 @@ interface GlyphProps {
   snapType: SnapType;
   x: number;
   y: number;
+  /** Ortho camera zoom — used to keep the glyph a constant on-screen size. */
+  zoom: number;
 }
 
-function SnapGlyph({ snapType, x, y }: GlyphProps): React.ReactElement {
+function SnapGlyph({ snapType, x, y, zoom }: GlyphProps): React.ReactElement {
   const geoRef = useRef<THREE.BufferGeometry | null>(null);
   const matRef = useRef<THREE.LineBasicMaterial | null>(null);
   const objRef = useRef<THREE.LineSegments | null>(null);
@@ -208,6 +224,8 @@ function SnapGlyph({ snapType, x, y }: GlyphProps): React.ReactElement {
   }, [segments]);
 
   segments.position.set(x, y, 0.1);
+  // Rescale so the glyph stays ~GLYPH_TARGET_PX on screen at any zoom.
+  segments.scale.setScalar(pixelsToWorld(GLYPH_TARGET_PX, zoom) / GLYPH_SIZE);
 
   return <primitive object={segments} />;
 }
@@ -272,7 +290,12 @@ function GroundPlane({ onMove, onLeave }: GroundPlaneProps): React.ReactElement 
  * Tracks pointer movement, computes the snap result via useSnap, and
  * renders the appropriate glyph. No document writes.
  */
-export function SnapIndicator(): React.ReactElement {
+interface SnapIndicatorProps {
+  /** Current ortho camera zoom — drives the adaptive snap grid + glyph size. */
+  zoom: number;
+}
+
+export function SnapIndicator({ zoom }: SnapIndicatorProps): React.ReactElement {
   const [cursor, setCursor] = useState<Vec2 | null>(null);
 
   const handleMove = useCallback((wx: number, wy: number) => {
@@ -283,7 +306,12 @@ export function SnapIndicator(): React.ReactElement {
     setCursor(null);
   }, []);
 
-  const snapResult = useSnap(cursor, { gridSize: 1, tolerance: 0.5 });
+  // Snap grid tracks the visible adaptive mesh (selectable points at every
+  // zoom); tolerance is pixel-constant so geometric snaps stay grabbable.
+  const snapResult = useSnap(cursor, {
+    gridSize: adaptiveGridStep(zoom),
+    tolerance: pixelsToWorld(SNAP_TOLERANCE_PX, zoom),
+  });
 
   return (
     <>
@@ -294,6 +322,7 @@ export function SnapIndicator(): React.ReactElement {
           snapType={snapResult.type}
           x={snapResult.x}
           y={snapResult.y}
+          zoom={zoom}
         />
       )}
     </>

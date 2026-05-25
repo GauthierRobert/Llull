@@ -1,13 +1,21 @@
 /**
  * @layer core/mcp
  *
- * Pure MCP tool-call dispatcher.
+ * Pure MCP content shaper and tool-call dispatcher.
  *
- * `applyMcpToolCall` is the single function the G2 transport layer calls on
- * every `tools/call` request. It threads the document through `execute` and
- * returns an MCP-style result payload that the transport can forward verbatim.
+ * Two exports:
  *
- * @pure over the document — the input doc is never mutated.
+ * `shapeToolCallContent` — the SINGLE implementation of MCP CallToolResult
+ *   content shaping. Takes a pre-computed result (summary, affected, isError,
+ *   data?) and builds the MCP content blocks. Pure: no `execute`, no document,
+ *   no side effects. The transport (server/src/mcp.ts) calls this after running
+ *   `commandBus.applyCommand`; `applyMcpToolCall` also delegates here.
+ *
+ * `applyMcpToolCall` — thin wrapper for callers that have a document and want
+ *   to run `execute` + shape in one step (used by pure unit tests; NOT called
+ *   by the production server which routes through the command bus instead).
+ *
+ * @pure over the document — neither function mutates the input doc.
  * No network, no DOM, no SDK imports. All side effects live in `server/`.
  */
 
@@ -26,44 +34,110 @@ export interface McpTextContent {
 }
 
 /**
+ * The shaped MCP CallToolResult, without the document.
+ *
+ * Returned by `shapeToolCallContent`; the transport can forward it verbatim
+ * (it matches the MCP SDK's `CallToolResult` shape).
+ *
+ * - `content`         — always >= 1 text block (summary); extra blocks for
+ *                       affected ids and json data when present.
+ * - `isError`         — true ONLY for unknown tool names.
+ * - `structuredContent` — present ONLY when the command returned record-type
+ *                       `data` (query commands); omitted for mutations/no-ops.
+ */
+export interface McpShapedResult {
+  content: McpTextContent[];
+  isError: boolean;
+  structuredContent?: Record<string, unknown>;
+}
+
+/**
  * The value returned by `applyMcpToolCall`.
  *
- * Mirrors the MCP `CallToolResult` shape so the transport can forward it
- * directly without any further transformation.
+ * Extends `McpShapedResult` with the document + affected ids so pure unit
+ * tests can assert the document state without a command bus.
  *
- * - `content`  — array of content blocks; always contains at least one text block
- *                carrying the command `summary`.
- * - `affected` — ids of entities created or changed (MCP extension field).
- * - `isError`  — true ONLY when the tool name is not a registered command; the
- *                document is returned unchanged. A registered command that
- *                gracefully no-ops on bad params (conventions C5) is NOT an error —
- *                its explanatory summary is normal feedback.
- * - `document` — the next document state (new object if a change was made,
- *                the SAME reference as the input if the command was a no-op).
- * - `data`     — present ONLY when the underlying command set `CommandResult.data`
- *                (read-only/query commands); structured output an agent can read
- *                without parsing `summary`.
+ * - `document` — the next document state (new object if mutated, same reference
+ *                if the command was a no-op or unknown).
+ * - `affected` — ids of entities created or changed (empty for queries/no-ops).
+ * - `data`     — present ONLY when the command set `CommandResult.data`.
  */
-export interface McpToolCallResult {
-  content: McpTextContent[];
+export interface McpToolCallResult extends McpShapedResult {
   affected: string[];
-  isError: boolean;
   document: CadDocument;
   data?: unknown;
 }
 
 // ---------------------------------------------------------------------------
-// Dispatcher
+// Single shaping implementation
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape a pre-computed command result into an MCP `CallToolResult` payload.
+ *
+ * This is the ONE place where MCP content blocks are assembled. The transport
+ * (`server/src/mcp.ts`) calls this after `commandBus.applyCommand`; the
+ * `applyMcpToolCall` wrapper calls it after `execute`. There is no other copy.
+ *
+ * Content block rules:
+ *   1. Always: `{ type:'text', text: summary }`.
+ *   2. When affected is non-empty: `{ type:'text', text:'Affected entity ids: ...' }`.
+ *   3. When data is defined: `{ type:'text', text:'```json\n...\n```' }`.
+ *   4. When data is a non-null, non-array object: also set `structuredContent`.
+ *
+ * @pure — no execute, no document, no side effects.
+ * @layer core/mcp
+ *
+ * @param result - The pre-computed fields from a CommandResult + isError flag.
+ * @returns The shaped MCP payload (content blocks + optional structuredContent).
+ */
+export function shapeToolCallContent(result: {
+  summary: string;
+  affected: string[];
+  isError: boolean;
+  data?: unknown;
+}): McpShapedResult {
+  const content: McpTextContent[] = [{ type: 'text', text: result.summary }];
+
+  if (result.affected.length > 0) {
+    content.push({
+      type: 'text',
+      text: `Affected entity ids: ${result.affected.join(', ')}`,
+    });
+  }
+
+  if (result.data !== undefined) {
+    content.push({
+      type: 'text',
+      text: `\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``,
+    });
+    const isRecord =
+      typeof result.data === 'object' &&
+      result.data !== null &&
+      !Array.isArray(result.data);
+    if (isRecord) {
+      return {
+        content,
+        isError: result.isError,
+        structuredContent: result.data as Record<string, unknown>,
+      };
+    }
+  }
+
+  return { content, isError: result.isError };
+}
+
+// ---------------------------------------------------------------------------
+// Dispatcher (thin wrapper for pure unit tests)
 // ---------------------------------------------------------------------------
 
 /**
  * Apply an MCP tool call to a document.
  *
- * Routes `toolName` + `args` through `execute`, then shapes the `CommandResult`
- * into an MCP-style result payload.
- *
- * Unknown tool names are treated as errors: `isError` is set, the document is
- * returned unchanged, and the summary explains the failure.
+ * Calls `execute` once, then delegates content shaping to `shapeToolCallContent`.
+ * Used by pure unit tests that operate directly on a document without a command
+ * bus. The production server routes through `commandBus.applyCommand` instead
+ * and calls `shapeToolCallContent` directly — ensuring execute() runs exactly once.
  *
  * @pure over doc — never mutates the input document.
  * @layer core/mcp
@@ -80,13 +154,19 @@ export function applyMcpToolCall(
   const isUnknown = getCommand(toolName) === undefined;
   const result = execute(doc, toolName, args);
 
-  const payload: McpToolCallResult = {
-    content: [{ type: 'text', text: result.summary }],
+  const shaped = shapeToolCallContent({
+    summary: result.summary,
     affected: result.affected,
     isError: isUnknown,
+    data: result.data,
+  });
+
+  const toolCallResult: McpToolCallResult = {
+    ...shaped,
+    affected: result.affected,
     document: result.document,
   };
   // Only surface `data` when the command produced it (exactOptionalPropertyTypes).
-  if (result.data !== undefined) payload.data = result.data;
-  return payload;
+  if (result.data !== undefined) toolCallResult.data = result.data;
+  return toolCallResult;
 }

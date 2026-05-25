@@ -8,25 +8,23 @@
  * - This file owns ONLY the transport wiring, auth middleware, and rate limiting.
  * - No command/geometry logic lives here (architecture L6).
  *
- * Session model (v2 — stateful, per-session documents):
+ * Session model (v3 — shared live document):
  * - Each MCP `initialize` handshake (POST without `mcp-session-id`) creates a new
- *   session entry: a fresh `CadDocument`, a `StreamableHTTPServerTransport` with a
- *   UUID session id, and a bound `Server` whose handlers read/write that session's
- *   document exclusively.
+ *   session entry: a `StreamableHTTPServerTransport` with a UUID session id, and a
+ *   bound `Server` whose handlers read/write the SINGLE shared `CadDocument` from
+ *   `liveDocument.ts` via `getLiveDoc` / `setLiveDoc`.
  * - Subsequent requests carry the `mcp-session-id` header; the router routes them to
- *   the existing transport.  No two sessions share state.
- * - DELETE terminates the session via `onsessionclosed`, which removes the entry and
- *   frees the document.
- * - A fresh session starts from `createEmptyDocument()` — isolated from every other
- *   concurrent session.
+ *   the existing transport.
+ * - All sessions see the same document. A mutation by session A is immediately visible
+ *   to session B and to the browser UI (broadcast via GET /live SSE).
+ * - DELETE terminates the session transport via `onsessionclosed`; the shared document
+ *   is untouched.
  *
- * TODO(KI1-followup): UI<->MCP document sync
- *   Loading the browser's live document into a new MCP session (and optionally writing
- *   MCP mutations back to the UI store) requires a UI-side piece: either a shared
- *   in-memory channel (same process) or a serialise/deserialise protocol (separate
- *   server process). The design decision — same-process singleton vs. out-of-process
- *   sidecar — must be made before implementation.  Until then, each MCP session begins
- *   from an empty document, which is correct for headless/agent-only use cases.
+ * UI<->MCP sync (KI1-followup resolved):
+ *   The shared document is the single source of truth for all MCP sessions.
+ *   After every mutating `tools/call`, `setLiveDoc(result.document)` stores the new
+ *   state and broadcasts it over the GET /live SSE endpoint, which the browser
+ *   EventSource subscribes to for live updates.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -47,14 +45,15 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   buildMcpTools,
-  applyMcpToolCall,
+  shapeToolCallContent,
   listMcpResources,
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
 } from '@core/mcp';
-import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
+import { getLiveDoc } from './liveDocument';
+import { applyCommand } from './commandBus';
 
 // ---------------------------------------------------------------------------
 // Session registry
@@ -192,17 +191,15 @@ function buildRateLimiter(): ReturnType<typeof rateLimit> {
 
 /**
  * Build a `Server` instance whose handlers are bound to the provided document
- * accessor functions.  The accessor pair is closured so that mutations from
- * `tools/call` are visible to subsequent `resources/read` calls within the same
- * session without any global state.
+ * accessor functions.
  *
- * @param getDoc - returns the session's current document
- * @param setDoc - replaces the session's document after a mutating tool call
+ * All sessions share the single live document from `liveDocument.ts`.
+ * Mutations route through `commandBus.applyCommand` so every tools/call shares
+ * the same undo/redo history as REST /command calls from the browser UI.
+ *
+ * @param getDoc - returns the current document (used for resources/read)
  */
-function buildMcpServer(
-  getDoc: () => CadDocument,
-  setDoc: (next: CadDocument) => void,
-): Server {
+function buildMcpServer(getDoc: () => CadDocument): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
@@ -222,51 +219,21 @@ function buildMcpServer(
     return { tools };
   });
 
-  // tools/call — delegate to applyMcpToolCall, thread session document forward
+  // tools/call — route through commandBus so MCP edits share history + broadcast,
+  // then shape the result into MCP content blocks via the single implementation
+  // in core/mcp (shapeToolCallContent).  execute() runs exactly once (in the bus).
   server.setRequestHandler(CallToolRequestSchema, (req): CallToolResult => {
     const { name, arguments: args } = req.params;
-    const result = applyMcpToolCall(getDoc(), name, args ?? {});
 
-    // Store the updated document back into this session's slot
-    setDoc(result.document);
+    // Route through the command bus — runs execute() once, records history for
+    // mutations, and broadcasts via setLiveDoc.  Query commands are skipped from
+    // history/broadcast (result.data !== undefined, same logic as the UI store).
+    const busResult = applyCommand(name, args ?? {});
 
-    // Include affected ids in a second content block when non-empty
-    const content: CallToolResult['content'] = [...result.content];
-    if (result.affected.length > 0) {
-      content.push({
-        type: 'text',
-        text: `Affected entity ids: ${result.affected.join(', ')}`,
-      });
-    }
-
-    // Surface structured data produced by read-only/query commands.
-    // `structuredContent` carries machine-readable output; the JSON text block
-    // ensures text-only clients can still read the payload (MCP spec dual-surface).
-    // Mutating commands that produce no `data` are byte-identical to before.
-    if (result.data !== undefined) {
-      // The JSON text block is the universal surface — valid for primitives,
-      // arrays, and objects alike. `structuredContent` is reserved for spec-valid
-      // records (the MCP/SDK schema types it as an object), so a future query
-      // command returning a primitive or array still surfaces via the text block
-      // without emitting an invalid `structuredContent`.
-      content.push({
-        type: 'text',
-        text: `\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``,
-      });
-      const isRecord =
-        typeof result.data === 'object' &&
-        result.data !== null &&
-        !Array.isArray(result.data);
-      return isRecord
-        ? {
-            content,
-            isError: result.isError,
-            structuredContent: result.data as Record<string, unknown>,
-          }
-        : { content, isError: result.isError };
-    }
-
-    return { content, isError: result.isError };
+    // Delegate all content-block assembly to the single shaping function.
+    // Cast: McpShapedResult lacks the SDK Result index signature ([x: string]: unknown)
+    // which is a type-system artifact — the runtime shape satisfies CallToolResult.
+    return shapeToolCallContent(busResult) as CallToolResult;
   });
 
   // resources/list — enumerate the three read-only CAD resources
@@ -315,15 +282,17 @@ function buildMcpServer(
 // ---------------------------------------------------------------------------
 
 /**
- * Allocate a new isolated MCP session.
+ * Allocate a new MCP session bound to the shared live document.
  *
  * Returns a `{ transport, server }` pair ready to be connected and used for the
  * first `initialize` POST.  The transport's `onsessioninitialized` callback fires
  * once the SDK assigns the session id (during `handleRequest`), at which point
  * the pair is registered in `sessions`.
  *
- * The session's document lives in a closure shared between `getDoc`/`setDoc` and
- * is never exposed to the module scope — guaranteeing isolation.
+ * Document access: all sessions share the single live document from `liveDocument.ts`.
+ * `getLiveDoc` / `setLiveDoc` are passed as the accessor pair so `buildMcpServer`
+ * is unchanged and testable in isolation. Mutations are broadcast to SSE subscribers
+ * inside `setLiveDoc`.
  *
  * Cleanup paths (belt-and-suspenders):
  * - `onsessionclosed` fires on explicit HTTP DELETE → removes from `sessions`.
@@ -332,14 +301,6 @@ function buildMcpServer(
  *   preventing unbounded Map growth from clients that never send DELETE.
  */
 function allocateSession(): { transport: StreamableHTTPServerTransport; server: Server } {
-  // Mutable document slot for this session.
-  let sessionDoc: CadDocument = createEmptyDocument();
-
-  const getDoc = (): CadDocument => sessionDoc;
-  const setDoc = (next: CadDocument): void => {
-    sessionDoc = next;
-  };
-
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
 
@@ -361,7 +322,9 @@ function allocateSession(): { transport: StreamableHTTPServerTransport; server: 
     if (transport.sessionId) sessions.delete(transport.sessionId);
   };
 
-  const server = buildMcpServer(getDoc, setDoc);
+  // Wire the shared live document read accessor.
+  // Mutations route through commandBus.applyCommand (not setLiveDoc directly).
+  const server = buildMcpServer(getLiveDoc);
 
   return { transport, server };
 }

@@ -1,19 +1,29 @@
 /**
- * Integration tests for undo/redo history in the Zustand CAD store.
+ * Integration tests for undo/redo — server-authoritative model.
  *
- * Covers:
- *   - undo restores the prior document; redo re-applies it
- *   - multiple dispatches then repeated undo/redo walks history correctly
- *   - a graceful no-op dispatch does NOT push onto undoStack
- *   - a new dispatch after undo clears the redo stack
- *   - setDocument clears both stacks
- *   - undo/redo are no-ops when the respective stack is empty
+ * Undo/redo history now lives on the server. The store's `undo()` and `redo()`
+ * are network calls (POST /undo, POST /redo). These tests verify:
+ *   - undo() POSTs to /undo; redo() POSTs to /redo
+ *   - the store updates lastSummary + canUndo/canRedo from the server response
+ *   - the reverted document arrives via hydrateLiveDocument (simulating /live SSE)
+ *   - no local undo/redo stacks exist in the store
+ *
+ * fetch is mocked via vi.stubGlobal — no real network calls are made.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
+import { localDispatch } from '../helpers/storeTestHelpers';
+import type { ServerCommandResponse } from '@ui/store/serverCommands';
+
+/** Flush all pending microtasks (multiple promise chain hops). */
+async function flushPromises(): Promise<void> {
+  for (let i = 0; i < 10; i++) {
+    await new Promise<void>((resolve) => resolve());
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -27,182 +37,195 @@ function resetStore(): void {
   useStore.setState({
     document: createEmptyDocument(),
     lastSummary: null,
-    undoStack: [],
-    redoStack: [],
+    canUndo: false,
+    canRedo: false,
   });
 }
 
+function mockFetch(response: ServerCommandResponse): ReturnType<typeof vi.fn> {
+  const spy = vi.fn().mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve(response),
+  });
+  vi.stubGlobal('fetch', spy);
+  return spy;
+}
+
 // ---------------------------------------------------------------------------
-// Tests
+// undo()
 // ---------------------------------------------------------------------------
 
-describe('undo/redo history', () => {
+describe('undo — server-authoritative', () => {
   beforeEach(() => {
     __resetIdCounter();
     resetStore();
   });
 
-  it('undo after add_box reverts the document to empty', () => {
-    const emptyDoc = getState().document;
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
-    getState().dispatch('add_box', { size: [2, 2, 2] });
+  it('undo() POSTs to /undo', async () => {
+    const spy = mockFetch({ summary: 'Undone.', affected: [], isError: false, canUndo: false, canRedo: true });
+
+    getState().undo();
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledOnce();
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://localhost:3001/undo');
+    expect(init.method).toBe('POST');
+  });
+
+  it('undo() updates lastSummary from the server response', async () => {
+    mockFetch({ summary: 'Undone.', affected: [], isError: false, canUndo: false, canRedo: true });
+
+    getState().undo();
+    await flushPromises();
+
+    expect(getState().lastSummary).toBe('Undone.');
+  });
+
+  it('undo() updates canUndo and canRedo from the server response', async () => {
+    mockFetch({ summary: 'Undone.', affected: [], isError: false, canUndo: false, canRedo: true });
+
+    getState().undo();
+    await flushPromises();
+
+    expect(getState().canUndo).toBe(false);
+    expect(getState().canRedo).toBe(true);
+  });
+
+  it('undo() document update arrives via hydrateLiveDocument (not from response)', async () => {
+    mockFetch({ summary: 'Undone.', affected: [], isError: false, canUndo: false, canRedo: true });
+
+    // Pre-populate with an entity via local simulate
+    localDispatch('add_box', { size: [2, 2, 2] });
     expect(getState().document.order).toHaveLength(1);
 
     getState().undo();
-    expect(getState().document).toBe(emptyDoc);
-    expect(getState().document.order).toHaveLength(0);
-  });
+    await flushPromises();
 
-  it('redo after undo re-applies the command result', () => {
-    getState().dispatch('add_box', { size: [2, 2, 2] });
-    const docWithBox = getState().document;
-
-    getState().undo();
-    expect(getState().document.order).toHaveLength(0);
-
-    getState().redo();
-    expect(getState().document).toBe(docWithBox);
+    // The document was NOT reverted by undo() itself — only /live SSE does that.
+    // The store still has the entity; the server would push the reverted doc via /live.
     expect(getState().document.order).toHaveLength(1);
-  });
 
-  it('multiple dispatches then repeated undo walks history step by step', () => {
-    const doc0 = getState().document;
-
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    const doc1 = getState().document;
-
-    getState().dispatch('add_box', { size: [2, 2, 2] });
-    const doc2 = getState().document;
-
-    getState().dispatch('add_box', { size: [3, 3, 3] });
-    expect(getState().document.order).toHaveLength(3);
-
-    getState().undo();
-    expect(getState().document).toBe(doc2);
-
-    getState().undo();
-    expect(getState().document).toBe(doc1);
-
-    getState().undo();
-    expect(getState().document).toBe(doc0);
-
-    // Stack exhausted — further undo is a no-op
-    getState().undo();
-    expect(getState().document).toBe(doc0);
-  });
-
-  it('repeated redo walks back through undone steps', () => {
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    const doc1 = getState().document;
-    getState().dispatch('add_box', { size: [2, 2, 2] });
-    const doc2 = getState().document;
-    getState().dispatch('add_box', { size: [3, 3, 3] });
-    const doc3 = getState().document;
-
-    getState().undo();
-    getState().undo();
-    getState().undo();
-
-    getState().redo();
-    expect(getState().document).toBe(doc1);
-
-    getState().redo();
-    expect(getState().document).toBe(doc2);
-
-    getState().redo();
-    expect(getState().document).toBe(doc3);
-
-    // Stack exhausted — further redo is a no-op
-    getState().redo();
-    expect(getState().document).toBe(doc3);
-  });
-
-  it('a graceful no-op dispatch does NOT push onto undoStack', () => {
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    const docWithBox = getState().document;
-    expect(getState().undoStack).toHaveLength(1);
-
-    // move_entity on a missing id is a graceful no-op (returns same doc)
-    getState().dispatch('move_entity', { id: 'nonexistent-id', delta: [0, 0, 0] });
-
-    // undoStack must still be length 1 — no-op did not push
-    expect(getState().undoStack).toHaveLength(1);
-    expect(getState().document).toBe(docWithBox);
-
-    // undo should recover the state before add_box, not some phantom state
-    getState().undo();
+    // Simulating the /live push with the reverted doc:
+    const emptyDoc = createEmptyDocument();
+    getState().hydrateLiveDocument(emptyDoc);
     expect(getState().document.order).toHaveLength(0);
   });
 
-  it('a new dispatch after undo clears the redo stack', () => {
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    getState().dispatch('add_box', { size: [2, 2, 2] });
+  it('undo() sets liveStatus to disconnected on network failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')));
 
-    getState().undo(); // redoStack now has one entry
-    expect(getState().redoStack).toHaveLength(1);
+    getState().undo();
+    await flushPromises();
 
-    // Dispatch a new command — redo stack must be cleared
-    getState().dispatch('add_box', { size: [3, 3, 3] });
-    expect(getState().redoStack).toHaveLength(0);
+    expect(getState().liveStatus).toBe('disconnected');
+    expect(getState().lastSummary).toContain('Network');
+  });
+});
 
-    // redo is now a no-op
-    const docAfterNewDispatch = getState().document;
-    getState().redo();
-    expect(getState().document).toBe(docAfterNewDispatch);
+// ---------------------------------------------------------------------------
+// redo()
+// ---------------------------------------------------------------------------
+
+describe('redo — server-authoritative', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    resetStore();
   });
 
-  it('setDocument clears both undoStack and redoStack', () => {
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    getState().dispatch('add_box', { size: [2, 2, 2] });
-    getState().undo();
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
-    expect(getState().undoStack.length).toBeGreaterThan(0);
-    expect(getState().redoStack.length).toBeGreaterThan(0);
+  it('redo() POSTs to /redo', async () => {
+    const spy = mockFetch({ summary: 'Redone.', affected: [], isError: false, canUndo: true, canRedo: false });
+
+    getState().redo();
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledOnce();
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://localhost:3001/redo');
+    expect(init.method).toBe('POST');
+  });
+
+  it('redo() updates lastSummary from the server response', async () => {
+    mockFetch({ summary: 'Redone.', affected: [], isError: false, canUndo: true, canRedo: false });
+
+    getState().redo();
+    await flushPromises();
+
+    expect(getState().lastSummary).toBe('Redone.');
+  });
+
+  it('redo() updates canUndo and canRedo from the server response', async () => {
+    mockFetch({ summary: 'Redone.', affected: [], isError: false, canUndo: true, canRedo: false });
+
+    getState().redo();
+    await flushPromises();
+
+    expect(getState().canUndo).toBe(true);
+    expect(getState().canRedo).toBe(false);
+  });
+
+  it('redo() sets liveStatus to disconnected on network failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Timeout')));
+
+    getState().redo();
+    await flushPromises();
+
+    expect(getState().liveStatus).toBe('disconnected');
+    expect(getState().lastSummary).toContain('Network');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// canUndo / canRedo — UI state driven by server responses
+// ---------------------------------------------------------------------------
+
+describe('canUndo / canRedo state', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    resetStore();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('canUndo and canRedo start as false', () => {
+    expect(getState().canUndo).toBe(false);
+    expect(getState().canRedo).toBe(false);
+  });
+
+  it('dispatch updates canUndo/canRedo from server response', async () => {
+    mockFetch({ summary: 'Box added.', affected: ['e1'], isError: false, canUndo: true, canRedo: false });
+
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    await flushPromises();
+
+    expect(getState().canUndo).toBe(true);
+    expect(getState().canRedo).toBe(false);
+  });
+
+  it('setDocument resets canUndo and canRedo to false', () => {
+    useStore.setState({ canUndo: true, canRedo: true });
 
     const fresh = createEmptyDocument();
     getState().setDocument(fresh);
 
-    expect(getState().undoStack).toHaveLength(0);
-    expect(getState().redoStack).toHaveLength(0);
-    expect(getState().document).toBe(fresh);
+    expect(getState().canUndo).toBe(false);
+    expect(getState().canRedo).toBe(false);
   });
 
-  it('undo is a no-op when undoStack is empty', () => {
-    const doc = getState().document;
-    getState().undo();
-    expect(getState().document).toBe(doc);
-  });
-
-  it('redo is a no-op when redoStack is empty', () => {
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    const doc = getState().document;
-    getState().redo();
-    expect(getState().document).toBe(doc);
-  });
-
-  it('undoStack and redoStack lengths reflect current history depth', () => {
-    expect(getState().undoStack).toHaveLength(0);
-    expect(getState().redoStack).toHaveLength(0);
-
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    expect(getState().undoStack).toHaveLength(1);
-    expect(getState().redoStack).toHaveLength(0);
-
-    getState().undo();
-    expect(getState().undoStack).toHaveLength(0);
-    expect(getState().redoStack).toHaveLength(1);
-
-    getState().redo();
-    expect(getState().undoStack).toHaveLength(1);
-    expect(getState().redoStack).toHaveLength(0);
-  });
-
-  it('unknown command (no-op) does not push to undoStack', () => {
-    getState().dispatch('add_box', { size: [1, 1, 1] });
-    const stackLengthBefore = getState().undoStack.length;
-
-    getState().dispatch('totally_unknown_command', {});
-
-    expect(getState().undoStack).toHaveLength(stackLengthBefore);
+  it('no local undoStack or redoStack fields exist on the store', () => {
+    // The store should NOT have undoStack / redoStack — those are server-side.
+    const state = getState() as unknown as Record<string, unknown>;
+    expect(state['undoStack']).toBeUndefined();
+    expect(state['redoStack']).toBeUndefined();
   });
 });

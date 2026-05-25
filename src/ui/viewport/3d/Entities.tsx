@@ -60,8 +60,9 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
   const select = useStore((s) => s.select);
   const toggleSelection = useStore((s) => s.toggleSelection);
 
-  // Render-only visibility override — never touches the document (PRIME DIRECTIVE).
+  // Render-only visibility overrides — never touch the document (PRIME DIRECTIVE).
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
+  const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
 
   /**
    * Called by each mesh on click.
@@ -84,9 +85,10 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
         const entity = entities[id];
         if (!entity) return null;
 
-        // Respect layer visibility.
+        // Respect layer visibility (document) and the local layer-hide filter (UI).
         const layer = layers[entity.layerId];
         if (layer && !layer.visible) return null;
+        if (hiddenLayerIds.has(entity.layerId)) return null;
 
         // Respect render-only UI hide override.
         if (hiddenEntityIds.has(id)) return null;

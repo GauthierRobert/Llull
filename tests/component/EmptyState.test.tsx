@@ -1,11 +1,11 @@
 /**
- * Component tests for <EmptyState /> (V4 — first-run onboarding).
+ * Component tests for <EmptyState /> — viewer mode.
  *
  * Asserts observable behavior (workflow W3, react R11):
  *   - Empty-state is rendered when document.order is empty.
  *   - Empty-state is absent once any entity exists in the document.
  *   - Dismiss button hides the overlay without changing the document.
- *   - Key copy of the getting-started message is visible.
+ *   - Key viewer-mode copy is visible.
  *
  * Does NOT test geometry, CSS variables, or r3f internals.
  */
@@ -16,6 +16,7 @@ import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { EmptyState } from '@ui/components/EmptyState';
+import { localDispatch } from '../helpers/storeTestHelpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,34 +38,32 @@ describe('EmptyState — visibility', () => {
 
   it('renders the empty-state when the document has 0 entities', () => {
     render(<EmptyState />);
-    expect(screen.getByRole('status', { name: /getting started/i })).toBeDefined();
+    expect(screen.getByRole('status', { name: /waiting for mcp agent/i })).toBeDefined();
   });
 
-  it('shows the heading "No geometry yet"', () => {
+  it('shows the viewer heading', () => {
     render(<EmptyState />);
-    expect(screen.getByText('No geometry yet')).toBeDefined();
+    expect(screen.getByText(/waiting for your mcp agent/i)).toBeDefined();
   });
 
-  it('includes a mention of the command palette shortcut', () => {
+  it('includes a "ask Claude" message', () => {
     render(<EmptyState />);
-    // The subheading references Ctrl/Cmd K
-    expect(screen.getByText(/ctrl\/cmd k/i)).toBeDefined();
+    expect(screen.getByText(/ask claude/i)).toBeDefined();
   });
 
   it('does NOT render when the document has at least 1 entity', () => {
-    // Dispatch a command to create a box (document mutation through the store).
-    useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+    localDispatch('add_box', { size: [2, 2, 2] });
 
     render(<EmptyState />);
-    expect(screen.queryByRole('status', { name: /getting started/i })).toBeNull();
+    expect(screen.queryByRole('status', { name: /waiting for mcp agent/i })).toBeNull();
   });
 
   it('does NOT render when the document has multiple entities', () => {
-    useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
-    useStore.getState().dispatch('add_box', { size: [2, 2, 2] });
+    localDispatch('add_box', { size: [1, 1, 1] });
+    localDispatch('add_box', { size: [2, 2, 2] });
 
     render(<EmptyState />);
-    expect(screen.queryByRole('status', { name: /getting started/i })).toBeNull();
+    expect(screen.queryByRole('status', { name: /waiting for mcp agent/i })).toBeNull();
   });
 });
 
@@ -89,7 +88,7 @@ describe('EmptyState — dismiss', () => {
     const dismissBtn = screen.getByRole('button', { name: /dismiss/i });
     fireEvent.click(dismissBtn);
 
-    expect(queryByRole('status', { name: /getting started/i })).toBeNull();
+    expect(queryByRole('status', { name: /waiting for mcp agent/i })).toBeNull();
   });
 
   it('does not change the document when dismissed (PRIME DIRECTIVE)', () => {
@@ -105,7 +104,7 @@ describe('EmptyState — dismiss', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — getting-started content
+// Tests — viewer content
 // ---------------------------------------------------------------------------
 
 describe('EmptyState — content', () => {
@@ -114,14 +113,13 @@ describe('EmptyState — content', () => {
     resetStore();
   });
 
-  it('shows getting-started tips list', () => {
+  it('shows viewer tips list', () => {
     render(<EmptyState />);
-    expect(screen.getByRole('list', { name: /getting started tips/i })).toBeDefined();
+    expect(screen.getByRole('list', { name: /viewer tips/i })).toBeDefined();
   });
 
   it('mentions MCP in the tips', () => {
     render(<EmptyState />);
-    // At least one element should mention MCP
     const matches = screen.getAllByText(/MCP/i);
     expect(matches.length).toBeGreaterThanOrEqual(1);
   });

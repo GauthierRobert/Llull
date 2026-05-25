@@ -20,7 +20,11 @@ import type { ThreeEvent } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
 import { useSnap } from './useSnap';
 import { DrawPreview, CollectedPointMarkers } from './DrawPreview';
+import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { DrawToolKind } from './useDrawTool';
+
+/** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
+const SNAP_TOLERANCE_PX = 12;
 
 // ---------------------------------------------------------------------------
 // Props
@@ -31,6 +35,8 @@ interface DrawInteractionProps {
   collectedPoints: Vec2[];
   onClickPoint: (point: Vec2) => void;
   onDoubleClick: () => void;
+  /** Current ortho camera zoom — drives the adaptive snap grid + tolerance. */
+  zoom: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +48,7 @@ export function DrawInteraction({
   collectedPoints,
   onClickPoint,
   onDoubleClick,
+  zoom,
 }: DrawInteractionProps): React.ReactElement | null {
   const [rawCursor, setRawCursor] = useState<Vec2 | null>(null);
 
@@ -49,10 +56,12 @@ export function DrawInteraction({
   const drawOrigin: Vec2 | null =
     collectedPoints.length > 0 ? collectedPoints[collectedPoints.length - 1]! : null;
 
-  // Snap the cursor with ortho/polar awareness.
+  // Snap grid tracks the visible adaptive mesh, so selectable grid points exist
+  // at every zoom level (the finest visible cell). Tolerance is pixel-constant
+  // so geometric snaps stay grabbable from very-zoomed-out to very-zoomed-in.
   const snapResult = useSnap(rawCursor, {
-    gridSize: 1,
-    tolerance: 0.5,
+    gridSize: adaptiveGridStep(zoom),
+    tolerance: pixelsToWorld(SNAP_TOLERANCE_PX, zoom),
     drawOrigin,
   });
 
