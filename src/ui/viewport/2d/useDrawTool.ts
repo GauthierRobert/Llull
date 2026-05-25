@@ -17,13 +17,25 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
-import { rectParamsFromCorners, circleRadiusFromPoints } from './drawHelpers';
+import {
+  rectParamsFromCorners,
+  circleRadiusFromPoints,
+  ellipseParamsFromCenterCorner,
+} from './drawHelpers';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type DrawToolKind = 'none' | 'line' | 'polyline' | 'circle' | 'rectangle' | 'point';
+export type DrawToolKind =
+  | 'none'
+  | 'line'
+  | 'polyline'
+  | 'circle'
+  | 'rectangle'
+  | 'point'
+  | 'ellipse'
+  | 'spline';
 
 export interface DrawToolState {
   /** The currently active tool. */
@@ -42,6 +54,8 @@ export interface UseDrawToolResult extends DrawToolState {
   handleClick: (point: Vec2) => void;
   /** Finish a polyline in progress (double-click or Enter). */
   finishPolyline: (closed?: boolean) => void;
+  /** Finish a spline in progress (double-click or Enter). */
+  finishSpline: (closed?: boolean) => void;
   /** Cancel the current in-progress shape. The tool stays active. */
   cancel: () => void;
 }
@@ -72,6 +86,18 @@ export function useDrawTool(): UseDrawToolResult {
         return;
       }
       dispatch('draw_polyline', { points: collectedPoints, closed });
+      setCollectedPoints([]);
+    },
+    [collectedPoints, dispatch],
+  );
+
+  const finishSpline = useCallback(
+    (closed = false) => {
+      if (collectedPoints.length < 2) {
+        setCollectedPoints([]);
+        return;
+      }
+      dispatch('draw_spline', { points: collectedPoints, closed });
       setCollectedPoints([]);
     },
     [collectedPoints, dispatch],
@@ -145,23 +171,50 @@ export function useDrawTool(): UseDrawToolResult {
           }
           break;
         }
+
+        case 'ellipse': {
+          const pts = [...collectedPoints, point];
+          if (pts.length === 1) {
+            // First click: record center.
+            setCollectedPoints(pts);
+          } else {
+            // Second click: compute semi-axes from center + corner and dispatch.
+            const params = ellipseParamsFromCenterCorner(pts[0]!, pts[1]!);
+            if (params !== null) {
+              dispatch('draw_ellipse', {
+                center: params.center,
+                radiusX: params.radiusX,
+                radiusY: params.radiusY,
+              });
+            }
+            setCollectedPoints([]);
+          }
+          break;
+        }
+
+        case 'spline': {
+          // Each click appends a vertex; finishSpline() or Enter commits.
+          setCollectedPoints((prev) => [...prev, point]);
+          break;
+        }
       }
     },
     [activeTool, collectedPoints, dispatch],
   );
 
-  // Keyboard: Escape cancels; Enter finishes polyline.
+  // Keyboard: Escape cancels; Enter finishes polyline or spline.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         cancel();
-      } else if (e.key === 'Enter' && activeTool === 'polyline') {
-        finishPolyline(false);
+      } else if (e.key === 'Enter') {
+        if (activeTool === 'polyline') finishPolyline(false);
+        else if (activeTool === 'spline') finishSpline(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeTool, cancel, finishPolyline]);
+  }, [activeTool, cancel, finishPolyline, finishSpline]);
 
   return {
     activeTool,
@@ -169,6 +222,7 @@ export function useDrawTool(): UseDrawToolResult {
     setActiveTool,
     handleClick,
     finishPolyline,
+    finishSpline,
     cancel,
   };
 }

@@ -55,6 +55,7 @@ import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
 import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
 import type { GizmoMode } from './TransformGizmo';
 import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
+import { NamedViewsInner, NamedViewsOverlay } from './NamedViews';
 import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
 import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
@@ -266,6 +267,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         allEntityIds={allEntityIds}
       />
 
+      {/* ---- Named-view camera bridge — exposes snapshot/apply callbacks across Canvas boundary ---- */}
+      <NamedViewsInner />
+
       {/* ---- Section / clipping plane sync ---- */}
       <ClippingPlane />
 
@@ -413,6 +417,9 @@ export function Viewport3D(): React.ReactElement {
 
       {/* View preset buttons (top-right) */}
       <ViewPresetsOverlay />
+
+      {/* Named-view bookmarks (below view presets) */}
+      <NamedViewsOverlay />
 
       {/* Display mode + section plane controls (top-left) */}
       <ViewportControls />

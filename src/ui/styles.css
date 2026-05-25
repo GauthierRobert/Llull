@@ -980,6 +980,194 @@ body,
 }
 
 /* ==========================================================================
+   Named views overlay (EN9)
+   ========================================================================== */
+
+.named-views {
+  position: absolute;
+  top: 46px;   /* below the view presets bar */
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: all;
+  user-select: none;
+}
+
+/* The toggle button reuses .view-preset-btn styles with an optional active state */
+.named-views-toggle--active {
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+  color: var(--accent-text);
+}
+
+/* Expanded panel */
+.named-views-panel {
+  margin-top: 4px;
+  min-width: 200px;
+  max-width: 260px;
+  background: var(--bg-overlay);
+  backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.30);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Save-current row */
+.named-views-save-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.named-views-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.named-views-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.named-views-input:focus {
+  background: var(--bg-input-focus);
+  border-color: var(--border-accent);
+}
+
+.named-views-input::placeholder {
+  color: var(--text-faint);
+}
+
+.named-views-save-btn {
+  padding: 3px 8px;
+  background: var(--color-submit);
+  border: 1px solid var(--color-submit-border);
+  border-radius: 4px;
+  color: var(--color-submit-text);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s ease;
+  white-space: nowrap;
+}
+
+.named-views-save-btn:hover {
+  background: var(--color-submit-hover);
+}
+
+.named-views-save-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Views list */
+.named-views-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.named-views-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+}
+
+.named-views-restore-btn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 4px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.10s ease, color 0.10s ease, border-color 0.10s ease;
+}
+
+.named-views-restore-btn:hover {
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+  color: var(--accent-text);
+}
+
+.named-views-restore-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.named-views-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.10s ease, color 0.10s ease, border-color 0.10s ease;
+}
+
+.named-views-delete-btn:hover {
+  background: rgba(224, 92, 92, 0.14);
+  border-color: rgba(224, 92, 92, 0.35);
+  color: var(--color-error);
+}
+
+.named-views-delete-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.named-views-empty {
+  padding: 8px 12px;
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ==========================================================================
    Measurement HUD (M2)
    ========================================================================== */
 

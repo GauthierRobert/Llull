@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
 import type { DrawToolKind } from './useDrawTool';
-import { rectParamsFromCorners, circleRadiusFromPoints } from './drawHelpers';
+import { rectParamsFromCorners, circleRadiusFromPoints, ellipseParamsFromCenterCorner } from './drawHelpers';
 
 // ---------------------------------------------------------------------------
 // Shared preview material (not disposed — singleton)
@@ -31,10 +31,7 @@ function buildLineGeo(a: Vec2, b: Vec2): THREE.BufferGeometry {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute(
     'position',
-    new THREE.BufferAttribute(
-      new Float32Array([a[0], a[1], 0, b[0], b[1], 0]),
-      3,
-    ),
+    new THREE.BufferAttribute(new Float32Array([a[0], a[1], 0, b[0], b[1], 0]), 3),
   );
   return geo;
 }
@@ -60,10 +57,7 @@ function buildRectGeo(a: Vec2, b: Vec2): THREE.BufferGeometry {
   const y0 = Math.min(a[1], b[1]);
   const y1 = Math.max(a[1], b[1]);
   const verts = new Float32Array([
-    x0, y0, 0,  x1, y0, 0,
-    x1, y0, 0,  x1, y1, 0,
-    x1, y1, 0,  x0, y1, 0,
-    x0, y1, 0,  x0, y0, 0,
+    x0, y0, 0, x1, y0, 0, x1, y0, 0, x1, y1, 0, x1, y1, 0, x0, y1, 0, x0, y1, 0, x0, y0, 0,
   ]);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
@@ -91,6 +85,37 @@ function buildCircleGeo(center: Vec2, radius: number): THREE.BufferGeometry {
   return geo;
 }
 
+/** Ellipse outline (32-segment approximation using bounding-box half-extents). */
+function buildEllipseGeo(center: Vec2, radiusX: number, radiusY: number): THREE.BufferGeometry {
+  const segments = 32;
+  const verts: number[] = [];
+  for (let i = 0; i < segments; i++) {
+    const a0 = (i / segments) * Math.PI * 2;
+    const a1 = ((i + 1) / segments) * Math.PI * 2;
+    verts.push(
+      center[0] + radiusX * Math.cos(a0),
+      center[1] + radiusY * Math.sin(a0),
+      0,
+      center[0] + radiusX * Math.cos(a1),
+      center[1] + radiusY * Math.sin(a1),
+      0,
+    );
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+  return geo;
+}
+
+/**
+ * Spline rubber-band preview: draws straight segments from collected points
+ * to the cursor. A full Catmull-Rom tessellation is intentionally avoided here
+ * for performance — the actual curve tessellation happens in SplineRenderer.
+ */
+function buildSplinePreviewGeo(points: Vec2[], cursor: Vec2): THREE.BufferGeometry {
+  // Show a polyline rubber-band while collecting; enough to indicate progress.
+  return buildPolylineGeo(points, cursor);
+}
+
 // ---------------------------------------------------------------------------
 // DrawPreview props
 // ---------------------------------------------------------------------------
@@ -111,7 +136,11 @@ export interface DrawPreviewProps {
  * every render. Geometry is rebuilt when relevant props change, then disposed.
  * Uses renderOrder 998 so it draws over entities but under snap glyphs.
  */
-export function DrawPreview({ activeTool, collectedPoints, cursor }: DrawPreviewProps): React.ReactElement | null {
+export function DrawPreview({
+  activeTool,
+  collectedPoints,
+  cursor,
+}: DrawPreviewProps): React.ReactElement | null {
   const objRef = useRef<THREE.LineSegments | null>(null);
   const geoRef = useRef<THREE.BufferGeometry | null>(null);
 
@@ -165,10 +194,18 @@ export function DrawPreview({ activeTool, collectedPoints, cursor }: DrawPreview
         // Show a small crosshair indicator at cursor position.
         const s = 0.15;
         const verts = new Float32Array([
-          cursor[0] - s, cursor[1], 0,
-          cursor[0] + s, cursor[1], 0,
-          cursor[0], cursor[1] - s, 0,
-          cursor[0], cursor[1] + s, 0,
+          cursor[0] - s,
+          cursor[1],
+          0,
+          cursor[0] + s,
+          cursor[1],
+          0,
+          cursor[0],
+          cursor[1] - s,
+          0,
+          cursor[0],
+          cursor[1] + s,
+          0,
         ]);
         geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
@@ -188,6 +225,37 @@ export function DrawPreview({ activeTool, collectedPoints, cursor }: DrawPreview
           geo = buildRectGeo(collectedPoints[0]!, cursor);
         }
       }
+    } else if (activeTool === 'ellipse') {
+      if (collectedPoints.length === 1) {
+        const params = ellipseParamsFromCenterCorner(collectedPoints[0]!, cursor);
+        if (params !== null) {
+          geo = buildEllipseGeo(params.center, params.radiusX, params.radiusY);
+        }
+      }
+    } else if (activeTool === 'spline') {
+      if (collectedPoints.length >= 1) {
+        geo = buildSplinePreviewGeo(collectedPoints, cursor);
+      } else {
+        // Crosshair at cursor.
+        const s = 0.15;
+        const verts = new Float32Array([
+          cursor[0] - s,
+          cursor[1],
+          0,
+          cursor[0] + s,
+          cursor[1],
+          0,
+          cursor[0],
+          cursor[1] - s,
+          0,
+          cursor[0],
+          cursor[1] + s,
+          0,
+        ]);
+        geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+        useDash = true;
+      }
     }
 
     if (!geo) return null;
@@ -195,7 +263,7 @@ export function DrawPreview({ activeTool, collectedPoints, cursor }: DrawPreview
     const segs = new THREE.LineSegments(geo, useDash ? dotMat : mat);
     segs.renderOrder = 998;
     return segs;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool, collectedPoints, cursor, mat, dotMat]);
 
   // Dispose previous geometry when a new one is built.
@@ -232,7 +300,9 @@ export function CollectedPointMarkers({ points }: PointMarkerProps): React.React
   );
 
   useEffect(() => {
-    return () => { mat.dispose(); };
+    return () => {
+      mat.dispose();
+    };
   }, [mat]);
 
   const segsObject = useMemo(() => {
@@ -242,10 +312,30 @@ export function CollectedPointMarkers({ points }: PointMarkerProps): React.React
     for (const p of points) {
       // Small square around each point.
       verts.push(
-        p[0] - s, p[1] - s, 0,  p[0] + s, p[1] - s, 0,
-        p[0] + s, p[1] - s, 0,  p[0] + s, p[1] + s, 0,
-        p[0] + s, p[1] + s, 0,  p[0] - s, p[1] + s, 0,
-        p[0] - s, p[1] + s, 0,  p[0] - s, p[1] - s, 0,
+        p[0] - s,
+        p[1] - s,
+        0,
+        p[0] + s,
+        p[1] - s,
+        0,
+        p[0] + s,
+        p[1] - s,
+        0,
+        p[0] + s,
+        p[1] + s,
+        0,
+        p[0] + s,
+        p[1] + s,
+        0,
+        p[0] - s,
+        p[1] + s,
+        0,
+        p[0] - s,
+        p[1] + s,
+        0,
+        p[0] - s,
+        p[1] - s,
+        0,
       );
     }
     const geo = new THREE.BufferGeometry();
@@ -259,7 +349,9 @@ export function CollectedPointMarkers({ points }: PointMarkerProps): React.React
   useEffect(() => {
     const prev = geoRef.current;
     geoRef.current = segsObject?.geometry ?? null;
-    return () => { prev?.dispose(); };
+    return () => {
+      prev?.dispose();
+    };
   }, [segsObject]);
 
   if (!segsObject) return null;

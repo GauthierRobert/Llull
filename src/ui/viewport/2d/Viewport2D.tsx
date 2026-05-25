@@ -372,7 +372,7 @@ function SceneContents2D({
 // ---------------------------------------------------------------------------
 
 export function Viewport2D(): React.ReactElement {
-  const { activeTool, collectedPoints, setActiveTool, handleClick, finishPolyline } =
+  const { activeTool, collectedPoints, setActiveTool, handleClick, finishPolyline, finishSpline } =
     useDrawTool();
 
   const document = useStore((s) => s.document);
@@ -382,8 +382,9 @@ export function Viewport2D(): React.ReactElement {
   const [cameraZoom, setCameraZoom] = useState<number>(50);
 
   const onDoubleClick = useCallback(() => {
-    finishPolyline(false);
-  }, [finishPolyline]);
+    if (activeTool === 'spline') finishSpline(false);
+    else finishPolyline(false);
+  }, [activeTool, finishPolyline, finishSpline]);
 
   const handleZoom = useCallback((zoom: number) => {
     setCameraZoom(zoom);

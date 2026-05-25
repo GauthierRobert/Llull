@@ -22,6 +22,7 @@ import { findEntities } from './query';
 import { buildProject } from './project';
 import { setUnits } from './units';
 import { setParameter, deleteParameter } from './parameters';
+import { checkModel } from './check';
 import {
   measureDistance,
   measureAngle,
@@ -76,6 +77,7 @@ const definitions = [
   massProperties,
   setParameter,
   deleteParameter,
+  checkModel,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

@@ -61,3 +61,44 @@ export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
   const r = Math.sqrt(dx * dx + dy * dy);
   return r > 0 ? r : null;
 }
+
+// ---------------------------------------------------------------------------
+// Ellipse from center + corner
+// ---------------------------------------------------------------------------
+
+export interface EllipseParams {
+  center: Vec2;
+  radiusX: number;
+  radiusY: number;
+}
+
+/**
+ * Compute draw_ellipse params from a center click and a "corner" click.
+ *
+ * The corner defines the bounding box half-extents: radiusX = |dx|, radiusY = |dy|.
+ * Both axes must be non-zero (the two clicks must differ on both axes).
+ *
+ * @pure
+ * @failure returns null when the corner is collinear with the center on either axis
+ */
+export function ellipseParamsFromCenterCorner(center: Vec2, corner: Vec2): EllipseParams | null {
+  const radiusX = Math.abs(corner[0] - center[0]);
+  const radiusY = Math.abs(corner[1] - center[1]);
+  if (radiusX === 0 || radiusY === 0) return null;
+  return { center, radiusX, radiusY };
+}
+
+// ---------------------------------------------------------------------------
+// Spline point collection helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate that a candidate spline point list meets the minimum length for dispatch.
+ * Returns the list unchanged when valid, null when too short.
+ *
+ * @pure
+ * @failure returns null when fewer than 2 points are provided
+ */
+export function validateSplinePoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> | null {
+  return points.length >= 2 ? points : null;
+}
