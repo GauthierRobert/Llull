@@ -17,6 +17,7 @@
 
 import React from 'react';
 import { useStore, useThemeStore } from '@ui/store';
+import { McpConnectButton } from '@ui/components/McpConnect';
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -98,7 +99,10 @@ export function StatusBar(): React.ReactElement {
           </>
         )}
       </div>
-      <ThemeToggle />
+      <div className="status-bar-bottom__right">
+        <McpConnectButton />
+        <ThemeToggle />
+      </div>
     </footer>
   );
 }

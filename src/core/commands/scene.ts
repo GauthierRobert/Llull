@@ -111,6 +111,32 @@ export function entityBounds(e: Entity): Bounds {
       }
       return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
     }
+    case 'cone':
+      // Base circle centered at position in XY; apex at position+height in Z.
+      return {
+        min: offset(e.position, -e.radius, -e.radius, 0),
+        max: offset(e.position, e.radius, e.radius, e.height),
+      };
+    case 'torus':
+      // Torus ring in XY plane: outer extent is ringRadius+tubeRadius; tube extends ±tubeRadius in Z.
+      return {
+        min: offset(e.position, -(e.ringRadius + e.tubeRadius), -(e.ringRadius + e.tubeRadius), -e.tubeRadius),
+        max: offset(e.position, e.ringRadius + e.tubeRadius, e.ringRadius + e.tubeRadius, e.tubeRadius),
+      };
+    case 'wedge': {
+      // Wedge lower-front-left corner is at position; bounding box is the full size.
+      const [ww, wh, wd] = e.size;
+      return { min: e.position, max: offset(e.position, ww, wh, wd) };
+    }
+    case 'pyramid': {
+      // Base centered at position; apex at position+height in Z.
+      const hw = e.baseWidth / 2;
+      const hd = e.baseDepth / 2;
+      return {
+        min: offset(e.position, -hw, -hd, 0),
+        max: offset(e.position, hw, hd, e.height),
+      };
+    }
     case 'line': {
       const minX = Math.min(e.start[0], e.end[0]);
       const maxX = Math.max(e.start[0], e.end[0]);

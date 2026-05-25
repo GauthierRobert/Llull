@@ -193,6 +193,34 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
           },
         };
         break;
+      case 'cone':
+        scaled = {
+          ...target,
+          radius: target.radius * factor,
+          height: target.height * factor,
+        };
+        break;
+      case 'torus':
+        scaled = {
+          ...target,
+          ringRadius: target.ringRadius * factor,
+          tubeRadius: target.tubeRadius * factor,
+        };
+        break;
+      case 'wedge':
+        scaled = {
+          ...target,
+          size: [target.size[0] * factor, target.size[1] * factor, target.size[2] * factor],
+        };
+        break;
+      case 'pyramid':
+        scaled = {
+          ...target,
+          baseWidth: target.baseWidth * factor,
+          baseDepth: target.baseDepth * factor,
+          height: target.height * factor,
+        };
+        break;
     }
 
     const dims =
@@ -206,21 +234,29 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
               ? `new depth ${scaled.depth}`
               : scaled.kind === 'mesh'
                 ? `scaled ${scaled.mesh.positions.length / 3} vertices`
-                : scaled.kind === 'line'
-                  ? `new start [${scaled.start.join(', ')}] end [${scaled.end.join(', ')}]`
-                  : scaled.kind === 'polyline'
-                    ? `scaled ${scaled.points.length} points`
-                    : scaled.kind === 'arc'
-                      ? `new center [${scaled.center.join(', ')}] radius ${scaled.radius}`
-                      : scaled.kind === 'circle'
-                        ? `new center [${scaled.center.join(', ')}] radius ${scaled.radius}`
-                        : scaled.kind === 'rectangle'
-                          ? `new size ${scaled.width}×${scaled.height}`
-                          : scaled.kind === 'ellipse'
-                            ? `new center [${scaled.center.join(', ')}] radiusX ${scaled.radiusX} radiusY ${scaled.radiusY}`
-                            : scaled.kind === 'spline'
-                              ? `scaled ${scaled.points.length} points`
-                              : 'point unchanged';
+                : scaled.kind === 'cone'
+                  ? `new radius ${scaled.radius}, height ${scaled.height}`
+                  : scaled.kind === 'torus'
+                    ? `new ringRadius ${scaled.ringRadius}, tubeRadius ${scaled.tubeRadius}`
+                    : scaled.kind === 'wedge'
+                      ? `new size [${scaled.size.join(', ')}]`
+                      : scaled.kind === 'pyramid'
+                        ? `new baseWidth ${scaled.baseWidth}, baseDepth ${scaled.baseDepth}, height ${scaled.height}`
+                        : scaled.kind === 'line'
+                          ? `new start [${scaled.start.join(', ')}] end [${scaled.end.join(', ')}]`
+                          : scaled.kind === 'polyline'
+                            ? `scaled ${scaled.points.length} points`
+                            : scaled.kind === 'arc'
+                              ? `new center [${scaled.center.join(', ')}] radius ${scaled.radius}`
+                              : scaled.kind === 'circle'
+                                ? `new center [${scaled.center.join(', ')}] radius ${scaled.radius}`
+                                : scaled.kind === 'rectangle'
+                                  ? `new size ${scaled.width}×${scaled.height}`
+                                  : scaled.kind === 'ellipse'
+                                    ? `new center [${scaled.center.join(', ')}] radiusX ${scaled.radiusX} radiusY ${scaled.radiusY}`
+                                    : scaled.kind === 'spline'
+                                      ? `scaled ${scaled.points.length} points`
+                                      : 'point unchanged';
     return {
       document: { ...doc, entities: { ...doc.entities, [id]: scaled } },
       summary: `Scaled ${id} by factor ${factor}; ${dims}.`,
