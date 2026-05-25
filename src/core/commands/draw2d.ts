@@ -5,6 +5,11 @@
  * BaseEntity.position places the work-plane origin in 3D space
  * (default plane: z=0, normal +Z).
  *
+ * Spline convention: Catmull-Rom interpolating spline with centripetal
+ * parameterization. `points` are through-points; the curve passes through
+ * each one. For closed splines the point array is treated as periodic.
+ * Tessellation is delegated to the viewport renderer (VS1).
+ *
  * @layer core/commands
  */
 
@@ -130,7 +135,7 @@ export const drawPolyline: CommandDefinition<DrawPolylineParams> = {
         type: 'array',
         description:
           'Ordered list of [x, y] vertices in local 2D work-plane coordinates. Minimum 2 points required.',
-        items: { type: 'array' },
+        items: { type: 'array', items: { type: 'number' } },
       },
       closed: {
         type: 'boolean',
@@ -471,6 +476,172 @@ export const drawPoint: CommandDefinition<DrawPointParams> = {
     return {
       document: withEntity(doc, entity),
       summary: `Drew point ${id} at [${position.join(', ')}].`,
+      affected: [id],
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// draw_ellipse
+// ---------------------------------------------------------------------------
+
+interface DrawEllipseParams {
+  center: Vec2;
+  radiusX: number;
+  radiusY: number;
+  position?: Vec3;
+  color?: string;
+}
+
+/**
+ * @command draw_ellipse
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 ellipse entity
+ * @invariant radiusX > 0 and radiusY > 0
+ * @failure radiusX <= 0 or radiusY <= 0 -> no-op, affected:[]
+ */
+export const drawEllipse: CommandDefinition<DrawEllipseParams> = {
+  name: 'draw_ellipse',
+  description:
+    'Draw an axis-aligned ellipse in the local 2D work plane, defined by center and semi-axis radii. ' +
+    'radiusX is the half-width along the local X axis; radiusY is the half-height along the local Y axis. ' +
+    'Both must be > 0. position places the work-plane origin in 3D space (default [0,0,0]).',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      center: {
+        type: 'array',
+        description: 'Center point [x, y] of the ellipse in local 2D work-plane coordinates.',
+        items: { type: 'number' },
+      },
+      radiusX: {
+        type: 'number',
+        description: 'Semi-axis length along the local X axis (half-width). Must be greater than 0.',
+      },
+      radiusY: {
+        type: 'number',
+        description: 'Semi-axis length along the local Y axis (half-height). Must be greater than 0.',
+      },
+      position: {
+        type: 'array',
+        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        items: { type: 'number' },
+      },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
+      },
+    },
+    required: ['center', 'radiusX', 'radiusY'],
+  },
+  run: (doc, { center, radiusX, radiusY, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+    if (radiusX <= 0 || radiusY <= 0) {
+      return {
+        document: doc,
+        summary: `draw_ellipse: radiusX and radiusY must both be > 0 (got radiusX=${radiusX}, radiusY=${radiusY}).`,
+        affected: [],
+      };
+    }
+    const id = nextId('ellipse');
+    const safeCenter: Vec2 = [center[0], center[1]];
+    const entity: Entity = {
+      id,
+      kind: 'ellipse',
+      center: safeCenter,
+      radiusX,
+      radiusY,
+      position,
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color,
+    };
+    return {
+      document: withEntity(doc, entity),
+      summary: `Drew ellipse ${id} center [${safeCenter.join(', ')}] radiusX ${radiusX} radiusY ${radiusY}.`,
+      affected: [id],
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// draw_spline
+// ---------------------------------------------------------------------------
+
+interface DrawSplineParams {
+  points: ReadonlyArray<Vec2>;
+  closed?: boolean;
+  position?: Vec3;
+  color?: string;
+}
+
+/**
+ * @command draw_spline
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 spline entity
+ * @invariant points.length >= 2; each point is a 2-element [x,y] array
+ * @failure fewer than 2 points -> no-op, affected:[]
+ */
+export const drawSpline: CommandDefinition<DrawSplineParams> = {
+  name: 'draw_spline',
+  description:
+    'Draw a Catmull-Rom interpolating spline through an ordered list of 2D through-points in the local work plane. ' +
+    'The curve passes through every point (not a control polygon). Requires at least 2 points. ' +
+    'When closed=true the spline loops back from the last point to the first. ' +
+    'Centripetal Catmull-Rom parameterization is used; tessellation is performed by the renderer.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      points: {
+        type: 'array',
+        description:
+          'Ordered list of through-points in local 2D work-plane coordinates. ' +
+          'Each point is [x, y]. Minimum 2 points required.',
+        items: { type: 'array', items: { type: 'number' } },
+      },
+      closed: {
+        type: 'boolean',
+        description:
+          'When true, the spline loops back from the last point to the first, forming a closed curve. Defaults to false.',
+      },
+      position: {
+        type: 'array',
+        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        items: { type: 'number' },
+      },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
+      },
+    },
+    required: ['points'],
+  },
+  run: (doc, { points, closed = false, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+    if (!Array.isArray(points) || points.length < 2) {
+      return {
+        document: doc,
+        summary: `draw_spline: requires at least 2 points (got ${Array.isArray(points) ? points.length : 0}).`,
+        affected: [],
+      };
+    }
+    const id = nextId('spline');
+    const safePoints: ReadonlyArray<Vec2> = points.map(
+      (p) => [(p as number[])[0] ?? 0, (p as number[])[1] ?? 0] as Vec2,
+    );
+    const entity: Entity = {
+      id,
+      kind: 'spline',
+      points: safePoints,
+      closed,
+      position,
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color,
+    };
+    return {
+      document: withEntity(doc, entity),
+      summary: `Drew spline ${id} with ${safePoints.length} points${closed ? ' (closed)' : ''}.`,
       affected: [id],
     };
   },

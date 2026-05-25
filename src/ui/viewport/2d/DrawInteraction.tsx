@@ -9,7 +9,7 @@
  *   3. CollectedPointMarkers (dots at already-placed vertices).
  *
  * Snapping is applied via useSnap before forwarding to useDrawTool.handleClick.
- * Double-click finishes a polyline.
+ * Double-click finishes a polyline or spline.
  *
  * Presentation only — no document mutations (R1).
  */
@@ -75,11 +75,14 @@ export function DrawInteraction({
     };
   }, [geo, mat]);
 
-  const handleMove = useCallback((e: ThreeEvent<PointerEvent>) => {
-    if (activeTool === 'none') return;
-    e.stopPropagation();
-    setRawCursor([e.point.x, e.point.y]);
-  }, [activeTool]);
+  const handleMove = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      if (activeTool === 'none') return;
+      e.stopPropagation();
+      setRawCursor([e.point.x, e.point.y]);
+    },
+    [activeTool],
+  );
 
   const handleLeave = useCallback(() => {
     setRawCursor(null);
@@ -97,7 +100,7 @@ export function DrawInteraction({
 
   const handleDoubleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {
-      if (activeTool !== 'polyline') return;
+      if (activeTool !== 'polyline' && activeTool !== 'spline') return;
       e.stopPropagation();
       onDoubleClick();
     },
@@ -119,11 +122,7 @@ export function DrawInteraction({
         onDoubleClick={handleDoubleClick}
       />
 
-      <DrawPreview
-        activeTool={activeTool}
-        collectedPoints={collectedPoints}
-        cursor={snappedCursor}
-      />
+      <DrawPreview activeTool={activeTool} collectedPoints={collectedPoints} cursor={snappedCursor} />
 
       <CollectedPointMarkers points={collectedPoints} />
     </>

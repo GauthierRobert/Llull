@@ -3,12 +3,14 @@
  *
  * Render branch for `kind:'cylinder'` entities.
  * Geometry is memoized on the entity's geometric fields; disposed on unmount.
+ * Material props reflect the active display mode (shaded/wireframe/xray).
  */
 
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { CylinderEntity } from '@core/model/types';
+import { useMaterialProps } from '../useMaterialProps';
 
 interface CylinderMeshProps {
   entity: CylinderEntity;
@@ -30,8 +32,7 @@ export function CylinderMesh({ entity, selected, onSelect }: CylinderMeshProps):
   // Dispose the previous geometry when it changes or the component unmounts (r3f R9).
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  const emissive = selected ? '#3a7bd5' : '#000000';
-  const emissiveIntensity = selected ? 0.35 : 0;
+  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8 });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();
@@ -50,12 +51,17 @@ export function CylinderMesh({ entity, selected, onSelect }: CylinderMeshProps):
       receiveShadow
     >
       <meshStandardMaterial
-        color={color}
-        emissive={emissive}
-        emissiveIntensity={emissiveIntensity}
-        roughness={0.45}
-        metalness={0.08}
-        envMapIntensity={0.8}
+        color={matProps.color}
+        emissive={matProps.emissive}
+        emissiveIntensity={matProps.emissiveIntensity}
+        roughness={matProps.roughness}
+        metalness={matProps.metalness}
+        envMapIntensity={matProps.envMapIntensity}
+        wireframe={matProps.wireframe}
+        transparent={matProps.transparent}
+        opacity={matProps.opacity}
+        depthWrite={matProps.depthWrite}
+        side={matProps.side}
       />
     </mesh>
   );

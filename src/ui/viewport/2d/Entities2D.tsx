@@ -16,6 +16,8 @@ import { CircleRenderer } from './entities/CircleRenderer';
 import { ArcRenderer } from './entities/ArcRenderer';
 import { RectangleRenderer } from './entities/RectangleRenderer';
 import { PointRenderer } from './entities/PointRenderer';
+import { EllipseRenderer } from './entities/EllipseRenderer';
+import { SplineRenderer } from './entities/SplineRenderer';
 
 interface Entities2DProps {
   document: CadDocument;
@@ -42,6 +44,10 @@ function Entity2DRenderer({
       return <RectangleRenderer entity={entity} selected={selected} />;
     case 'point':
       return <PointRenderer entity={entity} selected={selected} />;
+    case 'ellipse':
+      return <EllipseRenderer entity={entity} selected={selected} />;
+    case 'spline':
+      return <SplineRenderer entity={entity} selected={selected} />;
     // 3D solid kinds are intentionally not rendered here.
     default:
       return null;
@@ -63,9 +69,7 @@ export function Entities2D({ document }: Entities2DProps): React.ReactElement {
         const layer = layers[entity.layerId];
         if (layer && !layer.visible) return null;
 
-        return (
-          <Entity2DRenderer key={id} entity={entity} selected={selectionSet.has(id)} />
-        );
+        return <Entity2DRenderer key={id} entity={entity} selected={selectionSet.has(id)} />;
       })}
     </group>
   );

@@ -8,15 +8,28 @@
  * - This file owns ONLY the transport wiring, auth middleware, and rate limiting.
  * - No command/geometry logic lives here (architecture L6).
  *
- * Session strategy (v1):
- * - Stateless transport (`sessionIdGenerator: undefined`) — no per-session bookkeeping.
- *   Each `tools/call` request receives the current module-level working document.
- *   This is acceptable for v1; a session-keyed Map can be added later without
- *   changing `core/mcp` or any command code.
- * - The working document starts as `createEmptyDocument()` and is updated in-place
- *   after each successful tool call.
+ * Session model (v2 — stateful, per-session documents):
+ * - Each MCP `initialize` handshake (POST without `mcp-session-id`) creates a new
+ *   session entry: a fresh `CadDocument`, a `StreamableHTTPServerTransport` with a
+ *   UUID session id, and a bound `Server` whose handlers read/write that session's
+ *   document exclusively.
+ * - Subsequent requests carry the `mcp-session-id` header; the router routes them to
+ *   the existing transport.  No two sessions share state.
+ * - DELETE terminates the session via `onsessionclosed`, which removes the entry and
+ *   frees the document.
+ * - A fresh session starts from `createEmptyDocument()` — isolated from every other
+ *   concurrent session.
+ *
+ * TODO(KI1-followup): UI<->MCP document sync
+ *   Loading the browser's live document into a new MCP session (and optionally writing
+ *   MCP mutations back to the UI store) requires a UI-side piece: either a shared
+ *   in-memory channel (same process) or a serialise/deserialise protocol (separate
+ *   server process). The design decision — same-process singleton vs. out-of-process
+ *   sidecar — must be made before implementation.  Until then, each MCP session begins
+ *   from an empty document, which is correct for headless/agent-only use cases.
  */
 
+import { randomUUID } from 'node:crypto';
 import { type Request, type Response, type Router, Router as createRouter } from 'express';
 import rateLimit from 'express-rate-limit';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -27,25 +40,37 @@ import {
   CallToolRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   type CallToolResult,
+  type GetPromptResult,
 } from '@modelcontextprotocol/sdk/types.js';
-import { buildMcpTools, applyMcpToolCall, listMcpResources, readMcpResource } from '@core/mcp';
+import {
+  buildMcpTools,
+  applyMcpToolCall,
+  listMcpResources,
+  readMcpResource,
+  listMcpPrompts,
+  getMcpPrompt,
+} from '@core/mcp';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
-// Working document (module-level, v1 stateless session)
+// Session registry
 // ---------------------------------------------------------------------------
 
+interface SessionEntry {
+  transport: StreamableHTTPServerTransport;
+}
+
 /**
- * The single in-memory working document.
- *
- * Design choice (v1): stateless transport, one shared document for all callers.
- * An external agent that wants isolation should POST a `delete_entity` sweep or
- * start a new server process. A future v2 can key by session id (the transport
- * provides one in stateful mode).
+ * Live session map: session id → transport.
+ * Created on MCP `initialize`; removed on DELETE (onsessionclosed) OR when the
+ * transport closes by any path (transport.onclose) — whichever fires first.
+ * The session's document is held in a closure inside the Server's handlers.
  */
-let workingDoc: CadDocument = createEmptyDocument();
+const sessions = new Map<string, SessionEntry>();
 
 // ---------------------------------------------------------------------------
 // Auth middleware
@@ -101,19 +126,25 @@ function buildRateLimiter(): ReturnType<typeof rateLimit> {
 }
 
 // ---------------------------------------------------------------------------
-// MCP Server
+// MCP Server factory
 // ---------------------------------------------------------------------------
 
 /**
- * Build one `Server` instance with handlers for `tools/list` and `tools/call`.
+ * Build a `Server` instance whose handlers are bound to the provided document
+ * accessor functions.  The accessor pair is closured so that mutations from
+ * `tools/call` are visible to subsequent `resources/read` calls within the same
+ * session without any global state.
  *
- * A new Server + Transport pair is created **per request** in stateless mode.
- * This matches the pattern recommended by the SDK for Streamable HTTP stateless deployments.
+ * @param getDoc - returns the session's current document
+ * @param setDoc - replaces the session's document after a mutating tool call
  */
-function buildMcpServer(): Server {
+function buildMcpServer(
+  getDoc: () => CadDocument,
+  setDoc: (next: CadDocument) => void,
+): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
-    { capabilities: { tools: {}, resources: {} } },
+    { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
   // tools/list — return the full registry as MCP tool definitions
@@ -130,13 +161,13 @@ function buildMcpServer(): Server {
     return { tools };
   });
 
-  // tools/call — delegate to applyMcpToolCall, thread document forward
+  // tools/call — delegate to applyMcpToolCall, thread session document forward
   server.setRequestHandler(CallToolRequestSchema, (req): CallToolResult => {
     const { name, arguments: args } = req.params;
-    const result = applyMcpToolCall(workingDoc, name, args ?? {});
+    const result = applyMcpToolCall(getDoc(), name, args ?? {});
 
-    // Thread the working document forward (stateless v1: module-level update)
-    workingDoc = result.document;
+    // Store the updated document back into this session's slot
+    setDoc(result.document);
 
     // Include affected ids in a second content block when non-empty
     const content: CallToolResult['content'] = [...result.content];
@@ -145,6 +176,33 @@ function buildMcpServer(): Server {
         type: 'text',
         text: `Affected entity ids: ${result.affected.join(', ')}`,
       });
+    }
+
+    // Surface structured data produced by read-only/query commands.
+    // `structuredContent` carries machine-readable output; the JSON text block
+    // ensures text-only clients can still read the payload (MCP spec dual-surface).
+    // Mutating commands that produce no `data` are byte-identical to before.
+    if (result.data !== undefined) {
+      // The JSON text block is the universal surface — valid for primitives,
+      // arrays, and objects alike. `structuredContent` is reserved for spec-valid
+      // records (the MCP/SDK schema types it as an object), so a future query
+      // command returning a primitive or array still surfaces via the text block
+      // without emitting an invalid `structuredContent`.
+      content.push({
+        type: 'text',
+        text: `\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``,
+      });
+      const isRecord =
+        typeof result.data === 'object' &&
+        result.data !== null &&
+        !Array.isArray(result.data);
+      return isRecord
+        ? {
+            content,
+            isError: result.isError,
+            structuredContent: result.data as Record<string, unknown>,
+          }
+        : { content, isError: result.isError };
     }
 
     return { content, isError: result.isError };
@@ -158,14 +216,93 @@ function buildMcpServer(): Server {
   // resources/read — return the requested resource's current content
   server.setRequestHandler(ReadResourceRequestSchema, (req) => {
     const { uri } = req.params;
-    const content = readMcpResource(workingDoc, uri);
+    const content = readMcpResource(getDoc(), uri);
     if (content === null) {
       throw new Error(`Unknown resource URI: ${uri}`);
     }
     return { contents: [content] };
   });
 
+  // prompts/list — enumerate registered prompt templates
+  server.setRequestHandler(ListPromptsRequestSchema, () => {
+    return { prompts: listMcpPrompts() };
+  });
+
+  // prompts/get — resolve a prompt template by name, substituting provided args
+  server.setRequestHandler(GetPromptRequestSchema, (req): GetPromptResult => {
+    const { name, arguments: rawArgs } = req.params;
+    const args: Record<string, string> = {};
+    if (rawArgs && typeof rawArgs === 'object') {
+      for (const [k, v] of Object.entries(rawArgs)) {
+        if (typeof v === 'string') args[k] = v;
+      }
+    }
+    const result = getMcpPrompt(name, args);
+    if (result === null) {
+      throw new Error(`Unknown prompt: ${name}`);
+    }
+    // McpPromptResult is structurally identical to GetPromptResult (description? + messages[])
+    // but lacks the index signature from the SDK's Result base type.
+    return result as GetPromptResult;
+  });
+
   return server;
+}
+
+// ---------------------------------------------------------------------------
+// Session initialisation
+// ---------------------------------------------------------------------------
+
+/**
+ * Allocate a new isolated MCP session.
+ *
+ * Returns a `{ transport, server }` pair ready to be connected and used for the
+ * first `initialize` POST.  The transport's `onsessioninitialized` callback fires
+ * once the SDK assigns the session id (during `handleRequest`), at which point
+ * the pair is registered in `sessions`.
+ *
+ * The session's document lives in a closure shared between `getDoc`/`setDoc` and
+ * is never exposed to the module scope — guaranteeing isolation.
+ *
+ * Cleanup paths (belt-and-suspenders):
+ * - `onsessionclosed` fires on explicit HTTP DELETE → removes from `sessions`.
+ * - `transport.onclose` fires when the underlying transport closes by ANY path
+ *   (client `close()`, dropped socket, crash) → also removes from `sessions`,
+ *   preventing unbounded Map growth from clients that never send DELETE.
+ */
+function allocateSession(): { transport: StreamableHTTPServerTransport; server: Server } {
+  // Mutable document slot for this session.
+  let sessionDoc: CadDocument = createEmptyDocument();
+
+  const getDoc = (): CadDocument => sessionDoc;
+  const setDoc = (next: CadDocument): void => {
+    sessionDoc = next;
+  };
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+
+    onsessioninitialized: (sessionId: string): void => {
+      sessions.set(sessionId, { transport });
+    },
+
+    onsessionclosed: (sessionId: string): void => {
+      sessions.delete(sessionId);
+    },
+  });
+
+  // Belt-and-suspenders: also clean up when the transport closes via any path
+  // (client disconnect, dropped socket, crash) not covered by onsessionclosed/DELETE.
+  // Chain so we don't clobber any handler the SDK may have already set.
+  const priorOnClose = transport.onclose;
+  transport.onclose = (): void => {
+    priorOnClose?.();
+    if (transport.sessionId) sessions.delete(transport.sessionId);
+  };
+
+  const server = buildMcpServer(getDoc, setDoc);
+
+  return { transport, server };
 }
 
 // ---------------------------------------------------------------------------
@@ -179,9 +316,16 @@ function buildMcpServer(): Server {
  *   `app.use('/mcp', buildMcpRouter());`
  *
  * Exposed routes:
- *   POST /mcp  — MCP Streamable HTTP (initialize + tools/list + tools/call)
- *   GET  /mcp  — SSE stream for server-initiated notifications (MCP spec)
- *   DELETE /mcp — close session (stateless: no-op, returns 200)
+ *   POST   /mcp  — MCP Streamable HTTP (initialize + tools/list + tools/call)
+ *   GET    /mcp  — SSE stream for server-initiated notifications (MCP spec)
+ *   DELETE /mcp  — close session, free its document
+ *
+ * Session lifecycle:
+ *   1. POST without `mcp-session-id` → new session (new UUID + empty document).
+ *   2. POST/GET with `mcp-session-id` → route to existing session's transport.
+ *   3. DELETE with `mcp-session-id` → SDK calls onsessionclosed → session removed.
+ *   4. GET/DELETE without `mcp-session-id` header → 400 (header required).
+ *   5. Any request with an unknown session id → 404.
  */
 export function buildMcpRouter(): Router {
   const router = createRouter();
@@ -193,41 +337,93 @@ export function buildMcpRouter(): Router {
   router.use(limiter);
 
   /**
-   * Stateless mode: a new Server + Transport instance per request.
-   * The SDK's StreamableHTTPServerTransport handles the JSON-RPC framing,
-   * initialization handshake, and SSE if the client requests it.
+   * Route a request to an existing session's transport.
+   * Returns `true` if the session id header was present (response may be an error).
+   * Returns `false` if no session id header — caller handles as a new-session request.
    */
-  const handleRequest = async (req: Request, res: Response): Promise<void> => {
-    // Stateless mode: omit sessionIdGenerator entirely (exactOptionalPropertyTypes).
-    // The transport's `onclose` accessor is typed `(() => void) | undefined`, which
-    // clashes with Transport's optional `onclose?: () => void` under
-    // exactOptionalPropertyTypes; a precise cast to Transport satisfies `connect`
-    // while keeping the argument fully type-checked.
-    const transport = new StreamableHTTPServerTransport();
-    const server = buildMcpServer();
+  const routeToExistingSession = async (
+    req: Request,
+    res: Response,
+  ): Promise<boolean> => {
+    const sessionId = req.headers['mcp-session-id'];
+    if (typeof sessionId !== 'string') return false;
+
+    const entry = sessions.get(sessionId);
+    if (!entry) {
+      res.status(404).json({ error: `Unknown or expired session: ${sessionId}` });
+      return true; // handled (with error response)
+    }
+
     try {
-      await server.connect(transport as Transport);
-      await transport.handleRequest(req, res, req.body as unknown);
+      await entry.transport.handleRequest(req, res, req.body as unknown);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown MCP error';
-      console.error('[/mcp] error:', msg);
+      console.error(`[/mcp] session ${sessionId} error:`, msg);
       if (!res.headersSent) {
         res.status(500).json({ error: 'MCP internal error.' });
       }
     }
+    return true;
   };
 
+  /**
+   * POST handler:
+   * - If `mcp-session-id` is present → route to existing session.
+   * - Otherwise → allocate a new session (the `initialize` handshake).
+   */
   router.post('/', (req: Request, res: Response) => {
-    void handleRequest(req, res);
+    void (async () => {
+      // Route to existing session if session id header is present.
+      const handled = await routeToExistingSession(req, res);
+      if (handled) return;
+
+      // No session id → this is an `initialize` request; allocate a new session.
+      const { transport, server } = allocateSession();
+
+      try {
+        await server.connect(transport as Transport);
+        await transport.handleRequest(req, res, req.body as unknown);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown MCP error';
+        console.error('[/mcp] new session error:', msg);
+        // Release the connected transport/server to avoid an orphaned SSE stream
+        // or Server instance when initialization fails mid-flight.
+        await transport.close().catch(() => {});
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'MCP internal error.' });
+        }
+      }
+    })();
   });
 
+  /**
+   * GET handler — SSE stream for server-initiated notifications.
+   * Requires an existing session id (SSE is only valid for live sessions).
+   */
   router.get('/', (req: Request, res: Response) => {
-    void handleRequest(req, res);
+    void (async () => {
+      const sessionId = req.headers['mcp-session-id'];
+      if (typeof sessionId !== 'string') {
+        res.status(400).json({ error: 'mcp-session-id header required for GET.' });
+        return;
+      }
+      await routeToExistingSession(req, res);
+    })();
   });
 
-  router.delete('/', (_req: Request, res: Response) => {
-    // Stateless mode: no session to tear down
-    res.status(200).json({ status: 'ok' });
+  /**
+   * DELETE handler — close session and free its document.
+   * The SDK's handleDeleteRequest calls onsessionclosed → removes from sessions map.
+   */
+  router.delete('/', (req: Request, res: Response) => {
+    void (async () => {
+      const sessionId = req.headers['mcp-session-id'];
+      if (typeof sessionId !== 'string') {
+        res.status(400).json({ error: 'mcp-session-id header required for DELETE.' });
+        return;
+      }
+      await routeToExistingSession(req, res);
+    })();
   });
 
   return router;

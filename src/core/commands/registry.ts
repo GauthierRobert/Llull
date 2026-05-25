@@ -12,14 +12,26 @@ import type { CadDocument } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { addBox, addCylinder, addSphere, extrude, move, deleteEntity } from './geometry';
 import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
-import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint } from './draw2d';
+import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint, drawEllipse, drawSpline } from './draw2d';
 import { loadDocument } from './persistence';
 import { extrudeSketch, revolveProfile } from './profile';
-import { duplicateEntity, groupEntities, ungroupEntities } from './edit';
+import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit';
 import { booleanUnion, booleanSubtract, booleanIntersect } from './boolean';
 import { describeScene } from './scene';
+import { findEntities } from './query';
 import { buildProject } from './project';
 import { setUnits } from './units';
+import { setParameter, deleteParameter } from './parameters';
+import { checkModel } from './check';
+import {
+  measureDistance,
+  measureAngle,
+  measureArea,
+  measurePerimeter,
+  measureBoundingBox,
+  measureVolume,
+  massProperties,
+} from './measure';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -40,18 +52,32 @@ const definitions = [
   drawCircle,
   drawRectangle,
   drawPoint,
+  drawEllipse,
+  drawSpline,
   loadDocument,
   extrudeSketch,
   revolveProfile,
   duplicateEntity,
   groupEntities,
   ungroupEntities,
+  setEntityName,
+  findEntities,
   booleanUnion,
   booleanSubtract,
   booleanIntersect,
   describeScene,
   buildProject,
   setUnits,
+  measureDistance,
+  measureAngle,
+  measureArea,
+  measurePerimeter,
+  measureBoundingBox,
+  measureVolume,
+  massProperties,
+  setParameter,
+  deleteParameter,
+  checkModel,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

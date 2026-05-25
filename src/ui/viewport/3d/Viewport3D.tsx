@@ -8,6 +8,9 @@
  *     • OrbitControls / TransformControls: drei calls invalidate() on 'change'.
  *     • Document / selection / renderOrigin: StoreInvalidator subscribes to the
  *       Zustand store and calls invalidate() whenever those slices change.
+ *     • Viewport render state (displayMode / clipPlane / hiddenEntityIds):
+ *       ViewportStoreInvalidator subscribes to the viewport store and calls
+ *       invalidate() on any render-state change.
  * - OrbitControls (drei) for pan/orbit/zoom — disabled while a TransformGizmo
  *   drag is in progress so the camera does not fight the gizmo.
  * - Ground grid + axes for spatial reference.
@@ -22,6 +25,10 @@
  *   RenderOriginSyncer runs inside useFrame; because OrbitControls already calls
  *   invalidate() on every camera change event, useFrame fires on each orbit frame
  *   and the rebase check continues to work correctly under demand mode.
+ * - <ClippingPlane> (inside Canvas): syncs the viewport-store clip state to the
+ *   three.js renderer's clippingPlanes + localClippingEnabled.
+ * - <ViewportControls> (outside Canvas): display-mode segmented button + section
+ *   plane UI; state is render-only in the viewport store.
  *
  * This component is purely presentational: it reads from the store and never
  * mutates the document (PRIME DIRECTIVE). All changes go through dispatch.
@@ -42,13 +49,19 @@ import {
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
+import { useViewportStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
 import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
 import type { GizmoMode } from './TransformGizmo';
+import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
+import { NamedViewsInner, NamedViewsOverlay } from './NamedViews';
+import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
+import { ClippingPlane } from './ClippingPlane';
+import { ViewportControls } from './ViewportControls';
 
 // ---------------------------------------------------------------------------
-// StoreInvalidator — calls r3f invalidate() when the store changes
+// StoreInvalidator — calls r3f invalidate() when the CAD store changes
 // ---------------------------------------------------------------------------
 
 /**
@@ -76,6 +89,40 @@ function StoreInvalidator(): null {
       if (state.document !== prevDocument || state.renderOrigin !== prevOrigin) {
         prevDocument = state.document;
         prevOrigin = state.renderOrigin;
+        invalidate();
+      }
+    });
+  }, [invalidate]);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// ViewportStoreInvalidator — calls r3f invalidate() when viewport render state changes
+// ---------------------------------------------------------------------------
+
+/**
+ * Subscribes to the viewport store (displayMode, clipPlane, hiddenEntityIds)
+ * and calls r3f invalidate() on any change so the Canvas repaints under
+ * frameloop="demand". Pattern mirrors StoreInvalidator above.
+ */
+function ViewportStoreInvalidator(): null {
+  const invalidate = useThree((s) => s.invalidate);
+
+  useEffect(() => {
+    let prevMode    = useViewportStore.getState().displayMode;
+    let prevClip    = useViewportStore.getState().clipPlane;
+    let prevHidden  = useViewportStore.getState().hiddenEntityIds;
+
+    return useViewportStore.subscribe((state) => {
+      if (
+        state.displayMode     !== prevMode   ||
+        state.clipPlane       !== prevClip   ||
+        state.hiddenEntityIds !== prevHidden
+      ) {
+        prevMode   = state.displayMode;
+        prevClip   = state.clipPlane;
+        prevHidden = state.hiddenEntityIds;
         invalidate();
       }
     });
@@ -129,6 +176,9 @@ function RenderOriginSyncer(): null {
     if (!controls) return;
     // drei's <OrbitControls makeDefault> registers an OrbitControls instance here;
     // it extends EventDispatcher (the store's `controls` type) and exposes `target`.
+    // COUPLING: ViewPresets.applyPreset() must call invalidate() + controls.update()
+    // before returning so that this useFrame fires on the next demand frame and the
+    // rebase check runs against the new target position (P1 carry-forward).
     const orbitTarget = (controls as OrbitControlsImpl).target;
     if (!orbitTarget) return;
 
@@ -157,6 +207,8 @@ interface SceneContentsProps {
 function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
   const document = useStore((s) => s.document);
   const renderOrigin = useStore((s) => s.renderOrigin);
+  const selection = useStore((s) => s.document.selection);
+  const allEntityIds = useStore((s) => s.document.order);
   const { camera: cam } = document;
 
   const initialPosition = useMemo(
@@ -202,8 +254,24 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       {/* ---- Demand-mode invalidation: re-render on store/document changes ---- */}
       <StoreInvalidator />
 
+      {/* ---- Demand-mode invalidation: re-render on viewport render-state changes ---- */}
+      <ViewportStoreInvalidator />
+
       {/* ---- Per-frame rebase check — no setState per frame ---- */}
       <RenderOriginSyncer />
+
+      {/* ---- View preset camera driver — reads store via props to avoid Canvas re-render ---- */}
+      <ViewPresetsInner
+        entities={document.entities as Record<string, { position: readonly [number, number, number] }>}
+        selection={selection}
+        allEntityIds={allEntityIds}
+      />
+
+      {/* ---- Named-view camera bridge — exposes snapshot/apply callbacks across Canvas boundary ---- */}
+      <NamedViewsInner />
+
+      {/* ---- Section / clipping plane sync ---- */}
+      <ClippingPlane />
 
       {/* ---- IBL environment: studio preset for reflections/ambient; no background ---- */}
       <Environment preset="studio" background={false} />
@@ -265,6 +333,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       <group position={groupOffset}>
         <Entities document={document} />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+        {/* Measurement bbox wireframe — shown when measure_bounding_box result is present */}
+        <MeasureBBoxWireframe />
       </group>
 
       {/* ---- Orientation gizmo (bottom-right corner) ---- */}
@@ -344,6 +414,15 @@ export function Viewport3D(): React.ReactElement {
       {showModeToggle && (
         <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />
       )}
+
+      {/* View preset buttons (top-right) */}
+      <ViewPresetsOverlay />
+
+      {/* Named-view bookmarks (below view presets) */}
+      <NamedViewsOverlay />
+
+      {/* Display mode + section plane controls (top-left) */}
+      <ViewportControls />
     </div>
   );
 }

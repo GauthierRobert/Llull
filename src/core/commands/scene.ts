@@ -141,6 +141,22 @@ export function entityBounds(e: Entity): Bounds {
       return { min: e.position, max: offset(e.position, e.width, e.height, 0) };
     case 'point':
       return { min: e.position, max: e.position };
+    case 'ellipse':
+      return {
+        min: offset(e.position, e.center[0] - e.radiusX, e.center[1] - e.radiusY, 0),
+        max: offset(e.position, e.center[0] + e.radiusX, e.center[1] + e.radiusY, 0),
+      };
+    case 'spline': {
+      if (e.points.length === 0) return { min: e.position, max: e.position };
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const [x, y] of e.points) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+      return { min: offset(e.position, minX, minY, 0), max: offset(e.position, maxX, maxY, 0) };
+    }
     default: {
       const exhaustive: never = e;
       return { min: (exhaustive as Entity).position, max: (exhaustive as Entity).position };

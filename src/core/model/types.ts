@@ -23,7 +23,7 @@ export type Vec2 = readonly [number, number];
 export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh';
 
 /** 2D drafting shape kinds. Geometry is LOCAL to the entity work plane; BaseEntity.position places that plane in 3D space. */
-export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point';
+export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline';
 
 /** All entity kinds — 3D solids and 2D shapes. */
 export type EntityKind = SolidKind | Shape2DKind;
@@ -39,6 +39,17 @@ export interface BaseEntity {
   layerId: string;
   /** Hex color, e.g. "#c8553d". */
   color: string;
+  /**
+   * Optional human-readable name for the entity, set by `set_entity_name`.
+   * Enables AI/MCP plans to reference entities by meaning rather than generated ids.
+   */
+  name?: string;
+  /**
+   * Optional semantic tags for the entity, set by `set_entity_name`.
+   * Used by `find_entities` to filter by tag.
+   * @example ['structural', 'visible']
+   */
+  tags?: readonly string[];
 }
 
 export interface BoxEntity extends BaseEntity {
@@ -139,6 +150,42 @@ export interface PointEntity extends BaseEntity {
   readonly kind: 'point';
 }
 
+/**
+ * An axis-aligned ellipse in the local work plane.
+ * `center` is the ellipse center in local 2D coordinates.
+ * `radiusX` and `radiusY` are the semi-axes along the local plane's X and Y axes respectively.
+ * The entity `position`/`rotation` places the work plane in 3D space.
+ * Both radii must be > 0.
+ */
+export interface EllipseEntity extends BaseEntity {
+  readonly kind: 'ellipse';
+  /** Center of the ellipse in local 2D work-plane coordinates. */
+  center: Vec2;
+  /** Semi-axis length along the local X axis. Must be > 0. */
+  radiusX: number;
+  /** Semi-axis length along the local Y axis. Must be > 0. */
+  radiusY: number;
+}
+
+/**
+ * A Catmull-Rom interpolating spline in the local work plane.
+ * `points` are the through-points (the spline passes through each one).
+ * Requires at least 2 points.
+ * When `closed` is true, the curve loops back from the last point to the first.
+ *
+ * Convention for renderers (VS1): tessellate as a Catmull-Rom spline with
+ * centripetal parameterization. The control points ARE the through-points;
+ * no separate control polygon is stored. For closed splines, treat the point
+ * array as periodic (wrap the first/last points).
+ */
+export interface SplineEntity extends BaseEntity {
+  readonly kind: 'spline';
+  /** Ordered through-points in local 2D work-plane coordinates. Minimum 2 points. */
+  points: ReadonlyArray<Vec2>;
+  /** When true the spline loops back from the last point to the first. */
+  closed: boolean;
+}
+
 export type Entity =
   | BoxEntity
   | CylinderEntity
@@ -150,7 +197,9 @@ export type Entity =
   | ArcEntity
   | CircleEntity
   | RectangleEntity
-  | PointEntity;
+  | PointEntity
+  | EllipseEntity
+  | SplineEntity;
 
 // ---------------------------------------------------------------------------
 // Kind helpers
@@ -163,6 +212,8 @@ const SHAPE2D_KINDS: ReadonlySet<string> = new Set<Shape2DKind>([
   'circle',
   'rectangle',
   'point',
+  'ellipse',
+  'spline',
 ]);
 
 /** Returns true if the entity is a 2D drafting shape. */
@@ -204,6 +255,28 @@ export interface EntityGroup {
   memberIds: EntityId[];
 }
 
+/**
+ * A named numeric parameter that can reference other parameters via expressions.
+ *
+ * `expression` is the source of truth (e.g. `"width * 2"` or a literal `"10"`).
+ * `value` is the last successful evaluation result.
+ * `error` is set when evaluation fails (unknown reference, cycle, parse error).
+ * The shape is intentionally minimal and JSON-serializable.
+ */
+export interface Parameter {
+  /** Human-readable name used in expressions, e.g. `"width"`. */
+  readonly name: string;
+  /**
+   * The expression string that defines this parameter's value.
+   * May be a numeric literal (`"10"`) or reference other parameters (`"width * 2"`).
+   */
+  expression: string;
+  /** Last successfully evaluated numeric value. */
+  value: number;
+  /** Set to a descriptive message when evaluation failed; absent on success. */
+  error?: string;
+}
+
 export interface CadDocument {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
@@ -218,6 +291,13 @@ export interface CadDocument {
   units: DocumentUnit;
   /** Number of decimal places used when displaying/formatting length values. Default: 3. */
   displayPrecision: number;
+  /**
+   * Named numeric parameters. Keyed by parameter name.
+   * Parameters may reference each other via expressions; the system maintains
+   * topological evaluation order and marks cycles/unknown refs with `error`.
+   * Initialized as {} in createEmptyDocument.
+   */
+  parameters: Record<string, Parameter>;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';
@@ -245,5 +325,6 @@ export function createEmptyDocument(): CadDocument {
     groups: {},
     units: 'mm',
     displayPrecision: 3,
+    parameters: {},
   };
 }

@@ -198,5 +198,80 @@ export const ungroupEntities: CommandDefinition<UngroupEntitiesParams> = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// set_entity_name
+// ---------------------------------------------------------------------------
+
+interface SetEntityNameParams {
+  id: string;
+  name?: string;
+  tags?: readonly string[];
+}
+
+/**
+ * @command set_entity_name
+ * @pure
+ * @layer core/commands
+ * @affects updates name and/or tags on the target entity; affected:[id]
+ * @invariant entity geometry and position are not changed
+ * @failure missing id -> no-op, affected:[]
+ */
+export const setEntityName: CommandDefinition<SetEntityNameParams> = {
+  name: 'set_entity_name',
+  description:
+    'Set an entity\'s display name and/or tags. ' +
+    'Both fields are optional and independent — omitting a field leaves it unchanged. ' +
+    'Pass name:"" to clear the name, or tags:[] to clear all tags. ' +
+    'Enables AI/MCP plans to reference entities by meaning instead of generated ids, ' +
+    'and allows `find_entities` to filter by name or tag.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'Id of the entity to label.' },
+      name: {
+        type: 'string',
+        description:
+          'New display name for the entity, e.g. "Left wall". ' +
+          'Omit to leave the existing name unchanged; pass an empty string to clear it.',
+      },
+      tags: {
+        type: 'array',
+        description:
+          'Array of semantic tag strings to assign, e.g. ["structural","visible"]. ' +
+          'Omit to leave existing tags unchanged. Pass [] to clear all tags.',
+        items: { type: 'string' },
+      },
+    },
+    required: ['id'],
+  },
+  run: (doc, { id, name, tags }): CommandResult => {
+    const entity = doc.entities[id];
+    if (!entity) {
+      return { document: doc, summary: `No entity ${id} — set_entity_name is a no-op.`, affected: [] };
+    }
+
+    // Build a patched entity; only override fields that were provided.
+    // exactOptionalPropertyTypes: spread undefined to omit, or override with value.
+    const patched: typeof entity = {
+      ...entity,
+      ...(name !== undefined ? { name: name === '' ? undefined : name } : {}),
+      ...(tags !== undefined ? { tags: tags.length > 0 ? tags : undefined } : {}),
+    } as typeof entity;
+
+    const namePart = patched.name !== undefined ? `name="${patched.name}"` : 'name=<none>';
+    const tagsPart =
+      patched.tags !== undefined ? `tags=[${patched.tags.join(', ')}]` : 'tags=<none>';
+
+    return {
+      document: {
+        ...doc,
+        entities: { ...doc.entities, [id]: patched },
+      },
+      summary: `Entity ${id}: ${namePart}, ${tagsPart}.`,
+      affected: [id],
+    };
+  },
+};
+
 // Re-export for barrel convenience
-export const editCommands = [duplicateEntity, groupEntities, ungroupEntities];
+export const editCommands = [duplicateEntity, groupEntities, ungroupEntities, setEntityName];

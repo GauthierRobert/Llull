@@ -6,4 +6,5 @@ coverage
 *.log
 .DS_Store
 .vite
+.idea
 .claude/worktrees

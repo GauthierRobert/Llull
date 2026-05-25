@@ -14,3 +14,11 @@ export { applyMcpToolCall } from './dispatch';
 
 export type { McpResourceDescriptor, McpResourceContent, CadResourceUri } from './resources';
 export { listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from './resources';
+
+export type {
+  McpPromptMessage,
+  McpPromptArgument,
+  McpPromptDescriptor,
+  McpPromptResult,
+} from './prompts';
+export { listMcpPrompts, getMcpPrompt } from './prompts';

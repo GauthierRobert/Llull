@@ -7,7 +7,7 @@
  * @failure invalid JSON / wrong format or version / missing required fields -> no-op, affected:[]
  */
 
-import type { CadDocument, DocumentUnit, Entity, Layer, CameraState, Vec3 } from '../model/types';
+import type { CadDocument, DocumentUnit, Entity, Layer, CameraState, Vec3, Parameter } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 
 // ---------------------------------------------------------------------------
@@ -171,8 +171,11 @@ export function deserializeDocument(json: string): CadDocument {
     Number.isInteger(doc.displayPrecision)
       ? doc.displayPrecision
       : 3;
+  const parameters: Record<string, Parameter> = isRecord(doc.parameters)
+    ? (doc.parameters as Record<string, Parameter>)
+    : {};
 
-  return { ...doc, units, displayPrecision };
+  return { ...doc, units, displayPrecision, parameters };
 }
 
 // ---------------------------------------------------------------------------
