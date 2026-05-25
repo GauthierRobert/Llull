@@ -19,6 +19,7 @@ import { duplicateEntity, groupEntities, ungroupEntities } from './edit';
 import { booleanUnion, booleanSubtract, booleanIntersect } from './boolean';
 import { describeScene } from './scene';
 import { buildProject } from './project';
+import { setUnits } from './units';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -50,6 +51,7 @@ const definitions = [
   booleanIntersect,
   describeScene,
   buildProject,
+  setUnits,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
