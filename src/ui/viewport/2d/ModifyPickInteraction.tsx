@@ -19,7 +19,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useThree } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
-import type { Entity, LineEntity, PolylineEntity } from '@core/model/types';
+import type { Entity, LineEntity, PolylineEntity, CircleEntity, RectangleEntity } from '@core/model/types';
 import { useStore } from '@ui/store';
 import type { ModifyToolKind, ModifyToolPhase } from './useModifyTool';
 
@@ -45,12 +45,22 @@ function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
 }
 
 /**
- * Minimum squared distance from a pick point to a 2D entity.
- * Handles: line, polyline, circle, arc, rectangle.
+ * Minimum squared distance from a world-space pick point to a 2D entity.
+ *
+ * All 2D entity geometry is LOCAL to the entity's work plane; `entity.position`
+ * is the work-plane origin in world space. We shift the world-space pick into
+ * the entity's local frame once and compare all geometry in that frame.
+ *
+ * Handles: line, polyline, circle, rectangle.
  * Returns Infinity for unsupported kinds.
  * @pure
  */
-function entityDistSq(entity: Entity, pick: Vec2): number {
+function entityDistSq(entity: Entity, worldPick: Vec2): number {
+  // Shift pick into local frame — same for every kind.
+  const ox = entity.position[0];
+  const oy = entity.position[1];
+  const pick: Vec2 = [worldPick[0] - ox, worldPick[1] - oy];
+
   switch (entity.kind) {
     case 'line': {
       const l = entity as LineEntity;
@@ -74,21 +84,19 @@ function entityDistSq(entity: Entity, pick: Vec2): number {
       return best;
     }
     case 'circle': {
-      const c = entity as { kind: 'circle'; center: Vec2; radius: number } & Entity;
+      const c = entity as CircleEntity;
       const dx = pick[0] - c.center[0];
       const dy = pick[1] - c.center[1];
       const d = Math.sqrt(dx * dx + dy * dy) - c.radius;
       return d * d;
     }
     case 'rectangle': {
-      const r = entity as { kind: 'rectangle'; width: number; height: number } & Entity;
-      const ox = entity.position[0];
-      const oy = entity.position[1];
-      // Check each of the 4 sides.
-      const tl: Vec2 = [ox, oy + r.height];
-      const tr: Vec2 = [ox + r.width, oy + r.height];
-      const bl: Vec2 = [ox, oy];
-      const br: Vec2 = [ox + r.width, oy];
+      const r = entity as RectangleEntity;
+      // Rectangle corners are in local space (lower-left at local origin).
+      const tl: Vec2 = [0, r.height];
+      const tr: Vec2 = [r.width, r.height];
+      const bl: Vec2 = [0, 0];
+      const br: Vec2 = [r.width, 0];
       return Math.min(
         pointToSegDistSq(pick, bl, br),
         pointToSegDistSq(pick, br, tr),
@@ -155,7 +163,7 @@ export function ModifyPickInteraction({
 
       e.stopPropagation();
 
-      const pick: Vec2 = [e.point.x, e.point.y];
+      const worldPick: Vec2 = [e.point.x, e.point.y];
       const toleranceSq = tolerance * tolerance;
 
       let bestId: string | null = null;
@@ -165,16 +173,7 @@ export function ModifyPickInteraction({
         const entity = document.entities[id];
         if (!entity) continue;
 
-        // For fillet/chamfer in 'pick-vertex' phase: only consider the already-picked entity.
-        if (
-          (activeTool === 'fillet' || activeTool === 'chamfer') &&
-          phase === 'pick-vertex'
-        ) {
-          // The entity pick for vertex phase is handled specially below.
-          // We still need to find it by proximity so we check all and pick the best.
-        }
-
-        const dSq = entityDistSq(entity, pick);
+        const dSq = entityDistSq(entity, worldPick);
         if (dSq < toleranceSq && dSq < bestDist) {
           bestDist = dSq;
           bestId = id;
@@ -189,7 +188,7 @@ export function ModifyPickInteraction({
           ? (bestEntity as PolylineEntity).points
           : undefined;
 
-      onEntityPick(bestId, pick, entityPoints);
+      onEntityPick(bestId, worldPick, entityPoints);
     },
     [activeTool, document, onEntityPick, phase, tolerance],
   );
