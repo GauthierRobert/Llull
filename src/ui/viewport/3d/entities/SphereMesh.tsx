@@ -45,13 +45,16 @@ export function SphereMesh({ entity, selected, onSelect }: SphereMeshProps): Rea
       position={[position[0], position[1], position[2]]}
       rotation={[rotation[0], rotation[1], rotation[2]]}
       onClick={handleClick}
+      castShadow
+      receiveShadow
     >
       <meshStandardMaterial
         color={color}
         emissive={emissive}
         emissiveIntensity={emissiveIntensity}
-        roughness={0.4}
-        metalness={0.15}
+        roughness={0.35}
+        metalness={0.12}
+        envMapIntensity={1.0}
       />
     </mesh>
   );

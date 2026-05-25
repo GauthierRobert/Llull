@@ -29,7 +29,16 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera } from '@react-three/drei';
+import {
+  OrbitControls,
+  Grid,
+  GizmoHelper,
+  GizmoViewport,
+  PerspectiveCamera,
+  Environment,
+  ContactShadows,
+  SoftShadows,
+} from '@react-three/drei';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
@@ -196,14 +205,42 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       {/* ---- Per-frame rebase check — no setState per frame ---- */}
       <RenderOriginSyncer />
 
-      {/* ---- Lighting ---- */}
-      <ambientLight intensity={0.6} />
+      {/* ---- IBL environment: studio preset for reflections/ambient; no background ---- */}
+      <Environment preset="studio" background={false} />
+
+      {/* ---- Soft shadow patch: PCSS-style softening on the shadow map ---- */}
+      <SoftShadows size={25} samples={16} focus={0.5} />
+
+      {/* ---- Light rig ----
+           hemisphere: warm ground / cool sky fill to avoid pure-black undersides.
+           directional key: high-angle from front-right, casts shadows.
+           directional rim: cool back-left counter fill.  */}
+      <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} />
       <directionalLight
         position={[8, 14, 6]}
-        intensity={1.4}
-        castShadow={false}
+        intensity={1.8}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-near={0.5}
+        shadow-camera-far={200}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
+        shadow-bias={-0.0004}
       />
-      <directionalLight position={[-6, 4, -8]} intensity={0.3} color="#a8c8ff" />
+      <directionalLight position={[-6, 4, -8]} intensity={0.4} color="#a8c8ff" />
+
+      {/* ---- Contact shadows: rendered once (frames=1) — safe under demand frameloop ---- */}
+      <ContactShadows
+        position={[0, -0.001, 0]}
+        opacity={0.55}
+        scale={40}
+        blur={2.5}
+        far={20}
+        frames={1}
+        color="#1a1e2a"
+      />
 
       {/* ---- Ground grid ---- */}
       <Grid
@@ -283,7 +320,13 @@ export function Viewport3D(): React.ReactElement {
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <Canvas
         frameloop="demand"
-        gl={{ antialias: true, alpha: false }}
+        shadows
+        gl={{
+          antialias: true,
+          alpha: false,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.1,
+        }}
         dpr={[1, 2]}
         style={{ width: '100%', height: '100%', background: '#141720' }}
         onPointerMissed={handlePointerMissed}

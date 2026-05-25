@@ -46,13 +46,16 @@ export function CylinderMesh({ entity, selected, onSelect }: CylinderMeshProps):
       position={[position[0], position[1], position[2]]}
       rotation={[rotation[0], rotation[1], rotation[2]]}
       onClick={handleClick}
+      castShadow
+      receiveShadow
     >
       <meshStandardMaterial
         color={color}
         emissive={emissive}
         emissiveIntensity={emissiveIntensity}
-        roughness={0.55}
-        metalness={0.1}
+        roughness={0.45}
+        metalness={0.08}
+        envMapIntensity={0.8}
       />
     </mesh>
   );
