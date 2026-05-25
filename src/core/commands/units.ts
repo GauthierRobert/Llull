@@ -37,7 +37,7 @@ export const setUnits: CommandDefinition<SetUnitsParams> = {
         type: 'number',
         description:
           'Number of decimal places to show when formatting length values (e.g. 2 → "12.50 mm"). ' +
-          'Must be a non-negative integer (0–15).',
+          'Must be a non-negative integer.',
       },
     },
     required: [],
