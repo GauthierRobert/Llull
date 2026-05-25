@@ -641,7 +641,7 @@ const SNAP_TYPE_PRIORITY: Record<SnapType, number> = {
  * Find the best snap for a cursor position.
  *
  * Priority: endpoint > midpoint > center > intersection > perpendicular > tangent >
- * extension > nearest > osnap-tracking > grid.
+ * extension > nearest > grid.
  * Falls back to the nearest grid point when no geometric candidate is within tolerance.
  *
  * @pure deterministic, no side effects
