@@ -462,3 +462,360 @@ describe('command layer', () => {
     expect(result.summary).toContain('0 match');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Expression evaluator unit tests
+// ---------------------------------------------------------------------------
+
+import { evaluateExpression, extractReferences } from '@core/commands/expression';
+
+describe('evaluateExpression', () => {
+  it('evaluates a plain integer literal', () => {
+    const r = evaluateExpression('42', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(42);
+  });
+
+  it('evaluates a decimal literal', () => {
+    const r = evaluateExpression('3.14', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBeCloseTo(3.14);
+  });
+
+  it('addition', () => {
+    const r = evaluateExpression('1 + 2', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(3);
+  });
+
+  it('subtraction', () => {
+    const r = evaluateExpression('10 - 4', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(6);
+  });
+
+  it('multiplication', () => {
+    const r = evaluateExpression('3 * 4', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(12);
+  });
+
+  it('division', () => {
+    const r = evaluateExpression('10 / 4', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(2.5);
+  });
+
+  it('operator precedence: * before +', () => {
+    const r = evaluateExpression('2 + 3 * 4', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(14);
+  });
+
+  it('parentheses override precedence', () => {
+    const r = evaluateExpression('(2 + 3) * 4', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(20);
+  });
+
+  it('unary minus on a literal', () => {
+    const r = evaluateExpression('-5', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(-5);
+  });
+
+  it('unary minus in an expression', () => {
+    const r = evaluateExpression('10 + -3', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(7);
+  });
+
+  it('nested parentheses', () => {
+    const r = evaluateExpression('((2 + 3) * (1 + 1))', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(10);
+  });
+
+  it('reference to an env variable', () => {
+    const r = evaluateExpression('width', { width: 15 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(15);
+  });
+
+  it('expression using env reference in formula', () => {
+    const r = evaluateExpression('width * 2 + 5', { width: 10 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(25);
+  });
+
+  it('unknown reference returns EvalErr with descriptive message', () => {
+    const r = evaluateExpression('unknown_var', {});
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('unknown parameter: unknown_var');
+  });
+
+  it('divide by zero produces Infinity (IEEE 754)', () => {
+    const r = evaluateExpression('1 / 0', {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toBe(Infinity);
+  });
+
+  it('empty expression returns EvalErr', () => {
+    const r = evaluateExpression('', {});
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('empty');
+  });
+
+  it('unexpected character returns EvalErr', () => {
+    const r = evaluateExpression('2 @ 3', {});
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('@');
+  });
+
+  it('mismatched parenthesis returns EvalErr', () => {
+    const r = evaluateExpression('(2 + 3', {});
+    expect(r.ok).toBe(false);
+  });
+
+  it('trailing garbage returns EvalErr', () => {
+    const r = evaluateExpression('2 + 3 )', {});
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe('extractReferences', () => {
+  it('returns empty set for a plain literal', () => {
+    const refs = extractReferences('42');
+    expect(refs.size).toBe(0);
+  });
+
+  it('returns single reference', () => {
+    const refs = extractReferences('width * 2');
+    expect(refs.has('width')).toBe(true);
+    expect(refs.size).toBe(1);
+  });
+
+  it('returns multiple references', () => {
+    const refs = extractReferences('a + b * c');
+    expect(refs.has('a')).toBe(true);
+    expect(refs.has('b')).toBe(true);
+    expect(refs.has('c')).toBe(true);
+  });
+
+  it('returns empty set for unparseable input', () => {
+    const refs = extractReferences('@@garbage@@');
+    expect(refs.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// set_parameter / delete_parameter command tests
+// ---------------------------------------------------------------------------
+
+describe('set_parameter', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('creates a literal parameter and reports it in summary', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_parameter', { name: 'width', expression: '10' });
+
+    expect(result.document.parameters['width']).toBeDefined();
+    expect(result.document.parameters['width']!.value).toBe(10);
+    expect(result.document.parameters['width']!.expression).toBe('10');
+    expect(result.document.parameters['width']!.error).toBeUndefined();
+    expect(result.summary).toContain('width');
+    expect(result.summary).toContain('10');
+  });
+
+  it('creates a parameter referencing another parameter', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
+    const result = execute(doc, 'set_parameter', { name: 'height', expression: 'width * 2' });
+
+    expect(result.document.parameters['height']!.value).toBe(20);
+    expect(result.document.parameters['height']!.error).toBeUndefined();
+  });
+
+  it('changing a base parameter re-evaluates dependents transitively', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'base', expression: '5' }).document;
+    doc = execute(doc, 'set_parameter', { name: 'derived', expression: 'base * 3' }).document;
+    expect(doc.parameters['derived']!.value).toBe(15);
+
+    // Now change base — derived must re-evaluate.
+    const result = execute(doc, 'set_parameter', { name: 'base', expression: '10' });
+    expect(result.document.parameters['base']!.value).toBe(10);
+    expect(result.document.parameters['derived']!.value).toBe(30);
+  });
+
+  it('three-level chain re-evaluates fully', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'a', expression: '2' }).document;
+    doc = execute(doc, 'set_parameter', { name: 'b', expression: 'a * 3' }).document;
+    doc = execute(doc, 'set_parameter', { name: 'c', expression: 'b + 1' }).document;
+    expect(doc.parameters['c']!.value).toBe(7);
+
+    // Change a: b = 4*3=12, c = 12+1=13.
+    const result = execute(doc, 'set_parameter', { name: 'a', expression: '4' });
+    expect(result.document.parameters['b']!.value).toBe(12);
+    expect(result.document.parameters['c']!.value).toBe(13);
+  });
+
+  it('stores error when expression references an unknown parameter', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_parameter', { name: 'x', expression: 'ghost * 2' });
+
+    expect(result.document.parameters['x']!.error).toBeDefined();
+    expect(result.document.parameters['x']!.error).toContain('unknown parameter');
+    expect(result.summary).toContain('could not be evaluated');
+  });
+
+  it('detects a direct cycle and stores error on both parameters', () => {
+    let doc = createEmptyDocument();
+    // a = b (b not yet defined, will fail)
+    doc = execute(doc, 'set_parameter', { name: 'a', expression: 'b' }).document;
+    // b = a → cycle
+    const result = execute(doc, 'set_parameter', { name: 'b', expression: 'a' });
+
+    const paramA = result.document.parameters['a']!;
+    const paramB = result.document.parameters['b']!;
+    // At least one of them must have an error (cycle detected).
+    const hasCycleError = (paramA.error !== undefined) || (paramB.error !== undefined);
+    expect(hasCycleError).toBe(true);
+  });
+
+  it('parse error on a syntactically-invalid expression is NOT mislabeled as a cycle', () => {
+    // width is a valid known parameter; "width +" is a parse error, not a cycle.
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
+    const result = execute(doc, 'set_parameter', { name: 'x', expression: 'width +' });
+
+    const param = result.document.parameters['x']!;
+    expect(param.error).toBeDefined();
+    // Must NOT say "cycle" — the expression is simply malformed.
+    expect(param.error).not.toContain('cycle');
+  });
+
+  it('rejects an invalid parameter name (starts with digit)', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_parameter', { name: '1invalid', expression: '10' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('invalid');
+  });
+
+  it('rejects an empty expression', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_parameter', { name: 'x', expression: '' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('is pure — the input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'set_parameter', { name: 'width', expression: '10' });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('updates an existing parameter in-place', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'r', expression: '5' }).document;
+    const result = execute(doc, 'set_parameter', { name: 'r', expression: '7' });
+    expect(result.document.parameters['r']!.value).toBe(7);
+    expect(Object.keys(result.document.parameters)).toHaveLength(1);
+  });
+
+  it('parameters round-trip through serialize/deserialize', async () => {
+    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
+    doc = execute(doc, 'set_parameter', { name: 'height', expression: 'width * 2' }).document;
+
+    const json = serializeDocument(doc);
+    const restored = deserializeDocument(json);
+
+    expect(restored.parameters['width']!.value).toBe(10);
+    expect(restored.parameters['height']!.value).toBe(20);
+    expect(restored.parameters['height']!.expression).toBe('width * 2');
+  });
+
+  it('deserializing a pre-Q1 document without parameters key yields parameters: {}', async () => {
+    const { deserializeDocument } = await import('@core/commands/persistence');
+    const doc = createEmptyDocument();
+    // Manually build an envelope that lacks the parameters field (pre-Q1 format).
+    const envelope = {
+      format: 'llull-document',
+      version: 1,
+      document: {
+        entities: doc.entities,
+        order: doc.order,
+        layers: doc.layers,
+        layerOrder: doc.layerOrder,
+        selection: doc.selection,
+        camera: doc.camera,
+        // no parameters key
+      },
+    };
+    const restored = deserializeDocument(JSON.stringify(envelope));
+    expect(restored.parameters).toBeDefined();
+    expect(restored.parameters).toEqual({});
+  });
+});
+
+describe('delete_parameter', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('removes an existing parameter', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'x', expression: '5' }).document;
+    const result = execute(doc, 'delete_parameter', { name: 'x' });
+
+    expect(result.document.parameters['x']).toBeUndefined();
+    expect(result.summary).toContain('x');
+    expect(result.summary).toContain('removed');
+  });
+
+  it('no-op when the parameter does not exist', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'delete_parameter', { name: 'nonexistent' });
+
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('nonexistent');
+  });
+
+  it('dependents receive an error after their dependency is deleted', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'base', expression: '10' }).document;
+    doc = execute(doc, 'set_parameter', { name: 'derived', expression: 'base * 2' }).document;
+    expect(doc.parameters['derived']!.value).toBe(20);
+
+    const result = execute(doc, 'delete_parameter', { name: 'base' });
+
+    expect(result.document.parameters['base']).toBeUndefined();
+    expect(result.document.parameters['derived']!.error).toBeDefined();
+    expect(result.document.parameters['derived']!.error).toContain('base');
+    expect(result.summary).toContain('derived');
+  });
+
+  it('non-dependent parameters are unaffected by deletion', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'a', expression: '3' }).document;
+    doc = execute(doc, 'set_parameter', { name: 'b', expression: '7' }).document;
+
+    const result = execute(doc, 'delete_parameter', { name: 'a' });
+
+    expect(result.document.parameters['a']).toBeUndefined();
+    expect(result.document.parameters['b']!.value).toBe(7);
+    expect(result.document.parameters['b']!.error).toBeUndefined();
+  });
+
+  it('is pure — the input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'w', expression: '10' }).document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'delete_parameter', { name: 'w' });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});

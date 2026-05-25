@@ -25,6 +25,7 @@ import { Toolbar } from '@ui/components/Toolbar';
 import { StatusBar } from '@ui/components/StatusBar';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { CommandPalette } from '@ui/components/CommandPalette';
+import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 
 type ViewMode = '3d' | '2d';
@@ -56,6 +57,9 @@ export function App(): React.ReactElement {
         <PropertiesPanel className="app-properties" />
 
         <div className="app-viewport">
+          {/* Measurement HUD — overlays both 2D and 3D viewports; positioned bottom-left */}
+          <MeasurementHUD />
+
           {/* 2D / 3D view mode toggle — positioned over the viewport */}
           <div className="view-mode-toggle" role="group" aria-label="View mode">
             <button

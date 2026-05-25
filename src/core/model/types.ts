@@ -215,6 +215,28 @@ export interface EntityGroup {
   memberIds: EntityId[];
 }
 
+/**
+ * A named numeric parameter that can reference other parameters via expressions.
+ *
+ * `expression` is the source of truth (e.g. `"width * 2"` or a literal `"10"`).
+ * `value` is the last successful evaluation result.
+ * `error` is set when evaluation fails (unknown reference, cycle, parse error).
+ * The shape is intentionally minimal and JSON-serializable.
+ */
+export interface Parameter {
+  /** Human-readable name used in expressions, e.g. `"width"`. */
+  readonly name: string;
+  /**
+   * The expression string that defines this parameter's value.
+   * May be a numeric literal (`"10"`) or reference other parameters (`"width * 2"`).
+   */
+  expression: string;
+  /** Last successfully evaluated numeric value. */
+  value: number;
+  /** Set to a descriptive message when evaluation failed; absent on success. */
+  error?: string;
+}
+
 export interface CadDocument {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
@@ -229,6 +251,13 @@ export interface CadDocument {
   units: DocumentUnit;
   /** Number of decimal places used when displaying/formatting length values. Default: 3. */
   displayPrecision: number;
+  /**
+   * Named numeric parameters. Keyed by parameter name.
+   * Parameters may reference each other via expressions; the system maintains
+   * topological evaluation order and marks cycles/unknown refs with `error`.
+   * Initialized as {} in createEmptyDocument.
+   */
+  parameters: Record<string, Parameter>;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';
@@ -256,5 +285,6 @@ export function createEmptyDocument(): CadDocument {
     groups: {},
     units: 'mm',
     displayPrecision: 3,
+    parameters: {},
   };
 }

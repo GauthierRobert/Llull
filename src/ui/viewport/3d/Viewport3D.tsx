@@ -47,6 +47,7 @@ import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
 import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
 import type { GizmoMode } from './TransformGizmo';
 import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
+import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
 
 // ---------------------------------------------------------------------------
 // StoreInvalidator — calls r3f invalidate() when the store changes
@@ -278,6 +279,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       <group position={groupOffset}>
         <Entities document={document} />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
+        {/* Measurement bbox wireframe — shown when measure_bounding_box result is present */}
+        <MeasureBBoxWireframe />
       </group>
 
       {/* ---- Orientation gizmo (bottom-right corner) ---- */}

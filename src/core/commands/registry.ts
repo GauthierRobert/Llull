@@ -21,6 +21,7 @@ import { describeScene } from './scene';
 import { findEntities } from './query';
 import { buildProject } from './project';
 import { setUnits } from './units';
+import { setParameter, deleteParameter } from './parameters';
 import {
   measureDistance,
   measureAngle,
@@ -71,6 +72,8 @@ const definitions = [
   measureBoundingBox,
   measureVolume,
   massProperties,
+  setParameter,
+  deleteParameter,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

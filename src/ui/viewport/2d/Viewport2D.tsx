@@ -40,6 +40,7 @@ import { useDrawTool } from './useDrawTool';
 import type { DrawToolKind } from './useDrawTool';
 import { ScaleBar } from './ScaleBar';
 import { adaptiveGridStep, majorGridStep, shouldRebase2D, snapOrigin2D } from './gridHelpers';
+import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
 
 // ---------------------------------------------------------------------------
 // StoreInvalidator2D — calls r3f invalidate() when the store changes
@@ -358,6 +359,9 @@ function SceneContents2D({
           onClickPoint={onClickPoint}
           onDoubleClick={onDoubleClick}
         />
+
+        {/* Measurement bbox rectangle — shown when measure_bounding_box result is present */}
+        <MeasureBBoxRect2D />
       </group>
     </>
   );

@@ -25,7 +25,7 @@ function getState(): ReturnType<typeof useStore.getState> {
 }
 
 function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null, renderOrigin: [0, 0, 0] });
+  useStore.setState({ document: createEmptyDocument(), lastSummary: null, lastMeasure: null, renderOrigin: [0, 0, 0] });
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +167,44 @@ describe('CadStore', () => {
     getState().toggleSelection(id1);
 
     expect(getState().document.selection).toEqual([id2]);
+  });
+
+  // ── lastMeasure lifecycle ─────────────────────────────────────────────────
+
+  it('dispatch measure_bounding_box sets lastMeasure', () => {
+    const r = getState().dispatch('add_box', { size: [2, 2, 2] });
+    const id = r.affected[0]!;
+
+    getState().dispatch('measure_bounding_box', { entityId: id });
+    expect(getState().lastMeasure).not.toBeNull();
+    expect(getState().lastMeasure?.command).toBe('measure_bounding_box');
+  });
+
+  it('dispatch mutating command after measure clears lastMeasure', () => {
+    const r = getState().dispatch('add_box', { size: [2, 2, 2] });
+    const id = r.affected[0]!;
+
+    // Establish a measurement result.
+    getState().dispatch('measure_bounding_box', { entityId: id });
+    expect(getState().lastMeasure).not.toBeNull();
+
+    // A subsequent mutation (add another box) must clear the stale measurement.
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    expect(getState().lastMeasure).toBeNull();
+  });
+
+  it('dispatch no-op after measure leaves lastMeasure intact', () => {
+    const r = getState().dispatch('add_box', { size: [2, 2, 2] });
+    const id = r.affected[0]!;
+
+    getState().dispatch('measure_bounding_box', { entityId: id });
+    const measureBefore = getState().lastMeasure;
+    expect(measureBefore).not.toBeNull();
+
+    // An unknown command is a graceful no-op — document unchanged, no data.
+    getState().dispatch('totally_unknown_command', {});
+    // lastMeasure must be preserved.
+    expect(getState().lastMeasure).toBe(measureBefore);
   });
 
   // ── clearSelection ────────────────────────────────────────────────────────

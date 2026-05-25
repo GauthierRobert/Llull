@@ -30,6 +30,14 @@ const MAX_UNDO_DEPTH = 100;
 // State shape
 // ---------------------------------------------------------------------------
 
+/** The structured result of the most recently dispatched read-only/query command. */
+export interface LastMeasure {
+  /** The command name, e.g. 'measure_distance'. */
+  command: string;
+  /** The structured data returned by the command (typed per command, but stored as unknown here). */
+  data: unknown;
+}
+
 export interface CadStoreState {
   /** The live CAD document — single source of truth. */
   document: CadDocument;
@@ -49,6 +57,15 @@ export interface CadStoreState {
    * Null before any dispatch.
    */
   lastSummary: string | null;
+
+  /**
+   * Structured result of the most recent read-only/query command (one that
+   * returned `result.data`). Replaced on every new measure dispatch; cleared
+   * to null by `clearLastMeasure`. Mutating commands (those without `data`)
+   * do NOT touch this field — so the last measurement stays visible until the
+   * user explicitly dismisses it or runs a new measure.
+   */
+  lastMeasure: LastMeasure | null;
 
   /**
    * Prior document snapshots, oldest-first. Pop to undo.
@@ -122,6 +139,12 @@ export interface CadStoreState {
    * threshold. This is a render-only concern and MUST NOT touch the document.
    */
   setRenderOrigin(origin: [number, number, number]): void;
+
+  /**
+   * Dismiss the last measurement result (clears `lastMeasure` to null).
+   * Called by the MeasurementHUD dismiss button.
+   */
+  clearLastMeasure(): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +154,7 @@ export interface CadStoreState {
 export const useStore = create<CadStoreState>()((set, get) => ({
   document: createEmptyDocument(),
   lastSummary: null,
+  lastMeasure: null,
   undoStack: [],
   redoStack: [],
   renderOrigin: [0, 0, 0],
@@ -139,16 +163,23 @@ export const useStore = create<CadStoreState>()((set, get) => ({
     const prior = get().document;
     const result = execute(prior, name, params);
 
-    if (result.document !== prior) {
-      // Command produced a new document — record history.
+    if (result.data !== undefined) {
+      // Read-only/query command (e.g. measure_*) — capture the result, no history push.
+      // These always return the same document reference, so no mutation occurred.
+      set({ lastSummary: result.summary, lastMeasure: { command: name, data: result.data } });
+    } else if (result.document !== prior) {
+      // Mutating command — record history and clear any stale measurement overlay.
+      // A stale bbox wireframe detached from a moved/edited entity is confusing,
+      // so we drop lastMeasure the moment geometry changes.
       set((state) => ({
         document: result.document,
         lastSummary: result.summary,
+        lastMeasure: null,
         undoStack: [...state.undoStack, prior].slice(-MAX_UNDO_DEPTH),
         redoStack: [],
       }));
     } else {
-      // Graceful no-op — do NOT push history, just update summary.
+      // Graceful no-op (document unchanged, no data) — leave lastMeasure as-is.
       set({ lastSummary: result.summary });
     }
 
@@ -207,5 +238,9 @@ export const useStore = create<CadStoreState>()((set, get) => ({
 
   setRenderOrigin(origin: [number, number, number]): void {
     set({ renderOrigin: origin });
+  },
+
+  clearLastMeasure(): void {
+    set({ lastMeasure: null });
   },
 }));
