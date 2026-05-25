@@ -37,27 +37,17 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 ---
 
 ## NOW (auto-updated by the skill)
-- **Last updated:** 2026-05-25 (22 DONE; check green @ 244 tests; in-app AI bridge removed — MCP is the sole AI path)
-- **DONE (22):** W0-1,W0-2, A1,A2,A3,A6, B1,B3, C1,C2,C3, D1,D2,D3, E1,E2, G1,G2,G3, H1, I2,I3. (I1/I4 = continuous gate+review, satisfied throughout.)
-- **REMOVED (3):** F1,F2,F3 — the in-app AI bridge (`core/ai`), `/api/ai` proxy, and chat panel. Decision 2026-05-25: only MCP will be used for AI control. See decision log.
-- **Lanes 1–4 main deliverables COMPLETE.** App is a working MCP-first 2D+3D CAD: registry-driven 3D+2D viewports, toolbar, properties/param panel, hosted MCP endpoint + example agent, undo/redo, save/load, selection, gizmo, snapping, interactive draw.
-- **REMAINING — needs direction/decision:**
-  - `A4` boolean ops — **BLOCKED on CSG-lib choice (asking user now).**
-  - `A5` cone/torus/wedge + `B2` add_text/add_dimension — grow the entity union; need PAIRED viewport render branches (command-author + viewport-engineer together).
-  - `H2` STL export — deps A5.
-  - `E3` layers panel — needs NEW layer-mutation commands first (set_layer_visibility/lock, add_layer); the undo/redo-buttons + shortcuts sub-part is ready now.
-- **DONE & reviewed:** `A1`,`A2` (transforms+arrays), `W0-1` (store), `C1` (3D viewport+shell; disposal bug fixed to useEffect), `E1` (registry toolbar), `G1` (MCP defs; unknown-tool detection hardened to getCommand).
-- **Orchestrator glue:** `Entities.tsx` tolerant `default: return null` (union growth).
-- **WIP:**
-  - `B1` 2D draw + Entity-union 2D kinds (Lane 1) — code done & green; in `[REVIEW]`.
-  - `H1` save/load persistence (Lane 1, `command-author`)
-  - `E2` properties panel + param forms (Lane 2, `viewport-engineer`)
-  - `G2` MCP HTTP endpoint (Lane 4, `mcp-engineer`)
-- **Next up:**
-  - Lane 3 `D1` 2D view: launch once `B1` `[DONE]` AND `E2` frees `App.tsx` (avoid shell contention).
-  - Lane 1 after H1/B1: `B3` 2D→3D bridge (showcase), `B2` annotate, `A5` solids (pair with viewport branches), `A3` edit cmds.
-  - Lane 2 after E2: `C2` selection (raycast), `W0-2` undo + `E3`.
-  - Lane 4 after G2: `G3` example agent script.
+- **Last updated:** 2026-05-25 — **Wave 2 backlog opened** (capability expansion: precision/units, new 2D+3D tools, performance, design, parametric, export). Wave-1 deliverables complete per history below; green-check count not re-verified this session.
+- **Wave 1 DONE:** W0-1,W0-2, A1,A2,A3,A6, A4-core, R1, B1,B3, C1,C2,C3, D1,D2,D3, E1,E2, G1,G2,G3, H1, I2,I3. (I1/I4 = continuous gate+review.)
+- **REMOVED (3):** F1,F2,F3 — in-app AI bridge (`core/ai`), `/api/ai` proxy, chat panel. MCP is the sole AI path (decision log).
+- **Wave 1 carry-over WIP:** `A4-ui` Manifold WASM kernel + `mesh` render branch (Lane 2). _manifold-3d is a dep already; `Entities.tsx` still has no `case 'mesh'` → boolean results invisible until this lands._
+- **Reconciliation findings (verified against repo) — fold into Wave 2:**
+  - **GAP `N0`:** `add_cylinder`/`add_sphere` commands MISSING although `CylinderEntity`/`SphereEntity` types AND `CylinderMesh`/`SphereMesh` renderers already exist → command-only near-free win.
+  - **FOUNDATION `W1`:** `CommandResult` = `{document,summary,affected}` only — **no `data` channel** → read-only measure/query tools can't return values. Also `ParamSpec.type` lacks enum/nested-object. Gates all `M*` and `Q*`.
+  - **FOUNDATION `U1/U2`:** `CadDocument` has **no units/scale**; far-from-origin float32 jitter unaddressed → the "infinite scroll, no precision loss, scale present" ask.
+- **Registered commands (24):** add_box, extrude_profile, move/delete/rotate/scale/mirror_entity, array_linear/polar, draw_line/polyline/arc/circle/rectangle/point, load_document, extrude_sketch, revolve_profile(stub), duplicate_entity, group/ungroup_entities, boolean_union/subtract/intersect.
+- **Wave 2 eligible-now (deps already DONE):** W1, N0, N1(+pair VN1), U1, U2, S1, T1, L1, M-prep(after W1), P1, P2, P4, V1, V2, V3, J2, J3.
+- **Suggested first parallel batch (4 lanes):** L1=`W1` (foundation, unblocks measure/parametric) · L2=`U2` (floating-origin precision) · L3=`S1` (ellipse/spline 2D) · L4=`J3` (MCP scene-describe). Then L1=`N0`→`N1`, L2=`A4-ui`→`P1`.
 
 ---
 
@@ -71,8 +61,8 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 - `[DONE]` **A3** Edit commands: `delete` / `duplicate` / `group` / `ungroup` (`edit.ts`). _deps: —. Reviewed (APPROVE); NITs applied (removed dead DEFAULT_LAYER_ID import + void stmt). duplicate_entity + group_entities + ungroup_entities + EntityGroup/groups model (delete_entity untouched); 18 tests; gate held._
 - `[DONE]` **A6** (follow-up, from A3 review) `delete_entity` prunes deleted ids from `doc.groups` + dissolves groups <2 members. _Lane 1. deps: A3. Self-verified (orchestrator): 4 tests, commands/** gate held (99.51/92.05/100/99.51)._
 - `[DONE]` **A4-core** GeometryKernel port + `mesh` solid kind + boolean_union/subtract/intersect commands. _deps: —. Reviewed (APPROVE); SHOULD-FIX applied (scale-mesh test) + NITs (moved import, dropped dead ?? fallback). kernel.ts + MeshSolidEntity + 3 commands consume operands (+prune groups); tested vs fake kernel; 270 total; gate 99.57/92.71/100/100._
-- `[WIP]` **A4-ui** Manifold WASM kernel impl (tessellate operands → CSG → MeshData) injected at startup + `mesh` render branch in 3D viewport. _deps: A4-core. Lane 2._
-- `[WIP]` **R1** Remove AI-bridge code per F1/F2/F3 [REMOVED] (delete core/ai, /api/ai+anthropicClient, ChatPanel/useAiChat/chat.css, tests; unmount in App; drop @anthropic-ai/sdk). _Lane 4+shell. deps: —._
+- `[DONE]` **A4-ui** Manifold WASM kernel impl (tessellate operands → CSG → MeshData) injected at startup + `mesh` render branch in 3D viewport. _deps: A4-core. Lane 2. Reviewed (APPROVE); check green (270). manifoldKernel.ts (per-kind tessellation, transforms, `.delete()` cleanup) + setGeometryKernel in main.tsx (non-blocking) + MeshSolidMesh + Entities `case 'mesh'`. **FOLLOW-UPS (need in-browser verify, A4-ui-fix):** (1) rotation uses Manifold extrinsic-XYZ but three.js renders intrinsic-XYZ → multi-axis-rotated operands mis-orient (single-axis OK) — reverse to extrinsic ZYX; (2) `mesh`-operand branch passes a POJO to `ofMesh` (needs `new mod.Mesh(...)`) → stacked boolean-of-boolean silently no-ops; (NIT) align MeshSolidMesh material to BoxMesh._
+- `[DONE]` **R1** Remove AI-bridge code (F1/F2/F3). _Done by user edits; agent-verified: core/ai, ChatPanel/useAiChat/chat.css, anthropicClient + /api/ai all deleted; @anthropic-ai/sdk dropped; /mcp + example agent intact; zero dangling refs; root check green (270), server tsc clean._
 - `[TODO]` **A5** More solids: `cone` / `torus` / `wedge` (`geometry.ts` + extend `SolidKind`). _deps: —_
 - `[DONE]` **B1** 2D draw commands: line/polyline/arc/circle/rectangle/point (`draw2d.ts` + `Shape2DKind` + `is2D`). _deps: —. Reviewed (APPROVE; 3 minor NITs). 6 commands + Vec2/Shape2DKind/EntityKind/is2D/is3D; scale_entity extended for 2D; 127 tests; commands/** 100/97/100/100. NIT: draw_arc/draw_circle lack the array-shape guard draw_line has on center — robustness follow-up._
 - `[TODO]` **B2** `add_text` + `add_dimension` (`annotate.ts`). _deps: B1_
@@ -109,6 +99,89 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 
 ---
 
+# WAVE 2 — capability expansion (parallelizable backlog)
+
+New work, grouped by theme. Every task carries **Lane**, **deps**, and a one-line acceptance.
+`PAIR(x↔y)` = a model/command task (Lane 1) and its viewport render branch (Lane 2/3) that must
+land together — schedule them adjacent; the render task deps the command task. Lane file-ownership
+is unchanged, so themes interleave freely across the 4 lanes.
+
+## W — Foundations (Lane 1, `command-author`) — gate downstream themes
+- `[TODO]` **W1** Extend the command contract for read-only + richer tools: add optional `data?: unknown` to `CommandResult` (query channel; `execute`/MCP pass it through) and add `enum?` + nested-object support to `ParamSpec`. _deps: —. Acceptance: existing 24 commands unchanged; `data` round-trips through `execute()` and `applyMcpToolCall`; schema additions are backward-compatible; gate held. **Gates `M*`, `Q*`, and richer schemas.**_
+
+## N/K — 3D solids & features (Lane 1 cmd + Lane 2 render)
+- `[TODO]` **N0** `add_cylinder` + `add_sphere` commands (`geometry.ts`). _deps: —. Near-free: types + `CylinderMesh`/`SphereMesh` renderers already exist; just author the create-commands + register + tests. Acceptance: both appear in toolbar/MCP and render._
+- `[TODO]` **N1** `add_cone` + `add_torus` + `add_wedge` + `add_pyramid`: extend `SolidKind` + entities + commands. _deps: —. PAIR(N1↔VN1)._
+- `[TODO]` **VN1** Render branches for cone/torus/wedge/pyramid in `Entities.tsx` (three.js `Cone/Torus/...Geometry`, memoized+disposed). _Lane 2. deps: N1._
+- `[TODO]` **N2** Real `revolve_profile`: closed 2D profile + axis + angle → surface of revolution. Store a parametric `revolution` kind (rendered via `LatheGeometry`, no kernel needed). _deps: B3. PAIR(N2↔VN2)._
+- `[TODO]` **VN2** `revolution` render branch (`LatheGeometry`). _Lane 2. deps: N2._
+- `[TODO]` **K1** `fillet_edge` + `chamfer_edge` via the `GeometryKernel` interface. _deps: A4-ui. **Likely BLOCKED:** Manifold has no robust edge-fillet/chamfer; may require the OpenCascade.js kernel swap (L9). Surface the decision before building._
+- `[TODO]` **K2** `shell_solid` (hollow with wall thickness) via kernel. _deps: A4-ui. Same kernel-capability caveat as K1._
+- `[TODO]` **K3** `sweep_profile` (profile along a path) + `loft_profiles` (between sections) → `mesh`. _deps: A4-ui, B3._
+
+## U — Infinite precision & units (the "scroll forever, scale present" ask)
+- `[TODO]` **U1** Units system: add `units` (`'mm'|'cm'|'m'|'in'|'ft'`, default `mm`) + display precision to `CadDocument`; `set_units` command; thread through persistence + measure summaries. _Lane 1. deps: —. Acceptance: round-trips through save/load; summaries report values with unit suffix._
+- `[TODO]` **U2** Floating-origin / camera-relative rendering: rebase the rendered scene origin to a dynamic offset near the camera target so geometry far from (0,0,0) stays float32-stable (no jitter) — pan/zoom effectively infinite. Document keeps true double coords; offset is render-only (store, not document). _Lane 2. deps: —. Acceptance: a box at 1e7 units renders crisp; orbit/pan stable; selection raycast still correct._
+- `[TODO]` **U3** Adaptive infinite grid + on-screen **scale bar / ruler HUD** for the 3D view: grid subdivision steps per zoom decade; HUD shows current unit length (reads `U1` units). _Lane 2. deps: U1, U2._
+- `[TODO]` **U4** 2D view counterpart: adaptive ortho grid + scale bar + infinite pan/zoom in `Viewport2D`. _Lane 3. deps: U1. (U2 technique applied to the ortho camera.)_
+
+## S — 2D sketch tools (Lane 1 cmd + Lane 3 render/interaction)
+- `[TODO]` **S1** New 2D entities `ellipse` + `spline` (Catmull-Rom/Bézier): extend `Shape2DKind` + entities + `draw_ellipse`/`draw_spline` commands. _Lane 1. deps: —. PAIR(S1↔VS1)._
+- `[TODO]` **VS1** 2D renderers for ellipse + spline + interactive draw tools. _Lane 3. deps: S1._
+- `[TODO]` **S2** 2D modify commands: `offset_2d`, `fillet_2d`, `chamfer_2d`, `trim`, `extend`, `explode_polyline`. _Lane 1. deps: B1. PAIR(S2↔VS2 for the interactive pick-edge UI)._
+- `[TODO]` **VS2** Interactive 2D modify tools (pick + preview) wired to S2 commands. _Lane 3. deps: S2._
+- `[TODO]` **S3** `hatch_region` (fill a closed loop with a pattern) + `region` entity. _Lane 1+3. deps: B1._
+- `[TODO]` **S4** Advanced object snaps: perpendicular, tangent, parallel, extension, nearest + object-snap tracking. _Lane 3. deps: D2._
+
+## T — Annotation (was B2; Lane 1 cmd + render PAIR)
+- `[TODO]` **T1** `add_text` (string + height + plane placement). _Lane 1. deps: —. PAIR(T1↔VT1: drei `<Text>`/troika in both 2D & 3D)._
+- `[TODO]` **VT1** Text render branch (2D + 3D). _Lane 2+3. deps: T1._
+- `[TODO]` **T2** `add_dimension` (linear/aligned/radial/angular) referencing entity ids. _Lane 1. deps: B1, W1 (carry measured value). PAIR(T2↔VT2)._
+- `[TODO]` **VT2** Dimension render branch (extension/dimension lines, arrows, text). _Lane 3. deps: T2._
+
+## M — Measurement / query tools (read-only; ideal MCP tools)
+- `[TODO]` **M1** Query commands returning `data` (no mutation): `measure_distance`, `measure_angle`, `measure_area`, `measure_perimeter`, `measure_bounding_box`, `measure_volume`, `mass_properties` (density→mass). _Lane 1. deps: W1, U1. Use the `measure` skill. Acceptance: each returns `{summary, data, affected:[]}`, document untouched; happy+failure tests._
+- `[TODO]` **M2** Measurement HUD overlay: render measure results (distance readout, dimension witness lines, bbox) from the last query. _Lane 2 (3D) + Lane 3 (2D). deps: M1._
+
+## L — Layers (Lane 1 cmd + Lane 2 panel)
+- `[TODO]` **L1** Layer commands: `add_layer`, `rename_layer`, `set_layer_visibility`, `set_layer_lock`, `set_entity_layer`, `delete_layer` (reassign orphans to default). _Lane 1. deps: —. Acceptance: locked layers reject mutation gracefully; gate held._
+- `[TODO]` **L2** Layers panel (visibility/lock/active-layer/color) + undo/redo buttons + keyboard shortcuts. (Supersedes old `E3`.) _Lane 2. deps: L1, W0-2._
+
+## Q — Parametric (highest MCP value; Lane 1 model + Lane 2 panels)
+- `[TODO]` **Q1** Named parameters/variables in the document + expression evaluation; command params may reference `=width*2`. _Lane 1. deps: W1. Use the `parametric` skill. Acceptance: `set_parameter`/`delete_parameter`; changing one re-evaluates dependents; pure._
+- `[TODO]` **Q2** Constraints: dimensional (distance/angle driving) + geometric (coincident/parallel/perpendicular/tangent) as first-class document data + a solver pass. _Lane 1. deps: Q1._
+- `[TODO]` **Q3** Editable feature history (timeline): promote the undo snapshot stack into a named, replayable command list — insert/reorder/edit-params/suppress → re-evaluate downstream. _Lane 1. deps: W0-2._
+- `[TODO]` **VQ** Parameters panel + feature-history timeline panel. _Lane 2. deps: Q1, Q3._
+
+## X — Export / Import (Lane 1 serialization + optional Lane 4 endpoints)
+- `[TODO]` **X1** Export STL (ASCII+binary) from tessellated solids/meshes. (Was `H2`.) _Lane 1. deps: N0 (cylinder/sphere tess), A4-ui (mesh). Acceptance: valid STL for box/cylinder/sphere/extrusion/mesh._
+- `[TODO]` **X2** Export OBJ + glTF/GLB. _Lane 1/2. deps: X1._
+- `[TODO]` **X3** 2D export DXF + SVG from 2D entities. _Lane 1/3. deps: B1._
+- `[TODO]` **X4** Import: SVG path → 2D profile, STL → `mesh` entity. _Lane 1. deps: X1/X3._
+- `[TODO]` **JX** Optional MCP/server download endpoints for exports. _Lane 4. deps: X1._
+
+## P — Performance (Lane 2/3, `viewport-engineer`)
+- `[TODO]` **P1** On-demand rendering: `frameloop="demand"` + `invalidate()` on store/camera changes — idle scenes stop re-rendering (battery/CPU). _Lane 2. deps: —. Acceptance: no continuous rAF when idle; still smooth on orbit/drag._
+- `[TODO]` **P2** Instanced + merged rendering: `InstancedMesh` for `array_*`/duplicate results and identical primitives; merge static geometry to cut draw calls. _Lane 2. deps: —._
+- `[TODO]` **P3** BVH-accelerated raycasting via `three-mesh-bvh` for selection/snap on large scenes (add dep). _Lane 2/3. deps: C2. Acceptance: selection O(log n) on 10k-tri meshes._
+- `[TODO]` **P4** LOD + frustum culling + a geometry/material cache & disposal audit (no leaks across re-renders). _Lane 2. deps: —._
+- `[TODO]` **P5** (Stretch) WebGPU renderer opt-in behind a flag with WebGL fallback; verify drei helpers (Grid/Gizmo) degrade gracefully. _Lane 2. deps: P1. Re-evaluate only if P1–P4 leave a measured GPU bottleneck._
+
+## V — Design & UX feel (Lane 2/3, `viewport-engineer`)
+- `[TODO]` **V1** Material/lighting upgrade: PBR materials, environment map (drei `Environment`), soft contact shadows / AO, tone mapping. _Lane 2. deps: —._
+- `[TODO]` **V2** Command palette (Ctrl/Cmd-K over `listCommands()`), global keyboard-shortcut system, and view presets (front/top/right/iso + fit-to-selection). _Lane 2. deps: E1._
+- `[TODO]` **V3** Visual design system: refined dark theme + light theme toggle, consistent panel/toolbar styling, iconography, status bar (cursor coords + active units). _Lane 2. deps: U1 (units in status bar)._
+- `[TODO]` **V4** First-run empty-state / onboarding hints + MCP "connect an agent" affordance. _Lane 2. deps: —._
+
+## J — MCP enhancements (Lane 4, `mcp-engineer`)
+- `[TODO]` **J1** Expose the document as an MCP **resource** (read-only): list entities, read full document / selection. _deps: G2._
+- `[TODO]` **J2** Batch/transaction tool: apply an ordered list of commands atomically with a combined summary (one round-trip for multi-step agent edits). _deps: G1._
+- `[TODO]` **J3** `describe_scene` MCP tool: structured snapshot (entity ids, kinds, bounds, layers) so an agent can orient before editing. _deps: G1. (Pairs naturally with M1 once W1 lands.)_
+
+---
+
 ## Decision log (resolve `[BLOCKED]` items here)
 - **A4 boolean CSG library:** RESOLVED 2026-05-25 → **manifold-3d (Manifold)**. Robust watertight mesh booleans (WASM). Behind a `GeometryKernel` interface (L9) so OpenCascade.js can replace it later for exact B-rep/STEP. Mesh-based results stored as a new `mesh` solid kind.
 - **In-app AI bridge:** REMOVED 2026-05-25 (user decision: "only MCP will be used"). Deleted `src/core/ai/**`, the Express `/api/ai` proxy + `anthropicClient.ts`, the chat panel (`ChatPanel`/`useAiChat`/`chat.css`), and the `@anthropic-ai/sdk` dependency. AI control is now delivered solely through the MCP host (`/mcp`). Architecture rules updated: L1 is now "two callers" (UI + MCP). Tasks F1/F2/F3 → `[REMOVED]`.
+- **OPEN — kernel capability for K1/K2/K3 (fillet/chamfer/shell):** Manifold (current kernel) does mesh booleans well but has **no robust edge fillet/chamfer or shell**. These need either (a) an OpenCascade.js B-rep kernel swapped in behind the existing `GeometryKernel` interface (L9) — large WASM, slow init, but the "real CAD" path that also unlocks STEP export, or (b) mesh-approximation fillets (lower quality). Decide before scheduling K1/K2. Sweep/loft (K3) are achievable mesh-side. **Default recommendation: defer K1/K2 until an OCC kernel is justified; build N0–N3, sweep/loft, and the rest of Wave 2 first.**
+- **OPEN — WebGPU (P5):** stay on WebGL until P1–P4 leave a *measured* GPU bottleneck; the renderer is an isolated `ui/` swap (two `<Canvas>` call sites), so deferring costs nothing.

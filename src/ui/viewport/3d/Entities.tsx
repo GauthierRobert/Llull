@@ -16,6 +16,7 @@ import { BoxMesh } from './entities/BoxMesh';
 import { CylinderMesh } from './entities/CylinderMesh';
 import { SphereMesh } from './entities/SphereMesh';
 import { ExtrusionMesh } from './entities/ExtrusionMesh';
+import { MeshSolidMesh } from './entities/MeshSolidMesh';
 
 interface EntitiesProps {
   document: CadDocument;
@@ -40,6 +41,8 @@ function EntityRenderer({
       return <SphereMesh entity={entity} selected={selected} onSelect={onSelect} />;
     case 'extrusion':
       return <ExtrusionMesh entity={entity} selected={selected} onSelect={onSelect} />;
+    case 'mesh':
+      return <MeshSolidMesh entity={entity} selected={selected} onSelect={onSelect} />;
     default:
       // 2D shape kinds (line/arc/circle/…) are drawn by the 2D viewport (Lane 3 / D1),
       // not in the 3D scene. Keeping a tolerant default lets the Entity union grow
