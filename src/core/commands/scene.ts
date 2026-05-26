@@ -198,6 +198,12 @@ export function entityBounds(e: Entity): Bounds {
       const estimatedWidth = e.content.length * e.height * 0.6;
       return { min: e.position, max: offset(e.position, estimatedWidth, e.height, 0) };
     }
+    case 'dimension': {
+      // Dimensions have no own geometry — produce a small AABB around the entity position
+      // using the offset (witness-line distance) as a proxy for the annotation extent.
+      const ext = e.offset ?? 5;
+      return { min: offset(e.position, -ext, -ext, 0), max: offset(e.position, ext, ext, 0) };
+    }
     default: {
       const exhaustive: never = e;
       return { min: (exhaustive as Entity).position, max: (exhaustive as Entity).position };

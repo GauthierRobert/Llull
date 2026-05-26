@@ -26,7 +26,7 @@ import { setParameter, deleteParameter } from './parameters';
 import { checkModel } from './check';
 import { renderView } from './render';
 import { makeTubeBetween } from './composite';
-import { addText } from './annotate';
+import { addText, addDimension } from './annotate';
 import {
   explodePolyline,
   offset2D,
@@ -120,6 +120,7 @@ const definitions = [
   renderView,
   makeTubeBetween,
   addText,
+  addDimension,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

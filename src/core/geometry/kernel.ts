@@ -39,6 +39,12 @@ export type BooleanOp = 'union' | 'subtract' | 'intersect';
  *
  * Returns `null` when the operation cannot be performed (unsupported entity
  * kind, degenerate geometry, kernel error). Commands treat null as a no-op.
+ *
+ * Extended in Batch 14 / KI4-productionize with three B-rep ops:
+ *   - `filletEdges`  — OCC implements; Manifold graceful no-op.
+ *   - `chamferEdges` — OCC stub (needs separate spike); Manifold graceful no-op.
+ *   - `shellSolid`   — OCC stub (needs separate spike); Manifold graceful no-op.
+ * Commands K1/K2/K3 (future Lane-1 batch) will call these via this interface.
  */
 export interface GeometryKernel {
   /**
@@ -50,6 +56,38 @@ export interface GeometryKernel {
    * @param b    - second operand (must be a 3D solid entity); for 'subtract', result = a − b
    */
   booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null;
+
+  /**
+   * Fillet (round) the specified edges of a solid entity.
+   * Returns the tessellated result mesh, or null when the kernel cannot perform
+   * the operation (unsupported entity kind, degenerate geometry, kernel limitation).
+   *
+   * @param shape        - world-space input mesh (e.g. from a prior booleanOp result or direct entity tessellation)
+   * @param edgeIndices  - 0-based indices of the edges to fillet; empty array = all edges
+   * @param radius       - fillet radius in document units; must be > 0
+   */
+  filletEdges(shape: MeshData, edgeIndices: number[], radius: number): MeshData | null;
+
+  /**
+   * Chamfer (bevel) the specified edges of a solid entity.
+   * Returns the tessellated result mesh, or null when the kernel cannot perform
+   * the operation. Manifold returns null (graceful no-op). OCC spike pending.
+   *
+   * @param shape        - world-space input mesh
+   * @param edgeIndices  - 0-based indices of the edges to chamfer; empty = all edges
+   * @param distance     - chamfer distance in document units; must be > 0
+   */
+  chamferEdges(shape: MeshData, edgeIndices: number[], distance: number): MeshData | null;
+
+  /**
+   * Shell (hollow) a closed solid entity by removing one face and offsetting walls inward.
+   * Returns the tessellated shell mesh, or null when the kernel cannot perform
+   * the operation. Manifold returns null (graceful no-op). OCC spike pending.
+   *
+   * @param shape     - world-space input mesh representing a closed solid
+   * @param thickness - wall thickness in document units; must be > 0
+   */
+  shellSolid(shape: MeshData, thickness: number): MeshData | null;
 }
 
 // ---------------------------------------------------------------------------

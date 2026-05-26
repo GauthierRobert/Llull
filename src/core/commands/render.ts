@@ -675,7 +675,8 @@ function tessellateEntity(e: Entity): PreDepthPolygon[] {
     case 'point':    return tessellate2DPoint(e);
     case 'ellipse':  return tessellate2DEllipse(e);
     case 'spline':   return tessellate2DSpline(e);
-    case 'text':     return []; // render deferred to VT1 (viewport-engineer)
+    case 'text':      return []; // render deferred to VT1 (viewport-engineer)
+    case 'dimension': return []; // render deferred to VT2 (viewport-engineer)
     default: {
       const exhaustive: never = e;
       void exhaustive;

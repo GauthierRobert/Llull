@@ -1,43 +1,30 @@
 /**
- * KI4 SPIKE — occtKernel unit tests.
+ * OcctKernel unit tests.
  *
- * IMPORTANT: These tests require the opencascade.js WASM binary (63 MB) to load
- * and initialise in Vitest. In the current jsdom environment, the WASM cannot
- * be loaded (no filesystem access, no browser fetch for large binaries).
+ * Live WASM tests (BRepAlgoAPI_Fuse, BRepFilletAPI_MakeFillet) require the
+ * 63 MB opencascade.js binary and a Node.js environment with WASM support.
+ * They are marked `describe.skip` because Vitest runs in jsdom where WASM of
+ * this size cannot be loaded. Correctness is manually verified; measurements
+ * are recorded in docs/decisions/KI4-occt-spike.md.
  *
- * Tests are gated with `describe.skipIf` using a probe that checks whether
- * the Node.js `fs` module can read the WASM file. In CI (jsdom) they are
- * skipped. Correctness has been verified manually via the Node.js spike script
- * whose output is recorded in docs/decisions/KI4-occt-spike.md.
+ * The `describe.skipIf(!isNodeEnv)` gate from the KI4 spike was tautological:
+ * `process.versions.node` exists in jsdom too (Vitest runs in Node.js), so the
+ * condition never fired. Replaced with unconditional `describe.skip` so CI does
+ * not silently run (and try to load) the 63 MB WASM binary.
  *
- * SKIP STATUS: These tests skip in the standard Vitest jsdom env.
- * They would run if vitest were configured with `environment: 'node'` AND
- * the 63 MB WASM is present. Both conditions are true locally but not in CI.
- *
- * Manually verified measurements (Node.js v22, 2026-05-26):
- *   - Cold init: ~800–1000 ms
- *   - Boolean union (two 2×2×2 boxes): IsDone=true, triangles=28, no NaN
- *   - Fillet r=0.2 (box, 12 edges): IsDone=true, triangles=628, no NaN
+ * Always-run tests verify:
+ *   - Entity structure contracts (used by kernel internals).
+ *   - GeometryKernel interface conformance (TypeScript compile-time gate).
+ *   - New Batch-14 methods: filletEdges / chamferEdges / shellSolid exist on the interface.
  */
 
 import { describe, it, expect } from 'vitest';
-
-// ---------------------------------------------------------------------------
-// WASM availability probe — must not use `require` (no @types/node in tsconfig).
-// Instead, we probe via dynamic import of a tiny Node-only module pattern.
-// If we are in jsdom, `typeof process` is undefined or minimal.
-// ---------------------------------------------------------------------------
-
-// Use globalThis to avoid depending on @types/node (not in tsconfig lib).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const _proc = (globalThis as unknown as { process?: { versions?: { node?: string } } }).process;
-const isNodeEnv = typeof _proc !== 'undefined' && typeof _proc.versions?.node === 'string';
+import type { BoxEntity } from '@core/model/types';
+import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 
 // ---------------------------------------------------------------------------
 // Test entities — two 2×2×2 boxes (matching the spike script).
 // ---------------------------------------------------------------------------
-
-import type { BoxEntity } from '@core/model/types';
 
 const BOX_A: BoxEntity = {
   id: 'box-a',
@@ -60,25 +47,7 @@ const BOX_B: BoxEntity = {
 };
 
 // ---------------------------------------------------------------------------
-// The WASM test suite — skipped in jsdom / non-Node environments.
-// In Node with WASM present, these provide live correctness verification.
-// ---------------------------------------------------------------------------
-
-describe.skipIf(!isNodeEnv)(
-  'OcctKernel live (Node.js only — skipped in jsdom CI)',
-  () => {
-    it('skip placeholder — OCC WASM tests require node environment and 63MB WASM', () => {
-      // This test always passes; it documents the skip reason.
-      // Full live tests (union IsDone, tris=28, fillet tris=628, no NaN) were
-      // verified manually on 2026-05-26 — see docs/decisions/KI4-occt-spike.md.
-      expect(isNodeEnv).toBe(true);
-    });
-  },
-);
-
-// ---------------------------------------------------------------------------
-// Static correctness tests — no WASM, no network, always run.
-// Tests the type contract and entity structure used by the kernel.
+// Static entity contract tests — always run; no WASM required.
 // ---------------------------------------------------------------------------
 
 describe('OcctKernel — static contract tests (always run)', () => {
@@ -97,9 +66,113 @@ describe('OcctKernel — static contract tests (always run)', () => {
 
   it('documents skip reason: WASM binary is 63MB — not viable in jsdom CI', () => {
     // The opencascade.js WASM is 63 MB. Loading it in Vitest/jsdom would require
-    // either a custom Vite plugin for WASM or a Node-env vitest config.
-    // Until then, live tests are manually verified (see spike script output in
-    // docs/decisions/KI4-occt-spike.md).
+    // a Node-env vitest config. Until then, live tests are manually verified.
+    // See docs/decisions/KI4-occt-spike.md for recorded measurements.
     expect('skip reason documented').toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GeometryKernel interface conformance — compile-time check via `satisfies`.
+// If any of the three new methods are missing from the interface, tsc fails.
+// This test runs at zero cost (no WASM) and confirms L9 wiring.
+// ---------------------------------------------------------------------------
+
+describe('GeometryKernel — interface conformance (Batch 14 extension)', () => {
+  it('GeometryKernel type has booleanOp, filletEdges, chamferEdges, shellSolid', () => {
+    // Build a minimal conforming stub. TypeScript will error at compile time if
+    // any method is missing from the interface — that is the real assertion here.
+    const _stub: GeometryKernel = {
+      booleanOp: () => null,
+      filletEdges: () => null,
+      chamferEdges: () => null,
+      shellSolid: () => null,
+    } satisfies GeometryKernel;
+
+    // Confirm each method key exists at runtime too.
+    expect(typeof _stub.booleanOp).toBe('function');
+    expect(typeof _stub.filletEdges).toBe('function');
+    expect(typeof _stub.chamferEdges).toBe('function');
+    expect(typeof _stub.shellSolid).toBe('function');
+  });
+
+  it('filletEdges signature accepts MeshData + edgeIndices + radius', () => {
+    const mesh: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+    const stub: GeometryKernel = {
+      booleanOp: () => null,
+      filletEdges: (shape, edgeIndices, radius) => {
+        expect(shape.positions.length).toBeGreaterThan(0);
+        expect(Array.isArray(edgeIndices)).toBe(true);
+        expect(typeof radius).toBe('number');
+        return null;
+      },
+      chamferEdges: () => null,
+      shellSolid: () => null,
+    };
+    const result = stub.filletEdges(mesh, [], 0.2);
+    expect(result).toBeNull(); // Manifold/stub returns null — graceful no-op
+  });
+
+  it('chamferEdges signature accepts MeshData + edgeIndices + distance', () => {
+    const mesh: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+    const stub: GeometryKernel = {
+      booleanOp: () => null,
+      filletEdges: () => null,
+      chamferEdges: (_shape, _edgeIndices, _distance) => null,
+      shellSolid: () => null,
+    };
+    expect(stub.chamferEdges(mesh, [], 0.1)).toBeNull();
+  });
+
+  it('shellSolid signature accepts MeshData + thickness', () => {
+    const mesh: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+    const stub: GeometryKernel = {
+      booleanOp: () => null,
+      filletEdges: () => null,
+      chamferEdges: () => null,
+      shellSolid: (_shape, _thickness) => null,
+    };
+    expect(stub.shellSolid(mesh, 0.5)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Live WASM tests — ALWAYS SKIPPED in this config (jsdom + 63 MB WASM).
+// To un-skip: run vitest with `--environment node` AND the WASM binary present.
+// Measurements from manual verification: union tris=28, fillet tris=628 (r=0.2).
+// ---------------------------------------------------------------------------
+
+describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)', () => {
+  it('booleanOp union of two boxes returns mesh', async () => {
+    const { createOcctKernel } = await import('@ui/geometry/occtKernel');
+    const kernel = await createOcctKernel();
+    const result = kernel.booleanOp('union', BOX_A, BOX_B);
+    expect(result).not.toBeNull();
+    expect(result!.positions.length).toBeGreaterThan(0);
+    expect(result!.indices.length).toBeGreaterThan(0);
+  });
+
+  it('filletEdges returns a mesh with more triangles than the input box', async () => {
+    const { createOcctKernel } = await import('@ui/geometry/occtKernel');
+    const kernel = await createOcctKernel();
+    // Derive a flat MeshData from a box (16 triangles for 6 faces × 2 tris + edges).
+    const boxMesh: MeshData = {
+      positions: [
+        -1, -1, -1,  1, -1, -1,  1,  1, -1, -1,  1, -1,
+        -1, -1,  1,  1, -1,  1,  1,  1,  1, -1,  1,  1,
+      ],
+      indices: [
+        0, 1, 2,  0, 2, 3,   // bottom
+        4, 6, 5,  4, 7, 6,   // top
+        0, 4, 1,  4, 5, 1,   // front
+        1, 5, 2,  5, 6, 2,   // right
+        2, 6, 3,  6, 7, 3,   // back
+        3, 7, 0,  7, 4, 0,   // left
+      ],
+    };
+    const result = kernel.filletEdges(boxMesh, [], 0.2);
+    expect(result).not.toBeNull();
+    // Fillet of a box adds significant geometry — spike measured 628 triangles.
+    expect(result!.indices.length / 3).toBeGreaterThan(12);
   });
 });

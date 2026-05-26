@@ -186,6 +186,13 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
         // A point has no local geometry beyond position; return it unchanged.
         scaled = { ...target };
         break;
+      case 'dimension':
+        // References stay attached; only the witness-line offset is scaled.
+        scaled = {
+          ...target,
+          ...(target.offset !== undefined ? { offset: target.offset * factor } : {}),
+        };
+        break;
       case 'mesh':
         // Scale all world-space position triples in the flat positions array.
         scaled = {
@@ -261,7 +268,11 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
                                       ? `scaled ${scaled.points.length} points`
                                       : scaled.kind === 'text'
                                         ? `new height ${scaled.height}`
-                                        : 'point unchanged';
+                                        : scaled.kind === 'dimension'
+                                          ? scaled.offset !== undefined
+                                            ? `new offset ${scaled.offset}`
+                                            : 'offset unchanged (no offset set)'
+                                          : 'point unchanged';
     return {
       document: { ...doc, entities: { ...doc.entities, [id]: scaled } },
       summary: `Scaled ${id} by factor ${factor}; ${dims}.`,

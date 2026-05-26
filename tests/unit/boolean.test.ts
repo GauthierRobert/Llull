@@ -50,6 +50,9 @@ function makeFakeKernel(): GeometryKernel & {
       fake.callCount += 1;
       return fake.returnNull ? null : CANNED_MESH;
     },
+    filletEdges: (): MeshData | null => null,
+    chamferEdges: (): MeshData | null => null,
+    shellSolid: (): MeshData | null => null,
   };
   return fake;
 }

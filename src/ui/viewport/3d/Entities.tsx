@@ -36,6 +36,7 @@ import { ConeMesh } from './entities/ConeMesh';
 import { TorusMesh } from './entities/TorusMesh';
 import { WedgeMesh } from './entities/WedgeMesh';
 import { PyramidMesh } from './entities/PyramidMesh';
+import { TextMesh } from './entities/TextMesh';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 
@@ -76,6 +77,8 @@ function EntityRenderer({
       return <WedgeMesh entity={entity} selected={selected} onSelect={onSelect} />;
     case 'pyramid':
       return <PyramidMesh entity={entity} selected={selected} onSelect={onSelect} />;
+    case 'text':
+      return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
     default:
       // 2D shape kinds (line/arc/circle/…) are drawn by the 2D viewport (Lane 3 / D1),
       // not in the 3D scene. Keeping a tolerant default lets the Entity union grow

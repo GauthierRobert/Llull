@@ -23,7 +23,7 @@ export type Vec2 = readonly [number, number];
 export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid';
 
 /** 2D drafting shape kinds. Geometry is LOCAL to the entity work plane; BaseEntity.position places that plane in 3D space. */
-export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text';
+export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text' | 'dimension';
 
 /** All entity kinds — 3D solids and 2D shapes. */
 export type EntityKind = SolidKind | Shape2DKind;
@@ -273,6 +273,38 @@ export interface TextEntity extends BaseEntity {
   anchor?: 'left' | 'center' | 'right';
 }
 
+/**
+ * An associative dimension annotation placed in the document.
+ * `dimensionKind` controls the measurement type and the required `entityIds` count:
+ *   - 'linear'  : measures the straight-line distance between two endpoints; `entityIds` = 2 (line/point entities)
+ *   - 'aligned' : like linear but parallel to the segment between the two reference points; `entityIds` = 2
+ *   - 'radial'  : measures the radius of a circle, arc, or ellipse; `entityIds` = 1 (circle/arc/ellipse entity)
+ *   - 'angular' : measures the angle at the vertex of two line segments; `entityIds` = 3 (vertex point + 2 line entities, or 3 point entities)
+ * `entityIds` contains references to existing document entities; the dimension updates if those entities move.
+ * Optional `offset` is the perpendicular distance (in model units) from the measured geometry to the dimension line; default 5.
+ * Optional `precision` overrides the document display precision (number of decimal places) for this dimension only.
+ * Optional `label` replaces the computed numeric value with a custom string.
+ */
+export interface DimensionEntity extends BaseEntity {
+  readonly kind: 'dimension';
+  /** Controls how the measurement is computed and how many entityIds are required. */
+  dimensionKind: 'linear' | 'aligned' | 'radial' | 'angular';
+  /**
+   * Ids of the referenced document entities.
+   * linear/aligned: exactly 2 ids (line or point entities).
+   * radial: exactly 1 id (circle, arc, or ellipse entity).
+   * angular: exactly 3 ids (vertex point + 2 line entities, or 3 point entities).
+   * All ids must exist in the document. Dangling refs are flagged by check_model.
+   */
+  entityIds: readonly string[];
+  /** Perpendicular offset (model units) from the measured geometry to the dimension line. Default: 5. */
+  offset?: number;
+  /** Decimal precision override for this dimension; overrides CadDocument.displayPrecision when present. */
+  precision?: number;
+  /** Custom label overriding the computed numeric value. If absent, the value is computed at render time. */
+  label?: string;
+}
+
 export type Entity =
   | BoxEntity
   | CylinderEntity
@@ -291,7 +323,8 @@ export type Entity =
   | PointEntity
   | EllipseEntity
   | SplineEntity
-  | TextEntity;
+  | TextEntity
+  | DimensionEntity;
 
 // ---------------------------------------------------------------------------
 // Kind helpers
@@ -307,6 +340,7 @@ const SHAPE2D_KINDS: ReadonlySet<string> = new Set<Shape2DKind>([
   'ellipse',
   'spline',
   'text',
+  'dimension',
 ]);
 
 /** Returns true if the entity is a 2D drafting shape. */

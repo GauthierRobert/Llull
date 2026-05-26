@@ -372,6 +372,30 @@ function checkOrphanedGroupMembers(doc: CadDocument): Issue[] {
 }
 
 /**
+ * Dangling dimension references: a dimension entity whose entityIds point to
+ * entity ids that no longer exist in the document.
+ *
+ * Issue code: `dangling_dimension_ref`
+ */
+function checkDanglingDimensionRefs(doc: CadDocument): Issue[] {
+  const issues: Issue[] = [];
+  for (const entity of Object.values(doc.entities)) {
+    if (entity.kind !== 'dimension') continue;
+    for (const refId of entity.entityIds) {
+      if (!(refId in doc.entities)) {
+        issues.push({
+          severity: 'error',
+          code: 'dangling_dimension_ref',
+          message: `Dimension entity '${entity.id}' (${entity.dimensionKind}) references entity id '${refId}' which does not exist in the document.`,
+          entityId: entity.id,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+/**
  * Parameter errors: parameters whose `error` field is set.
  */
 function checkParameterErrors(doc: CadDocument): Issue[] {
@@ -412,6 +436,7 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
   // Document-level checks
   issues.push(...checkEmptyLayers(doc));
   issues.push(...checkOrphanedGroupMembers(doc));
+  issues.push(...checkDanglingDimensionRefs(doc));
   issues.push(...checkParameterErrors(doc));
 
   const ok = !issues.some((i) => i.severity === 'error');
@@ -442,6 +467,7 @@ export const checkModel: CommandDefinition<CheckModelParams> = {
     'open_profile (polyline not closed), insufficient_points (polyline/spline < 2 points), ' +
     'far_from_origin (entity center > farThreshold units from world origin), ' +
     'empty_layer (layer with no entities), orphaned_group_member (group references missing entity id), ' +
+    'dangling_dimension_ref (dimension entity references a missing entity id), ' +
     'parameter_error (a named parameter has an evaluation error).',
   paramsSchema: {
     type: 'object',

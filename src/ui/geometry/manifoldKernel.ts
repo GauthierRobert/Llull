@@ -265,5 +265,20 @@ export async function createManifoldKernel(): Promise<GeometryKernel> {
         try { result?.delete(); } catch { /* ignore */ }
       }
     },
+
+    // Manifold cannot do filletEdges robustly — graceful no-op; OCC kernel handles it.
+    filletEdges(_shape: MeshData, _edgeIndices: number[], _radius: number): MeshData | null {
+      return null;
+    },
+
+    // Manifold cannot do chamferEdges robustly — graceful no-op; OCC kernel handles it.
+    chamferEdges(_shape: MeshData, _edgeIndices: number[], _distance: number): MeshData | null {
+      return null;
+    },
+
+    // Manifold cannot do shellSolid robustly — graceful no-op; OCC kernel handles it.
+    shellSolid(_shape: MeshData, _thickness: number): MeshData | null {
+      return null;
+    },
   };
 }

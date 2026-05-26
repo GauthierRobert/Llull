@@ -2096,3 +2096,347 @@ describe('render_view', () => {
     expect(scaled.summary).toContain('height');
   });
 });
+
+// ---------------------------------------------------------------------------
+// add_dimension
+// ---------------------------------------------------------------------------
+
+describe('add_dimension', () => {
+  beforeEach(() => __resetIdCounter());
+
+  // Helpers to seed reference entities
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  function makeDoc() {
+    let doc = createEmptyDocument();
+    // Two point entities for linear/aligned/angular
+    const p1 = execute(doc, 'draw_point', { position: [0, 0, 0] });
+    doc = p1.document;
+    const p2 = execute(doc, 'draw_point', { position: [10, 0, 0] });
+    doc = p2.document;
+    const p3 = execute(doc, 'draw_point', { position: [5, 5, 0] });
+    doc = p3.document;
+    // A circle for radial
+    const circ = execute(doc, 'draw_circle', { center: [0, 0], radius: 5 });
+    doc = circ.document;
+    // A line for linear/aligned/angular
+    const ln = execute(doc, 'draw_line', { start: [0, 0], end: [10, 0] });
+    doc = ln.document;
+    return {
+      doc,
+      pointId1: p1.affected[0]!,
+      pointId2: p2.affected[0]!,
+      pointId3: p3.affected[0]!,
+      circleId: circ.affected[0]!,
+      lineId: ln.affected[0]!,
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // Happy paths
+  // ------------------------------------------------------------------
+
+  it('linear — creates a dimension entity referencing 2 point entities', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1, pointId2],
+      offset: 8,
+    });
+    expect(result.affected).toHaveLength(1);
+    const id = result.affected[0]!;
+    const e = result.document.entities[id]! as import('@core/model/types').DimensionEntity;
+    expect(e.kind).toBe('dimension');
+    expect(e.dimensionKind).toBe('linear');
+    expect(e.entityIds).toEqual([pointId1, pointId2]);
+    expect(e.offset).toBe(8);
+    expect(result.document.order).toContain(id);
+    expect(result.summary).toContain(id);
+    expect(result.summary).toContain('linear');
+  });
+
+  it('linear — works with 2 line entities', () => {
+    const { doc, lineId } = makeDoc();
+    // Need a second line
+    const ln2 = execute(doc, 'draw_line', { start: [0, 5], end: [10, 5] });
+    const result = execute(ln2.document, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [lineId, ln2.affected[0]!],
+    });
+    expect(result.affected).toHaveLength(1);
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    expect(e.dimensionKind).toBe('linear');
+  });
+
+  it('aligned — creates a dimension entity referencing 2 point entities', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'aligned',
+      entityIds: [pointId1, pointId2],
+    });
+    expect(result.affected).toHaveLength(1);
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    expect(e.kind).toBe('dimension');
+    expect(e.dimensionKind).toBe('aligned');
+  });
+
+  it('radial — creates a dimension entity referencing a circle', () => {
+    const { doc, circleId } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'radial',
+      entityIds: [circleId],
+      label: 'R5',
+    });
+    expect(result.affected).toHaveLength(1);
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    expect(e.dimensionKind).toBe('radial');
+    expect(e.entityIds).toEqual([circleId]);
+    expect(e.label).toBe('R5');
+  });
+
+  it('radial — accepts an arc entity', () => {
+    let doc = createEmptyDocument();
+    const arc = execute(doc, 'draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: Math.PI });
+    doc = arc.document;
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'radial',
+      entityIds: [arc.affected[0]!],
+    });
+    expect(result.affected).toHaveLength(1);
+  });
+
+  it('angular — creates a dimension entity referencing 3 point entities', () => {
+    const { doc, pointId1, pointId2, pointId3 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'angular',
+      entityIds: [pointId1, pointId2, pointId3],
+      precision: 1,
+    });
+    expect(result.affected).toHaveLength(1);
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    expect(e.dimensionKind).toBe('angular');
+    expect(e.entityIds).toHaveLength(3);
+    expect(e.precision).toBe(1);
+  });
+
+  it('angular — accepts line entities', () => {
+    const { doc, lineId, pointId1 } = makeDoc();
+    const ln2 = execute(doc, 'draw_line', { start: [0, 0], end: [0, 10] });
+    const result = execute(ln2.document, 'add_dimension', {
+      dimensionKind: 'angular',
+      entityIds: [pointId1, lineId, ln2.affected[0]!],
+    });
+    expect(result.affected).toHaveLength(1);
+  });
+
+  it('optional fields — label, precision, offset stored on entity', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1, pointId2],
+      offset: 12,
+      precision: 2,
+      label: '≈ 10 mm',
+    });
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    expect(e.offset).toBe(12);
+    expect(e.precision).toBe(2);
+    expect(e.label).toBe('≈ 10 mm');
+  });
+
+  it('is2D — created entity is classified as 2D', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1, pointId2],
+    });
+    const e = result.document.entities[result.affected[0]!]!;
+    expect(is2D(e)).toBe(true);
+  });
+
+  // ------------------------------------------------------------------
+  // Purity
+  // ------------------------------------------------------------------
+
+  it('is pure — input document is not mutated', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_dimension', { dimensionKind: 'linear', entityIds: [pointId1, pointId2] });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ------------------------------------------------------------------
+  // Failure paths
+  // ------------------------------------------------------------------
+
+  it('failure — unknown dimensionKind is a no-op', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'diagonal',
+      entityIds: [pointId1, pointId2],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('diagonal');
+  });
+
+  it('failure — wrong entityIds count for linear (1 instead of 2) is a no-op', () => {
+    const { doc, pointId1 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('2');
+  });
+
+  it('failure — wrong entityIds count for radial (2 instead of 1) is a no-op', () => {
+    const { doc, circleId, pointId1 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'radial',
+      entityIds: [circleId, pointId1],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('1');
+  });
+
+  it('failure — wrong entityIds count for angular (2 instead of 3) is a no-op', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'angular',
+      entityIds: [pointId1, pointId2],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('3');
+  });
+
+  it('failure — empty entityIds array is a no-op', () => {
+    const { doc } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('failure — missing referenced entity id is a no-op', () => {
+    const { doc, pointId1 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1, 'ghost-id'],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ghost-id');
+  });
+
+  it('failure — radial on a non-circle/arc/ellipse entity (box) is a no-op', () => {
+    let doc = createEmptyDocument();
+    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = box.document;
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'radial',
+      entityIds: [box.affected[0]!],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('radial');
+  });
+
+  it('failure — linear on an incompatible entity kind (box) is a no-op', () => {
+    let doc = createEmptyDocument();
+    const b1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = b1.document;
+    const b2 = execute(doc, 'add_box', { size: [2, 2, 2] });
+    doc = b2.document;
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [b1.affected[0]!, b2.affected[0]!],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('linear');
+  });
+
+  it('failure — angular on an incompatible entity kind (circle) is a no-op', () => {
+    const { doc, circleId, pointId1, pointId2 } = makeDoc();
+    const result = execute(doc, 'add_dimension', {
+      dimensionKind: 'angular',
+      entityIds: [pointId1, pointId2, circleId],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('angular');
+  });
+
+  // ------------------------------------------------------------------
+  // scale_entity on dimension
+  // ------------------------------------------------------------------
+
+  it('scale_entity — dimension: scales offset, leaves entityIds unchanged', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const created = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1, pointId2],
+      offset: 10,
+    });
+    const dimId = created.affected[0]!;
+    const scaled = execute(created.document, 'scale_entity', { id: dimId, factor: 2 });
+    expect(scaled.affected).toEqual([dimId]);
+    const e = scaled.document.entities[dimId]! as import('@core/model/types').DimensionEntity;
+    expect(e.offset).toBeCloseTo(20);
+    expect(e.entityIds).toEqual([pointId1, pointId2]);
+    expect(scaled.summary).toContain('offset');
+  });
+
+  it('scale_entity — dimension without offset: returns entity unchanged (no offset field)', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const created = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1, pointId2],
+    });
+    const dimId = created.affected[0]!;
+    const scaled = execute(created.document, 'scale_entity', { id: dimId, factor: 3 });
+    expect(scaled.affected).toEqual([dimId]);
+    const e = scaled.document.entities[dimId]! as import('@core/model/types').DimensionEntity;
+    expect(e.offset).toBeUndefined();
+  });
+
+  // ------------------------------------------------------------------
+  // check_model — dangling_dimension_ref
+  // ------------------------------------------------------------------
+
+  it('check_model — flags dangling_dimension_ref when a referenced entity is deleted', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    // Create dimension
+    const dimCreated = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1, pointId2],
+    });
+    // Delete one of the referenced entities
+    const afterDelete = execute(dimCreated.document, 'delete_entity', { id: pointId1 });
+    // Check model
+    const checkResult = execute(afterDelete.document, 'check_model', {});
+    const data = checkResult.data as import('@core/commands/check').CheckResult;
+    const danglingIssues = data.issues.filter((i) => i.code === 'dangling_dimension_ref');
+    expect(danglingIssues).toHaveLength(1);
+    expect(danglingIssues[0]!.severity).toBe('error');
+    expect(danglingIssues[0]!.message).toContain(pointId1);
+    expect(data.ok).toBe(false);
+  });
+
+  it('check_model — no dangling_dimension_ref when all references are intact', () => {
+    const { doc, pointId1, pointId2 } = makeDoc();
+    const dimCreated = execute(doc, 'add_dimension', {
+      dimensionKind: 'linear',
+      entityIds: [pointId1, pointId2],
+    });
+    const checkResult = execute(dimCreated.document, 'check_model', {});
+    const data = checkResult.data as import('@core/commands/check').CheckResult;
+    const danglingIssues = data.issues.filter((i) => i.code === 'dangling_dimension_ref');
+    expect(danglingIssues).toHaveLength(0);
+  });
+});

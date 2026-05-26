@@ -19,6 +19,7 @@ import { RectangleRenderer } from './entities/RectangleRenderer';
 import { PointRenderer } from './entities/PointRenderer';
 import { EllipseRenderer } from './entities/EllipseRenderer';
 import { SplineRenderer } from './entities/SplineRenderer';
+import { TextRenderer2D } from './entities/TextRenderer2D';
 
 interface Entities2DProps {
   document: CadDocument;
@@ -49,6 +50,8 @@ function Entity2DRenderer({
       return <EllipseRenderer entity={entity} selected={selected} />;
     case 'spline':
       return <SplineRenderer entity={entity} selected={selected} />;
+    case 'text':
+      return <TextRenderer2D entity={entity} selected={selected} />;
     // 3D solid kinds are intentionally not rendered here.
     default:
       return null;
