@@ -30,8 +30,14 @@ export function ConeMesh({ entity, selected, onSelect }: ConeMeshProps): React.R
 
   const meshRef = useRef<THREE.Mesh>(null);
 
-  // Dispose the previous geometry when it changes or the component unmounts (r3f R9).
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  // Build BVH once per geometry for O(log n) raycasting; dispose with the geometry (R9).
+  useEffect(() => {
+    geometry.computeBoundsTree();
+    return () => {
+      geometry.disposeBoundsTree();
+      geometry.dispose();
+    };
+  }, [geometry]);
 
   const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8 });
 

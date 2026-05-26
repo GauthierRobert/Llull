@@ -882,6 +882,58 @@ describe('2D modify commands', () => {
       expect(result.document).toBe(doc);
     });
 
+    it('S2 left-turn: arc center and sweep direction are mirrored vs right-turn for a 90° left corner', () => {
+      // Left-turn geometry: (0,8) → (4,8) → (4,0)
+      // At vertex (4,8): dirPrev=(-1,0) toward (0,8), dirNext=(0,-1) toward (4,0)
+      // cross2(dirPrev, dirNext) = (-1)*(-1) - (0)*(0) = 1 > 0 → left turn (crossVal > 0 branch)
+      // Expected arc center for r=1: bisector=normalize(-1,-1)=(-√2/2,-√2/2)
+      //   centerDist = 1/sin(45°) = √2
+      //   arcCenter = (4,8) + √2*(−√2/2,−√2/2) = (4,8) + (−1,−1) = (3,7)
+      // Tangent points: tangentPrev=(3,8), tangentNext=(4,7)
+      let doc = createEmptyDocument();
+      const r = execute(doc, 'draw_polyline', {
+        points: [[0, 8], [4, 8], [4, 0]],
+        closed: false,
+      });
+      doc = r.document;
+      const polyId = r.affected[0]!;
+
+      const result = execute(doc, 'fillet_2d', {
+        id: polyId,
+        radius: 1,
+        vertexIndex: 1,
+      });
+
+      expect(result.affected).toHaveLength(2);
+      const arcId = result.affected[1]!;
+      const arc = result.document.entities[arcId]! as ArcEntity;
+
+      // Arc center should be at (3,7) — the interior of the left-turn corner
+      expect(arc.center[0]).toBeCloseTo(3);
+      expect(arc.center[1]).toBeCloseTo(7);
+      expect(arc.radius).toBeCloseTo(1);
+
+      // Arc center is equidistant (= radius) from both tangent points
+      const tangentPrev: [number, number] = [3, 8]; // 1 back from vertex along dirPrev
+      const tangentNext: [number, number] = [4, 7]; // 1 back from vertex along dirNext
+      const c = arc.center;
+      const d1 = Math.sqrt((c[0] - tangentPrev[0]) ** 2 + (c[1] - tangentPrev[1]) ** 2);
+      const d2 = Math.sqrt((c[0] - tangentNext[0]) ** 2 + (c[1] - tangentNext[1]) ** 2);
+      expect(d1).toBeCloseTo(1);
+      expect(d2).toBeCloseTo(1);
+
+      // The left-turn arc must have its start and end angles SWAPPED compared to a right-turn.
+      // For the right-turn case (0,0)→(4,0)→(4,8) with r=1, center (3,1):
+      //   startAngle = atan2(0-1, 3-3) = atan2(-1, 0) = -π/2
+      //   endAngle   = atan2(1-1, 4-3) = atan2(0, 1) = 0
+      // For this left-turn, center (3,7):
+      //   raw startAngle = atan2(8-7, 3-3) = atan2(1, 0) = π/2
+      //   raw endAngle   = atan2(7-7, 4-3) = atan2(0, 1) = 0
+      //   After swap (crossVal > 0): arcStart = endAngle = 0, arcEnd = startAngle = π/2
+      expect(arc.startAngle).toBeCloseTo(0);
+      expect(arc.endAngle).toBeCloseTo(Math.PI / 2);
+    });
+
     it('arc center is equidistant from both tangent points', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {

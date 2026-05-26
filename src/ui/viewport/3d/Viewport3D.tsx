@@ -35,6 +35,10 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ensureBvhSetup } from './bvhSetup';
+
+// Engage BVH prototype patch once at module load — idempotent, safe under StrictMode.
+ensureBvhSetup();
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   OrbitControls,

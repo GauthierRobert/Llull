@@ -583,6 +583,24 @@ describe('measure commands', () => {
       expect(d.volume).toBeCloseTo(3, 10);
     });
 
+    it('N1 torus volume: R=4, r=0.5 → 2π²·R·r² = 2π²·4·0.25 = 2π²', () => {
+      // Uses non-trivial values (r=0.5 so r²=0.25) to catch any formula that
+      // relies on r²=1 (the r=1 case masks a missing square).
+      // Expected = 2 * π² * 4 * 0.5² = 2 * π² * 4 * 0.25 = 2π² ≈ 19.7392
+      let doc = createEmptyDocument();
+      const created = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 0.5 });
+      doc = created.document;
+      const id = created.affected[0]!;
+
+      const result = execute(doc, 'measure_volume', { entityId: id });
+      expect(result.affected).toEqual([]);
+      expect(result.document).toBe(doc);
+      const d = result.data as { volume: number; unit: string };
+      const expected = 2 * Math.PI ** 2 * 4 * 0.25; // 2π²
+      expect(d.volume).toBeCloseTo(expected, 5);
+      expect(d.unit).toBe('mm³');
+    });
+
     it('failure: missing entity id', () => {
       const doc = createEmptyDocument();
       const result = execute(doc, 'measure_volume', { entityId: 'ghost' });
