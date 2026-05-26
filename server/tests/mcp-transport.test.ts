@@ -365,6 +365,87 @@ describe('MCP tools/call + REST /undo interop', () => {
 });
 
 // ---------------------------------------------------------------------------
+// (g) tools/call render_view → image block present, no raw SVG in any text block
+// ---------------------------------------------------------------------------
+
+describe('MCP tools/call — render_view (SVG stripping)', () => {
+  it('response contains an image block', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    // Add a box so the render has something to draw.
+    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+
+    const result = await mcpCallTool(sessionId, 'render_view', {});
+
+    const imageBlocks = result.content.filter((b) => b.type === 'image');
+    expect(imageBlocks.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('no text block contains raw SVG markup (<svg or <polygon)', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+
+    const result = await mcpCallTool(sessionId, 'render_view', {});
+
+    const textBlocks = result.content.filter((b) => b.type === 'text');
+    for (const block of textBlocks) {
+      expect(block.text ?? '').not.toMatch(/<svg/i);
+      expect(block.text ?? '').not.toMatch(/<polygon/i);
+    }
+  });
+
+  it('json metadata block still contains useful fields (not svg)', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+
+    const result = await mcpCallTool(sessionId, 'render_view', {});
+
+    const jsonBlock = result.content.find((b) => b.text?.startsWith('```json'));
+    expect(jsonBlock).toBeDefined();
+    // Metadata fields that agents actually use must be present.
+    expect(jsonBlock!.text).toMatch(/"width"/);
+    expect(jsonBlock!.text).toMatch(/"height"/);
+    // The raw svg key must not appear.
+    expect(jsonBlock!.text).not.toMatch(/"svg"/);
+  });
+
+  it('structuredContent does not contain svg key', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+
+    const result = await mcpCallTool(sessionId, 'render_view', {});
+
+    if (result.structuredContent !== undefined) {
+      expect('svg' in result.structuredContent).toBe(false);
+    }
+  });
+
+  it('normal mutation (add_box) still works unchanged — regression', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    const result = await mcpCallTool(sessionId, 'add_box', {
+      size: [1, 1, 1],
+      position: [0, 0, 0],
+    });
+
+    expect(result.isError).toBeFalsy();
+    // No image block for non-SVG results.
+    expect(result.content.filter((b) => b.type === 'image')).toHaveLength(0);
+    // Summary and affected blocks present.
+    expect(result.content[0]!.type).toBe('text');
+    expect(result.content.some((b) => b.text?.startsWith('Affected entity ids:'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // (f) Unknown tool name → isError:true
 // ---------------------------------------------------------------------------
 
