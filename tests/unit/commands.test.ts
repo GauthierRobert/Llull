@@ -4611,7 +4611,6 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('add_box ignores wrong-length rotation array and still creates the entity', () => {
     const doc = createEmptyDocument();
-    // @ts-expect-error intentional wrong-length for test
     const result = execute(doc, 'add_box', { size: [2, 2, 2], rotation: [0.5, 0.5] });
     expect(result.affected).toHaveLength(1);
     const id = result.affected[0]!;
@@ -4641,7 +4640,6 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('add_cylinder ignores malformed rotation and still creates the entity', () => {
     const doc = createEmptyDocument();
-    // @ts-expect-error intentional non-array for test
     const result = execute(doc, 'add_cylinder', { radius: 1, height: 2, rotation: 'bad' });
     expect(result.affected).toHaveLength(1);
     expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
@@ -4686,7 +4684,6 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('add_cone ignores malformed rotation (wrong length) and still creates entity', () => {
     const doc = createEmptyDocument();
-    // @ts-expect-error intentional for test
     const result = execute(doc, 'add_cone', { radius: 2, height: 5, rotation: [0, 0, 0, 0] });
     expect(result.affected).toHaveLength(1);
     expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
@@ -4731,7 +4728,6 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('add_wedge ignores malformed rotation (non-array) and still creates entity', () => {
     const doc = createEmptyDocument();
-    // @ts-expect-error intentional for test
     const result = execute(doc, 'add_wedge', { size: [2, 2, 2], rotation: null });
     expect(result.affected).toHaveLength(1);
     expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
@@ -4790,7 +4786,6 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('extrude_profile ignores malformed rotation and still creates entity', () => {
     const doc = createEmptyDocument();
-    // @ts-expect-error intentional for test
     const result = execute(doc, 'extrude_profile', {
       profile: [[0, 0], [2, 0], [1, 2]],
       depth: 3,
@@ -4807,5 +4802,24 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
       depth: 4,
     });
     expect(result.summary).toContain('world AABB');
+  });
+
+  it('extrude_profile no-ops on a profile with fewer than 3 points', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'extrude_profile', { profile: [[0, 0], [1, 0]], depth: 4 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toMatch(/at least 3/i);
+  });
+
+  it('extrude_profile no-ops on non-positive depth', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'extrude_profile', {
+      profile: [[0, 0], [2, 0], [1, 2]],
+      depth: 0,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toMatch(/> 0/);
   });
 });

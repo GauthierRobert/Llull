@@ -176,6 +176,20 @@ export const extrude: CommandDefinition<ExtrudeParams> = {
     required: ['profile', 'depth'],
   },
   run: (doc, { profile, depth, position = [0, 0, 0], rotation, color = '#c8553d' }): CommandResult => {
+    if (!Array.isArray(profile) || profile.length < 3) {
+      return {
+        document: doc,
+        summary: `extrude_profile: profile must be an array of at least 3 [x,y] points; no-op.`,
+        affected: [],
+      };
+    }
+    if (!Number.isFinite(depth) || depth <= 0) {
+      return {
+        document: doc,
+        summary: `extrude_profile: depth must be a finite number > 0 (got ${String(depth)}); no-op.`,
+        affected: [],
+      };
+    }
     const id = nextId('ext');
     const entity: Entity = {
       id,
