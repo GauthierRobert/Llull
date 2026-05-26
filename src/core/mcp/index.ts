@@ -22,3 +22,8 @@ export type {
   McpPromptResult,
 } from './prompts';
 export { listMcpPrompts, getMcpPrompt } from './prompts';
+
+export type { UiBridge } from './uiBridge';
+
+export type { BridgeToolResult } from './bridgeTools';
+export { buildBridgeToolDefinitions, applyBridgeToolCall } from './bridgeTools';

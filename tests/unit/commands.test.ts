@@ -2439,4 +2439,371 @@ describe('add_dimension', () => {
     const danglingIssues = data.issues.filter((i) => i.code === 'dangling_dimension_ref');
     expect(danglingIssues).toHaveLength(0);
   });
+
+  // ── Feature history (Q3) ──────────────────────────────────────────────────
+
+  it('featureHistory — fresh document has empty featureHistory', () => {
+    const doc = createEmptyDocument();
+    expect(doc.featureHistory).toEqual([]);
+  });
+
+  it('featureHistory — add_box appends one step to featureHistory', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_box', { size: [2, 2, 2] });
+    expect(result.document.featureHistory).toHaveLength(1);
+    expect(result.document.featureHistory[0]!.name).toBe('add_box');
+    expect(result.document.featureHistory[0]!.suppressed).toBe(false);
+  });
+
+  it('featureHistory — two add_box calls produce two steps', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    expect(doc.featureHistory).toHaveLength(2);
+    expect(doc.featureHistory[0]!.name).toBe('add_box');
+    expect(doc.featureHistory[1]!.name).toBe('add_box');
+  });
+
+  it('featureHistory — failed command (no-op) does NOT append a step', () => {
+    const doc = createEmptyDocument();
+    // move_entity on missing id returns same doc ref => no step
+    const result = execute(doc, 'move_entity', { id: 'ghost', delta: [1, 0, 0] });
+    expect(result.document.featureHistory).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('featureHistory — read-only command (measure_distance) does NOT append a step', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_box', { size: [1, 1, 1], position: [5, 0, 0] });
+    doc = r2.document;
+    const stepsBefore = doc.featureHistory.length;
+    const id1 = r1.affected[0]!;
+    const id2 = r2.affected[0]!;
+    const measured = execute(doc, 'measure_distance', { fromId: id1, toId: id2 });
+    // measure_distance is readOnly — doc ref must be the same, no new step
+    expect(measured.document).toBe(doc);
+    expect(measured.document.featureHistory).toHaveLength(stepsBefore);
+  });
+
+  it('featureHistory — input document is never mutated (purity)', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_box', { size: [1, 1, 1] });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── replay_history ────────────────────────────────────────────────────────
+
+  it('replay_history — empty history returns doc unchanged with summary', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'replay_history', {});
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('empty');
+  });
+
+  it('replay_history — replaying two add_box steps regenerates both entities', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    expect(doc.featureHistory).toHaveLength(2);
+
+    const replayed = execute(doc, 'replay_history', {});
+    expect(Object.keys(replayed.document.entities)).toHaveLength(2);
+    expect(replayed.document.featureHistory).toHaveLength(2);
+    expect(replayed.summary).toContain('2 step');
+  });
+
+  it('replay_history — meta-command does NOT append a featureHistory step', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const stepsBefore = doc.featureHistory.length;
+    const result = execute(doc, 'replay_history', {});
+    // replay_history is metaHistory — must not grow the list
+    expect(result.document.featureHistory).toHaveLength(stepsBefore);
+  });
+
+  // ── set_step_suppressed ───────────────────────────────────────────────────
+
+  it('set_step_suppressed — suppressing step 0 removes that entity from regenerated doc', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    expect(doc.featureHistory).toHaveLength(2);
+
+    const step0Id = doc.featureHistory[0]!.id;
+    const result = execute(doc, 'set_step_suppressed', { stepId: step0Id, suppressed: true });
+
+    // Second box still exists; first is gone.
+    expect(Object.keys(result.document.entities)).toHaveLength(1);
+    expect(result.document.featureHistory[0]!.suppressed).toBe(true);
+    expect(result.document.featureHistory).toHaveLength(2);
+  });
+
+  it('set_step_suppressed — un-suppressing restores the entity', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [3, 3, 3] }).document;
+    const stepId = doc.featureHistory[0]!.id;
+
+    // Suppress then un-suppress.
+    doc = execute(doc, 'set_step_suppressed', { stepId, suppressed: true }).document;
+    expect(Object.keys(doc.entities)).toHaveLength(0);
+
+    const restored = execute(doc, 'set_step_suppressed', { stepId, suppressed: false });
+    expect(Object.keys(restored.document.entities)).toHaveLength(1);
+    expect(restored.document.featureHistory[0]!.suppressed).toBe(false);
+  });
+
+  it('set_step_suppressed — unknown stepId is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_step_suppressed', { stepId: 'ghost', suppressed: true });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('set_step_suppressed — meta-command does NOT append a featureHistory step', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const stepId = doc.featureHistory[0]!.id;
+    const stepsBefore = doc.featureHistory.length;
+    const result = execute(doc, 'set_step_suppressed', { stepId, suppressed: true });
+    expect(result.document.featureHistory).toHaveLength(stepsBefore);
+  });
+
+  // ── edit_step_params ──────────────────────────────────────────────────────
+
+  it('edit_step_params — changing size of box step regenerates with new size', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const stepId = doc.featureHistory[0]!.id;
+
+    const result = execute(doc, 'edit_step_params', {
+      stepId,
+      params: { size: [20, 20, 20] },
+    });
+
+    expect(Object.keys(result.document.entities)).toHaveLength(1);
+    const entityId = result.document.order[0]!;
+    const entity = result.document.entities[entityId]!;
+    // @ts-expect-error narrowing not needed in test
+    expect(entity.size).toEqual([20, 20, 20]);
+    expect(result.document.featureHistory[0]!.params).toEqual({ size: [20, 20, 20] });
+  });
+
+  it('edit_step_params — unknown stepId is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'edit_step_params', { stepId: 'ghost', params: {} });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('edit_step_params — meta-command does NOT append a featureHistory step', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const stepId = doc.featureHistory[0]!.id;
+    const stepsBefore = doc.featureHistory.length;
+    const result = execute(doc, 'edit_step_params', { stepId, params: { size: [5, 5, 5] } });
+    expect(result.document.featureHistory).toHaveLength(stepsBefore);
+  });
+
+  // ── reorder_step ──────────────────────────────────────────────────────────
+
+  it('reorder_step — moves step from index 0 to index 1 and regenerates', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_cylinder', { radius: 2, height: 4 }).document;
+    expect(doc.featureHistory).toHaveLength(2);
+
+    const step0Id = doc.featureHistory[0]!.id;
+    const step1Id = doc.featureHistory[1]!.id;
+
+    const result = execute(doc, 'reorder_step', { stepId: step0Id, newIndex: 1 });
+    // After reorder: step1 is now first, step0 is second.
+    expect(result.document.featureHistory[0]!.id).toBe(step1Id);
+    expect(result.document.featureHistory[1]!.id).toBe(step0Id);
+    expect(Object.keys(result.document.entities)).toHaveLength(2);
+  });
+
+  it('reorder_step — moving to same index is a no-op returning same doc ref', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const stepId = doc.featureHistory[0]!.id;
+    const result = execute(doc, 'reorder_step', { stepId, newIndex: 0 });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+  });
+
+  it('reorder_step — unknown stepId is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'reorder_step', { stepId: 'ghost', newIndex: 0 });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('reorder_step — meta-command does NOT append a featureHistory step', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    const stepId = doc.featureHistory[0]!.id;
+    const stepsBefore = doc.featureHistory.length;
+    const result = execute(doc, 'reorder_step', { stepId, newIndex: 1 });
+    expect(result.document.featureHistory).toHaveLength(stepsBefore);
+  });
+
+  // ── delete_step ───────────────────────────────────────────────────────────
+
+  it('delete_step — removes a step and regenerates without that entity', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    const step0Id = doc.featureHistory[0]!.id;
+
+    const result = execute(doc, 'delete_step', { stepId: step0Id });
+    expect(result.document.featureHistory).toHaveLength(1);
+    expect(Object.keys(result.document.entities)).toHaveLength(1);
+    expect(result.summary).toContain(step0Id);
+  });
+
+  it('delete_step — unknown stepId is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'delete_step', { stepId: 'ghost' });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('delete_step — meta-command does NOT append a featureHistory step', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    const stepId = doc.featureHistory[0]!.id;
+    const result = execute(doc, 'delete_step', { stepId });
+    // After deleting step 0 we have 1 step remaining — NOT 2 (no append from execute)
+    expect(result.document.featureHistory).toHaveLength(1);
+  });
+
+  // ── insert_step ───────────────────────────────────────────────────────────
+
+  it('insert_step — appends a new step when afterStepId omitted', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    expect(doc.featureHistory).toHaveLength(1);
+
+    const result = execute(doc, 'insert_step', {
+      name: 'add_box',
+      params: { size: [5, 5, 5] },
+    });
+    expect(result.document.featureHistory).toHaveLength(2);
+    expect(Object.keys(result.document.entities)).toHaveLength(2);
+  });
+
+  it('insert_step — inserts after a specific step', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    const step0Id = doc.featureHistory[0]!.id;
+
+    const result = execute(doc, 'insert_step', {
+      afterStepId: step0Id,
+      name: 'add_sphere',
+      params: { radius: 3 },
+    });
+    // History: [step0, newSphere, step1]
+    expect(result.document.featureHistory).toHaveLength(3);
+    expect(result.document.featureHistory[1]!.name).toBe('add_sphere');
+    expect(Object.keys(result.document.entities)).toHaveLength(3);
+  });
+
+  it('insert_step — unknown afterStepId is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'insert_step', {
+      afterStepId: 'ghost',
+      name: 'add_box',
+      params: { size: [1, 1, 1] },
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('insert_step — unknown command name is stored but skipped during replay', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'insert_step', {
+      name: 'nonexistent_command_xyz',
+      params: {},
+    });
+    // Step is inserted but replay skips it — no entity created
+    expect(result.document.featureHistory).toHaveLength(1);
+    expect(result.document.featureHistory[0]!.name).toBe('nonexistent_command_xyz');
+    expect(Object.keys(result.document.entities)).toHaveLength(0);
+  });
+
+  it('insert_step — meta-command does NOT append a featureHistory step', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const stepsBefore = doc.featureHistory.length;
+    const result = execute(doc, 'insert_step', {
+      name: 'add_box',
+      params: { size: [2, 2, 2] },
+    });
+    // insert_step adds exactly 1 step (the inserted one), not 2 (no execute-append)
+    expect(result.document.featureHistory).toHaveLength(stepsBefore + 1);
+  });
+
+  // ── integration: suppressed step + downstream move ────────────────────────
+
+  it('featureHistory — move referencing suppressed entity does not throw', () => {
+    let doc = createEmptyDocument();
+    // Step 0: create a box
+    doc = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] }).document;
+    const boxEntityId = doc.order[0]!;
+    // Step 1: move that box
+    doc = execute(doc, 'move_entity', { id: boxEntityId, delta: [5, 0, 0] }).document;
+    expect(doc.featureHistory).toHaveLength(2);
+
+    // Now suppress step 0 — box is no longer created, move becomes a no-op
+    const step0Id = doc.featureHistory[0]!.id;
+    const result = execute(doc, 'set_step_suppressed', { stepId: step0Id, suppressed: true });
+
+    // Should not throw; no entities in document (move silently no-ops)
+    expect(() => result).not.toThrow();
+    expect(Object.keys(result.document.entities)).toHaveLength(0);
+  });
+
+  // ── persistence: featureHistory round-trips through serializeDocument ─────
+
+  it('featureHistory — round-trips through serializeDocument / deserializeDocument', async () => {
+    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [3, 3, 3] }).document;
+    const json = serializeDocument(doc);
+    const loaded = deserializeDocument(json);
+    expect(loaded.featureHistory).toHaveLength(1);
+    expect(loaded.featureHistory[0]!.name).toBe('add_box');
+  });
+
+  it('featureHistory — deserializeDocument defaults to [] when featureHistory absent', async () => {
+    const { deserializeDocument } = await import('@core/commands/persistence');
+    // Simulate an old doc that has no featureHistory field.
+    const oldDoc = {
+      format: 'llull-document',
+      version: 1,
+      document: {
+        entities: {},
+        order: [],
+        layers: { 'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false } },
+        layerOrder: ['layer-default'],
+        selection: [],
+        camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
+        // featureHistory intentionally absent
+      },
+    };
+    const loaded = deserializeDocument(JSON.stringify(oldDoc));
+    expect(loaded.featureHistory).toEqual([]);
+  });
 });

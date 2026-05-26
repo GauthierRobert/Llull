@@ -56,7 +56,7 @@ function Entity2DRenderer({
     case 'text':
       return <TextRenderer2D entity={entity} selected={selected} />;
     case 'dimension':
-      return <DimensionRenderer2D entity={entity} document={document} selected={selected} />;
+      return <DimensionRenderer2D entity={entity} doc={document} selected={selected} />;
     // 3D solid kinds are intentionally not rendered here.
     default:
       return null;

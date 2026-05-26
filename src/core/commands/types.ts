@@ -58,6 +58,12 @@ export interface CommandAnnotations {
    * Maps to MCP `annotations.idempotentHint`.
    */
   readonly idempotent?: boolean;
+  /**
+   * When true: this command edits the featureHistory list itself (or wholesale replaces the
+   * document) and must NOT cause `execute()` to append a new FeatureStep to the result.
+   * Used by history meta-commands and `load_document`. Not emitted to MCP tool schemas.
+   */
+  readonly metaHistory?: boolean;
 }
 
 /**

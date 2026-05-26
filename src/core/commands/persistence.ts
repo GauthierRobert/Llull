@@ -11,6 +11,7 @@ import type {
   CadDocument,
   DocumentUnit,
   Entity,
+  FeatureStep,
   Layer,
   CameraState,
   Vec3,
@@ -186,8 +187,12 @@ export function deserializeDocument(json: string): CadDocument {
   const animations: Record<string, Animation> = isRecord(doc.animations)
     ? (doc.animations as Record<string, Animation>)
     : {};
+  // Back-compat: older saved docs lack featureHistory — default to empty.
+  const featureHistory: FeatureStep[] = Array.isArray(doc.featureHistory)
+    ? (doc.featureHistory as FeatureStep[])
+    : [];
 
-  return { ...doc, units, displayPrecision, parameters, animations };
+  return { ...doc, units, displayPrecision, parameters, animations, featureHistory };
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +209,7 @@ export const loadDocument: CommandDefinition<LoadDocumentParams> = {
     'Replace the current document with one parsed from a serialized JSON string ' +
     'produced by serializeDocument (envelope format: llull-document v1). ' +
     'On parse or validation failure the document is left unchanged.',
+  annotations: { metaHistory: true, idempotent: true },
   paramsSchema: {
     type: 'object',
     properties: {

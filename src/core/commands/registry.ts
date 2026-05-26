@@ -8,8 +8,9 @@
  *   - the MCP server (same schemas, served over the wire)
  */
 
-import type { CadDocument } from '../model/types';
+import type { CadDocument, FeatureStep } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { nextId } from '../../lib/id';
 import { addBox, addCylinder, addSphere, addCone, addTorus, addWedge, addPyramid, extrude, move, deleteEntity } from './geometry';
 import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
 import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint, drawEllipse, drawSpline } from './draw2d';
@@ -28,6 +29,7 @@ import { renderView } from './render';
 import { makeTubeBetween } from './composite';
 import { addText, addDimension } from './annotate';
 import { filletEdge, chamferEdge } from './modify3d';
+import { historyCommands, setRegistryRef } from './history';
 import {
   explodePolyline,
   offset2D,
@@ -124,11 +126,16 @@ const definitions = [
   addDimension,
   filletEdge,
   chamferEdge,
+  ...historyCommands,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
   definitions.map((d) => [d.name, d]),
 );
+
+// Wire up the late-bound reference so history.ts can call getCommand without
+// a circular import at module load time.
+setRegistryRef((name) => byName.get(name));
 
 export function listCommands(): ReadonlyArray<CommandDefinition<unknown>> {
   return definitions;
@@ -142,6 +149,16 @@ export function getCommand(name: string): CommandDefinition<unknown> | undefined
  * The single entry point every surface calls. Validates the command exists,
  * runs it, and returns the result. This is the choke point where you'd add
  * logging, undo-stack push, permission checks, etc.
+ *
+ * Feature history append rules (architecture L8):
+ * - If the command is read-only (`annotations.readOnly`) it returns the same
+ *   doc reference — no step is appended.
+ * - If the command is a history meta-command (`annotations.metaHistory`) it
+ *   edits the history list itself — appending would cause infinite recursion,
+ *   so no step is appended.
+ * - Otherwise, when the returned document reference differs from the input
+ *   (i.e. the command actually mutated the document), a FeatureStep is
+ *   appended to the new document's featureHistory.
  */
 export function execute(
   doc: CadDocument,
@@ -152,7 +169,35 @@ export function execute(
   if (!def) {
     return { document: doc, summary: `Unknown command: ${commandName}`, affected: [] };
   }
-  return def.run(doc, params);
+  const result = def.run(doc, params);
+
+  // Skip history append for read-only queries and history meta-commands.
+  const ann = def.annotations;
+  const isReadOnly = ann?.readOnly === true;
+  const isMetaHistory = ann?.metaHistory === true;
+  if (isReadOnly || isMetaHistory) {
+    return result;
+  }
+
+  // Only append when the document actually changed (pure mutation detection).
+  if (result.document === doc) {
+    return result;
+  }
+
+  const step: FeatureStep = {
+    id: nextId('step'),
+    name: commandName,
+    params,
+    suppressed: false,
+  };
+
+  return {
+    ...result,
+    document: {
+      ...result.document,
+      featureHistory: [...result.document.featureHistory, step],
+    },
+  };
 }
 
 /** Generate AI/MCP tool schemas from the registry. */

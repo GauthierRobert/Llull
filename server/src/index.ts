@@ -20,6 +20,8 @@
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { buildMcpRouter } from './mcp';
+import { buildUiBridgeRouter } from './uiBridgeRouter';
+import { inMemoryBridge } from './uiBridge';
 import { subscribeLive } from './liveDocument';
 import { applyCommand, undo, redo } from './commandBus';
 
@@ -168,9 +170,13 @@ app.post('/redo', (_req: Request, res: Response) => {
   res.status(200).json(redo());
 });
 
+// UI↔MCP live-sync bridge routes — guarded by the same bearer auth as /mcp.
+// See server/src/uiBridgeRouter.ts for the implementation.
+app.use('/ui-bridge', buildUiBridgeRouter());
+
 // MCP endpoint — Streamable HTTP, guarded by bearer auth + rate limiting.
 // See server/src/mcp.ts for the implementation.
-app.use('/mcp', buildMcpRouter());
+app.use('/mcp', buildMcpRouter(inMemoryBridge));
 
 // ---------------------------------------------------------------------------
 // Start

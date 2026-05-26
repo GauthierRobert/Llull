@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
-    "agent:example": "tsx examples/mcp-agent.ts"
+    "agent:example": "tsx examples/mcp-agent.ts",
+    "verify:ui-bridge": "tsx examples/verify-ui-bridge.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

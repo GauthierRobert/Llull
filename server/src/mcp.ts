@@ -50,9 +50,12 @@ import {
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
+  buildBridgeToolDefinitions,
+  applyBridgeToolCall,
 } from '@core/mcp';
+import type { UiBridge } from '@core/mcp';
 import type { CadDocument } from '@core/model/types';
-import { getLiveDoc } from './liveDocument';
+import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
 import { buildImageBlock, stripSvgFromData, rasterizeSvg } from './renderImage';
 import {
@@ -417,16 +420,26 @@ function r2Public(n: number): number {
  * Mutations route through `commandBus.applyCommand` so every tools/call shares
  * the same undo/redo history as REST /command calls from the browser UI.
  *
- * @param getDoc - returns the current document (used for resources/read)
+ * Each session maintains its own working document for bridge operations:
+ *   snapshot_in_from_ui replaces the session working doc from the UI bridge.
+ *   snapshot_out_to_ui  stages the session working doc to the UI bridge.
+ *
+ * @param getDoc - returns the current shared document (used for resources/read)
+ * @param bridge - the injected UiBridge for UI↔session sync tools
  */
-function buildMcpServer(getDoc: () => CadDocument): Server {
+function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
+  // Session-level working document for bridge operations.
+  // Starts as the shared live doc; snapshot_in_from_ui can replace it.
+  let sessionDoc: CadDocument = getDoc();
+
   // tools/list — return the full registry as MCP tool definitions,
-  // with render_view augmented to advertise the server-side enrichment params.
+  // with render_view augmented to advertise the server-side enrichment params,
+  // plus the two UI bridge tools appended.
   server.setRequestHandler(ListToolsRequestSchema, () => {
     const tools = buildMcpTools().map((t) => {
       if (t.name === 'render_view') {
@@ -499,14 +512,46 @@ function buildMcpServer(getDoc: () => CadDocument): Server {
         },
       };
     });
-    return { tools };
+
+    // Append the two bridge tools (not in the core registry — bridge-level only).
+    const bridgeTools = buildBridgeToolDefinitions().map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema as {
+        type: 'object';
+        properties?: Record<string, object>;
+        required?: string[];
+      },
+      annotations: t.annotations,
+    }));
+
+    return { tools: [...tools, ...bridgeTools] };
   });
 
   // tools/call — route through commandBus so MCP edits share history + broadcast,
   // then shape the result into MCP content blocks via the single implementation
   // in core/mcp (shapeToolCallContent).  execute() runs exactly once (in the bus).
-  server.setRequestHandler(CallToolRequestSchema, (req): CallToolResult => {
+  server.setRequestHandler(CallToolRequestSchema, async (req): Promise<CallToolResult> => {
     const { name, arguments: args } = req.params;
+
+    // -----------------------------------------------------------------------
+    // Bridge tool intercept — snapshot_in_from_ui / snapshot_out_to_ui
+    // -----------------------------------------------------------------------
+    // These tools operate on the per-session working document (sessionDoc) and
+    // are NOT routed through the shared command bus — they are bridge-level only.
+    const bridgeResult = await applyBridgeToolCall(sessionDoc, name, bridge);
+    if (bridgeResult !== null) {
+      // snapshot_in_from_ui: update sessionDoc with the UI doc (and also the
+      // shared live doc so other sessions and the SSE stream see the new state).
+      if (name === 'snapshot_in_from_ui' && bridgeResult.document !== sessionDoc) {
+        sessionDoc = bridgeResult.document;
+        setLiveDoc(sessionDoc);
+      }
+      // snapshot_out_to_ui does not change sessionDoc (it only stages a copy).
+      // Double cast: BridgeToolResult lacks the SDK's index signature — same
+      // pattern as shapeToolCallContent casts throughout this file.
+      return bridgeResult as unknown as CallToolResult;
+    }
 
     // -----------------------------------------------------------------------
     // render_view enrichment intercept
@@ -530,6 +575,11 @@ function buildMcpServer(getDoc: () => CadDocument): Server {
     // history/broadcast (result.data !== undefined, same logic as the UI store).
     const coreArgs = name === 'render_view' ? stripEnrichParams(args ?? {}) : (args ?? {});
     const busResult = applyCommand(name, coreArgs);
+
+    // Keep sessionDoc in sync with the shared live doc after mutations.
+    if (busResult.affected.length > 0) {
+      sessionDoc = getLiveDoc();
+    }
 
     // Vision loop: rasterize data.svg → PNG image block (if present).
     // Failure is silent (buildImageBlock returns null) so a broken SVG never 500s
@@ -626,7 +676,7 @@ function buildMcpServer(getDoc: () => CadDocument): Server {
  *   (client `close()`, dropped socket, crash) → also removes from `sessions`,
  *   preventing unbounded Map growth from clients that never send DELETE.
  */
-function allocateSession(): { transport: StreamableHTTPServerTransport; server: Server } {
+function allocateSession(bridge: UiBridge): { transport: StreamableHTTPServerTransport; server: Server } {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
 
@@ -648,9 +698,9 @@ function allocateSession(): { transport: StreamableHTTPServerTransport; server: 
     if (transport.sessionId) sessions.delete(transport.sessionId);
   };
 
-  // Wire the shared live document read accessor.
+  // Wire the shared live document read accessor and the UI bridge.
   // Mutations route through commandBus.applyCommand (not setLiveDoc directly).
-  const server = buildMcpServer(getLiveDoc);
+  const server = buildMcpServer(getLiveDoc, bridge);
 
   return { transport, server };
 }
@@ -663,7 +713,7 @@ function allocateSession(): { transport: StreamableHTTPServerTransport; server: 
  * Build and return the Express Router that mounts the MCP endpoint.
  *
  * Mount in `index.ts` with:
- *   `app.use('/mcp', buildMcpRouter());`
+ *   `app.use('/mcp', buildMcpRouter(bridge));`
  *
  * Exposed routes:
  *   POST   /mcp  — MCP Streamable HTTP (initialize + tools/list + tools/call)
@@ -676,8 +726,10 @@ function allocateSession(): { transport: StreamableHTTPServerTransport; server: 
  *   3. DELETE with `mcp-session-id` → SDK calls onsessionclosed → session removed.
  *   4. GET/DELETE without `mcp-session-id` header → 400 (header required).
  *   5. Any request with an unknown session id → 404.
+ *
+ * @param bridge - the UI↔MCP bridge injected at server startup.
  */
-export function buildMcpRouter(): Router {
+export function buildMcpRouter(bridge: UiBridge): Router {
   // Start the background idle-TTL sweep (no-op if already running).
   startSessionSweep();
 
@@ -734,7 +786,7 @@ export function buildMcpRouter(): Router {
       if (handled) return;
 
       // No session id → this is an `initialize` request; allocate a new session.
-      const { transport, server } = allocateSession();
+      const { transport, server } = allocateSession(bridge);
 
       try {
         await server.connect(transport as Transport);

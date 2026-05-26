@@ -49,7 +49,7 @@ const TEXT_HEIGHT = 0.5;
 
 export interface DimensionRenderer2DProps {
   entity: DimensionEntity;
-  document: CadDocument;
+  doc: CadDocument;
   selected: boolean;
 }
 
@@ -132,26 +132,14 @@ function buildLinearGeometry(
     dimBx = bx + perpX * offset;
     dimBy = by + perpY * offset;
   } else {
-    // Linear: horizontal distance; dimension line is horizontal, offset vertically.
-    perpX = 0;
-    perpY = 1;
-    const signedOffset = ay < by ? -offset : offset;
-    const baseY = Math.max(ay, by) + Math.abs(offset);
-    dimAy = baseY;
-    dimBy = baseY;
-    dimAx = ax;
-    dimBx = bx;
-    // perpendicular for extension lines
-    perpX = 0;
-    perpY = signedOffset >= 0 ? 1 : -1;
-    // Recompute: offset from whichever ref is higher
+    // Linear: horizontal distance; dimension line is horizontal, offset vertically above the higher ref.
     const topY = Math.max(ay, by);
-    dimAy = topY + offset;
-    dimBy = topY + offset;
-    dimAx = ax;
-    dimBx = bx;
     perpX = 0;
     perpY = 1;
+    dimAx = ax;
+    dimAy = topY + offset;
+    dimBx = bx;
+    dimBy = topY + offset;
   }
 
   const group = new THREE.Group();
@@ -285,7 +273,7 @@ function disposeGroup(group: THREE.Group | null): void {
 
 export function DimensionRenderer2D({
   entity,
-  document: doc,
+  doc,
   selected,
 }: DimensionRenderer2DProps): React.ReactElement | null {
   const { dimensionKind, entityIds, offset: rawOffset, precision, label, color, position } = entity;
@@ -342,7 +330,6 @@ export function DimensionRenderer2D({
     }
 
     return { group, value, textX, textY };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimensionKind, refs, offset, dimColor]);
 
   useEffect(() => {
@@ -351,6 +338,8 @@ export function DimensionRenderer2D({
 
   // ---------------------------------------------------------------------------
   // Radial
+  // @invariant entity.offset is interpreted as an angle in radians (0, 2π) here,
+  //            not as a perpendicular distance — unlike the linear/aligned branches.
   // ---------------------------------------------------------------------------
   const radialData = useMemo(() => {
     if (dimensionKind !== 'radial') return null;
@@ -387,7 +376,6 @@ export function DimensionRenderer2D({
 
     const group = buildRadialGeometry(cx, cy, radius, offset, dimColor);
     return { group, value: radius, textX, textY };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimensionKind, refs, offset, dimColor]);
 
   useEffect(() => {
@@ -440,7 +428,6 @@ export function DimensionRenderer2D({
 
     const group = buildAngularGeometry(vx, vy, ax, ay, bx, by, offset, dimColor);
     return { group, value: angleDeg, textX, textY };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimensionKind, refs, offset, dimColor]);
 
   useEffect(() => {
