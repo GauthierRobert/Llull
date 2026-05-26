@@ -44,6 +44,19 @@ interface UseMaterialPropsInput {
   metalness?: number;
   /** Base envMapIntensity for the material. */
   envMapIntensity?: number;
+  /**
+   * Optional PBR overrides from an assigned document material (VNF4).
+   * When provided, replaces color/roughness/metalness for the shaded display mode.
+   * Wireframe and x-ray modes ignore these to preserve their visual intent.
+   */
+  pbrOverride?: {
+    /** Material diffuse/albedo color (hex). */
+    color: string;
+    /** PBR metalness in [0,1]. */
+    metalness: number;
+    /** PBR roughness in [0,1]. */
+    roughness: number;
+  };
 }
 
 /**
@@ -58,6 +71,7 @@ export function useMaterialProps({
   roughness = 0.45,
   metalness = 0.08,
   envMapIntensity = 0.8,
+  pbrOverride,
 }: UseMaterialPropsInput): MaterialProps {
   const displayMode: DisplayMode = useViewportStore((s) => s.displayMode);
 
@@ -67,6 +81,7 @@ export function useMaterialProps({
 
     switch (displayMode) {
       case 'wireframe':
+        // Wireframe ignores PBR material override — keep uniform appearance.
         return {
           color,
           emissive,
@@ -82,6 +97,7 @@ export function useMaterialProps({
         };
 
       case 'xray':
+        // X-ray ignores PBR material override — keep transparent appearance.
         return {
           color,
           emissive: '#4a9eff',
@@ -97,13 +113,18 @@ export function useMaterialProps({
         };
 
       case 'shaded':
-      default:
+      default: {
+        // In shaded mode, PBR override wins for base color/roughness/metalness.
+        // Selection highlight (emissive) still wins on top of any material color.
+        const shadedColor = pbrOverride ? pbrOverride.color : color;
+        const shadedRoughness = pbrOverride ? pbrOverride.roughness : roughness;
+        const shadedMetalness = pbrOverride ? pbrOverride.metalness : metalness;
         return {
-          color,
+          color: shadedColor,
           emissive,
           emissiveIntensity,
-          roughness,
-          metalness,
+          roughness: shadedRoughness,
+          metalness: shadedMetalness,
           envMapIntensity,
           wireframe: false,
           transparent: false,
@@ -111,6 +132,7 @@ export function useMaterialProps({
           depthWrite: true,
           side: THREE.FrontSide,
         };
+      }
     }
   }, [
     displayMode,
@@ -119,5 +141,6 @@ export function useMaterialProps({
     roughness,
     metalness,
     envMapIntensity,
+    pbrOverride,
   ]);
 }

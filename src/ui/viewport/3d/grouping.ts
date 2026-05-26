@@ -13,7 +13,7 @@
  * @pure — all exports are pure functions; no React, no DOM, no side effects.
  */
 
-import type { Entity, EntityId } from '@core/model/types';
+import type { Entity, EntityId, Material } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,6 +33,20 @@ export interface InstanceBatch {
    * The index of an entity in this array is its instanceId in the InstancedMesh.
    */
   entities: Entity[];
+  /**
+   * Optional PBR material override for this batch (VNF4).
+   * When set, the InstanceBatchMesh uses these values for its base
+   * roughness/metalness, and for instance colors in shaded mode.
+   * All entities in a batch share the same materialId (it is part of the key).
+   */
+  pbrMaterial?: {
+    /** Diffuse/albedo color (hex). Used as default instance color in shaded mode. */
+    color: string;
+    /** PBR metalness in [0,1]. Applied to the shared MeshStandardMaterial. */
+    metalness: number;
+    /** PBR roughness in [0,1]. Applied to the shared MeshStandardMaterial. */
+    roughness: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -55,17 +69,20 @@ export interface InstanceBatch {
  */
 export function entityRenderKey(entity: Entity): string | null {
   const { color, layerId } = entity;
+  // materialId is part of the key so entities with different materials form separate
+  // batches — this ensures per-material PBR values can be applied at the batch level.
+  const matSuffix = entity.materialId ? `|mat:${entity.materialId}` : '';
   const n = (v: number): string => parseFloat(v.toPrecision(6)).toString();
 
   switch (entity.kind) {
     case 'box': {
       const [w, h, d] = entity.size;
-      return `box|${n(w)}|${n(h)}|${n(d)}|${color}|${layerId}`;
+      return `box|${n(w)}|${n(h)}|${n(d)}|${color}|${layerId}${matSuffix}`;
     }
     case 'cylinder':
-      return `cylinder|${n(entity.radius)}|${n(entity.height)}|${color}|${layerId}`;
+      return `cylinder|${n(entity.radius)}|${n(entity.height)}|${color}|${layerId}${matSuffix}`;
     case 'sphere':
-      return `sphere|${n(entity.radius)}|${color}|${layerId}`;
+      return `sphere|${n(entity.radius)}|${color}|${layerId}${matSuffix}`;
     default:
       // Not batchable in v1.
       return null;
@@ -91,13 +108,17 @@ export function isBatchable(entity: Entity): boolean {
  *   skip per-entity rendering for any entity claimed here.
  * - Entities within each batch are sorted by id (ascending, lexicographic)
  *   so that instanceId → entityId mapping is deterministic across re-renders.
+ * - `materials` is used to resolve per-batch PBR overrides (VNF4). Entities
+ *   with different materialIds have different batch keys so they never merge.
  *
  * @pure — no mutation, no side effects.
  * @param entities — flat array of entities to group (already filtered for visibility by the caller).
+ * @param materials — document material library; used to set `pbrMaterial` on each batch.
  * @returns Map from render key → InstanceBatch.
  */
 export function groupEntitiesForInstancing(
   entities: Entity[],
+  materials: Record<string, Material> = {},
 ): Map<string, InstanceBatch> {
   const map = new Map<string, InstanceBatch>();
 
@@ -109,11 +130,23 @@ export function groupEntitiesForInstancing(
     if (existing) {
       existing.entities.push(entity);
     } else {
-      map.set(key, {
-        key,
-        kind: entity.kind as BatchableKind,
-        entities: [entity],
-      });
+      // Resolve PBR material for this batch (all entities share the same materialId).
+      const mat = entity.materialId ? materials[entity.materialId] : undefined;
+
+      if (mat) {
+        map.set(key, {
+          key,
+          kind: entity.kind as BatchableKind,
+          entities: [entity],
+          pbrMaterial: { color: mat.color, metalness: mat.metalness, roughness: mat.roughness },
+        });
+      } else {
+        map.set(key, {
+          key,
+          kind: entity.kind as BatchableKind,
+          entities: [entity],
+        });
+      }
     }
   }
 

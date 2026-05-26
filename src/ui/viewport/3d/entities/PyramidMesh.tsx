@@ -20,6 +20,8 @@ interface PyramidMeshProps {
   entity: PyramidEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
+  /** Optional PBR material override from an assigned document material (VNF4). */
+  pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
 /**
@@ -61,7 +63,7 @@ function buildPyramidGeometry(baseWidth: number, baseDepth: number, height: numb
   return geo;
 }
 
-export function PyramidMesh({ entity, selected, onSelect }: PyramidMeshProps): React.ReactElement {
+export function PyramidMesh({ entity, selected, onSelect, pbrMaterial }: PyramidMeshProps): React.ReactElement {
   const { baseWidth, baseDepth, height, position, rotation, color } = entity;
 
   const geometry = useMemo(
@@ -80,7 +82,7 @@ export function PyramidMesh({ entity, selected, onSelect }: PyramidMeshProps): R
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

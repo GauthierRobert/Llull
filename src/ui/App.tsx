@@ -32,6 +32,7 @@ import { LayersPanel } from '@ui/panels/LayersPanel';
 import { ParametersPanel } from '@ui/panels/ParametersPanel';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
+import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { EmptyState } from '@ui/components/EmptyState';
 import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
@@ -93,6 +94,7 @@ export function App(): React.ReactElement {
           <ParametersPanel className="app-params-inner" />
           <FeatureHistoryPanel className="app-history-inner" />
           <ConfigurationsPanel className="app-configs-inner" />
+          <MaterialsPanel className="app-materials-inner" />
         </div>
       </div>
 

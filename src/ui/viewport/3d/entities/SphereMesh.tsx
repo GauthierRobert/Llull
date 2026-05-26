@@ -17,9 +17,11 @@ interface SphereMeshProps {
   entity: SphereEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
+  /** Optional PBR material override from an assigned document material (VNF4). */
+  pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function SphereMesh({ entity, selected, onSelect }: SphereMeshProps): React.ReactElement {
+export function SphereMesh({ entity, selected, onSelect, pbrMaterial }: SphereMeshProps): React.ReactElement {
   const { radius, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
@@ -41,7 +43,7 @@ export function SphereMesh({ entity, selected, onSelect }: SphereMeshProps): Rea
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.35, metalness: 0.12, envMapIntensity: 1.0 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.35, metalness: 0.12, envMapIntensity: 1.0, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

@@ -20,6 +20,8 @@ interface WedgeMeshProps {
   entity: WedgeEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
+  /** Optional PBR material override from an assigned document material (VNF4). */
+  pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
 /**
@@ -69,7 +71,7 @@ function buildWedgeGeometry(w: number, h: number, d: number): THREE.BufferGeomet
   return geo;
 }
 
-export function WedgeMesh({ entity, selected, onSelect }: WedgeMeshProps): React.ReactElement {
+export function WedgeMesh({ entity, selected, onSelect, pbrMaterial }: WedgeMeshProps): React.ReactElement {
   const { size, position, rotation, color } = entity;
   const [w, h, d] = size;
 
@@ -86,7 +88,7 @@ export function WedgeMesh({ entity, selected, onSelect }: WedgeMeshProps): React
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.5, metalness: 0.08, envMapIntensity: 0.8 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.5, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

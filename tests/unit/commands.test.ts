@@ -3976,3 +3976,235 @@ describe('Q4 — replayHistory id-remapping', () => {
     expect(total).toBe(Object.keys(doc.entities).length);
   });
 });
+
+describe('instantiate_template (templates.ts generators)', () => {
+  it('instantiate_template bolt_hole_pattern — creates correct count of circle entities', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'bolt_hole_pattern',
+      params: { count: 6, boltCircleRadius: 25, holeRadius: 3 },
+    });
+    expect(result.affected).toHaveLength(6);
+    expect(result.document.order).toHaveLength(6);
+    for (const id of result.affected) {
+      expect(result.document.entities[id]!.kind).toBe('circle');
+    }
+    expect(result.summary).toContain('bolt_hole_pattern');
+    expect(result.summary).toContain('6');
+  });
+
+  it('instantiate_template bolt_hole_pattern — holes are on the bolt circle at correct angles', () => {
+    const doc = createEmptyDocument();
+    const R = 50;
+    const result = execute(doc, 'instantiate_template', {
+      template: 'bolt_hole_pattern',
+      params: { count: 4, boltCircleRadius: R, holeRadius: 5 },
+    });
+    expect(result.affected).toHaveLength(4);
+    const expectedAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+    for (let i = 0; i < 4; i++) {
+      const entity = result.document.entities[result.affected[i]!]! as { center: readonly [number, number] };
+      expect(entity.center[0]!).toBeCloseTo(R * Math.cos(expectedAngles[i]!), 5);
+      expect(entity.center[1]!).toBeCloseTo(R * Math.sin(expectedAngles[i]!), 5);
+    }
+  });
+
+  it('instantiate_template bolt_hole_pattern — affected order is deterministic (stable for replay)', () => {
+    const callParams = {
+      template: 'bolt_hole_pattern',
+      params: { count: 3, boltCircleRadius: 20, holeRadius: 2 },
+    };
+    const result1 = execute(createEmptyDocument(), 'instantiate_template', callParams);
+    const result2 = execute(createEmptyDocument(), 'instantiate_template', callParams);
+    // Ids are globally unique (timestamp + monotonic counter), so they differ between
+    // calls — but the affected ORDER is deterministic (Q4 relies on this for replay
+    // zipping). Assert the created entities appear in the same geometric sequence.
+    expect(result1.affected).toHaveLength(result2.affected.length);
+    const centers1 = result1.affected.map(
+      (id) => (result1.document.entities[id]! as { center: readonly [number, number] }).center,
+    );
+    const centers2 = result2.affected.map(
+      (id) => (result2.document.entities[id]! as { center: readonly [number, number] }).center,
+    );
+    expect(centers1).toEqual(centers2);
+  });
+
+  it('instantiate_template flange — creates outer + bore + N bolt holes', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'flange',
+      params: {
+        outerRadius: 60,
+        boreRadius: 15,
+        boltCount: 6,
+        boltCircleRadius: 40,
+        holeRadius: 5,
+      },
+    });
+    // 2 structural circles (outer + bore) + 6 bolt holes = 8 total
+    expect(result.affected).toHaveLength(8);
+    for (const id of result.affected) {
+      expect(result.document.entities[id]!.kind).toBe('circle');
+    }
+    // First two are at [0,0] (outer and bore)
+    const outerE = result.document.entities[result.affected[0]!]! as { center: readonly [number, number]; radius: number };
+    const boreE = result.document.entities[result.affected[1]!]! as { center: readonly [number, number]; radius: number };
+    expect(outerE.center).toEqual([0, 0]);
+    expect(outerE.radius).toBe(60);
+    expect(boreE.center).toEqual([0, 0]);
+    expect(boreE.radius).toBe(15);
+    expect(result.summary).toContain('flange');
+  });
+
+  it('instantiate_template rectangular_plate_with_holes — creates plate + hole grid', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'rectangular_plate_with_holes',
+      params: { width: 100, height: 60, holeRows: 2, holeCols: 3, holeRadius: 4, marginX: 10, marginY: 10 },
+    });
+    // 1 rectangle + 2*3=6 circles = 7 entities
+    expect(result.affected).toHaveLength(7);
+    expect(result.document.entities[result.affected[0]!]!.kind).toBe('rectangle');
+    for (let i = 1; i < 7; i++) {
+      expect(result.document.entities[result.affected[i]!]!.kind).toBe('circle');
+    }
+    expect(result.summary).toContain('rectangular_plate_with_holes');
+  });
+
+  it('instantiate_template rectangular_plate_with_holes — single hole (1×1 grid)', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'rectangular_plate_with_holes',
+      params: { width: 50, height: 50, holeRows: 1, holeCols: 1, holeRadius: 5, marginX: 15, marginY: 15 },
+    });
+    // 1 rectangle + 1 circle = 2 entities
+    expect(result.affected).toHaveLength(2);
+    expect(result.document.entities[result.affected[0]!]!.kind).toBe('rectangle');
+    const hole = result.document.entities[result.affected[1]!]! as { center: readonly [number, number] };
+    // Single hole placed at [marginX, marginY]
+    expect(hole.center[0]!).toBeCloseTo(15, 5);
+    expect(hole.center[1]!).toBeCloseTo(15, 5);
+  });
+
+  it('instantiate_template — custom position is passed to all entities', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'bolt_hole_pattern',
+      params: { count: 3, boltCircleRadius: 10, holeRadius: 2 },
+      position: [5, 10, 0],
+    });
+    for (const id of result.affected) {
+      expect(result.document.entities[id]!.position).toEqual([5, 10, 0]);
+    }
+  });
+
+  it('instantiate_template — is pure (input doc not mutated)', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'instantiate_template', {
+      template: 'bolt_hole_pattern',
+      params: { count: 4, boltCircleRadius: 20, holeRadius: 3 },
+    });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('instantiate_template — unknown template is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'nonexistent_template' as never,
+      params: {},
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('nonexistent_template');
+  });
+
+  it('instantiate_template bolt_hole_pattern — count <= 0 is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'bolt_hole_pattern',
+      params: { count: 0, boltCircleRadius: 25, holeRadius: 3 },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('count');
+  });
+
+  it('instantiate_template bolt_hole_pattern — holeRadius <= 0 is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'bolt_hole_pattern',
+      params: { count: 4, boltCircleRadius: 25, holeRadius: -1 },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('holeRadius');
+  });
+
+  it('instantiate_template flange — boreRadius >= outerRadius is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'flange',
+      params: { outerRadius: 30, boreRadius: 40, boltCount: 4, boltCircleRadius: 20, holeRadius: 3 },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('boreRadius');
+  });
+
+  it('instantiate_template rectangular_plate_with_holes — width <= 0 is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'instantiate_template', {
+      template: 'rectangular_plate_with_holes',
+      params: { width: 0, height: 50, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: 5, marginY: 5 },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('width');
+  });
+
+  it.each([
+    ['height', { width: 50, height: 0, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: 5, marginY: 5 }],
+    ['holeRows', { width: 50, height: 50, holeRows: 0, holeCols: 2, holeRadius: 4, marginX: 5, marginY: 5 }],
+    ['holeCols', { width: 50, height: 50, holeRows: 2, holeCols: 0, holeRadius: 4, marginX: 5, marginY: 5 }],
+    ['holeRadius', { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 0, marginX: 5, marginY: 5 }],
+    ['marginX', { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: -1, marginY: 5 }],
+    ['marginY', { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: 5, marginY: -1 }],
+  ])(
+    'instantiate_template rectangular_plate_with_holes — invalid %s is a graceful no-op',
+    (field, params) => {
+      const doc = createEmptyDocument();
+      const result = execute(doc, 'instantiate_template', {
+        template: 'rectangular_plate_with_holes',
+        params,
+      });
+      expect(result.affected).toHaveLength(0);
+      expect(result.document).toBe(doc);
+      expect(result.summary).toContain(field);
+    },
+  );
+
+  it('instantiate_template — feature history replay regenerates same entity count and kinds', () => {
+    let doc = createEmptyDocument();
+    // Instantiate a bolt-hole pattern (goes into featureHistory via execute())
+    doc = execute(doc, 'instantiate_template', {
+      template: 'bolt_hole_pattern',
+      params: { count: 6, boltCircleRadius: 25, holeRadius: 3 },
+    }).document;
+
+    expect(doc.featureHistory).toHaveLength(1);
+    expect(doc.featureHistory[0]!.name).toBe('instantiate_template');
+    const originalAffectedCount = doc.order.length;
+
+    // Replay the history from an empty document
+    const replayResult = execute(doc, 'replay_history', {});
+    const replayed = replayResult.document;
+
+    // Should have the same number of entities
+    expect(Object.keys(replayed.entities)).toHaveLength(originalAffectedCount);
+    // All should be circles
+    for (const entity of Object.values(replayed.entities)) {
+      expect(entity.kind).toBe('circle');
+    }
+  });
+});

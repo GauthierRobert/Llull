@@ -18,9 +18,11 @@ interface ConeMeshProps {
   entity: ConeEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
+  /** Optional PBR material override from an assigned document material (VNF4). */
+  pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function ConeMesh({ entity, selected, onSelect }: ConeMeshProps): React.ReactElement {
+export function ConeMesh({ entity, selected, onSelect, pbrMaterial }: ConeMeshProps): React.ReactElement {
   const { radius, height, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
@@ -41,7 +43,7 @@ export function ConeMesh({ entity, selected, onSelect }: ConeMeshProps): React.R
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

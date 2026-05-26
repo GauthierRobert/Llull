@@ -1253,7 +1253,8 @@ body,
 /* Inner panels override their own border-left (the dock wrapper provides it). */
 .app-layers-inner,
 .app-params-inner,
-.app-history-inner {
+.app-history-inner,
+.app-materials-inner {
   border-left: none;
   flex: 1 1 0;
   min-height: 0;
@@ -2997,6 +2998,298 @@ body,
 }
 
 .config-create-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Materials panel (VNF4)
+   ========================================================================== */
+
+.materials-panel {
+  flex: 0 0 auto;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.app-materials-inner.materials-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+.materials-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 5px;
+  flex-shrink: 0;
+}
+
+.materials-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-label);
+  margin: 0;
+}
+
+.materials-panel-count {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border-radius: 10px;
+  padding: 0 6px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.materials-empty {
+  padding: 6px 12px 8px;
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.material-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.material-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 5px;
+  padding: 1px 2px;
+  transition: background 0.08s ease;
+}
+
+.material-row--selected {
+  background: var(--accent-bg);
+}
+
+.material-row-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 4px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: left;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  transition: background 0.08s ease, color 0.08s ease;
+}
+
+.material-row-btn:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.material-row-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Color swatch: inline background is data (the material color), not a CSS var. */
+.material-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border-light);
+}
+
+.material-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.material-density {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.material-assign-btn {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+  white-space: nowrap;
+}
+
+.material-assign-btn:hover:not(:disabled) {
+  background: var(--accent-bg);
+  border-color: var(--border-accent);
+  color: var(--accent-text);
+}
+
+.material-assign-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.material-assign-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------- Create material form ------------------------------------------ */
+
+.materials-panel-footer {
+  flex-shrink: 0;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.material-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.material-create-row {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.material-create-row--color {
+  grid-template-columns: 68px auto 1fr;
+}
+
+.material-create-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.material-create-input {
+  padding: 3px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  min-width: 0;
+}
+
+.material-create-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  background: var(--bg-input-focus);
+}
+
+/* Native color picker — keep the swatch visible at a compact size. */
+.material-create-color-picker {
+  width: 26px;
+  height: 22px;
+  padding: 1px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  background: var(--bg-input);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.material-create-color-picker:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.material-create-color-hex {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-create-range {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.material-create-range-value {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 28px;
+}
+
+.material-create-btn {
+  align-self: flex-end;
+  padding: 4px 10px;
+  background: var(--color-submit);
+  border: 1px solid var(--color-submit-border);
+  border-radius: 4px;
+  color: var(--color-submit-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  white-space: nowrap;
+}
+
+.material-create-btn:hover:not(:disabled) {
+  background: var(--color-submit-hover);
+}
+
+.material-create-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.material-create-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

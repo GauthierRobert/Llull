@@ -29,6 +29,7 @@ import { renderView } from './render';
 import { makeTubeBetween } from './composite';
 import { addText, addDimension } from './annotate';
 import { filletEdge, chamferEdge } from './modify3d';
+import { instantiateTemplate } from './templates';
 import { historyCommands, setRegistryRef } from './history';
 import { createConfiguration, activateConfiguration, setConfigRegistryRef } from './configurations';
 import { createMaterial, assignMaterial } from './materials';
@@ -128,6 +129,7 @@ const definitions = [
   addDimension,
   filletEdge,
   chamferEdge,
+  instantiateTemplate,
   ...historyCommands,
   createConfiguration,
   activateConfiguration,

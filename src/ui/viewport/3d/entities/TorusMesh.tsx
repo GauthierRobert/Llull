@@ -19,9 +19,11 @@ interface TorusMeshProps {
   entity: TorusEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
+  /** Optional PBR material override from an assigned document material (VNF4). */
+  pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function TorusMesh({ entity, selected, onSelect }: TorusMeshProps): React.ReactElement {
+export function TorusMesh({ entity, selected, onSelect, pbrMaterial }: TorusMeshProps): React.ReactElement {
   const { ringRadius, tubeRadius, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
@@ -45,7 +47,7 @@ export function TorusMesh({ entity, selected, onSelect }: TorusMeshProps): React
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.4, metalness: 0.1, envMapIntensity: 0.9 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.4, metalness: 0.1, envMapIntensity: 0.9, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

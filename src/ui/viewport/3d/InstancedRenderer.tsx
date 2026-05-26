@@ -101,8 +101,18 @@ const WHITE = new THREE.Color(1, 1, 1);
 /**
  * Returns MeshStandardMaterial constructor args matching the display mode.
  * Mirrors the logic in useMaterialProps.ts for consistency.
+ *
+ * `batchMaterial` carries optional PBR overrides from an assigned document material (VNF4).
+ * The overrides are applied in shaded mode only — wireframe and x-ray ignore them.
  */
-function makeMaterialArgs(displayMode: DisplayMode): THREE.MeshStandardMaterialParameters {
+function makeMaterialArgs(
+  displayMode: DisplayMode,
+  batchMaterial?: { roughness: number; metalness: number } | undefined,
+): THREE.MeshStandardMaterialParameters {
+  // In shaded mode, use batch-level PBR values when available.
+  const roughness = displayMode === 'shaded' && batchMaterial ? batchMaterial.roughness : 0.45;
+  const metalness = displayMode === 'shaded' && batchMaterial ? batchMaterial.metalness : 0.08;
+
   switch (displayMode) {
     case 'wireframe':
       return {
@@ -131,8 +141,8 @@ function makeMaterialArgs(displayMode: DisplayMode): THREE.MeshStandardMaterialP
     case 'shaded':
     default:
       return {
-        roughness: 0.45,
-        metalness: 0.08,
+        roughness,
+        metalness,
         envMapIntensity: 0.8,
         wireframe: false,
         transparent: false,
@@ -182,10 +192,11 @@ function InstanceBatchMesh({
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   // --- Material ---
+  // Uses batch.pbrMaterial (VNF4) for roughness/metalness in shaded mode.
   const material = useMemo(() => {
-    const mat = new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode));
+    const mat = new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, batch.pbrMaterial));
     return mat;
-  }, [displayMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayMode, batch.pbrMaterial]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dispose material on unmount or displayMode change.
   useEffect(() => () => material.dispose(), [material]);
@@ -203,8 +214,10 @@ function InstanceBatchMesh({
     const transforms = batch.entities
       .map((e) => `${e.position.join(',')}/${e.rotation.join(',')}`)
       .join(';');
-    return `${ids}|${selBits}|${transforms}`;
-  }, [batch.entities, selectionSet]);
+    // Include batch material color so instance colors update when material changes.
+    const matColor = batch.pbrMaterial?.color ?? '';
+    return `${ids}|${selBits}|${transforms}|${matColor}`;
+  }, [batch.entities, selectionSet, batch.pbrMaterial]);
 
   const _dummy = useMemo(() => new THREE.Object3D(), []);
   const _color = useMemo(() => new THREE.Color(), []);
@@ -232,14 +245,18 @@ function InstanceBatchMesh({
       mesh.setMatrixAt(i, _dummy.matrix);
 
       // Write per-instance color.
+      // In shaded mode with an assigned material, use the material's diffuse color.
+      // Otherwise fall back to the entity's own color.
+      // Selection highlight blends on top of whichever base color is active.
+      const baseColor = batch.pbrMaterial ? batch.pbrMaterial.color : entity.color;
       const isSelected = selectionSet.has(entity.id);
       if (isSelected) {
         // Blend base color with the highlight emissive tint.
-        _color.set(entity.color);
+        _color.set(baseColor);
         _color.lerp(SELECTED_EMISSIVE, SELECTED_EMISSIVE_INTENSITY);
         mesh.setColorAt(i, _color);
       } else {
-        _color.set(entity.color);
+        _color.set(baseColor);
         mesh.setColorAt(i, _color);
       }
     }
@@ -252,7 +269,7 @@ function InstanceBatchMesh({
     // Suppress unused-variable warning on `needsColor` — it is used as a side-
     // effect gate above to ensure the color buffer existed before the loop.
     void needsColor;
-  }, [entitySignature, batch.entities, selectionSet, _dummy, _color]);
+  }, [entitySignature, batch.entities, batch.pbrMaterial, selectionSet, _dummy, _color]);
 
   // --- Xray mode: update opacity per frame is not needed; material opacity is uniform ---
   // For xray, selected instances get a slightly higher opacity. Since THREE

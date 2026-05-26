@@ -23,12 +23,15 @@ interface MeshSolidMeshProps {
   entity: MeshSolidEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
+  /** Optional PBR material override from an assigned document material (VNF4). */
+  pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
 export function MeshSolidMesh({
   entity,
   selected,
   onSelect,
+  pbrMaterial,
 }: MeshSolidMeshProps): React.ReactElement {
   const { mesh, position, rotation, color } = entity;
 
@@ -62,7 +65,7 @@ export function MeshSolidMesh({
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.5, metalness: 0.15, envMapIntensity: 0.8 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.5, metalness: 0.15, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

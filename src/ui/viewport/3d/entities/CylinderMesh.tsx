@@ -17,9 +17,11 @@ interface CylinderMeshProps {
   entity: CylinderEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
+  /** Optional PBR material override from an assigned document material (VNF4). */
+  pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function CylinderMesh({ entity, selected, onSelect }: CylinderMeshProps): React.ReactElement {
+export function CylinderMesh({ entity, selected, onSelect, pbrMaterial }: CylinderMeshProps): React.ReactElement {
   const { radius, height, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
@@ -40,7 +42,7 @@ export function CylinderMesh({ entity, selected, onSelect }: CylinderMeshProps):
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8 });
+  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

@@ -23,7 +23,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import type { CadDocument, Entity, EntityId } from '@core/model/types';
+import type { CadDocument, Entity, EntityId, Material } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import { findClickAnimationsForEntity } from './animationClickHelpers';
@@ -44,6 +44,13 @@ interface EntitiesProps {
   document: CadDocument;
 }
 
+/** PBR material override passed to entity mesh components (VNF4). */
+interface PbrMaterial {
+  color: string;
+  metalness: number;
+  roughness: number;
+}
+
 /**
  * Render a single entity; one pure branch per `kind`.
  * Used only for NON-batchable kinds — batchable kinds (box/cylinder/sphere)
@@ -53,30 +60,33 @@ function EntityRenderer({
   entity,
   selected,
   onSelect,
+  pbrMaterial,
 }: {
   entity: Entity;
   selected: boolean;
   onSelect: (id: EntityId, additive: boolean) => void;
+  pbrMaterial?: PbrMaterial;
 }): React.ReactElement | null {
+  const pbr = pbrMaterial ? { pbrMaterial } : {};
   switch (entity.kind) {
     case 'box':
-      return <BoxMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <BoxMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'cylinder':
-      return <CylinderMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <CylinderMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'sphere':
-      return <SphereMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <SphereMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'extrusion':
-      return <ExtrusionMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <ExtrusionMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'mesh':
-      return <MeshSolidMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <MeshSolidMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'cone':
-      return <ConeMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <ConeMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'torus':
-      return <TorusMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <TorusMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'wedge':
-      return <WedgeMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <WedgeMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'pyramid':
-      return <PyramidMesh entity={entity} selected={selected} onSelect={onSelect} />;
+      return <PyramidMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'text':
       return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
     default:
@@ -88,7 +98,7 @@ function EntityRenderer({
 }
 
 export function Entities({ document }: EntitiesProps): React.ReactElement {
-  const { order, entities, layers, selection } = document;
+  const { order, entities, layers, selection, materials } = document;
   const selectionSet = useMemo(() => new Set<EntityId>(selection), [selection]);
 
   const select = useStore((s) => s.select);
@@ -152,9 +162,10 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
   );
 
   // --- Group batchable entities into InstancedMesh batches ---
+  // Pass the materials map so batches can carry per-batch PBR overrides (VNF4).
   const batches = useMemo(
-    () => groupEntitiesForInstancing(batchableEntities),
-    [batchableEntities],
+    () => groupEntitiesForInstancing(batchableEntities, materials),
+    [batchableEntities, materials],
   );
 
   return (
@@ -167,14 +178,21 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
       />
 
       {/* Per-entity rendering: non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid) */}
-      {nonBatchableEntities.map((entity) => (
-        <EntityRenderer
-          key={entity.id}
-          entity={entity}
-          selected={selectionSet.has(entity.id)}
-          onSelect={handleSelect}
-        />
-      ))}
+      {nonBatchableEntities.map((entity) => {
+        const mat: Material | undefined = entity.materialId ? materials[entity.materialId] : undefined;
+        const pbrProp = mat
+          ? { pbrMaterial: { color: mat.color, metalness: mat.metalness, roughness: mat.roughness } }
+          : {};
+        return (
+          <EntityRenderer
+            key={entity.id}
+            entity={entity}
+            selected={selectionSet.has(entity.id)}
+            onSelect={handleSelect}
+            {...pbrProp}
+          />
+        );
+      })}
     </group>
   );
 }
