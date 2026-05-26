@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createEmptyDocument, is2D } from '@core/model/types';
+import type { TextEntity } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
 import { __resetIdCounter } from '@lib/id';
 
@@ -1977,5 +1978,121 @@ describe('render_view', () => {
     // Blue (farther) must appear BEFORE red (nearer) in the SVG output.
     // This fails with an ascending sort (the original bug).
     expect(firstBlueIdx).toBeLessThan(firstRedIdx);
+  });
+
+  // ---------------------------------------------------------------------------
+  // add_text (T1)
+  // ---------------------------------------------------------------------------
+
+  it('add_text — happy path: creates text entity with correct fields', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', {
+      content: 'Hello World',
+      position: [1, 2, 0],
+      height: 5,
+      anchor: 'center',
+      color: '#ff0000',
+    });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const e = result.document.entities[id]! as TextEntity;
+    expect(e.kind).toBe('text');
+    expect(e.content).toBe('Hello World');
+    expect(e.height).toBe(5);
+    expect(e.position).toEqual([1, 2, 0]);
+    expect(e.anchor).toBe('center');
+    expect(e.color).toBe('#ff0000');
+    expect(result.summary).toContain(id);
+    expect(result.summary).toContain('Hello World');
+  });
+
+  it('add_text — defaults: anchor=left, rotation=[0,0,0], color=#333333', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', {
+      content: 'Label',
+      position: [0, 0, 0],
+      height: 2,
+    });
+
+    const id = result.affected[0]!;
+    const e = result.document.entities[id]! as TextEntity;
+    expect(e.anchor).toBe('left');
+    expect(e.rotation).toEqual([0, 0, 0]);
+    expect(e.color).toBe('#333333');
+  });
+
+  it('add_text — is pure: input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_text', { content: 'Test', position: [0, 0, 0], height: 1 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('add_text — is2D: created entity is classified as 2D', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', { content: 'X', position: [0, 0, 0], height: 1 });
+    const id = result.affected[0]!;
+    const e = result.document.entities[id]!;
+    expect(is2D(e)).toBe(true);
+  });
+
+  it('add_text — failure: empty content is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', { content: '', position: [0, 0, 0], height: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('non-empty');
+  });
+
+  it('add_text — failure: whitespace-only content is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', { content: '   ', position: [0, 0, 0], height: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('add_text — failure: height=0 is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', { content: 'Hi', position: [0, 0, 0], height: 0 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('height');
+  });
+
+  it('add_text — failure: negative height is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', { content: 'Hi', position: [0, 0, 0], height: -3 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('add_text — failure: missing position is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', { content: 'Hi', position: null, height: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('position');
+  });
+
+  it('add_text — failure: short position array is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_text', { content: 'Hi', position: [0, 0], height: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('scale_entity — text: scales height by factor', () => {
+    let doc = createEmptyDocument();
+    const created = execute(doc, 'add_text', { content: 'Scale me', position: [0, 0, 0], height: 4 });
+    doc = created.document;
+    const id = created.affected[0]!;
+
+    const scaled = execute(doc, 'scale_entity', { id, factor: 2.5 });
+    expect(scaled.affected).toEqual([id]);
+    const e = scaled.document.entities[id]! as TextEntity;
+    expect(e.height).toBeCloseTo(10);
+    expect(scaled.summary).toContain('height');
   });
 });

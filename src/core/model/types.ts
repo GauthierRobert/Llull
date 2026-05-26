@@ -23,7 +23,7 @@ export type Vec2 = readonly [number, number];
 export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid';
 
 /** 2D drafting shape kinds. Geometry is LOCAL to the entity work plane; BaseEntity.position places that plane in 3D space. */
-export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline';
+export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text';
 
 /** All entity kinds — 3D solids and 2D shapes. */
 export type EntityKind = SolidKind | Shape2DKind;
@@ -252,6 +252,27 @@ export interface SplineEntity extends BaseEntity {
   closed: boolean;
 }
 
+/**
+ * An annotation text label placed in the document.
+ * Geometry is anchored at `position` (world-space, same convention as other 2D entities: z=0 plane by default).
+ * `content` is the displayed string; `height` is the cap-height in model units.
+ * Optional `anchor` controls the horizontal alignment of the text relative to `position`:
+ *   'left'   — position is the left edge of the first glyph (default)
+ *   'center' — position is the horizontal midpoint of the text
+ *   'right'  — position is the right edge of the last glyph
+ * Optional `layer` is inherited from BaseEntity.layerId if omitted during creation.
+ * Both `content` must be non-empty and `height` must be > 0.
+ */
+export interface TextEntity extends BaseEntity {
+  readonly kind: 'text';
+  /** The text string to display. Must not be empty. */
+  content: string;
+  /** Cap-height of the text in model units. Must be > 0. */
+  height: number;
+  /** Horizontal alignment of the text relative to `position`. Default: 'left'. */
+  anchor?: 'left' | 'center' | 'right';
+}
+
 export type Entity =
   | BoxEntity
   | CylinderEntity
@@ -269,7 +290,8 @@ export type Entity =
   | RectangleEntity
   | PointEntity
   | EllipseEntity
-  | SplineEntity;
+  | SplineEntity
+  | TextEntity;
 
 // ---------------------------------------------------------------------------
 // Kind helpers
@@ -284,6 +306,7 @@ const SHAPE2D_KINDS: ReadonlySet<string> = new Set<Shape2DKind>([
   'point',
   'ellipse',
   'spline',
+  'text',
 ]);
 
 /** Returns true if the entity is a 2D drafting shape. */

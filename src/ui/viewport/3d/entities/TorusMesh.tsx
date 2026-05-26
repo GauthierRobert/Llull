@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { TorusEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
+import { radialSegmentsForDiag, torusDiag } from '../lodSegments';
 
 interface TorusMeshProps {
   entity: TorusEntity;
@@ -24,8 +25,12 @@ export function TorusMesh({ entity, selected, onSelect }: TorusMeshProps): React
   const { ringRadius, tubeRadius, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
+    const diag = torusDiag(ringRadius, tubeRadius);
+    const tubularSeg = radialSegmentsForDiag(diag);
+    // radialSegments (tube cross-section) = half of tubularSegments, min 8.
+    const radialSeg = Math.max(8, Math.floor(tubularSeg / 2));
     // TorusGeometry(radius, tube, radialSegments, tubularSegments)
-    const geo = new THREE.TorusGeometry(ringRadius, tubeRadius, 20, 48);
+    const geo = new THREE.TorusGeometry(ringRadius, tubeRadius, radialSeg, tubularSeg);
     return geo;
   }, [ringRadius, tubeRadius]);
 

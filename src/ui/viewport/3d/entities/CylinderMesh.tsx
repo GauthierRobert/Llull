@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { CylinderEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
+import { radialSegmentsForDiag, cylinderDiag } from '../lodSegments';
 
 interface CylinderMeshProps {
   entity: CylinderEntity;
@@ -22,8 +23,9 @@ export function CylinderMesh({ entity, selected, onSelect }: CylinderMeshProps):
   const { radius, height, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
+    const segments = radialSegmentsForDiag(cylinderDiag(radius, height));
     // radiusTop, radiusBottom, height, radialSegments
-    const geo = new THREE.CylinderGeometry(radius, radius, height, 32);
+    const geo = new THREE.CylinderGeometry(radius, radius, height, segments);
     return geo;
   }, [radius, height]);
 

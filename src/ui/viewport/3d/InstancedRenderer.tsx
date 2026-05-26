@@ -43,6 +43,7 @@ import { useViewportStore } from '@ui/store';
 import type { DisplayMode } from '@ui/store';
 import type { InstanceBatch } from './grouping';
 import { entityIdFromInstanceId } from './grouping';
+import { radialSegmentsForDiag, sphereDiag, cylinderDiag } from './lodSegments';
 
 // ---------------------------------------------------------------------------
 // Geometry factory (pure, called inside useMemo)
@@ -67,11 +68,14 @@ function makeGeometry(batch: InstanceBatch): THREE.BufferGeometry {
     }
     case 'cylinder': {
       if (first.kind !== 'cylinder') return new THREE.BufferGeometry();
-      return new THREE.CylinderGeometry(first.radius, first.radius, first.height, 32);
+      const cylSeg = radialSegmentsForDiag(cylinderDiag(first.radius, first.height));
+      return new THREE.CylinderGeometry(first.radius, first.radius, first.height, cylSeg);
     }
     case 'sphere': {
       if (first.kind !== 'sphere') return new THREE.BufferGeometry();
-      return new THREE.SphereGeometry(first.radius, 32, 16);
+      const sphSeg = radialSegmentsForDiag(sphereDiag(first.radius));
+      const sphHSeg = Math.max(4, Math.min(32, Math.floor(sphSeg / 2)));
+      return new THREE.SphereGeometry(first.radius, sphSeg, sphHSeg);
     }
     default: {
       // Exhaustiveness guard — TypeScript narrows BatchableKind; this is unreachable

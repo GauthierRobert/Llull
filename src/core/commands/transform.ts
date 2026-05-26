@@ -179,6 +179,9 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
           points: target.points.map(([x, y]) => [x * factor, y * factor] as Vec2),
         };
         break;
+      case 'text':
+        scaled = { ...target, height: target.height * factor };
+        break;
       case 'point':
         // A point has no local geometry beyond position; return it unchanged.
         scaled = { ...target };
@@ -256,7 +259,9 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
                                     ? `new center [${scaled.center.join(', ')}] radiusX ${scaled.radiusX} radiusY ${scaled.radiusY}`
                                     : scaled.kind === 'spline'
                                       ? `scaled ${scaled.points.length} points`
-                                      : 'point unchanged';
+                                      : scaled.kind === 'text'
+                                        ? `new height ${scaled.height}`
+                                        : 'point unchanged';
     return {
       document: { ...doc, entities: { ...doc.entities, [id]: scaled } },
       summary: `Scaled ${id} by factor ${factor}; ${dims}.`,

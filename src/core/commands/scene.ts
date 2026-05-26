@@ -193,6 +193,11 @@ export function entityBounds(e: Entity): Bounds {
       }
       return { min: offset(e.position, minX, minY, 0), max: offset(e.position, maxX, maxY, 0) };
     }
+    case 'text': {
+      // Estimated width using a monospace approximation: each glyph ≈ 0.6×height.
+      const estimatedWidth = e.content.length * e.height * 0.6;
+      return { min: e.position, max: offset(e.position, estimatedWidth, e.height, 0) };
+    }
     default: {
       const exhaustive: never = e;
       return { min: (exhaustive as Entity).position, max: (exhaustive as Entity).position };

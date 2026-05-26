@@ -236,6 +236,25 @@ function checkDegenerateGeometry(e: Entity): Issue[] {
       }
       break;
     }
+    case 'text': {
+      if (e.height <= 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Text entity '${e.id}' has height ${e.height} ≤ 0. Height must be > 0.`,
+          entityId: e.id,
+        });
+      }
+      if (e.content.trim().length === 0) {
+        issues.push({
+          severity: 'error',
+          code: 'degenerate_size',
+          message: `Text entity '${e.id}' has empty content. Content must be a non-empty string.`,
+          entityId: e.id,
+        });
+      }
+      break;
+    }
     // 'line', 'polyline', 'rectangle', 'point', 'spline', 'mesh' handled elsewhere or N/A
   }
 

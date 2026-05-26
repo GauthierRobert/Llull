@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { SphereEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
+import { radialSegmentsForDiag, sphereDiag } from '../lodSegments';
 
 interface SphereMeshProps {
   entity: SphereEntity;
@@ -22,7 +23,10 @@ export function SphereMesh({ entity, selected, onSelect }: SphereMeshProps): Rea
   const { radius, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
-    const geo = new THREE.SphereGeometry(radius, 32, 16);
+    const segments = radialSegmentsForDiag(sphereDiag(radius));
+    // heightSegments = half of radialSegments, clamped to [4, 32] for correct normals.
+    const heightSeg = Math.max(4, Math.min(32, Math.floor(segments / 2)));
+    const geo = new THREE.SphereGeometry(radius, segments, heightSeg);
     return geo;
   }, [radius]);
 

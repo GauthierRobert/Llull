@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { ConeEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
+import { radialSegmentsForDiag, cylinderDiag } from '../lodSegments';
 
 interface ConeMeshProps {
   entity: ConeEntity;
@@ -23,8 +24,9 @@ export function ConeMesh({ entity, selected, onSelect }: ConeMeshProps): React.R
   const { radius, height, position, rotation, color } = entity;
 
   const geometry = useMemo(() => {
+    const segments = radialSegmentsForDiag(cylinderDiag(radius, height));
     // radiusTop=0, radiusBottom=radius, height, radialSegments — apex along +Y (three.js default).
-    const geo = new THREE.ConeGeometry(radius, height, 32);
+    const geo = new THREE.ConeGeometry(radius, height, segments);
     return geo;
   }, [radius, height]);
 

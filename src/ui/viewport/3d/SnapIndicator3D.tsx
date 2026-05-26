@@ -91,14 +91,14 @@ export function SnapIndicator3D({ position, snapType }: SnapIndicator3DProps): R
     return () => invalidate();
   }, [invalidate]);
 
-  // Dispose geometry + material on unmount (R9).
-  useEffect(
-    () => () => {
-      geometry.dispose();
-      material.dispose();
-    },
-    [geometry, material],
-  );
+  // Dispose geometry on unmount (R9). Keyed separately from material because
+  // geometry has no deps (stable for the lifetime of the component) while
+  // material is recreated when `colour` changes. A shared cleanup would dispose
+  // the still-live geometry when only the material changes.
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  // Dispose material when colour changes (new material) or on unmount (R9).
+  useEffect(() => () => material.dispose(), [material]);
 
   if (snapType === 'none') return null;
 
