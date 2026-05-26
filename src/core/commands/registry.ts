@@ -24,6 +24,7 @@ import { buildProject } from './project';
 import { setUnits } from './units';
 import { setParameter, deleteParameter } from './parameters';
 import { checkModel } from './check';
+import { renderView } from './render';
 import {
   explodePolyline,
   offset2D,
@@ -114,6 +115,7 @@ const definitions = [
   animateSpin,
   animateOscillate,
   stopAnimation,
+  renderView,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

@@ -54,6 +54,7 @@ import {
 import type { CadDocument } from '@core/model/types';
 import { getLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
+import { buildImageBlock } from './renderImage';
 
 // ---------------------------------------------------------------------------
 // Session registry
@@ -233,7 +234,23 @@ function buildMcpServer(getDoc: () => CadDocument): Server {
     // Delegate all content-block assembly to the single shaping function.
     // Cast: McpShapedResult lacks the SDK Result index signature ([x: string]: unknown)
     // which is a type-system artifact — the runtime shape satisfies CallToolResult.
-    return shapeToolCallContent(busResult) as CallToolResult;
+    const shaped = shapeToolCallContent(busResult) as CallToolResult;
+
+    // Vision loop: if the command result carries an SVG string (data.svg), rasterize
+    // it to PNG and append an image content block.  Triggered generically on any
+    // command that emits data.svg — not tied to a specific command name.
+    // Failure is silent (buildImageBlock returns null) so a broken SVG never 500s
+    // the tool call; the text/structured content is always returned intact.
+    const imageBlock = buildImageBlock(busResult.data);
+    if (imageBlock !== null) {
+      // Cast: the SDK's content array type is TextContent|ImageContent|EmbeddedResource
+      // but the TypeScript union is exhaustive at compile time; at runtime the MCP
+      // spec accepts any object with a valid `type` field. The cast is equivalent to
+      // what shapeToolCallContent already does for the whole return value above.
+      (shaped.content as unknown[]).push(imageBlock);
+    }
+
+    return shaped;
   });
 
   // resources/list — enumerate the three read-only CAD resources

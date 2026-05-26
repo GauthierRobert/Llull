@@ -1674,3 +1674,259 @@ describe('scale_entity — ellipse and spline', () => {
     expect(result.summary).toContain('1 animation');
   });
 });
+
+// ---------------------------------------------------------------------------
+// render_view
+// ---------------------------------------------------------------------------
+
+describe('render_view', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('empty doc returns a valid SVG, entityCount 0, bounds null', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'render_view', {});
+
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc); // referential equality — pure
+
+    const data = result.data as {
+      svg: string;
+      view: string;
+      width: number;
+      height: number;
+      entityCount: number;
+      bounds: null;
+      camera: { position: [number, number, number]; target: [number, number, number]; up: [number, number, number] };
+    };
+
+    expect(data.entityCount).toBe(0);
+    expect(data.bounds).toBeNull();
+    expect(data.view).toBe('iso');
+    expect(data.width).toBe(800);
+    expect(data.height).toBe(600);
+    expect(data.svg).toContain('<svg');
+    expect(data.svg).toContain('xmlns="http://www.w3.org/2000/svg"');
+    expect(data.svg).toContain('</svg>');
+    expect(data.svg).toContain('width="800"');
+    expect(data.svg).toContain('height="600"');
+    expect(result.summary).toContain('0 entit');
+    expect(result.summary).toContain('800×600');
+  });
+
+  it('doc with a box produces polygon elements, correct entityCount, populated bounds and camera', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] }).document;
+
+    const result = execute(doc, 'render_view', { view: 'iso' });
+    const data = result.data as {
+      svg: string;
+      entityCount: number;
+      bounds: { min: [number, number, number]; max: [number, number, number] };
+      camera: { position: [number, number, number]; target: [number, number, number]; up: [number, number, number] };
+    };
+
+    expect(data.entityCount).toBe(1);
+    expect(data.bounds).not.toBeNull();
+    expect(data.svg).toContain('<polygon');
+    expect(data.camera.position).toHaveLength(3);
+    expect(data.camera.target).toHaveLength(3);
+    expect(data.camera.up).toHaveLength(3);
+    expect(result.summary).toContain('1 entity');
+  });
+
+  it('renders all seven views and each produces a different SVG', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+
+    const views = ['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'] as const;
+    const svgs = views.map((v) => {
+      const r = execute(doc, 'render_view', { view: v });
+      return (r.data as { svg: string }).svg;
+    });
+
+    // top vs front must differ
+    expect(svgs[0]).not.toBe(svgs[2]);
+    // iso vs top must differ
+    expect(svgs[6]).not.toBe(svgs[0]);
+    // all must contain <svg
+    for (const svg of svgs) {
+      expect(svg).toContain('<svg');
+    }
+  });
+
+  it('resolved view name is present in the data.view field', () => {
+    const doc = createEmptyDocument();
+    const frontResult = execute(doc, 'render_view', { view: 'front' });
+    expect((frontResult.data as { view: string }).view).toBe('front');
+
+    const topResult = execute(doc, 'render_view', { view: 'top' });
+    expect((topResult.data as { view: string }).view).toBe('top');
+  });
+
+  it('width and height are clamped: too large → 2000, too small → 64', () => {
+    const doc = createEmptyDocument();
+
+    const large = execute(doc, 'render_view', { width: 5000, height: 9999 });
+    const largeData = large.data as { width: number; height: number; svg: string };
+    expect(largeData.width).toBe(2000);
+    expect(largeData.height).toBe(2000);
+    expect(largeData.svg).toContain('width="2000"');
+    expect(largeData.svg).toContain('height="2000"');
+
+    const small = execute(doc, 'render_view', { width: 1, height: 5 });
+    const smallData = small.data as { width: number; height: number; svg: string };
+    expect(smallData.width).toBe(64);
+    expect(smallData.height).toBe(64);
+    expect(smallData.svg).toContain('width="64"');
+    expect(smallData.svg).toContain('height="64"');
+  });
+
+  it('unknown view name falls back to iso without throwing', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'render_view', { view: 'diagonal' });
+    const data = result.data as { view: string; svg: string };
+    expect(data.view).toBe('iso');
+    expect(data.svg).toContain('<svg');
+  });
+
+  it('is pure — the input document is returned unchanged (referential equality)', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const snapshot = JSON.stringify(doc);
+
+    execute(doc, 'render_view', { view: 'iso' });
+
+    expect(JSON.stringify(doc)).toBe(snapshot);
+    const result = execute(doc, 'render_view', { view: 'top' });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+  });
+
+  it('SVG contains 2D shape stroked paths when doc has a circle', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'draw_circle', { center: [0, 0], radius: 3 }).document;
+
+    const result = execute(doc, 'render_view', { view: 'top' });
+    const svg = (result.data as { svg: string }).svg;
+    expect(svg).toContain('<polyline');
+  });
+
+  it('doc with multiple entity kinds (box + cylinder + cone) renders all', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    doc = execute(doc, 'add_cylinder', { radius: 1, height: 3 }).document;
+    doc = execute(doc, 'add_cone', { radius: 1, height: 2 }).document;
+
+    const result = execute(doc, 'render_view', { view: 'iso' });
+    const data = result.data as { entityCount: number; svg: string };
+    expect(data.entityCount).toBe(3);
+    expect(data.svg).toContain('<polygon');
+    expect(result.summary).toContain('3 entit');
+  });
+
+  it('toToolSchemas() still maps 1:1 with listCommands() after registration', () => {
+    const schemas = toToolSchemas();
+    const commands = listCommands();
+    expect(schemas).toHaveLength(commands.length);
+    const renderSchema = schemas.find((s) => s.name === 'render_view');
+    expect(renderSchema).toBeDefined();
+    expect(renderSchema?.input_schema.required).toEqual([]);
+  });
+
+  it('renders sphere, torus, wedge, pyramid without throwing', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
+    doc = execute(doc, 'add_torus', { ringRadius: 2, tubeRadius: 0.5 }).document;
+    doc = execute(doc, 'add_wedge', { size: [2, 1, 3] }).document;
+    doc = execute(doc, 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 3 }).document;
+
+    const result = execute(doc, 'render_view', { view: 'iso' });
+    const data = result.data as { entityCount: number; svg: string };
+    expect(data.entityCount).toBe(4);
+    expect(data.svg).toContain('<polygon');
+    expect(result.affected).toEqual([]);
+    expect(result.document).toBe(doc);
+  });
+
+  it('renders extrusion without throwing', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'extrude_profile', {
+      profile: [[0, 0], [2, 0], [2, 2], [0, 2]],
+      depth: 1,
+    }).document;
+
+    const result = execute(doc, 'render_view', { view: 'front' });
+    const data = result.data as { entityCount: number; svg: string };
+    expect(data.entityCount).toBe(1);
+    expect(data.svg).toContain('<polygon');
+  });
+
+  it('renders 2D rectangle, ellipse, spline, point, arc, line, polyline without throwing', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'draw_rectangle', { width: 2, height: 1 }).document;
+    doc = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 1, radiusY: 2 }).document;
+    doc = execute(doc, 'draw_spline', { points: [[0, 0], [1, 1], [2, 0]] }).document;
+    doc = execute(doc, 'draw_point', { position: [0, 0, 0] }).document;
+    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 1, startAngle: 0, endAngle: 1 }).document;
+    doc = execute(doc, 'draw_line', { start: [0, 0], end: [1, 1] }).document;
+    doc = execute(doc, 'draw_polyline', { points: [[0, 0], [1, 0], [1, 1]] }).document;
+
+    const result = execute(doc, 'render_view', { view: 'top' });
+    const data = result.data as { entityCount: number; svg: string };
+    expect(data.entityCount).toBe(7);
+    // All 2D shapes produce <polyline> stroke elements
+    expect(data.svg).toContain('<polyline');
+    expect(result.document).toBe(doc);
+  });
+
+  it('closed polyline and closed spline add the closing vertex', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'draw_polyline', { points: [[0, 0], [1, 0], [0.5, 1]], closed: true }).document;
+    doc = execute(doc, 'draw_spline', { points: [[0, 0], [1, 0], [0.5, 1]], closed: true }).document;
+
+    const result = execute(doc, 'render_view', { view: 'top' });
+    const data = result.data as { svg: string };
+    expect(data.svg).toContain('<polyline');
+  });
+
+  it('arc with endAngle < startAngle wraps span correctly', () => {
+    let doc = createEmptyDocument();
+    // endAngle < startAngle → span goes negative → must add 2π
+    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 2, startAngle: 3, endAngle: 1 }).document;
+
+    const result = execute(doc, 'render_view', { view: 'front' });
+    expect(result.affected).toEqual([]);
+    expect((result.data as { svg: string }).svg).toContain('<polyline');
+  });
+
+  it('extrusion with valid profile renders polygons and returns valid SVG', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'extrude_profile', { profile: [[0, 0], [1, 0], [1, 1]], depth: 2 }).document;
+
+    const result = execute(doc, 'render_view', { view: 'iso' });
+    expect((result.data as { svg: string }).svg).toContain('<svg');
+    expect((result.data as { svg: string }).svg).toContain('<polygon');
+  });
+
+  it('all six axis views produce different camera positions', () => {
+    const doc = createEmptyDocument();
+    const views = ['top', 'bottom', 'front', 'back', 'left', 'right'] as const;
+    const cameras = views.map((v) => {
+      const r = execute(doc, 'render_view', { view: v });
+      return JSON.stringify((r.data as { camera: unknown }).camera);
+    });
+    // Each view must have a unique camera
+    const unique = new Set(cameras);
+    expect(unique.size).toBe(6);
+  });
+
+  it('default params (no args) work and produce 800×600 iso SVG', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'render_view', {});
+    const data = result.data as { view: string; width: number; height: number; svg: string };
+    expect(data.view).toBe('iso');
+    expect(data.width).toBe(800);
+    expect(data.height).toBe(600);
+    expect(data.svg).toContain('width="800"');
+  });
+});
