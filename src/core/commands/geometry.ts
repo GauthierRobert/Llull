@@ -40,6 +40,14 @@ export const addBox: CommandDefinition<AddBoxParams> = {
     required: ['size'],
   },
   run: (doc, { size, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
+    const [w, h, d] = size;
+    if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(d) || w <= 0 || h <= 0 || d <= 0) {
+      return {
+        document: doc,
+        summary: `add_box failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
+        affected: [],
+      };
+    }
     const id = nextId('box');
     const entity: Entity = {
       id,
@@ -174,11 +182,11 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
     required: ['radius', 'height'],
   },
   run: (doc, { radius, height, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
-    if (radius <= 0) {
-      return { document: doc, summary: `add_cylinder failed: radius must be > 0, got ${radius}.`, affected: [] };
+    if (!Number.isFinite(radius) || radius <= 0) {
+      return { document: doc, summary: `add_cylinder failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
     }
-    if (height <= 0) {
-      return { document: doc, summary: `add_cylinder failed: height must be > 0, got ${height}.`, affected: [] };
+    if (!Number.isFinite(height) || height <= 0) {
+      return { document: doc, summary: `add_cylinder failed: height must be finite and > 0, got ${height}.`, affected: [] };
     }
     const id = nextId('cyl');
     const entity: Entity = {
@@ -233,8 +241,8 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
     required: ['radius'],
   },
   run: (doc, { radius, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
-    if (radius <= 0) {
-      return { document: doc, summary: `add_sphere failed: radius must be > 0, got ${radius}.`, affected: [] };
+    if (!Number.isFinite(radius) || radius <= 0) {
+      return { document: doc, summary: `add_sphere failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
     }
     const id = nextId('sph');
     const entity: Entity = {
@@ -295,11 +303,11 @@ export const addCone: CommandDefinition<AddConeParams> = {
     required: ['radius', 'height'],
   },
   run: (doc, { radius, height, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
-    if (radius <= 0) {
-      return { document: doc, summary: `add_cone failed: radius must be > 0, got ${radius}.`, affected: [] };
+    if (!Number.isFinite(radius) || radius <= 0) {
+      return { document: doc, summary: `add_cone failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
     }
-    if (height <= 0) {
-      return { document: doc, summary: `add_cone failed: height must be > 0, got ${height}.`, affected: [] };
+    if (!Number.isFinite(height) || height <= 0) {
+      return { document: doc, summary: `add_cone failed: height must be finite and > 0, got ${height}.`, affected: [] };
     }
     const id = nextId('cone');
     const entity: Entity = {
@@ -365,17 +373,17 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
     required: ['ringRadius', 'tubeRadius'],
   },
   run: (doc, { ringRadius, tubeRadius, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
-    if (ringRadius <= 0) {
+    if (!Number.isFinite(ringRadius) || ringRadius <= 0) {
       return {
         document: doc,
-        summary: `add_torus failed: ringRadius must be > 0, got ${ringRadius}.`,
+        summary: `add_torus failed: ringRadius must be finite and > 0, got ${ringRadius}.`,
         affected: [],
       };
     }
-    if (tubeRadius <= 0) {
+    if (!Number.isFinite(tubeRadius) || tubeRadius <= 0) {
       return {
         document: doc,
-        summary: `add_torus failed: tubeRadius must be > 0, got ${tubeRadius}.`,
+        summary: `add_torus failed: tubeRadius must be finite and > 0, got ${tubeRadius}.`,
         affected: [],
       };
     }
@@ -441,10 +449,10 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
   },
   run: (doc, { size, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
     const [w, h, d] = size;
-    if (w <= 0 || h <= 0 || d <= 0) {
+    if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(d) || w <= 0 || h <= 0 || d <= 0) {
       return {
         document: doc,
-        summary: `add_wedge failed: all size components must be > 0, got [${size.join(', ')}].`,
+        summary: `add_wedge failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
         affected: [],
       };
     }
@@ -514,24 +522,24 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
     required: ['baseWidth', 'baseDepth', 'height'],
   },
   run: (doc, { baseWidth, baseDepth, height, position = [0, 0, 0], color = '#6b8f9c' }): CommandResult => {
-    if (baseWidth <= 0) {
+    if (!Number.isFinite(baseWidth) || baseWidth <= 0) {
       return {
         document: doc,
-        summary: `add_pyramid failed: baseWidth must be > 0, got ${baseWidth}.`,
+        summary: `add_pyramid failed: baseWidth must be finite and > 0, got ${baseWidth}.`,
         affected: [],
       };
     }
-    if (baseDepth <= 0) {
+    if (!Number.isFinite(baseDepth) || baseDepth <= 0) {
       return {
         document: doc,
-        summary: `add_pyramid failed: baseDepth must be > 0, got ${baseDepth}.`,
+        summary: `add_pyramid failed: baseDepth must be finite and > 0, got ${baseDepth}.`,
         affected: [],
       };
     }
-    if (height <= 0) {
+    if (!Number.isFinite(height) || height <= 0) {
       return {
         document: doc,
-        summary: `add_pyramid failed: height must be > 0, got ${height}.`,
+        summary: `add_pyramid failed: height must be finite and > 0, got ${height}.`,
         affected: [],
       };
     }

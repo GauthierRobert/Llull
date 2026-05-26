@@ -3041,9 +3041,9 @@ describe('KI3 — =expr param resolution in replay_history', () => {
     // Must not throw; must surface the warning in summary.
     expect(result.summary).toContain('Unresolved');
     expect(result.summary).toContain('nonexistent');
-    // The unresolved =expr string is left in place and passed to add_box (which does not
-    // currently validate size — see board follow-up KI6/add_box guard). The contract under
-    // test here is the REPLAY level: it completes without throwing and reports the failure.
+    // With the KI6 add_box guard in place, the unresolved =expr string is caught by add_box
+    // (non-finite/non-numeric size → graceful no-op). The contract under test here is the
+    // REPLAY level: it completes without throwing and reports the failure.
     expect(result.document).toBeDefined();
   });
 
