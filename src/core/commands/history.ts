@@ -19,6 +19,7 @@ import type { CadDocument, FeatureStep } from '../model/types';
 import { createEmptyDocument } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { buildParamEnv, resolveStepParams } from './regenerate';
 
 // ---------------------------------------------------------------------------
 // Late-bound registry reference (breaks circular dep)
@@ -55,12 +56,16 @@ export function setRegistryRef(
  * Steps whose `run` throws are silently skipped (e.g. a move referencing
  * an entity that a prior suppressed step would have created).
  *
+ * Any `=expr` strings in step params are resolved against `base.parameters`
+ * before each step runs. Unresolved expressions are reported in `resolveWarnings`.
+ *
  * @pure — returns a new CadDocument; never mutates `base`.
  */
 export function replayHistory(
   base: CadDocument,
   history: FeatureStep[],
   getCommandFn: (name: string) => CommandDefinition<unknown> | undefined,
+  resolveWarnings?: string[],
 ): CadDocument {
   // Start from empty geometry but preserve document-level settings.
   let doc: CadDocument = {
@@ -81,7 +86,16 @@ export function replayHistory(
     const cmd = getCommandFn(step.name);
     if (!cmd) continue; // Unknown command — skip gracefully.
     try {
-      const result = cmd.run(doc, step.params);
+      // Resolve any `=expr` strings in step.params against the current
+      // parameter environment before running the command (KI3: constructive→evaluated).
+      const env = buildParamEnv(doc.parameters);
+      const { resolved, errors } = resolveStepParams(step.params, env);
+      for (const e of errors) {
+        resolveWarnings?.push(
+          `step '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`,
+        );
+      }
+      const result = cmd.run(doc, resolved);
       // Accept the new geometry but keep OUR featureHistory intact.
       doc = { ...result.document, featureHistory: history };
     } catch {
@@ -133,11 +147,16 @@ export const replayHistory_cmd: CommandDefinition<ReplayHistoryParams> = {
         affected: [],
       };
     }
-    const regenerated = replayHistory(doc, doc.featureHistory, resolveGetCommand());
+    const warnings: string[] = [];
+    const regenerated = replayHistory(doc, doc.featureHistory, resolveGetCommand(), warnings);
     const count = Object.keys(regenerated.entities).length;
+    const warnSuffix =
+      warnings.length > 0
+        ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`
+        : '';
     return {
       document: regenerated,
-      summary: `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.`,
+      summary: `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${warnSuffix}`,
       affected: regenerated.order,
     };
   },

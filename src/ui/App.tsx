@@ -29,6 +29,9 @@ import { Viewport2D } from '@ui/viewport/2d/Viewport2D';
 import { StatusBar } from '@ui/components/StatusBar';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { LayersPanel } from '@ui/panels/LayersPanel';
+import { ParametersPanel } from '@ui/panels/ParametersPanel';
+import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
+import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { EmptyState } from '@ui/components/EmptyState';
 import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
@@ -84,8 +87,13 @@ export function App(): React.ReactElement {
           </ViewportErrorBoundary>
         </div>
 
-        {/* Layers panel — right dock */}
-        <LayersPanel className="app-layers" />
+        {/* Right dock — layers, parameters, feature history, and configurations panels stacked */}
+        <div className="app-right-dock">
+          <LayersPanel className="app-layers-inner" />
+          <ParametersPanel className="app-params-inner" />
+          <FeatureHistoryPanel className="app-history-inner" />
+          <ConfigurationsPanel className="app-configs-inner" />
+        </div>
       </div>
 
       <StatusBar />

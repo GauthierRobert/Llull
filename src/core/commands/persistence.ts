@@ -9,6 +9,7 @@
 
 import type {
   CadDocument,
+  Configuration,
   DocumentUnit,
   Entity,
   FeatureStep,
@@ -191,8 +192,12 @@ export function deserializeDocument(json: string): CadDocument {
   const featureHistory: FeatureStep[] = Array.isArray(doc.featureHistory)
     ? (doc.featureHistory as FeatureStep[])
     : [];
+  // Back-compat: older saved docs lack configurations — default to empty.
+  const configurations: Record<string, Configuration> = isRecord(doc.configurations)
+    ? (doc.configurations as Record<string, Configuration>)
+    : {};
 
-  return { ...doc, units, displayPrecision, parameters, animations, featureHistory };
+  return { ...doc, units, displayPrecision, parameters, animations, featureHistory, configurations };
 }
 
 // ---------------------------------------------------------------------------

@@ -2487,6 +2487,20 @@ describe('add_dimension', () => {
     expect(measured.document.featureHistory).toHaveLength(stepsBefore);
   });
 
+  it('featureHistory — set_parameter/delete_parameter do NOT append steps (metaHistory; parameters are document state, not recipe steps)', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'w', expression: '10' }).document;
+    expect(doc.featureHistory).toHaveLength(0);
+    expect(doc.parameters['w']?.value).toBe(10);
+    // Updating it again must still not append (idempotent in the recipe).
+    doc = execute(doc, 'set_parameter', { name: 'w', expression: '20' }).document;
+    expect(doc.featureHistory).toHaveLength(0);
+    expect(doc.parameters['w']?.value).toBe(20);
+    doc = execute(doc, 'delete_parameter', { name: 'w' }).document;
+    expect(doc.featureHistory).toHaveLength(0);
+    expect(doc.parameters['w']).toBeUndefined();
+  });
+
   it('featureHistory — input document is never mutated (purity)', () => {
     const doc = createEmptyDocument();
     const snapshot = JSON.stringify(doc);
@@ -2805,5 +2819,458 @@ describe('add_dimension', () => {
     };
     const loaded = deserializeDocument(JSON.stringify(oldDoc));
     expect(loaded.featureHistory).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// KI3 — Constructive vs evaluated geometry: =expr resolution in replay
+// ---------------------------------------------------------------------------
+
+import { resolveStepParams, buildParamEnv } from '@core/commands/regenerate';
+
+describe('KI3 — =expr param resolution in replay_history', () => {
+  beforeEach(() => __resetIdCounter());
+
+  // ── AC1: headline round-trip ─────────────────────────────────────────────
+
+  it('AC1 round-trip: =expr param in a step reflects updated parameter after replay', () => {
+    // Step 1: set a parameter `side = 4`
+    // Step 2: add_box with size stored as `=expr` strings — done via insert_step so
+    //         the stored params literally contain `=side` strings.
+    // Step 3: set_parameter changes `side` to 8
+    // Step 4: replay_history → box size should be [8, 8, 8]
+
+    let doc = createEmptyDocument();
+
+    // Set the parameter. set_parameter is metaHistory (parameters are document
+    // INPUT state, not a geometry-recipe step) so it does NOT append to
+    // featureHistory — its current value is carried into replay.
+    doc = execute(doc, 'set_parameter', { name: 'side', expression: '4' }).document;
+
+    // Insert a step whose params reference the parameter via =expr.
+    // We use insert_step (a meta-command) to plant literal =expr strings.
+    doc = execute(doc, 'insert_step', {
+      name: 'add_box',
+      params: { size: ['=side', '=side', '=side'] },
+      label: 'Parametric box',
+    }).document;
+
+    // Verify the box was created with resolved size [4, 4, 4].
+    expect(Object.keys(doc.entities)).toHaveLength(1);
+    const boxId = doc.order[0]!;
+    const box = doc.entities[boxId]!;
+    expect(box.kind).toBe('box');
+    if (box.kind === 'box') {
+      expect(box.size).toEqual([4, 4, 4]);
+    }
+
+    // Now change the parameter.
+    doc = execute(doc, 'set_parameter', { name: 'side', expression: '8' }).document;
+
+    // Replay — the =expr params must be re-evaluated against the new `side = 8`.
+    const result = execute(doc, 'replay_history', {});
+    expect(result.affected.length).toBeGreaterThan(0);
+
+    // Find the box entity (there must be exactly one entity).
+    const entityIds = Object.keys(result.document.entities);
+    expect(entityIds).toHaveLength(1);
+    const updatedBox = result.document.entities[entityIds[0]!]!;
+    expect(updatedBox.kind).toBe('box');
+    if (updatedBox.kind === 'box') {
+      expect(updatedBox.size).toEqual([8, 8, 8]);
+    }
+    expect(result.summary).toContain('replayed');
+  });
+
+  // ── AC2: reproducibility ─────────────────────────────────────────────────
+
+  it('AC2: replaying featureHistory from empty reproduces entities deterministically', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 3, 4] }).document;
+    doc = execute(doc, 'add_sphere', { radius: 5 }).document;
+    expect(Object.keys(doc.entities)).toHaveLength(2);
+
+    // Replay should reproduce the same entity count and kinds.
+    const result = execute(doc, 'replay_history', {});
+    expect(Object.keys(result.document.entities)).toHaveLength(2);
+    const kinds = Object.values(result.document.entities).map((e) => e.kind).sort();
+    expect(kinds).toEqual(['box', 'sphere']);
+  });
+
+  // ── AC3 / purity ─────────────────────────────────────────────────────────
+
+  it('purity: resolveStepParams does not mutate the input params', () => {
+    const original = { size: ['=width', 1, 2], label: 'test' };
+    const env = { width: 10 };
+    const snapshot = JSON.stringify(original);
+    resolveStepParams(original, env);
+    expect(JSON.stringify(original)).toBe(snapshot);
+  });
+
+  it('purity: replay_history is pure — input doc is not mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'replay_history', {});
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── resolveStepParams unit tests ─────────────────────────────────────────
+
+  it('resolveStepParams: plain number value passes through unchanged', () => {
+    const { resolved, errors } = resolveStepParams({ radius: 5 }, {});
+    expect(errors).toHaveLength(0);
+    expect((resolved as { radius: number }).radius).toBe(5);
+  });
+
+  it('resolveStepParams: plain string (no =) passes through unchanged', () => {
+    const { resolved, errors } = resolveStepParams({ label: 'hello' }, {});
+    expect(errors).toHaveLength(0);
+    expect((resolved as { label: string }).label).toBe('hello');
+  });
+
+  it('resolveStepParams: =expr string is replaced by evaluated number', () => {
+    const { resolved, errors } = resolveStepParams(
+      { radius: '=r' },
+      { r: 7 },
+    );
+    expect(errors).toHaveLength(0);
+    expect((resolved as { radius: number }).radius).toBe(7);
+  });
+
+  it('resolveStepParams: =expr arithmetic expression is evaluated correctly', () => {
+    const { resolved, errors } = resolveStepParams(
+      { size: '=width * 2' },
+      { width: 5 },
+    );
+    expect(errors).toHaveLength(0);
+    expect((resolved as { size: number }).size).toBe(10);
+  });
+
+  it('resolveStepParams: array elements with =expr strings are resolved', () => {
+    const { resolved, errors } = resolveStepParams(
+      { position: ['=x', 0, '=z'] },
+      { x: 3, z: 7 },
+    );
+    expect(errors).toHaveLength(0);
+    expect((resolved as { position: number[] }).position).toEqual([3, 0, 7]);
+  });
+
+  it('resolveStepParams: nested object keys are resolved recursively', () => {
+    const { resolved, errors } = resolveStepParams(
+      { outer: { inner: '=val' } },
+      { val: 42 },
+    );
+    expect(errors).toHaveLength(0);
+    expect(
+      (resolved as { outer: { inner: number } }).outer.inner,
+    ).toBe(42);
+  });
+
+  it('resolveStepParams: unknown parameter reference → error recorded, original string kept', () => {
+    const { resolved, errors } = resolveStepParams(
+      { radius: '=missing_param' },
+      {},
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.expression).toBe('=missing_param');
+    expect(errors[0]!.reason).toContain('unknown parameter');
+    // The original =expr string is kept so the caller knows which param failed.
+    expect((resolved as { radius: string }).radius).toBe('=missing_param');
+  });
+
+  it('resolveStepParams: malformed =expr → error recorded, original string kept', () => {
+    const { resolved, errors } = resolveStepParams(
+      { size: '=width +' },
+      { width: 5 },
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.path).toBe('size');
+    expect((resolved as { size: string }).size).toBe('=width +');
+  });
+
+  it('resolveStepParams: boolean and null values pass through unchanged', () => {
+    const { resolved, errors } = resolveStepParams(
+      { flag: true, nothing: null },
+      {},
+    );
+    expect(errors).toHaveLength(0);
+    const r = resolved as { flag: boolean; nothing: null };
+    expect(r.flag).toBe(true);
+    expect(r.nothing).toBeNull();
+  });
+
+  it('resolveStepParams: error path is correct for array element', () => {
+    const { errors } = resolveStepParams(
+      { size: ['=a', '=b', '=c'] },
+      { a: 1 }, // b and c are missing
+    );
+    expect(errors).toHaveLength(2);
+    const paths = errors.map((e) => e.path).sort();
+    expect(paths).toEqual(['size[1]', 'size[2]']);
+  });
+
+  // ── buildParamEnv unit tests ─────────────────────────────────────────────
+
+  it('buildParamEnv: includes only parameters without errors', () => {
+    const parameters = {
+      width: { name: 'width', expression: '10', value: 10 },
+      bad: { name: 'bad', expression: '=ghost', value: 0, error: 'unknown parameter: ghost' },
+    };
+    const env = buildParamEnv(parameters);
+    expect(env['width']).toBe(10);
+    expect('bad' in env).toBe(false);
+  });
+
+  it('buildParamEnv: returns empty object when no parameters', () => {
+    const env = buildParamEnv({});
+    expect(Object.keys(env)).toHaveLength(0);
+  });
+
+  // ── replay with unresolvable =expr: graceful, summary reports it ─────────
+
+  it('replay_history reports unresolved =expr in summary without throwing', () => {
+    let doc = createEmptyDocument();
+    // Insert a step with an =expr referencing a parameter that does not exist.
+    doc = execute(doc, 'insert_step', {
+      name: 'add_box',
+      params: { size: ['=nonexistent', 2, 2] },
+    }).document;
+
+    const result = execute(doc, 'replay_history', {});
+    // Must not throw; must surface the warning in summary.
+    expect(result.summary).toContain('Unresolved');
+    expect(result.summary).toContain('nonexistent');
+    // The unresolved =expr string is left in place and passed to add_box (which does not
+    // currently validate size — see board follow-up KI6/add_box guard). The contract under
+    // test here is the REPLAY level: it completes without throwing and reports the failure.
+    expect(result.document).toBeDefined();
+  });
+
+  // ── =expr in nested position array (e.g. position: ["=x", 0, 0]) ─────────
+
+  it('=expr in position array is resolved and applied to entity position', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'xpos', expression: '15' }).document;
+
+    doc = execute(doc, 'insert_step', {
+      name: 'add_box',
+      params: { size: [1, 1, 1], position: ['=xpos', 0, 0] },
+    }).document;
+
+    const entityIds = Object.keys(doc.entities);
+    expect(entityIds).toHaveLength(1);
+    const entity = doc.entities[entityIds[0]!]!;
+    expect(entity.position).toEqual([15, 0, 0]);
+
+    // Change the parameter and replay — position must update.
+    doc = execute(doc, 'set_parameter', { name: 'xpos', expression: '30' }).document;
+    const result = execute(doc, 'replay_history', {});
+
+    const updatedIds = Object.keys(result.document.entities);
+    expect(updatedIds).toHaveLength(1);
+    expect(result.document.entities[updatedIds[0]!]!.position).toEqual([30, 0, 0]);
+    expect(result.summary).not.toContain('Unresolved');
+  });
+
+  // ── create_configuration ─────────────────────────────────────────────────
+
+  it('create_configuration stores a new configuration in the document', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_configuration', {
+      name: 'small',
+      parameterValues: { w: '10' },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document.configurations['small']).toBeDefined();
+    expect(result.document.configurations['small']!.name).toBe('small');
+    expect(result.document.configurations['small']!.parameterValues).toEqual({ w: '10' });
+    expect(result.summary).toContain('small');
+    expect(result.summary).toContain('w');
+  });
+
+  it('create_configuration replaces an existing configuration with the same name', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_configuration', { name: 'cfg', parameterValues: { w: '10' } }).document;
+    const result = execute(doc, 'create_configuration', { name: 'cfg', parameterValues: { w: '99' } });
+    expect(result.document.configurations['cfg']!.parameterValues).toEqual({ w: '99' });
+  });
+
+  it('create_configuration is pure — input document is not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'create_configuration', { name: 'small', parameterValues: { w: '10' } });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('create_configuration with blank name is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_configuration', { name: '', parameterValues: { w: '10' } });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('non-empty');
+  });
+
+  it('create_configuration with non-object parameterValues is a no-op', () => {
+    const doc = createEmptyDocument();
+    // Pass an array instead of a plain object.
+    const result = execute(doc, 'create_configuration', {
+      name: 'bad',
+      parameterValues: ['w', '10'] as unknown as Record<string, string>,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('parameterValues');
+  });
+
+  it('create_configuration with non-string value in parameterValues is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_configuration', {
+      name: 'bad',
+      parameterValues: { w: 42 as unknown as string },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain("parameterValues['w']");
+  });
+
+  // ── activate_configuration ───────────────────────────────────────────────
+
+  it('activate_configuration AC1 round-trip: small→10³ then large→40³', () => {
+    let doc = createEmptyDocument();
+
+    // Define parameter w and a box whose size uses =w.
+    doc = execute(doc, 'set_parameter', { name: 'w', expression: '10' }).document;
+    doc = execute(doc, 'insert_step', {
+      name: 'add_box',
+      params: { size: ['=w', '=w', '=w'] },
+    }).document;
+
+    // Create two configurations.
+    doc = execute(doc, 'create_configuration', { name: 'small', parameterValues: { w: '10' } }).document;
+    doc = execute(doc, 'create_configuration', { name: 'large', parameterValues: { w: '40' } }).document;
+
+    // Activate small — box should be 10×10×10.
+    const smallResult = execute(doc, 'activate_configuration', { name: 'small' });
+    const smallIds = Object.keys(smallResult.document.entities);
+    expect(smallIds).toHaveLength(1);
+    // @ts-expect-error narrowing through discriminated union not needed in test
+    expect(smallResult.document.entities[smallIds[0]!]!.size).toEqual([10, 10, 10]);
+    expect(smallResult.summary).toContain('small');
+
+    // Activate large — box should be 40×40×40.
+    const largeResult = execute(doc, 'activate_configuration', { name: 'large' });
+    const largeIds = Object.keys(largeResult.document.entities);
+    expect(largeIds).toHaveLength(1);
+    // @ts-expect-error narrowing through discriminated union not needed in test
+    expect(largeResult.document.entities[largeIds[0]!]!.size).toEqual([40, 40, 40]);
+    expect(largeResult.summary).toContain('large');
+  });
+
+  it('activate_configuration updates doc.parameters to the config values', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
+    doc = execute(doc, 'create_configuration', { name: 'big', parameterValues: { w: '100' } }).document;
+
+    const result = execute(doc, 'activate_configuration', { name: 'big' });
+    expect(result.document.parameters['w']!.expression).toBe('100');
+    expect(result.document.parameters['w']!.value).toBe(100);
+  });
+
+  it('activate_configuration preserves featureHistory unchanged', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    doc = execute(doc, 'create_configuration', { name: 'v', parameterValues: { w: '20' } }).document;
+
+    const historyBefore = JSON.stringify(doc.featureHistory);
+    const result = execute(doc, 'activate_configuration', { name: 'v' });
+    expect(JSON.stringify(result.document.featureHistory)).toBe(historyBefore);
+  });
+
+  it('activate_configuration is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
+    doc = execute(doc, 'create_configuration', { name: 'v', parameterValues: { w: '20' } }).document;
+
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'activate_configuration', { name: 'v' });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('activate_configuration with unknown config name is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'activate_configuration', { name: 'ghost' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ghost');
+    expect(result.summary).toContain('not found');
+  });
+
+  it('activate_configuration with blank name is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'activate_configuration', { name: '' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('non-empty');
+  });
+
+  it('activate_configuration referencing unknown parameter surfaces note in summary without throwing', () => {
+    let doc = createEmptyDocument();
+    // Config references "phantom" which does not exist in doc.parameters.
+    doc = execute(doc, 'create_configuration', {
+      name: 'test',
+      parameterValues: { phantom: '99' },
+    }).document;
+
+    const result = execute(doc, 'activate_configuration', { name: 'test' });
+    // Must not throw; must report the new parameter in the summary.
+    expect(result.document).toBeDefined();
+    expect(result.summary).toContain('phantom');
+    // The phantom parameter should have been created.
+    expect(result.document.parameters['phantom']).toBeDefined();
+    expect(result.document.parameters['phantom']!.value).toBe(99);
+  });
+
+  // ── persistence round-trip includes configurations ───────────────────────
+
+  it('persistence round-trip: configurations survive serialize/deserialize', async () => {
+    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_configuration', {
+      name: 'large',
+      parameterValues: { w: '40', h: '20' },
+    }).document;
+
+    const json = serializeDocument(doc);
+    const loaded = deserializeDocument(json);
+    expect(loaded.configurations['large']).toBeDefined();
+    expect(loaded.configurations['large']!.parameterValues).toEqual({ w: '40', h: '20' });
+  });
+
+  it('persistence: deserializeDocument defaults configurations to {} for old docs without it', async () => {
+    const { deserializeDocument } = await import('@core/commands/persistence');
+    // Simulate an old document envelope without a configurations field.
+    const oldDoc = {
+      format: 'llull-document',
+      version: 1,
+      document: {
+        entities: {},
+        order: [],
+        layers: { 'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false } },
+        layerOrder: ['layer-default'],
+        selection: [],
+        camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
+        // no configurations field
+      },
+    };
+    const loaded = deserializeDocument(JSON.stringify(oldDoc));
+    expect(loaded.configurations).toEqual({});
+  });
+
+  // ── registry 1:1 invariant still holds ───────────────────────────────────
+
+  it('toToolSchemas length equals listCommands length after configuration commands added', () => {
+    expect(toToolSchemas().length).toBe(listCommands().length);
   });
 });

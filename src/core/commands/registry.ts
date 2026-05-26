@@ -30,6 +30,7 @@ import { makeTubeBetween } from './composite';
 import { addText, addDimension } from './annotate';
 import { filletEdge, chamferEdge } from './modify3d';
 import { historyCommands, setRegistryRef } from './history';
+import { createConfiguration, activateConfiguration, setConfigRegistryRef } from './configurations';
 import {
   explodePolyline,
   offset2D,
@@ -127,15 +128,18 @@ const definitions = [
   filletEdge,
   chamferEdge,
   ...historyCommands,
+  createConfiguration,
+  activateConfiguration,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
   definitions.map((d) => [d.name, d]),
 );
 
-// Wire up the late-bound reference so history.ts can call getCommand without
-// a circular import at module load time.
+// Wire up the late-bound references so history.ts and configurations.ts can call
+// getCommand without a circular import at module load time.
 setRegistryRef((name) => byName.get(name));
+setConfigRegistryRef((name) => byName.get(name));
 
 export function listCommands(): ReadonlyArray<CommandDefinition<unknown>> {
   return definitions;
@@ -153,9 +157,12 @@ export function getCommand(name: string): CommandDefinition<unknown> | undefined
  * Feature history append rules (architecture L8):
  * - If the command is read-only (`annotations.readOnly`) it returns the same
  *   doc reference — no step is appended.
- * - If the command is a history meta-command (`annotations.metaHistory`) it
- *   edits the history list itself — appending would cause infinite recursion,
- *   so no step is appended.
+ * - If the command is flagged `annotations.metaHistory` no step is appended.
+ *   This covers two cases: history meta-commands (which edit the history list
+ *   itself — appending would recurse) and parameter-table commands
+ *   (`set_parameter`/`delete_parameter`), whose effect is document INPUT state,
+ *   not a replayable geometry step (L8). Their current values are carried into
+ *   replay via `base.parameters` in `replayHistory`.
  * - Otherwise, when the returned document reference differs from the input
  *   (i.e. the command actually mutated the document), a FeatureStep is
  *   appended to the new document's featureHistory.

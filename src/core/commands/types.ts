@@ -59,9 +59,12 @@ export interface CommandAnnotations {
    */
   readonly idempotent?: boolean;
   /**
-   * When true: this command edits the featureHistory list itself (or wholesale replaces the
-   * document) and must NOT cause `execute()` to append a new FeatureStep to the result.
-   * Used by history meta-commands and `load_document`. Not emitted to MCP tool schemas.
+   * When true: `execute()` must NOT append a new FeatureStep for this command. Covers three
+   * cases that are not replayable geometry steps: history meta-commands (which edit the
+   * featureHistory list itself — appending would recurse), `load_document` (wholesale doc
+   * replacement), and parameter-table commands (`set_parameter`/`delete_parameter`) whose
+   * effect is document INPUT state, not recipe geometry (architecture L8). Not emitted to
+   * MCP tool schemas.
    */
   readonly metaHistory?: boolean;
 }

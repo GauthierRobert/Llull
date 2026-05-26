@@ -82,9 +82,12 @@ function topoSort(parameters: Readonly<Record<string, Parameter>>): {
  * Re-evaluate ALL parameters in topological order and return a new parameters
  * record. Parameters with cycles or unknown references are marked with `error`.
  *
+ * Exported so that commands that batch-update parameters (e.g. `activate_configuration`)
+ * can reuse the same topo-sort re-eval logic without duplicating it.
+ *
  * @pure — does not mutate input.
  */
-function reEvaluateAll(
+export function reEvaluateAll(
   parameters: Readonly<Record<string, Parameter>>,
 ): Record<string, Parameter> {
   const { sorted, cycleSet } = topoSort(parameters);
@@ -136,7 +139,12 @@ interface SetParameterParams {
  */
 export const setParameter: CommandDefinition<SetParameterParams> = {
   name: 'set_parameter',
-  annotations: { idempotent: true },
+  // metaHistory: parameters are first-class document state (the recipe's INPUTS),
+  // not geometry-recipe steps (architecture L8). They are excluded from
+  // featureHistory so editing a parameter and replaying re-evaluates dependent
+  // `=expr` steps against the CURRENT value (carried into replay via base.parameters)
+  // rather than replaying a stale set_parameter step at its historical position.
+  annotations: { idempotent: true, metaHistory: true },
   description:
     'Create or update a named numeric parameter in the document. ' +
     'The expression may be a numeric literal (e.g. "10") or reference other ' +
@@ -239,7 +247,9 @@ interface DeleteParameterParams {
  */
 export const deleteParameter: CommandDefinition<DeleteParameterParams> = {
   name: 'delete_parameter',
-  annotations: { destructive: true },
+  // metaHistory: see set_parameter — the parameter table is document state, not a
+  // replayable geometry-recipe step.
+  annotations: { destructive: true, metaHistory: true },
   description:
     'Remove a named parameter from the document. ' +
     'The parameter record is deleted; any other parameters whose expressions ' +

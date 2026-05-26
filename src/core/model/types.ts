@@ -385,6 +385,27 @@ export interface EntityGroup {
 }
 
 /**
+ * A named set of parameter-value overrides that produces a model variant.
+ *
+ * Each entry in `parameterValues` maps a parameter name to an expression string
+ * (the same format as `Parameter.expression`). Activating a configuration applies
+ * those expressions to `CadDocument.parameters` and replays the feature history so
+ * `=expr` geometry regenerates with the variant's values.
+ *
+ * @see create_configuration, activate_configuration
+ */
+export interface Configuration {
+  /** Human-readable identifier, also used as the configuration key. */
+  readonly name: string;
+  /**
+   * Map of parameter name → expression string for this variant.
+   * Only parameters listed here are changed when the configuration is activated;
+   * all other parameters retain their current expressions.
+   */
+  parameterValues: Record<string, string>;
+}
+
+/**
  * A named numeric parameter that can reference other parameters via expressions.
  *
  * `expression` is the source of truth (e.g. `"width * 2"` or a literal `"10"`).
@@ -531,6 +552,14 @@ export interface CadDocument {
    * Initialized as [] in createEmptyDocument.
    */
   featureHistory: FeatureStep[];
+  /**
+   * Named parameter-value sets ("design table"). Each entry maps a configuration
+   * name to a `Configuration` that lists parameter expressions for that variant.
+   * Activating a configuration overwrites the listed parameters and replays the
+   * feature history so `=expr` geometry regenerates as the variant.
+   * Initialized as {} in createEmptyDocument.
+   */
+  configurations: Record<string, Configuration>;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';
@@ -561,5 +590,6 @@ export function createEmptyDocument(): CadDocument {
     parameters: {},
     animations: {},
     featureHistory: [],
+    configurations: {},
   };
 }
