@@ -97,7 +97,60 @@ export function resolveStepParams(
 }
 
 // ---------------------------------------------------------------------------
-// Internal recursive helpers
+// Public API — id remapping
+// ---------------------------------------------------------------------------
+
+/**
+ * Recursively walk a step's params object/array and replace any STRING value
+ * that is a key in `idMap` with the corresponding mapped value.
+ *
+ * This is used during `replayHistory` to rewrite stale entity-id references
+ * in subsequent steps' params after earlier creation steps produced new ids.
+ *
+ * Rules (mirrors `resolveStepParams`):
+ * - A string value that exists as a key in `idMap` is replaced with `idMap[value]`.
+ * - All other string values pass through unchanged (non-id strings are safe).
+ * - Arrays are walked element-by-element.
+ * - Plain objects are walked key-by-key recursively.
+ * - Primitives (number, boolean, null, undefined) pass through unchanged.
+ * - The function never throws; `params` is never mutated.
+ *
+ * @pure
+ * @invariant `params` is never mutated; new objects/arrays are always returned.
+ */
+export function remapIds(params: unknown, idMap: ReadonlyMap<string, string>): unknown {
+  // Blind walk (no per-command id-param allowlist): a free-text param equal to a prior
+  // id (`prefix-base36-base36`) would be rewritten, but such a collision is astronomically
+  // unlikely. If it ever matters, add an id-param-path allowlist.
+  if (idMap.size === 0) return params;
+  return remapValue(params, idMap);
+}
+
+// ---------------------------------------------------------------------------
+// Internal recursive helpers — remapIds
+// ---------------------------------------------------------------------------
+
+function remapValue(value: unknown, idMap: ReadonlyMap<string, string>): unknown {
+  if (typeof value === 'string') {
+    const mapped = idMap.get(value);
+    return mapped !== undefined ? mapped : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => remapValue(item, idMap));
+  }
+  if (value !== null && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      result[key] = remapValue(val, idMap);
+    }
+    return result;
+  }
+  return value;
+}
+
+// ---------------------------------------------------------------------------
+// Internal recursive helpers — resolveStepParams
 // ---------------------------------------------------------------------------
 
 function resolveValue(

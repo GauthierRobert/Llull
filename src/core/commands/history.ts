@@ -19,7 +19,7 @@ import type { CadDocument, FeatureStep } from '../model/types';
 import { createEmptyDocument } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
-import { buildParamEnv, resolveStepParams } from './regenerate';
+import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
 
 // ---------------------------------------------------------------------------
 // Late-bound registry reference (breaks circular dep)
@@ -81,13 +81,17 @@ export function replayHistory(
     featureHistory: history,
   };
 
+  // idMap tracks old entity id (from when the step was first recorded) → new id
+  // (assigned during this replay). Subsequent steps' params are rewritten via
+  // remapIds so that id references survive even though nextId() produces new ids.
+  const idMap = new Map<string, string>();
+
   for (const step of history) {
     if (step.suppressed) continue;
     const cmd = getCommandFn(step.name);
     if (!cmd) continue; // Unknown command — skip gracefully.
     try {
-      // Resolve any `=expr` strings in step.params against the current
-      // parameter environment before running the command (KI3: constructive→evaluated).
+      // 1. Resolve any `=expr` strings against the current parameter environment.
       const env = buildParamEnv(doc.parameters);
       const { resolved, errors } = resolveStepParams(step.params, env);
       for (const e of errors) {
@@ -95,9 +99,25 @@ export function replayHistory(
           `step '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`,
         );
       }
-      const result = cmd.run(doc, resolved);
+      // 2. Rewrite stale entity-id references using the accumulated idMap.
+      const remapped = remapIds(resolved, idMap);
+      const result = cmd.run(doc, remapped);
       // Accept the new geometry but keep OUR featureHistory intact.
       doc = { ...result.document, featureHistory: history };
+
+      // 3. Extend idMap: zip step.affected (old ids) with result.affected (new ids)
+      // positionally. Commands produce entities in the same order given the same
+      // params, so positional zip is correct. If lengths differ, map the common prefix.
+      if (step.affected && step.affected.length > 0 && result.affected.length > 0) {
+        const len = Math.min(step.affected.length, result.affected.length);
+        for (let i = 0; i < len; i++) {
+          const oldId = step.affected[i];
+          const newId = result.affected[i];
+          if (oldId !== undefined && newId !== undefined && oldId !== newId) {
+            idMap.set(oldId, newId);
+          }
+        }
+      }
     } catch {
       // A step that throws (e.g. referencing a now-deleted entity) is skipped.
     }

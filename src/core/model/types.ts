@@ -515,6 +515,15 @@ export interface FeatureStep {
   suppressed?: boolean;
   /** Optional human/AI-readable label for this step, e.g. "Base plate". */
   label?: string;
+  /**
+   * Entity ids created or affected when this step was first recorded.
+   * Populated by `execute()` from `CommandResult.affected`.
+   * Used during `replayHistory` to maintain an old→new id map so that
+   * subsequent steps referencing these ids are rewritten to the new ids.
+   * Optional for back-compat: steps without this field degrade to the
+   * pre-remapping behavior (affected ids may not be found during replay).
+   */
+  affected?: readonly EntityId[];
 }
 
 export interface CadDocument {

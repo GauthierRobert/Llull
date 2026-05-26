@@ -19,7 +19,13 @@ export interface CommandResult {
   document: CadDocument;
   /** Human/AI-readable summary of what happened (great for AI feedback loops). */
   summary: string;
-  /** Ids of entities created or affected — lets the caller select/highlight them. */
+  /**
+   * Ids of entities created or affected — lets the caller select/highlight them.
+   * @invariant Ordering MUST be deterministic for the same (doc-shape, params): the
+   * feature-history replay (Q4) positionally zips a step's recorded `affected` (old ids)
+   * with the replay's `affected` (new ids) to remap downstream id references. A command
+   * that creates multiple entities must list them in a stable order across runs.
+   */
   affected: string[];
   /**
    * Structured result for read-only/query commands (e.g. measure_distance,

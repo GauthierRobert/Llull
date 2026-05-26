@@ -199,6 +199,7 @@ export function execute(
     name: commandName,
     params,
     suppressed: false,
+    affected: result.affected,
   };
 
   return {

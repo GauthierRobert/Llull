@@ -3715,3 +3715,264 @@ describe('KI3 — =expr param resolution in replay_history', () => {
     expect(toToolSchemas().length).toBe(listCommands().length);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Q4 — Stable entity ids across replayHistory (id-remapping)
+// ---------------------------------------------------------------------------
+
+describe('Q4 — replayHistory id-remapping', () => {
+  beforeEach(() => __resetIdCounter());
+
+  // ── AC1: move + assign_material + delete all survive replay ─────────────
+
+  it('AC1: move_entity applied to a replayed entity lands at the correct position', () => {
+    let doc = createEmptyDocument();
+    // Step 1: create box
+    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = r1.document;
+    const originalId = r1.affected[0]!;
+
+    // Step 2: move it
+    doc = execute(doc, 'move_entity', { id: originalId, delta: [5, 0, 0] }).document;
+
+    // Replay: the box gets a new id, but move must be remapped to the new id.
+    const replayed = execute(doc, 'replay_history', {});
+    const entities = Object.values(replayed.document.entities);
+    expect(entities).toHaveLength(1);
+    expect(entities[0]!.position).toEqual([5, 0, 0]);
+  });
+
+  it('AC1: assign_material survives replay — entity retains materialId', () => {
+    let doc = createEmptyDocument();
+    // Create material
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.1,
+    }).document;
+    // Create box
+    const r1 = execute(doc, 'add_box', { size: [3, 3, 3] });
+    doc = r1.document;
+    const originalId = r1.affected[0]!;
+    // Assign material using the original id
+    doc = execute(doc, 'assign_material', {
+      materialName: 'steel',
+      entityIds: [originalId],
+    }).document;
+    // Verify live doc has the material assignment
+    expect(doc.entities[originalId]!.materialId).toBe('steel');
+
+    // Replay: box gets new id; assign_material step must be remapped to new id.
+    const replayed = execute(doc, 'replay_history', {});
+    const entities = Object.values(replayed.document.entities);
+    expect(entities).toHaveLength(1);
+    expect(entities[0]!.materialId).toBe('steel');
+  });
+
+  it('AC1: delete_entity step is faithfully replayed — entity is absent after replay', () => {
+    let doc = createEmptyDocument();
+    // Create two boxes
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
+    doc = r2.document;
+    const idToDelete = r1.affected[0]!;
+
+    // Delete the first box
+    doc = execute(doc, 'delete_entity', { id: idToDelete }).document;
+    expect(Object.keys(doc.entities)).toHaveLength(1);
+
+    // Replay: only 1 entity should remain (the deletion is faithfully applied)
+    const replayed = execute(doc, 'replay_history', {});
+    expect(Object.keys(replayed.document.entities)).toHaveLength(1);
+    const remaining = Object.values(replayed.document.entities)[0]!;
+    expect(remaining.kind).toBe('box');
+  });
+
+  it('AC1: combined — add_box → move → assign_material → delete another box all survive replay', () => {
+    let doc = createEmptyDocument();
+    // Create material
+    doc = execute(doc, 'create_material', {
+      name: 'aluminium',
+      density: 0.0027,
+      color: '#c0c0c0',
+      metalness: 0.8,
+      roughness: 0.2,
+    }).document;
+    // Add box A
+    const rA = execute(doc, 'add_box', { size: [4, 4, 4], position: [0, 0, 0] });
+    doc = rA.document;
+    const idA = rA.affected[0]!;
+    // Add box B
+    const rB = execute(doc, 'add_box', { size: [1, 1, 1], position: [10, 0, 0] });
+    doc = rB.document;
+    const idB = rB.affected[0]!;
+    // Move box A
+    doc = execute(doc, 'move_entity', { id: idA, delta: [3, 3, 0] }).document;
+    // Assign material to box A
+    doc = execute(doc, 'assign_material', {
+      materialName: 'aluminium',
+      entityIds: [idA],
+    }).document;
+    // Delete box B
+    doc = execute(doc, 'delete_entity', { id: idB }).document;
+
+    // Live doc assertions
+    expect(Object.keys(doc.entities)).toHaveLength(1);
+    expect(doc.entities[idA]!.position).toEqual([3, 3, 0]);
+    expect(doc.entities[idA]!.materialId).toBe('aluminium');
+
+    // Replay assertions
+    const replayed = execute(doc, 'replay_history', {});
+    const replayedEntities = Object.values(replayed.document.entities);
+    expect(replayedEntities).toHaveLength(1);
+    expect(replayedEntities[0]!.position).toEqual([3, 3, 0]);
+    expect(replayedEntities[0]!.materialId).toBe('aluminium');
+  });
+
+  // ── AC2: multi-id creation step (duplicate_entity) survives ─────────────
+
+  it('AC2: duplicate_entity — subsequent move of the duplicate survives replay', () => {
+    let doc = createEmptyDocument();
+    // Create original
+    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = r1.document;
+    const originalId = r1.affected[0]!;
+    // Duplicate it
+    const rDup = execute(doc, 'duplicate_entity', { id: originalId, offset: [5, 0, 0] });
+    doc = rDup.document;
+    const dupId = rDup.affected[0]!;
+    // Move the duplicate
+    doc = execute(doc, 'move_entity', { id: dupId, delta: [0, 3, 0] }).document;
+
+    // Live doc: duplicate should be at [5, 3, 0]
+    expect(doc.entities[dupId]!.position).toEqual([5, 3, 0]);
+
+    // Replay: both entities present; moved duplicate is at [5, 3, 0]
+    const replayed = execute(doc, 'replay_history', {});
+    const replayedEntities = Object.values(replayed.document.entities);
+    expect(replayedEntities).toHaveLength(2);
+    const movedEntity = replayedEntities.find((e) => e.position[1] === 3);
+    expect(movedEntity).toBeDefined();
+    expect(movedEntity!.position).toEqual([5, 3, 0]);
+  });
+
+  // ── AC3: back-compat — steps without affected degrade gracefully ─────────
+
+  it('AC3: steps without affected field (old doc) replay without throwing', () => {
+    // Build a doc via execute (steps have affected), then strip affected from steps
+    // to simulate an old saved document.
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    doc = execute(doc, 'add_sphere', { radius: 3 }).document;
+
+    // Strip affected from all steps to simulate old format.
+    const strippedHistory = doc.featureHistory.map((step) => {
+      const { affected: _affected, ...rest } = step as typeof step & { affected?: unknown };
+      void _affected;
+      return rest;
+    });
+    const oldDoc = { ...doc, featureHistory: strippedHistory };
+
+    // Should not throw; should replay both entities (add_box + add_sphere don't
+    // reference prior ids so they succeed regardless of idMap).
+    const replayed = execute(oldDoc, 'replay_history', {});
+    expect(Object.keys(replayed.document.entities)).toHaveLength(2);
+  });
+
+  // ── remapIds unit tests ───────────────────────────────────────────────────
+
+  it('remapIds: replaces a string value that is a key in idMap', async () => {
+    const { remapIds } = await import('@core/commands/regenerate');
+    const idMap = new Map([['old-1', 'new-1']]);
+    const result = remapIds({ id: 'old-1', size: [1, 1, 1] }, idMap) as {
+      id: string;
+      size: number[];
+    };
+    expect(result.id).toBe('new-1');
+    expect(result.size).toEqual([1, 1, 1]);
+  });
+
+  it('remapIds: does not touch strings that are NOT in idMap', async () => {
+    const { remapIds } = await import('@core/commands/regenerate');
+    const idMap = new Map([['old-1', 'new-1']]);
+    const result = remapIds({ id: 'some-label', count: 3 }, idMap) as { id: string };
+    expect(result.id).toBe('some-label');
+  });
+
+  it('remapIds: remaps ids inside arrays', async () => {
+    const { remapIds } = await import('@core/commands/regenerate');
+    const idMap = new Map([['a', 'x'], ['b', 'y']]);
+    const result = remapIds({ entityIds: ['a', 'b', 'c'] }, idMap) as {
+      entityIds: string[];
+    };
+    expect(result.entityIds).toEqual(['x', 'y', 'c']);
+  });
+
+  it('remapIds: does not mutate the input params', async () => {
+    const { remapIds } = await import('@core/commands/regenerate');
+    const idMap = new Map([['old-1', 'new-1']]);
+    const params = { id: 'old-1', nested: { ref: 'old-1' } };
+    const snapshot = JSON.stringify(params);
+    remapIds(params, idMap);
+    expect(JSON.stringify(params)).toBe(snapshot);
+  });
+
+  it('remapIds: empty idMap returns params unchanged (fast path)', async () => {
+    const { remapIds } = await import('@core/commands/regenerate');
+    const params = { id: 'some-id', size: [1, 2, 3] };
+    const result = remapIds(params, new Map());
+    // Fast path: same reference when idMap is empty.
+    expect(result).toBe(params);
+  });
+
+  // ── FeatureStep.affected is stored by execute() ──────────────────────────
+
+  it('execute() stores result.affected on the FeatureStep', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_box', { size: [1, 1, 1] });
+    const step = result.document.featureHistory[0]!;
+    expect(step.affected).toBeDefined();
+    expect(step.affected).toEqual(result.affected);
+  });
+
+  it('execute() stores affected for move_entity (single entity mutation)', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const id = r1.affected[0]!;
+    const result = execute(doc, 'move_entity', { id, delta: [1, 0, 0] });
+    const moveStep = result.document.featureHistory[1]!;
+    expect(moveStep.name).toBe('move_entity');
+    expect(moveStep.affected).toEqual([id]);
+  });
+
+  it('AC2: multi-id producer (array_linear) — moving the Nth copy survives replay (locks positional-zip ordering)', () => {
+    let doc = createEmptyDocument();
+    const rBox = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = rBox.document;
+    const baseId = rBox.affected[0]!;
+    // Array into 3 (count-1 = 2 new copies) along +X: affected lists the new copies in order.
+    const rArr = execute(doc, 'array_linear', { id: baseId, count: 3, offset: [5, 0, 0] });
+    doc = rArr.document;
+    expect(rArr.affected.length).toBeGreaterThanOrEqual(2);
+    const secondCopyId = rArr.affected[1]!; // a specific copy by position in `affected`
+    // Move exactly that copy up in Y.
+    doc = execute(doc, 'move_entity', { id: secondCopyId, delta: [0, 7, 0] }).document;
+    const liveY = doc.entities[secondCopyId]!.position[1];
+    expect(liveY).toBe(7);
+
+    // Replay: the moved copy must still be the one displaced by +7 in Y (positional
+    // zip of array_linear's `affected` must map the SAME copy across regeneration).
+    const replayed = execute(doc, 'replay_history', {});
+    const movedInReplay = Object.values(replayed.document.entities).filter(
+      (e) => e.position[1] === 7,
+    );
+    expect(movedInReplay).toHaveLength(1);
+    // And exactly one entity is displaced — no other copy accidentally got the move.
+    const total = Object.keys(replayed.document.entities).length;
+    expect(total).toBe(Object.keys(doc.entities).length);
+  });
+});
