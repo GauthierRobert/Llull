@@ -25,6 +25,7 @@ import { setUnits } from './units';
 import { setParameter, deleteParameter } from './parameters';
 import { checkModel } from './check';
 import { renderView } from './render';
+import { makeTubeBetween } from './composite';
 import {
   explodePolyline,
   offset2D,
@@ -116,6 +117,7 @@ const definitions = [
   animateOscillate,
   stopAnimation,
   renderView,
+  makeTubeBetween,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

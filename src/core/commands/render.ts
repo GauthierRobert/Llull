@@ -113,6 +113,83 @@ function r2(n: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// Euler rotation helpers (three.js 'XYZ' intrinsic order = M = Rx·Ry·Rz)
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply a three.js-style intrinsic XYZ Euler rotation (M = Rx · Ry · Rz) to a
+ * world-space vertex, rotating about `origin`.  Matches the live viewport which
+ * uses `<mesh rotation={[rx,ry,rz]}/>` (three.js default Euler order 'XYZ').
+ *
+ * Column-vector composition: Rz acts on the vector first, then Ry, then Rx.
+ * Verified against three.js Matrix4.makeRotationFromEuler (XYZ order), where
+ * M[0][2] = sin(y) — consistent with Rx·Ry·Rz applied to (0,0,1), not Rz·Ry·Rx.
+ *
+ * @pure
+ */
+export function applyEulerXYZ(v: Vec3, origin: Vec3, euler: Vec3): Vec3 {
+  const [rx, ry, rz] = euler;
+  // Translate to origin-relative space
+  let x = v[0] - origin[0];
+  let y = v[1] - origin[1];
+  let z = v[2] - origin[2];
+
+  // three.js Euler('XYZ') means M = Rx · Ry · Rz applied as M·v
+  // (i.e. Rz is applied to the vector first, then Ry, then Rx)
+
+  // Rz first
+  const czr = Math.cos(rz), szr = Math.sin(rz);
+  const x1 = czr * x - szr * y;
+  const y1 = szr * x + czr * y;
+  x = x1; y = y1;
+
+  // Ry second
+  const cyr = Math.cos(ry), syr = Math.sin(ry);
+  const x2 = cyr * x + syr * z;
+  const z2 = -syr * x + cyr * z;
+  x = x2; z = z2;
+
+  // Rx last
+  const cxr = Math.cos(rx), sxr = Math.sin(rx);
+  const y3 = cxr * y - sxr * z;
+  const z3 = sxr * y + cxr * z;
+  y = y3; z = z3;
+
+  return [x + origin[0], y + origin[1], z + origin[2]];
+}
+
+/**
+ * Apply the same intrinsic XYZ Euler rotation to a direction vector (normal).
+ * No translation — normals transform by the same rotation matrix.
+ *
+ * @pure
+ */
+function rotateNormalXYZ(n: Vec3, euler: Vec3): Vec3 {
+  return applyEulerXYZ(n, [0, 0, 0], euler);
+}
+
+/** True when the rotation is the identity — lets us skip the rotation pass cheaply. */
+function isZeroRotation(euler: Vec3): boolean {
+  return euler[0] === 0 && euler[1] === 0 && euler[2] === 0;
+}
+
+/**
+ * Apply entity rotation to every polygon produced by a tessellator.
+ * Verts are rotated about `position`; normals are rotated without translation.
+ * No-op when rotation is [0,0,0].
+ *
+ * @pure
+ */
+function applyRotation(polys: PreDepthPolygon[], position: Vec3, rotation: Vec3): PreDepthPolygon[] {
+  if (isZeroRotation(rotation)) return polys;
+  return polys.map((poly) => ({
+    ...poly,
+    verts: poly.verts.map((v) => applyEulerXYZ(v, position, rotation)),
+    normal: rotateNormalXYZ(poly.normal, rotation),
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Camera / view
 // ---------------------------------------------------------------------------
 
@@ -579,15 +656,17 @@ function tessellate2DPoint(e: { position: Vec3; color: string }): PreDepthPolygo
 
 function tessellateEntity(e: Entity): PreDepthPolygon[] {
   switch (e.kind) {
-    case 'box':      return tessellateBox(e);
-    case 'cylinder': return tessellateCylinder(e);
-    case 'sphere':   return tessellateSphere(e);
-    case 'cone':     return tessellateCone(e);
-    case 'torus':    return tessellateTorus(e);
-    case 'wedge':    return tessellateWedge(e);
-    case 'pyramid':  return tessellatePyramid(e);
-    case 'extrusion':return tessellateExtrusion(e);
-    case 'mesh':     return tessellateMesh(e);
+    // 3D solids — apply entity rotation (three.js intrinsic XYZ Euler order)
+    case 'box':      return applyRotation(tessellateBox(e),       e.position, e.rotation);
+    case 'cylinder': return applyRotation(tessellateCylinder(e),  e.position, e.rotation);
+    case 'sphere':   return applyRotation(tessellateSphere(e),    e.position, e.rotation);
+    case 'cone':     return applyRotation(tessellateCone(e),      e.position, e.rotation);
+    case 'torus':    return applyRotation(tessellateTorus(e),     e.position, e.rotation);
+    case 'wedge':    return applyRotation(tessellateWedge(e),     e.position, e.rotation);
+    case 'pyramid':  return applyRotation(tessellatePyramid(e),   e.position, e.rotation);
+    case 'extrusion':return applyRotation(tessellateExtrusion(e), e.position, e.rotation);
+    case 'mesh':     return applyRotation(tessellateMesh(e),      e.position, e.rotation);
+    // 2D shapes — rotation not applied here (2D plane orientation is out of scope)
     case 'line':     return tessellate2DLine(e);
     case 'polyline': return tessellate2DPolyline(e);
     case 'arc':      return tessellate2DArc(e);

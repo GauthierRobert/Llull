@@ -8,3 +8,4 @@ coverage
 .vite
 .idea
 .claude/worktrees
+.playwright-mcp

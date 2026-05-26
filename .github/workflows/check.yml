@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Typecheck + Lint + Test + Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install server dependencies
+        run: npm ci --prefix server
+
+      # Canonical gate: typecheck + lint + tests (mirrors `npm run check`)
+      - name: Run check (typecheck + lint + tests)
+        run: npm run check
+
+      # Coverage gate: 90/85/90/90 on src/core/commands/**
+      - name: Run coverage (90/85/90/90 gate)
+        run: npm run test:coverage
+
+      # Server typecheck
+      - name: Server typecheck
+        run: npm --prefix server run typecheck
+
+      # Registry 1:1 guard: listCommands() must match toToolSchemas() exactly
+      - name: Registry schema 1:1 guard
+        run: npx tsx scripts/check-registry-schema.ts
