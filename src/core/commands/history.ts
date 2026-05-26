@@ -79,6 +79,10 @@ export function replayHistory(
     layers: base.layers,
     layerOrder: base.layerOrder,
     featureHistory: history,
+    // Recipes must survive replay so that a recorded `instantiate_recipe` step can
+    // re-expand its recipe when this history is replayed again (e.g. via replay_history).
+    // NB: configurations/materials are similarly not preserved here — see AI6
+    recipes: base.recipes,
   };
 
   // idMap tracks old entity id (from when the step was first recorded) → new id

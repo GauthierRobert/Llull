@@ -526,6 +526,25 @@ export interface FeatureStep {
   affected?: readonly EntityId[];
 }
 
+/**
+ * A named, reusable constructive recipe.
+ *
+ * A recipe is a snapshot of a `featureHistory` sequence. Calling `instantiate_recipe`
+ * re-plays those steps ADDITIVELY on the current document, assigning fresh entity ids.
+ * This lets an agent define a parametric sub-assembly once and stamp it out many times.
+ *
+ * @see save_recipe   — snapshot the current featureHistory into a named recipe
+ * @see instantiate_recipe — replay a recipe additively with fresh entity ids
+ */
+export interface Recipe {
+  /** Lookup key in `CadDocument.recipes` and displayed label; also used by `instantiate_recipe`. */
+  readonly name: string;
+  /** Ordered constructive steps — a deep copy of the featureHistory at save time. */
+  readonly steps: FeatureStep[];
+  /** Optional human/AI note describing the recipe's purpose. */
+  label?: string;
+}
+
 export interface CadDocument {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
@@ -583,6 +602,15 @@ export interface CadDocument {
    * Initialized as {} in createEmptyDocument.
    */
   materials: Record<string, Material>;
+  /**
+   * Named constructive recipes. Keyed by recipe name.
+   * Each recipe is a snapshot of a featureHistory sequence that can be re-instantiated
+   * additively onto any document any number of times, assigning fresh entity ids each time.
+   * Recipes let an agent save a build sequence once and stamp it out many times.
+   * @see save_recipe, instantiate_recipe
+   * Initialized as {} in createEmptyDocument.
+   */
+  recipes: Record<string, Recipe>;
 }
 
 /**
@@ -653,5 +681,6 @@ export function createEmptyDocument(): CadDocument {
     featureHistory: [],
     configurations: {},
     materials: {},
+    recipes: {},
   };
 }

@@ -33,6 +33,7 @@ import { instantiateTemplate } from './templates';
 import { historyCommands, setRegistryRef } from './history';
 import { createConfiguration, activateConfiguration, setConfigRegistryRef } from './configurations';
 import { createMaterial, assignMaterial } from './materials';
+import { saveRecipe, instantiateRecipe, setRecipeRegistryRef } from './recipes';
 import {
   explodePolyline,
   offset2D,
@@ -137,16 +138,19 @@ const definitions = [
   createMaterial,
   assignMaterial,
   exportStl,
+  saveRecipe,
+  instantiateRecipe,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
   definitions.map((d) => [d.name, d]),
 );
 
-// Wire up the late-bound references so history.ts and configurations.ts can call
-// getCommand without a circular import at module load time.
+// Wire up the late-bound references so history.ts, configurations.ts, and recipes.ts
+// can call getCommand without a circular import at module load time.
 setRegistryRef((name) => byName.get(name));
 setConfigRegistryRef((name) => byName.get(name));
+setRecipeRegistryRef((name) => byName.get(name));
 
 export function listCommands(): ReadonlyArray<CommandDefinition<unknown>> {
   return definitions;

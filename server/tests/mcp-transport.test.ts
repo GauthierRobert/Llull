@@ -31,6 +31,7 @@ import { app } from '../src/index';
 import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { listCommands } from '@core/commands/registry';
+import { buildBridgeToolDefinitions } from '@core/mcp';
 
 // ---------------------------------------------------------------------------
 // SSE parsing helpers
@@ -196,22 +197,25 @@ describe('MCP initialize handshake', () => {
 // ---------------------------------------------------------------------------
 
 describe('MCP tools/list', () => {
-  it('returns one tool per registered command', async () => {
+  it('returns one tool per registered command, plus the bridge tools', async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
     const tools = await mcpListTools(sessionId);
-    expect(tools.length).toBe(listCommands().length);
+    expect(tools.length).toBe(listCommands().length + buildBridgeToolDefinitions().length);
   });
 
-  it('tool names match the registered command names', async () => {
+  it('tool names match the registered command names followed by the bridge tools', async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
     const tools = await mcpListTools(sessionId);
-    const registeredNames = listCommands().map((c) => c.name);
+    const expectedNames = [
+      ...listCommands().map((c) => c.name),
+      ...buildBridgeToolDefinitions().map((t) => t.name),
+    ];
     const toolNames = tools.map((t) => t.name);
-    expect(toolNames).toEqual(registeredNames);
+    expect(toolNames).toEqual(expectedNames);
   });
 });
 
