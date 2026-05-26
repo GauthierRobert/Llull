@@ -62,6 +62,7 @@ import {
   buildTurntableFrames,
   buildIsolateSvg,
   appendDimensionLabels,
+  appendAxesAndGrid,
   buildSectionSvg,
   type RenderViewEnrichParams,
 } from './renderViewEnrich';
@@ -201,7 +202,7 @@ function buildRateLimiter(): ReturnType<typeof rateLimit> {
 // ---------------------------------------------------------------------------
 
 /** The set of param keys that are handled server-side (not forwarded to core). */
-const ENRICH_PARAM_KEYS = new Set(['turntable', 'isolate', 'showDimensions', 'section']);
+const ENRICH_PARAM_KEYS = new Set(['turntable', 'isolate', 'showDimensions', 'section', 'showAxes', 'showGrid']);
 
 /**
  * Strip enrichment-only params from a render_view args object so the core
@@ -221,25 +222,35 @@ function stripEnrichParams(args: unknown): unknown {
  * Apply server-side render_view enrichments when any enrichment param is present.
  *
  * Returns a `CallToolResult` when enrichment was applied, or `null` when no
- * enrichment params are present (caller falls through to normal applyCommand path).
+ * enrichment params are present and neither showAxes nor showGrid are requested
+ * (caller falls through to normal applyCommand path).
  *
- * Enrichments are applied in this priority order (only the first active one wins,
- * except showDimensions which composes with any other enrichment):
+ * Enrichments are applied in this priority order (only the first mutually-exclusive
+ * one wins; showDimensions, showAxes, and showGrid compose with any other enrichment):
  *   1. turntable → N-frame horizontal PNG strip
  *   2. isolate   → highlight specific entities
  *   3. section   → section-plane view
- *   4. (base render via applyCommand + showDimensions post-process)
+ *   4. showDimensions / showAxes / showGrid only → base render + post-process
+ *
+ * showAxes and showGrid default to true when not explicitly set to false.
  */
 function applyRenderViewEnrichments(
   args: Record<string, unknown>,
   getDoc: () => CadDocument,
 ): CallToolResult | null {
   const params = args as RenderViewEnrichParams;
+
+  // showAxes and showGrid default to true (not false)
+  const wantAxes = params.showAxes !== false;
+  const wantGrid = params.showGrid !== false;
+
   const hasEnrichment =
     params.turntable !== undefined ||
     params.isolate !== undefined ||
     params.showDimensions === true ||
-    params.section !== undefined;
+    params.section !== undefined ||
+    wantAxes ||
+    wantGrid;
 
   if (!hasEnrichment) return null;
 
@@ -249,6 +260,7 @@ function applyRenderViewEnrichments(
   const baseHeight = typeof params.height === 'number' ? Math.max(64, Math.min(2000, Math.round(params.height))) : 600;
 
   const doc = getDoc();
+  const docUnits: string = doc.units ?? 'mm';
 
   // ------------------------------------------------------------------
   // turntable: N-frame horizontal strip
@@ -307,12 +319,19 @@ function applyRenderViewEnrichments(
       return makeErrorResult('render_view isolate: render failed.');
     }
 
-    // Compose showDimensions on top if requested
-    if (params.showDimensions === true) {
-      const baseResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
-      if (baseResult.data) {
-        svg = appendDimensionLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData);
-      }
+    // Compose overlay enrichments on top
+    const baseResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+    if (params.showDimensions === true && baseResult.data) {
+      svg = appendDimensionLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData);
+    }
+    if ((wantAxes || wantGrid) && baseResult.data) {
+      svg = appendAxesAndGrid(
+        svg,
+        baseResult.data as import('@core/commands/render').RenderViewData,
+        docUnits,
+        wantAxes,
+        wantGrid,
+      );
     }
 
     const base64 = rasterizeSvg(svg, baseWidth);
@@ -340,12 +359,19 @@ function applyRenderViewEnrichments(
       return makeErrorResult('render_view section: render failed.');
     }
 
-    // Compose showDimensions on top if requested
-    if (params.showDimensions === true) {
-      const baseResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
-      if (baseResult.data) {
-        svg = appendDimensionLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData);
-      }
+    // Compose overlay enrichments on top
+    const baseResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+    if (params.showDimensions === true && baseResult.data) {
+      svg = appendDimensionLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData);
+    }
+    if ((wantAxes || wantGrid) && baseResult.data) {
+      svg = appendAxesAndGrid(
+        svg,
+        baseResult.data as import('@core/commands/render').RenderViewData,
+        docUnits,
+        wantAxes,
+        wantGrid,
+      );
     }
 
     const base64 = rasterizeSvg(svg, baseWidth);
@@ -360,33 +386,37 @@ function applyRenderViewEnrichments(
   }
 
   // ------------------------------------------------------------------
-  // showDimensions only: run base render then post-process
+  // showDimensions / showAxes / showGrid (no other enrichment): base render + post-process
   // ------------------------------------------------------------------
+  const busResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+  if (!busResult.data) {
+    return makeErrorResult('render_view enrichment: base render returned no data.');
+  }
+  const baseData = busResult.data as import('@core/commands/render').RenderViewData;
+
+  let enrichedSvg = baseData.svg;
+
   if (params.showDimensions === true) {
-    const busResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
-    if (!busResult.data) {
-      return makeErrorResult('render_view showDimensions: base render returned no data.');
-    }
-    const baseData = busResult.data as import('@core/commands/render').RenderViewData;
-    const enrichedSvg = appendDimensionLabels(baseData.svg, baseData);
-
-    const base64 = rasterizeSvg(enrichedSvg, baseWidth);
-    if (base64 === null) {
-      return makeErrorResult('render_view showDimensions: rasterization failed.');
-    }
-
-    const summary = `Rendered view with dimensions: ${baseData.entityCount} entit${baseData.entityCount === 1 ? 'y' : 'ies'}, ${baseWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({
-      summary,
-      affected: [],
-      isError: false,
-      data: stripSvgFromData(busResult.data),
-    }) as CallToolResult;
-    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-    return shaped;
+    enrichedSvg = appendDimensionLabels(enrichedSvg, baseData);
+  }
+  if (wantAxes || wantGrid) {
+    enrichedSvg = appendAxesAndGrid(enrichedSvg, baseData, docUnits, wantAxes, wantGrid);
   }
 
-  return null;
+  const base64 = rasterizeSvg(enrichedSvg, baseWidth);
+  if (base64 === null) {
+    return makeErrorResult('render_view enrichment: rasterization failed.');
+  }
+
+  const summary = `Rendered view: ${baseData.entityCount} entit${baseData.entityCount === 1 ? 'y' : 'ies'}, ${baseWidth}×${baseHeight}.`;
+  const shaped = shapeToolCallContent({
+    summary,
+    affected: [],
+    isError: false,
+    data: stripSvgFromData(busResult.data),
+  }) as CallToolResult;
+  (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
+  return shaped;
 }
 
 /** Build an error CallToolResult for enrichment failures. */
@@ -487,6 +517,19 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
               },
               required: ['axis', 'offset'],
             },
+            showAxes: {
+              type: 'boolean',
+              description:
+                'When true (default), overlay a world-frame X/Y/Z axis triad anchored at the world origin. ' +
+                'X=red, Y=green, Z=blue. A scale label (e.g. "1 mm = 42 px") is also shown. ' +
+                'Set to false to suppress.',
+            },
+            showGrid: {
+              type: 'boolean',
+              description:
+                'When true (default), overlay a faint ground grid on the Z=0 plane so you can judge ' +
+                'object placement relative to the world origin. Set to false to suppress.',
+            },
           },
         };
         return {
@@ -494,7 +537,8 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
           description:
             t.description +
             ' [Server enrichments available: turntable (multi-frame strip), isolate (highlight entity), ' +
-            'showDimensions (bbox labels), section (cut-plane view).]',
+            'showDimensions (bbox labels), section (cut-plane view), showAxes (world triad, default on), ' +
+            'showGrid (ground grid, default on).]',
           inputSchema: augmented as {
             type: 'object';
             properties?: Record<string, object>;

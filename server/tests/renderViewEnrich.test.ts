@@ -25,6 +25,7 @@ import {
   buildTurntableFrames,
   buildIsolateSvg,
   appendDimensionLabels,
+  appendAxesAndGrid,
   buildSectionSvg,
 } from '../src/renderViewEnrich';
 
@@ -326,5 +327,133 @@ describe('render_view back-compat (no enrichment)', () => {
     expect(data.view).toBe('iso');
     expect(data.width).toBe(800);
     expect(data.height).toBe(600);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (E) appendAxesAndGrid — world-frame axis triad + ground grid overlay
+// ---------------------------------------------------------------------------
+
+describe('appendAxesAndGrid', () => {
+  it('inserts world-axes group into the SVG when showAxes=true', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', true, false);
+    expect(enriched).toContain('id="world-axes"');
+    expect(enriched).toContain('</svg>');
+  });
+
+  it('inserts X/Y/Z labels into the SVG when showAxes=true', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', true, false);
+    // Axis labels X, Y, Z must appear
+    expect(enriched).toMatch(/>X</);
+    expect(enriched).toMatch(/>Y</);
+    expect(enriched).toMatch(/>Z</);
+  });
+
+  it('inserts ground-grid group into the SVG when showGrid=true', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', false, true);
+    expect(enriched).toContain('id="ground-grid"');
+  });
+
+  it('inserts both axes and grid when both flags are true', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', true, true);
+    expect(enriched).toContain('id="world-axes"');
+    expect(enriched).toContain('id="ground-grid"');
+  });
+
+  it('does NOT insert axes or grid when both flags are false', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', false, false);
+    expect(enriched).not.toContain('id="world-axes"');
+    expect(enriched).not.toContain('id="ground-grid"');
+  });
+
+  it('uses X=red, Y=green, Z=blue axis colors', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', true, false);
+    // Red for X, green for Y, blue for Z (stroke colors)
+    expect(enriched).toContain('#ff4444');
+    expect(enriched).toContain('#44dd44');
+    expect(enriched).toContain('#4488ff');
+  });
+
+  it('includes a scale label showing the document units', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', true, false);
+    // Scale label mentions "mm" and "px"
+    expect(enriched).toContain('mm');
+    expect(enriched).toContain('px');
+  });
+
+  it('document units appear in scale label for different unit types', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enrichedM = appendAxesAndGrid(data.svg, data, 'm', true, false);
+    expect(enrichedM).toContain(' m ');
+    const enrichedIn = appendAxesAndGrid(data.svg, data, 'in', true, false);
+    expect(enrichedIn).toContain('in');
+  });
+
+  it('works for top-down view (Z axis degenerates to a point in screen space)', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'top', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+    // Should not throw even when Z projects near the origin
+    expect(() => appendAxesAndGrid(data.svg, data, 'mm', true, true)).not.toThrow();
+  });
+
+  it('works for front view', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'front', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+    expect(() => appendAxesAndGrid(data.svg, data, 'mm', true, true)).not.toThrow();
+  });
+
+  it('works on an empty document (null bounds)', () => {
+    const doc = createEmptyDocument();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+    expect(data.bounds).toBeNull();
+    // Should still inject axes/grid without throwing
+    expect(() => appendAxesAndGrid(data.svg, data, 'mm', true, true)).not.toThrow();
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', true, true);
+    expect(enriched).toContain('id="world-axes"');
+  });
+
+  it('still rasterizes to a valid PNG after axes+grid injection', () => {
+    const { doc } = makeDocWithBox();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 200, height: 150 });
+    const data = renderResult.data as RenderViewData;
+
+    const enriched = appendAxesAndGrid(data.svg, data, 'mm', true, true);
+    const base64 = rasterizeSvg(enriched, 200);
+    expect(base64).not.toBeNull();
+    expect(isPngBase64(base64!)).toBe(true);
   });
 });
