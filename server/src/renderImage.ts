@@ -64,6 +64,41 @@ export function rasterizeSvg(svg: string, width?: number): string | null {
 // ---------------------------------------------------------------------------
 
 /**
+ * Strip the `svg` field from a data record before text/structured content shaping.
+ *
+ * When a command result carries `data.svg` and we rasterize it to a PNG image
+ * block, the raw SVG markup is redundant in the text/JSON representation — it is
+ * multi-KB of `<polygon>` noise that burns agent context without adding value.
+ * The other metadata fields (`bounds`, `camera`, `entityCount`, `width`, `height`,
+ * `view`) remain so non-multimodal clients and programmatic agents keep them.
+ *
+ * Called by the `tools/call` handler in `mcp.ts` AFTER confirming an image block
+ * was produced (i.e. `buildImageBlock` returned non-null). Only strips when `data`
+ * is a plain record; returns `data` unchanged for arrays or non-objects.
+ *
+ * @pure — returns a new object, never mutates the input.
+ * @layer server
+ *
+ * @param data - The `data` field from a CommandBusResult.
+ * @returns A new record with `svg` omitted, or the original value if not a record.
+ */
+export function stripSvgFromData(data: unknown): unknown {
+  if (
+    typeof data !== 'object' ||
+    data === null ||
+    Array.isArray(data)
+  ) {
+    return data;
+  }
+  const record = data as Record<string, unknown>;
+  const rest: Record<string, unknown> = {};
+  for (const key of Object.keys(record)) {
+    if (key !== 'svg') rest[key] = record[key];
+  }
+  return rest;
+}
+
+/**
  * Build an MCP image content block from a busResult's `data` field.
  *
  * Triggers when `data.svg` is a non-empty string — generic, not command-specific.

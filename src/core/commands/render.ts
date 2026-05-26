@@ -233,14 +233,12 @@ const SEG_SPHERE_LAT = 12;
 const SEG_SPHERE_LON = 16;
 const SEG_TORUS_TUBE = 12;
 
-function circlePoints(cx: number, cy: number, cz: number, r: number, segments: number, axis: 'Z' | 'Y'): Vec3[] {
+/** Points on a circle in the XY plane at height `cz` (Z-up). */
+function circlePoints(cx: number, cy: number, cz: number, r: number, segments: number): Vec3[] {
   const pts: Vec3[] = [];
   for (let i = 0; i < segments; i++) {
     const a = (2 * Math.PI * i) / segments;
-    const cos = r * Math.cos(a);
-    const sin = r * Math.sin(a);
-    if (axis === 'Z') pts.push([cx + cos, cy + sin, cz]);
-    else pts.push([cx + cos, cy + cz, sin]); // unused but kept for completeness
+    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a), cz]);
   }
   return pts;
 }
@@ -292,8 +290,8 @@ function tessellateCylinder(e: { position: Vec3; radius: number; height: number;
   const { radius, height, color } = e;
   const zb = pz - height / 2;
   const zt = pz + height / 2;
-  const bottom = circlePoints(px, py, zb, radius, SEG_CIRCLE, 'Z');
-  const top = circlePoints(px, py, zt, radius, SEG_CIRCLE, 'Z');
+  const bottom = circlePoints(px, py, zb, radius, SEG_CIRCLE);
+  const top = circlePoints(px, py, zt, radius, SEG_CIRCLE);
   const polys: PreDepthPolygon[] = [];
 
   // Bottom cap
@@ -333,7 +331,7 @@ function tessellateSphere(e: { position: Vec3; radius: number; color: string }):
 function tessellateCone(e: { position: Vec3; radius: number; height: number; color: string }): PreDepthPolygon[] {
   const [px, py, pz] = e.position;
   const { radius, height, color } = e;
-  const base = circlePoints(px, py, pz, radius, SEG_CIRCLE, 'Z');
+  const base = circlePoints(px, py, pz, radius, SEG_CIRCLE);
   const apex: Vec3 = [px, py, pz + height];
   const polys: PreDepthPolygon[] = [];
 

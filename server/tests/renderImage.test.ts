@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { rasterizeSvg, buildImageBlock } from '../src/renderImage';
+import { rasterizeSvg, buildImageBlock, stripSvgFromData } from '../src/renderImage';
 import { shapeToolCallContent } from '@core/mcp';
 
 // ---------------------------------------------------------------------------
@@ -155,6 +155,155 @@ describe('buildImageBlock — non-object data', () => {
 
   it('returns null for an array', () => {
     expect(buildImageBlock([VALID_SVG])).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stripSvgFromData — removes svg field, preserves metadata, leaves non-records intact
+// ---------------------------------------------------------------------------
+
+describe('stripSvgFromData', () => {
+  it('removes the svg field and keeps all other fields', () => {
+    const data = {
+      svg: VALID_SVG,
+      width: 800,
+      height: 600,
+      bounds: { minX: 0, maxX: 10 },
+      camera: { position: [0, 0, 5] },
+      entityCount: 3,
+      view: 'perspective',
+    };
+    const result = stripSvgFromData(data) as Record<string, unknown>;
+    expect('svg' in result).toBe(false);
+    expect(result['width']).toBe(800);
+    expect(result['height']).toBe(600);
+    expect(result['bounds']).toEqual({ minX: 0, maxX: 10 });
+    expect(result['camera']).toEqual({ position: [0, 0, 5] });
+    expect(result['entityCount']).toBe(3);
+    expect(result['view']).toBe('perspective');
+  });
+
+  it('does not mutate the original object', () => {
+    const data = { svg: VALID_SVG, width: 400 };
+    stripSvgFromData(data);
+    expect('svg' in data).toBe(true);
+  });
+
+  it('returns the value unchanged for null', () => {
+    expect(stripSvgFromData(null)).toBeNull();
+  });
+
+  it('returns the value unchanged for undefined', () => {
+    expect(stripSvgFromData(undefined)).toBeUndefined();
+  });
+
+  it('returns the value unchanged for an array', () => {
+    const arr = ['a', 'b'];
+    expect(stripSvgFromData(arr)).toBe(arr);
+  });
+
+  it('returns the value unchanged for a string', () => {
+    expect(stripSvgFromData('hello')).toBe('hello');
+  });
+
+  it('returns empty object when data is {} (no svg field)', () => {
+    const result = stripSvgFromData({});
+    expect(result).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// svg-stripping integration — text/json block must NOT contain raw svg markup
+// ---------------------------------------------------------------------------
+
+describe('svg stripping in MCP content shaping', () => {
+  it('text block does not contain raw svg markup after stripping', () => {
+    const data = {
+      svg: VALID_SVG,
+      width: 800,
+      height: 600,
+      entityCount: 2,
+      view: 'perspective',
+    };
+    const imageBlock = buildImageBlock(data);
+    expect(imageBlock).not.toBeNull(); // confirms stripping should be applied
+
+    const stripped = stripSvgFromData(data);
+    const shaped = shapeToolCallContent({
+      summary: 'Rendered view.',
+      affected: [],
+      isError: false,
+      data: stripped,
+    });
+
+    // No text block should contain raw SVG markup.
+    for (const block of shaped.content) {
+      expect(block.text).not.toMatch(/<svg/i);
+      expect(block.text).not.toMatch(/<polygon/i);
+      expect(block.text).not.toMatch(/<rect/i);
+    }
+  });
+
+  it('text block still contains useful metadata fields after stripping', () => {
+    const data = {
+      svg: VALID_SVG,
+      width: 800,
+      height: 600,
+      entityCount: 5,
+      view: 'top',
+    };
+    const stripped = stripSvgFromData(data);
+    const shaped = shapeToolCallContent({
+      summary: 'Rendered view.',
+      affected: [],
+      isError: false,
+      data: stripped,
+    });
+
+    const jsonBlock = shaped.content.find((b) => b.text.startsWith('```json'));
+    expect(jsonBlock).toBeDefined();
+    expect(jsonBlock!.text).toContain('"width"');
+    expect(jsonBlock!.text).toContain('"height"');
+    expect(jsonBlock!.text).toContain('"entityCount"');
+    expect(jsonBlock!.text).toContain('"view"');
+    expect(jsonBlock!.text).not.toContain('"svg"');
+  });
+
+  it('structuredContent does not contain svg key after stripping', () => {
+    const data = {
+      svg: VALID_SVG,
+      width: 800,
+      height: 600,
+      entityCount: 1,
+    };
+    const stripped = stripSvgFromData(data);
+    const shaped = shapeToolCallContent({
+      summary: 'Rendered view.',
+      affected: [],
+      isError: false,
+      data: stripped,
+    });
+
+    expect(shaped.structuredContent).toBeDefined();
+    expect('svg' in (shaped.structuredContent as Record<string, unknown>)).toBe(false);
+    expect(shaped.structuredContent!['width']).toBe(800);
+    expect(shaped.structuredContent!['entityCount']).toBe(1);
+  });
+
+  it('non-SVG busResult is shaped exactly as before — no behavior change', () => {
+    const busResult = {
+      summary: 'Added box e-001.',
+      affected: ['e-001'],
+      isError: false,
+    };
+    const imageBlock = buildImageBlock(undefined);
+    expect(imageBlock).toBeNull(); // confirms no stripping
+
+    const shaped = shapeToolCallContent(busResult);
+    expect(shaped.content[0]!.text).toBe('Added box e-001.');
+    expect(shaped.content[1]!.text).toBe('Affected entity ids: e-001');
+    expect(shaped.structuredContent).toBeUndefined();
+    expect(shaped.content.every((b) => b.type === 'text')).toBe(true);
   });
 });
 

@@ -1929,4 +1929,53 @@ describe('render_view', () => {
     expect(data.height).toBe(600);
     expect(data.svg).toContain('width="800"');
   });
+
+  // Regression: painter's-algorithm depth sort must be DESCENDING (farthest drawn
+  // first so nearest paints on top). The bug sorted ASCENDING, letting far faces
+  // overwrite near ones.
+  //
+  // Setup (top view, camera looking down -Z):
+  //   BLUE box centered at z = -5  (far from camera — all its faces have LARGE depth)
+  //   RED  box centered at z = +5  (near the camera — all its faces have SMALL depth)
+  //
+  // Separation of 10 units guarantees no face of the red box is farther than any face
+  // of the blue box. With correct DESCENDING depth sort:
+  //   blue (farther, larger depth) → drawn FIRST → appears EARLIER in the SVG
+  //   red  (nearer,  smaller depth) → drawn LAST  → appears LATER  in the SVG
+  //
+  // The shaded fill of pure blue (#0000ff) produces "rgb(0,0," and pure red (#ff0000)
+  // produces ",0,0)" (zero green, zero blue). These tokens are mutually exclusive,
+  // making the first-occurrence index comparison unambiguous.
+  //
+  // If the sort were reverted to ASCENDING, red (smaller depth) would sort FIRST
+  // and blue LAST, flipping the index order and failing the assertion.
+  it('painter depth sort (descending) — nearer object polygons appear later in SVG than farther ones', () => {
+    let doc = createEmptyDocument();
+    // Blue box: centered at z = -5 (FAR from top camera — all faces have large depth)
+    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, -5], color: '#0000ff' }).document;
+    // Red box: centered at z = +5 (NEAR the top camera — all faces have small depth)
+    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 5], color: '#ff0000' }).document;
+
+    const result = execute(doc, 'render_view', { view: 'top' });
+    const svg = (result.data as { svg: string }).svg;
+
+    // Shading #ff0000 via tintHex always yields "rgb(NNN,0,0)" — zero green, zero blue.
+    // Shading #0000ff via tintHex always yields "rgb(0,0,NNN)" — zero red, zero green.
+    // ",0,0)" uniquely identifies red faces; "rgb(0,0," uniquely identifies blue faces.
+    const redSignature = ',0,0)';
+    const blueSignature = 'rgb(0,0,';
+
+    expect(svg).toContain(redSignature);
+    expect(svg).toContain(blueSignature);
+
+    const firstBlueIdx = svg.indexOf(blueSignature);
+    const firstRedIdx = svg.indexOf(redSignature);
+
+    expect(firstBlueIdx).toBeGreaterThan(-1);
+    expect(firstRedIdx).toBeGreaterThan(-1);
+
+    // Blue (farther) must appear BEFORE red (nearer) in the SVG output.
+    // This fails with an ascending sort (the original bug).
+    expect(firstBlueIdx).toBeLessThan(firstRedIdx);
+  });
 });

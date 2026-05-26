@@ -54,7 +54,7 @@ import {
 import type { CadDocument } from '@core/model/types';
 import { getLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
-import { buildImageBlock } from './renderImage';
+import { buildImageBlock, stripSvgFromData } from './renderImage';
 
 // ---------------------------------------------------------------------------
 // Session registry
@@ -231,17 +231,26 @@ function buildMcpServer(getDoc: () => CadDocument): Server {
     // history/broadcast (result.data !== undefined, same logic as the UI store).
     const busResult = applyCommand(name, args ?? {});
 
-    // Delegate all content-block assembly to the single shaping function.
-    // Cast: McpShapedResult lacks the SDK Result index signature ([x: string]: unknown)
-    // which is a type-system artifact — the runtime shape satisfies CallToolResult.
-    const shaped = shapeToolCallContent(busResult) as CallToolResult;
-
-    // Vision loop: if the command result carries an SVG string (data.svg), rasterize
-    // it to PNG and append an image content block.  Triggered generically on any
-    // command that emits data.svg — not tied to a specific command name.
+    // Vision loop: rasterize data.svg → PNG image block (if present).
     // Failure is silent (buildImageBlock returns null) so a broken SVG never 500s
     // the tool call; the text/structured content is always returned intact.
     const imageBlock = buildImageBlock(busResult.data);
+
+    // When an image block was produced, strip the raw SVG from the text/structured
+    // content shaping input.  The multi-KB <polygon> markup is redundant alongside
+    // the PNG — it only burns agent context tokens.  All other metadata fields
+    // (bounds, camera, entityCount, width, height, view) are preserved so
+    // non-multimodal clients and programmatic agents still receive them.
+    // When no image block was produced (normal commands), shapeInput === busResult
+    // and behavior is completely unchanged.
+    const shapeInput =
+      imageBlock !== null ? { ...busResult, data: stripSvgFromData(busResult.data) } : busResult;
+
+    // Delegate all content-block assembly to the single shaping function.
+    // Cast: McpShapedResult lacks the SDK Result index signature ([x: string]: unknown)
+    // which is a type-system artifact — the runtime shape satisfies CallToolResult.
+    const shaped = shapeToolCallContent(shapeInput) as CallToolResult;
+
     if (imageBlock !== null) {
       // Cast: the SDK's content array type is TextContent|ImageContent|EmbeddedResource
       // but the TypeScript union is exhaustive at compile time; at runtime the MCP
