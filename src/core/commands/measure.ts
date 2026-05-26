@@ -810,20 +810,25 @@ interface MassPropertiesData {
  * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { volume, density, mass, unit }
- * @failure non-solid entity, missing id, or density <= 0 -> no-op, affected:[], no data
+ * @failure non-solid entity, missing id, or effective density <= 0 -> no-op, affected:[], no data
  *
- * Density is a command param — no material model is stored on entities (planned Wave 3).
+ * Density resolution order:
+ *   1. If the entity has a `materialId` and that material exists in `doc.materials`,
+ *      the material's density is used (ignores the `density` param for that entity).
+ *   2. Otherwise the caller-supplied `density` param is used (back-compat).
  * Unit assumption: density is in g/(document-unit)³ so that mass = volume × density in grams.
  */
 export const massProperties: CommandDefinition<MassPropertiesParams> = {
   name: 'mass_properties',
   annotations: { readOnly: true },
   description:
-    "Compute the mass of a 3D solid from its volume and a caller-supplied density. " +
-    "Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh'. " +
-    "The density parameter is in g/(document-unit)³ — e.g. for a document in mm, density is g/mm³ " +
-    "(steel ≈ 0.00785, aluminium ≈ 0.0027, PLA plastic ≈ 0.00124). " +
-    "Density is NOT stored on the entity; pass it each time (Wave 3 will add a material model). " +
+    "Compute the mass of a 3D solid from its volume and density. " +
+    "Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', " +
+    "'cone', 'torus', 'wedge', 'pyramid'. " +
+    "Density resolution: if the entity has a material assigned (via assign_material) and that " +
+    "material exists in doc.materials, the material's density is used automatically — the density " +
+    "param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). " +
+    "The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. " +
     "Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). " +
     "Does not modify the document.",
   paramsSchema: {
@@ -832,18 +837,22 @@ export const massProperties: CommandDefinition<MassPropertiesParams> = {
       entityId: {
         type: 'string',
         description:
-          "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh'.",
+          "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', " +
+          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
       },
       density: {
         type: 'number',
         description:
-          'Material density in g/(document-unit)³. Must be > 0. ' +
+          'Fallback material density in g/(document-unit)³. Must be > 0. ' +
+          'Used only when the entity has no material assigned via assign_material. ' +
           'Examples for a mm document: steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124.',
       },
     },
     required: ['entityId', 'density'],
   },
   run: (doc, { entityId, density }): CommandResult => {
+    // Validate the fallback density param even if it may not be used — caller must
+    // supply a valid number so the API stays consistent.
     if (typeof density !== 'number' || density <= 0) {
       return {
         document: doc,
@@ -857,6 +866,17 @@ export const massProperties: CommandDefinition<MassPropertiesParams> = {
       return { document: doc, summary: `mass_properties: entity '${entityId}' not found.`, affected: [] };
     }
 
+    // Resolve the effective density: prefer assigned material over the param.
+    let effectiveDensity = density;
+    let densitySource = 'param';
+    if (e.materialId) {
+      const mat = doc.materials[e.materialId];
+      if (mat) {
+        effectiveDensity = mat.density;
+        densitySource = `material '${e.materialId}'`;
+      }
+    }
+
     const volumeResult = measureVolume.run(doc, { entityId });
     if (!volumeResult.data) {
       // measureVolume returned a no-op — propagate its summary.
@@ -864,13 +884,13 @@ export const massProperties: CommandDefinition<MassPropertiesParams> = {
     }
 
     const { volume } = volumeResult.data as MeasureVolumeData;
-    const mass = volume * density;
-    const data: MassPropertiesData = { volume, density, mass, unit: 'g' };
+    const mass = volume * effectiveDensity;
+    const data: MassPropertiesData = { volume, density: effectiveDensity, mass, unit: 'g' };
     return {
       document: doc,
       summary:
         `Mass of ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
-        `density=${density} g/${doc.units}³, mass=${mass.toFixed(doc.displayPrecision)} g.`,
+        `density=${effectiveDensity} g/${doc.units}³ (${densitySource}), mass=${mass.toFixed(doc.displayPrecision)} g.`,
       affected: [],
       data,
     };

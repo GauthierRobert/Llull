@@ -18,6 +18,7 @@ import type {
   Vec3,
   Parameter,
   Animation,
+  Material,
 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 
@@ -196,8 +197,12 @@ export function deserializeDocument(json: string): CadDocument {
   const configurations: Record<string, Configuration> = isRecord(doc.configurations)
     ? (doc.configurations as Record<string, Configuration>)
     : {};
+  // Back-compat: older saved docs lack materials — default to empty.
+  const materials: Record<string, Material> = isRecord(doc.materials)
+    ? (doc.materials as Record<string, Material>)
+    : {};
 
-  return { ...doc, units, displayPrecision, parameters, animations, featureHistory, configurations };
+  return { ...doc, units, displayPrecision, parameters, animations, featureHistory, configurations, materials };
 }
 
 // ---------------------------------------------------------------------------

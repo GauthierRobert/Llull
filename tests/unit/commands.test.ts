@@ -3268,6 +3268,447 @@ describe('KI3 — =expr param resolution in replay_history', () => {
     expect(loaded.configurations).toEqual({});
   });
 
+  // ── create_material ───────────────────────────────────────────────────────
+
+  it('create_material: happy path — adds material to doc.materials', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document.materials['steel']).toBeDefined();
+    expect(result.document.materials['steel']!.density).toBe(0.00785);
+    expect(result.document.materials['steel']!.color).toBe('#808080');
+    expect(result.document.materials['steel']!.metalness).toBe(0.9);
+    expect(result.document.materials['steel']!.roughness).toBe(0.3);
+    expect(result.summary).toContain('steel');
+    expect(result.summary).toContain('created');
+  });
+
+  it('create_material: replaces existing material with same name', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+    const result = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.008,
+      color: '#a0a0a0',
+      metalness: 1.0,
+      roughness: 0.2,
+    });
+    expect(result.document.materials['steel']!.density).toBe(0.008);
+    expect(result.summary).toContain('replaced');
+  });
+
+  it('create_material: failure — blank name', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_material', {
+      name: '',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('non-empty');
+  });
+
+  it('create_material: failure — density <= 0', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_material', {
+      name: 'bad',
+      density: -1,
+      color: '#808080',
+      metalness: 0.5,
+      roughness: 0.5,
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('density');
+  });
+
+  it('create_material: failure — density = 0', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_material', {
+      name: 'bad',
+      density: 0,
+      color: '#808080',
+      metalness: 0.5,
+      roughness: 0.5,
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+  });
+
+  it('create_material: failure — metalness out of range', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_material', {
+      name: 'bad',
+      density: 0.001,
+      color: '#808080',
+      metalness: 1.5,
+      roughness: 0.5,
+    });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('metalness');
+  });
+
+  it('create_material: failure — roughness out of range', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_material', {
+      name: 'bad',
+      density: 0.001,
+      color: '#808080',
+      metalness: 0.5,
+      roughness: -0.1,
+    });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('roughness');
+  });
+
+  it('create_material: failure — invalid hex color', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_material', {
+      name: 'bad',
+      density: 0.001,
+      color: 'not-a-color',
+      metalness: 0.5,
+      roughness: 0.5,
+    });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('color');
+  });
+
+  it('create_material: failure — hex color wrong length (3 digits)', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_material', {
+      name: 'bad',
+      density: 0.001,
+      color: '#abc',
+      metalness: 0.5,
+      roughness: 0.5,
+    });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('color');
+  });
+
+  it('create_material is pure — input doc not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── assign_material ───────────────────────────────────────────────────────
+
+  it('assign_material: happy path — single entity', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'aluminium',
+      density: 0.0027,
+      color: '#c0c0c0',
+      metalness: 0.8,
+      roughness: 0.2,
+    }).document;
+    const boxResult = execute(doc, 'add_box', { size: [10, 10, 10] });
+    doc = boxResult.document;
+    const boxId = boxResult.affected[0]!;
+
+    const result = execute(doc, 'assign_material', {
+      materialName: 'aluminium',
+      entityIds: [boxId],
+    });
+    expect(result.affected).toEqual([boxId]);
+    expect(result.document.entities[boxId]!.materialId).toBe('aluminium');
+    expect(result.summary).toContain('aluminium');
+    expect(result.summary).toContain(boxId);
+  });
+
+  it('assign_material: happy path — multiple entities', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+    const r1 = execute(doc, 'add_box', { size: [5, 5, 5] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_box', { size: [5, 5, 5] });
+    doc = r2.document;
+    const id1 = r1.affected[0]!;
+    const id2 = r2.affected[0]!;
+
+    const result = execute(doc, 'assign_material', {
+      materialName: 'steel',
+      entityIds: [id1, id2],
+    });
+    expect(result.affected).toHaveLength(2);
+    expect(result.document.entities[id1]!.materialId).toBe('steel');
+    expect(result.document.entities[id2]!.materialId).toBe('steel');
+  });
+
+  it('assign_material: partial success — unknown ids are skipped, valid ids assigned', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
+    doc = r.document;
+    const validId = r.affected[0]!;
+
+    const result = execute(doc, 'assign_material', {
+      materialName: 'steel',
+      entityIds: [validId, 'ghost-id'],
+    });
+    expect(result.affected).toEqual([validId]);
+    expect(result.document.entities[validId]!.materialId).toBe('steel');
+    expect(result.summary).toContain('ghost-id');
+  });
+
+  it('assign_material: failure — unknown material', () => {
+    let doc = createEmptyDocument();
+    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
+    doc = r.document;
+    const boxId = r.affected[0]!;
+
+    const result = execute(doc, 'assign_material', {
+      materialName: 'nonexistent',
+      entityIds: [boxId],
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('nonexistent');
+    expect(result.summary).toContain('not found');
+  });
+
+  it('assign_material: failure — all entity ids unknown', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+
+    const result = execute(doc, 'assign_material', {
+      materialName: 'steel',
+      entityIds: ['ghost-1', 'ghost-2'],
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('ghost-1');
+  });
+
+  it('assign_material: failure — empty entityIds array', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+
+    const result = execute(doc, 'assign_material', {
+      materialName: 'steel',
+      entityIds: [],
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+  });
+
+  it('assign_material: failure — blank materialName', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'assign_material', {
+      materialName: '',
+      entityIds: ['anything'],
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+  });
+
+  it('assign_material is pure — input doc not mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
+    doc = r.document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'assign_material', { materialName: 'steel', entityIds: [r.affected[0]!] });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── AC1: steel vs aluminium mass difference ────────────────────────────────
+
+  it('AC1: mass_properties uses assigned material density — steel vs aluminium on identical boxes', () => {
+    let doc = createEmptyDocument();
+
+    // Define two materials with different densities.
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+    doc = execute(doc, 'create_material', {
+      name: 'aluminium',
+      density: 0.0027,
+      color: '#c0c0c0',
+      metalness: 0.8,
+      roughness: 0.2,
+    }).document;
+
+    // Create two identical boxes.
+    const r1 = execute(doc, 'add_box', { size: [10, 10, 10] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_box', { size: [10, 10, 10] });
+    doc = r2.document;
+    const steelId = r1.affected[0]!;
+    const alumId = r2.affected[0]!;
+
+    // Assign different materials.
+    doc = execute(doc, 'assign_material', { materialName: 'steel', entityIds: [steelId] }).document;
+    doc = execute(doc, 'assign_material', { materialName: 'aluminium', entityIds: [alumId] }).document;
+
+    // Compute mass — pass a dummy density; should be overridden by the assigned material.
+    const steelResult = execute(doc, 'mass_properties', { entityId: steelId, density: 1 });
+    const alumResult = execute(doc, 'mass_properties', { entityId: alumId, density: 1 });
+
+    const steelData = steelResult.data as { mass: number; density: number; volume: number };
+    const alumData = alumResult.data as { mass: number; density: number; volume: number };
+
+    // Volumes must be equal (same box size).
+    expect(steelData.volume).toBeCloseTo(alumData.volume, 6);
+
+    // Densities must reflect the assigned materials.
+    expect(steelData.density).toBe(0.00785);
+    expect(alumData.density).toBe(0.0027);
+
+    // Masses must differ proportionally to the density ratio.
+    const ratio = steelData.mass / alumData.mass;
+    expect(ratio).toBeCloseTo(0.00785 / 0.0027, 4);
+
+    // Steel must be heavier.
+    expect(steelData.mass).toBeGreaterThan(alumData.mass);
+
+    // Summary must mention material source.
+    expect(steelResult.summary).toContain("material 'steel'");
+    expect(alumResult.summary).toContain("material 'aluminium'");
+  });
+
+  // ── mass_properties back-compat: explicit density param still works ────────
+
+  it('mass_properties back-compat: explicit density param used when no material assigned', () => {
+    let doc = createEmptyDocument();
+    const r = execute(doc, 'add_box', { size: [10, 10, 10] });
+    doc = r.document;
+    const boxId = r.affected[0]!;
+
+    const result = execute(doc, 'mass_properties', { entityId: boxId, density: 0.00785 });
+    expect(result.data).toBeDefined();
+    const data = result.data as { mass: number; density: number };
+    expect(data.density).toBe(0.00785);
+    expect(data.mass).toBeCloseTo(1000 * 0.00785, 6);
+    // density source should say 'param'
+    expect(result.summary).toContain('param');
+  });
+
+  it('mass_properties: density param still required and validated even when material is assigned', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
+    doc = r.document;
+    const boxId = r.affected[0]!;
+    doc = execute(doc, 'assign_material', { materialName: 'steel', entityIds: [boxId] }).document;
+
+    // Even though material is assigned, density param must be > 0.
+    const result = execute(doc, 'mass_properties', { entityId: boxId, density: -1 });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('density');
+  });
+
+  // ── persistence round-trip includes materials ────────────────────────────
+
+  it('persistence round-trip: materials survive serialize/deserialize', async () => {
+    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', {
+      name: 'steel',
+      density: 0.00785,
+      color: '#808080',
+      metalness: 0.9,
+      roughness: 0.3,
+    }).document;
+    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
+    doc = r.document;
+    doc = execute(doc, 'assign_material', {
+      materialName: 'steel',
+      entityIds: [r.affected[0]!],
+    }).document;
+
+    const json = serializeDocument(doc);
+    const loaded = deserializeDocument(json);
+
+    expect(loaded.materials['steel']).toBeDefined();
+    expect(loaded.materials['steel']!.density).toBe(0.00785);
+    expect(loaded.entities[r.affected[0]!]!.materialId).toBe('steel');
+  });
+
+  it('persistence: deserializeDocument defaults materials to {} for old docs without it', async () => {
+    const { deserializeDocument } = await import('@core/commands/persistence');
+    const oldDoc = {
+      format: 'llull-document',
+      version: 1,
+      document: {
+        entities: {},
+        order: [],
+        layers: { 'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false } },
+        layerOrder: ['layer-default'],
+        selection: [],
+        camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
+        // no materials field
+      },
+    };
+    const loaded = deserializeDocument(JSON.stringify(oldDoc));
+    expect(loaded.materials).toEqual({});
+  });
+
   // ── registry 1:1 invariant still holds ───────────────────────────────────
 
   it('toToolSchemas length equals listCommands length after configuration commands added', () => {

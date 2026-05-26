@@ -50,6 +50,12 @@ export interface BaseEntity {
    * @example ['structural', 'visible']
    */
   tags?: readonly string[];
+  /**
+   * Optional reference to a material defined in `CadDocument.materials`.
+   * When set, `mass_properties` uses the material's density instead of a caller-supplied value.
+   * Set by `assign_material`.
+   */
+  materialId?: string;
 }
 
 export interface BoxEntity extends BaseEntity {
@@ -560,6 +566,52 @@ export interface CadDocument {
    * Initialized as {} in createEmptyDocument.
    */
   configurations: Record<string, Configuration>;
+  /**
+   * Named material definitions. Keyed by material name.
+   * Each material carries physical properties (density) and visual PBR properties
+   * (color, metalness, roughness). Entities reference materials via `BaseEntity.materialId`.
+   * `mass_properties` uses the assigned material's density when present.
+   * Initialized as {} in createEmptyDocument.
+   */
+  materials: Record<string, Material>;
+}
+
+/**
+ * A physical + visual material definition.
+ *
+ * `density` drives mass computation in `mass_properties` (mass = volume × density).
+ * `color`, `metalness`, `roughness` are PBR visual properties (rendered by the viewport
+ * when the VNF4 render branch is implemented; stored here for completeness).
+ *
+ * Density units match the document unit system: the value is in mass-per-(document-unit)³
+ * so that mass = volume × density works directly (e.g. for a mm document: g/mm³).
+ *
+ * JSON-serializable and immutable by convention; use `create_material` to define/replace.
+ */
+export interface Material {
+  /** Human-readable name used as the lookup key in `CadDocument.materials`. */
+  readonly name: string;
+  /**
+   * Density in (mass unit) per (document-length-unit)³.
+   * For a document in mm: density is g/mm³ (steel ≈ 0.00785, aluminium ≈ 0.0027).
+   * Must be > 0 and finite.
+   */
+  density: number;
+  /**
+   * Diffuse/albedo color as a CSS hex string, e.g. "#b0b0b0".
+   * Used by the VNF4 viewport PBR renderer. Must match /^#[0-9a-fA-F]{6}$/.
+   */
+  color: string;
+  /**
+   * PBR metalness factor in [0, 1].
+   * 0 = fully dielectric (plastic/wood), 1 = fully metallic.
+   */
+  metalness: number;
+  /**
+   * PBR roughness factor in [0, 1].
+   * 0 = mirror smooth, 1 = fully rough/diffuse.
+   */
+  roughness: number;
 }
 
 export const DEFAULT_LAYER_ID = 'layer-default';
@@ -591,5 +643,6 @@ export function createEmptyDocument(): CadDocument {
     animations: {},
     featureHistory: [],
     configurations: {},
+    materials: {},
   };
 }

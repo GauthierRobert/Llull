@@ -31,6 +31,7 @@ import { addText, addDimension } from './annotate';
 import { filletEdge, chamferEdge } from './modify3d';
 import { historyCommands, setRegistryRef } from './history';
 import { createConfiguration, activateConfiguration, setConfigRegistryRef } from './configurations';
+import { createMaterial, assignMaterial } from './materials';
 import {
   explodePolyline,
   offset2D,
@@ -130,6 +131,8 @@ const definitions = [
   ...historyCommands,
   createConfiguration,
   activateConfiguration,
+  createMaterial,
+  assignMaterial,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
