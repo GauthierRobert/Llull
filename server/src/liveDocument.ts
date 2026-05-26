@@ -15,16 +15,58 @@
  *   (Replaces the former TODO(KI1-followup) per-session isolation approach.)
  */
 
+import fs from 'fs';
+import path from 'path';
 import type { Response } from 'express';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
+import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+
+// ---------------------------------------------------------------------------
+// Disk persistence (autosave between server restarts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Autosave path. Override via `LLULL_AUTOSAVE_PATH`; default lives next to the
+ * server bundle. Autosave is disabled inside tests (vitest sets `VITEST`, our
+ * own harness sets `TEST`) to avoid clobbering a user's saved project.
+ */
+const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH']
+  ?? path.resolve(__dirname, '..', '.autosave.json');
+
+const AUTOSAVE_ENABLED =
+  process.env['VITEST'] === undefined &&
+  process.env['TEST'] !== 'true' &&
+  process.env['LLULL_AUTOSAVE_DISABLED'] !== 'true';
+
+function loadAutosave(): CadDocument {
+  if (!AUTOSAVE_ENABLED) return createEmptyDocument();
+  try {
+    if (!fs.existsSync(AUTOSAVE_PATH)) return createEmptyDocument();
+    const json = fs.readFileSync(AUTOSAVE_PATH, 'utf8');
+    return deserializeDocument(json);
+  } catch (err) {
+    console.warn(`[liveDocument] autosave load failed (${(err as Error).message}); starting empty.`);
+    return createEmptyDocument();
+  }
+}
+
+function writeAutosave(doc: CadDocument): void {
+  if (!AUTOSAVE_ENABLED) return;
+  try {
+    fs.mkdirSync(path.dirname(AUTOSAVE_PATH), { recursive: true });
+    fs.writeFileSync(AUTOSAVE_PATH, serializeDocument(doc), 'utf8');
+  } catch (err) {
+    console.warn(`[liveDocument] autosave write failed: ${(err as Error).message}`);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Shared document
 // ---------------------------------------------------------------------------
 
 /** The single live document shared across all MCP sessions and the browser UI. */
-let _liveDoc: CadDocument = createEmptyDocument();
+let _liveDoc: CadDocument = loadAutosave();
 
 /** Return the current shared document. */
 export function getLiveDoc(): CadDocument {
@@ -72,6 +114,7 @@ function broadcastDoc(doc: CadDocument): void {
  */
 export function setLiveDoc(next: CadDocument): void {
   _liveDoc = next;
+  writeAutosave(next);
   broadcastDoc(next);
 }
 

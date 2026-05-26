@@ -15,6 +15,7 @@
 import React from 'react';
 import { useStore, useThemeStore } from '@ui/store';
 import { McpConnectButton } from '@ui/components/McpConnect';
+import { ProjectIO } from '@ui/components/ProjectIO';
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -121,6 +122,8 @@ export function StatusBar(): React.ReactElement {
         )}
       </div>
       <div className="status-bar-bottom__right">
+        <ProjectIO />
+        <span className="status-divider" aria-hidden="true" />
         <McpConnectButton />
         <span className="status-divider" aria-hidden="true" />
         <ThemeToggle />
