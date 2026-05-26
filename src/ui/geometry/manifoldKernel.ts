@@ -280,5 +280,18 @@ export async function createManifoldKernel(): Promise<GeometryKernel> {
     shellSolid(_shape: MeshData, _thickness: number): MeshData | null {
       return null;
     },
+
+    tessellate(entity: Entity): MeshData | null {
+      let solid: ManifoldShape | null = null;
+      try {
+        solid = entityToManifold(mod, entity);
+        if (!solid) return null;
+        return manifoldToMeshData(solid);
+      } catch {
+        return null;
+      } finally {
+        try { solid?.delete(); } catch { /* ignore */ }
+      }
+    },
   };
 }

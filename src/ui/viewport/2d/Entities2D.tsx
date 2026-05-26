@@ -20,6 +20,7 @@ import { PointRenderer } from './entities/PointRenderer';
 import { EllipseRenderer } from './entities/EllipseRenderer';
 import { SplineRenderer } from './entities/SplineRenderer';
 import { TextRenderer2D } from './entities/TextRenderer2D';
+import { DimensionRenderer2D } from './entities/DimensionRenderer2D';
 
 interface Entities2DProps {
   document: CadDocument;
@@ -29,9 +30,11 @@ interface Entities2DProps {
 function Entity2DRenderer({
   entity,
   selected,
+  document,
 }: {
   entity: Entity;
   selected: boolean;
+  document: CadDocument;
 }): React.ReactElement | null {
   switch (entity.kind) {
     case 'line':
@@ -52,6 +55,8 @@ function Entity2DRenderer({
       return <SplineRenderer entity={entity} selected={selected} />;
     case 'text':
       return <TextRenderer2D entity={entity} selected={selected} />;
+    case 'dimension':
+      return <DimensionRenderer2D entity={entity} document={document} selected={selected} />;
     // 3D solid kinds are intentionally not rendered here.
     default:
       return null;
@@ -77,7 +82,7 @@ export function Entities2D({ document }: Entities2DProps): React.ReactElement {
         if (layer && !layer.visible) return null;
         if (hiddenLayerIds.has(entity.layerId)) return null;
 
-        return <Entity2DRenderer key={id} entity={entity} selected={selectionSet.has(id)} />;
+        return <Entity2DRenderer key={id} entity={entity} selected={selectionSet.has(id)} document={document} />;
       })}
     </group>
   );

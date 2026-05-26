@@ -88,6 +88,16 @@ export interface GeometryKernel {
    * @param thickness - wall thickness in document units; must be > 0
    */
   shellSolid(shape: MeshData, thickness: number): MeshData | null;
+
+  /**
+   * Tessellate a solid entity into a world-space triangle MeshData.
+   * Used by commands that need to convert an entity to MeshData before passing
+   * it to kernel operations like filletEdges or chamferEdges.
+   * Returns null for 2D entities, degenerate geometry, or unsupported kinds.
+   *
+   * @param entity - the solid entity to tessellate (must be a 3D solid kind)
+   */
+  tessellate(entity: Entity): MeshData | null;
 }
 
 // ---------------------------------------------------------------------------

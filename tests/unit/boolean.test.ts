@@ -53,6 +53,7 @@ function makeFakeKernel(): GeometryKernel & {
     filletEdges: (): MeshData | null => null,
     chamferEdges: (): MeshData | null => null,
     shellSolid: (): MeshData | null => null,
+    tessellate: (): MeshData | null => null,
   };
   return fake;
 }

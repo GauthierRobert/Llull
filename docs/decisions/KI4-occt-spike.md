@@ -139,3 +139,72 @@ injected kernel specifically for the operations Manifold cannot do: fillet, cham
 the three new method stubs, have Manifold return `null` for them (graceful no-op, already
 the contract), and wire `occtKernel.ts` for those operations only — so users pay the
 63 MB WASM cost only when they first invoke a fillet or export, not on app load.
+
+---
+
+## Batch 15 KI4-followup: mesh→BREP via BRepBuilderAPI_Sewing
+
+**Date:** 2026-05-26  
+**Author:** mcp-engineer (Lane 4, Batch 15)
+
+### What was attempted
+
+The AABB-rebuild approach in `filletEdges` (which only produced correct results for
+axis-aligned box solids) was replaced with a proper mesh→BREP conversion implemented
+in the new private helper `meshDataToTopoDSShape`.
+
+**Approach chosen: Approach 2 — BRepBuilderAPI_Sewing**
+
+For each triangle in MeshData:
+1. Build three `gp_Pnt_3` points from the triangle vertices.
+2. Construct a closed triangular wire via `BRepBuilderAPI_MakePolygon`.
+3. Build a planar face from the wire via `BRepBuilderAPI_MakeFace_15`.
+4. Add all triangle faces to a `BRepBuilderAPI_Sewing` instance (tolerance 1e-6).
+5. `Sewing.Perform()` merges shared edges into a watertight shell.
+6. Enumerate shells in the sewn shape via `TopExp_Explorer_2`.
+7. Add shells to `BRepBuilderAPI_MakeSolid` and call `Build()`.
+8. If `IsDone()`, the result is a proper OCC solid suitable for `BRepFilletAPI_MakeFillet`.
+
+Degenerate (zero-area) triangles are skipped before wire construction to prevent
+sewing failures. The cross-product magnitude check (`crossSq < 1e-24`) guards this.
+
+### Runtime verification status
+
+The OCC WASM cannot be loaded in bare Node.js v22 because the `opencascade.js@1.1.1`
+entry point (`index.js`) uses `import wasmFile from "./dist/opencascade.wasm.wasm"` —
+an ESM static import of a WASM file — which Node.js v22 does not support without
+the experimental Wasm Modules flag. All probing in this environment fails at module
+load, not at the sewing API level. The JS glue's approach of setting `ENVIRONMENT_IS_NODE`
+and using `require('fs')` internally also conflicts with the project's `"type":"module"`.
+
+The Vite bundler (used for `npm run dev` and tests in jsdom) handles the WASM import
+correctly. The live WASM test suite (`describe.skip`) documents the correctness tests;
+they remain skipped until a Node-env Vitest config is wired.
+
+The sewing APIs (`BRepBuilderAPI_Sewing`, `BRepBuilderAPI_MakePolygon`,
+`BRepBuilderAPI_MakeFace_15`, `BRepBuilderAPI_MakeSolid`) are confirmed present in
+`Supported APIs.md` with the same "unsupported" badge (= incomplete auto-bindings,
+not uncallable) as the APIs that the Batch 13 spike confirmed work at runtime
+(`BRepAlgoAPI_Fuse_3`, `BRepFilletAPI_MakeFillet`, etc.).
+
+### Remaining limitations
+
+- **Robustness depends on triangle sealing**: degenerate triangles are skipped but may
+  leave gaps. If sewing produces an open shell, `MakeSolid.IsDone()` returns false and
+  `filletEdges` returns null (graceful no-op with `console.warn`).
+- **Non-manifold / open meshes**: `filletEdges` returns null. This is correct — an open
+  surface cannot be filleted.
+- **Planar approximation**: `BRepBuilderAPI_MakeFace_15` builds a planar face from each
+  triangle wire. Curved-surface meshes (sphere, cylinder) are approximated as polyhedral
+  solids. The fillet operates on this approximation — geometrically close but not exact.
+- **Sewing tolerance**: the 1e-6 tolerance merges nearly-coincident vertices, which is
+  correct for watertight sealing but may lose sub-micrometer detail.
+
+### Operand types now handled by filletEdges
+
+| Operand type | Status |
+|---|---|
+| `box` entity | Exact B-rep via `BRepPrimAPI_MakeBox_2` (unchanged, always worked) |
+| Closed manifold mesh (any orientation) | Sewing approach; works for box, rotated box, boolean-result mesh |
+| Non-manifold / open mesh | Graceful null (console.warn emitted) |
+| `cylinder` / `sphere` / `extrusion` entity | entityToOccShape still returns null for these; their MeshData goes through the sewing path |

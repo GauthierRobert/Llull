@@ -27,6 +27,7 @@ import { checkModel } from './check';
 import { renderView } from './render';
 import { makeTubeBetween } from './composite';
 import { addText, addDimension } from './annotate';
+import { filletEdge, chamferEdge } from './modify3d';
 import {
   explodePolyline,
   offset2D,
@@ -121,6 +122,8 @@ const definitions = [
   makeTubeBetween,
   addText,
   addDimension,
+  filletEdge,
+  chamferEdge,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

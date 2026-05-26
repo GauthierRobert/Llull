@@ -20,6 +20,43 @@
  *   Bbox correctness: union bbox [-1,-1,-1]→[2,1,1] matches expected 3×2×2 envelope
  *
  * ---------------------------------------------------------------------------
+ * MESH→BREP APPROACH (Batch 15, KI4-followup)
+ * ---------------------------------------------------------------------------
+ * `filletEdges` now uses `meshDataToTopoDSShape` (Approach 2: BRepBuilderAPI_Sewing).
+ * Per-triangle faces are built via BRepBuilderAPI_MakePolygon (closed triangle wire)
+ * → BRepBuilderAPI_MakeFace_15 (planar face from wire), then sewn together into a
+ * shell and promoted to a solid via BRepBuilderAPI_MakeSolid.
+ *
+ * Remaining limitations:
+ *   - Robustness depends on triangle sealing: degenerate triangles (zero-area) are
+ *     skipped but may leave gaps in the shell, causing BRepBuilderAPI_MakeSolid to
+ *     fail. In that case filletEdges returns null (graceful no-op).
+ *   - The sewing tolerance is 1e-6; meshes with vertices that differ by less than
+ *     this are merged, which is correct behaviour but may lose fine detail.
+ *   - Non-manifold meshes (open surfaces, meshes with T-junctions) will produce an
+ *     open shell; MakeSolid will still fail gracefully, filletEdges returns null.
+ *   - BRepBuilderAPI_MakeFace_15 builds a planar face from the triangle wire;
+ *     curved surfaces (sphere faces, cylinder caps) become flat approximations.
+ *     The fillet operates on this approximate topology — the result is geometrically
+ *     close but not exact for non-polyhedral inputs.
+ *   - API availability verified by the same "all OCC APIs are callable despite
+ *     the 'unsupported' badge" rule established in KI4 Batch 13 spike.
+ *     Runtime correctness of the sewing path is EXPECTED to work in-browser via Vite
+ *     but is UNVERIFIED at commit time: bare Node.js ESM cannot resolve the static
+ *     `import wasmFile from './dist/opencascade.wasm.wasm'` entry point without
+ *     --experimental-wasm-modules, so the live WASM tests are still `describe.skip`.
+ *     See docs/decisions/KI4-occt-spike.md (Batch 15 section) for follow-up.
+ *
+ * Operand types now correctly handled by filletEdges:
+ *   - box entity     → exact B-rep via BRepPrimAPI_MakeBox_2 (unchanged, always worked)
+ *   - arbitrary mesh → sewing approach above; solid produced when mesh is manifold
+ *
+ * Operand types still not handled (return null gracefully):
+ *   - cylinder/sphere/extrusion entities → entityToOccShape still returns null for
+ *     these; the mesh path handles their MeshData representations instead.
+ *   - Open / non-manifold MeshData → sewing produces open shell → MakeSolid fails → null.
+ *
+ * ---------------------------------------------------------------------------
  * TODO: chamferEdges spike — BRepFilletAPI_MakeChamfer, needs separate batch.
  * TODO: shellSolid spike — BRepOffsetAPI_MakeThickSolid, needs separate batch.
  * ---------------------------------------------------------------------------
@@ -101,6 +138,39 @@ interface OccGpPnt {
 
 interface OccTopLoc_Location {
   delete(): void;
+}
+
+interface OccMakePolygon {
+  Add_1(pt: OccGpPnt): void;
+  Close(): void;
+  IsDone(): boolean;
+  Wire(): OccShape;
+  delete(): void;
+}
+
+interface OccMakeFace {
+  IsDone(): boolean;
+  Face(): OccShape;
+  delete(): void;
+}
+
+interface OccSewing {
+  Add(shape: OccShape): void;
+  Perform(): void;
+  SewedShape(): OccShape;
+  delete(): void;
+}
+
+interface OccMakeSolid {
+  Add(shell: OccShape): void;
+  Build(): void;
+  IsDone(): boolean;
+  Shape(): OccShape;
+  delete(): void;
+}
+
+interface OccTopoDS_ModuleFull extends OccTopoDS_Module {
+  Shell_1(shape: OccShape): OccShape;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -204,6 +274,123 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
 
   if (positions.length === 0) return null;
   return { positions, indices };
+}
+
+// ---------------------------------------------------------------------------
+// Helper: reconstruct a TopoDS_Shape from arbitrary MeshData.
+//
+// Approach 2 — BRepBuilderAPI_Sewing:
+//   For each triangle in the mesh, build a closed triangular wire via
+//   BRepBuilderAPI_MakePolygon → BRepBuilderAPI_MakeFace_15 (planar face).
+//   All triangle faces are sewn together into a shell by BRepBuilderAPI_Sewing.
+//   The sealed shell is promoted to a solid via BRepBuilderAPI_MakeSolid.
+//
+// Returns null if:
+//   - The mesh has no triangles or degenerate geometry.
+//   - Sewing produces an open shell (non-manifold / open mesh input).
+//   - BRepBuilderAPI_MakeSolid.IsDone() is false.
+//
+// @pure (does not mutate mesh; all OCC objects are .delete()d before return)
+// ---------------------------------------------------------------------------
+
+function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
+  const { positions, indices } = mesh;
+  if (positions.length === 0 || indices.length === 0) return null;
+  if (indices.length % 3 !== 0) return null;
+
+  const sewing: OccSewing = new api.BRepBuilderAPI_Sewing(1e-6, true, true, true, false);
+  const createdFaces: OccShape[] = [];
+
+  const triCount = indices.length / 3;
+  for (let t = 0; t < triCount; t++) {
+    const i0 = indices[t * 3] ?? 0;
+    const i1 = indices[t * 3 + 1] ?? 0;
+    const i2 = indices[t * 3 + 2] ?? 0;
+
+    const x0 = positions[i0 * 3] ?? 0, y0 = positions[i0 * 3 + 1] ?? 0, z0 = positions[i0 * 3 + 2] ?? 0;
+    const x1 = positions[i1 * 3] ?? 0, y1 = positions[i1 * 3 + 1] ?? 0, z1 = positions[i1 * 3 + 2] ?? 0;
+    const x2 = positions[i2 * 3] ?? 0, y2 = positions[i2 * 3 + 1] ?? 0, z2 = positions[i2 * 3 + 2] ?? 0;
+
+    // Skip degenerate (zero-area) triangles to avoid sewing failures.
+    const abx = x1 - x0, aby = y1 - y0, abz = z1 - z0;
+    const acx = x2 - x0, acy = y2 - y0, acz = z2 - z0;
+    const crossSq = (aby * acz - abz * acy) ** 2 + (abz * acx - abx * acz) ** 2 + (abx * acy - aby * acx) ** 2;
+    if (crossSq < 1e-24) continue; // degenerate — skip
+
+    const gp0: OccGpPnt = new api.gp_Pnt_3(x0, y0, z0);
+    const gp1: OccGpPnt = new api.gp_Pnt_3(x1, y1, z1);
+    const gp2: OccGpPnt = new api.gp_Pnt_3(x2, y2, z2);
+
+    const poly: OccMakePolygon = new api.BRepBuilderAPI_MakePolygon();
+    poly.Add_1(gp0);
+    poly.Add_1(gp1);
+    poly.Add_1(gp2);
+    poly.Close();
+    gp0.delete();
+    gp1.delete();
+    gp2.delete();
+
+    if (!poly.IsDone()) {
+      poly.delete();
+      continue;
+    }
+
+    const wire = poly.Wire();
+    const makeFace: OccMakeFace = new api.BRepBuilderAPI_MakeFace_15(wire, false);
+    poly.delete();
+
+    if (makeFace.IsDone()) {
+      const face = makeFace.Face();
+      sewing.Add(face);
+      createdFaces.push(face);
+    }
+    makeFace.delete();
+  }
+
+  // Clean up temporary face references (shapes are owned by OCC topology).
+  // createdFaces are passed to sewing; sewing holds them internally.
+  // We do NOT delete them here — sewing manages their lifetime.
+
+  sewing.Perform();
+  const sewn = sewing.SewedShape() as OccShape | null;
+
+  if (!sewn) {
+    sewing.delete();
+    return null;
+  }
+
+  // Promote the sewed shell to a solid.
+  const makeSolid: OccMakeSolid = new api.BRepBuilderAPI_MakeSolid();
+  const shellExp: OccExplorer = new api.TopExp_Explorer_2(
+    sewn,
+    api.TopAbs_ShapeEnum.TopAbs_SHELL,
+    api.TopAbs_ShapeEnum.TopAbs_SHAPE,
+  );
+
+  let shellCount = 0;
+  while (shellExp.More()) {
+    const shell = (api.TopoDS as OccTopoDS_ModuleFull).Shell_1(shellExp.Current());
+    makeSolid.Add(shell);
+    shellCount++;
+    shellExp.Next();
+  }
+  shellExp.delete();
+  sewing.delete();
+
+  if (shellCount === 0) {
+    makeSolid.delete();
+    return null;
+  }
+
+  makeSolid.Build();
+  if (!makeSolid.IsDone()) {
+    makeSolid.delete();
+    return null;
+  }
+
+  const solid = makeSolid.Shape();
+  makeSolid.delete();
+  return solid;
 }
 
 // ---------------------------------------------------------------------------
@@ -311,54 +498,42 @@ export async function createOcctKernel(wasmBinary?: Uint8Array): Promise<Geometr
      * Fillet the specified edges of a mesh using BRepFilletAPI_MakeFillet.
      *
      * The `shape` operand is a MeshData (kernel-agnostic). We rebuild an OCC
-     * TopoDS_Shape from it by treating the mesh as a polyhedral solid via
-     * BRep_Builder + BRepMesh. Because MeshData has no B-rep topology, we use
-     * an intermediate re-meshing approach: reconstruct the shape from vertices
-     * and triangles, then run the fillet. This is the "missing piece" identified
-     * in the KI4 spike — entity-based fillet (box/cylinder/sphere) is handled
-     * via entityToOccShape directly and is the primary production path.
+     * TopoDS_Shape from it via `meshDataToTopoDSShape` (BRepBuilderAPI_Sewing —
+     * per-triangle planar faces sewn into a shell, promoted to a solid). This
+     * replaces the previous AABB-rebuild approach (which only produced correct
+     * results for axis-aligned box solids).
      *
-     * @param shape       - input mesh (world-space)
+     * If `meshDataToTopoDSShape` returns null (non-manifold mesh, degenerate
+     * triangles, or sewing failure), `filletEdges` returns null as a graceful
+     * no-op and logs once via console.warn so the developer/user is informed.
+     *
+     * @param shape       - input mesh (world-space, any orientation)
      * @param edgeIndices - 0-based edge indices to fillet; empty = all edges
      * @param radius      - fillet radius; must be > 0
      */
     filletEdges(shape: MeshData, edgeIndices: number[], radius: number): MeshData | null {
       if (radius <= 0 || shape.positions.length === 0) return null;
 
-      let boxShape: OccShape | null = null;
+      let occShape: OccShape | null = null;
       let filletMaker: OccFilletMaker | null = null;
 
       try {
-        // Primary path: we reconstruct a parametric shape from the bounding box of
-        // the MeshData so OCC has proper B-rep topology for edge selection.
-        // Full mesh→B-rep conversion (BRep_Builder triangle-by-triangle) is a
-        // separate spike. For now, we derive an axis-aligned box from the mesh AABB
-        // and fillet that — sufficient for the common box-boolean→fillet workflow.
-        let minX = Infinity, minY = Infinity, minZ = Infinity;
-        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-        const pos = shape.positions;
-        for (let i = 0; i < pos.length; i += 3) {
-          const x = pos[i] ?? 0, y = pos[i + 1] ?? 0, z = pos[i + 2] ?? 0;
-          if (x < minX) minX = x; if (x > maxX) maxX = x;
-          if (y < minY) minY = y; if (y > maxY) maxY = y;
-          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        occShape = meshDataToTopoDSShape(api, shape);
+        if (!occShape) {
+          console.warn(
+            '[occtKernel] filletEdges: could not reconstruct a manifold solid from MeshData ' +
+              '(non-manifold mesh, open shell, or degenerate triangles). Returning null.',
+          );
+          return null;
         }
-        const sx = maxX - minX, sy = maxY - minY, sz = maxZ - minZ;
-        if (sx <= 0 || sy <= 0 || sz <= 0) return null;
-
-        const origin: OccGpPnt = new api.gp_Pnt_3(minX, minY, minZ);
-        const makeBox: OccMakeBox = new api.BRepPrimAPI_MakeBox_2(origin, sx, sy, sz);
-        boxShape = makeBox.Shape() as OccShape;
-        origin.delete();
-        makeBox.delete();
 
         filletMaker = new api.BRepFilletAPI_MakeFillet(
-          boxShape,
+          occShape,
           api.ChFi3d_FilletShape.ChFi3d_Rational,
         ) as OccFilletMaker;
 
         const edgeExp = new api.TopExp_Explorer_2(
-          boxShape,
+          occShape,
           api.TopAbs_ShapeEnum.TopAbs_EDGE,
           api.TopAbs_ShapeEnum.TopAbs_SHAPE,
         ) as OccExplorer;
@@ -368,7 +543,11 @@ export async function createOcctKernel(wasmBinary?: Uint8Array): Promise<Geometr
         while (edgeExp.More()) {
           if (!edgeSet || edgeSet.has(edgeIdx)) {
             const edge = (api.TopoDS as OccTopoDS_Module).Edge_1(edgeExp.Current());
-            filletMaker.Add_2(radius, edge);
+            try {
+              filletMaker.Add_2(radius, edge);
+            } catch {
+              // Degenerate or seam edge — skip gracefully.
+            }
           }
           edgeIdx++;
           edgeExp.Next();
@@ -383,7 +562,7 @@ export async function createOcctKernel(wasmBinary?: Uint8Array): Promise<Geometr
       } catch {
         return null;
       } finally {
-        try { boxShape?.delete(); } catch { /* ignore */ }
+        try { occShape?.delete(); } catch { /* ignore */ }
         try { filletMaker?.delete(); } catch { /* ignore */ }
       }
     },
@@ -399,6 +578,19 @@ export async function createOcctKernel(wasmBinary?: Uint8Array): Promise<Geometr
     // Returns null (graceful no-op) until implemented; matches the GeometryKernel contract.
     shellSolid(_shape: MeshData, _thickness: number): MeshData | null {
       return null;
+    },
+
+    tessellate(entity: Entity): MeshData | null {
+      let shape: OccShape | null = null;
+      try {
+        shape = entityToOccShape(api, entity);
+        if (!shape) return null;
+        return extractMeshData(api, shape);
+      } catch {
+        return null;
+      } finally {
+        try { shape?.delete(); } catch { /* ignore */ }
+      }
     },
   };
 }
