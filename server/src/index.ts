@@ -24,6 +24,7 @@ import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
 import { subscribeLive } from './liveDocument';
 import { applyCommand, undo, redo } from './commandBus';
+import type { ExportStlData } from '@core/commands/export';
 
 // ---------------------------------------------------------------------------
 // App setup
@@ -209,8 +210,7 @@ app.get('/export/stl', (req: Request, res: Response) => {
     return;
   }
 
-  // Type-narrow the data payload — mirrors ExportStlData from core/commands/export.ts.
-  const data = result.data as { format: 'ascii' | 'binary'; triangleCount: number; stl?: string; stlBase64?: string };
+  const data = result.data as ExportStlData;
 
   res.setHeader('Content-Disposition', `attachment; filename="${name}.stl"`);
   res.setHeader('Content-Type', 'model/stl');
