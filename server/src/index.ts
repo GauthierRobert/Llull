@@ -170,6 +170,65 @@ app.post('/redo', (_req: Request, res: Response) => {
   res.status(200).json(redo());
 });
 
+// ---------------------------------------------------------------------------
+// Export download routes — OUTSIDE /mcp auth (browser downloads cannot send
+// Authorization headers — same rationale as /live and /command).
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /export/stl — stream the shared live document as a downloadable STL file.
+ *
+ * Query params:
+ *   format  — 'ascii' (default) or 'binary'. Anything other than 'binary' → 'ascii'.
+ *   name    — solid name embedded in the STL header and used as the download filename
+ *             (default 'llull').  The response Content-Disposition will be
+ *             `attachment; filename="<name>.stl"`.
+ *
+ * Response (200):
+ *   Content-Type: model/stl
+ *   Content-Disposition: attachment; filename="<name>.stl"
+ *   Body: raw ASCII STL text (ascii) OR raw binary STL bytes (binary).
+ *
+ * An empty or all-2D document produces a valid empty STL (triangleCount=0) — still 200.
+ * If the command result is missing data, responds 500 with { error }.
+ *
+ * No auth required.
+ * CORS already allows GET from http://localhost:5173.
+ */
+app.get('/export/stl', (req: Request, res: Response) => {
+  const rawFormat = req.query['format'];
+  const format: 'ascii' | 'binary' = rawFormat === 'binary' ? 'binary' : 'ascii';
+
+  const rawName = req.query['name'];
+  const name: string = typeof rawName === 'string' && rawName.length > 0 ? rawName : 'llull';
+
+  const result = applyCommand('export_stl', { format, name });
+
+  if (!result.data) {
+    res.status(500).json({ error: 'export_stl returned no data.' });
+    return;
+  }
+
+  // Type-narrow the data payload — mirrors ExportStlData from core/commands/export.ts.
+  const data = result.data as { format: 'ascii' | 'binary'; triangleCount: number; stl?: string; stlBase64?: string };
+
+  res.setHeader('Content-Disposition', `attachment; filename="${name}.stl"`);
+  res.setHeader('Content-Type', 'model/stl');
+
+  if (data.format === 'binary') {
+    if (!data.stlBase64) {
+      res.status(500).json({ error: 'export_stl binary result missing stlBase64.' });
+      return;
+    }
+    const buf = Buffer.from(data.stlBase64, 'base64');
+    res.setHeader('Content-Length', buf.length);
+    res.status(200).end(buf);
+  } else {
+    const body = data.stl ?? '';
+    res.status(200).send(body);
+  }
+});
+
 // UI↔MCP live-sync bridge routes — guarded by the same bearer auth as /mcp.
 // See server/src/uiBridgeRouter.ts for the implementation.
 app.use('/ui-bridge', buildUiBridgeRouter());

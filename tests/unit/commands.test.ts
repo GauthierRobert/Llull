@@ -4576,4 +4576,276 @@ describe('export_stl', () => {
     expect(schema).toBeDefined();
     expect(schema?.annotations?.readOnlyHint).toBe(true);
   });
+
+  // ── save_recipe ───────────────────────────────────────────────────────────
+
+  describe('save_recipe', () => {
+    it('happy path: snapshots featureHistory into doc.recipes with correct step count', () => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+      doc = execute(doc, 'add_sphere', { radius: 1 }).document;
+      expect(doc.featureHistory).toHaveLength(2);
+
+      const result = execute(doc, 'save_recipe', { name: 'my_bracket' });
+
+      // save_recipe is metaHistory — the doc ref changes for recipes but featureHistory grows only from non-meta commands
+      expect(result.affected).toHaveLength(0);
+      const recipe = result.document.recipes['my_bracket'];
+      expect(recipe).toBeDefined();
+      expect(recipe!.name).toBe('my_bracket');
+      expect(recipe!.steps).toHaveLength(2);
+      expect(result.summary).toContain('my_bracket');
+      expect(result.summary).toContain('2 step');
+    });
+
+    it('happy path: optional label is stored on the recipe', () => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+
+      const result = execute(doc, 'save_recipe', { name: 'labelled', label: 'A simple box recipe' });
+      const recipe = result.document.recipes['labelled'];
+      expect(recipe!.label).toBe('A simple box recipe');
+    });
+
+    it('empty featureHistory: still saves recipe but summary notes it is empty', () => {
+      const doc = createEmptyDocument();
+      expect(doc.featureHistory).toHaveLength(0);
+
+      const result = execute(doc, 'save_recipe', { name: 'empty_recipe' });
+      const recipe = result.document.recipes['empty_recipe'];
+      expect(recipe).toBeDefined();
+      expect(recipe!.steps).toHaveLength(0);
+      expect(result.summary).toContain('empty');
+    });
+
+    it('replaces an existing recipe with the same name', () => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+      doc = execute(doc, 'save_recipe', { name: 'r' }).document;
+      expect(doc.recipes['r']!.steps).toHaveLength(1);
+
+      // Add another entity then re-save under the same name.
+      doc = execute(doc, 'add_sphere', { radius: 2 }).document;
+      const result = execute(doc, 'save_recipe', { name: 'r' });
+      expect(result.document.recipes['r']!.steps).toHaveLength(2);
+    });
+
+    it('failure: blank name → no-op, affected:[], unchanged doc', () => {
+      const doc = createEmptyDocument();
+
+      const result = execute(doc, 'save_recipe', { name: '' });
+      expect(result.affected).toHaveLength(0);
+      expect(result.document).toBe(doc);
+      expect(result.summary).toContain('failed');
+    });
+
+    it('failure: whitespace-only name → no-op', () => {
+      const doc = createEmptyDocument();
+      const result = execute(doc, 'save_recipe', { name: '   ' });
+      expect(result.affected).toHaveLength(0);
+      expect(result.document).toBe(doc);
+    });
+
+    it('is pure: input document is not mutated', () => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+      const snapshot = JSON.stringify(doc);
+
+      execute(doc, 'save_recipe', { name: 'purity_check' });
+      expect(JSON.stringify(doc)).toBe(snapshot);
+    });
+
+    it('steps are a deep copy: mutating featureHistory after save does not corrupt the recipe', () => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+      const saved = execute(doc, 'save_recipe', { name: 'copy_test' }).document;
+      const recipeStepsBefore = saved.recipes['copy_test']!.steps.length;
+
+      // Add another step to the doc — recipe must be unaffected.
+      const updated = execute(saved, 'add_sphere', { radius: 1 }).document;
+      expect(updated.featureHistory).toHaveLength(2);
+      expect(saved.recipes['copy_test']!.steps).toHaveLength(recipeStepsBefore);
+    });
+  });
+
+  // ── instantiate_recipe ────────────────────────────────────────────────────
+
+  describe('instantiate_recipe', () => {
+    it('happy path: 1-step recipe creates one entity with a fresh id', () => {
+      let doc = createEmptyDocument();
+      // Build a box, save as recipe.
+      const boxResult = execute(doc, 'add_box', { size: [3, 3, 3] });
+      doc = boxResult.document;
+      doc = execute(doc, 'save_recipe', { name: 'one_box' }).document;
+
+      // Start fresh — wipe the existing entity to prove instantiate adds independently.
+      let freshDoc = createEmptyDocument();
+      freshDoc = { ...freshDoc, recipes: doc.recipes };
+
+      const result = execute(freshDoc, 'instantiate_recipe', { name: 'one_box' });
+      expect(result.affected).toHaveLength(1);
+      expect(result.document.order).toHaveLength(1);
+      const id = result.affected[0]!;
+      expect(result.document.entities[id]!.kind).toBe('box');
+      expect(result.summary).toContain('one_box');
+      expect(result.summary).toContain('1 step');
+    });
+
+    it('happy path: 2-step recipe (add_box + move_entity) correctly remaps ids', () => {
+      let doc = createEmptyDocument();
+      // Step 1: create a box.
+      const boxResult = execute(doc, 'add_box', { size: [1, 1, 1] });
+      doc = boxResult.document;
+      const originalBoxId = boxResult.affected[0]!;
+      // Step 2: move the box — references the original box id.
+      doc = execute(doc, 'move_entity', { id: originalBoxId, delta: [5, 0, 0] }).document;
+      expect(doc.featureHistory).toHaveLength(2);
+
+      // Save the recipe then instantiate onto a clean doc.
+      doc = execute(doc, 'save_recipe', { name: 'box_with_move' }).document;
+      let targetDoc = createEmptyDocument();
+      targetDoc = { ...targetDoc, recipes: doc.recipes };
+
+      const result = execute(targetDoc, 'instantiate_recipe', { name: 'box_with_move' });
+      expect(result.affected).toHaveLength(1); // move_entity doesn't add a new entity
+      expect(result.document.order).toHaveLength(1);
+      const newId = result.affected[0]!;
+      // The box should be at position [5, 0, 0] (moved) — proves id remapping worked.
+      expect(result.document.entities[newId]!.position).toEqual([5, 0, 0]);
+    });
+
+    it('additive: instantiating onto a doc with existing entities leaves them untouched', () => {
+      let doc = createEmptyDocument();
+      // Pre-existing sphere.
+      doc = execute(doc, 'add_sphere', { radius: 2 }).document;
+      const existingId = doc.order[0]!;
+
+      // Save a 1-box recipe.
+      let recipeDoc = createEmptyDocument();
+      recipeDoc = execute(recipeDoc, 'add_box', { size: [1, 1, 1] }).document;
+      recipeDoc = execute(recipeDoc, 'save_recipe', { name: 'just_box' }).document;
+
+      // Merge the recipe into doc.
+      doc = { ...doc, recipes: recipeDoc.recipes };
+      const result = execute(doc, 'instantiate_recipe', { name: 'just_box' });
+
+      // Both the original sphere and the new box are present.
+      expect(result.document.order).toHaveLength(2);
+      expect(result.document.entities[existingId]).toBeDefined();
+      expect(result.document.entities[existingId]!.kind).toBe('sphere');
+    });
+
+    it('idempotency: instantiating twice yields two independent copies', () => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+      doc = execute(doc, 'save_recipe', { name: 'dup' }).document;
+
+      let targetDoc = createEmptyDocument();
+      targetDoc = { ...targetDoc, recipes: doc.recipes };
+
+      const r1 = execute(targetDoc, 'instantiate_recipe', { name: 'dup' });
+      const r2 = execute(r1.document, 'instantiate_recipe', { name: 'dup' });
+
+      expect(r2.document.order).toHaveLength(2);
+      // The two ids must be different.
+      const [id1, id2] = r2.document.order;
+      expect(id1).not.toBe(id2);
+    });
+
+    it('failure: unknown recipe name → no-op, affected:[], summary mentions name', () => {
+      const doc = createEmptyDocument();
+      const result = execute(doc, 'instantiate_recipe', { name: 'does_not_exist' });
+      expect(result.affected).toHaveLength(0);
+      expect(result.document).toBe(doc);
+      expect(result.summary).toContain('does_not_exist');
+      expect(result.summary).toContain('not found');
+    });
+
+    it('failure: blank name → no-op', () => {
+      const doc = createEmptyDocument();
+      const result = execute(doc, 'instantiate_recipe', { name: '' });
+      expect(result.affected).toHaveLength(0);
+      expect(result.document).toBe(doc);
+    });
+
+    it('is pure: input document is not mutated', () => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+      doc = execute(doc, 'save_recipe', { name: 'pure_test' }).document;
+      const snapshot = JSON.stringify(doc);
+
+      execute(doc, 'instantiate_recipe', { name: 'pure_test' });
+      expect(JSON.stringify(doc)).toBe(snapshot);
+    });
+
+    it('featureHistory records instantiate_recipe as a single step', () => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+      doc = execute(doc, 'save_recipe', { name: 'hist_test' }).document;
+
+      let targetDoc = createEmptyDocument();
+      targetDoc = { ...targetDoc, recipes: doc.recipes };
+
+      const result = execute(targetDoc, 'instantiate_recipe', { name: 'hist_test' });
+      // instantiate_recipe is a normal (non-meta) command, so execute() appends one step.
+      expect(result.document.featureHistory).toHaveLength(1);
+      expect(result.document.featureHistory[0]!.name).toBe('instantiate_recipe');
+    });
+  });
+
+  // ── replay survival (critical integration test) ───────────────────────────
+
+  describe('recipe replay survival', () => {
+    it('instantiated entities survive replay_history (recipes: base.recipes fix)', () => {
+      // 1. Build a 2-step recipe.
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+      doc = execute(doc, 'add_sphere', { radius: 1 }).document;
+      doc = execute(doc, 'save_recipe', { name: 'survival_test' }).document;
+
+      // 2. Fresh doc — carry only the recipes dict.
+      let freshDoc = createEmptyDocument();
+      freshDoc = { ...freshDoc, recipes: doc.recipes };
+
+      // 3. Instantiate the recipe — records one featureHistory step.
+      const instantiated = execute(freshDoc, 'instantiate_recipe', { name: 'survival_test' });
+      const docAfterInstantiate = instantiated.document;
+      expect(docAfterInstantiate.order).toHaveLength(2);
+      expect(docAfterInstantiate.featureHistory).toHaveLength(1);
+
+      // 4. replay_history replays the single instantiate_recipe step.
+      //    Without the `recipes: base.recipes` fix in replayHistory, the recipes dict
+      //    would be {} in the base and instantiate_recipe would find no recipe → 0 entities.
+      const replayed = execute(docAfterInstantiate, 'replay_history', {});
+      expect(replayed.document.order).toHaveLength(2);
+      expect(replayed.summary).toContain('2 entit');
+    });
+
+    it('recipe count and entity count survive serialise → deserialise round-trip', async () => {
+      const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence');
+
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+      doc = execute(doc, 'save_recipe', { name: 'round_trip' }).document;
+
+      const json = serializeDocument(doc);
+      const loaded = deserializeDocument(json);
+
+      expect(Object.keys(loaded.recipes)).toHaveLength(1);
+      expect(loaded.recipes['round_trip']!.steps).toHaveLength(1);
+    });
+  });
+
+  // ── toToolSchemas 1:1 invariant (recipes) ────────────────────────────────
+
+  it('toToolSchemas() still 1:1 with listCommands() after save_recipe and instantiate_recipe registered', () => {
+    expect(toToolSchemas().length).toBe(listCommands().length);
+    const saveSchema = toToolSchemas().find((s) => s.name === 'save_recipe');
+    const instantiateSchema = toToolSchemas().find((s) => s.name === 'instantiate_recipe');
+    expect(saveSchema).toBeDefined();
+    expect(instantiateSchema).toBeDefined();
+    // save_recipe is idempotent (meta); instantiate_recipe is not
+    expect(saveSchema?.annotations?.idempotentHint).toBe(true);
+    expect(instantiateSchema?.annotations?.idempotentHint).toBeUndefined();
+  });
 });

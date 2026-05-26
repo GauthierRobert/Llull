@@ -19,6 +19,7 @@ import type {
   Parameter,
   Animation,
   Material,
+  Recipe,
 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 
@@ -267,6 +268,22 @@ function validateParameterValue(name: string, v: unknown): string | null {
 }
 
 /**
+ * Validate a Recipe entry. Returns a descriptive error string on failure, or `null` on success.
+ */
+function validateRecipeValue(name: string, v: unknown): string | null {
+  if (!isRecord(v)) return `recipe '${name}' is not an object`;
+  if (typeof v['name'] !== 'string') return `recipe '${name}': name field must be a string`;
+  if (!Array.isArray(v['steps'])) return `recipe '${name}': steps must be an array`;
+  for (let i = 0; i < v['steps'].length; i++) {
+    const step = v['steps'][i] as unknown;
+    if (!isRecord(step)) return `recipe '${name}': steps[${i}] is not an object`;
+    if (typeof step['id'] !== 'string') return `recipe '${name}': steps[${i}].id must be a string`;
+    if (typeof step['name'] !== 'string') return `recipe '${name}': steps[${i}].name must be a string`;
+  }
+  return null;
+}
+
+/**
  * Structural validation of the raw document record (shape-only, no value checks).
  * Value checks are done in `validateDocumentValues`.
  */
@@ -323,6 +340,15 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
     const params = v['parameters'] as Record<string, unknown>;
     for (const [pname, param] of Object.entries(params)) {
       const err = validateParameterValue(pname, param);
+      if (err !== null) errors.push(err);
+    }
+  }
+
+  // Recipes (optional field — only validate if present)
+  if (isRecord(v['recipes'])) {
+    const recs = v['recipes'] as Record<string, unknown>;
+    for (const [rname, rec] of Object.entries(recs)) {
+      const err = validateRecipeValue(rname, rec);
       if (err !== null) errors.push(err);
     }
   }
@@ -388,6 +414,11 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     ? (raw['groups'] as Record<string, unknown>)
     : {};
 
+  // Recipes (added in AI6)
+  const recipes: Record<string, Recipe> = isRecord(raw['recipes'])
+    ? (raw['recipes'] as Record<string, Recipe>)
+    : {};
+
   return {
     ...raw,
     units,
@@ -398,6 +429,7 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     configurations,
     materials,
     groups,
+    recipes,
   };
 }
 
