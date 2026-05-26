@@ -58,6 +58,7 @@ import {
   measureVolume,
   massProperties,
 } from './measure';
+import { exportStl } from './export';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -135,6 +136,7 @@ const definitions = [
   activateConfiguration,
   createMaterial,
   assignMaterial,
+  exportStl,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
