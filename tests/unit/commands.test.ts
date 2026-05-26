@@ -4577,3 +4577,235 @@ describe('export_stl', () => {
     expect(schema?.annotations?.readOnlyHint).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// W4A — rotation param at creation + W4C — AABB in summaries
+// ---------------------------------------------------------------------------
+
+describe('W4A/W4C — rotation at creation and AABB summaries', () => {
+  beforeEach(() => __resetIdCounter());
+
+  // ── add_box ──────────────────────────────────────────────────────────────
+
+  it('add_box stores non-zero rotation on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_box', { size: [2, 4, 6], rotation: [0.1, 0.2, 0.3] });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation).toEqual([0.1, 0.2, 0.3]);
+  });
+
+  it('add_box defaults to rotation [0,0,0] when omitted', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_box', { size: [1, 1, 1] });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_box ignores non-finite rotation and still creates the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_box', { size: [2, 2, 2], rotation: [Infinity, 0, 0] });
+    expect(result.affected).toHaveLength(1);
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_box ignores wrong-length rotation array and still creates the entity', () => {
+    const doc = createEmptyDocument();
+    // @ts-expect-error intentional wrong-length for test
+    const result = execute(doc, 'add_box', { size: [2, 2, 2], rotation: [0.5, 0.5] });
+    expect(result.affected).toHaveLength(1);
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_box summary contains world AABB', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_box', { size: [2, 4, 6], position: [1, 2, 3] });
+    // box center [1,2,3], size [2,4,6] → min [-1,0,0] max [3,4,6]
+    expect(result.summary).toContain('world AABB');
+    expect(result.summary).toContain('min');
+    expect(result.summary).toContain('max');
+  });
+
+  // ── add_cylinder ─────────────────────────────────────────────────────────
+
+  it('add_cylinder stores non-zero rotation on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cylinder', { radius: 3, height: 5, rotation: [0, 0, Math.PI / 2] });
+    const id = result.affected[0]!;
+    const r = result.document.entities[id]!.rotation;
+    expect(r[0]).toBeCloseTo(0);
+    expect(r[1]).toBeCloseTo(0);
+    expect(r[2]).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('add_cylinder ignores malformed rotation and still creates the entity', () => {
+    const doc = createEmptyDocument();
+    // @ts-expect-error intentional non-array for test
+    const result = execute(doc, 'add_cylinder', { radius: 1, height: 2, rotation: 'bad' });
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_cylinder summary contains world AABB', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cylinder', { radius: 2, height: 6, position: [0, 0, 0] });
+    expect(result.summary).toContain('world AABB');
+  });
+
+  // ── add_sphere ───────────────────────────────────────────────────────────
+
+  it('add_sphere stores non-zero rotation on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_sphere', { radius: 5, rotation: [Math.PI, 0, 0] });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation[0]).toBeCloseTo(Math.PI);
+  });
+
+  it('add_sphere ignores rotation with NaN component and still creates entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_sphere', { radius: 3, rotation: [NaN, 0, 0] });
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_sphere summary contains world AABB', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_sphere', { radius: 4 });
+    expect(result.summary).toContain('world AABB');
+  });
+
+  // ── add_cone ─────────────────────────────────────────────────────────────
+
+  it('add_cone stores non-zero rotation on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cone', { radius: 2, height: 5, rotation: [0, Math.PI / 4, 0] });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation[1]).toBeCloseTo(Math.PI / 4);
+  });
+
+  it('add_cone ignores malformed rotation (wrong length) and still creates entity', () => {
+    const doc = createEmptyDocument();
+    // @ts-expect-error intentional for test
+    const result = execute(doc, 'add_cone', { radius: 2, height: 5, rotation: [0, 0, 0, 0] });
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_cone summary contains world AABB', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_cone', { radius: 3, height: 7 });
+    expect(result.summary).toContain('world AABB');
+  });
+
+  // ── add_torus ────────────────────────────────────────────────────────────
+
+  it('add_torus stores non-zero rotation on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_torus', { ringRadius: 5, tubeRadius: 1, rotation: [0.5, 0, 0] });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation[0]).toBeCloseTo(0.5);
+  });
+
+  it('add_torus ignores non-finite rotation and still creates entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1, rotation: [0, NaN, 0] });
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_torus summary contains world AABB', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
+    expect(result.summary).toContain('world AABB');
+  });
+
+  // ── add_wedge ────────────────────────────────────────────────────────────
+
+  it('add_wedge stores non-zero rotation on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_wedge', { size: [4, 3, 5], rotation: [0, 0, Math.PI] });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation[2]).toBeCloseTo(Math.PI);
+  });
+
+  it('add_wedge ignores malformed rotation (non-array) and still creates entity', () => {
+    const doc = createEmptyDocument();
+    // @ts-expect-error intentional for test
+    const result = execute(doc, 'add_wedge', { size: [2, 2, 2], rotation: null });
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_wedge summary contains world AABB', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_wedge', { size: [4, 3, 6], position: [1, 0, 0] });
+    expect(result.summary).toContain('world AABB');
+  });
+
+  // ── add_pyramid ──────────────────────────────────────────────────────────
+
+  it('add_pyramid stores non-zero rotation on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_pyramid', {
+      baseWidth: 4,
+      baseDepth: 3,
+      height: 5,
+      rotation: [Math.PI / 6, 0, 0],
+    });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation[0]).toBeCloseTo(Math.PI / 6);
+  });
+
+  it('add_pyramid ignores non-finite rotation and still creates entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_pyramid', {
+      baseWidth: 2,
+      baseDepth: 2,
+      height: 3,
+      rotation: [Infinity, Infinity, Infinity],
+    });
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('add_pyramid summary contains world AABB', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'add_pyramid', { baseWidth: 6, baseDepth: 4, height: 8 });
+    expect(result.summary).toContain('world AABB');
+  });
+
+  // ── extrude_profile ───────────────────────────────────────────────────────
+
+  it('extrude_profile stores non-zero rotation on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'extrude_profile', {
+      profile: [[0, 0], [4, 0], [4, 3], [0, 3]],
+      depth: 5,
+      rotation: [0, Math.PI / 3, 0],
+    });
+    const id = result.affected[0]!;
+    expect(result.document.entities[id]!.rotation[1]).toBeCloseTo(Math.PI / 3);
+  });
+
+  it('extrude_profile ignores malformed rotation and still creates entity', () => {
+    const doc = createEmptyDocument();
+    // @ts-expect-error intentional for test
+    const result = execute(doc, 'extrude_profile', {
+      profile: [[0, 0], [2, 0], [1, 2]],
+      depth: 3,
+      rotation: [0, Infinity, 0],
+    });
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('extrude_profile summary contains world AABB', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'extrude_profile', {
+      profile: [[0, 0], [3, 0], [3, 2], [0, 2]],
+      depth: 4,
+    });
+    expect(result.summary).toContain('world AABB');
+  });
+});
