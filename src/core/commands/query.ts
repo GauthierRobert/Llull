@@ -160,6 +160,7 @@ function resolveTouchingBounds(doc: CadDocument, touchingId: string): Bounds | n
  */
 export const findEntities: CommandDefinition<FindEntitiesParams> = {
   name: 'find_entities',
+  annotations: { readOnly: true },
   description:
     'Filter entities by any combination of: kind, layerId, name (exact or substring), tag (exact), ' +
     'bboxMin/bboxMax (legacy overlap), nearPoint (centroid within radius), insideBBox (AABB fully inside), ' +

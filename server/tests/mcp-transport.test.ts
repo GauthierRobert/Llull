@@ -369,7 +369,7 @@ describe('MCP tools/call + REST /undo interop', () => {
 // ---------------------------------------------------------------------------
 
 describe('MCP tools/call — render_view (SVG stripping)', () => {
-  it('response contains an image block', async () => {
+  it('response contains an image block', { timeout: 15000 }, async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
@@ -382,7 +382,7 @@ describe('MCP tools/call — render_view (SVG stripping)', () => {
     expect(imageBlocks.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('no text block contains raw SVG markup (<svg or <polygon)', async () => {
+  it('no text block contains raw SVG markup (<svg or <polygon)', { timeout: 15000 }, async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
@@ -397,7 +397,7 @@ describe('MCP tools/call — render_view (SVG stripping)', () => {
     }
   });
 
-  it('json metadata block still contains useful fields (not svg)', async () => {
+  it('json metadata block still contains useful fields (not svg)', { timeout: 15000 }, async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
@@ -414,7 +414,7 @@ describe('MCP tools/call — render_view (SVG stripping)', () => {
     expect(jsonBlock!.text).not.toMatch(/"svg"/);
   });
 
-  it('structuredContent does not contain svg key', async () => {
+  it('structuredContent does not contain svg key', { timeout: 15000 }, async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 

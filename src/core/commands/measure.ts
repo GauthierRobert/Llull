@@ -74,6 +74,7 @@ interface MeasureDistanceData {
  */
 export const measureDistance: CommandDefinition<MeasureDistanceParams> = {
   name: 'measure_distance',
+  annotations: { readOnly: true },
   description:
     'Measure the straight-line distance between two locations. Each location may be a world-space ' +
     'point [x,y,z] (point1/point2) or an entity id (entityId1/entityId2, centroid used). ' +
@@ -188,6 +189,7 @@ interface MeasureAngleData {
  */
 export const measureAngle: CommandDefinition<MeasureAngleParams> = {
   name: 'measure_angle',
+  annotations: { readOnly: true },
   description:
     'Measure an angle. Provide either: (a) three world-space points as [[vx,vy,vz],[a1x,a1y,a1z],[a2x,a2y,a2z]] ' +
     'where the first point is the vertex and the angle is between the two rays vertex→arm1 and vertex→arm2; or ' +
@@ -327,6 +329,7 @@ function polygonArea(pts: ReadonlyArray<readonly [number, number]>): number {
  */
 export const measureArea: CommandDefinition<MeasureAreaParams> = {
   name: 'measure_area',
+  annotations: { readOnly: true },
   description:
     'Compute the area of a closed 2D shape. Provide either: (a) an entityId for a closed ' +
     "polyline, rectangle, or circle entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). " +
@@ -452,6 +455,7 @@ interface MeasurePerimeterData {
  */
 export const measurePerimeter: CommandDefinition<MeasurePerimeterParams> = {
   name: 'measure_perimeter',
+  annotations: { readOnly: true },
   description:
     "Compute the perimeter or total length of a 2D shape. Supported entity kinds: 'line' (segment length), " +
     "'polyline' (sum of segment lengths; closed polyline adds last→first segment), " +
@@ -567,6 +571,7 @@ interface MeasureBoundingBoxData {
  */
 export const measureBoundingBox: CommandDefinition<MeasureBoundingBoxParams> = {
   name: 'measure_bounding_box',
+  annotations: { readOnly: true },
   description:
     'Compute the world-space axis-aligned bounding box (AABB). Three modes: ' +
     '(a) entityId — AABB of one entity; ' +
@@ -693,6 +698,7 @@ function meshVolume(positions: ReadonlyArray<number>, indices: ReadonlyArray<num
  */
 export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
   name: 'measure_volume',
+  annotations: { readOnly: true },
   description:
     "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), " +
     "'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), " +
@@ -811,6 +817,7 @@ interface MassPropertiesData {
  */
 export const massProperties: CommandDefinition<MassPropertiesParams> = {
   name: 'mass_properties',
+  annotations: { readOnly: true },
   description:
     "Compute the mass of a 3D solid from its volume and a caller-supplied density. " +
     "Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh'. " +

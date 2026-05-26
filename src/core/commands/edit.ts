@@ -218,6 +218,7 @@ interface SetEntityNameParams {
  */
 export const setEntityName: CommandDefinition<SetEntityNameParams> = {
   name: 'set_entity_name',
+  annotations: { idempotent: true },
   description:
     'Set an entity\'s display name and/or tags. ' +
     'Both fields are optional and independent — omitting a field leaves it unchanged. ' +

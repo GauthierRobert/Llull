@@ -54,7 +54,14 @@ import {
 import type { CadDocument } from '@core/model/types';
 import { getLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
-import { buildImageBlock, stripSvgFromData } from './renderImage';
+import { buildImageBlock, stripSvgFromData, rasterizeSvg } from './renderImage';
+import {
+  buildTurntableFrames,
+  buildIsolateSvg,
+  appendDimensionLabels,
+  buildSectionSvg,
+  type RenderViewEnrichParams,
+} from './renderViewEnrich';
 
 // ---------------------------------------------------------------------------
 // Session registry
@@ -187,6 +194,218 @@ function buildRateLimiter(): ReturnType<typeof rateLimit> {
 }
 
 // ---------------------------------------------------------------------------
+// render_view enrichment helpers
+// ---------------------------------------------------------------------------
+
+/** The set of param keys that are handled server-side (not forwarded to core). */
+const ENRICH_PARAM_KEYS = new Set(['turntable', 'isolate', 'showDimensions', 'section']);
+
+/**
+ * Strip enrichment-only params from a render_view args object so the core
+ * command only receives the params it understands (view, width, height).
+ */
+function stripEnrichParams(args: unknown): unknown {
+  if (typeof args !== 'object' || args === null) return args;
+  const record = args as Record<string, unknown>;
+  const stripped: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(record)) {
+    if (!ENRICH_PARAM_KEYS.has(k)) stripped[k] = v;
+  }
+  return stripped;
+}
+
+/**
+ * Apply server-side render_view enrichments when any enrichment param is present.
+ *
+ * Returns a `CallToolResult` when enrichment was applied, or `null` when no
+ * enrichment params are present (caller falls through to normal applyCommand path).
+ *
+ * Enrichments are applied in this priority order (only the first active one wins,
+ * except showDimensions which composes with any other enrichment):
+ *   1. turntable → N-frame horizontal PNG strip
+ *   2. isolate   → highlight specific entities
+ *   3. section   → section-plane view
+ *   4. (base render via applyCommand + showDimensions post-process)
+ */
+function applyRenderViewEnrichments(
+  args: Record<string, unknown>,
+  getDoc: () => CadDocument,
+): CallToolResult | null {
+  const params = args as RenderViewEnrichParams;
+  const hasEnrichment =
+    params.turntable !== undefined ||
+    params.isolate !== undefined ||
+    params.showDimensions === true ||
+    params.section !== undefined;
+
+  if (!hasEnrichment) return null;
+
+  // Base render params forwarded to core
+  const baseView = typeof params.view === 'string' ? params.view : 'iso';
+  const baseWidth = typeof params.width === 'number' ? Math.max(64, Math.min(2000, Math.round(params.width))) : 800;
+  const baseHeight = typeof params.height === 'number' ? Math.max(64, Math.min(2000, Math.round(params.height))) : 600;
+
+  const doc = getDoc();
+
+  // ------------------------------------------------------------------
+  // turntable: N-frame horizontal strip
+  // ------------------------------------------------------------------
+  if (params.turntable !== undefined) {
+    const frames = Math.max(1, Math.min(12, Math.round(params.turntable.frames)));
+    const svgs = buildTurntableFrames(doc, frames, baseView, baseWidth, baseHeight);
+    if (svgs === null || svgs.length === 0) {
+      return makeErrorResult('render_view turntable: failed to produce frames.');
+    }
+
+    // Rasterize each frame and concatenate horizontally into a single SVG strip.
+    // We compose the SVGs side-by-side in a wrapper SVG, then rasterize once.
+    const totalWidth = baseWidth * svgs.length;
+    const stripLines: string[] = [];
+    stripLines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${baseHeight}" viewBox="0 0 ${totalWidth} ${baseHeight}">`);
+    stripLines.push(`  <rect width="${totalWidth}" height="${baseHeight}" fill="#1a1a2e"/>`);
+    for (let i = 0; i < svgs.length; i++) {
+      const inner = extractSvgInnerPublic(svgs[i] as string);
+      stripLines.push(`  <g transform="translate(${i * baseWidth}, 0)">${inner}</g>`);
+    }
+    // Frame number labels
+    for (let i = 0; i < svgs.length; i++) {
+      const angle = Math.round((360 * i) / svgs.length);
+      stripLines.push(
+        `  <text x="${r2Public(i * baseWidth + 4)}" y="32" font-family="monospace" font-size="13" fill="#aaaacc">${angle}°</text>`,
+      );
+    }
+    stripLines.push('</svg>');
+    const stripSvg = stripLines.join('\n');
+
+    const base64 = rasterizeSvg(stripSvg, totalWidth);
+    if (base64 === null) {
+      return makeErrorResult('render_view turntable: rasterization failed.');
+    }
+
+    const summary = `Rendered turntable strip: ${frames} frame(s), ${totalWidth}×${baseHeight}.`;
+    const shaped = shapeToolCallContent({ summary, affected: [], isError: false }) as CallToolResult;
+    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
+    return shaped;
+  }
+
+  // ------------------------------------------------------------------
+  // isolate: highlight specific entities, dim everything else
+  // ------------------------------------------------------------------
+  if (params.isolate !== undefined) {
+    const rawIsolate = params.isolate;
+    const ids: string[] = Array.isArray(rawIsolate)
+      ? (rawIsolate as string[])
+      : typeof rawIsolate === 'string'
+        ? [rawIsolate]
+        : [];
+
+    let svg = buildIsolateSvg(doc, ids, baseView, baseWidth, baseHeight);
+    if (svg === null) {
+      return makeErrorResult('render_view isolate: render failed.');
+    }
+
+    // Compose showDimensions on top if requested
+    if (params.showDimensions === true) {
+      const baseResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+      if (baseResult.data) {
+        svg = appendDimensionLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData);
+      }
+    }
+
+    const base64 = rasterizeSvg(svg, baseWidth);
+    if (base64 === null) {
+      return makeErrorResult('render_view isolate: rasterization failed.');
+    }
+
+    const summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${baseWidth}×${baseHeight}.`;
+    const shaped = shapeToolCallContent({ summary, affected: [], isError: false }) as CallToolResult;
+    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
+    return shaped;
+  }
+
+  // ------------------------------------------------------------------
+  // section: section-plane view
+  // ------------------------------------------------------------------
+  if (params.section !== undefined) {
+    const { axis, offset } = params.section;
+    if (axis !== 'x' && axis !== 'y' && axis !== 'z') {
+      return makeErrorResult(`render_view section: invalid axis "${String(axis)}". Must be "x", "y", or "z".`);
+    }
+
+    let svg = buildSectionSvg(doc, { axis, offset }, baseView, baseWidth, baseHeight);
+    if (svg === null) {
+      return makeErrorResult('render_view section: render failed.');
+    }
+
+    // Compose showDimensions on top if requested
+    if (params.showDimensions === true) {
+      const baseResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+      if (baseResult.data) {
+        svg = appendDimensionLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData);
+      }
+    }
+
+    const base64 = rasterizeSvg(svg, baseWidth);
+    if (base64 === null) {
+      return makeErrorResult('render_view section: rasterization failed.');
+    }
+
+    const summary = `Rendered section view: cut at ${axis}=${offset}, ${baseWidth}×${baseHeight}.`;
+    const shaped = shapeToolCallContent({ summary, affected: [], isError: false }) as CallToolResult;
+    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
+    return shaped;
+  }
+
+  // ------------------------------------------------------------------
+  // showDimensions only: run base render then post-process
+  // ------------------------------------------------------------------
+  if (params.showDimensions === true) {
+    const busResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+    if (!busResult.data) {
+      return makeErrorResult('render_view showDimensions: base render returned no data.');
+    }
+    const baseData = busResult.data as import('@core/commands/render').RenderViewData;
+    const enrichedSvg = appendDimensionLabels(baseData.svg, baseData);
+
+    const base64 = rasterizeSvg(enrichedSvg, baseWidth);
+    if (base64 === null) {
+      return makeErrorResult('render_view showDimensions: rasterization failed.');
+    }
+
+    const summary = `Rendered view with dimensions: ${baseData.entityCount} entit${baseData.entityCount === 1 ? 'y' : 'ies'}, ${baseWidth}×${baseHeight}.`;
+    const shaped = shapeToolCallContent({
+      summary,
+      affected: [],
+      isError: false,
+      data: stripSvgFromData(busResult.data),
+    }) as CallToolResult;
+    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
+    return shaped;
+  }
+
+  return null;
+}
+
+/** Build an error CallToolResult for enrichment failures. */
+function makeErrorResult(message: string): CallToolResult {
+  return shapeToolCallContent({ summary: message, affected: [], isError: true }) as CallToolResult;
+}
+
+/** Extract SVG inner content (strips outer svg tags). Used by enrichment functions. */
+function extractSvgInnerPublic(svgString: string): string {
+  const openEnd = svgString.indexOf('>');
+  if (openEnd === -1) return svgString;
+  const closeStart = svgString.lastIndexOf('</svg>');
+  if (closeStart === -1) return svgString.substring(openEnd + 1);
+  return svgString.substring(openEnd + 1, closeStart);
+}
+
+/** Round to 2 decimal places (used in SVG coordinate output). */
+function r2Public(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
 // MCP Server factory
 // ---------------------------------------------------------------------------
 
@@ -206,17 +425,80 @@ function buildMcpServer(getDoc: () => CadDocument): Server {
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
-  // tools/list — return the full registry as MCP tool definitions
+  // tools/list — return the full registry as MCP tool definitions,
+  // with render_view augmented to advertise the server-side enrichment params.
   server.setRequestHandler(ListToolsRequestSchema, () => {
-    const tools = buildMcpTools().map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema as {
-        type: 'object';
-        properties?: Record<string, object>;
-        required?: string[];
-      },
-    }));
+    const tools = buildMcpTools().map((t) => {
+      if (t.name === 'render_view') {
+        // Augment the core render_view schema with server-side enrichment params.
+        // The core schema already has: view, width, height.
+        // We add: turntable, isolate, showDimensions, section.
+        const augmented = {
+          ...t.inputSchema,
+          properties: {
+            ...(t.inputSchema.properties ?? {}),
+            turntable: {
+              type: 'object',
+              description:
+                'Produce a horizontal strip of N evenly-spaced rotation frames around the Z (up) axis. ' +
+                'frames: integer 1..12. When omitted, behavior is unchanged (single frame).',
+              properties: {
+                frames: {
+                  type: 'number',
+                  description: 'Number of frames (1..12). Each frame is a separate rotated view stitched into one wide PNG strip.',
+                },
+              },
+              required: ['frames'],
+            },
+            isolate: {
+              type: 'string',
+              description:
+                'Entity id (or JSON array of ids) to highlight. All other entities are rendered ' +
+                'dimmed/desaturated; the specified id(s) are shown at full color. ' +
+                'Pass a single id string or a JSON-encoded array of id strings.',
+            },
+            showDimensions: {
+              type: 'boolean',
+              description:
+                'When true, overlay the bounding-box dimensions (W × D × H) as text labels on the image. ' +
+                'Labels are placed near the bounding box edges in screen space.',
+            },
+            section: {
+              type: 'object',
+              description:
+                'Render a section-plane view: entities on the negative side of the cut plane are dimmed; ' +
+                'a colored dashed line marks the cut. axis: "x"|"y"|"z"; offset: world-space position of the plane.',
+              properties: {
+                axis: { type: 'string', description: 'Axis normal to the cut plane: "x", "y", or "z".' },
+                offset: { type: 'number', description: 'World-space position of the cut plane along the axis.' },
+              },
+              required: ['axis', 'offset'],
+            },
+          },
+        };
+        return {
+          name: t.name,
+          description:
+            t.description +
+            ' [Server enrichments available: turntable (multi-frame strip), isolate (highlight entity), ' +
+            'showDimensions (bbox labels), section (cut-plane view).]',
+          inputSchema: augmented as {
+            type: 'object';
+            properties?: Record<string, object>;
+            required?: string[];
+          },
+        };
+      }
+      return {
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema as {
+          type: 'object';
+          properties?: Record<string, object>;
+          required?: string[];
+        },
+      };
+    });
     return { tools };
   });
 
@@ -226,10 +508,28 @@ function buildMcpServer(getDoc: () => CadDocument): Server {
   server.setRequestHandler(CallToolRequestSchema, (req): CallToolResult => {
     const { name, arguments: args } = req.params;
 
+    // -----------------------------------------------------------------------
+    // render_view enrichment intercept
+    // -----------------------------------------------------------------------
+    // When the tool is render_view with server-side enrichment params present,
+    // we handle the enrichment here before (or instead of) the normal command
+    // bus path.  Enrichment params are stripped before forwarding to applyCommand
+    // so the core command never receives unknown params.
+    if (name === 'render_view' && args != null) {
+      const enrichResult = applyRenderViewEnrichments(args, getDoc);
+      if (enrichResult !== null) {
+        return enrichResult;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Normal path: route through the command bus
+    // -----------------------------------------------------------------------
     // Route through the command bus — runs execute() once, records history for
     // mutations, and broadcasts via setLiveDoc.  Query commands are skipped from
     // history/broadcast (result.data !== undefined, same logic as the UI store).
-    const busResult = applyCommand(name, args ?? {});
+    const coreArgs = name === 'render_view' ? stripEnrichParams(args ?? {}) : (args ?? {});
+    const busResult = applyCommand(name, coreArgs);
 
     // Vision loop: rasterize data.svg → PNG image block (if present).
     // Failure is silent (buildImageBlock returns null) so a broken SVG never 500s

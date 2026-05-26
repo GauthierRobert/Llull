@@ -107,6 +107,7 @@ interface RenameLayerParams {
  */
 export const renameLayer: CommandDefinition<RenameLayerParams> = {
   name: 'rename_layer',
+  annotations: { idempotent: true },
   description:
     'Rename a layer. Does not affect visibility, lock state, or entities. ' +
     'Graceful no-op if the layer id does not exist or the name is empty.',
@@ -174,6 +175,7 @@ interface SetLayerVisibilityParams {
  */
 export const setLayerVisibility: CommandDefinition<SetLayerVisibilityParams> = {
   name: 'set_layer_visibility',
+  annotations: { idempotent: true },
   description:
     'Show or hide a layer. Hidden layers are not rendered in the viewport. ' +
     'Graceful no-op if the layer id does not exist.',
@@ -231,6 +233,7 @@ interface SetLayerLockParams {
  */
 export const setLayerLock: CommandDefinition<SetLayerLockParams> = {
   name: 'set_layer_lock',
+  annotations: { idempotent: true },
   description:
     'Lock or unlock a layer. Entities on a locked layer cannot have their layer reassigned ' +
     'via set_entity_layer. (Note: locking does not yet block geometry edits to those entities — ' +
@@ -290,6 +293,7 @@ interface SetEntityLayerParams {
  */
 export const setEntityLayer: CommandDefinition<SetEntityLayerParams> = {
   name: 'set_entity_layer',
+  annotations: { idempotent: true },
   description:
     'Move an entity to a different layer by updating its layerId. ' +
     'Graceful no-op if the entity or target layer does not exist. ' +
@@ -373,6 +377,7 @@ interface DeleteLayerParams {
  */
 export const deleteLayer: CommandDefinition<DeleteLayerParams> = {
   name: 'delete_layer',
+  annotations: { destructive: true },
   description:
     'Delete a layer by id. All entities that were on the deleted layer are automatically ' +
     'reassigned to the default layer (layer-default). ' +

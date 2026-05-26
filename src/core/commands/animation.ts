@@ -308,6 +308,7 @@ interface StopAnimationParams {
  */
 export const stopAnimation: CommandDefinition<StopAnimationParams> = {
   name: 'stop_animation',
+  annotations: { idempotent: true },
   description:
     'Remove one or more animations from the document. ' +
     'If animationId is provided, only that animation is removed (no-op if not found). ' +

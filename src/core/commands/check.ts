@@ -413,6 +413,7 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
  */
 export const checkModel: CommandDefinition<CheckModelParams> = {
   name: 'check_model',
+  annotations: { readOnly: true },
   description:
     'Scan the document for geometry defects, structural issues, and parameter errors. ' +
     'Returns a structured issue list in `data` ({ ok: boolean, issues: Issue[] }) — ' +

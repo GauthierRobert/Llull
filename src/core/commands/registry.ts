@@ -154,10 +154,34 @@ export function toToolSchemas(): Array<{
   name: string;
   description: string;
   input_schema: CommandDefinition<unknown>['paramsSchema'];
+  annotations?: {
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+  };
 }> {
-  return definitions.map((d) => ({
-    name: d.name,
-    description: d.description,
-    input_schema: d.paramsSchema,
-  }));
+  return definitions.map((d) => {
+    const schema: {
+      name: string;
+      description: string;
+      input_schema: CommandDefinition<unknown>['paramsSchema'];
+      annotations?: {
+        readOnlyHint?: boolean;
+        destructiveHint?: boolean;
+        idempotentHint?: boolean;
+      };
+    } = {
+      name: d.name,
+      description: d.description,
+      input_schema: d.paramsSchema,
+    };
+    if (d.annotations) {
+      const ann: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean } = {};
+      if (d.annotations.readOnly === true) ann.readOnlyHint = true;
+      if (d.annotations.destructive === true) ann.destructiveHint = true;
+      if (d.annotations.idempotent === true) ann.idempotentHint = true;
+      if (Object.keys(ann).length > 0) schema.annotations = ann;
+    }
+    return schema;
+  });
 }

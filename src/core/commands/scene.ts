@@ -274,6 +274,7 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
  */
 export const describeScene: CommandDefinition<Record<string, never>> = {
   name: 'describe_scene',
+  annotations: { readOnly: true },
   description:
     'Return a structured, read-only snapshot of the document (entity ids, kinds, world bounds, ' +
     'layers, groups, selection) so an agent can orient before editing. Does not modify the document. ' +

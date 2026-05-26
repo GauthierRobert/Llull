@@ -19,6 +19,7 @@ interface SetUnitsParams {
 
 export const setUnits: CommandDefinition<SetUnitsParams> = {
   name: 'set_units',
+  annotations: { idempotent: true },
   description:
     'Set the document unit of length and/or the display precision (decimal places). ' +
     'Affects how all geometry values are displayed and labelled. ' +

@@ -33,6 +33,34 @@ export interface CommandResult {
 export type Command<P> = (doc: CadDocument, params: P) => CommandResult;
 
 /**
+ * Safety annotations for a command. Emitted verbatim as MCP tool `annotations`.
+ * Field names follow the MCP Tool Annotations spec (readOnlyHint, destructiveHint, idempotentHint).
+ *
+ * @see https://spec.modelcontextprotocol.io/specification/2025-03-26/server/tools/#tool-annotations
+ */
+export interface CommandAnnotations {
+  /**
+   * When true: the command never mutates the document. It returns the SAME document
+   * reference, `affected:[]`, and a `data` field with query results.
+   * Safe to call at any time without side effects.
+   * Maps to MCP `annotations.readOnlyHint`.
+   */
+  readonly readOnly?: boolean;
+  /**
+   * When true: the command removes or irreversibly destroys document content (e.g. delete_entity,
+   * delete_layer). Agents should prefer confirmation or undo before calling.
+   * Maps to MCP `annotations.destructiveHint`.
+   */
+  readonly destructive?: boolean;
+  /**
+   * When true: calling the command twice with the same params produces the same end-state as
+   * calling it once (setter/renamer semantics). Safe to retry on network failure.
+   * Maps to MCP `annotations.idempotentHint`.
+   */
+  readonly idempotent?: boolean;
+}
+
+/**
  * A registered command, carrying enough metadata to auto-generate:
  *   - UI affordances
  *   - the AI tool schema
@@ -47,6 +75,11 @@ export interface CommandDefinition<P> {
   /** JSON-schema-like parameter spec, consumed by the AI/MCP tool generators. */
   readonly paramsSchema: ParamsSchema;
   readonly run: Command<P>;
+  /**
+   * Optional safety hints for AI agents and MCP clients.
+   * Emitted as MCP tool `annotations`. Absent means no special semantics.
+   */
+  readonly annotations?: CommandAnnotations;
 }
 
 export interface ParamsSchema {

@@ -21,6 +21,21 @@ import { toToolSchemas } from '@core/commands/registry';
 // ---------------------------------------------------------------------------
 
 /**
+ * MCP tool annotations — safety hints for AI agents and MCP clients.
+ * Field names follow the MCP Tool Annotations spec.
+ *
+ * @see https://spec.modelcontextprotocol.io/specification/2025-03-26/server/tools/#tool-annotations
+ */
+export interface McpToolAnnotations {
+  /** true when the tool never mutates the document. Safe to call freely. */
+  readOnlyHint?: boolean;
+  /** true when the tool destroys document content (delete commands). */
+  destructiveHint?: boolean;
+  /** true when calling twice with same params yields the same end-state. */
+  idempotentHint?: boolean;
+}
+
+/**
  * A single MCP tool definition.
  *
  * MCP uses `inputSchema` (camelCase) where Anthropic uses `input_schema`.
@@ -36,6 +51,11 @@ export interface McpToolDefinition {
    * Same value as `CommandDefinition.paramsSchema`; field renamed per MCP spec.
    */
   inputSchema: ParamsSchema;
+  /**
+   * Optional safety annotations. Present only when the underlying command carries
+   * at least one annotation flag. Absent means no special semantics.
+   */
+  annotations?: McpToolAnnotations;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,9 +71,15 @@ export interface McpToolDefinition {
  * @invariant buildMcpTools()[i].name === listCommands()[i].name for all i
  */
 export function buildMcpTools(): McpToolDefinition[] {
-  return toToolSchemas().map((schema) => ({
-    name: schema.name,
-    description: schema.description,
-    inputSchema: schema.input_schema,
-  }));
+  return toToolSchemas().map((schema) => {
+    const tool: McpToolDefinition = {
+      name: schema.name,
+      description: schema.description,
+      inputSchema: schema.input_schema,
+    };
+    if (schema.annotations) {
+      tool.annotations = schema.annotations;
+    }
+    return tool;
+  });
 }

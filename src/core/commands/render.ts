@@ -907,6 +907,7 @@ interface RenderViewParams {
  */
 export const renderView: CommandDefinition<RenderViewParams> = {
   name: 'render_view',
+  annotations: { readOnly: true },
   description:
     'Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. ' +
     'Returns the unchanged document plus a `data` object containing: `svg` (complete SVG string), ' +

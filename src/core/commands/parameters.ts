@@ -136,6 +136,7 @@ interface SetParameterParams {
  */
 export const setParameter: CommandDefinition<SetParameterParams> = {
   name: 'set_parameter',
+  annotations: { idempotent: true },
   description:
     'Create or update a named numeric parameter in the document. ' +
     'The expression may be a numeric literal (e.g. "10") or reference other ' +
@@ -238,6 +239,7 @@ interface DeleteParameterParams {
  */
 export const deleteParameter: CommandDefinition<DeleteParameterParams> = {
   name: 'delete_parameter',
+  annotations: { destructive: true },
   description:
     'Remove a named parameter from the document. ' +
     'The parameter record is deleted; any other parameters whose expressions ' +

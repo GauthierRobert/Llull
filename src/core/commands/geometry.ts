@@ -570,6 +570,7 @@ interface DeleteParams {
  */
 export const deleteEntity: CommandDefinition<DeleteParams> = {
   name: 'delete_entity',
+  annotations: { destructive: true },
   description:
     'Permanently remove an entity from the document, including from any groups it belongs to. ' +
     'Groups that drop below 2 members are dissolved automatically.',
