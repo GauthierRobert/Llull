@@ -165,22 +165,35 @@ describe('applyMcpToolCall() — purity', () => {
 // ---------------------------------------------------------------------------
 
 describe('listMcpResources()', () => {
-  it('returns exactly three resource descriptors', () => {
-    expect(listMcpResources()).toHaveLength(3);
+  it('returns exactly four resource descriptors', () => {
+    // document, scene, selection, conventions
+    expect(listMcpResources()).toHaveLength(4);
   });
 
-  it('includes all three expected URIs', () => {
+  it('includes all four expected URIs', () => {
     const uris = listMcpResources().map((r) => r.uri);
     expect(uris).toContain(CAD_RESOURCE_URIS.document);
     expect(uris).toContain(CAD_RESOURCE_URIS.scene);
     expect(uris).toContain(CAD_RESOURCE_URIS.selection);
+    expect(uris).toContain(CAD_RESOURCE_URIS.conventions);
   });
 
-  it('every descriptor has a non-empty name, description, and mimeType', () => {
+  it('document/scene/selection have mimeType application/json', () => {
+    const byUri = Object.fromEntries(listMcpResources().map((r) => [r.uri, r]));
+    expect(byUri['cad://document']!.mimeType).toBe('application/json');
+    expect(byUri['cad://scene']!.mimeType).toBe('application/json');
+    expect(byUri['cad://selection']!.mimeType).toBe('application/json');
+  });
+
+  it('conventions has mimeType text/markdown', () => {
+    const byUri = Object.fromEntries(listMcpResources().map((r) => [r.uri, r]));
+    expect(byUri['cad://conventions']!.mimeType).toBe('text/markdown');
+  });
+
+  it('every descriptor has a non-empty name and description', () => {
     for (const r of listMcpResources()) {
       expect(r.name.length).toBeGreaterThan(0);
       expect(r.description.length).toBeGreaterThan(0);
-      expect(r.mimeType).toBe('application/json');
     }
   });
 
@@ -194,6 +207,10 @@ describe('listMcpResources()', () => {
 
   it('CAD_RESOURCE_URIS.selection is cad://selection', () => {
     expect(CAD_RESOURCE_URIS.selection).toBe('cad://selection');
+  });
+
+  it('CAD_RESOURCE_URIS.conventions is cad://conventions', () => {
+    expect(CAD_RESOURCE_URIS.conventions).toBe('cad://conventions');
   });
 });
 

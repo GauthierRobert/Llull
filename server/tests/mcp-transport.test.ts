@@ -197,23 +197,25 @@ describe('MCP initialize handshake', () => {
 // ---------------------------------------------------------------------------
 
 describe('MCP tools/list', () => {
-  it('returns one tool per registered command, plus the bridge tools', async () => {
+  it('returns one tool per registered command plus bridge tools', async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
     const tools = await mcpListTools(sessionId);
-    expect(tools.length).toBe(listCommands().length + buildBridgeToolDefinitions().length);
+    // The transport appends bridge tools (snapshot_in_from_ui, snapshot_out_to_ui)
+    // on top of the core registry tools.
+    const expectedCount = listCommands().length + buildBridgeToolDefinitions().length;
+    expect(tools.length).toBe(expectedCount);
   });
 
-  it('tool names match the registered command names followed by the bridge tools', async () => {
+  it('tool names include all registered command names plus bridge tool names', async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
     const tools = await mcpListTools(sessionId);
-    const expectedNames = [
-      ...listCommands().map((c) => c.name),
-      ...buildBridgeToolDefinitions().map((t) => t.name),
-    ];
+    const registeredNames = listCommands().map((c) => c.name);
+    const bridgeNames = buildBridgeToolDefinitions().map((t) => t.name);
+    const expectedNames = [...registeredNames, ...bridgeNames];
     const toolNames = tools.map((t) => t.name);
     expect(toolNames).toEqual(expectedNames);
   });

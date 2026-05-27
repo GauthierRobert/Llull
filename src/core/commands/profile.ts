@@ -12,10 +12,28 @@
  * @failure revolve_profile -> always no-op (not yet implemented)
  */
 
-import type { CadDocument, Entity, ExtrusionEntity } from '../model/types';
+import type { CadDocument, Entity, ExtrusionEntity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { entityBounds } from './scene';
+
+/**
+ * Validate an optional rotation param (shared convention with geometry.ts).
+ * Returns [0,0,0] if rotation is absent, not length-3, or contains non-finite values.
+ */
+function resolveRotation(rotation: unknown): Vec3 {
+  if (!Array.isArray(rotation) || rotation.length !== 3) return [0, 0, 0];
+  const [rx, ry, rz] = rotation as unknown[];
+  if (!Number.isFinite(rx) || !Number.isFinite(ry) || !Number.isFinite(rz)) return [0, 0, 0];
+  return [rx as number, ry as number, rz as number];
+}
+
+/** Format an AABB for inclusion in a command summary. */
+function boundsText(b: { min: Vec3; max: Vec3 }): string {
+  const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
+  return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
+}
 
 /** Number of polygon segments used to approximate a circle. */
 const CIRCLE_SEGMENTS = 32;
@@ -38,6 +56,8 @@ interface ExtrudeSketchParams {
   id: string;
   /** Extrusion depth in world units along Z. Must be > 0. */
   depth: number;
+  /** Optional extrinsic XYZ Euler angles in RADIANS. Defaults to [0,0,0]. Malformed values are ignored. */
+  rotation?: Vec3;
 }
 
 /**
@@ -55,7 +75,9 @@ interface ExtrudeSketchParams {
 export const extrudeSketch: CommandDefinition<ExtrudeSketchParams> = {
   name: 'extrude_sketch',
   description:
-    'Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. Keeps the source entity. depth must be > 0.',
+    'Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. ' +
+    'Right-handed world frame, +Z up. The solid is placed at the source entity position and extends depth ' +
+    'units along +Z. Keeps the source entity in the document. depth must be > 0.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -66,12 +88,21 @@ export const extrudeSketch: CommandDefinition<ExtrudeSketchParams> = {
       },
       depth: {
         type: 'number',
-        description: 'Extrusion depth in world units along the Z axis. Must be greater than 0.',
+        description:
+          'Extrusion depth in document units along +Z from the source entity position. Must be > 0.',
+      },
+      rotation: {
+        type: 'array',
+        description:
+          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the resulting extrusion solid. ' +
+          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
+          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
+        items: { type: 'number' },
       },
     },
     required: ['id', 'depth'],
   },
-  run: (doc, { id, depth }): CommandResult => {
+  run: (doc, { id, depth, rotation }): CommandResult => {
     // --- guard: depth ---
     if (typeof depth !== 'number' || depth <= 0) {
       return {
@@ -144,14 +175,16 @@ export const extrudeSketch: CommandDefinition<ExtrudeSketchParams> = {
       profile,
       depth,
       position: [source.position[0], source.position[1], source.position[2]],
-      rotation: [0, 0, 0],
+      rotation: resolveRotation(rotation),
       layerId: DEFAULT_LAYER_ID,
       color: '#c8553d',
     };
 
+    const newDoc = withEntity(doc, extrusion);
+    const b = entityBounds(newDoc.entities[extId] as Entity);
     return {
-      document: withEntity(doc, extrusion),
-      summary: `extrude_sketch: created extrusion "${extId}" from ${source.kind} "${id}" (${profile.length}-point profile, depth=${depth}).`,
+      document: newDoc,
+      summary: `extrude_sketch: created extrusion "${extId}" from ${source.kind} "${id}" (${profile.length}-point profile, depth=${depth}); ${boundsText(b)}.`,
       affected: [extId],
     };
   },

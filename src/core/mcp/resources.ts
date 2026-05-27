@@ -20,6 +20,7 @@
 import type { CadDocument } from '@core/model/types';
 import { serializeDocument } from '@core/commands/persistence';
 import { computeSceneSnapshot } from '@core/commands/scene';
+import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 
 // ---------------------------------------------------------------------------
 // Resource descriptor type (minimal — mirrors MCP ResourceSchema fields)
@@ -50,11 +51,12 @@ export interface McpResourceContent {
 // Static resource list (URIs + metadata, document-independent)
 // ---------------------------------------------------------------------------
 
-/** The three URIs this module exposes. */
+/** The URIs this module exposes. */
 export const CAD_RESOURCE_URIS = {
   document: 'cad://document',
   scene: 'cad://scene',
   selection: 'cad://selection',
+  conventions: CONVENTIONS_URI,
 } as const;
 
 export type CadResourceUri = (typeof CAD_RESOURCE_URIS)[keyof typeof CAD_RESOURCE_URIS];
@@ -90,6 +92,17 @@ export function listMcpResources(): McpResourceDescriptor[] {
         'The currently selected entity ids and a brief summary (kind, position) for each. ' +
         'Empty array when nothing is selected.',
       mimeType: 'application/json',
+    },
+    {
+      uri: CAD_RESOURCE_URIS.conventions,
+      name: 'Agent Modeling Conventions',
+      description:
+        'Read this BEFORE modeling. Covers: document units, the right-handed +Z-up world frame, ' +
+        'per-primitive anchor conventions (box=center, cylinder=center, sphere=center, ' +
+        'cone=base-center, torus=center, wedge=lower-front-left, pyramid=base-center), ' +
+        'rotation in Euler XYZ radians, the recommended orient→create→render→lint loop, ' +
+        'and common pitfalls.',
+      mimeType: 'text/markdown',
     },
   ];
 }
@@ -147,9 +160,25 @@ export function readSelectionResource(doc: CadDocument): McpResourceContent {
 }
 
 /**
+ * Read `cad://conventions` — static agent modeling guide (Markdown).
+ *
+ * Document-independent: the guide is static content, not derived from the doc.
+ *
+ * @pure
+ * @layer core/mcp
+ */
+export function readConventionsResource(): McpResourceContent {
+  return {
+    uri: CAD_RESOURCE_URIS.conventions,
+    mimeType: 'text/markdown',
+    text: CONVENTIONS_GUIDE,
+  };
+}
+
+/**
  * Dispatch a resource read by URI.
  *
- * Returns `null` when the URI is not one of the three known resources
+ * Returns `null` when the URI is not one of the known resources
  * (the transport should reply with an appropriate error).
  *
  * @pure over doc
@@ -164,6 +193,8 @@ export function readMcpResource(doc: CadDocument, uri: string): McpResourceConte
       return readSceneResource(doc);
     case CAD_RESOURCE_URIS.selection:
       return readSelectionResource(doc);
+    case CAD_RESOURCE_URIS.conventions:
+      return readConventionsResource();
     default:
       return null;
   }
