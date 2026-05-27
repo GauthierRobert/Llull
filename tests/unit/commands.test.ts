@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createEmptyDocument, is2D } from '@core/model/types';
-import type { TextEntity } from '@core/model/types';
+import type { Entity, TextEntity, Vec3 } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
 import { __resetIdCounter } from '@lib/id';
+import { entityBounds } from '@core/commands/scene';
 
 describe('command layer', () => {
   beforeEach(() => __resetIdCounter());
@@ -5094,4 +5095,80 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
     expect(result.document).toBe(doc);
     expect(result.summary).toMatch(/> 0/);
   });
+});
+
+// W4B — unified placement anchor (`'center' | 'min' | 'base-center'`).
+// Asserts placement via entityBounds (the AABB convention each command must honour),
+// so a wrong halfExtents/default would be caught. Back-compat: no anchor => stored
+// position is the input position unchanged (each command's pre-W4B default).
+describe('W4B — placement anchor', () => {
+  beforeEach(() => __resetIdCounter());
+
+  const CASES: Array<{
+    command: string;
+    params: Record<string, unknown>;
+    defaultAnchor: 'center' | 'min' | 'base-center';
+  }> = [
+    { command: 'add_box', params: { size: [2, 4, 6] }, defaultAnchor: 'center' },
+    { command: 'add_cylinder', params: { radius: 3, height: 8 }, defaultAnchor: 'center' },
+    { command: 'add_sphere', params: { radius: 5 }, defaultAnchor: 'center' },
+    { command: 'add_cone', params: { radius: 3, height: 7 }, defaultAnchor: 'base-center' },
+    { command: 'add_torus', params: { ringRadius: 5, tubeRadius: 1 }, defaultAnchor: 'center' },
+    { command: 'add_wedge', params: { size: [2, 4, 6] }, defaultAnchor: 'min' },
+    { command: 'add_pyramid', params: { baseWidth: 4, baseDepth: 6, height: 8 }, defaultAnchor: 'base-center' },
+  ];
+
+  const P: [number, number, number] = [10, 20, 30];
+
+  function boundsOf(
+    command: string,
+    params: Record<string, unknown>,
+    anchor?: string,
+  ): { entity: Entity; bounds: { min: Vec3; max: Vec3 } } {
+    const doc = createEmptyDocument();
+    const result = execute(
+      doc,
+      command,
+      anchor === undefined ? { ...params, position: P } : { ...params, position: P, anchor },
+    );
+    const id = result.affected[0]!;
+    const entity = result.document.entities[id]!;
+    return { entity, bounds: entityBounds(entity) };
+  }
+
+  for (const { command, params, defaultAnchor } of CASES) {
+    it(`${command} — anchor:'min' puts the AABB min corner at position`, () => {
+      const { bounds } = boundsOf(command, params, 'min');
+      expect(bounds.min[0]).toBeCloseTo(P[0], 6);
+      expect(bounds.min[1]).toBeCloseTo(P[1], 6);
+      expect(bounds.min[2]).toBeCloseTo(P[2], 6);
+    });
+
+    it(`${command} — anchor:'center' puts the AABB center at position`, () => {
+      const { bounds } = boundsOf(command, params, 'center');
+      expect((bounds.min[0] + bounds.max[0]) / 2).toBeCloseTo(P[0], 6);
+      expect((bounds.min[1] + bounds.max[1]) / 2).toBeCloseTo(P[1], 6);
+      expect((bounds.min[2] + bounds.max[2]) / 2).toBeCloseTo(P[2], 6);
+    });
+
+    it(`${command} — anchor:'base-center' puts mid-X/Y + min-Z at position`, () => {
+      const { bounds } = boundsOf(command, params, 'base-center');
+      expect((bounds.min[0] + bounds.max[0]) / 2).toBeCloseTo(P[0], 6);
+      expect((bounds.min[1] + bounds.max[1]) / 2).toBeCloseTo(P[1], 6);
+      expect(bounds.min[2]).toBeCloseTo(P[2], 6);
+    });
+
+    it(`${command} — no anchor preserves the pre-W4B default (stored position == input)`, () => {
+      const { entity } = boundsOf(command, params, undefined);
+      expect(entity.position[0]).toBeCloseTo(P[0], 6);
+      expect(entity.position[1]).toBeCloseTo(P[1], 6);
+      expect(entity.position[2]).toBeCloseTo(P[2], 6);
+    });
+
+    it(`${command} — unknown anchor falls back to the default (no throw)`, () => {
+      const bogus = boundsOf(command, params, 'not-an-anchor');
+      const def = boundsOf(command, params, defaultAnchor);
+      expect(bogus.entity.position).toEqual(def.entity.position);
+    });
+  }
 });

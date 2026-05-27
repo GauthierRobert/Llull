@@ -9,13 +9,14 @@
  * `data`) and is also embedded in the `build_project` report so an agent sees the
  * final scene in the same round-trip.
  *
- * Bounds are world-space axis-aligned boxes computed from each primitive's
- * extents at its `position`. Entity `rotation` is NOT applied — bounds are an
- * orientation aid, not an exact oriented bounding box.
+ * Agent-facing bounds (describe_scene, creation summaries) use `worldAabb` —
+ * the rotation-aware world AABB. `entityBounds` remains the unrotated local AABB
+ * used by measure, query, and check commands (unchanged by W4F).
  */
 
 import type { AnimationChannel, AnimationMode, CadDocument, Entity, EntityKind, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { applyEulerXYZ, isZeroRotation } from '../../lib/math3';
 
 // ---------------------------------------------------------------------------
 // Snapshot types
@@ -32,8 +33,13 @@ export interface EntitySummary {
   kind: EntityKind;
   layerId: string;
   position: Vec3;
-  /** World-space axis-aligned bounds (rotation not applied). */
+  /** World-space axis-aligned bounds (rotation-aware world AABB via worldAabb). */
   bounds: Bounds;
+  /**
+   * Present only when the entity has a non-zero rotation.
+   * Reminds the agent that bounds is the rotated world AABB, not the local AABB.
+   */
+  rotated?: true;
 }
 
 export interface LayerSummary {
@@ -211,6 +217,55 @@ export function entityBounds(e: Entity): Bounds {
   }
 }
 
+/**
+ * Rotation-aware world AABB for one entity.
+ *
+ * Fast path: when rotation is absent or [0,0,0] returns entityBounds(e) unchanged
+ * (byte-identical result — non-rotated entities are unaffected).
+ *
+ * Rotated path: generates the 8 corners of the local AABB, maps each through
+ * applyEulerXYZ (same XYZ Euler convention as the viewport), then takes
+ * component-wise min/max for the true world AABB.
+ *
+ * @pure
+ * @affects nothing — read-only
+ */
+export function worldAabb(e: Entity): Bounds {
+  const rot = e.rotation;
+  if (!rot || isZeroRotation(rot)) return entityBounds(e);
+
+  const local = entityBounds(e);
+  const { min, max } = local;
+  const pos = e.position;
+
+  // 8 corners of the local AABB
+  const corners: Vec3[] = [
+    [min[0], min[1], min[2]],
+    [max[0], min[1], min[2]],
+    [min[0], max[1], min[2]],
+    [max[0], max[1], min[2]],
+    [min[0], min[1], max[2]],
+    [max[0], min[1], max[2]],
+    [min[0], max[1], max[2]],
+    [max[0], max[1], max[2]],
+  ];
+
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+  for (const c of corners) {
+    const r = applyEulerXYZ(c, pos, rot);
+    if (r[0] < minX) minX = r[0];
+    if (r[1] < minY) minY = r[1];
+    if (r[2] < minZ) minZ = r[2];
+    if (r[0] > maxX) maxX = r[0];
+    if (r[1] > maxY) maxY = r[1];
+    if (r[2] > maxZ) maxZ = r[2];
+  }
+
+  return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
+}
+
 function mergeBounds(a: Bounds, b: Bounds): Bounds {
   return {
     min: [Math.min(a.min[0], b.min[0]), Math.min(a.min[1], b.min[1]), Math.min(a.min[2], b.min[2])],
@@ -236,8 +291,16 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
   for (const id of doc.order) {
     const e = doc.entities[id];
     if (!e) continue;
-    const bounds = entityBounds(e);
-    entities.push({ id: e.id, kind: e.kind, layerId: e.layerId, position: e.position, bounds });
+    const bounds = worldAabb(e);
+    const isRotated = !!e.rotation && !isZeroRotation(e.rotation);
+    entities.push({
+      id: e.id,
+      kind: e.kind,
+      layerId: e.layerId,
+      position: e.position,
+      bounds,
+      ...(isRotated ? { rotated: true as const } : {}),
+    });
     sceneBounds = sceneBounds ? mergeBounds(sceneBounds, bounds) : bounds;
     layerCounts[e.layerId] = (layerCounts[e.layerId] ?? 0) + 1;
   }

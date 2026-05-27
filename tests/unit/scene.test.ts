@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { computeSceneSnapshot, entityBounds } from '@core/commands/scene';
+import { computeSceneSnapshot, entityBounds, worldAabb } from '@core/commands/scene';
 import { __resetIdCounter } from '@lib/id';
 
 describe('describe_scene command', () => {
@@ -166,5 +166,158 @@ describe('entityBounds — per kind', () => {
   it('point: zero-extent at position', () => {
     const doc = execute(createEmptyDocument(), 'draw_point', { position: [3, 4, 5] }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [3, 4, 5], max: [3, 4, 5] });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W4F — worldAabb: rotation-aware world AABB
+// ---------------------------------------------------------------------------
+
+describe('worldAabb — fast path (no rotation)', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('returns entityBounds unchanged for zero rotation', () => {
+    const e: Entity = {
+      id: 'b1', kind: 'box', size: [4, 6, 8],
+      position: [1, 2, 3], rotation: [0, 0, 0], layerId: 'layer-default', color: '#fff',
+    };
+    expect(worldAabb(e)).toEqual(entityBounds(e));
+  });
+
+  it('returns entityBounds unchanged when rotation field is absent', () => {
+    // Cast: rotation is required in types but absent callers may slip through at runtime.
+    const e = {
+      id: 'b2', kind: 'box', size: [2, 2, 2],
+      position: [0, 0, 0], rotation: undefined as unknown as [number,number,number],
+      layerId: 'layer-default', color: '#fff',
+    } as Entity;
+    expect(worldAabb(e)).toEqual(entityBounds(e));
+  });
+});
+
+describe('worldAabb — rotated box swaps footprint', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('2×4×6 box rotated 90° about Z: X-extent becomes 4, Y-extent becomes 2', () => {
+    // Box centered at origin: local AABB min=[-1,-2,-3], max=[1,2,3]
+    // After Rz=π/2: local X→−Y, local Y→X
+    // So world X-extent = 4 (was local Y), world Y-extent = 2 (was local X)
+    const e: Entity = {
+      id: 'b3', kind: 'box', size: [2, 4, 6],
+      position: [0, 0, 0], rotation: [0, 0, Math.PI / 2], layerId: 'layer-default', color: '#fff',
+    };
+    const b = worldAabb(e);
+    expect(b.min[0]).toBeCloseTo(-2, 5);
+    expect(b.max[0]).toBeCloseTo(2, 5);
+    expect(b.min[1]).toBeCloseTo(-1, 5);
+    expect(b.max[1]).toBeCloseTo(1, 5);
+    // Z unchanged
+    expect(b.min[2]).toBeCloseTo(-3, 5);
+    expect(b.max[2]).toBeCloseTo(3, 5);
+  });
+
+  it('2×4×6 box rotated 45° about Z: world AABB is larger than local AABB', () => {
+    // Local half-extents in X/Y: 1 and 2. At 45° the diagonal is the max extent:
+    // max(|x·cos45 - y·sin45|) for corners (±1, ±2) = (1+2)/√2 ≈ 2.121
+    const e: Entity = {
+      id: 'b4', kind: 'box', size: [2, 4, 6],
+      position: [0, 0, 0], rotation: [0, 0, Math.PI / 4], layerId: 'layer-default', color: '#fff',
+    };
+    const b = worldAabb(e);
+    const localB = entityBounds(e);
+    // World AABB X half-extent should exceed local X half-extent (1)
+    expect(b.max[0]).toBeGreaterThan(localB.max[0]);
+    // World AABB Y half-extent should exceed local Y half-extent (2)
+    expect(b.max[1]).toBeGreaterThan(localB.max[1]);
+    // Diagonal extent: (hx+hy)/√2 = (1+2)/√2 ≈ 2.121
+    expect(b.max[0]).toBeCloseTo((1 + 2) / Math.SQRT2, 5);
+    expect(b.max[1]).toBeCloseTo((1 + 2) / Math.SQRT2, 5);
+  });
+
+  it('cone (asymmetric local AABB) rotated 90° about X pivots about position, not the AABB center', () => {
+    // Cone local AABB: min=[-2,-2,0], max=[2,2,6] (base at z=0, apex at z=6); position=[0,0,0].
+    // Rx=π/2 maps (x,y,z)→(x,−z,y) about the origin. The pivot is position [0,0,0], NOT the
+    // AABB centroid [0,0,3] — so world Y spans [−6, 0] (from local z∈[0,6]), which a
+    // centroid-pivot bug would instead report as [−3, 3].
+    const e: Entity = {
+      id: 'cn1', kind: 'cone', radius: 2, height: 6,
+      position: [0, 0, 0], rotation: [Math.PI / 2, 0, 0], layerId: 'layer-default', color: '#fff',
+    };
+    const b = worldAabb(e);
+    expect(b.min[0]).toBeCloseTo(-2, 5);
+    expect(b.max[0]).toBeCloseTo(2, 5);
+    expect(b.min[1]).toBeCloseTo(-6, 5);
+    expect(b.max[1]).toBeCloseTo(0, 5);
+    expect(b.min[2]).toBeCloseTo(-2, 5);
+    expect(b.max[2]).toBeCloseTo(2, 5);
+  });
+});
+
+describe('worldAabb — describe_scene uses rotation-aware bounds', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('non-rotated entity: snapshot bounds == entityBounds', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [4, 6, 8], position: [0, 0, 0] }).document;
+    const snap = computeSceneSnapshot(doc);
+    const id = doc.order[0]!;
+    expect(snap.entities[0]!.bounds).toEqual(entityBounds(doc.entities[id]!));
+    expect(snap.entities[0]!.rotated).toBeUndefined();
+  });
+
+  it('rotated entity: snapshot bounds reflects the world AABB and rotated flag is set', () => {
+    const e: Entity = {
+      id: 'rx1', kind: 'box', size: [2, 4, 6],
+      position: [0, 0, 0], rotation: [0, 0, Math.PI / 2], layerId: 'layer-default', color: '#fff',
+    };
+    const doc = {
+      ...createEmptyDocument(),
+      entities: { rx1: e },
+      order: ['rx1'],
+    };
+    const snap = computeSceneSnapshot(doc);
+    const b = snap.entities[0]!.bounds;
+    // X-extent ≈ 4 (swapped from local Y)
+    expect(b.max[0]).toBeCloseTo(2, 5);
+    expect(b.max[1]).toBeCloseTo(1, 5);
+    expect(snap.entities[0]!.rotated).toBe(true);
+  });
+
+  it('scene overall bounds includes the rotation-aware entity footprint', () => {
+    // A box at origin rotated 90° about Z: size [2,4,6] → world X-extent=4, Y-extent=2
+    const e: Entity = {
+      id: 'rx2', kind: 'box', size: [2, 4, 6],
+      position: [0, 0, 0], rotation: [0, 0, Math.PI / 2], layerId: 'layer-default', color: '#fff',
+    };
+    const doc = { ...createEmptyDocument(), entities: { rx2: e }, order: ['rx2'] };
+    const snap = computeSceneSnapshot(doc);
+    expect(snap.bounds!.max[0]).toBeCloseTo(2, 5);
+    expect(snap.bounds!.max[1]).toBeCloseTo(1, 5);
+  });
+});
+
+describe('W4F — add_box creation summary reports rotation-aware world AABB', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('unrotated box: summary world AABB matches entityBounds', () => {
+    const result = execute(createEmptyDocument(), 'add_box', { size: [2, 4, 6] });
+    // Exact boundsText for a centered 2×4×6 box at origin (tighter than substring matches).
+    expect(result.summary).toContain('world AABB min [-1, -2, -3] max [1, 2, 3]');
+  });
+
+  it('rotated box (Rz=π/4): summary reports expanded world AABB, not the unrotated local AABB', () => {
+    const result = execute(createEmptyDocument(), 'add_box', {
+      size: [2, 4, 6],
+      rotation: [0, 0, Math.PI / 4],
+    });
+    expect(result.summary).toContain('world AABB');
+    // The local X max is 1; after 45° rotation the world X max ≈ 2.121 — not "1"
+    // Check the summary does NOT contain the local max "1, " as the X bound
+    // (we verify it contains a value > 1, concretely ≈2.121)
+    const id = result.affected[0]!;
+    const e = result.document.entities[id]!;
+    const wb = worldAabb(e);
+    const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
+    expect(result.summary).toContain(fmt(wb.max[0]));
   });
 });

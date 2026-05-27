@@ -24,6 +24,7 @@ import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { computeSceneSnapshot } from './scene';
 import type { Bounds } from './scene';
+import { applyEulerXYZ as _applyEulerXYZ, isZeroRotation as _isZeroRotation } from '../../lib/math3';
 
 // ---------------------------------------------------------------------------
 // Public result type — a second agent depends on these field names exactly.
@@ -117,46 +118,12 @@ function r2(n: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Apply a three.js-style intrinsic XYZ Euler rotation (M = Rx · Ry · Rz) to a
- * world-space vertex, rotating about `origin`.  Matches the live viewport which
- * uses `<mesh rotation={[rx,ry,rz]}/>` (three.js default Euler order 'XYZ').
- *
- * Column-vector composition: Rz acts on the vector first, then Ry, then Rx.
- * Verified against three.js Matrix4.makeRotationFromEuler (XYZ order), where
- * M[0][2] = sin(y) — consistent with Rx·Ry·Rz applied to (0,0,1), not Rz·Ry·Rx.
+ * Re-export applyEulerXYZ so callers that imported it from render.ts keep working.
+ * Implementation lives in lib/math3 to avoid an import cycle with scene.ts.
  *
  * @pure
  */
-export function applyEulerXYZ(v: Vec3, origin: Vec3, euler: Vec3): Vec3 {
-  const [rx, ry, rz] = euler;
-  // Translate to origin-relative space
-  let x = v[0] - origin[0];
-  let y = v[1] - origin[1];
-  let z = v[2] - origin[2];
-
-  // three.js Euler('XYZ') means M = Rx · Ry · Rz applied as M·v
-  // (i.e. Rz is applied to the vector first, then Ry, then Rx)
-
-  // Rz first
-  const czr = Math.cos(rz), szr = Math.sin(rz);
-  const x1 = czr * x - szr * y;
-  const y1 = szr * x + czr * y;
-  x = x1; y = y1;
-
-  // Ry second
-  const cyr = Math.cos(ry), syr = Math.sin(ry);
-  const x2 = cyr * x + syr * z;
-  const z2 = -syr * x + cyr * z;
-  x = x2; z = z2;
-
-  // Rx last
-  const cxr = Math.cos(rx), sxr = Math.sin(rx);
-  const y3 = cxr * y - sxr * z;
-  const z3 = sxr * y + cxr * z;
-  y = y3; z = z3;
-
-  return [x + origin[0], y + origin[1], z + origin[2]];
-}
+export { _applyEulerXYZ as applyEulerXYZ };
 
 /**
  * Apply the same intrinsic XYZ Euler rotation to a direction vector (normal).
@@ -165,12 +132,7 @@ export function applyEulerXYZ(v: Vec3, origin: Vec3, euler: Vec3): Vec3 {
  * @pure
  */
 function rotateNormalXYZ(n: Vec3, euler: Vec3): Vec3 {
-  return applyEulerXYZ(n, [0, 0, 0], euler);
-}
-
-/** True when the rotation is the identity — lets us skip the rotation pass cheaply. */
-function isZeroRotation(euler: Vec3): boolean {
-  return euler[0] === 0 && euler[1] === 0 && euler[2] === 0;
+  return _applyEulerXYZ(n, [0, 0, 0], euler);
 }
 
 /**
@@ -181,10 +143,10 @@ function isZeroRotation(euler: Vec3): boolean {
  * @pure
  */
 function applyRotation(polys: PreDepthPolygon[], position: Vec3, rotation: Vec3): PreDepthPolygon[] {
-  if (isZeroRotation(rotation)) return polys;
+  if (_isZeroRotation(rotation)) return polys;
   return polys.map((poly) => ({
     ...poly,
-    verts: poly.verts.map((v) => applyEulerXYZ(v, position, rotation)),
+    verts: poly.verts.map((v) => _applyEulerXYZ(v, position, rotation)),
     normal: rotateNormalXYZ(poly.normal, rotation),
   }));
 }

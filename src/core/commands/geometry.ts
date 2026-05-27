@@ -11,7 +11,7 @@ import type { CadDocument, Entity, EntityGroup, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
-import { entityBounds } from './scene';
+import { worldAabb } from './scene';
 
 /**
  * Validate an optional rotation param.
@@ -23,6 +23,92 @@ function resolveRotation(rotation: unknown): Vec3 {
   const [rx, ry, rz] = rotation as unknown[];
   if (!Number.isFinite(rx) || !Number.isFinite(ry) || !Number.isFinite(rz)) return [0, 0, 0];
   return [rx as number, ry as number, rz as number];
+}
+
+/**
+ * Placement anchor values.
+ *
+ * These control how the caller's `position` input is interpreted for a 3D-creation
+ * command. The anchor names the point on the entity's LOCAL, UNROTATED AABB that must
+ * land at the caller's `position`. The stored `position` (persisted on the entity) is
+ * then the one that achieves this in the entity's own coordinate space, i.e. the offset
+ * is applied BEFORE rotation. Rotation is applied by the viewport about the stored
+ * origin exactly as it is today — this is an intentional, documented interaction.
+ *
+ * Right-handed frame, +Z up (document convention).
+ *
+ * | value         | anchor point (in local AABB)                                 |
+ * |---------------|--------------------------------------------------------------|
+ * | 'center'      | geometric center: mid X, mid Y, mid Z                        |
+ * | 'min'         | min corner: min X, min Y, min Z                               |
+ * | 'base-center' | center of the bottom face: mid X, mid Y, min Z                |
+ */
+export type PlacementAnchor = 'center' | 'min' | 'base-center';
+
+const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>(['center', 'min', 'base-center']);
+
+/**
+ * Compute the stored `position` so that the requested anchor lands at `inputPosition`.
+ *
+ * The offset is computed in the LOCAL, UNROTATED frame. Rotation is NOT applied here —
+ * it is applied later by the viewport about the stored origin.
+ *
+ * @param halfExtents  [hx, hy, hz]: half-extents of the AABB measured from its CENTER
+ *                     (the entity spans ±hx in X, ±hy in Y, ±hz in Z about the AABB center).
+ *                     Always positive. Independent of `defaultAnchor` — always center-relative,
+ *                     so callers pass e.g. `height/2`, not the full height.
+ * @param defaultAnchor  The anchor that the stored `position` natively represents
+ *                       (each command's pre-W4B convention, e.g. box='center', cone='base-center').
+ * @param requestedAnchor  The anchor the CALLER named; unknown values fall back to `defaultAnchor`.
+ * @param inputPosition    The world-space position the caller wants the named anchor to land at.
+ * @returns The stored `position` to persist on the entity.
+ */
+function resolvePosition(
+  halfExtents: Vec3,
+  defaultAnchor: PlacementAnchor,
+  requestedAnchor: unknown,
+  inputPosition: Vec3,
+): Vec3 {
+  const anchor: PlacementAnchor =
+    typeof requestedAnchor === 'string' && VALID_ANCHORS.has(requestedAnchor)
+      ? (requestedAnchor as PlacementAnchor)
+      : defaultAnchor;
+
+  if (anchor === defaultAnchor) return inputPosition;
+
+  const [hx, hy, hz] = halfExtents;
+
+  // Anchor point relative to AABB center (canonical frame):
+  // center      → [0,    0,    0   ]
+  // min         → [-hx, -hy,  -hz  ]
+  // base-center → [0,    0,   -hz  ]  (bottom face center; min-Z = aabbCenter.z − hz)
+
+  function anchorOffsetFromCenter(a: PlacementAnchor): Vec3 {
+    switch (a) {
+      case 'center':      return [0, 0, 0];
+      case 'min':         return [-hx, -hy, -hz];
+      case 'base-center': return [0, 0, -hz];
+    }
+  }
+
+  // Derivation (all offsets relative to AABB center):
+  //   anchorPoint(a) = aabbCenter + anchorOffsetFromCenter(a)
+  //   storedOrigin   = aabbCenter + anchorOffsetFromCenter(defaultAnchor)   [by definition]
+  //   We want: storedOrigin + (anchorPoint(requested) - storedOrigin) = inputPosition
+  //     ↔ anchorPoint(requested) = inputPosition
+  //     ↔ aabbCenter + anchorOffsetFromCenter(requested) = inputPosition
+  //     ↔ aabbCenter = inputPosition - anchorOffsetFromCenter(requested)
+  //   And storedOrigin = aabbCenter + anchorOffsetFromCenter(defaultAnchor)
+  //     = inputPosition - anchorOffsetFromCenter(requested) + anchorOffsetFromCenter(defaultAnchor)
+
+  const defOffset = anchorOffsetFromCenter(defaultAnchor);
+  const reqOffset = anchorOffsetFromCenter(anchor);
+
+  return [
+    inputPosition[0] - reqOffset[0] + defOffset[0],
+    inputPosition[1] - reqOffset[1] + defOffset[1],
+    inputPosition[2] - reqOffset[2] + defOffset[2],
+  ];
 }
 
 /** Format an AABB for inclusion in a command summary. */
@@ -46,24 +132,28 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
  * @command add_box
  * @pure
  * @layer core/commands
- * @affects creates 1 box entity; position is the center of the box
+ * @affects creates 1 box entity
  * @invariant all size components > 0
  * @failure any size component <= 0 or non-finite -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'center', no throw
  */
 interface AddBoxParams {
   size: Vec3;
   position?: Vec3;
   rotation?: Vec3;
   color?: string;
+  anchor?: PlacementAnchor;
 }
 
 export const addBox: CommandDefinition<AddBoxParams> = {
   name: 'add_box',
   description:
     'Create a rectangular box solid. Right-handed world frame, +Z up. ' +
-    'position is the CENTER of the box [x, y, z] in document units. ' +
-    'size is [width, height, depth] in document units; all components must be > 0.',
+    'size is [width, height, depth] in document units; all components must be > 0. ' +
+    'anchor controls which point on the entity the position refers to: ' +
+    '"center" (default) = geometric center; "min" = min-XYZ corner; "base-center" = center of bottom face (mid X/Y, min Z). ' +
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -76,9 +166,20 @@ export const addBox: CommandDefinition<AddBoxParams> = {
       position: {
         type: 'array',
         description:
-          'World-space center of the box [x, y, z] in document units. ' +
+          'World-space location of the anchor point [x, y, z] in document units. ' +
           'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
         items: { type: 'number' },
+      },
+      anchor: {
+        type: 'string',
+        description:
+          'Which point on the box the position refers to. ' +
+          '"center" (default): geometric center. ' +
+          '"min": min-XYZ corner of the AABB. ' +
+          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+          'Unknown values fall back to "center". ' +
+          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        enum: ['center', 'min', 'base-center'],
       },
       rotation: {
         type: 'array',
@@ -92,7 +193,7 @@ export const addBox: CommandDefinition<AddBoxParams> = {
     },
     required: ['size'],
   },
-  run: (doc, { size, position = [0, 0, 0], rotation, color = '#6b8f9c' }): CommandResult => {
+  run: (doc, { size, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
     const [w, h, d] = size;
     if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(d) || w <= 0 || h <= 0 || d <= 0) {
       return {
@@ -101,18 +202,21 @@ export const addBox: CommandDefinition<AddBoxParams> = {
         affected: [],
       };
     }
+    // Default anchor for box is 'center': stored position IS the geometric center.
+    // Half-extents from center: [w/2, h/2, d/2].
+    const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'center', anchor, position);
     const id = nextId('box');
     const entity: Entity = {
       id,
       kind: 'box',
       size,
-      position,
+      position: storedPosition,
       rotation: resolveRotation(rotation),
       layerId: DEFAULT_LAYER_ID,
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = entityBounds(newDoc.entities[id] as Entity);
+    const b = worldAabb(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added box ${id} of size ${size.join('×')}; ${boundsText(b)}.`,
@@ -202,7 +306,7 @@ export const extrude: CommandDefinition<ExtrudeParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = entityBounds(newDoc.entities[id] as Entity);
+    const b = worldAabb(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Extruded a ${profile.length}-point profile by ${depth}; ${boundsText(b)}.`,
@@ -252,13 +356,14 @@ export const move: CommandDefinition<MoveParams> = {
  * @command add_cylinder
  * @pure
  * @layer core/commands
- * @affects creates 1 cylinder entity; position is the geometric center of the cylinder
+ * @affects creates 1 cylinder entity; stored position is the geometric center of the cylinder
  * @invariant radius > 0; height > 0
  * @failure radius <= 0 or height <= 0 -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'center', no throw
  *
- * NOTE: position is the CENTER of the cylinder (it spans ±height/2 along the local axis),
- * NOT the base-center. The viewport uses three.js CylinderGeometry which is Y-axis centered.
+ * NOTE: the viewport renders via three.js CylinderGeometry (Y-axis centered). The document
+ * frame is +Z up, so entityBounds uses ±height/2 on the Y axis. Default anchor is 'center'.
  */
 interface AddCylinderParams {
   radius: number;
@@ -266,15 +371,19 @@ interface AddCylinderParams {
   position?: Vec3;
   rotation?: Vec3;
   color?: string;
+  anchor?: PlacementAnchor;
 }
 
 export const addCylinder: CommandDefinition<AddCylinderParams> = {
   name: 'add_cylinder',
   description:
     'Create a cylinder solid. Right-handed world frame, +Z up. ' +
-    'position is the GEOMETRIC CENTER of the cylinder [x, y, z] in document units; ' +
-    'the cylinder spans ±height/2 about position along its local axis. ' +
-    'radius and height must both be > 0.',
+    'radius and height must both be > 0. ' +
+    'anchor controls which point the position refers to: ' +
+    '"center" (default) = geometric center (cylinder spans ±height/2 about stored position along its axis); ' +
+    '"min" = min-XYZ corner of the AABB; ' +
+    '"base-center" = center of the bottom face (mid X/Y, min Z of AABB). ' +
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -285,15 +394,25 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
       height: {
         type: 'number',
         description:
-          'Total height of the cylinder in document units. The solid spans ±height/2 ' +
-          'about position along its local axis. Must be > 0.',
+          'Total height of the cylinder in document units. Must be > 0.',
       },
       position: {
         type: 'array',
         description:
-          'World-space geometric center of the cylinder [x, y, z] in document units. ' +
+          'World-space location of the anchor point [x, y, z] in document units. ' +
           'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
         items: { type: 'number' },
+      },
+      anchor: {
+        type: 'string',
+        description:
+          'Which point on the cylinder the position refers to. ' +
+          '"center" (default): geometric center. ' +
+          '"min": min-XYZ corner of the AABB. ' +
+          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+          'Unknown values fall back to "center". ' +
+          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        enum: ['center', 'min', 'base-center'],
       },
       rotation: {
         type: 'array',
@@ -307,26 +426,30 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
     },
     required: ['radius', 'height'],
   },
-  run: (doc, { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c' }): CommandResult => {
+  run: (doc, { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
       return { document: doc, summary: `add_cylinder failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
     }
     if (!Number.isFinite(height) || height <= 0) {
       return { document: doc, summary: `add_cylinder failed: height must be finite and > 0, got ${height}.`, affected: [] };
     }
+    // Default anchor for cylinder is 'center': stored position is the geometric center.
+    // AABB half-extents from center: [radius, height/2, radius].
+    // (entityBounds uses Y axis for height per three.js CylinderGeometry convention.)
+    const storedPosition = resolvePosition([radius, height / 2, radius], 'center', anchor, position);
     const id = nextId('cyl');
     const entity: Entity = {
       id,
       kind: 'cylinder',
       radius,
       height,
-      position,
+      position: storedPosition,
       rotation: resolveRotation(rotation),
       layerId: DEFAULT_LAYER_ID,
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = entityBounds(newDoc.entities[id] as Entity);
+    const b = worldAabb(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added cylinder ${id} with radius ${radius} and height ${height}; ${boundsText(b)}.`,
@@ -339,25 +462,29 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
  * @command add_sphere
  * @pure
  * @layer core/commands
- * @affects creates 1 sphere entity; position is the center of the sphere
+ * @affects creates 1 sphere entity; stored position is the center of the sphere
  * @invariant radius > 0
  * @failure radius <= 0 -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'center', no throw
  */
 interface AddSphereParams {
   radius: number;
   position?: Vec3;
   rotation?: Vec3;
   color?: string;
+  anchor?: PlacementAnchor;
 }
 
 export const addSphere: CommandDefinition<AddSphereParams> = {
   name: 'add_sphere',
   description:
     'Create a sphere solid. Right-handed world frame, +Z up. ' +
-    'position is the CENTER of the sphere [x, y, z] in document units. ' +
-    'The sphere extends ±radius in all directions from position. ' +
-    'radius must be > 0. rotation is accepted and stored for uniformity but is geometrically moot.',
+    'radius must be > 0. rotation is accepted and stored for uniformity but is geometrically moot. ' +
+    'anchor controls which point the position refers to: ' +
+    '"center" (default) = geometric center; "min" = min-XYZ corner of the AABB; ' +
+    '"base-center" = center of the bottom face (mid X/Y, min Z). ' +
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -368,9 +495,20 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
       position: {
         type: 'array',
         description:
-          'World-space center of the sphere [x, y, z] in document units. ' +
+          'World-space location of the anchor point [x, y, z] in document units. ' +
           'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
         items: { type: 'number' },
+      },
+      anchor: {
+        type: 'string',
+        description:
+          'Which point on the sphere the position refers to. ' +
+          '"center" (default): geometric center. ' +
+          '"min": min-XYZ corner of the AABB. ' +
+          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+          'Unknown values fall back to "center". ' +
+          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        enum: ['center', 'min', 'base-center'],
       },
       rotation: {
         type: 'array',
@@ -384,22 +522,25 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
     },
     required: ['radius'],
   },
-  run: (doc, { radius, position = [0, 0, 0], rotation, color = '#6b8f9c' }): CommandResult => {
+  run: (doc, { radius, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
       return { document: doc, summary: `add_sphere failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
     }
+    // Default anchor for sphere is 'center': stored position is the geometric center.
+    // Half-extents from center: [radius, radius, radius].
+    const storedPosition = resolvePosition([radius, radius, radius], 'center', anchor, position);
     const id = nextId('sph');
     const entity: Entity = {
       id,
       kind: 'sphere',
       radius,
-      position,
+      position: storedPosition,
       rotation: resolveRotation(rotation),
       layerId: DEFAULT_LAYER_ID,
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = entityBounds(newDoc.entities[id] as Entity);
+    const b = worldAabb(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added sphere ${id} with radius ${radius}; ${boundsText(b)}.`,
@@ -412,10 +553,14 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
  * @command add_cone
  * @pure
  * @layer core/commands
- * @affects creates 1 cone entity; position is the center of the base circle
+ * @affects creates 1 cone entity; stored position is the center of the base circle (base-center)
  * @invariant radius > 0; height > 0
  * @failure radius <= 0 or height <= 0 -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'base-center', no throw
+ *
+ * Default anchor is 'base-center': the stored position is the center of the circular base;
+ * the AABB spans [pos-radius..pos+radius, pos-radius..pos+radius, pos.z..pos.z+height].
  */
 interface AddConeParams {
   radius: number;
@@ -423,15 +568,19 @@ interface AddConeParams {
   position?: Vec3;
   rotation?: Vec3;
   color?: string;
+  anchor?: PlacementAnchor;
 }
 
 export const addCone: CommandDefinition<AddConeParams> = {
   name: 'add_cone',
   description:
     'Create a cone solid. Right-handed world frame, +Z up. ' +
-    'position is the CENTER of the circular base [x, y, z] in document units; ' +
-    'the apex is at position + [0, 0, height]. ' +
-    'radius and height must both be > 0.',
+    'radius and height must both be > 0. ' +
+    'anchor controls which point the position refers to: ' +
+    '"base-center" (default) = center of the circular base (the apex is at position + [0,0,height]); ' +
+    '"center" = geometric center of the AABB; ' +
+    '"min" = min-XYZ corner of the AABB. ' +
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -447,9 +596,20 @@ export const addCone: CommandDefinition<AddConeParams> = {
       position: {
         type: 'array',
         description:
-          'World-space center of the cone base [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. The apex is at position + [0, 0, height]. Defaults to [0, 0, 0].',
+          'World-space location of the anchor point [x, y, z] in document units. ' +
+          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
         items: { type: 'number' },
+      },
+      anchor: {
+        type: 'string',
+        description:
+          'Which point on the cone the position refers to. ' +
+          '"base-center" (default): center of the circular base; apex at position+[0,0,height]. ' +
+          '"center": geometric center of the AABB (mid X/Y/Z). ' +
+          '"min": min-XYZ corner of the AABB. ' +
+          'Unknown values fall back to "base-center". ' +
+          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        enum: ['center', 'min', 'base-center'],
       },
       rotation: {
         type: 'array',
@@ -463,26 +623,33 @@ export const addCone: CommandDefinition<AddConeParams> = {
     },
     required: ['radius', 'height'],
   },
-  run: (doc, { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c' }): CommandResult => {
+  run: (doc, { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
       return { document: doc, summary: `add_cone failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
     }
     if (!Number.isFinite(height) || height <= 0) {
       return { document: doc, summary: `add_cone failed: height must be finite and > 0, got ${height}.`, affected: [] };
     }
+    // Default anchor for cone is 'base-center': stored position IS the base center.
+    // AABB from base-center origin: spans [−radius..+radius, −radius..+radius, 0..height].
+    // To use resolvePosition (which works from center), we express the base-center origin
+    // relative to the AABB center: AABB center is at [0, 0, height/2] from base-center.
+    // We pass half-extents as seen from the AABB center: [radius, radius, height/2].
+    // defaultAnchor='base-center' tells resolvePosition the stored origin is the base-center.
+    const storedPosition = resolvePosition([radius, radius, height / 2], 'base-center', anchor, position);
     const id = nextId('cone');
     const entity: Entity = {
       id,
       kind: 'cone',
       radius,
       height,
-      position,
+      position: storedPosition,
       rotation: resolveRotation(rotation),
       layerId: DEFAULT_LAYER_ID,
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = entityBounds(newDoc.entities[id] as Entity);
+    const b = worldAabb(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added cone ${id} with base radius ${radius} and height ${height}; ${boundsText(b)}.`,
@@ -495,10 +662,14 @@ export const addCone: CommandDefinition<AddConeParams> = {
  * @command add_torus
  * @pure
  * @layer core/commands
- * @affects creates 1 torus entity; position is the center of the torus
+ * @affects creates 1 torus entity; stored position is the geometric center of the torus
  * @invariant ringRadius > 0; tubeRadius > 0
  * @failure ringRadius <= 0 or tubeRadius <= 0 -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'center', no throw
+ *
+ * Default anchor is 'center': the stored position is the geometric center of the torus.
+ * AABB: ±(ringRadius+tubeRadius) in X/Y; ±tubeRadius in Z.
  */
 interface AddTorusParams {
   ringRadius: number;
@@ -506,16 +677,20 @@ interface AddTorusParams {
   position?: Vec3;
   rotation?: Vec3;
   color?: string;
+  anchor?: PlacementAnchor;
 }
 
 export const addTorus: CommandDefinition<AddTorusParams> = {
   name: 'add_torus',
   description:
     'Create a torus (donut) solid. Right-handed world frame, +Z up. ' +
-    'position is the CENTER of the torus [x, y, z] in document units; the ring lies in the XY plane. ' +
     'ringRadius is the distance from the torus center to the tube center (major radius); ' +
     'tubeRadius is the radius of the tube cross-section (minor radius). ' +
-    'Both must be > 0; tubeRadius < ringRadius for a non-self-intersecting torus.',
+    'Both must be > 0; tubeRadius < ringRadius for a non-self-intersecting torus. ' +
+    'anchor controls which point the position refers to: ' +
+    '"center" (default) = geometric center of the torus; "min" = min-XYZ corner of the AABB; ' +
+    '"base-center" = center of the bottom face (mid X/Y, min Z). ' +
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -533,9 +708,20 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
       position: {
         type: 'array',
         description:
-          'World-space center of the torus [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. The ring lies in the XY plane at this position. Defaults to [0, 0, 0].',
+          'World-space location of the anchor point [x, y, z] in document units. ' +
+          'Right-handed frame, +Z up. The ring lies in the XY plane. Defaults to [0, 0, 0].',
         items: { type: 'number' },
+      },
+      anchor: {
+        type: 'string',
+        description:
+          'Which point on the torus the position refers to. ' +
+          '"center" (default): geometric center. ' +
+          '"min": min-XYZ corner of the AABB. ' +
+          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+          'Unknown values fall back to "center". ' +
+          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        enum: ['center', 'min', 'base-center'],
       },
       rotation: {
         type: 'array',
@@ -549,7 +735,7 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
     },
     required: ['ringRadius', 'tubeRadius'],
   },
-  run: (doc, { ringRadius, tubeRadius, position = [0, 0, 0], rotation, color = '#6b8f9c' }): CommandResult => {
+  run: (doc, { ringRadius, tubeRadius, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
     if (!Number.isFinite(ringRadius) || ringRadius <= 0) {
       return {
         document: doc,
@@ -564,19 +750,23 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
         affected: [],
       };
     }
+    // Default anchor for torus is 'center': stored position is the geometric center.
+    // AABB half-extents from center: [ringRadius+tubeRadius, ringRadius+tubeRadius, tubeRadius].
+    const outerRadius = ringRadius + tubeRadius;
+    const storedPosition = resolvePosition([outerRadius, outerRadius, tubeRadius], 'center', anchor, position);
     const id = nextId('tor');
     const entity: Entity = {
       id,
       kind: 'torus',
       ringRadius,
       tubeRadius,
-      position,
+      position: storedPosition,
       rotation: resolveRotation(rotation),
       layerId: DEFAULT_LAYER_ID,
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = entityBounds(newDoc.entities[id] as Entity);
+    const b = worldAabb(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}; ${boundsText(b)}.`,
@@ -589,26 +779,35 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
  * @command add_wedge
  * @pure
  * @layer core/commands
- * @affects creates 1 wedge entity; position is the lower-front-left corner of the bounding box
+ * @affects creates 1 wedge entity; stored position is the lower-front-left corner of the bounding box
  * @invariant all size components > 0
  * @failure any size component <= 0 -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'min', no throw
+ *
+ * Default anchor is 'min': the stored position is the lower-front-left (min-XYZ) corner.
+ * AABB: [position..position+size] in all axes.
  */
 interface AddWedgeParams {
   size: Vec3;
   position?: Vec3;
   rotation?: Vec3;
   color?: string;
+  anchor?: PlacementAnchor;
 }
 
 export const addWedge: CommandDefinition<AddWedgeParams> = {
   name: 'add_wedge',
   description:
     'Create a wedge solid — a right-triangular prism (ramp shape). Right-handed world frame, +Z up. ' +
-    'position is the LOWER-FRONT-LEFT corner of the bounding box [x, y, z] in document units. ' +
-    'size is [width, height, depth]: width = X extent; height = full height of the front face (local z=0); ' +
+    'size is [width, height, depth]: width = X extent; height = full height of the front face; ' +
     'depth = Z extent (ramp direction). The slope cuts the top-rear corner: front face is a full rectangle, ' +
-    'back edge tapers to zero height. All size components must be > 0.',
+    'back edge tapers to zero height. All size components must be > 0. ' +
+    'anchor controls which point the position refers to: ' +
+    '"min" (default) = lower-front-left corner of the bounding box (min-XYZ); ' +
+    '"center" = geometric center of the AABB; ' +
+    '"base-center" = center of the bottom face (mid X/Y, min Z). ' +
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -622,9 +821,20 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
       position: {
         type: 'array',
         description:
-          'World-space lower-front-left corner of the wedge bounding box [x, y, z] in document units. ' +
+          'World-space location of the anchor point [x, y, z] in document units. ' +
           'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
         items: { type: 'number' },
+      },
+      anchor: {
+        type: 'string',
+        description:
+          'Which point on the wedge the position refers to. ' +
+          '"min" (default): lower-front-left corner of the bounding box (min-XYZ). ' +
+          '"center": geometric center of the AABB. ' +
+          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+          'Unknown values fall back to "min". ' +
+          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        enum: ['center', 'min', 'base-center'],
       },
       rotation: {
         type: 'array',
@@ -638,7 +848,7 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
     },
     required: ['size'],
   },
-  run: (doc, { size, position = [0, 0, 0], rotation, color = '#6b8f9c' }): CommandResult => {
+  run: (doc, { size, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
     const [w, h, d] = size;
     if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(d) || w <= 0 || h <= 0 || d <= 0) {
       return {
@@ -647,18 +857,21 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
         affected: [],
       };
     }
+    // Default anchor for wedge is 'min': stored position is the lower-front-left (min-XYZ) corner.
+    // AABB half-extents from min corner: [w/2, h/2, d/2] (half-extents measured from min = stored origin).
+    const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'min', anchor, position);
     const id = nextId('wdg');
     const entity: Entity = {
       id,
       kind: 'wedge',
       size,
-      position,
+      position: storedPosition,
       rotation: resolveRotation(rotation),
       layerId: DEFAULT_LAYER_ID,
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = entityBounds(newDoc.entities[id] as Entity);
+    const b = worldAabb(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added wedge ${id} of size ${size.join('×')}; ${boundsText(b)}.`,
@@ -671,10 +884,14 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
  * @command add_pyramid
  * @pure
  * @layer core/commands
- * @affects creates 1 pyramid entity; position is the center of the rectangular base
+ * @affects creates 1 pyramid entity; stored position is the center of the rectangular base
  * @invariant baseWidth > 0; baseDepth > 0; height > 0
  * @failure any dimension <= 0 -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'base-center', no throw
+ *
+ * Default anchor is 'base-center': the stored position is the center of the rectangular base.
+ * AABB from base-center: ±baseWidth/2 in X; ±baseDepth/2 in Y; 0..height in Z.
  */
 interface AddPyramidParams {
   baseWidth: number;
@@ -683,15 +900,20 @@ interface AddPyramidParams {
   position?: Vec3;
   rotation?: Vec3;
   color?: string;
+  anchor?: PlacementAnchor;
 }
 
 export const addPyramid: CommandDefinition<AddPyramidParams> = {
   name: 'add_pyramid',
   description:
     'Create a pyramid solid with a rectangular base and a single apex. Right-handed world frame, +Z up. ' +
-    'position is the CENTER of the rectangular base [x, y, z] in document units. ' +
-    'The base extends ±baseWidth/2 in X and ±baseDepth/2 in Y from position. ' +
-    'The apex is at position + [0, 0, height]. All three dimensions must be > 0.',
+    'The base extends ±baseWidth/2 in X and ±baseDepth/2 in Y from the anchor point. ' +
+    'The apex is at base-center + [0, 0, height]. All three dimensions must be > 0. ' +
+    'anchor controls which point the position refers to: ' +
+    '"base-center" (default) = center of the rectangular base; apex at position+[0,0,height]; ' +
+    '"center" = geometric center of the AABB; ' +
+    '"min" = min-XYZ corner of the AABB. ' +
+    'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -711,9 +933,20 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
       position: {
         type: 'array',
         description:
-          'World-space center of the pyramid base [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. The apex is at position + [0, 0, height]. Defaults to [0, 0, 0].',
+          'World-space location of the anchor point [x, y, z] in document units. ' +
+          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
         items: { type: 'number' },
+      },
+      anchor: {
+        type: 'string',
+        description:
+          'Which point on the pyramid the position refers to. ' +
+          '"base-center" (default): center of the rectangular base; apex at position+[0,0,height]. ' +
+          '"center": geometric center of the AABB (mid X/Y/Z). ' +
+          '"min": min-XYZ corner of the AABB. ' +
+          'Unknown values fall back to "base-center". ' +
+          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        enum: ['center', 'min', 'base-center'],
       },
       rotation: {
         type: 'array',
@@ -727,7 +960,7 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
     },
     required: ['baseWidth', 'baseDepth', 'height'],
   },
-  run: (doc, { baseWidth, baseDepth, height, position = [0, 0, 0], rotation, color = '#6b8f9c' }): CommandResult => {
+  run: (doc, { baseWidth, baseDepth, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
     if (!Number.isFinite(baseWidth) || baseWidth <= 0) {
       return {
         document: doc,
@@ -749,6 +982,11 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
         affected: [],
       };
     }
+    // Default anchor for pyramid is 'base-center': stored position IS the base center.
+    // AABB from base-center origin: spans [−bw/2..+bw/2, −bd/2..+bd/2, 0..height].
+    // Half-extents for resolvePosition (which works from AABB center internally):
+    // pass half-extents as seen from base-center: [baseWidth/2, baseDepth/2, height/2].
+    const storedPosition = resolvePosition([baseWidth / 2, baseDepth / 2, height / 2], 'base-center', anchor, position);
     const id = nextId('pyr');
     const entity: Entity = {
       id,
@@ -756,13 +994,13 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
       baseWidth,
       baseDepth,
       height,
-      position,
+      position: storedPosition,
       rotation: resolveRotation(rotation),
       layerId: DEFAULT_LAYER_ID,
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = entityBounds(newDoc.entities[id] as Entity);
+    const b = worldAabb(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}; ${boundsText(b)}.`,
