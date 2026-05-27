@@ -35,6 +35,7 @@ import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { EmptyState } from '@ui/components/EmptyState';
+import { TopBar } from '@ui/components/TopBar';
 import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
 
 type ViewMode = '3d' | '2d';
@@ -54,6 +55,8 @@ export function App(): React.ReactElement {
 
   return (
     <div className="app-layout" data-theme={theme}>
+      <TopBar />
+
       <div className="app-content">
         {/* Properties panel: left dock — read-only entity inspector. */}
         <PropertiesPanel className="app-properties" />
