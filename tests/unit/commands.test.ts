@@ -463,6 +463,354 @@ describe('command layer', () => {
     expect(result.summary).toContain('kind=sphere');
     expect(result.summary).toContain('0 match');
   });
+
+  // ---------------------------------------------------------------------------
+  // Assemblies: create_component, insert_instance, explode_instance
+  // ---------------------------------------------------------------------------
+
+  it('create_component promotes entities into a component and replaces them with one instance', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_sphere', { radius: 1, position: [5, 0, 0] });
+    doc = r2.document;
+    const boxId = r1.affected[0]!;
+    const sphereId = r2.affected[0]!;
+
+    const result = execute(doc, 'create_component', { name: 'MyComp', entityIds: [boxId, sphereId] });
+    doc = result.document;
+
+    // One instance replaces the two source entities
+    expect(result.affected).toHaveLength(1);
+    const instanceId = result.affected[0]!;
+    const instance = doc.entities[instanceId];
+    expect(instance).toBeDefined();
+    expect(instance!.kind).toBe('instance');
+
+    // Source entities removed
+    expect(doc.entities[boxId]).toBeUndefined();
+    expect(doc.entities[sphereId]).toBeUndefined();
+    expect(doc.order).not.toContain(boxId);
+    expect(doc.order).not.toContain(sphereId);
+    expect(doc.order).toContain(instanceId);
+
+    // Component stored
+    const componentId = (instance as { componentId: string }).componentId;
+    expect(doc.components[componentId]).toBeDefined();
+    expect(doc.components[componentId]!.name).toBe('MyComp');
+    expect(Object.keys(doc.components[componentId]!.entities)).toHaveLength(2);
+
+    // Summary is informative
+    expect(result.summary).toContain('MyComp');
+    expect(result.summary).toContain(instanceId);
+  });
+
+  it('create_component is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const boxId = doc.order[0]!;
+
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'create_component', { name: 'Test', entityIds: [boxId] });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('create_component with empty entityIds is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'create_component', { name: 'Empty', entityIds: [] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('non-empty');
+  });
+
+  it('create_component with a missing entity id is a graceful no-op', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+
+    const result = execute(doc, 'create_component', { name: 'Bad', entityIds: ['does-not-exist'] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('does-not-exist');
+  });
+
+  it('create_component prunes removed ids from groups and selection', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r2.document;
+    const idA = r1.affected[0]!;
+    const idB = r2.affected[0]!;
+
+    // Group the two
+    const grouped = execute(doc, 'group_entities', { ids: [idA, idB] });
+    doc = { ...grouped.document, selection: [idA, idB] };
+
+    // Promote both into a component
+    const result = execute(doc, 'create_component', { name: 'Pruned', entityIds: [idA, idB] });
+    doc = result.document;
+
+    // Group should be dissolved (< 2 members left)
+    expect(Object.keys(doc.groups)).toHaveLength(0);
+    // Selection should be clear of removed ids
+    expect(doc.selection).not.toContain(idA);
+    expect(doc.selection).not.toContain(idB);
+  });
+
+  it('insert_instance adds an instance entity with correct transform', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+
+    const comp = execute(doc, 'create_component', { name: 'Widget', entityIds: [boxId] });
+    doc = comp.document;
+    const instanceId = comp.affected[0]!;
+    const componentId = (doc.entities[instanceId] as { componentId: string }).componentId;
+
+    const result = execute(doc, 'insert_instance', {
+      componentId,
+      position: [10, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [2, 2, 2],
+    });
+    doc = result.document;
+
+    expect(result.affected).toHaveLength(1);
+    const newInstanceId = result.affected[0]!;
+    const newInstance = doc.entities[newInstanceId]!;
+    expect(newInstance.kind).toBe('instance');
+    expect(newInstance.position).toEqual([10, 0, 0]);
+    expect((newInstance as { scale?: number[] }).scale).toEqual([2, 2, 2]);
+    expect((newInstance as { componentId: string }).componentId).toBe(componentId);
+  });
+
+  it('insert_instance is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'W', entityIds: [boxId] });
+    doc = comp.document;
+    const instanceId = comp.affected[0]!;
+    const componentId = (doc.entities[instanceId] as { componentId: string }).componentId;
+
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'insert_instance', { componentId });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('insert_instance with unknown componentId is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'insert_instance', { componentId: 'ghost-comp' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ghost-comp');
+  });
+
+  it('insert_instance with non-finite position is a graceful no-op', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'W2', entityIds: [boxId] });
+    doc = comp.document;
+    const instanceId = comp.affected[0]!;
+    const componentId = (doc.entities[instanceId] as { componentId: string }).componentId;
+
+    const result = execute(doc, 'insert_instance', {
+      componentId,
+      position: [Infinity, 0, 0] as unknown as [number, number, number],
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('two instances of one component share the same componentId (no geometry duplication)', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [2, 2, 2] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+
+    // Promote to component
+    const comp = execute(doc, 'create_component', { name: 'Brick', entityIds: [boxId] });
+    doc = comp.document;
+    const inst1Id = comp.affected[0]!;
+    const componentId = (doc.entities[inst1Id] as { componentId: string }).componentId;
+
+    // Insert a second instance at a different position
+    const inst2 = execute(doc, 'insert_instance', { componentId, position: [10, 0, 0] });
+    doc = inst2.document;
+    const inst2Id = inst2.affected[0]!;
+
+    // Both instances reference the same component — geometry is not duplicated
+    const i1 = doc.entities[inst1Id] as { componentId: string };
+    const i2 = doc.entities[inst2Id] as { componentId: string };
+    expect(i1.componentId).toBe(componentId);
+    expect(i2.componentId).toBe(componentId);
+    expect(Object.keys(doc.components)).toHaveLength(1);
+
+    // Editing the component is reflected in both (they reference by id)
+    const component = doc.components[componentId]!;
+    expect(Object.keys(component.entities)).toHaveLength(1);
+  });
+
+  it('explode_instance replaces instance with baked world-space entities', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1], position: [3, 0, 0] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+
+    // Promote to component, then insert at [10,0,0]
+    const comp = execute(doc, 'create_component', { name: 'BoxComp', entityIds: [boxId] });
+    doc = comp.document;
+    const inst1Id = comp.affected[0]!;
+    const componentId = (doc.entities[inst1Id] as { componentId: string }).componentId;
+
+    const inst2 = execute(doc, 'insert_instance', { componentId, position: [10, 0, 0] });
+    doc = inst2.document;
+    const inst2Id = inst2.affected[0]!;
+
+    // Explode the second instance
+    const result = execute(doc, 'explode_instance', { id: inst2Id });
+    doc = result.document;
+
+    // Instance gone, new concrete entities in its place
+    expect(doc.entities[inst2Id]).toBeUndefined();
+    expect(result.affected).toHaveLength(1); // one child entity (the box)
+    const bakedId = result.affected[0]!;
+    const baked = doc.entities[bakedId]!;
+    expect(baked.kind).toBe('box');
+
+    // World position: component-local box was at [3,0,0]; instance at [10,0,0] → [13,0,0]
+    expect(baked.position[0]).toBeCloseTo(13);
+    expect(baked.position[1]).toBeCloseTo(0);
+    expect(baked.position[2]).toBeCloseTo(0);
+
+    // Component definition is unchanged
+    expect(doc.components[componentId]).toBeDefined();
+  });
+
+  it('explode_instance bakes the instance rotation and scale into child world position', () => {
+    let doc = createEmptyDocument();
+    // Component-local box at [1,0,0].
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1], position: [1, 0, 0] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'Rot', entityIds: [boxId] });
+    doc = comp.document;
+    const componentId = (doc.entities[comp.affected[0]!] as { componentId: string }).componentId;
+
+    // Instance: scale x2, rotate +90° about Z, translate to [0,0,5].
+    const inst = execute(doc, 'insert_instance', {
+      componentId,
+      position: [0, 0, 5],
+      rotation: [0, 0, Math.PI / 2],
+      scale: [2, 2, 2],
+    });
+    doc = inst.document;
+    const instId = inst.affected[0]!;
+
+    const result = execute(doc, 'explode_instance', { id: instId });
+    const baked = result.document.entities[result.affected[0]!]!;
+    // local [1,0,0] → scale×2 → [2,0,0] → Rz(+90°) → [0,2,0] → +[0,0,5] → [0,2,5]
+    expect(baked.position[0]).toBeCloseTo(0);
+    expect(baked.position[1]).toBeCloseTo(2);
+    expect(baked.position[2]).toBeCloseTo(5);
+  });
+
+  it('describe_scene reports an instance world AABB from its component extent (not a point)', () => {
+    let doc = createEmptyDocument();
+    // Box size [2,2,2] at origin → local AABB [-1,-1,-1]..[1,1,1].
+    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'Brick2', entityIds: [boxId] });
+    doc = comp.document;
+    const componentId = (doc.entities[comp.affected[0]!] as { componentId: string }).componentId;
+    // Second instance offset to [10,0,0].
+    const inst2 = execute(doc, 'insert_instance', { componentId, position: [10, 0, 0] });
+    doc = inst2.document;
+    const inst2Id = inst2.affected[0]!;
+
+    const snap = execute(doc, 'describe_scene', {}).data as {
+      entities: Array<{ id: string; kind: string; bounds: { min: number[]; max: number[] } }>;
+    };
+    const summary = snap.entities.find((e) => e.id === inst2Id)!;
+    expect(summary.kind).toBe('instance');
+    // Component extent ±1 around the instance position → not a degenerate point.
+    expect(summary.bounds.min[0]).toBeCloseTo(9);
+    expect(summary.bounds.max[0]).toBeCloseTo(11);
+    expect(summary.bounds.min[1]).toBeCloseTo(-1);
+    expect(summary.bounds.max[1]).toBeCloseTo(1);
+  });
+
+  it('explode_instance is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'E', entityIds: [boxId] });
+    doc = comp.document;
+    const instanceId = comp.affected[0]!;
+
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'explode_instance', { id: instanceId });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('explode_instance on a non-instance entity is a graceful no-op', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const boxId = doc.order[0]!;
+
+    const result = execute(doc, 'explode_instance', { id: boxId });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('not an instance');
+  });
+
+  it('explode_instance on a missing id is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'explode_instance', { id: 'ghost' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('explode_instance when component is missing is a graceful no-op', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'Gone', entityIds: [boxId] });
+    doc = comp.document;
+    const instanceId = comp.affected[0]!;
+
+    // Manually remove the component to simulate dangling reference
+    const danglingComponentId = (doc.entities[instanceId] as { componentId: string }).componentId;
+    const remainingComponents = { ...doc.components };
+    delete remainingComponents[danglingComponentId];
+    doc = { ...doc, components: remainingComponents };
+
+    const result = execute(doc, 'explode_instance', { id: instanceId });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('not found');
+  });
+
+  it('scale_entity on an instance multiplies its scale field', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const boxId = r1.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'S', entityIds: [boxId] });
+    doc = comp.document;
+    const instanceId = comp.affected[0]!;
+
+    const scaled = execute(doc, 'scale_entity', { id: instanceId, factor: 3 });
+    const instance = scaled.document.entities[instanceId] as { scale?: number[] };
+    expect(instance.scale).toEqual([3, 3, 3]);
+  });
 });
 
 // ---------------------------------------------------------------------------

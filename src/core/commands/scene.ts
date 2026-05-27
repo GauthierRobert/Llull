@@ -14,7 +14,7 @@
  * used by measure, query, and check commands (unchanged by W4F).
  */
 
-import type { AnimationChannel, AnimationMode, CadDocument, Entity, EntityKind, Vec3 } from '../model/types';
+import type { AnimationChannel, AnimationMode, CadDocument, Entity, EntityKind, InstanceEntity, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { applyEulerXYZ, isZeroRotation } from '../../lib/math3';
 
@@ -210,11 +210,85 @@ export function entityBounds(e: Entity): Bounds {
       const ext = e.offset ?? 5;
       return { min: offset(e.position, -ext, -ext, 0), max: offset(e.position, ext, ext, 0) };
     }
+    case 'instance': {
+      // Instance bounds without component access: return a point at the instance position.
+      // Callers with doc access should use instanceBoundsFromDoc() for accurate bounds.
+      return { min: e.position, max: e.position };
+    }
     default: {
       const exhaustive: never = e;
       return { min: (exhaustive as Entity).position, max: (exhaustive as Entity).position };
     }
   }
+}
+
+/**
+ * Compute the world AABB of an InstanceEntity by expanding it against its component's
+ * child entities. Callers that have access to the document should prefer this over
+ * `entityBounds` for `instance` kind entities.
+ *
+ * Falls back to a point at the instance position when the component is empty or missing.
+ *
+ * @pure — reads only; does not mutate
+ */
+export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument): Bounds {
+  // Inline import to avoid circular dep: assemblies.ts imports from scene.ts only
+  // through lib/math3, not through scene. We reproduce the bake logic here using only
+  // applyEulerXYZ which lives in lib.
+  const component = doc.components[instance.componentId];
+  if (!component || component.order.length === 0) {
+    return { min: instance.position, max: instance.position };
+  }
+
+  // Expand each child's local AABB through the instance transform.
+  const scale = instance.scale ?? ([1, 1, 1] as const);
+  const [sx, sy, sz] = scale;
+  const rot = instance.rotation;
+  const pos = instance.position;
+  const hasRotation = !isZeroRotation(rot);
+
+  let combined: Bounds | null = null;
+
+  for (const cid of component.order) {
+    const child = component.entities[cid];
+    if (!child) continue;
+
+    const localBounds = entityBounds(child);
+
+    // 8 corners of the child local AABB
+    const lMin = localBounds.min;
+    const lMax = localBounds.max;
+    const corners: Vec3[] = [
+      [lMin[0], lMin[1], lMin[2]],
+      [lMax[0], lMin[1], lMin[2]],
+      [lMin[0], lMax[1], lMin[2]],
+      [lMax[0], lMax[1], lMin[2]],
+      [lMin[0], lMin[1], lMax[2]],
+      [lMax[0], lMin[1], lMax[2]],
+      [lMin[0], lMax[1], lMax[2]],
+      [lMax[0], lMax[1], lMax[2]],
+    ];
+
+    for (const c of corners) {
+      // Scale
+      const scaled: Vec3 = [c[0] * sx, c[1] * sy, c[2] * sz];
+      // Rotate around component origin
+      const rotated: Vec3 = hasRotation ? applyEulerXYZ(scaled, [0, 0, 0], rot) : scaled;
+      // Translate
+      const world: Vec3 = [rotated[0] + pos[0], rotated[1] + pos[1], rotated[2] + pos[2]];
+
+      if (!combined) {
+        combined = { min: [...world] as unknown as Vec3, max: [...world] as unknown as Vec3 };
+      } else {
+        combined = {
+          min: [Math.min(combined.min[0], world[0]), Math.min(combined.min[1], world[1]), Math.min(combined.min[2], world[2])],
+          max: [Math.max(combined.max[0], world[0]), Math.max(combined.max[1], world[1]), Math.max(combined.max[2], world[2])],
+        };
+      }
+    }
+  }
+
+  return combined ?? { min: instance.position, max: instance.position };
 }
 
 /**
@@ -291,7 +365,9 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
   for (const id of doc.order) {
     const e = doc.entities[id];
     if (!e) continue;
-    const bounds = worldAabb(e);
+    // Instances have no own geometry — their world AABB comes from expanding the
+    // referenced component (entityBounds/worldAabb alone return a point for instances).
+    const bounds = e.kind === 'instance' ? instanceBoundsFromDoc(e, doc) : worldAabb(e);
     const isRotated = !!e.rotation && !isZeroRotation(e.rotation);
     entities.push({
       id: e.id,

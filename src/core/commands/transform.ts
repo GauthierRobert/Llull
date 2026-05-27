@@ -231,6 +231,17 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
           height: target.height * factor,
         };
         break;
+      case 'instance':
+        // Scale an instance by multiplying its per-axis scale field.
+        scaled = {
+          ...target,
+          scale: [
+            (target.scale?.[0] ?? 1) * factor,
+            (target.scale?.[1] ?? 1) * factor,
+            (target.scale?.[2] ?? 1) * factor,
+          ],
+        };
+        break;
     }
 
     const dims =
@@ -272,7 +283,9 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
                                           ? scaled.offset !== undefined
                                             ? `new offset ${scaled.offset}`
                                             : 'offset unchanged (no offset set)'
-                                          : 'point unchanged';
+                                          : scaled.kind === 'instance'
+                                            ? `new scale [${scaled.scale?.join(', ') ?? '1, 1, 1'}]`
+                                            : 'point unchanged';
     return {
       document: { ...doc, entities: { ...doc.entities, [id]: scaled } },
       summary: `Scaled ${id} by factor ${factor}; ${dims}.`,

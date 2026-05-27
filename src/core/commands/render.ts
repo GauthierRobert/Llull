@@ -639,6 +639,7 @@ function tessellateEntity(e: Entity): PreDepthPolygon[] {
     case 'spline':   return tessellate2DSpline(e);
     case 'text':      return []; // render deferred to VT1 (viewport-engineer)
     case 'dimension': return []; // render deferred to VT2 (viewport-engineer)
+    case 'instance':  return []; // expanded form not yet tessellated; explode_instance to export
     default: {
       const exhaustive: never = e;
       void exhaustive;

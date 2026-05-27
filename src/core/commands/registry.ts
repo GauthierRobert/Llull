@@ -60,6 +60,7 @@ import {
   massProperties,
 } from './measure';
 import { exportStl } from './export';
+import { createComponent, insertInstance, explodeInstance } from './assemblies';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -140,6 +141,9 @@ const definitions = [
   exportStl,
   saveRecipe,
   instantiateRecipe,
+  createComponent,
+  insertInstance,
+  explodeInstance,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
