@@ -17,8 +17,9 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 // Static constants (no registry import — pure UI)
 // ---------------------------------------------------------------------------
 
+const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server run dev';
 const SERVER_START_CMD = 'npm --prefix server run dev';
-const ENDPOINT_URL = 'http://localhost:3000/mcp';
+const ENDPOINT_URL = 'http://localhost:3001/mcp';
 
 interface CapabilityBadge {
   readonly label: string;
@@ -29,6 +30,40 @@ const CAPABILITY_BADGES: readonly CapabilityBadge[] = [
   { label: 'structuredContent (KI2)' },
   { label: 'prompts (EN2)' },
   { label: 'session isolation (KI1)' },
+];
+
+interface AgentLoopStep {
+  readonly index: number;
+  readonly tool: string;
+  readonly description: string;
+}
+
+const AGENT_LOOP_STEPS: readonly AgentLoopStep[] = [
+  {
+    index: 1,
+    tool: 'read cad://conventions',
+    description: 'Load the llull conventions resource to understand coordinate axes, units, and entity kinds.',
+  },
+  {
+    index: 2,
+    tool: 'describe_scene',
+    description: 'Inspect the current document: all entities, layers, and their properties.',
+  },
+  {
+    index: 3,
+    tool: 'add_box (or any create/edit command)',
+    description: 'Create or modify geometry via any registered command (add_box, draw_line, extrude_profile, …).',
+  },
+  {
+    index: 4,
+    tool: 'render_view',
+    description: 'Render a screenshot with axes, grid, units, and showLabels:true to verify the result visually.',
+  },
+  {
+    index: 5,
+    tool: 'check_model',
+    description: 'Validate the model (watertight, no self-intersections) after modifications.',
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -73,6 +108,29 @@ function CopyButton({ text, label }: CopyButtonProps): React.ReactElement {
     >
       {copied ? 'Copied!' : 'Copy'}
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// McpAgentLoop — the recommended reliable-modeling loop as ordered steps
+// ---------------------------------------------------------------------------
+
+function McpAgentLoop(): React.ReactElement {
+  return (
+    <section className="mcp-connect__section" aria-label="Recommended agent loop">
+      <p className="mcp-connect__section-label">3. Recommended agent loop</p>
+      <ol className="mcp-connect__loop-list">
+        {AGENT_LOOP_STEPS.map((step) => (
+          <li key={step.index} className="mcp-connect__loop-item">
+            <div className="mcp-connect__loop-tool-row">
+              <code className="mcp-connect__loop-tool">{step.tool}</code>
+              <CopyButton text={step.tool} label={`${step.tool} tool name`} />
+            </div>
+            <p className="mcp-connect__loop-desc">{step.description}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -184,32 +242,38 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
             ))}
           </div>
 
-          {/* Start command */}
-          <section className="mcp-connect__section" aria-label="Server start command">
-            <p className="mcp-connect__section-label">Start the MCP server</p>
+          {/* 1. Install + start the server */}
+          <section className="mcp-connect__section" aria-label="Install and start server">
+            <p className="mcp-connect__section-label">1. Install &amp; start the MCP server</p>
             <div className="mcp-connect__code-row">
               <pre className="mcp-connect__code">
-                <code>{SERVER_START_CMD}</code>
+                <code>{SERVER_INSTALL_CMD}</code>
               </pre>
-              <CopyButton text={SERVER_START_CMD} label="start command" />
+              <CopyButton text={SERVER_INSTALL_CMD} label="install and start command" />
             </div>
+            <p className="mcp-connect__hint mcp-connect__hint--inline">
+              If the server is already installed, use:{' '}
+              <code className="mcp-connect__inline-code">{SERVER_START_CMD}</code>
+            </p>
           </section>
 
-          {/* Endpoint URL */}
+          {/* 2. Endpoint URL */}
           <section className="mcp-connect__section" aria-label="Endpoint URL">
-            <p className="mcp-connect__section-label">MCP endpoint</p>
+            <p className="mcp-connect__section-label">2. MCP endpoint</p>
             <div className="mcp-connect__code-row">
               <pre className="mcp-connect__code">
                 <code>{ENDPOINT_URL}</code>
               </pre>
               <CopyButton text={ENDPOINT_URL} label="endpoint URL" />
             </div>
+            <p className="mcp-connect__hint mcp-connect__hint--inline">
+              Point your MCP client (Claude Desktop, Cursor, etc.) at this URL.
+              Set <code className="mcp-connect__inline-code">MCP_AUTH_TOKEN</code> to protect the endpoint in production.
+            </p>
           </section>
 
-          {/* Footer hint */}
-          <p className="mcp-connect__hint">
-            Point your MCP client (Claude Desktop, Cursor, etc.) at the endpoint above.
-          </p>
+          {/* 3. Agent loop */}
+          <McpAgentLoop />
         </div>
       </div>
     </div>

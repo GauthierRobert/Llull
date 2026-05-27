@@ -11,6 +11,7 @@
  *   - Backdrop click closes the modal.
  *   - Focus is restored to the trigger button after close.
  *   - Copy buttons call navigator.clipboard.writeText with the correct strings.
+ *   - Quickstart sections: server install command, endpoint URL, agent loop steps.
  *   - No document mutation (PRIME DIRECTIVE).
  */
 
@@ -62,14 +63,14 @@ describe('McpConnect — structure', () => {
     expect(screen.getByText(/connect an mcp agent/i)).toBeDefined();
   });
 
-  it('shows the server start command in a code block', () => {
+  it('shows the server install and start command in a code block', () => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('npm --prefix server run dev')).toBeDefined();
+    expect(screen.getByText('npm --prefix server install && npm --prefix server run dev')).toBeDefined();
   });
 
   it('shows the endpoint URL in a code block', () => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('http://localhost:3000/mcp')).toBeDefined();
+    expect(screen.getByText('http://localhost:3001/mcp')).toBeDefined();
   });
 
   it('shows the "60 tools" capability badge', () => {
@@ -97,10 +98,11 @@ describe('McpConnect — structure', () => {
     expect(screen.getByRole('button', { name: /close dialog/i })).toBeDefined();
   });
 
-  it('has two Copy buttons', () => {
+  it('has multiple Copy buttons (at least one per copyable block)', () => {
     render(<McpConnect onClose={() => undefined} />);
     const copyBtns = screen.getAllByRole('button', { name: /copy/i });
-    expect(copyBtns.length).toBeGreaterThanOrEqual(2);
+    // 1 install cmd + 1 endpoint + 5 agent loop steps = 7 minimum
+    expect(copyBtns.length).toBeGreaterThanOrEqual(7);
   });
 });
 
@@ -198,6 +200,59 @@ describe('McpConnect — focus management', () => {
 });
 
 // ---------------------------------------------------------------------------
+// McpConnect modal — quickstart content
+// ---------------------------------------------------------------------------
+
+describe('McpConnect — quickstart content', () => {
+  it('shows the install+start server section label', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(screen.getByText(/install.*start the mcp server/i)).toBeDefined();
+  });
+
+  it('shows the install+start command text', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(
+      screen.getByText('npm --prefix server install && npm --prefix server run dev'),
+    ).toBeDefined();
+  });
+
+  it('shows the correct endpoint URL with port 3001', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(screen.getByText('http://localhost:3001/mcp')).toBeDefined();
+  });
+
+  it('shows the recommended agent loop section', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(screen.getByRole('region', { name: /recommended agent loop/i })).toBeDefined();
+  });
+
+  it('shows the cad://conventions step', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(screen.getByText('read cad://conventions')).toBeDefined();
+  });
+
+  it('shows the describe_scene step', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(screen.getByText(/describe_scene/)).toBeDefined();
+  });
+
+  it('shows the render_view step', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(screen.getByText(/render_view/)).toBeDefined();
+  });
+
+  it('shows the check_model step', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(screen.getByText(/check_model/)).toBeDefined();
+  });
+
+  it('mentions MCP_AUTH_TOKEN in the endpoint section', () => {
+    render(<McpConnect onClose={() => undefined} />);
+    expect(screen.getByText(/MCP_AUTH_TOKEN/)).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // McpConnectButton — launcher
 // ---------------------------------------------------------------------------
 
@@ -247,39 +302,50 @@ describe('McpConnectButton', () => {
 // ---------------------------------------------------------------------------
 
 describe('McpConnect — copy buttons', () => {
-  it('Copy button for start command calls clipboard.writeText with the command', async () => {
+  it('Copy button for install+start command calls clipboard.writeText with the full command', async () => {
     render(<McpConnect onClose={() => undefined} />);
-    // "Copy start command" button — aria-label is "Copy start command"
-    const copyBtns = screen.getAllByRole('button', { name: /copy start command/i });
+    const copyBtns = screen.getAllByRole('button', { name: /copy install and start command/i });
     expect(copyBtns.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(copyBtns[0]!);
 
     await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith('npm --prefix server run dev');
+      expect(writeTextMock).toHaveBeenCalledWith(
+        'npm --prefix server install && npm --prefix server run dev',
+      );
     });
   });
 
-  it('Copy button for endpoint URL calls clipboard.writeText with the URL', async () => {
+  it('Copy button for endpoint URL calls clipboard.writeText with the correct port-3001 URL', async () => {
     render(<McpConnect onClose={() => undefined} />);
     const copyBtns = screen.getAllByRole('button', { name: /copy endpoint url/i });
     expect(copyBtns.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(copyBtns[0]!);
 
     await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith('http://localhost:3000/mcp');
+      expect(writeTextMock).toHaveBeenCalledWith('http://localhost:3001/mcp');
     });
   });
 
   it('Copy button shows "Copied!" label after click', async () => {
     render(<McpConnect onClose={() => undefined} />);
-    const [firstCopy] = screen.getAllByRole('button', { name: /copy start command/i });
+    const [firstCopy] = screen.getAllByRole('button', { name: /copy install and start command/i });
     fireEvent.click(firstCopy!);
 
     await waitFor(() => {
-      // aria-label changes to "start command copied"
       expect(
-        screen.getByRole('button', { name: /start command copied/i }),
+        screen.getByRole('button', { name: /install and start command copied/i }),
       ).toBeDefined();
+    });
+  });
+
+  it('Copy button for read cad://conventions calls clipboard.writeText with the tool name', async () => {
+    render(<McpConnect onClose={() => undefined} />);
+    const copyBtns = screen.getAllByRole('button', { name: /copy read cad:\/\/conventions tool name/i });
+    expect(copyBtns.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(copyBtns[0]!);
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith('read cad://conventions');
     });
   });
 });
