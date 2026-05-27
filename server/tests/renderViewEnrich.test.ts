@@ -26,6 +26,7 @@ import {
   buildIsolateSvg,
   appendDimensionLabels,
   appendAxesAndGrid,
+  appendEntityLabels,
   buildSectionSvg,
 } from '../src/renderViewEnrich';
 
@@ -455,5 +456,250 @@ describe('appendAxesAndGrid', () => {
     const base64 = rasterizeSvg(enriched, 200);
     expect(base64).not.toBeNull();
     expect(isPngBase64(base64!)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (F) appendEntityLabels — per-entity id/name labels + key-point markers + legend
+// ---------------------------------------------------------------------------
+
+describe('appendEntityLabels', () => {
+  // Helper: render and return data + entity list for a given doc
+  function renderAndEntities(doc: CadDocument): { data: RenderViewData; entities: import('@core/model/types').Entity[] } {
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 300, height: 200 });
+    const data = renderResult.data as RenderViewData;
+    const entities = Object.values(doc.entities).filter((e): e is NonNullable<typeof e> => e !== undefined);
+    return { data, entities };
+  }
+
+  it('inserts entity-labels overlay group for a box entity (showLabels on)', () => {
+    const { doc, boxId } = makeDocWithBox();
+    const { data, entities } = renderAndEntities(doc);
+
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    // Should contain the entity labels comment marker
+    expect(enriched).toContain('entity labels overlay');
+    // The box entity id should appear in a data attribute
+    expect(enriched).toContain(boxId);
+    // Should still be valid SVG
+    expect(enriched).toContain('<svg');
+    expect(enriched).toContain('</svg>');
+  });
+
+  it('inserts 8 AABB corner markers for a box entity', () => {
+    const { doc } = makeDocWithBox();
+    const { data, entities } = renderAndEntities(doc);
+
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    // The box has 8 AABB corners — each is a <circle> marker.
+    // Count circle elements in the entity labels overlay section.
+    const circleMatches = enriched.match(/<circle[^>]+r="3"/g);
+    expect(circleMatches).not.toBeNull();
+    // At least 8 corner markers (some may be outside viewport)
+    // +1 for each legend dot (4 legend entries), but corners first
+    expect(circleMatches!.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('inserts endpoint markers for a line entity', () => {
+    const empty = createEmptyDocument();
+    const result = execute(empty, 'draw_line', {
+      start: [0, 0],
+      end: [3, 3],
+    });
+    const doc = result.document;
+    const lineId = result.affected[0] as string;
+
+    const { data, entities } = renderAndEntities(doc);
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    // Line entity id should appear
+    expect(enriched).toContain(lineId);
+    // Two endpoint markers per line
+    const entityGroup = enriched.match(new RegExp(`data-entity-id="${lineId}"[\\s\\S]*?</g>`))?.[0];
+    expect(entityGroup).toBeDefined();
+    const lineMarkers = entityGroup!.match(/<circle[^>]+r="3"/g);
+    expect(lineMarkers).not.toBeNull();
+    expect(lineMarkers!.length).toBe(2);
+  });
+
+  it('inserts center marker for a circle entity', () => {
+    const empty = createEmptyDocument();
+    const result = execute(empty, 'draw_circle', {
+      center: [1, 2],
+      radius: 1.5,
+    });
+    const doc = result.document;
+    const circleId = result.affected[0] as string;
+
+    const { data, entities } = renderAndEntities(doc);
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    expect(enriched).toContain(circleId);
+    // Circle produces 2 markers: center + radius handle
+    const entityGroup = enriched.match(new RegExp(`data-entity-id="${circleId}"[\\s\\S]*?</g>`))?.[0];
+    expect(entityGroup).toBeDefined();
+    const circleMarkers = entityGroup!.match(/<circle[^>]+r="3"/g);
+    expect(circleMarkers).not.toBeNull();
+    expect(circleMarkers!.length).toBe(2);
+  });
+
+  it('inserts center + 2 semi-axis markers for an ellipse entity', () => {
+    const empty = createEmptyDocument();
+    const result = execute(empty, 'draw_ellipse', { center: [0, 0], radiusX: 3, radiusY: 1.5 });
+    const ellipseId = result.affected[0] as string;
+
+    const { data, entities } = renderAndEntities(result.document);
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    expect(enriched).toContain(ellipseId);
+    const entityGroup = enriched.match(new RegExp(`data-entity-id="${ellipseId}"[\\s\\S]*?</g>`))?.[0];
+    expect(entityGroup).toBeDefined();
+    const markers = entityGroup!.match(/<circle[^>]+r="3"/g);
+    expect(markers).not.toBeNull();
+    expect(markers!.length).toBe(3);
+  });
+
+  it('inserts center + on-curve radius handle for an arc entity', () => {
+    const empty = createEmptyDocument();
+    // A 90°→180° arc never reaches +X; the handle must sit on the sweep, not at +X.
+    const result = execute(empty, 'draw_arc', {
+      center: [0, 0],
+      radius: 2,
+      startAngle: Math.PI / 2,
+      endAngle: Math.PI,
+    });
+    const arcId = result.affected[0] as string;
+
+    const { data, entities } = renderAndEntities(result.document);
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    expect(enriched).toContain(arcId);
+    const entityGroup = enriched.match(new RegExp(`data-entity-id="${arcId}"[\\s\\S]*?</g>`))?.[0];
+    expect(entityGroup).toBeDefined();
+    const markers = entityGroup!.match(/<circle[^>]+r="3"/g);
+    expect(markers).not.toBeNull();
+    expect(markers!.length).toBe(2);
+  });
+
+  it('uses the entity name as label when set (not the id)', () => {
+    const empty = createEmptyDocument();
+    const boxResult = execute(empty, 'add_box', { position: [0, 0, 0], size: [1, 1, 1] });
+    const boxId = boxResult.affected[0] as string;
+    // Set a display name via set_entity_name
+    const nameResult = execute(boxResult.document, 'set_entity_name', {
+      id: boxId,
+      name: 'MySpecialBox',
+    });
+    const doc = nameResult.document;
+
+    const { data, entities } = renderAndEntities(doc);
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    expect(enriched).toContain('MySpecialBox');
+  });
+
+  it('falls back to entity id as label when name is not set', () => {
+    const { doc, boxId } = makeDocWithBox();
+    const { data, entities } = renderAndEntities(doc);
+
+    const enriched = appendEntityLabels(data.svg, data, entities);
+    // The box was created without a name — id should appear as label text
+    expect(enriched).toContain(boxId);
+  });
+
+  it('inserts the category legend in the top-right corner', () => {
+    const { doc } = makeDocWithBox();
+    const { data, entities } = renderAndEntities(doc);
+
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    expect(enriched).toContain('id="entity-labels-legend"');
+    // Legend should list all 4 categories
+    expect(enriched).toContain('3D solid');
+    expect(enriched).toContain('2D curve');
+    expect(enriched).toContain('point');
+    expect(enriched).toContain('annotation');
+  });
+
+  it('uses category colors: purple for 3D solid, cyan for 2D curve', () => {
+    const empty = createEmptyDocument();
+    // Add a box (solid3d) and a line (curve2d)
+    const withBox = execute(empty, 'add_box', { position: [0, 0, 0], size: [2, 2, 2] }).document;
+    const withLine = execute(withBox, 'draw_line', { start: [0, 0], end: [4, 0] }).document;
+
+    const { data, entities } = renderAndEntities(withLine);
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    // Purple (#bb88ff) for solid3d, cyan (#44ddff) for curve2d
+    expect(enriched).toContain('#bb88ff');
+    expect(enriched).toContain('#44ddff');
+  });
+
+  it('inserts 4 corner markers for a rectangle entity', () => {
+    const empty = createEmptyDocument();
+    const result = execute(empty, 'draw_rectangle', {
+      position: [0, 0],
+      width: 4,
+      height: 3,
+    });
+    const doc = result.document;
+    const rectId = result.affected[0] as string;
+
+    const { data, entities } = renderAndEntities(doc);
+    const enriched = appendEntityLabels(data.svg, data, entities);
+
+    const entityGroup = enriched.match(new RegExp(`data-entity-id="${rectId}"[\\s\\S]*?</g>`))?.[0];
+    expect(entityGroup).toBeDefined();
+    const rectMarkers = entityGroup!.match(/<circle[^>]+r="3"/g);
+    expect(rectMarkers).not.toBeNull();
+    expect(rectMarkers!.length).toBe(4);
+  });
+
+  it('with showLabels OFF (no call), annotations are absent', () => {
+    const { doc } = makeDocWithBox();
+    const { data } = renderAndEntities(doc);
+
+    // The base SVG (no appendEntityLabels call) has no entity labels overlay
+    expect(data.svg).not.toContain('entity labels overlay');
+    expect(data.svg).not.toContain('entity-labels-legend');
+  });
+
+  it('works on empty document (no entities — still valid SVG)', () => {
+    const doc = createEmptyDocument();
+    const renderResult = execute(doc, 'render_view', { view: 'iso', width: 300, height: 200 });
+    const data = renderResult.data as RenderViewData;
+
+    // No entities to label — should not throw and should still produce valid SVG
+    expect(() => appendEntityLabels(data.svg, data, [])).not.toThrow();
+    const enriched = appendEntityLabels(data.svg, data, []);
+    expect(enriched).toContain('<svg');
+    expect(enriched).toContain('</svg>');
+    // Legend still appears even with no entities
+    expect(enriched).toContain('entity-labels-legend');
+  });
+
+  it('still rasterizes to a valid PNG after entity labels injection', () => {
+    const { doc } = makeDocWithBox();
+    const { data, entities } = renderAndEntities(doc);
+
+    const enriched = appendEntityLabels(data.svg, data, entities);
+    const base64 = rasterizeSvg(enriched, 300);
+    expect(base64).not.toBeNull();
+    expect(isPngBase64(base64!)).toBe(true);
+  });
+
+  it('composes correctly with appendAxesAndGrid (axes+labels together)', () => {
+    const { doc } = makeDocWithBox();
+    const { data, entities } = renderAndEntities(doc);
+
+    let enriched = appendAxesAndGrid(data.svg, data, 'mm', true, true);
+    enriched = appendEntityLabels(enriched, data, entities);
+
+    // Both overlays present
+    expect(enriched).toContain('id="world-axes"');
+    expect(enriched).toContain('entity labels overlay');
+    expect(enriched).toContain('</svg>');
   });
 });

@@ -63,6 +63,7 @@ import {
   buildIsolateSvg,
   appendDimensionLabels,
   appendAxesAndGrid,
+  appendEntityLabels,
   buildSectionSvg,
   type RenderViewEnrichParams,
 } from './renderViewEnrich';
@@ -202,7 +203,7 @@ function buildRateLimiter(): ReturnType<typeof rateLimit> {
 // ---------------------------------------------------------------------------
 
 /** The set of param keys that are handled server-side (not forwarded to core). */
-const ENRICH_PARAM_KEYS = new Set(['turntable', 'isolate', 'showDimensions', 'section', 'showAxes', 'showGrid']);
+const ENRICH_PARAM_KEYS = new Set(['turntable', 'isolate', 'showDimensions', 'section', 'showAxes', 'showGrid', 'showLabels']);
 
 /**
  * Strip enrichment-only params from a render_view args object so the core
@@ -244,13 +245,16 @@ function applyRenderViewEnrichments(
   const wantAxes = params.showAxes !== false;
   const wantGrid = params.showGrid !== false;
 
+  const wantLabels = params.showLabels === true;
+
   const hasEnrichment =
     params.turntable !== undefined ||
     params.isolate !== undefined ||
     params.showDimensions === true ||
     params.section !== undefined ||
     wantAxes ||
-    wantGrid;
+    wantGrid ||
+    wantLabels;
 
   if (!hasEnrichment) return null;
 
@@ -333,6 +337,10 @@ function applyRenderViewEnrichments(
         wantGrid,
       );
     }
+    if (wantLabels && baseResult.data) {
+      const allEntities = Object.values(doc.entities).filter((e): e is NonNullable<typeof e> => e !== undefined);
+      svg = appendEntityLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData, allEntities);
+    }
 
     const base64 = rasterizeSvg(svg, baseWidth);
     if (base64 === null) {
@@ -373,6 +381,10 @@ function applyRenderViewEnrichments(
         wantGrid,
       );
     }
+    if (wantLabels && baseResult.data) {
+      const allEntities = Object.values(doc.entities).filter((e): e is NonNullable<typeof e> => e !== undefined);
+      svg = appendEntityLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData, allEntities);
+    }
 
     const base64 = rasterizeSvg(svg, baseWidth);
     if (base64 === null) {
@@ -401,6 +413,10 @@ function applyRenderViewEnrichments(
   }
   if (wantAxes || wantGrid) {
     enrichedSvg = appendAxesAndGrid(enrichedSvg, baseData, docUnits, wantAxes, wantGrid);
+  }
+  if (wantLabels) {
+    const allEntities = Object.values(doc.entities).filter((e): e is NonNullable<typeof e> => e !== undefined);
+    enrichedSvg = appendEntityLabels(enrichedSvg, baseData, allEntities);
   }
 
   const base64 = rasterizeSvg(enrichedSvg, baseWidth);
@@ -530,6 +546,15 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
                 'When true (default), overlay a faint ground grid on the Z=0 plane so you can judge ' +
                 'object placement relative to the world origin. Set to false to suppress.',
             },
+            showLabels: {
+              type: 'boolean',
+              description:
+                'When true, overlay per-entity id/name labels and key-point markers on the image. ' +
+                'Each entity shows its name (or id) at the centroid of its key points (endpoints, center, ' +
+                'corners, AABB corners for solids). Markers are color-coded by category: ' +
+                'orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. ' +
+                'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
+            },
           },
         };
         return {
@@ -538,7 +563,7 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
             t.description +
             ' [Server enrichments available: turntable (multi-frame strip), isolate (highlight entity), ' +
             'showDimensions (bbox labels), section (cut-plane view), showAxes (world triad, default on), ' +
-            'showGrid (ground grid, default on).]',
+            'showGrid (ground grid, default on), showLabels (entity id/name labels + key-point markers, default off).]',
           inputSchema: augmented as {
             type: 'object';
             properties?: Record<string, object>;
