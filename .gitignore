@@ -9,3 +9,4 @@ coverage
 .idea
 .claude/worktrees
 .playwright-mcp
+server/.autosave.json
