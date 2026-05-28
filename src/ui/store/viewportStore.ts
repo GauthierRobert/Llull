@@ -63,6 +63,15 @@ export interface ClipPlaneState {
 // Store state
 // ---------------------------------------------------------------------------
 
+/** Identifies a selected mechanism item for overlay rendering. */
+export type MechanismSelectionKind = 'constraint' | 'joint';
+
+/** Currently highlighted constraint or joint in the MechanismsPanel. */
+export interface MechanismSelection {
+  kind: MechanismSelectionKind;
+  id: string;
+}
+
 export interface ViewportStoreState {
   /** Active render style for all 3D solid entities. Default: 'shaded'. */
   displayMode: DisplayMode;
@@ -119,6 +128,13 @@ export interface ViewportStoreState {
    */
   animationResetNonce: number;
 
+  /**
+   * Currently highlighted mechanism item (constraint or joint) for the 3D overlay.
+   * Null when no mechanism item is selected in the panel.
+   * UI-only state — never serialised into CadDocument.
+   */
+  mechanismSelection: MechanismSelection | null;
+
   // ---- Actions ------------------------------------------------------------
 
   /** Set the global display mode ('shaded' | 'wireframe' | 'xray'). */
@@ -171,6 +187,12 @@ export interface ViewportStoreState {
    * If the id is already in the set it is removed (toggle off); otherwise it is added (toggle on).
    */
   toggleClickAnimation(animId: string): void;
+
+  /**
+   * Set the highlighted mechanism item (constraint/joint) for the 3D overlay.
+   * Pass null to clear the selection.
+   */
+  setMechanismSelection(selection: MechanismSelection | null): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +222,8 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   animationPlaying: false,
   activeClickAnimationIds: new Set<string>(),
   animationResetNonce: 0,
+
+  mechanismSelection: null,
 
   setDisplayMode(mode: DisplayMode): void {
     set({ displayMode: mode });
@@ -279,5 +303,9 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
       }
       return { activeClickAnimationIds: next };
     });
+  },
+
+  setMechanismSelection(selection: MechanismSelection | null): void {
+    set({ mechanismSelection: selection });
   },
 }));

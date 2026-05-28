@@ -69,6 +69,7 @@ import { arrayAlongPath, distributeOnArc } from './array_along_path';
 import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } from './constraints';
 import { addMate, billOfMaterials } from './mates';
 import { addJoint, deleteJoint, setJointValue, addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './joints';
+import { motionStudy } from './motion_study';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -176,6 +177,7 @@ const definitions = [
   deleteDriveRelation,
   evaluateMotion,
   bakeMotion,
+  motionStudy,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

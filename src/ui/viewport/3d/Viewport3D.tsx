@@ -77,6 +77,7 @@ import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { useRenderQuality } from './useRenderQuality';
+import { MechanismOverlay } from './MechanismOverlay';
 
 // ---------------------------------------------------------------------------
 // StoreInvalidator — calls r3f invalidate() when the CAD store changes
@@ -432,6 +433,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         {/* Measurement bbox wireframe — shown when measure_bounding_box result is present */}
         <MeasureBBoxWireframe />
+        {/* Mechanism overlay — constraint line or joint arrow for the highlighted mechanism item */}
+        <MechanismOverlay />
       </group>
 
       {/* ---- Orientation gizmo (bottom-right corner) ---- */}

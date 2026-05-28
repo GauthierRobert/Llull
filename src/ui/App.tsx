@@ -34,6 +34,7 @@ import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
+import { MechanismsPanel } from '@ui/panels/MechanismsPanel';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { EmptyState } from '@ui/components/EmptyState';
 import { TopBar } from '@ui/components/TopBar';
@@ -96,6 +97,7 @@ export function App(): React.ReactElement {
         <div className="app-right-dock">
           <LayersPanel className="app-layers-inner" />
           <AssemblyPanel className="app-assembly-inner" />
+          <MechanismsPanel className="app-mechanisms-inner" />
           <ParametersPanel className="app-params-inner" />
           <FeatureHistoryPanel className="app-history-inner" />
           <ConfigurationsPanel className="app-configs-inner" />

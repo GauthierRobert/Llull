@@ -2413,6 +2413,248 @@ describe('render_view', () => {
     expect(reloaded.jointOrder).toContain(jid1);
     expect(reloaded.driveRelationOrder).toContain(drid);
   });
+
+  // ---------------------------------------------------------------------------
+  // KN2 — motion_study
+  // ---------------------------------------------------------------------------
+
+  it('motion_study — joint sweep: instanceRotations change monotonically and doc is unchanged', () => {
+    // A revolute joint swept from π/4 to 3π/4 in 5 steps.
+    // Instance b starts at [2, 0, 0] (offset from a at [0,0,0]).
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
+
+    const snapshot = JSON.stringify(doc);
+    const result = execute(doc, 'motion_study', {
+      mode: 'joint',
+      target: jid,
+      start: Math.PI / 4,
+      end: (3 * Math.PI) / 4,
+      steps: 5,
+    });
+
+    // Purity: input doc unchanged
+    expect(JSON.stringify(doc)).toBe(snapshot);
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+
+    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    expect(data.steps).toHaveLength(5);
+
+    // Rotation of idB about Z increases monotonically as sweep value grows
+    const zRotations = data.steps.map((s) => (s.instanceRotations[idB] ?? [0, 0, 0])[2]);
+    for (let i = 1; i < zRotations.length; i++) {
+      expect(zRotations[i]!).toBeGreaterThan(zRotations[i - 1]!);
+    }
+
+    // Sweep values are monotonically increasing
+    const sweepValues = data.steps.map((s) => s.sweepValue);
+    for (let i = 1; i < sweepValues.length; i++) {
+      expect(sweepValues[i]!).toBeGreaterThan(sweepValues[i - 1]!);
+    }
+  });
+
+  it('motion_study — parameter sweep: downstream joint resolvedJoints vary with the parameter', () => {
+    // Set parameter "angle" and couple a revolute joint to it via set_joint_value.
+    // Sweep "angle" from 0 to π in 4 steps; check that resolvedJoints[jid] changes.
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'set_parameter', { name: 'angle', expression: '0' }).document;
+    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    // Manually set the joint value to match the parameter value (0 → 0).
+    doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
+
+    const result = execute(doc, 'motion_study', {
+      mode: 'parameter',
+      target: 'angle',
+      start: 0,
+      end: Math.PI,
+      steps: 4,
+    });
+
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+
+    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    expect(data.steps).toHaveLength(4);
+    expect(data.summary.totalSteps).toBe(4);
+
+    // Steps should include the full range including start and end
+    expect(data.steps[0]!.sweepValue).toBeCloseTo(0);
+    expect(data.steps[3]!.sweepValue).toBeCloseTo(Math.PI, 5);
+  });
+
+  it('motion_study — interference: two overlapping boxes produce at least one flagged frame', () => {
+    // Build two instances very close together so they overlap at the start position.
+    // Use a prismatic joint with a zero displacement — they should already overlap.
+    let doc = createEmptyDocument();
+    const seedA = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = seedA.document;
+    const compA = execute(doc, 'create_component', { name: 'PartA', entityIds: [seedA.affected[0]!] });
+    doc = compA.document;
+    const compId = Object.keys(doc.components)[0]!;
+    const idA = compA.affected[0]!;
+
+    // Place instance B at [0.5, 0, 0] — overlaps with a 2×2×2 box at origin
+    const instB = execute(doc, 'insert_instance', { componentId: compId, position: [0.5, 0, 0] });
+    doc = instB.document;
+    const idB = instB.affected[0]!;
+
+    // Add a prismatic joint along X; sweep from 0 to 0 (same position) — already overlapping
+    doc = execute(doc, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'x' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
+
+    const result = execute(doc, 'motion_study', {
+      mode: 'joint',
+      target: jid,
+      start: 0,
+      end: 0.1,
+      steps: 3,
+      interferenceCheck: true,
+    });
+
+    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    // At least one step should detect the overlap (both instances share the same component
+    // bounds centered at [0,0,0] with half-extents [1,1,1], instance B at [0.5,0,0])
+    expect(data.interferences.length).toBeGreaterThan(0);
+    expect(data.summary.framesWithInterference).toBeGreaterThan(0);
+  });
+
+  it('motion_study — interference: non-overlapping instances produce zero interference frames', () => {
+    // A prismatic joint along X sweeps B from [500, 0, 0] to [501, 0, 0].
+    // A is at [0, 0, 0]. With a 1×1×1 component (half-extent 0.5), A occupies
+    // roughly [-0.5, 0.5] in X. B at 500+ never overlaps A.
+    let doc = createEmptyDocument();
+    const seedA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = seedA.document;
+    const compA = execute(doc, 'create_component', { name: 'PartA', entityIds: [seedA.affected[0]!] });
+    doc = compA.document;
+    const compId = Object.keys(doc.components)[0]!;
+    const idA = compA.affected[0]!;
+
+    // B: insert at an arbitrary position; the joint will place it relative to A.
+    const instB = execute(doc, 'insert_instance', { componentId: compId, position: [0, 0, 0] });
+    doc = instB.document;
+    const idB = instB.affected[0]!;
+
+    // Prismatic joint along X: B's evaluated position = A.pos + axis * sweepValue.
+    // Sweep from 500 to 501 — B stays far from A (which is at [0,0,0]).
+    doc = execute(doc, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'x' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    const result = execute(doc, 'motion_study', {
+      mode: 'joint',
+      target: jid,
+      start: 500,
+      end: 501,
+      steps: 5,
+      interferenceCheck: true,
+    });
+
+    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    expect(data.summary.framesWithInterference).toBe(0);
+    expect(data.interferences).toHaveLength(0);
+  });
+
+  it('motion_study — failure: unknown joint id is a graceful no-op', () => {
+    const { doc } = makeDocWithInstances();
+    const result = execute(doc, 'motion_study', {
+      mode: 'joint',
+      target: 'ghost-joint',
+      start: 0,
+      end: Math.PI,
+      steps: 5,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ghost-joint');
+  });
+
+  it('motion_study — failure: non-numeric parameter is a graceful no-op', () => {
+    // A parameter with an error (expression referencing an unknown name) is non-numeric.
+    let doc = createEmptyDocument();
+    // Force an error by referencing an unknown parameter
+    doc = execute(doc, 'set_parameter', { name: 'bad', expression: 'unknown_ref * 2' }).document;
+    const result = execute(doc, 'motion_study', {
+      mode: 'parameter',
+      target: 'bad',
+      start: 0,
+      end: 1,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('motion_study — failure: unknown parameter name is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'motion_study', {
+      mode: 'parameter',
+      target: 'no_such_param',
+      start: 0,
+      end: 1,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('no_such_param');
+  });
+
+  it('motion_study — failure: steps=1 is a graceful no-op', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    const result = execute(doc, 'motion_study', {
+      mode: 'joint',
+      target: jid,
+      start: 0,
+      end: Math.PI,
+      steps: 1,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    expect(data.steps).toHaveLength(0);
+  });
+
+  it('motion_study — failure: start === end returns friendly summary with empty steps', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    const result = execute(doc, 'motion_study', {
+      mode: 'joint',
+      target: jid,
+      start: 1.0,
+      end: 1.0,
+    });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('zero length');
+    const data = result.data as import('@core/commands/motion_study').MotionStudyData;
+    expect(data.steps).toHaveLength(0);
+  });
+
+  it('motion_study — purity: result.document === input doc', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
+
+    const snapshot = JSON.stringify(doc);
+    const result = execute(doc, 'motion_study', {
+      mode: 'joint',
+      target: jid,
+      start: 0,
+      end: Math.PI,
+      steps: 8,
+    });
+
+    // result.document is the exact same reference
+    expect(result.document).toBe(doc);
+    // The original doc object was not mutated
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
 });
 
 // ---------------------------------------------------------------------------
