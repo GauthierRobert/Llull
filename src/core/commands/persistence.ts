@@ -9,6 +9,7 @@
 
 import type {
   CadDocument,
+  Component,
   Configuration,
   DocumentUnit,
   EntityKind,
@@ -93,6 +94,8 @@ const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set<EntityKind>([
   'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid',
   // 2D shapes
   'line', 'polyline', 'arc', 'circle', 'rectangle', 'point', 'ellipse', 'spline', 'text', 'dimension',
+  // Assembly
+  'instance',
 ]);
 
 const VALID_UNITS: ReadonlySet<string> = new Set<DocumentUnit>(['mm', 'cm', 'm', 'in', 'ft']);
@@ -229,6 +232,23 @@ function validateEntityValue(v: unknown): string | null {
       const height = v['height'];
       if (typeof height !== 'number' || !Number.isFinite(height) || height <= 0)
         return `entity ${id} (text): height must be finite and > 0, got ${String(height)}`;
+      break;
+    }
+    case 'instance': {
+      const componentId = v['componentId'];
+      if (typeof componentId !== 'string' || componentId.length === 0)
+        return `entity ${id} (instance): componentId must be a non-empty string, got ${String(componentId)}`;
+      // scale is optional; when present must be a 3-element finite array
+      const scale = v['scale'];
+      if (scale !== undefined) {
+        if (!Array.isArray(scale) || scale.length !== 3)
+          return `entity ${id} (instance): scale must be a 3-element array when present`;
+        for (let i = 0; i < 3; i++) {
+          const c = scale[i] as unknown;
+          if (typeof c !== 'number' || !Number.isFinite(c))
+            return `entity ${id} (instance): scale[${i}] must be a finite number, got ${String(c)}`;
+        }
+      }
       break;
     }
     // 'line', 'polyline', 'point', 'spline', 'dimension', 'mesh' — no extra numeric invariants enforced here
@@ -419,6 +439,11 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     ? (raw['recipes'] as Record<string, Recipe>)
     : {};
 
+  // Components (added in NF1 — assembly support)
+  const components: Record<string, Component> = isRecord(raw['components'])
+    ? (raw['components'] as Record<string, Component>)
+    : {};
+
   return {
     ...raw,
     units,
@@ -430,6 +455,7 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     materials,
     groups,
     recipes,
+    components,
   };
 }
 

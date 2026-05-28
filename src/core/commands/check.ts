@@ -396,6 +396,27 @@ function checkDanglingDimensionRefs(doc: CadDocument): Issue[] {
 }
 
 /**
+ * Dangling component references: an instance entity whose componentId is not in doc.components.
+ *
+ * Issue code: `dangling_component`
+ */
+function checkDanglingComponentRefs(doc: CadDocument): Issue[] {
+  const issues: Issue[] = [];
+  for (const entity of Object.values(doc.entities)) {
+    if (entity.kind !== 'instance') continue;
+    if (!(entity.componentId in (doc.components ?? {}))) {
+      issues.push({
+        severity: 'error',
+        code: 'dangling_component',
+        message: `Instance entity '${entity.id}' references component id '${entity.componentId}' which does not exist in doc.components.`,
+        entityId: entity.id,
+      });
+    }
+  }
+  return issues;
+}
+
+/**
  * Parameter errors: parameters whose `error` field is set.
  */
 function checkParameterErrors(doc: CadDocument): Issue[] {
@@ -437,6 +458,7 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
   issues.push(...checkEmptyLayers(doc));
   issues.push(...checkOrphanedGroupMembers(doc));
   issues.push(...checkDanglingDimensionRefs(doc));
+  issues.push(...checkDanglingComponentRefs(doc));
   issues.push(...checkParameterErrors(doc));
 
   const ok = !issues.some((i) => i.severity === 'error');

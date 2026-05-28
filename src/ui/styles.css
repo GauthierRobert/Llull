@@ -1843,7 +1843,8 @@ body,
 /* The dialog panel */
 .mcp-connect {
   position: relative;
-  width: min(480px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(88vh, 720px);
   background: var(--bg-surface);
   border: 1px solid var(--border-medium);
   border-radius: 12px;
@@ -1909,6 +1910,9 @@ body,
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
 }
 
 /* Capability badge row */
@@ -2025,6 +2029,71 @@ body,
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.5;
+  margin: 0;
+}
+
+/* Inline hint — sits below a section's code row */
+.mcp-connect__hint--inline {
+  margin-top: 2px;
+}
+
+/* Inline code token inside hint text */
+.mcp-connect__inline-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* Agent loop ordered list */
+.mcp-connect__loop-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  counter-reset: loop-step;
+}
+
+.mcp-connect__loop-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+}
+
+/* Tool name row: code + copy button */
+.mcp-connect__loop-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcp-connect__loop-tool {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Step description */
+.mcp-connect__loop-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
   margin: 0;
 }
 
