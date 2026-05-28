@@ -33,6 +33,7 @@ import { ParametersPanel } from '@ui/panels/ParametersPanel';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
+import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { EmptyState } from '@ui/components/EmptyState';
 import { TopBar } from '@ui/components/TopBar';
@@ -91,9 +92,10 @@ export function App(): React.ReactElement {
           </ViewportErrorBoundary>
         </div>
 
-        {/* Right dock — layers, parameters, feature history, and configurations panels stacked */}
+        {/* Right dock — layers, assembly, parameters, feature history, and configurations panels stacked */}
         <div className="app-right-dock">
           <LayersPanel className="app-layers-inner" />
+          <AssemblyPanel className="app-assembly-inner" />
           <ParametersPanel className="app-params-inner" />
           <FeatureHistoryPanel className="app-history-inner" />
           <ConfigurationsPanel className="app-configs-inner" />

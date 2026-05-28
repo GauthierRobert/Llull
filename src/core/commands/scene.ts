@@ -156,6 +156,37 @@ export function entityBounds(e: Entity): Bounds {
         max: offset(e.position, hw, hd, e.height),
       };
     }
+    case 'revolution': {
+      // Conservative AABB: max radial offset sweeps a cylinder around the axis.
+      // We compute the bounding box of the swept profile for the primary axes only.
+      // For non-axis-aligned axes the bounds are conservative (a cube wrapping the cylinder).
+      const maxR = e.profile.reduce((m, [x]) => Math.max(m, Math.abs(x)), 0);
+      const axialValues = e.profile.map(([, y]) => y);
+      const minAxial = Math.min(...axialValues);
+      const maxAxial = Math.max(...axialValues);
+      const [ax, ay, az] = e.axis;
+      // Determine which world axis the revolution axis aligns with (largest component).
+      const abx = Math.abs(ax), aby = Math.abs(ay), abz = Math.abs(az);
+      if (abz >= abx && abz >= aby) {
+        // Z-axis revolution: radial in XY, axial in Z
+        return {
+          min: offset(e.position, -maxR, -maxR, minAxial),
+          max: offset(e.position, maxR, maxR, maxAxial),
+        };
+      } else if (aby >= abx) {
+        // Y-axis revolution: radial in XZ, axial in Y
+        return {
+          min: offset(e.position, -maxR, minAxial, -maxR),
+          max: offset(e.position, maxR, maxAxial, maxR),
+        };
+      } else {
+        // X-axis revolution: radial in YZ, axial in X
+        return {
+          min: offset(e.position, minAxial, -maxR, -maxR),
+          max: offset(e.position, maxAxial, maxR, maxR),
+        };
+      }
+    }
     case 'line': {
       const minX = Math.min(e.start[0], e.end[0]);
       const maxX = Math.max(e.start[0], e.end[0]);
@@ -386,6 +417,34 @@ function localEntityCorners(e: Entity): Vec3[] {
         [-hw, -hd, 0], [hw, -hd, 0], [hw, hd, 0], [-hw, hd, 0],
         [0,   0, e.height],
       ];
+    }
+    case 'revolution': {
+      // Conservative OBB corners: cylinder wrapping the swept profile.
+      const maxR = e.profile.reduce((m, [x]) => Math.max(m, Math.abs(x)), 0);
+      const axialValues = e.profile.map(([, y]) => y);
+      const minA = Math.min(...axialValues);
+      const maxA = Math.max(...axialValues);
+      const [ax, ay, az] = e.axis;
+      const abx = Math.abs(ax), aby = Math.abs(ay), abz = Math.abs(az);
+      if (abz >= abx && abz >= aby) {
+        // Z-axis: radial in XY, axial in Z
+        return [
+          [-maxR, -maxR, minA], [maxR, -maxR, minA], [maxR, maxR, minA], [-maxR, maxR, minA],
+          [-maxR, -maxR, maxA], [maxR, -maxR, maxA], [maxR, maxR, maxA], [-maxR, maxR, maxA],
+        ];
+      } else if (aby >= abx) {
+        // Y-axis: radial in XZ, axial in Y
+        return [
+          [-maxR, minA, -maxR], [maxR, minA, -maxR], [maxR, minA, maxR], [-maxR, minA, maxR],
+          [-maxR, maxA, -maxR], [maxR, maxA, -maxR], [maxR, maxA, maxR], [-maxR, maxA, maxR],
+        ];
+      } else {
+        // X-axis: radial in YZ, axial in X
+        return [
+          [minA, -maxR, -maxR], [maxA, -maxR, -maxR], [maxA, maxR, -maxR], [minA, maxR, -maxR],
+          [minA, -maxR, maxR], [maxA, -maxR, maxR], [maxA, maxR, maxR], [minA, maxR, maxR],
+        ];
+      }
     }
     // 2D kinds — all flat in the Z=0 plane; OBB corners are their 2D AABB corners.
     case 'line': {

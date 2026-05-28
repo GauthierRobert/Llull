@@ -1281,6 +1281,7 @@ body,
 
 /* Inner panels override their own border-left (the dock wrapper provides it). */
 .app-layers-inner,
+.app-assembly-inner,
 .app-params-inner,
 .app-history-inner,
 .app-materials-inner {
@@ -3651,6 +3652,233 @@ body,
   padding: 1px 7px;
   white-space: nowrap;
   line-height: 1.5;
+}
+
+/* ==========================================================================
+   Assembly panel (VNF1)
+   ========================================================================== */
+
+.assembly-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-surface);
+  height: 100%;
+}
+
+.app-assembly-inner {
+  border-left: none;
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  width: 100%;
+}
+
+.assembly-panel-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.assembly-panel-section:last-child {
+  border-bottom: none;
+}
+
+.assembly-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.assembly-panel-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.assembly-panel-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 99px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.assembly-empty-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  padding: 10px 12px;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Component list */
+
+.assembly-component-list,
+.assembly-instance-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.assembly-component-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  min-width: 0;
+}
+
+.assembly-component-row:last-child {
+  border-bottom: none;
+}
+
+.assembly-component-icon {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+}
+
+.assembly-component-name {
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.assembly-component-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 99px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.assembly-insert-btn {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--accent-text);
+  background: var(--accent-bg);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius);
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  white-space: nowrap;
+}
+
+.assembly-insert-btn:hover {
+  background: var(--accent-bg-hover);
+  color: var(--accent-text-hover);
+}
+
+/* Instance list */
+
+.assembly-instance-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  min-width: 0;
+  transition: background 80ms ease;
+}
+
+.assembly-instance-row:last-child {
+  border-bottom: none;
+}
+
+.assembly-instance-row:hover {
+  background: var(--bg-elev-2);
+}
+
+.assembly-instance-row--selected {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.assembly-instance-row--selected:hover {
+  background: var(--accent-bg-hover);
+}
+
+.assembly-instance-icon {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+}
+
+.assembly-instance-info {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.assembly-instance-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assembly-instance-pos {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assembly-explode-btn {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  white-space: nowrap;
+}
+
+.assembly-explode-btn:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
 }
 
 /* ==========================================================================

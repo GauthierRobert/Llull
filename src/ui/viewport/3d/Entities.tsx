@@ -23,7 +23,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import type { CadDocument, Entity, EntityId, Material } from '@core/model/types';
+import type { CadDocument, Entity, EntityId, InstanceEntity, Material } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import { findClickAnimationsForEntity } from './animationClickHelpers';
@@ -39,9 +39,79 @@ import { PyramidMesh } from './entities/PyramidMesh';
 import { TextMesh } from './entities/TextMesh';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
+import { expandInstance } from '@core/commands/assemblies';
 
 interface EntitiesProps {
   document: CadDocument;
+}
+
+// ---------------------------------------------------------------------------
+// InstanceEntityRenderer — renders one InstanceEntity as its expanded children
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders a single InstanceEntity by expanding it into world-space entities via
+ * `expandInstance` and delegating to the same per-kind EntityRenderer branches.
+ *
+ * All sub-mesh clicks are intercepted and re-routed to the INSTANCE id so that
+ * selection always targets the instance as a unit (not its expanded children).
+ *
+ * The expanded entity list is memoized on (componentId, position, rotation, scale)
+ * so it is only recomputed when the instance transform or component changes (R9 / R7).
+ *
+ * @layer ui/viewport/3d
+ * @pure of props — given the same instance + components, produces the same tree.
+ */
+function InstanceEntityRenderer({
+  instance,
+  document,
+  selected,
+  onSelect,
+}: {
+  instance: InstanceEntity;
+  document: CadDocument;
+  selected: boolean;
+  onSelect: (id: EntityId, additive: boolean) => void;
+}): React.ReactElement | null {
+  const component = document.components[instance.componentId];
+
+  // Route all sub-entity clicks to the instance id so the gizmo and selection
+  // operate on the instance as a unit. Must be declared before any early return
+  // to satisfy the Rules of Hooks (react-hooks/rules-of-hooks).
+  const handleSubSelect = useCallback(
+    (_childId: EntityId, additive: boolean): void => {
+      onSelect(instance.id, additive);
+    },
+    [instance.id, onSelect],
+  );
+
+  // Expand the instance into world-space entities, memoized on the instance
+  // transform fields + componentId.
+  // Use a stable string key for position/rotation/scale since array references
+  // are not stable across renders.
+  const posKey = instance.position.join(',');
+  const rotKey = instance.rotation.join(',');
+  const scaleKey = (instance.scale ?? [1, 1, 1]).join(',');
+  const expandedEntities = useMemo(() => {
+    if (!component) return [];
+    return expandInstance(instance, component);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [component, instance.componentId, posKey, rotKey, scaleKey]);
+
+  if (!component || expandedEntities.length === 0) return null;
+
+  return (
+    <group name={`instance-${instance.id}`}>
+      {expandedEntities.map((entity) => (
+        <EntityRenderer
+          key={entity.id}
+          entity={entity}
+          selected={selected}
+          onSelect={handleSubSelect}
+        />
+      ))}
+    </group>
+  );
 }
 
 /** PBR material override passed to entity mesh components (VNF4). */
@@ -55,17 +125,23 @@ interface PbrMaterial {
  * Render a single entity; one pure branch per `kind`.
  * Used only for NON-batchable kinds — batchable kinds (box/cylinder/sphere)
  * are rendered by InstancedRenderer.
+ *
+ * The `document` prop is required only for the `instance` branch; other branches
+ * ignore it. Passing it here keeps the signature uniform and avoids a separate
+ * component-level store read inside each branch.
  */
 function EntityRenderer({
   entity,
   selected,
   onSelect,
   pbrMaterial,
+  document,
 }: {
   entity: Entity;
   selected: boolean;
   onSelect: (id: EntityId, additive: boolean) => void;
   pbrMaterial?: PbrMaterial;
+  document?: CadDocument;
 }): React.ReactElement | null {
   const pbr = pbrMaterial ? { pbrMaterial } : {};
   switch (entity.kind) {
@@ -89,6 +165,17 @@ function EntityRenderer({
       return <PyramidMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'text':
       return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
+    case 'instance':
+      // `document` is required for the instance branch — it is always passed from Entities.
+      if (!document) return null;
+      return (
+        <InstanceEntityRenderer
+          instance={entity}
+          document={document}
+          selected={selected}
+          onSelect={onSelect}
+        />
+      );
     default:
       // 2D shape kinds (line/arc/circle/…) are drawn by the 2D viewport (Lane 3 / D1),
       // not in the 3D scene. Keeping a tolerant default lets the Entity union grow
@@ -177,7 +264,7 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
         onSelect={handleSelect}
       />
 
-      {/* Per-entity rendering: non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid) */}
+      {/* Per-entity rendering: non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid, instance) */}
       {nonBatchableEntities.map((entity) => {
         const mat: Material | undefined = entity.materialId ? materials[entity.materialId] : undefined;
         const pbrProp = mat
@@ -189,6 +276,7 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
             entity={entity}
             selected={selectionSet.has(entity.id)}
             onSelect={handleSelect}
+            document={document}
             {...pbrProp}
           />
         );

@@ -20,7 +20,7 @@ export type DocumentUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export type Vec2 = readonly [number, number];
 
 /** Primitive solids supported in v1. Extend this union to add new geometry. */
-export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid';
+export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid' | 'revolution';
 
 /** 2D drafting shape kinds. Geometry is LOCAL to the entity work plane; BaseEntity.position places that plane in 3D space. */
 export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text' | 'dimension';
@@ -158,6 +158,41 @@ export interface PyramidEntity extends BaseEntity {
   baseDepth: number;
   /** Height from the base center to the apex along the local +Z axis. Must be > 0. */
   height: number;
+}
+
+/**
+ * A surface of revolution — a closed 2D profile rotated around an axis.
+ *
+ * `profile` is the generating cross-section: a closed polygon in the half-plane
+ * where the axis is the Y axis of the profile plane (Y ≥ 0 for a well-formed solid).
+ * Points are [x, y] in the profile plane; x is the radial offset from the axis.
+ *
+ * `axis` is the revolution axis expressed as a unit Vec3 in local entity space.
+ * Canonical values: [0,1,0] = Y axis, [1,0,0] = X axis, [0,0,1] = Z axis.
+ *
+ * `angle` is the sweep angle in radians (0 < angle ≤ 2π). 2π = full revolution.
+ *
+ * `segments` is the number of radial subdivisions used to tessellate the surface.
+ * Minimum 3; default 32.
+ *
+ * `position` is the world-space origin of the revolution axis (the axis passes
+ * through this point and extends in the `axis` direction).
+ *
+ * @invariant profile.length >= 3
+ * @invariant 0 < angle <= 2π
+ * @invariant segments >= 3
+ * @see revolve_profile
+ */
+export interface RevolutionEntity extends BaseEntity {
+  readonly kind: 'revolution';
+  /** Closed polygon defining the cross-section in the profile plane. Each point is [radialOffset, axialOffset]. */
+  profile: ReadonlyArray<readonly [number, number]>;
+  /** Revolution axis direction in local entity space (unit vector). */
+  axis: Vec3;
+  /** Sweep angle in radians. 2π = full revolution. */
+  angle: number;
+  /** Number of radial subdivisions for tessellation. Minimum 3. */
+  segments: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -343,6 +378,7 @@ export type Entity =
   | TorusEntity
   | WedgeEntity
   | PyramidEntity
+  | RevolutionEntity
   | LineEntity
   | PolylineEntity
   | ArcEntity

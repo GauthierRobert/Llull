@@ -231,6 +231,13 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
           height: target.height * factor,
         };
         break;
+      case 'revolution':
+        // Scale the profile radial and axial offsets; axis direction is unchanged.
+        scaled = {
+          ...target,
+          profile: target.profile.map(([x, y]) => [x * factor, y * factor] as const),
+        };
+        break;
       case 'instance':
         // Scale an instance by multiplying its per-axis scale field.
         scaled = {
@@ -283,9 +290,11 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
                                           ? scaled.offset !== undefined
                                             ? `new offset ${scaled.offset}`
                                             : 'offset unchanged (no offset set)'
-                                          : scaled.kind === 'instance'
-                                            ? `new scale [${scaled.scale?.join(', ') ?? '1, 1, 1'}]`
-                                            : 'point unchanged';
+                                          : scaled.kind === 'revolution'
+                                            ? `scaled ${scaled.profile.length}-point profile`
+                                            : scaled.kind === 'instance'
+                                              ? `new scale [${scaled.scale?.join(', ') ?? '1, 1, 1'}]`
+                                              : 'point unchanged';
     return {
       document: { ...doc, entities: { ...doc.entities, [id]: scaled } },
       summary: `Scaled ${id} by factor ${factor}; ${dims}.`,

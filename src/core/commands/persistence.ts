@@ -91,7 +91,7 @@ function isValidHexColor(v: unknown): v is string {
 /** All legal entity kinds (must stay in sync with EntityKind union in types.ts). */
 const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set<EntityKind>([
   // 3D solids
-  'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid',
+  'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution',
   // 2D shapes
   'line', 'polyline', 'arc', 'circle', 'rectangle', 'point', 'ellipse', 'spline', 'text', 'dimension',
   // Assembly

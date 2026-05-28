@@ -4,19 +4,20 @@
  * @pure
  * @layer core/commands
  * @affects extrude_sketch: creates 1 extrusion entity from a closed 2D shape entity
- * @affects revolve_profile: no-op stub; reserved for future surface-of-revolution kernel
+ * @affects revolve_profile: creates 1 revolution entity — surface of revolution from a closed 2D polygon profile
  * @invariant extrude_sketch: source entity remains in document; only depth > 0 is accepted
+ * @invariant revolve_profile: profile.length >= 3; angle in (0, 2π]; segments >= 3
  * @failure missing id -> no-op, affected:[]
  * @failure non-closed or non-2D entity -> no-op, affected:[]
  * @failure depth <= 0 -> no-op, affected:[]
- * @failure revolve_profile -> always no-op (not yet implemented)
+ * @failure revolve_profile: profile < 3 points, angle <= 0, invalid axis -> no-op, affected:[]
  */
 
-import type { CadDocument, Entity, ExtrusionEntity, Vec3 } from '../model/types';
+import type { CadDocument, Entity, ExtrusionEntity, RevolutionEntity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
-import { entityBounds } from './scene';
+import { rotatedEntityBounds } from './scene';
 
 /**
  * Validate an optional rotation param (shared convention with geometry.ts).
@@ -181,7 +182,7 @@ export const extrudeSketch: CommandDefinition<ExtrudeSketchParams> = {
     };
 
     const newDoc = withEntity(doc, extrusion);
-    const b = entityBounds(newDoc.entities[extId] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[extId] as Entity);
     return {
       document: newDoc,
       summary: `extrude_sketch: created extrusion "${extId}" from ${source.kind} "${id}" (${profile.length}-point profile, depth=${depth}); ${boundsText(b)}.`,
@@ -191,52 +192,212 @@ export const extrudeSketch: CommandDefinition<ExtrudeSketchParams> = {
 };
 
 // ---------------------------------------------------------------------------
-// revolve_profile (stub)
+// revolve_profile
 // ---------------------------------------------------------------------------
 
+/**
+ * Normalise a raw axis param to a unit Vec3, or return null if invalid.
+ * Accepts 'x'|'y'|'z' shorthand strings or a [number,number,number] array.
+ * Default axis when omitted: +Z ([0,0,1]) per the document +Z-up convention.
+ */
+function resolveAxis(raw: unknown): Vec3 | null {
+  if (raw === undefined || raw === null) return [0, 0, 1]; // default: Z-axis
+  if (raw === 'x') return [1, 0, 0];
+  if (raw === 'y') return [0, 1, 0];
+  if (raw === 'z') return [0, 0, 1];
+  if (!Array.isArray(raw) || raw.length !== 3) return null;
+  const [ax, ay, az] = raw as unknown[];
+  if (!Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(az)) return null;
+  const len = Math.sqrt((ax as number) ** 2 + (ay as number) ** 2 + (az as number) ** 2);
+  if (len < 1e-10) return null;
+  return [(ax as number) / len, (ay as number) / len, (az as number) / len];
+}
+
 interface RevolveProfileParams {
-  /** Id of the 2D profile entity to revolve. */
-  id: string;
   /**
-   * Revolution angle in radians. Default is 2π (full revolution).
-   * Note: this parameter is accepted but ignored in the current stub.
+   * Array of [x, y] points forming the generating cross-section. Must be a closed polygon
+   * (first point need not equal last — the command treats the polygon as implicitly closed).
+   * Minimum 3 points. x is the radial offset from the revolution axis; y is the axial offset.
    */
+  profile: ReadonlyArray<readonly [number, number]>;
+  /**
+   * Revolution axis. One of 'x', 'y', 'z' (shorthand) or a [dx, dy, dz] unit-vector array.
+   * Default: 'z' (+Z, the natural axis for a Z-up document).
+   */
+  axis?: string | Vec3;
+  /** Sweep angle in radians. Default: 2π (full revolution). Must be > 0 and ≤ 2π. */
   angle?: number;
+  /** Number of radial subdivisions for tessellation. Default: 32. Minimum: 3. */
+  segments?: number;
+  /** World-space position of the revolution-axis origin [x, y, z]. Default: [0, 0, 0]. */
+  position?: Vec3;
+  /** Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Default: [0, 0, 0]. */
+  rotation?: Vec3;
+  /** Optional layer id. Defaults to the document default layer. */
+  layerId?: string;
+  /** Hex color string, e.g. "#c8553d". Default: "#6b8f9c". */
+  color?: string;
+  /** Optional explicit entity id. If absent a unique id is generated. */
+  id?: string;
 }
 
 /**
  * @command revolve_profile
  * @pure
- * STUB — reserved tool name across UI / AI / MCP. Returns a graceful no-op until a
- * surface-of-revolution kernel is available. Planned: revolve a closed 2D profile
- * around the Y axis by `angle` radians (default 2π) to produce a solid of revolution.
- *
- * @failure always returns no-op with explanatory summary; affected:[]
+ * @layer core/commands
+ * @affects creates 1 revolution entity — surface of revolution from a closed 2D polygon profile
+ * @invariant profile.length >= 3; angle in (0, 2π]; segments >= 3
+ * @failure profile < 3 points -> no-op, affected:[]
+ * @failure angle <= 0 or non-finite -> no-op, affected:[]
+ * @failure invalid axis (not 'x'/'y'/'z' and not a valid Vec3) -> no-op, affected:[]
+ * @failure segments < 3 -> clamped to 3, no no-op
  */
 export const revolveProfile: CommandDefinition<RevolveProfileParams> = {
   name: 'revolve_profile',
   description:
-    'PLANNED: revolve a closed 2D profile entity around the Y axis to produce a solid of revolution. Currently a stub — registers the tool name for UI/AI/MCP discovery but does not yet produce geometry (requires a surface-of-revolution kernel).',
+    'Create a surface of revolution by rotating a closed 2D polygon profile around an axis. ' +
+    'Right-handed world frame, +Z up. ' +
+    'profile is an array of [x, y] points where x is the radial offset from the axis and y is the axial offset. ' +
+    'At least 3 points required. The polygon is treated as implicitly closed. ' +
+    'axis controls the revolution axis: "x", "y", or "z" (shorthand), or a [dx,dy,dz] direction vector. ' +
+    'Default axis is "z" (+Z up, the natural axis for a Z-up document). ' +
+    'angle is the sweep in radians (default 2π for a full revolution; must be > 0). ' +
+    'segments is the number of radial subdivisions (default 32, minimum 3). ' +
+    'Stores a parametric revolution entity; tessellated as triangles in render_view and export_stl.',
   paramsSchema: {
     type: 'object',
     properties: {
-      id: {
+      profile: {
+        type: 'array',
+        description:
+          'Closed polygon cross-section: array of [x, y] points. x = radial offset from the axis (≥ 0 for outward), ' +
+          'y = axial offset along the axis. Minimum 3 points. The polygon is implicitly closed — ' +
+          'do NOT repeat the first point at the end.',
+      },
+      axis: {
         type: 'string',
-        description: 'Id of the closed 2D shape entity to revolve.',
+        description:
+          'Revolution axis. Use "x", "y", or "z" for the principal axes, or pass a [dx, dy, dz] array ' +
+          'for an arbitrary direction (it will be normalised). Default: "z" (natural +Z-up axis).',
       },
       angle: {
         type: 'number',
         description:
-          'Revolution angle in radians. Defaults to 2π (full revolution). Currently ignored (stub).',
+          'Sweep angle in radians. Must be > 0. Default: 2π (full 360° revolution). ' +
+          'Use π for a half-revolution, π/2 for a quarter, etc.',
+      },
+      segments: {
+        type: 'number',
+        description:
+          'Number of radial subdivisions for tessellation. Higher = smoother surface. Default: 32. Minimum: 3.',
+      },
+      position: {
+        type: 'array',
+        description:
+          'World-space origin of the revolution axis [x, y, z] in document units. Default: [0, 0, 0].',
+        items: { type: 'number' },
+      },
+      rotation: {
+        type: 'array',
+        description:
+          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] applied after revolution. Default: [0, 0, 0]. ' +
+          'Malformed or non-length-3 values are ignored and [0,0,0] is used.',
+        items: { type: 'number' },
+      },
+      layerId: {
+        type: 'string',
+        description: 'Layer id to assign the entity to. Defaults to the document default layer.',
+      },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Default: "#6b8f9c".',
+      },
+      id: {
+        type: 'string',
+        description: 'Optional explicit entity id. If omitted a unique id is generated.',
       },
     },
-    required: ['id'],
+    required: ['profile'],
   },
-  run: (doc, { id }): CommandResult => {
+  run: (
+    doc,
+    {
+      profile,
+      axis: rawAxis,
+      angle: rawAngle,
+      segments: rawSegments,
+      position = [0, 0, 0],
+      rotation,
+      layerId,
+      color = '#6b8f9c',
+      id: explicitId,
+    },
+  ): CommandResult => {
+    // --- guard: profile ---
+    if (!Array.isArray(profile) || profile.length < 3) {
+      return {
+        document: doc,
+        summary: `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${Array.isArray(profile) ? profile.length : 'non-array'}); no-op.`,
+        affected: [],
+      };
+    }
+
+    // --- guard: angle ---
+    const TWO_PI = 2 * Math.PI;
+    const angle = rawAngle !== undefined ? rawAngle : TWO_PI;
+    if (!Number.isFinite(angle) || angle <= 0) {
+      return {
+        document: doc,
+        summary: `revolve_profile: angle must be a finite number > 0 (got ${String(angle)}); no-op.`,
+        affected: [],
+      };
+    }
+
+    // --- guard: axis ---
+    const axis = resolveAxis(rawAxis);
+    if (axis === null) {
+      return {
+        document: doc,
+        summary: `revolve_profile: axis must be 'x', 'y', 'z', or a [dx,dy,dz] direction array (got ${JSON.stringify(rawAxis)}); no-op.`,
+        affected: [],
+      };
+    }
+
+    // --- segments: clamp to minimum 3 ---
+    const segments = Math.max(3, Math.round(typeof rawSegments === 'number' && Number.isFinite(rawSegments) ? rawSegments : 32));
+
+    // --- resolve layer ---
+    const resolvedLayerId =
+      typeof layerId === 'string' && doc.layers[layerId] !== undefined
+        ? layerId
+        : Object.keys(doc.layers)[0] ?? 'layer-default';
+
+    // --- build entity ---
+    const id = typeof explicitId === 'string' && explicitId.length > 0 ? explicitId : nextId('rev');
+    const entity: RevolutionEntity = {
+      id,
+      kind: 'revolution',
+      profile,
+      axis,
+      angle: Math.min(angle, TWO_PI),
+      segments,
+      position,
+      rotation: resolveRotation(rotation),
+      layerId: resolvedLayerId,
+      color,
+    };
+
+    const newDoc = withEntity(doc, entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
+    const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
+    const boundsStr = `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
+    const axisLabel = rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z'
+      ? rawAxis
+      : `[${axis.map((v) => parseFloat(v.toFixed(3))).join(', ')}]`;
     return {
-      document: doc,
-      summary: `revolve_profile is not yet implemented (needs a surface-of-revolution kernel); entity "${id}" unchanged.`,
-      affected: [],
+      document: newDoc,
+      summary: `revolve_profile: created revolution "${id}" — ${profile.length}-point profile, axis=${axisLabel}, angle=${parseFloat(angle.toFixed(4))} rad, segments=${segments}; ${boundsStr}.`,
+      affected: [id],
     };
   },
 };

@@ -197,6 +197,28 @@ describe('load_document command', () => {
     expect(result.affected).toEqual(result.document.order);
   });
 
+  it('round-trips a revolution entity through save→load', () => {
+    let sourceDoc = createEmptyDocument();
+    sourceDoc = execute(sourceDoc, 'revolve_profile', {
+      profile: [
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [1, 1],
+      ],
+      axis: 'z',
+      angle: Math.PI,
+      segments: 16,
+    }).document;
+
+    const json = serializeDocument(sourceDoc);
+    const result = execute(createEmptyDocument(), 'load_document', { json });
+
+    expect(result.document).toEqual(sourceDoc);
+    const loaded = result.document.entities[result.affected[0]!];
+    expect(loaded?.kind).toBe('revolution');
+  });
+
   it('failure path: invalid JSON is a graceful no-op', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'load_document', { json: '{{bad' });

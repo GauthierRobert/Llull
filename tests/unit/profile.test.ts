@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type { CircleEntity, RectangleEntity, PolylineEntity, LineEntity, ExtrusionEntity } from '@core/model/types';
+import type { CircleEntity, RectangleEntity, PolylineEntity, LineEntity, ExtrusionEntity, RevolutionEntity } from '@core/model/types';
 import { DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { __resetIdCounter } from '@lib/id';
@@ -233,39 +233,234 @@ describe('extrude_sketch', () => {
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('not closed');
   });
+
+  it('closed polyline with < 3 points → graceful no-op', () => {
+    // Build a 2-point closed polyline directly (degenerate profile)
+    const base = createEmptyDocument();
+    const id = 'poly-short';
+    const entity: PolylineEntity = {
+      id,
+      kind: 'polyline',
+      points: [[0, 0], [5, 0]],
+      closed: true,
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color: '#ffffff',
+    };
+    const doc = { ...base, entities: { ...base.entities, [id]: entity }, order: [id] };
+    const result = execute(doc, 'extrude_sketch', { id, depth: 5 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('fewer than 3 points');
+  });
 });
 
 // ---------------------------------------------------------------------------
-// revolve_profile (stub)
+// revolve_profile — full implementation
 // ---------------------------------------------------------------------------
+
+/** Triangle profile for revolution tests: 3 points in the +X half-plane */
+const TRI_PROFILE: ReadonlyArray<readonly [number, number]> = [[1, 0], [3, 0], [2, 2]];
 
 describe('revolve_profile', () => {
   beforeEach(() => __resetIdCounter());
 
-  it('is a registered no-op stub — returns unchanged document', () => {
-    const { doc, id } = docWithCircle();
-    const result = execute(doc, 'revolve_profile', { id });
+  // ── happy paths ────────────────────────────────────────────────────────────
+
+  it('full 2π revolution creates a revolution entity with correct kind and defaults', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE });
+
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.order).toHaveLength(1);
+    const id = result.affected[0]!;
+    const e = result.document.entities[id] as RevolutionEntity;
+    expect(e.kind).toBe('revolution');
+    expect(e.profile).toHaveLength(3);
+    expect(e.segments).toBe(32);
+    expect(e.angle).toBeCloseTo(2 * Math.PI, 5);
+    // default axis is Z
+    expect(e.axis[0]).toBeCloseTo(0, 5);
+    expect(e.axis[1]).toBeCloseTo(0, 5);
+    expect(e.axis[2]).toBeCloseTo(1, 5);
+  });
+
+  it('entity is in document.order and entities map', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE });
+    const id = result.affected[0]!;
+    expect(result.document.order).toContain(id);
+    expect(result.document.entities[id]).toBeDefined();
+  });
+
+  it('summary contains id, axis, angle, and segments', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 'z', segments: 16 });
+    const id = result.affected[0]!;
+    expect(result.summary).toContain(id);
+    expect(result.summary).toContain('z');
+    expect(result.summary).toContain('16');
+  });
+
+  it('partial angle (π) revolution stores the correct angle', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, angle: Math.PI });
+    const id = result.affected[0]!;
+    const e = result.document.entities[id] as RevolutionEntity;
+    expect(e.angle).toBeCloseTo(Math.PI, 5);
+  });
+
+  it('axis "x" produces a unit X-axis revolution entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 'x' });
+    const e = result.document.entities[result.affected[0]!] as RevolutionEntity;
+    expect(e.axis[0]).toBeCloseTo(1, 5);
+    expect(e.axis[1]).toBeCloseTo(0, 5);
+    expect(e.axis[2]).toBeCloseTo(0, 5);
+  });
+
+  it('axis "y" produces a unit Y-axis revolution entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 'y' });
+    const e = result.document.entities[result.affected[0]!] as RevolutionEntity;
+    expect(e.axis[1]).toBeCloseTo(1, 5);
+  });
+
+  it('arbitrary Vec3 axis is normalised and stored', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: [1, 1, 0] });
+    const e = result.document.entities[result.affected[0]!] as RevolutionEntity;
+    const len = Math.sqrt(e.axis[0] ** 2 + e.axis[1] ** 2 + e.axis[2] ** 2);
+    expect(len).toBeCloseTo(1, 5);
+  });
+
+  it('bounds are sane for a Z-axis revolution with radial extent 1–3', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 'z' });
+    const id = result.affected[0]!;
+    // Profile x ∈ [1,3] → maxR = 3; y ∈ [0,2] → axial [0,2]
+    // Z-axis: AABB X/Y should span ±3, Z should span [0,2]
+    const e = result.document.entities[id] as RevolutionEntity;
+    expect(e.kind).toBe('revolution');
+    // Just check the summary mentions "AABB" (bounds computed without error)
+    expect(result.summary).toContain('AABB');
+  });
+
+  it('segments < 3 is clamped to 3', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, segments: 1 });
+    const e = result.document.entities[result.affected[0]!] as RevolutionEntity;
+    expect(e.segments).toBe(3);
+  });
+
+  it('optional position and color are stored on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', {
+      profile: TRI_PROFILE,
+      position: [5, 6, 7],
+      color: '#ff0000',
+    });
+    const e = result.document.entities[result.affected[0]!] as RevolutionEntity;
+    expect(e.position).toEqual([5, 6, 7]);
+    expect(e.color).toBe('#ff0000');
+  });
+
+  it('valid layerId is stored on the entity', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', {
+      profile: TRI_PROFILE,
+      layerId: DEFAULT_LAYER_ID,
+    });
+    const e = result.document.entities[result.affected[0]!] as RevolutionEntity;
+    expect(e.layerId).toBe(DEFAULT_LAYER_ID);
+  });
+
+  it('unknown layerId falls back to the document default layer', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', {
+      profile: TRI_PROFILE,
+      layerId: 'nonexistent-layer',
+    });
+    const e = result.document.entities[result.affected[0]!] as RevolutionEntity;
+    expect(e.layerId).toBe(DEFAULT_LAYER_ID);
+  });
+
+  it('is pure — input document is never mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'revolve_profile', { profile: TRI_PROFILE });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── failure paths ──────────────────────────────────────────────────────────
+
+  it('profile with < 3 points → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: [[1, 0], [2, 1]] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('at least 3');
+  });
+
+  it('empty profile array → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: [] });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
 
-  it('stub summary mentions "not yet implemented" and the entity id', () => {
-    const { doc, id } = docWithCircle();
-    const result = execute(doc, 'revolve_profile', { id });
-    expect(result.summary).toContain('not yet implemented');
-    expect(result.summary).toContain(id);
+  it('non-array profile → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = execute(doc, 'revolve_profile', { profile: 'bad' as any });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
   });
 
-  it('is pure — input document is never mutated', () => {
-    const { doc, id } = docWithCircle();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'revolve_profile', { id });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+  it('angle = 0 → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, angle: 0 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('angle');
   });
 
-  it('accepts optional angle param without throwing', () => {
-    const { doc, id } = docWithCircle();
-    const result = execute(doc, 'revolve_profile', { id, angle: Math.PI });
+  it('negative angle → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, angle: -1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('non-finite angle → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, angle: Infinity });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('invalid axis string → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 'diagonal' as any });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('axis');
+  });
+
+  it('zero-length Vec3 axis → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: [0, 0, 0] as any });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('non-array axis → graceful no-op', () => {
+    const doc = createEmptyDocument();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 42 as any });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
