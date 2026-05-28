@@ -95,6 +95,10 @@ export interface DocPatch {
   units?: DocumentUnit;
   /** Display precision — present only when it changed. */
   displayPrecision?: number;
+  /** Full constraints map — present only when any constraint changed. */
+  constraints?: Record<string, unknown>;
+  /** Full constraintOrder array — present only when it changed. */
+  constraintOrder?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +192,8 @@ export function computeDocPatch(prev: CadDocument, next: CadDocument): DocPatch 
   if (!jsonEqual(prev.camera, next.camera))                 patch.camera = next.camera;
   if (prev.units !== next.units)                            patch.units = next.units;
   if (prev.displayPrecision !== next.displayPrecision)      patch.displayPrecision = next.displayPrecision;
+  if (!jsonEqual(prev.constraints, next.constraints))       patch.constraints = next.constraints as Record<string, unknown>;
+  if (!jsonEqual(prev.constraintOrder, next.constraintOrder)) patch.constraintOrder = next.constraintOrder;
 
   return patch;
 }
@@ -249,5 +255,7 @@ export function applyDocPatch(doc: CadDocument, patch: DocPatch): CadDocument {
     camera:           patch.camera           ?? doc.camera,
     units:            patch.units            ?? doc.units,
     displayPrecision: patch.displayPrecision ?? doc.displayPrecision,
+    constraints:      (patch.constraints as typeof doc.constraints | undefined) ?? doc.constraints,
+    constraintOrder:  patch.constraintOrder ?? doc.constraintOrder,
   };
 }

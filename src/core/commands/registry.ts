@@ -66,6 +66,7 @@ import { clearDocument } from './document';
 import { setCamera, lookAt, fitView } from './camera';
 import { align, distribute, stackOn } from './place';
 import { arrayAlongPath, distributeOnArc } from './array_along_path';
+import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } from './constraints';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -160,6 +161,10 @@ const definitions = [
   stackOn,
   arrayAlongPath,
   distributeOnArc,
+  addConstraint,
+  deleteConstraint,
+  updateConstraint,
+  solveConstraints,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

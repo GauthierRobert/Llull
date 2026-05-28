@@ -626,6 +626,125 @@ export interface Component {
   order: EntityId[];
 }
 
+// ---------------------------------------------------------------------------
+// Constraints — geometric and dimensional relationships between entities.
+// The solver (solve_constraints command) reads this table and adjusts entity
+// positions to satisfy the declared relationships.
+// ---------------------------------------------------------------------------
+
+/**
+ * A reference to a specific geometric point on an entity.
+ *
+ * `{ entityId }` — uses the entity's `position` (point-like entity or centroid).
+ * `{ entityId, kind }` — selects a named sub-point on a line, arc, or circle:
+ *   'start'  — first endpoint of a line or start of an arc.
+ *   'end'    — second endpoint of a line or end of an arc.
+ *   'center' — center of a circle, arc, or the midpoint of a line.
+ *   'mid'    — midpoint of a line segment.
+ */
+export type EntityRef =
+  | { readonly entityId: string }
+  | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
+
+/**
+ * Geometric (non-driving) constraint kinds.
+ * These impose a positional or directional relationship with no numeric target.
+ */
+export type GeometricConstraintKind = 'coincident' | 'parallel' | 'perpendicular' | 'tangent';
+
+/**
+ * Dimensional (driving) constraint kinds.
+ * These impose a numeric distance or angle target between entities.
+ */
+export type DimensionalConstraintKind = 'distance' | 'angle';
+
+/** All constraint kinds — geometric or dimensional. */
+export type ConstraintKind = GeometricConstraintKind | DimensionalConstraintKind;
+
+/**
+ * A coincident constraint: point `a` and point `b` share the same location.
+ * The solver minimises `||pa - pb||²`.
+ */
+export interface CoincidentConstraint {
+  readonly id: string;
+  readonly kind: 'coincident';
+  /** First entity reference. */
+  readonly a: EntityRef;
+  /** Second entity reference. */
+  readonly b: EntityRef;
+}
+
+/**
+ * A parallel constraint: the direction of entity `a` is parallel to entity `b`.
+ * Both entities should be line-like. The solver minimises `(da × db)²`.
+ */
+export interface ParallelConstraint {
+  readonly id: string;
+  readonly kind: 'parallel';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+}
+
+/**
+ * A perpendicular constraint: the direction of entity `a` is perpendicular to entity `b`.
+ * Both entities should be line-like. The solver minimises `(da · db)²`.
+ */
+export interface PerpendicularConstraint {
+  readonly id: string;
+  readonly kind: 'perpendicular';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+}
+
+/**
+ * A tangent constraint between a line and a circle/arc, or two circles/arcs.
+ * For line↔circle: solver minimises `(||pc - pline|| - radius)²`.
+ * For circle↔circle: solver minimises `(||pc1 - pc2|| - (r1 + r2))²` (external tangency).
+ */
+export interface TangentConstraint {
+  readonly id: string;
+  readonly kind: 'tangent';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+}
+
+/**
+ * A distance constraint: the distance between point `a` and point `b` equals `value`.
+ * `value` may be a numeric literal or a parameter name/expression string.
+ * The solver minimises `(||pa - pb|| - target)²`.
+ */
+export interface DistanceConstraint {
+  readonly id: string;
+  readonly kind: 'distance';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+  /** Target distance in document units. May be a number or a parameter expression string. */
+  readonly value: number | string;
+}
+
+/**
+ * An angle constraint: the angle from direction `a` to direction `b` (radians) equals `value`.
+ * `value` may be a numeric literal or a parameter name/expression string.
+ * The solver minimises `(atan2(da×db, da·db) - target)²`.
+ */
+export interface AngleConstraint {
+  readonly id: string;
+  readonly kind: 'angle';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+  /** Target angle in radians. May be a number or a parameter expression string. */
+  readonly value: number | string;
+}
+
+/** Discriminated union of all constraint types. */
+export type Constraint =
+  | CoincidentConstraint
+  | ParallelConstraint
+  | PerpendicularConstraint
+  | TangentConstraint
+  | DistanceConstraint
+  | AngleConstraint;
+
 export interface CadDocument {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
@@ -700,6 +819,18 @@ export interface CadDocument {
    * Initialized as {} in createEmptyDocument.
    */
   components: Record<string, Component>;
+  /**
+   * Geometric and dimensional constraints. Keyed by constraint id.
+   * The solver (solve_constraints) reads this table and adjusts entity positions to
+   * satisfy the declared relationships. Initialized as {} in createEmptyDocument.
+   * @see add_constraint, delete_constraint, update_constraint, solve_constraints
+   */
+  constraints: Record<string, Constraint>;
+  /**
+   * Ordered constraint ids — mirrors the `entities`/`order` pattern.
+   * Initialized as [] in createEmptyDocument.
+   */
+  constraintOrder: string[];
 }
 
 /**
@@ -772,5 +903,7 @@ export function createEmptyDocument(): CadDocument {
     materials: {},
     recipes: {},
     components: {},
+    constraints: {},
+    constraintOrder: [],
   };
 }

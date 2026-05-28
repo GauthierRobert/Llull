@@ -11,6 +11,8 @@ import type {
   CadDocument,
   Component,
   Configuration,
+  Constraint,
+  ConstraintKind,
   DocumentUnit,
   EntityKind,
   FeatureStep,
@@ -287,6 +289,45 @@ function validateParameterValue(name: string, v: unknown): string | null {
   return null;
 }
 
+/** All legal constraint kinds (must stay in sync with ConstraintKind union in types.ts). */
+const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
+  'coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle',
+]);
+
+/**
+ * Validate a Constraint entry. Returns a descriptive error string on failure, or `null` on success.
+ */
+function validateConstraintValue(id: string, v: unknown): string | null {
+  if (!isRecord(v)) return `constraint '${id}' is not an object`;
+  if (typeof v['id'] !== 'string') return `constraint '${id}': id field must be a string`;
+  const kind = v['kind'];
+  if (typeof kind !== 'string' || !VALID_CONSTRAINT_KINDS.has(kind)) {
+    return `constraint '${id}': unknown kind '${String(kind)}'`;
+  }
+  // Validate EntityRef a and b.
+  for (const field of ['a', 'b'] as const) {
+    const ref = v[field];
+    if (!isRecord(ref)) return `constraint '${id}': ${field} must be an object`;
+    if (typeof ref['entityId'] !== 'string' || ref['entityId'].length === 0) {
+      return `constraint '${id}': ${field}.entityId must be a non-empty string`;
+    }
+    if ('kind' in ref) {
+      const rk = ref['kind'];
+      if (rk !== 'start' && rk !== 'end' && rk !== 'center' && rk !== 'mid') {
+        return `constraint '${id}': ${field}.kind must be start|end|center|mid, got '${String(rk)}'`;
+      }
+    }
+  }
+  // Dimensional constraints require a value field.
+  if (kind === 'distance' || kind === 'angle') {
+    const val = v['value'];
+    if (typeof val !== 'number' && typeof val !== 'string') {
+      return `constraint '${id}' (${kind}): value must be a number or string`;
+    }
+  }
+  return null;
+}
+
 /**
  * Validate a Recipe entry. Returns a descriptive error string on failure, or `null` on success.
  */
@@ -373,6 +414,15 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
     }
   }
 
+  // Constraints (optional field — only validate if present)
+  if (isRecord(v['constraints'])) {
+    const cons = v['constraints'] as Record<string, unknown>;
+    for (const [cid, con] of Object.entries(cons)) {
+      const err = validateConstraintValue(cid, con);
+      if (err !== null) errors.push(err);
+    }
+  }
+
   return errors;
 }
 
@@ -444,6 +494,15 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     ? (raw['components'] as Record<string, Component>)
     : {};
 
+  // Constraints (added in Q2 — first-class constraint solver)
+  const constraints: Record<string, Constraint> = isRecord(raw['constraints'])
+    ? (raw['constraints'] as Record<string, Constraint>)
+    : {};
+
+  const constraintOrder: string[] = Array.isArray(raw['constraintOrder'])
+    ? (raw['constraintOrder'] as string[])
+    : [];
+
   return {
     ...raw,
     units,
@@ -456,6 +515,8 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     groups,
     recipes,
     components,
+    constraints,
+    constraintOrder,
   };
 }
 
