@@ -21,6 +21,8 @@ import type { Response } from 'express';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+import { computeDocPatch } from './docPatch';
+import type { DocPatch } from './docPatch';
 
 // ---------------------------------------------------------------------------
 // Disk persistence (autosave between server restarts)
@@ -85,16 +87,40 @@ export function getLiveDoc(): CadDocument {
 const _subscribers = new Set<Response>();
 
 /**
- * Serialise and write a single SSE data event carrying the full document.
- * The `data:` line must be a single JSON line terminated by two newlines.
+ * Write a single SSE event to one response, with an event type and JSON data.
+ * The named-event format (`event: <type>\ndata: <json>\n\n`) lets the browser
+ * hook discriminate between patch and snapshot events via `addEventListener`.
  */
-function broadcastDoc(doc: CadDocument): void {
-  const payload = `data: ${JSON.stringify(doc)}\n\n`;
+function writeSseEvent(res: Response, eventType: string, payload: unknown): boolean {
+  try {
+    res.write(`event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Broadcast a full-document snapshot to all SSE subscribers.
+ * Used on initial connect and as fallback after undo/redo (full state replacement).
+ * Named event: `snapshot`.
+ */
+function broadcastSnapshot(doc: CadDocument): void {
   for (const res of _subscribers) {
-    try {
-      res.write(payload);
-    } catch {
-      // Write failed (connection already closed) — remove the stale subscriber.
+    if (!writeSseEvent(res, 'snapshot', doc)) {
+      _subscribers.delete(res);
+    }
+  }
+}
+
+/**
+ * Broadcast an entity-level patch to all SSE subscribers.
+ * Named event: `patch`.
+ * The browser applies this incrementally — only changed entities re-render.
+ */
+function broadcastPatch(patch: DocPatch): void {
+  for (const res of _subscribers) {
+    if (!writeSseEvent(res, 'patch', patch)) {
       _subscribers.delete(res);
     }
   }
@@ -105,17 +131,31 @@ function broadcastDoc(doc: CadDocument): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Replace the shared document and broadcast the new state to all SSE subscribers.
+ * Replace the shared document and broadcast the change to all SSE subscribers.
  *
- * Called by the MCP router after every mutating `tools/call`.
- * Also callable directly (e.g. from tests or future REST endpoints).
+ * Computes an entity-level patch (prev→next) and emits it as a `patch` SSE event.
+ * The browser applies the patch incrementally — only changed entities cause React
+ * to re-render, keeping per-command cost O(change) rather than O(doc size).
+ *
+ * When `fullSnapshot` is true (undo/redo/reset paths), a `snapshot` event is
+ * emitted instead so the browser replaces the full document — necessary when
+ * entities may have been removed and there is no safe patch base.
+ *
+ * Called by the MCP router after every mutating `tools/call` and by `commandBus`.
  *
  * @sideeffect replaces module-level `_liveDoc` and broadcasts to all subscribers.
  */
-export function setLiveDoc(next: CadDocument): void {
+export function setLiveDoc(next: CadDocument, fullSnapshot = false): void {
+  const prev = _liveDoc;
   _liveDoc = next;
   writeAutosave(next);
-  broadcastDoc(next);
+
+  if (fullSnapshot) {
+    broadcastSnapshot(next);
+  } else {
+    const patch = computeDocPatch(prev, next);
+    broadcastPatch(patch);
+  }
 }
 
 /**
@@ -131,10 +171,8 @@ export function subscribeLive(res: Response): () => void {
   _subscribers.add(res);
 
   // Send the current snapshot immediately so the browser is in sync from t=0.
-  const snapshot = `data: ${JSON.stringify(_liveDoc)}\n\n`;
-  try {
-    res.write(snapshot);
-  } catch {
+  // Named event `snapshot` — the browser hook listens for this distinct event type.
+  if (!writeSseEvent(res, 'snapshot', _liveDoc)) {
     // If the write fails immediately the client is already gone; clean up now.
     _subscribers.delete(res);
   }

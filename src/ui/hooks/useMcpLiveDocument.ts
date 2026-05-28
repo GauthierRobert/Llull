@@ -4,14 +4,19 @@
  * useMcpLiveDocument — subscribes to the server-side SSE document stream.
  *
  * Opens `GET http://localhost:3001/live` as an EventSource.
- * Protocol:
- *   - Server sends one `data: <json>\n\n` immediately with the full CadDocument.
- *   - Server sends a new snapshot after every MCP mutation.
- *   - EventSource auto-reconnects on disconnect (browser native behaviour).
+ *
+ * Protocol (named SSE events):
+ *   - `snapshot` event: full CadDocument JSON. Used on initial connect and after
+ *     undo/redo. The store replaces the whole document (hydrateLiveDocument).
+ *   - `patch` event: incremental DocPatch JSON. Emitted after every normal mutating
+ *     command. The store applies only the changed entities (applyLivePatch), so
+ *     cost is O(change) not O(document size). Unchanged entity object refs stay
+ *     stable → React does not re-render unaffected meshes.
  *
  * Lifecycle:
  *   - onopen  → setLiveStatus('connected')
- *   - onmessage → JSON.parse(e.data) as CadDocument → hydrateLiveDocument
+ *   - snapshot → JSON.parse → hydrateLiveDocument (full replace)
+ *   - patch   → JSON.parse → applyLivePatch (incremental update)
  *   - onerror → setLiveStatus('disconnected') (EventSource retries automatically)
  *   - unmount → EventSource.close()
  *
@@ -22,6 +27,7 @@
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import type { CadDocument } from '@core/model/types';
+import type { DocPatch } from '@core/mcp/docPatch';
 
 const LIVE_URL = 'http://localhost:3001/live';
 
@@ -31,6 +37,7 @@ const LIVE_URL = 'http://localhost:3001/live';
  */
 export function useMcpLiveDocument(): void {
   const hydrateLiveDocument = useStore((s) => s.hydrateLiveDocument);
+  const applyLivePatch = useStore((s) => s.applyLivePatch);
   const setLiveStatus = useStore((s) => s.setLiveStatus);
 
   useEffect(() => {
@@ -42,12 +49,38 @@ export function useMcpLiveDocument(): void {
       setLiveStatus('connected');
     };
 
+    // Named event: `snapshot` — full document replacement.
+    // Used on initial connect and after undo/redo.
+    source.addEventListener('snapshot', (e: Event) => {
+      const me = e as MessageEvent<string>;
+      try {
+        const doc = JSON.parse(me.data) as CadDocument;
+        hydrateLiveDocument(doc);
+      } catch {
+        // Malformed JSON from server — ignore, stay connected.
+      }
+    });
+
+    // Named event: `patch` — incremental entity-level delta.
+    // Used after every normal mutating command.
+    source.addEventListener('patch', (e: Event) => {
+      const me = e as MessageEvent<string>;
+      try {
+        const patch = JSON.parse(me.data) as DocPatch;
+        applyLivePatch(patch);
+      } catch {
+        // Malformed JSON from server — ignore, stay connected.
+      }
+    });
+
+    // Fallback: unnamed `onmessage` (server emitting without `event:` field).
+    // Treats it as a full snapshot for backward compatibility.
     source.onmessage = (e: MessageEvent<string>) => {
       try {
         const doc = JSON.parse(e.data) as CadDocument;
         hydrateLiveDocument(doc);
       } catch {
-        // Malformed JSON from server — ignore, stay connected.
+        // Malformed JSON — ignore.
       }
     };
 
@@ -59,5 +92,5 @@ export function useMcpLiveDocument(): void {
     return () => {
       source.close();
     };
-  }, [hydrateLiveDocument, setLiveStatus]);
+  }, [hydrateLiveDocument, applyLivePatch, setLiveStatus]);
 }

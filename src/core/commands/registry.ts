@@ -62,6 +62,7 @@ import {
 import { exportStl } from './export';
 import { createComponent, insertInstance, explodeInstance } from './assemblies';
 import { clearDocument } from './document';
+import { setCamera, lookAt, fitView } from './camera';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -146,6 +147,9 @@ const definitions = [
   insertInstance,
   explodeInstance,
   clearDocument,
+  setCamera,
+  lookAt,
+  fitView,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

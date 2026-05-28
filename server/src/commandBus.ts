@@ -127,7 +127,9 @@ export function undo(): CommandBusResult {
   const previous = _undoStack[_undoStack.length - 1] as CadDocument;
   _undoStack = _undoStack.slice(0, -1);
   _redoStack = [..._redoStack, current].slice(-MAX_UNDO_DEPTH);
-  setLiveDoc(previous);
+  // fullSnapshot=true: undo replaces the full doc state; a patch would be ambiguous
+  // because entities may have been removed in the undone step.
+  setLiveDoc(previous, true);
   return {
     summary: 'Undid last change.',
     affected: [],
@@ -158,7 +160,8 @@ export function redo(): CommandBusResult {
   const next = _redoStack[_redoStack.length - 1] as CadDocument;
   _redoStack = _redoStack.slice(0, -1);
   _undoStack = [..._undoStack, current].slice(-MAX_UNDO_DEPTH);
-  setLiveDoc(next);
+  // fullSnapshot=true: redo reinstates a prior full doc state.
+  setLiveDoc(next, true);
   return {
     summary: 'Redid last change.',
     affected: [],

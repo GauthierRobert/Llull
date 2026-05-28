@@ -28,6 +28,8 @@ import { create } from 'zustand';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, EntityId } from '@core/model/types';
 import { postCommand, postUndo, postRedo, ServerCommandError } from './serverCommands';
+import type { DocPatch } from '@core/mcp/docPatch';
+import { applyDocPatch } from '@core/mcp/docPatch';
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -162,10 +164,25 @@ export interface CadStoreState {
    * Preserves the current local selection — filtered to entity ids that still
    * exist in the incoming document — so click-highlights survive a server push.
    *
+   * Used for: initial connect, undo/redo (full state replacement).
+   *
    * @pure  This is display sync, NOT a document mutation routed through execute().
    *        Allowed by the PRIME DIRECTIVE because it does not originate a CAD command.
    */
   hydrateLiveDocument(doc: CadDocument): void;
+
+  /**
+   * Apply an incremental entity-level patch from the server SSE stream.
+   * Only touched entities are updated in the store; unchanged entities keep
+   * their same object references so React does not re-render unaffected meshes.
+   *
+   * Preserves the current local selection (filters stale ids after the patch).
+   *
+   * Used for: every normal mutating command result (O(change) cost).
+   *
+   * @pure  Display sync only, not a CAD command.
+   */
+  applyLivePatch(patch: DocPatch): void;
 
   /**
    * Update the live SSE connection status.
@@ -279,6 +296,17 @@ export const useStore = create<CadStoreState>()((set, get) => ({
     const nextSelection = currentSelection.filter((id) => id in doc.entities);
     set({
       document: { ...doc, selection: nextSelection },
+    });
+  },
+
+  applyLivePatch(patch: DocPatch): void {
+    const state = get();
+    const next = applyDocPatch(state.document, patch);
+    // Preserve selection: filter out any ids removed by the patch.
+    const removedSet = new Set(patch.entities.removed);
+    const nextSelection = state.document.selection.filter((id) => !removedSet.has(id));
+    set({
+      document: { ...next, selection: nextSelection },
     });
   },
 

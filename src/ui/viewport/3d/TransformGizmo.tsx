@@ -3,15 +3,18 @@
  *
  * Transform gizmo for the selected 3D entity.
  *
- * Attaches drei <TransformControls> to a dummy Object3D target whose transform
- * is initialised from the selected entity each time selection changes. On drag
- * END the component computes the delta vs the entity's stored transform and
- * dispatches the appropriate command — it NEVER mutates the entity directly
+ * Attaches drei <TransformControls> using the CHILDREN pattern — a <group>
+ * rendered inside <TransformControls> is the transform target. Because that
+ * group is a real scene-graph node, TransformControls.attach() succeeds and
+ * the "attached object must be part of the scene graph" error never fires.
+ *
+ * On drag END the component computes the delta vs the entity's stored transform
+ * and dispatches the appropriate command — it NEVER mutates the entity directly
  * (PRIME DIRECTIVE / R1).
  *
  * Feedback-loop prevention
  * ─────────────────────────
- * The dummy target is only synced FROM the entity store at two safe moments:
+ * The target group is only synced FROM the entity store at two safe moments:
  *   1. When the selected entity id changes (new selection).
  *   2. After a dispatch completes (store updates → entity has new transform).
  * During a drag the store is read-only from the gizmo's perspective; the gizmo
@@ -47,10 +50,13 @@
  * `SnapIndicator3D` also calls `invalidate()` on mount/unmount to ensure the
  * indicator appears and disappears cleanly.
  *
+ * When no drag is in progress the gizmo is IDLE: no invalidate() is called by
+ * this component — the demand frameloop quiesces correctly.
+ *
  * @affects dispatches move_entity | rotate_entity | scale_entity on drag end
  */
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, type MutableRefObject } from 'react';
 import { TransformControls } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -138,9 +144,11 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
   const selectedId = selection.length === 1 ? selection[0] : undefined;
   const entity: Entity | undefined = selectedId != null ? entities[selectedId] : undefined;
 
-  // The dummy Object3D that TransformControls attaches to.
-  // We imperatively set its transform; drei then renders the gizmo around it.
-  const targetRef = useRef<THREE.Object3D>(new THREE.Object3D());
+  // Ref to the <group> sibling that TransformControls attaches to.
+  // Typed as THREE.Group | null so React gives us a MutableRefObject (current
+  // is writable). The group IS rendered into the scene — parent != null after
+  // mount — so controls.attach(targetRef.current) succeeds without error (W5C).
+  const targetRef = useRef<THREE.Group | null>(null);
 
   // Pre-drag baseline — captured in the dragging-changed → true handler so
   // the delta on drag end is always relative to where the drag started.
@@ -177,9 +185,11 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
   }, [selectedId]);
 
   // ---- Sync target from entity on id change ----
+  // Compute render-space position from entity's world position minus renderOrigin.
   useEffect(() => {
     if (!entity) return;
     const t = targetRef.current;
+    if (!t) return;
     const rp = toRenderPosition(entity.position, renderOrigin);
     t.position.set(rp[0], rp[1], rp[2]);
     t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
@@ -191,6 +201,7 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
   useEffect(() => {
     if (!entity) return;
     const t = targetRef.current;
+    if (!t) return;
     const rp = toRenderPosition(entity.position, renderOrigin);
     t.position.set(rp[0], rp[1], rp[2]);
     t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
@@ -199,6 +210,9 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
   }, [entity, renderOrigin]);
 
   // ---- Per-frame snap computation (translate only) ----
+  // NOTE: this useFrame runs ONLY when a drag is in progress (isDraggingRef.current).
+  // When idle it returns immediately after the first branch — no setState, no
+  // invalidate() calls → the demand frameloop quiesces.
   useFrame(() => {
     if (!isDraggingRef.current || mode !== 'translate' || !snap3dEnabled) {
       // Ensure indicator is cleared when not snapping.
@@ -210,6 +224,7 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
     }
 
     const t = targetRef.current;
+    if (!t) return;
     // t.position is in RENDER space (relative to floating-origin group).
     // Convert to world space for snap computation.
     const worldX = t.position.x + renderOrigin[0];
@@ -260,6 +275,7 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
       if (dragging) {
         // Snapshot pre-drag baseline and rebuild candidates.
         const t = targetRef.current;
+        if (!t) return;
         preDragPos.current.copy(t.position);
         preDragRot.current.copy(t.rotation);
         preDragScale.current.copy(t.scale);
@@ -276,6 +292,7 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
 
       if (!selectedId) return;
       const t = targetRef.current;
+      if (!t) return;
 
       if (mode === 'translate') {
         // Apply snapped position to the gizmo target before computing delta.
@@ -322,11 +339,27 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
 
   if (!entity || !selectedId) return null;
 
+  // Compute the render-space position for initial group placement.
+  const rp = toRenderPosition(entity.position, renderOrigin);
+
   return (
     <>
+      {/*
+        Sibling pattern: render a real scene-graph <group> and pass its ref
+        to TransformControls as the `object` prop. drei calls:
+          controls.attach(object instanceof THREE.Object3D ? object : object.current)
+        Because targetRef.current is a proper scene node (parent != null),
+        the "attached object must be part of the scene graph" error never fires
+        and the demand frameloop quiesces when idle (W5C / W5G).
+      */}
+      <group
+        ref={targetRef}
+        position={[rp[0], rp[1], rp[2]]}
+        rotation={[entity.rotation[0], entity.rotation[1], entity.rotation[2]]}
+      />
       <TransformControls
         ref={controlsRef}
-        object={targetRef.current}
+        object={targetRef as unknown as MutableRefObject<THREE.Object3D>}
         mode={mode}
         size={0.8}
       />

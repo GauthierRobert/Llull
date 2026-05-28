@@ -5331,3 +5331,273 @@ describe('clear_document', () => {
     expect(schema!.annotations?.destructiveHint).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// set_camera
+// ---------------------------------------------------------------------------
+
+describe('set_camera', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('updates all four camera fields when all are provided', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_camera', {
+      target: [1, 2, 3],
+      azimuth: 0.5,
+      polar: 1.0,
+      distance: 20,
+    });
+
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).not.toBe(doc);
+    expect(result.document.camera.target).toEqual([1, 2, 3]);
+    expect(result.document.camera.azimuth).toBe(0.5);
+    expect(result.document.camera.polar).toBe(1.0);
+    expect(result.document.camera.distance).toBe(20);
+    expect(result.summary).toContain('target');
+  });
+
+  it('preserves unspecified fields', () => {
+    const doc = createEmptyDocument();
+    const prev = doc.camera;
+    const result = execute(doc, 'set_camera', { azimuth: 1.2 });
+
+    expect(result.document.camera.target).toEqual(prev.target);
+    expect(result.document.camera.polar).toBe(prev.polar);
+    expect(result.document.camera.distance).toBe(prev.distance);
+    expect(result.document.camera.azimuth).toBe(1.2);
+  });
+
+  it('is pure — input document is never mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'set_camera', { distance: 50, azimuth: 1 });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('does NOT append to featureHistory', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_camera', { distance: 15 });
+    expect(result.document.featureHistory).toHaveLength(0);
+  });
+
+  it('graceful no-op when distance <= 0', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_camera', { distance: 0 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('distance');
+  });
+
+  it('graceful no-op when no fields are specified', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'set_camera', {});
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('tool schema is present and has idempotentHint', () => {
+    const schemas = toToolSchemas();
+    const schema = schemas.find((s) => s.name === 'set_camera');
+    expect(schema).toBeDefined();
+    expect(schema!.annotations?.idempotentHint).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// look_at
+// ---------------------------------------------------------------------------
+
+describe('look_at', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('sets target and preserves distance', () => {
+    const doc = createEmptyDocument();
+    const prevDistance = doc.camera.distance;
+    const result = execute(doc, 'look_at', { target: [5, 10, 0] });
+
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).not.toBe(doc);
+    expect(result.document.camera.target).toEqual([5, 10, 0]);
+    expect(result.document.camera.distance).toBe(prevDistance);
+  });
+
+  it('optionally overrides azimuth and polar', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'look_at', { target: [0, 0, 0], azimuth: 1.57, polar: 0.8 });
+
+    expect(result.document.camera.azimuth).toBeCloseTo(1.57);
+    expect(result.document.camera.polar).toBeCloseTo(0.8);
+  });
+
+  it('preserves existing azimuth/polar when not specified', () => {
+    const doc = createEmptyDocument();
+    const prev = doc.camera;
+    const result = execute(doc, 'look_at', { target: [3, 3, 3] });
+
+    expect(result.document.camera.azimuth).toBe(prev.azimuth);
+    expect(result.document.camera.polar).toBe(prev.polar);
+  });
+
+  it('is pure — input document is never mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'look_at', { target: [1, 2, 3] });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('does NOT append to featureHistory', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'look_at', { target: [0, 0, 0] });
+    expect(result.document.featureHistory).toHaveLength(0);
+  });
+
+  it('graceful no-op when target is missing', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'look_at', {} as { target: [number, number, number] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('target');
+  });
+
+  it('graceful no-op when target has wrong length', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'look_at', { target: [1, 2] as unknown as [number, number, number] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('graceful no-op when target contains non-finite value', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'look_at', { target: [1, Infinity, 0] });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('tool schema is present and lists target as required', () => {
+    const schemas = toToolSchemas();
+    const schema = schemas.find((s) => s.name === 'look_at');
+    expect(schema).toBeDefined();
+    expect(schema!.input_schema.required).toContain('target');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fit_view
+// ---------------------------------------------------------------------------
+
+describe('fit_view', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('fits all entities — target near scene centre, distance > 0', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] }).document;
+
+    const result = execute(doc, 'fit_view', { direction: 'iso' });
+
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).not.toBe(doc);
+    expect(result.document.camera.distance).toBeGreaterThan(0);
+    // Target should be near the box centre [0,0,0].
+    const t = result.document.camera.target;
+    expect(t[0]).toBeCloseTo(0, 3);
+    expect(t[1]).toBeCloseTo(0, 3);
+    expect(t[2]).toBeCloseTo(0, 3);
+    expect(result.summary).toContain('iso');
+  });
+
+  it('applies correct azimuth/polar for front preset', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const result = execute(doc, 'fit_view', { direction: 'front' });
+
+    expect(result.document.camera.azimuth).toBeCloseTo(0, 5);
+    expect(result.document.camera.polar).toBeCloseTo(Math.PI / 2, 5);
+  });
+
+  it('applies correct azimuth/polar for top preset', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const result = execute(doc, 'fit_view', { direction: 'top' });
+
+    expect(result.document.camera.polar).toBeCloseTo(0.01, 5);
+  });
+
+  it('"current" direction preserves existing azimuth and polar', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_camera', { azimuth: 1.1, polar: 0.7 }).document;
+    doc = execute(doc, 'add_box', { size: [3, 3, 3] }).document;
+
+    const result = execute(doc, 'fit_view', { direction: 'current' });
+    expect(result.document.camera.azimuth).toBeCloseTo(1.1, 5);
+    expect(result.document.camera.polar).toBeCloseTo(0.7, 5);
+    expect(result.document.camera.distance).toBeGreaterThan(0);
+  });
+
+  it('padding scales the computed distance', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+
+    const tight = execute(doc, 'fit_view', { direction: 'iso', padding: 1.0 });
+    const loose = execute(doc, 'fit_view', { direction: 'iso', padding: 2.0 });
+
+    expect(loose.document.camera.distance).toBeCloseTo(
+      tight.document.camera.distance * 2,
+      5,
+    );
+  });
+
+  it('empty document falls back to default framing with explanatory summary', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'fit_view', { direction: 'front' });
+
+    expect(result.document).not.toBe(doc);
+    expect(result.document.camera.distance).toBe(10);
+    expect(result.document.camera.target).toEqual([0, 0, 0]);
+    expect(result.summary).toContain('empty');
+  });
+
+  it('is pure — input document is never mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'fit_view', {});
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('does NOT append to featureHistory', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const result = execute(doc, 'fit_view', { direction: 'iso' });
+    // featureHistory should only contain the add_box step, not fit_view.
+    expect(result.document.featureHistory).toHaveLength(1);
+    expect(result.document.featureHistory[0]!.name).toBe('add_box');
+  });
+
+  it('graceful no-op for unknown direction', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'fit_view', { direction: 'diagonal' as 'front' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('diagonal');
+  });
+
+  it('graceful no-op when padding <= 0', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'fit_view', { padding: 0 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('padding');
+  });
+
+  it('tool schema is present and lists all valid direction enum values', () => {
+    const schemas = toToolSchemas();
+    const schema = schemas.find((s) => s.name === 'fit_view');
+    expect(schema).toBeDefined();
+    const dirProp = schema!.input_schema.properties['direction'];
+    expect(dirProp).toBeDefined();
+    expect(dirProp!.enum).toEqual(
+      expect.arrayContaining(['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current']),
+    );
+  });
+});

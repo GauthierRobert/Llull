@@ -4,6 +4,18 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   plugins: [react()],
+  // Serve .wasm files with the correct MIME type so WebAssembly.instantiateStreaming
+  // succeeds in the browser (manifold-3d, opencascade.js). Vite dev-server otherwise
+  // serves them as application/octet-stream which browsers reject for streaming compile.
+  assetsInclude: ['**/*.wasm'],
+  server: {
+    headers: {
+      // Required for SharedArrayBuffer / COOP-COEP if needed; harmless otherwise.
+      // application/wasm is set by Vite's built-in mime map when assetsInclude covers .wasm.
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
   resolve: {
     alias: {
       '@core': resolve(__dirname, 'src/core'),
