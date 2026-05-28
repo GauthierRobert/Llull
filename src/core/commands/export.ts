@@ -8,10 +8,11 @@
  * @layer core/commands
  */
 
-import type { Entity, Vec3 } from '../model/types';
+import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
 import { is3D } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { applyEulerXYZ } from './render';
+import { expandInstance } from './assemblies';
 
 // ---------------------------------------------------------------------------
 // Internal math helpers (pure)
@@ -47,7 +48,7 @@ function facetNormal(v0: Vec3, v1: Vec3, v2: Vec3): Vec3 {
 // Triangle soup: a list of [v0, v1, v2] world-space triangles
 // ---------------------------------------------------------------------------
 
-type Triangle = readonly [Vec3, Vec3, Vec3];
+export type Triangle = readonly [Vec3, Vec3, Vec3];
 
 // ---------------------------------------------------------------------------
 // Shared tessellation constants (mirror render.ts values for consistency)
@@ -328,22 +329,112 @@ function applyRotationToTriangles(tris: Triangle[], position: Vec3, rotation: Ve
   );
 }
 
+/**
+ * Triangulate a surface of revolution (mirrors tessellateRevolution in render.ts,
+ * outputting Triangle[] instead of PreDepthPolygon[]).
+ *
+ * Coordinate conventions match render.ts:
+ *   Z-axis revolution: radial→X, axial→Z (default/Z-up)
+ *   Y-axis revolution: radial→X, axial→Y
+ *   X-axis revolution: radial→Y, axial→X
+ */
+function triangulateRevolution(e: {
+  position: Vec3;
+  profile: ReadonlyArray<readonly [number, number]>;
+  axis: Vec3;
+  angle: number;
+  segments: number;
+  rotation: Vec3;
+}): Triangle[] {
+  if (e.profile.length < 3) return [];
+  const { profile, angle, segments } = e;
+  const [px, py, pz] = e.position;
+  const [ax, ay, az] = e.axis;
+  const absX = Math.abs(ax), absY = Math.abs(ay), absZ = Math.abs(az);
+
+  function profileToWorld(r: number, a: number, theta: number): Vec3 {
+    const cosT = Math.cos(theta);
+    const sinT = Math.sin(theta);
+    if (absZ >= absX && absZ >= absY) {
+      return [px + r * cosT, py + r * sinT, pz + a];
+    } else if (absY >= absX) {
+      return [px + r * cosT, py + a, pz + r * sinT];
+    } else {
+      return [px + a, py + r * cosT, pz + r * sinT];
+    }
+  }
+
+  const n = profile.length;
+  const isFull = angle >= 2 * Math.PI - 1e-6;
+  const ringCount = isFull ? segments : segments + 1;
+  const rings: Vec3[][] = [];
+  for (let s = 0; s < ringCount; s++) {
+    const theta = (angle * s) / segments;
+    const ring: Vec3[] = [];
+    for (let i = 0; i < n; i++) {
+      const [r, a] = profile[i]!;
+      ring.push(profileToWorld(r, a, theta));
+    }
+    rings.push(ring);
+  }
+
+  const tris: Triangle[] = [];
+  const numRings = rings.length;
+
+  // Stitch side quads between consecutive rings → 2 triangles each
+  for (let s = 0; s < segments; s++) {
+    const ringA = rings[s]!;
+    const ringB = rings[(s + 1) % numRings]!;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      tris.push([ringA[i]!, ringA[j]!, ringB[j]!]);
+      tris.push([ringA[i]!, ringB[j]!, ringB[i]!]);
+    }
+  }
+
+  // End caps for partial revolutions
+  if (!isFull) {
+    tris.push(...fanTriangulate([...rings[0]!].reverse()));
+    tris.push(...fanTriangulate([...rings[segments]!]));
+  }
+
+  return applyRotationToTriangles(tris, e.position, e.rotation);
+}
+
 // ---------------------------------------------------------------------------
 // Entity → triangles dispatch
 // ---------------------------------------------------------------------------
 
-function entityToTriangles(e: Entity): Triangle[] {
+/**
+ * Convert a single entity to a world-space triangle list.
+ * Accepts `doc` for instance expansion (looks up components).
+ * 2D shapes and unknown kinds return [].
+ */
+export function entityToTriangles(e: Entity, doc: CadDocument): Triangle[] {
   switch (e.kind) {
-    case 'box':       return triangulateBox(e);
-    case 'cylinder':  return triangulateCylinder(e);
-    case 'sphere':    return triangulateSphere(e);
-    case 'cone':      return triangulateCone(e);
-    case 'torus':     return triangulateTorus(e);
-    case 'wedge':     return tessellateWedge(e);
-    case 'pyramid':   return triangulatePyramid(e);
-    case 'extrusion': return triangulateExtrusion(e);
-    case 'mesh':      return triangulateMesh(e);
-    default:          return [];   // 2D shapes and unknowns → nothing
+    case 'box':        return triangulateBox(e);
+    case 'cylinder':   return triangulateCylinder(e);
+    case 'sphere':     return triangulateSphere(e);
+    case 'cone':       return triangulateCone(e);
+    case 'torus':      return triangulateTorus(e);
+    case 'wedge':      return tessellateWedge(e);
+    case 'pyramid':    return triangulatePyramid(e);
+    case 'extrusion':  return triangulateExtrusion(e);
+    case 'mesh':       return triangulateMesh(e);
+    case 'revolution': return triangulateRevolution(e);
+    case 'instance': {
+      const inst = e as InstanceEntity;
+      const component = doc.components[inst.componentId];
+      if (!component) return [];
+      const children = expandInstance(inst, component);
+      const result: Triangle[] = [];
+      for (const child of children) {
+        const childTris = entityToTriangles(child, doc);
+        for (const t of childTris) result.push(t);
+      }
+      return result;
+    }
+    default:           return [];   // 2D shapes → nothing
   }
 }
 
@@ -567,7 +658,7 @@ export const exportStl: CommandDefinition<ExportStlParams> = {
         skipped2D++;
         continue;
       }
-      const tris = entityToTriangles(e);
+      const tris = entityToTriangles(e, doc);
       for (const t of tris) {
         allTris.push(t);
       }

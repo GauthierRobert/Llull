@@ -36,6 +36,7 @@ import { ConeMesh } from './entities/ConeMesh';
 import { TorusMesh } from './entities/TorusMesh';
 import { WedgeMesh } from './entities/WedgeMesh';
 import { PyramidMesh } from './entities/PyramidMesh';
+import { RevolutionMesh } from './entities/RevolutionMesh';
 import { TextMesh } from './entities/TextMesh';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
@@ -163,6 +164,8 @@ function EntityRenderer({
       return <WedgeMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'pyramid':
       return <PyramidMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+    case 'revolution':
+      return <RevolutionMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
     case 'text':
       return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
     case 'instance':

@@ -60,6 +60,7 @@ import {
   massProperties,
 } from './measure';
 import { exportStl } from './export';
+import { exportObj, exportGltf } from './export_formats';
 import { createComponent, insertInstance, explodeInstance } from './assemblies';
 import { clearDocument } from './document';
 import { setCamera, lookAt, fitView } from './camera';
@@ -141,6 +142,8 @@ const definitions = [
   createMaterial,
   assignMaterial,
   exportStl,
+  exportObj,
+  exportGltf,
   saveRecipe,
   instantiateRecipe,
   createComponent,

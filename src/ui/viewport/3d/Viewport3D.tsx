@@ -163,6 +163,54 @@ function sphericalToCartesian(
 }
 
 // ---------------------------------------------------------------------------
+// CameraReactor — syncs document.camera changes to the live three.js camera
+// ---------------------------------------------------------------------------
+
+/**
+ * Reacts to `document.camera` changes written by commands (`set_camera`, `fit_view`)
+ * and imperatively updates the PerspectiveCamera + OrbitControls to match.
+ *
+ * Pattern (R6): useEffect syncs an external object (three.js camera/controls) to
+ * React state. Does NOT push drag-orbit updates back to the store — orbit/zoom
+ * are presentation-only (architecture L4; PRIME DIRECTIVE).
+ *
+ * Feedback-loop guard: the effect compares the incoming CameraState value against
+ * what the live camera currently shows (target + azimuth/polar/distance computed
+ * from the camera position). Only applies when the selector produces a new object
+ * reference (Zustand shallow equality keeps this stable through re-renders caused
+ * by unrelated store slices).
+ *
+ * Must be mounted inside the Canvas so useThree resolves.
+ */
+function CameraReactor(): null {
+  const { camera, controls, invalidate } = useThree();
+  // Narrow selector: only subscribe to the camera slice (R3).
+  const docCamera = useStore((s) => s.document.camera);
+
+  useEffect(() => {
+    const orbit = controls as OrbitControlsImpl | null;
+    if (!orbit) return;
+
+    const newPos = sphericalToCartesian(
+      docCamera.target as [number, number, number],
+      docCamera.azimuth,
+      docCamera.polar,
+      docCamera.distance,
+    );
+
+    camera.position.set(newPos[0], newPos[1], newPos[2]);
+    orbit.target.set(docCamera.target[0], docCamera.target[1], docCamera.target[2]);
+
+    // Sync OrbitControls internal spherical state to new position/target.
+    orbit.update();
+    // Queue a render frame (demand frameloop).
+    invalidate();
+  }, [docCamera, camera, controls, invalidate]);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // RenderOriginSyncer — per-frame rebase check (inside Canvas, no setState/frame)
 // ---------------------------------------------------------------------------
 
@@ -264,6 +312,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         enabled={orbitEnabled}
         up={[0, 0, 1]}
       />
+
+      {/* ---- Camera reactor: syncs document.camera commands to the live camera ---- */}
+      <CameraReactor />
 
       {/* ---- Demand-mode invalidation: re-render on store/document changes ---- */}
       <StoreInvalidator />

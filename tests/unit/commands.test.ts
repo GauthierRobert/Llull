@@ -5601,3 +5601,404 @@ describe('fit_view', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// export_obj — Wavefront OBJ export
+// ---------------------------------------------------------------------------
+
+describe('export_obj', () => {
+  beforeEach(() => __resetIdCounter());
+
+  /** Helper: decode base64 to Uint8Array (same as in export_stl tests). */
+  function base64ToUint8Array(b64: string): Uint8Array {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const out: number[] = [];
+    let i = 0;
+    const raw = b64.replace(/=+$/, '');
+    while (i < raw.length) {
+      const c0 = chars.indexOf(raw[i++]!);
+      const c1 = chars.indexOf(raw[i++]!);
+      const c2 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
+      const c3 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
+      const n = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
+      out.push((n >> 16) & 0xff);
+      if (raw[i - 2] !== undefined) out.push((n >> 8) & 0xff);
+      if (raw[i - 1] !== undefined) out.push(n & 0xff);
+    }
+    return new Uint8Array(out);
+  }
+  void base64ToUint8Array; // used only in gltf tests below but defined here too
+
+  type ObjData = { format: string; text: string; triangleCount: number };
+
+  // ── happy path: box ───────────────────────────────────────────────────────
+
+  it('box: format=obj, triangleCount=12, well-formed OBJ text', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+
+    const result = execute(doc, 'export_obj', {});
+    expect(result.affected).toEqual([]);
+    expect(result.document).toBe(doc); // same reference — read-only
+
+    const data = result.data as ObjData;
+    expect(data.format).toBe('obj');
+    expect(data.triangleCount).toBe(12);
+
+    // OBJ text must contain v / vn / f records
+    expect(data.text).toContain('v ');
+    expect(data.text).toContain('vn ');
+    expect(data.text).toContain('f ');
+
+    // Vertex count: 12 triangles × 3 vertices = 36
+    const vLines = data.text.split('\n').filter((l) => /^v /.test(l));
+    expect(vLines).toHaveLength(36);
+
+    // Face count: 12 (one f-record per triangle)
+    const fLines = data.text.split('\n').filter((l) => /^f /.test(l));
+    expect(fLines).toHaveLength(12);
+  });
+
+  it('sphere: triangleCount > 0, OBJ text non-empty', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
+
+    const data = execute(doc, 'export_obj', {}).data as ObjData;
+    expect(data.triangleCount).toBeGreaterThan(0);
+    expect(data.text.length).toBeGreaterThan(0);
+  });
+
+  // ── failure path: empty doc ───────────────────────────────────────────────
+
+  it('empty document: triangleCount=0, affected:[], doc unchanged', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'export_obj', {});
+
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+    const data = result.data as ObjData;
+    expect(data.triangleCount).toBe(0);
+    expect(data.format).toBe('obj');
+  });
+
+  it('unknown entityIds: graceful no-op, triangleCount=0, summary mentions id', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'export_obj', { entityIds: ['ghost-id'] });
+
+    const data = result.data as ObjData;
+    expect(data.triangleCount).toBe(0);
+    expect(result.affected).toEqual([]);
+    expect(result.summary).toContain('ghost-id');
+  });
+
+  it('2D-only entities skipped, triangleCount=0', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'draw_line', { start: [0, 0], end: [5, 5] }).document;
+
+    const data = execute(doc, 'export_obj', {}).data as ObjData;
+    expect(data.triangleCount).toBe(0);
+  });
+
+  // ── purity ────────────────────────────────────────────────────────────────
+
+  it('is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'export_obj', {});
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── entityIds subset ──────────────────────────────────────────────────────
+
+  it('entityIds subset: only exports specified entities', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [2, 2, 2] });
+    doc = r1.document;
+    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
+    const boxId = r1.affected[0]!;
+
+    const data = execute(doc, 'export_obj', { entityIds: [boxId] }).data as ObjData;
+    expect(data.triangleCount).toBe(12); // only the box
+  });
+
+  // ── read-only annotation ──────────────────────────────────────────────────
+
+  it('toToolSchemas includes export_obj with readOnlyHint', () => {
+    const schema = toToolSchemas().find((s) => s.name === 'export_obj');
+    expect(schema).toBeDefined();
+    expect(schema?.annotations?.readOnlyHint).toBe(true);
+  });
+
+  // ── revolution regression ─────────────────────────────────────────────────
+
+  it('revolution entity: triangleCount > 0 in OBJ export', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'revolve_profile', {
+      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      axis: 'z',
+      angle: Math.PI * 2,
+      segments: 8,
+    }).document;
+
+    const data = execute(doc, 'export_obj', {}).data as ObjData;
+    expect(data.triangleCount).toBeGreaterThan(0);
+    expect(data.text).toContain('v ');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// export_gltf — glTF 2.0 / GLB export
+// ---------------------------------------------------------------------------
+
+describe('export_gltf', () => {
+  beforeEach(() => __resetIdCounter());
+
+  /** Decode base64 → Uint8Array. */
+  function base64ToUint8Array(b64: string): Uint8Array {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const out: number[] = [];
+    let i = 0;
+    const raw = b64.replace(/=+$/, '');
+    while (i < raw.length) {
+      const c0 = chars.indexOf(raw[i++]!);
+      const c1 = chars.indexOf(raw[i++]!);
+      const c2 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
+      const c3 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
+      const n = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
+      out.push((n >> 16) & 0xff);
+      if (raw[i - 2] !== undefined) out.push((n >> 8) & 0xff);
+      if (raw[i - 1] !== undefined) out.push(n & 0xff);
+    }
+    return new Uint8Array(out);
+  }
+
+  type GltfData = { format: string; triangleCount: number; text?: string; base64?: string };
+
+  // ── happy path: box (glTF JSON) ───────────────────────────────────────────
+
+  it('box + sphere: format=gltf, triangleCount > 12, valid JSON with asset.version=2.0', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
+
+    const result = execute(doc, 'export_gltf', {});
+    expect(result.affected).toEqual([]);
+    expect(result.document).toBe(doc);
+
+    const data = result.data as GltfData;
+    expect(data.format).toBe('gltf');
+    expect(data.triangleCount).toBeGreaterThan(12); // box alone = 12
+
+    // Must be parseable JSON
+    expect(() => JSON.parse(data.text!)).not.toThrow();
+    const gltf = JSON.parse(data.text!) as Record<string, unknown>;
+
+    // Minimal valid glTF 2.0 structure
+    expect((gltf['asset'] as Record<string, unknown>)['version']).toBe('2.0');
+    expect(gltf['scene']).toBe(0);
+    expect(Array.isArray(gltf['scenes'])).toBe(true);
+    expect(Array.isArray(gltf['meshes'])).toBe(true);
+    expect(Array.isArray(gltf['accessors'])).toBe(true);
+    expect(Array.isArray(gltf['bufferViews'])).toBe(true);
+    expect(Array.isArray(gltf['buffers'])).toBe(true);
+
+    // BIN buffer inlined as data: URI
+    const buffers = gltf['buffers'] as Array<Record<string, unknown>>;
+    expect((buffers[0]!['uri'] as string).startsWith('data:application/octet-stream;base64,')).toBe(true);
+  });
+
+  it('box: triangleCount=12 in glTF JSON mode', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+
+    const data = execute(doc, 'export_gltf', { binary: false }).data as GltfData;
+    expect(data.triangleCount).toBe(12);
+    expect(data.format).toBe('gltf');
+    expect(data.text).toBeDefined();
+  });
+
+  // ── GLB binary mode ───────────────────────────────────────────────────────
+
+  it('box: GLB mode — format=glb, base64 defined, magic bytes correct', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+
+    const result = execute(doc, 'export_gltf', { binary: true });
+    const data = result.data as GltfData;
+    expect(data.format).toBe('glb');
+    expect(data.base64).toBeDefined();
+    expect(data.triangleCount).toBe(12);
+
+    // Decode and check GLB magic 0x46546C67 ('glTF') at offset 0
+    const bytes = base64ToUint8Array(data.base64!);
+    const view = new DataView(bytes.buffer);
+    expect(view.getUint32(0, true)).toBe(0x46546C67); // 'glTF' little-endian
+    expect(view.getUint32(4, true)).toBe(2);           // version 2
+  });
+
+  it('GLB total byte length matches header field', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+
+    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
+    const bytes = base64ToUint8Array(data.base64!);
+    const view = new DataView(bytes.buffer);
+    const headerLength = view.getUint32(8, true);
+    expect(headerLength).toBe(bytes.length);
+  });
+
+  it('GLB JSON chunk type is 0x4E4F534A', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+
+    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
+    const bytes = base64ToUint8Array(data.base64!);
+    const view = new DataView(bytes.buffer);
+    // First chunk type at offset 16
+    expect(view.getUint32(16, true)).toBe(0x4E4F534A); // 'JSON'
+  });
+
+  // ── failure path: empty doc ───────────────────────────────────────────────
+
+  it('empty document: triangleCount=0, affected:[], doc unchanged', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'export_gltf', {});
+
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+    const data = result.data as GltfData;
+    expect(data.triangleCount).toBe(0);
+    expect(data.format).toBe('gltf');
+    // JSON still parseable
+    expect(() => JSON.parse(data.text!)).not.toThrow();
+  });
+
+  it('empty document GLB: still has valid header', () => {
+    const doc = createEmptyDocument();
+    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
+    expect(data.triangleCount).toBe(0);
+    expect(data.base64).toBeDefined();
+
+    const bytes = base64ToUint8Array(data.base64!);
+    const view = new DataView(bytes.buffer);
+    expect(view.getUint32(0, true)).toBe(0x46546C67); // valid GLB magic
+  });
+
+  it('unknown entityIds: triangleCount=0, summary mentions id', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'export_gltf', { entityIds: ['ghost-id'] });
+
+    expect((result.data as GltfData).triangleCount).toBe(0);
+    expect(result.affected).toEqual([]);
+    expect(result.summary).toContain('ghost-id');
+  });
+
+  // ── purity ────────────────────────────────────────────────────────────────
+
+  it('is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'export_gltf', {});
+    execute(doc, 'export_gltf', { binary: true });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  // ── read-only annotation ──────────────────────────────────────────────────
+
+  it('toToolSchemas includes export_gltf with readOnlyHint', () => {
+    const schema = toToolSchemas().find((s) => s.name === 'export_gltf');
+    expect(schema).toBeDefined();
+    expect(schema?.annotations?.readOnlyHint).toBe(true);
+  });
+
+  // ── registry 1:1 invariant ────────────────────────────────────────────────
+
+  it('toToolSchemas() still 1:1 with listCommands() after export_gltf registered', () => {
+    expect(toToolSchemas().length).toBe(listCommands().length);
+  });
+
+  // ── revolution regression: all three exporters ────────────────────────────
+
+  it('revolution entity: triangleCount > 0 in glTF JSON export', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'revolve_profile', {
+      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      axis: 'z',
+      angle: Math.PI * 2,
+      segments: 8,
+    }).document;
+
+    const data = execute(doc, 'export_gltf', {}).data as GltfData;
+    expect(data.triangleCount).toBeGreaterThan(0);
+  });
+
+  it('revolution entity: triangleCount > 0 in GLB export', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'revolve_profile', {
+      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      axis: 'z',
+      angle: Math.PI * 2,
+      segments: 8,
+    }).document;
+
+    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
+    expect(data.triangleCount).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// export_stl + export_obj + export_gltf — revolution regression (all three)
+// ---------------------------------------------------------------------------
+
+describe('export revolution regression', () => {
+  beforeEach(() => __resetIdCounter());
+
+  type StlData = { format: string; triangleCount: number; stl?: string };
+  type ObjData = { format: string; text: string; triangleCount: number };
+  type GltfData = { format: string; triangleCount: number; text?: string; base64?: string };
+
+  it('revolve_profile entity serialises non-empty in export_stl', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'revolve_profile', {
+      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      axis: 'z',
+      angle: Math.PI * 2,
+      segments: 12,
+    }).document;
+
+    const data = execute(doc, 'export_stl', {}).data as StlData;
+    expect(data.triangleCount).toBeGreaterThan(0);
+    expect(data.stl).toContain('facet normal');
+  });
+
+  it('revolve_profile entity serialises non-empty in export_obj', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'revolve_profile', {
+      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      axis: 'z',
+      angle: Math.PI * 2,
+      segments: 12,
+    }).document;
+
+    const data = execute(doc, 'export_obj', {}).data as ObjData;
+    expect(data.triangleCount).toBeGreaterThan(0);
+    expect(data.text).toContain('f ');
+  });
+
+  it('revolve_profile entity serialises non-empty in export_gltf', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'revolve_profile', {
+      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      axis: 'z',
+      angle: Math.PI * 2,
+      segments: 12,
+    }).document;
+
+    const data = execute(doc, 'export_gltf', {}).data as GltfData;
+    expect(data.triangleCount).toBeGreaterThan(0);
+    const gltf = JSON.parse(data.text!) as Record<string, unknown>;
+    expect((gltf['asset'] as Record<string, unknown>)['version']).toBe('2.0');
+  });
+});
