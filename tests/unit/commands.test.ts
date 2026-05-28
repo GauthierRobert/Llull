@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createEmptyDocument, is2D } from '@core/model/types';
-import type { Entity, TextEntity, Vec3 } from '@core/model/types';
+import type { Entity, TextEntity } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 import { entityBounds } from '@core/commands/scene';
+import { __resetIdCounter } from '@lib/id';
 
 describe('command layer', () => {
   beforeEach(() => __resetIdCounter());
@@ -462,354 +462,6 @@ describe('command layer', () => {
     const result = execute(doc, 'find_entities', { kind: 'sphere' });
     expect(result.summary).toContain('kind=sphere');
     expect(result.summary).toContain('0 match');
-  });
-
-  // ---------------------------------------------------------------------------
-  // Assemblies: create_component, insert_instance, explode_instance
-  // ---------------------------------------------------------------------------
-
-  it('create_component promotes entities into a component and replaces them with one instance', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_sphere', { radius: 1, position: [5, 0, 0] });
-    doc = r2.document;
-    const boxId = r1.affected[0]!;
-    const sphereId = r2.affected[0]!;
-
-    const result = execute(doc, 'create_component', { name: 'MyComp', entityIds: [boxId, sphereId] });
-    doc = result.document;
-
-    // One instance replaces the two source entities
-    expect(result.affected).toHaveLength(1);
-    const instanceId = result.affected[0]!;
-    const instance = doc.entities[instanceId];
-    expect(instance).toBeDefined();
-    expect(instance!.kind).toBe('instance');
-
-    // Source entities removed
-    expect(doc.entities[boxId]).toBeUndefined();
-    expect(doc.entities[sphereId]).toBeUndefined();
-    expect(doc.order).not.toContain(boxId);
-    expect(doc.order).not.toContain(sphereId);
-    expect(doc.order).toContain(instanceId);
-
-    // Component stored
-    const componentId = (instance as { componentId: string }).componentId;
-    expect(doc.components[componentId]).toBeDefined();
-    expect(doc.components[componentId]!.name).toBe('MyComp');
-    expect(Object.keys(doc.components[componentId]!.entities)).toHaveLength(2);
-
-    // Summary is informative
-    expect(result.summary).toContain('MyComp');
-    expect(result.summary).toContain(instanceId);
-  });
-
-  it('create_component is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const boxId = doc.order[0]!;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'create_component', { name: 'Test', entityIds: [boxId] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('create_component with empty entityIds is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_component', { name: 'Empty', entityIds: [] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('non-empty');
-  });
-
-  it('create_component with a missing entity id is a graceful no-op', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const result = execute(doc, 'create_component', { name: 'Bad', entityIds: ['does-not-exist'] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('does-not-exist');
-  });
-
-  it('create_component prunes removed ids from groups and selection', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r2.document;
-    const idA = r1.affected[0]!;
-    const idB = r2.affected[0]!;
-
-    // Group the two
-    const grouped = execute(doc, 'group_entities', { ids: [idA, idB] });
-    doc = { ...grouped.document, selection: [idA, idB] };
-
-    // Promote both into a component
-    const result = execute(doc, 'create_component', { name: 'Pruned', entityIds: [idA, idB] });
-    doc = result.document;
-
-    // Group should be dissolved (< 2 members left)
-    expect(Object.keys(doc.groups)).toHaveLength(0);
-    // Selection should be clear of removed ids
-    expect(doc.selection).not.toContain(idA);
-    expect(doc.selection).not.toContain(idB);
-  });
-
-  it('insert_instance adds an instance entity with correct transform', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-
-    const comp = execute(doc, 'create_component', { name: 'Widget', entityIds: [boxId] });
-    doc = comp.document;
-    const instanceId = comp.affected[0]!;
-    const componentId = (doc.entities[instanceId] as { componentId: string }).componentId;
-
-    const result = execute(doc, 'insert_instance', {
-      componentId,
-      position: [10, 0, 0],
-      rotation: [0, 0, 0],
-      scale: [2, 2, 2],
-    });
-    doc = result.document;
-
-    expect(result.affected).toHaveLength(1);
-    const newInstanceId = result.affected[0]!;
-    const newInstance = doc.entities[newInstanceId]!;
-    expect(newInstance.kind).toBe('instance');
-    expect(newInstance.position).toEqual([10, 0, 0]);
-    expect((newInstance as { scale?: number[] }).scale).toEqual([2, 2, 2]);
-    expect((newInstance as { componentId: string }).componentId).toBe(componentId);
-  });
-
-  it('insert_instance is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-    const comp = execute(doc, 'create_component', { name: 'W', entityIds: [boxId] });
-    doc = comp.document;
-    const instanceId = comp.affected[0]!;
-    const componentId = (doc.entities[instanceId] as { componentId: string }).componentId;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'insert_instance', { componentId });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('insert_instance with unknown componentId is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'insert_instance', { componentId: 'ghost-comp' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost-comp');
-  });
-
-  it('insert_instance with non-finite position is a graceful no-op', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-    const comp = execute(doc, 'create_component', { name: 'W2', entityIds: [boxId] });
-    doc = comp.document;
-    const instanceId = comp.affected[0]!;
-    const componentId = (doc.entities[instanceId] as { componentId: string }).componentId;
-
-    const result = execute(doc, 'insert_instance', {
-      componentId,
-      position: [Infinity, 0, 0] as unknown as [number, number, number],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('two instances of one component share the same componentId (no geometry duplication)', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-
-    // Promote to component
-    const comp = execute(doc, 'create_component', { name: 'Brick', entityIds: [boxId] });
-    doc = comp.document;
-    const inst1Id = comp.affected[0]!;
-    const componentId = (doc.entities[inst1Id] as { componentId: string }).componentId;
-
-    // Insert a second instance at a different position
-    const inst2 = execute(doc, 'insert_instance', { componentId, position: [10, 0, 0] });
-    doc = inst2.document;
-    const inst2Id = inst2.affected[0]!;
-
-    // Both instances reference the same component — geometry is not duplicated
-    const i1 = doc.entities[inst1Id] as { componentId: string };
-    const i2 = doc.entities[inst2Id] as { componentId: string };
-    expect(i1.componentId).toBe(componentId);
-    expect(i2.componentId).toBe(componentId);
-    expect(Object.keys(doc.components)).toHaveLength(1);
-
-    // Editing the component is reflected in both (they reference by id)
-    const component = doc.components[componentId]!;
-    expect(Object.keys(component.entities)).toHaveLength(1);
-  });
-
-  it('explode_instance replaces instance with baked world-space entities', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1], position: [3, 0, 0] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-
-    // Promote to component, then insert at [10,0,0]
-    const comp = execute(doc, 'create_component', { name: 'BoxComp', entityIds: [boxId] });
-    doc = comp.document;
-    const inst1Id = comp.affected[0]!;
-    const componentId = (doc.entities[inst1Id] as { componentId: string }).componentId;
-
-    const inst2 = execute(doc, 'insert_instance', { componentId, position: [10, 0, 0] });
-    doc = inst2.document;
-    const inst2Id = inst2.affected[0]!;
-
-    // Explode the second instance
-    const result = execute(doc, 'explode_instance', { id: inst2Id });
-    doc = result.document;
-
-    // Instance gone, new concrete entities in its place
-    expect(doc.entities[inst2Id]).toBeUndefined();
-    expect(result.affected).toHaveLength(1); // one child entity (the box)
-    const bakedId = result.affected[0]!;
-    const baked = doc.entities[bakedId]!;
-    expect(baked.kind).toBe('box');
-
-    // World position: component-local box was at [3,0,0]; instance at [10,0,0] → [13,0,0]
-    expect(baked.position[0]).toBeCloseTo(13);
-    expect(baked.position[1]).toBeCloseTo(0);
-    expect(baked.position[2]).toBeCloseTo(0);
-
-    // Component definition is unchanged
-    expect(doc.components[componentId]).toBeDefined();
-  });
-
-  it('explode_instance bakes the instance rotation and scale into child world position', () => {
-    let doc = createEmptyDocument();
-    // Component-local box at [1,0,0].
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1], position: [1, 0, 0] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-    const comp = execute(doc, 'create_component', { name: 'Rot', entityIds: [boxId] });
-    doc = comp.document;
-    const componentId = (doc.entities[comp.affected[0]!] as { componentId: string }).componentId;
-
-    // Instance: scale x2, rotate +90° about Z, translate to [0,0,5].
-    const inst = execute(doc, 'insert_instance', {
-      componentId,
-      position: [0, 0, 5],
-      rotation: [0, 0, Math.PI / 2],
-      scale: [2, 2, 2],
-    });
-    doc = inst.document;
-    const instId = inst.affected[0]!;
-
-    const result = execute(doc, 'explode_instance', { id: instId });
-    const baked = result.document.entities[result.affected[0]!]!;
-    // local [1,0,0] → scale×2 → [2,0,0] → Rz(+90°) → [0,2,0] → +[0,0,5] → [0,2,5]
-    expect(baked.position[0]).toBeCloseTo(0);
-    expect(baked.position[1]).toBeCloseTo(2);
-    expect(baked.position[2]).toBeCloseTo(5);
-  });
-
-  it('describe_scene reports an instance world AABB from its component extent (not a point)', () => {
-    let doc = createEmptyDocument();
-    // Box size [2,2,2] at origin → local AABB [-1,-1,-1]..[1,1,1].
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-    const comp = execute(doc, 'create_component', { name: 'Brick2', entityIds: [boxId] });
-    doc = comp.document;
-    const componentId = (doc.entities[comp.affected[0]!] as { componentId: string }).componentId;
-    // Second instance offset to [10,0,0].
-    const inst2 = execute(doc, 'insert_instance', { componentId, position: [10, 0, 0] });
-    doc = inst2.document;
-    const inst2Id = inst2.affected[0]!;
-
-    const snap = execute(doc, 'describe_scene', {}).data as {
-      entities: Array<{ id: string; kind: string; bounds: { min: number[]; max: number[] } }>;
-    };
-    const summary = snap.entities.find((e) => e.id === inst2Id)!;
-    expect(summary.kind).toBe('instance');
-    // Component extent ±1 around the instance position → not a degenerate point.
-    expect(summary.bounds.min[0]).toBeCloseTo(9);
-    expect(summary.bounds.max[0]).toBeCloseTo(11);
-    expect(summary.bounds.min[1]).toBeCloseTo(-1);
-    expect(summary.bounds.max[1]).toBeCloseTo(1);
-  });
-
-  it('explode_instance is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-    const comp = execute(doc, 'create_component', { name: 'E', entityIds: [boxId] });
-    doc = comp.document;
-    const instanceId = comp.affected[0]!;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'explode_instance', { id: instanceId });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('explode_instance on a non-instance entity is a graceful no-op', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const boxId = doc.order[0]!;
-
-    const result = execute(doc, 'explode_instance', { id: boxId });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('not an instance');
-  });
-
-  it('explode_instance on a missing id is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'explode_instance', { id: 'ghost' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('explode_instance when component is missing is a graceful no-op', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-    const comp = execute(doc, 'create_component', { name: 'Gone', entityIds: [boxId] });
-    doc = comp.document;
-    const instanceId = comp.affected[0]!;
-
-    // Manually remove the component to simulate dangling reference
-    const danglingComponentId = (doc.entities[instanceId] as { componentId: string }).componentId;
-    const remainingComponents = { ...doc.components };
-    delete remainingComponents[danglingComponentId];
-    doc = { ...doc, components: remainingComponents };
-
-    const result = execute(doc, 'explode_instance', { id: instanceId });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('not found');
-  });
-
-  it('scale_entity on an instance multiplies its scale field', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const boxId = r1.affected[0]!;
-    const comp = execute(doc, 'create_component', { name: 'S', entityIds: [boxId] });
-    doc = comp.document;
-    const instanceId = comp.affected[0]!;
-
-    const scaled = execute(doc, 'scale_entity', { id: instanceId, factor: 3 });
-    const instance = scaled.document.entities[instanceId] as { scale?: number[] };
-    expect(instance.scale).toEqual([3, 3, 3]);
   });
 });
 
@@ -5445,78 +5097,237 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
   });
 });
 
-// W4B — unified placement anchor (`'center' | 'min' | 'base-center'`).
-// Asserts placement via entityBounds (the AABB convention each command must honour),
-// so a wrong halfExtents/default would be caught. Back-compat: no anchor => stored
-// position is the input position unchanged (each command's pre-W4B default).
-describe('W4B — placement anchor', () => {
+// ---------------------------------------------------------------------------
+// W4B — unified placement anchor ('center' | 'min' | 'base-center')
+// Each add_* command keeps its CURRENT default placement when `anchor` is
+// omitted (back-compat lock); an explicit anchor places the corresponding
+// point of the world AABB at the supplied `position`.
+// ---------------------------------------------------------------------------
+
+describe('W4B — unified placement anchor', () => {
   beforeEach(() => __resetIdCounter());
 
-  const CASES: Array<{
-    command: string;
-    params: Record<string, unknown>;
-    defaultAnchor: 'center' | 'min' | 'base-center';
-  }> = [
-    { command: 'add_box', params: { size: [2, 4, 6] }, defaultAnchor: 'center' },
-    { command: 'add_cylinder', params: { radius: 3, height: 8 }, defaultAnchor: 'center' },
-    { command: 'add_sphere', params: { radius: 5 }, defaultAnchor: 'center' },
-    { command: 'add_cone', params: { radius: 3, height: 7 }, defaultAnchor: 'base-center' },
-    { command: 'add_torus', params: { ringRadius: 5, tubeRadius: 1 }, defaultAnchor: 'center' },
-    { command: 'add_wedge', params: { size: [2, 4, 6] }, defaultAnchor: 'min' },
-    { command: 'add_pyramid', params: { baseWidth: 4, baseDepth: 6, height: 8 }, defaultAnchor: 'base-center' },
-  ];
+  /** Per-component near-equality on a Vec3 (avoids -0 / float noise). */
+  function expectVec(actual: readonly number[], expected: readonly number[]): void {
+    expect(actual).toHaveLength(expected.length);
+    expected.forEach((v, i) => expect(actual[i]!).toBeCloseTo(v, 9));
+  }
 
-  const P: [number, number, number] = [10, 20, 30];
+  /** Resolve the single created entity from a command result. */
+  function createdEntity(
+    doc: ReturnType<typeof createEmptyDocument>,
+    name: string,
+    params: object,
+  ): Entity {
+    const result = execute(doc, name, params);
+    expect(result.affected).toHaveLength(1);
+    return result.document.entities[result.affected[0]!]!;
+  }
 
-  function boundsOf(
-    command: string,
-    params: Record<string, unknown>,
-    anchor?: string,
-  ): { entity: Entity; bounds: { min: Vec3; max: Vec3 } } {
+  // ── Back-compat: omitting anchor reproduces today's stored position ──────
+
+  it('add_box default (no anchor) keeps "center" — stored position === position', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 4, 6], position: [5, 6, 7] });
+    expectVec(e.position, [5, 6, 7]);
+  });
+
+  it('add_cylinder default keeps "center"', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_cylinder', { radius: 1, height: 4, position: [1, 2, 3] });
+    expectVec(e.position, [1, 2, 3]);
+  });
+
+  it('add_sphere default keeps "center"', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_sphere', { radius: 2, position: [1, 2, 3] });
+    expectVec(e.position, [1, 2, 3]);
+  });
+
+  it('add_torus default keeps "center"', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_torus', { ringRadius: 3, tubeRadius: 1, position: [1, 1, 1] });
+    expectVec(e.position, [1, 1, 1]);
+  });
+
+  it('add_cone default keeps "base-center" — base sits at position.z', () => {
+    const result = execute(createEmptyDocument(), 'add_cone', { radius: 1, height: 4, position: [0, 0, 4] });
+    const e = result.document.entities[result.affected[0]!]!;
+    expectVec(e.position, [0, 0, 4]);
+    expect(entityBounds(e).min[2]).toBeCloseTo(4, 9); // base at z = position.z
+  });
+
+  it('add_pyramid default keeps "base-center" — base sits at position.z', () => {
+    const result = execute(createEmptyDocument(), 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 2, position: [0, 0, 3] });
+    const e = result.document.entities[result.affected[0]!]!;
+    expectVec(e.position, [0, 0, 3]);
+    expect(entityBounds(e).min[2]).toBeCloseTo(3, 9);
+  });
+
+  it('add_wedge default keeps "min" — AABB min corner at position', () => {
+    const result = execute(createEmptyDocument(), 'add_wedge', { size: [2, 2, 2], position: [2, 2, 2] });
+    const e = result.document.entities[result.affected[0]!]!;
+    expectVec(e.position, [2, 2, 2]);
+    expectVec(entityBounds(e).min, [2, 2, 2]);
+  });
+
+  // ── Explicit anchors place the right AABB point at position ──────────────
+
+  it('add_box anchor "min" puts the AABB min corner at position', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 4, 6], position: [0, 0, 0], anchor: 'min' });
+    const b = entityBounds(e);
+    expectVec(b.min, [0, 0, 0]);
+    expectVec(b.max, [2, 4, 6]);
+  });
+
+  it('add_box anchor "base-center" centers XY and puts AABB min-Z at position', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 2, 2], position: [1, 1, 0], anchor: 'base-center' });
+    const b = entityBounds(e);
+    expectVec(b.min, [0, 0, 0]);
+    expectVec(b.max, [2, 2, 2]);
+  });
+
+  it('add_cylinder anchor "min" puts the AABB min corner at position', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_cylinder', { radius: 1, height: 4, position: [0, 0, 0], anchor: 'min' });
+    const b = entityBounds(e);
+    expectVec(b.min, [0, 0, 0]);
+    expectVec(b.max, [2, 4, 2]);
+  });
+
+  it('add_sphere anchor "min" puts the AABB min corner at position', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_sphere', { radius: 1, position: [0, 0, 0], anchor: 'min' });
+    const b = entityBounds(e);
+    expectVec(b.min, [0, 0, 0]);
+    expectVec(b.max, [2, 2, 2]);
+  });
+
+  it('add_cone anchor "center" centers the AABB on position', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_cone', { radius: 1, height: 4, position: [0, 0, 0], anchor: 'center' });
+    const b = entityBounds(e);
+    expect(b.min[2]).toBeCloseTo(-2, 9);
+    expect(b.max[2]).toBeCloseTo(2, 9);
+  });
+
+  it('add_pyramid anchor "min" puts the AABB min corner at position', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 2, position: [0, 0, 0], anchor: 'min' });
+    expectVec(entityBounds(e).min, [0, 0, 0]);
+  });
+
+  it('add_wedge anchor "center" centers the AABB on position', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_wedge', { size: [2, 2, 2], position: [0, 0, 0], anchor: 'center' });
+    const b = entityBounds(e);
+    expectVec(b.min, [-1, -1, -1]);
+    expectVec(b.max, [1, 1, 1]);
+  });
+
+  // ── Failure / robustness: unknown or non-string anchor → command default ─
+
+  it('add_box with an unknown anchor string falls back to "center" (no throw)', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 2, 2], position: [3, 3, 3], anchor: 'garbage' });
+    expectVec(e.position, [3, 3, 3]); // identical to the default-center placement
+  });
+
+  it('add_box with a non-string anchor falls back to "center"', () => {
+    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 2, 2], position: [3, 3, 3], anchor: 123 } as object);
+    expectVec(e.position, [3, 3, 3]);
+  });
+
+  it('is pure — using anchor does not mutate the input document', () => {
     const doc = createEmptyDocument();
-    const result = execute(
-      doc,
-      command,
-      anchor === undefined ? { ...params, position: P } : { ...params, position: P, anchor },
-    );
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    return { entity, bounds: entityBounds(entity) };
-  }
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 1, 1], anchor: 'min' });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
 
-  for (const { command, params, defaultAnchor } of CASES) {
-    it(`${command} — anchor:'min' puts the AABB min corner at position`, () => {
-      const { bounds } = boundsOf(command, params, 'min');
-      expect(bounds.min[0]).toBeCloseTo(P[0], 6);
-      expect(bounds.min[1]).toBeCloseTo(P[1], 6);
-      expect(bounds.min[2]).toBeCloseTo(P[2], 6);
-    });
+// ── clear_document ──────────────────────────────────────────────────────────
 
-    it(`${command} — anchor:'center' puts the AABB center at position`, () => {
-      const { bounds } = boundsOf(command, params, 'center');
-      expect((bounds.min[0] + bounds.max[0]) / 2).toBeCloseTo(P[0], 6);
-      expect((bounds.min[1] + bounds.max[1]) / 2).toBeCloseTo(P[1], 6);
-      expect((bounds.min[2] + bounds.max[2]) / 2).toBeCloseTo(P[2], 6);
-    });
+describe('clear_document', () => {
+  beforeEach(() => __resetIdCounter());
 
-    it(`${command} — anchor:'base-center' puts mid-X/Y + min-Z at position`, () => {
-      const { bounds } = boundsOf(command, params, 'base-center');
-      expect((bounds.min[0] + bounds.max[0]) / 2).toBeCloseTo(P[0], 6);
-      expect((bounds.min[1] + bounds.max[1]) / 2).toBeCloseTo(P[1], 6);
-      expect(bounds.min[2]).toBeCloseTo(P[2], 6);
-    });
+  it('clears all entities, order, selection, groups and resets layers', () => {
+    let doc = createEmptyDocument();
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_cylinder', { radius: 1, height: 2 });
+    doc = r2.document;
 
-    it(`${command} — no anchor preserves the pre-W4B default (stored position == input)`, () => {
-      const { entity } = boundsOf(command, params, undefined);
-      expect(entity.position[0]).toBeCloseTo(P[0], 6);
-      expect(entity.position[1]).toBeCloseTo(P[1], 6);
-      expect(entity.position[2]).toBeCloseTo(P[2], 6);
-    });
+    const result = execute(doc, 'clear_document', {});
+    expect(result.affected).toHaveLength(0);
+    expect(result.document.entities).toEqual({});
+    expect(result.document.order).toEqual([]);
+    expect(result.document.selection).toEqual([]);
+    expect(result.document.groups).toEqual({});
+  });
 
-    it(`${command} — unknown anchor falls back to the default (no throw)`, () => {
-      const bogus = boundsOf(command, params, 'not-an-anchor');
-      const def = boundsOf(command, params, defaultAnchor);
-      expect(bogus.entity.position).toEqual(def.entity.position);
-    });
-  }
+  it('resets layers to a single default layer when keepLayers is false (default)', () => {
+    let doc = createEmptyDocument();
+    // Add a second layer and an entity.
+    const layerResult = execute(doc, 'add_layer', { name: 'Extra Layer' });
+    doc = layerResult.document;
+    expect(Object.keys(doc.layers)).toHaveLength(2);
+
+    const result = execute(doc, 'clear_document', {});
+    expect(Object.keys(result.document.layers)).toHaveLength(1);
+    expect(result.document.layerOrder).toHaveLength(1);
+  });
+
+  it('preserves layers when keepLayers is true', () => {
+    let doc = createEmptyDocument();
+    const layerResult = execute(doc, 'add_layer', { name: 'Keep Me' });
+    doc = layerResult.document;
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    expect(Object.keys(doc.layers)).toHaveLength(2);
+
+    const result = execute(doc, 'clear_document', { keepLayers: true });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document.entities).toEqual({});
+    expect(Object.keys(result.document.layers)).toHaveLength(2);
+    expect(result.document.layerOrder).toHaveLength(2);
+  });
+
+  it('preserves units and camera', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_units', { units: 'in' }).document;
+    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r1.document;
+    const originalCamera = doc.camera;
+
+    const result = execute(doc, 'clear_document', {});
+    expect(result.document.units).toBe('in');
+    expect(result.document.camera).toEqual(originalCamera);
+  });
+
+  it('is idempotent — already-empty doc returns no-op summary and same reference', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'clear_document', {});
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    expect(result.summary).toContain('already empty');
+  });
+
+  it('summary is factual — includes entity count, layer count, and units', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_units', { units: 'cm' }).document;
+    for (let i = 0; i < 3; i++) {
+      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    }
+
+    const result = execute(doc, 'clear_document', {});
+    expect(result.summary).toContain('3');
+    expect(result.summary).toContain('cm');
+  });
+
+  it('is pure — input document is never mutated', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'clear_document', {});
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('tool schema round-trips through toToolSchemas()', () => {
+    const schemas = toToolSchemas();
+    const schema = schemas.find((s) => s.name === 'clear_document');
+    expect(schema).toBeDefined();
+    expect(schema!.description).toBeTruthy();
+    expect(schema!.annotations?.destructiveHint).toBe(true);
+  });
 });

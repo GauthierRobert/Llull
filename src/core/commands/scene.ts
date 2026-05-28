@@ -9,14 +9,15 @@
  * `data`) and is also embedded in the `build_project` report so an agent sees the
  * final scene in the same round-trip.
  *
- * Agent-facing bounds (describe_scene, creation summaries) use `worldAabb` —
- * the rotation-aware world AABB. `entityBounds` remains the unrotated local AABB
- * used by measure, query, and check commands (unchanged by W4F).
+ * Bounds are world-space AABBs. When an entity has non-zero `rotation` the AABB
+ * is computed from the rotated OBB corners (three.js Rx·Ry·Rz convention) and
+ * carries `oriented:true` so agents know the bounds reflect the actual rotated
+ * geometry. Zero-rotation entities produce the same output as before (back-compat).
  */
 
 import type { AnimationChannel, AnimationMode, CadDocument, Entity, EntityKind, InstanceEntity, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { applyEulerXYZ, isZeroRotation } from '../../lib/math3';
+import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
 
 // ---------------------------------------------------------------------------
 // Snapshot types
@@ -26,6 +27,13 @@ import { applyEulerXYZ, isZeroRotation } from '../../lib/math3';
 export interface Bounds {
   min: Vec3;
   max: Vec3;
+  /**
+   * True when the entity had non-zero rotation and the bounds were computed by
+   * rotating the entity's local OBB corners into world space (i.e. the AABB
+   * wraps the actual rotated geometry). Absent / false for unrotated entities —
+   * those bounds are identical to the previous behaviour.
+   */
+  oriented?: true;
 }
 
 export interface EntitySummary {
@@ -33,13 +41,8 @@ export interface EntitySummary {
   kind: EntityKind;
   layerId: string;
   position: Vec3;
-  /** World-space axis-aligned bounds (rotation-aware world AABB via worldAabb). */
+  /** World-space AABB. `oriented:true` when rotation was applied. */
   bounds: Bounds;
-  /**
-   * Present only when the entity has a non-zero rotation.
-   * Reminds the agent that bounds is the rotated world AABB, not the local AABB.
-   */
-  rotated?: true;
 }
 
 export interface LayerSummary {
@@ -232,15 +235,11 @@ export function entityBounds(e: Entity): Bounds {
  * @pure — reads only; does not mutate
  */
 export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument): Bounds {
-  // Inline import to avoid circular dep: assemblies.ts imports from scene.ts only
-  // through lib/math3, not through scene. We reproduce the bake logic here using only
-  // applyEulerXYZ which lives in lib.
   const component = doc.components[instance.componentId];
   if (!component || component.order.length === 0) {
     return { min: instance.position, max: instance.position };
   }
 
-  // Expand each child's local AABB through the instance transform.
   const scale = instance.scale ?? ([1, 1, 1] as const);
   const [sx, sy, sz] = scale;
   const rot = instance.rotation;
@@ -254,8 +253,6 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
     if (!child) continue;
 
     const localBounds = entityBounds(child);
-
-    // 8 corners of the child local AABB
     const lMin = localBounds.min;
     const lMax = localBounds.max;
     const corners: Vec3[] = [
@@ -278,7 +275,7 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
       const world: Vec3 = [rotated[0] + pos[0], rotated[1] + pos[1], rotated[2] + pos[2]];
 
       if (!combined) {
-        combined = { min: [...world] as unknown as Vec3, max: [...world] as unknown as Vec3 };
+        combined = { min: [world[0], world[1], world[2]], max: [world[0], world[1], world[2]] };
       } else {
         combined = {
           min: [Math.min(combined.min[0], world[0]), Math.min(combined.min[1], world[1]), Math.min(combined.min[2], world[2])],
@@ -292,52 +289,205 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
 }
 
 /**
- * Rotation-aware world AABB for one entity.
+ * Return the local-space corners of an entity's oriented bounding box — i.e.
+ * the vertices of the OBB **before** applying `entity.rotation` or `entity.position`.
+ * Each point is in the entity's own coordinate frame centred at its position.
  *
- * Fast path: when rotation is absent or [0,0,0] returns entityBounds(e) unchanged
- * (byte-identical result — non-rotated entities are unaffected).
- *
- * Rotated path: generates the 8 corners of the local AABB, maps each through
- * applyEulerXYZ (same XYZ Euler convention as the viewport), then takes
- * component-wise min/max for the true world AABB.
+ * For 2D entities (flat in the Z=0 plane) rotation is rarely non-zero, but the
+ * helper is exhaustive so `rotatedEntityBounds` can handle every kind uniformly.
  *
  * @pure
- * @affects nothing — read-only
  */
-export function worldAabb(e: Entity): Bounds {
-  const rot = e.rotation;
-  if (!rot || isZeroRotation(rot)) return entityBounds(e);
+function localEntityCorners(e: Entity): Vec3[] {
+  switch (e.kind) {
+    case 'box': {
+      const [w, h, d] = e.size;
+      const hw = w / 2, hh = h / 2, hd = d / 2;
+      return [
+        [-hw, -hh, -hd], [hw, -hh, -hd], [hw, hh, -hd], [-hw, hh, -hd],
+        [-hw, -hh,  hd], [hw, -hh,  hd], [hw, hh,  hd], [-hw, hh,  hd],
+      ];
+    }
+    case 'cylinder': {
+      // AABB of cylinder: radius in X/Z, height along Y (three.js CylinderGeometry).
+      const r = e.radius, hh = e.height / 2;
+      return [
+        [-r, -hh, -r], [r, -hh, -r], [r, -hh, r], [-r, -hh, r],
+        [-r,  hh, -r], [r,  hh, -r], [r,  hh, r], [-r,  hh, r],
+      ];
+    }
+    case 'sphere': {
+      const r = e.radius;
+      return [
+        [-r, -r, -r], [r, -r, -r], [r, r, -r], [-r, r, -r],
+        [-r, -r,  r], [r, -r,  r], [r, r,  r], [-r, r,  r],
+      ];
+    }
+    case 'extrusion': {
+      const xs = e.profile.map((pt) => pt[0]);
+      const ys = e.profile.map((pt) => pt[1]);
+      const minX = xs.length ? Math.min(...xs) : 0;
+      const maxX = xs.length ? Math.max(...xs) : 0;
+      const minY = ys.length ? Math.min(...ys) : 0;
+      const maxY = ys.length ? Math.max(...ys) : 0;
+      return [
+        [minX, minY, 0], [maxX, minY, 0], [maxX, maxY, 0], [minX, maxY, 0],
+        [minX, minY, e.depth], [maxX, minY, e.depth], [maxX, maxY, e.depth], [minX, maxY, e.depth],
+      ];
+    }
+    case 'mesh': {
+      const p = e.mesh.positions;
+      // @invariant positions is a flat Float32-style array of xyz triples; one triangle = 9 floats minimum.
+      if (p.length < 9 || p.length % 3 !== 0) return [[0, 0, 0]];
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      for (let i = 0; i + 2 < p.length; i += 3) {
+        const x = p[i] as number, y = p[i + 1] as number, z = p[i + 2] as number;
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+      }
+      // @invariant positions are world-space; subtract position so rotatedEntityBounds
+      // round-trips correctly (it adds position back for every corner).
+      const px = e.position[0], py = e.position[1], pz = e.position[2];
+      return [
+        [minX - px, minY - py, minZ - pz], [maxX - px, minY - py, minZ - pz],
+        [maxX - px, maxY - py, minZ - pz], [minX - px, maxY - py, minZ - pz],
+        [minX - px, minY - py, maxZ - pz], [maxX - px, minY - py, maxZ - pz],
+        [maxX - px, maxY - py, maxZ - pz], [minX - px, maxY - py, maxZ - pz],
+      ];
+    }
+    case 'cone': {
+      // Base circle in XY at z=0; apex at z=height. OBB: radius in X/Y, height in Z.
+      const r = e.radius, h = e.height;
+      return [
+        [-r, -r, 0], [r, -r, 0], [r, r, 0], [-r, r, 0],
+        [0,   0, h],
+      ];
+    }
+    case 'torus': {
+      const outer = e.ringRadius + e.tubeRadius, t = e.tubeRadius;
+      return [
+        [-outer, -outer, -t], [outer, -outer, -t], [outer, outer, -t], [-outer, outer, -t],
+        [-outer, -outer,  t], [outer, -outer,  t], [outer, outer,  t], [-outer, outer,  t],
+      ];
+    }
+    case 'wedge': {
+      const [ww, wh, wd] = e.size;
+      // Lower-front-left corner is at local (0,0,0); extends +X/+Y/+Z.
+      return [
+        [0, 0, 0], [ww, 0, 0], [ww, wh, 0], [0, wh, 0],
+        [0, 0, wd], [ww, 0, wd], [ww, wh, wd], [0, wh, wd],
+      ];
+    }
+    case 'pyramid': {
+      const hw = e.baseWidth / 2, hd = e.baseDepth / 2;
+      return [
+        [-hw, -hd, 0], [hw, -hd, 0], [hw, hd, 0], [-hw, hd, 0],
+        [0,   0, e.height],
+      ];
+    }
+    // 2D kinds — all flat in the Z=0 plane; OBB corners are their 2D AABB corners.
+    case 'line': {
+      const minX = Math.min(e.start[0], e.end[0]);
+      const maxX = Math.max(e.start[0], e.end[0]);
+      const minY = Math.min(e.start[1], e.end[1]);
+      const maxY = Math.max(e.start[1], e.end[1]);
+      return [[minX, minY, 0], [maxX, minY, 0], [maxX, maxY, 0], [minX, maxY, 0]];
+    }
+    case 'polyline':
+    case 'spline': {
+      if (e.points.length === 0) return [[0, 0, 0]];
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const [x, y] of e.points) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+      return [[minX, minY, 0], [maxX, minY, 0], [maxX, maxY, 0], [minX, maxY, 0]];
+    }
+    case 'arc':
+    case 'circle': {
+      const r = e.radius;
+      const cx = e.center[0], cy = e.center[1];
+      return [
+        [cx - r, cy - r, 0], [cx + r, cy - r, 0],
+        [cx + r, cy + r, 0], [cx - r, cy + r, 0],
+      ];
+    }
+    case 'ellipse': {
+      const cx = e.center[0], cy = e.center[1];
+      return [
+        [cx - e.radiusX, cy - e.radiusY, 0], [cx + e.radiusX, cy - e.radiusY, 0],
+        [cx + e.radiusX, cy + e.radiusY, 0], [cx - e.radiusX, cy + e.radiusY, 0],
+      ];
+    }
+    case 'rectangle':
+      return [[0, 0, 0], [e.width, 0, 0], [e.width, e.height, 0], [0, e.height, 0]];
+    case 'point':
+      return [[0, 0, 0]];
+    case 'text': {
+      const estimatedWidth = e.content.length * e.height * 0.6;
+      return [[0, 0, 0], [estimatedWidth, 0, 0], [estimatedWidth, e.height, 0], [0, e.height, 0]];
+    }
+    case 'dimension': {
+      const ext = e.offset ?? 5;
+      return [[-ext, -ext, 0], [ext, -ext, 0], [ext, ext, 0], [-ext, ext, 0]];
+    }
+    case 'instance': {
+      // Instance has no own geometry in local space — collapse to a single point.
+      // rotatedEntityBounds will offset this by e.position producing a point AABB.
+      // Callers needing accurate bounds should use instanceBoundsFromDoc instead.
+      return [[0, 0, 0]];
+    }
+    default: {
+      // Compile-time exhaustiveness check: adding a new EntityKind without a case here is a type error.
+      const _exhaustive: never = e;
+      void _exhaustive;
+      return [[0, 0, 0]];
+    }
+  }
+}
 
-  const local = entityBounds(e);
-  const { min, max } = local;
-  const pos = e.position;
-
-  // 8 corners of the local AABB
-  const corners: Vec3[] = [
-    [min[0], min[1], min[2]],
-    [max[0], min[1], min[2]],
-    [min[0], max[1], min[2]],
-    [max[0], max[1], min[2]],
-    [min[0], min[1], max[2]],
-    [max[0], min[1], max[2]],
-    [min[0], max[1], max[2]],
-    [max[0], max[1], max[2]],
-  ];
-
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-
-  for (const c of corners) {
-    const r = applyEulerXYZ(c, pos, rot);
-    if (r[0] < minX) minX = r[0];
-    if (r[1] < minY) minY = r[1];
-    if (r[2] < minZ) minZ = r[2];
-    if (r[0] > maxX) maxX = r[0];
-    if (r[1] > maxY) maxY = r[1];
-    if (r[2] > maxZ) maxZ = r[2];
+/**
+ * World-space AABB of one entity, with rotation correctly applied when non-zero.
+ *
+ * When `entity.rotation` is `[0,0,0]` the result is byte-for-byte identical to
+ * the previous `entityBounds` output (back-compat). When rotation is non-zero
+ * the returned bounds wrap the actual oriented geometry and carry `oriented:true`
+ * so an agent knows the AABB reflects the real rotated extents.
+ *
+ * Approach: enumerate the OBB corners in local space, apply `applyEulerXYZ`
+ * (three.js Rx·Ry·Rz, matching the live viewport), offset by `position`, then
+ * compute the world-space AABB of those transformed corners.
+ *
+ * @pure
+ * @affects nothing — read-only helper
+ */
+export function rotatedEntityBounds(e: Entity): Bounds {
+  if (isZeroRotation(e.rotation)) {
+    // Fast path: zero rotation → return the same AABB as before (no oriented flag).
+    return entityBounds(e);
   }
 
-  return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
+  const corners = localEntityCorners(e);
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (const local of corners) {
+    // local corner is relative to position=0; rotate it about the entity origin
+    const world = applyEulerXYZ(
+      [e.position[0] + local[0], e.position[1] + local[1], e.position[2] + local[2]],
+      e.position,
+      e.rotation,
+    );
+    if (world[0] < minX) minX = world[0]; if (world[0] > maxX) maxX = world[0];
+    if (world[1] < minY) minY = world[1]; if (world[1] > maxY) maxY = world[1];
+    if (world[2] < minZ) minZ = world[2]; if (world[2] > maxZ) maxZ = world[2];
+  }
+  return {
+    min: [minX, minY, minZ],
+    max: [maxX, maxY, maxZ],
+    oriented: true,
+  };
 }
 
 function mergeBounds(a: Bounds, b: Bounds): Bounds {
@@ -366,17 +516,9 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     const e = doc.entities[id];
     if (!e) continue;
     // Instances have no own geometry — their world AABB comes from expanding the
-    // referenced component (entityBounds/worldAabb alone return a point for instances).
-    const bounds = e.kind === 'instance' ? instanceBoundsFromDoc(e, doc) : worldAabb(e);
-    const isRotated = !!e.rotation && !isZeroRotation(e.rotation);
-    entities.push({
-      id: e.id,
-      kind: e.kind,
-      layerId: e.layerId,
-      position: e.position,
-      bounds,
-      ...(isRotated ? { rotated: true as const } : {}),
-    });
+    // referenced component (rotatedEntityBounds alone returns a point for instances).
+    const bounds = e.kind === 'instance' ? instanceBoundsFromDoc(e, doc) : rotatedEntityBounds(e);
+    entities.push({ id: e.id, kind: e.kind, layerId: e.layerId, position: e.position, bounds });
     sceneBounds = sceneBounds ? mergeBounds(sceneBounds, bounds) : bounds;
     layerCounts[e.layerId] = (layerCounts[e.layerId] ?? 0) + 1;
   }

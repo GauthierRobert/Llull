@@ -11,7 +11,7 @@ import type { CadDocument, Entity, EntityGroup, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
-import { worldAabb } from './scene';
+import { rotatedEntityBounds } from './scene';
 
 /**
  * Validate an optional rotation param.
@@ -216,7 +216,7 @@ export const addBox: CommandDefinition<AddBoxParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = worldAabb(newDoc.entities[id] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added box ${id} of size ${size.join('×')}; ${boundsText(b)}.`,
@@ -306,7 +306,7 @@ export const extrude: CommandDefinition<ExtrudeParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = worldAabb(newDoc.entities[id] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Extruded a ${profile.length}-point profile by ${depth}; ${boundsText(b)}.`,
@@ -449,7 +449,7 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = worldAabb(newDoc.entities[id] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added cylinder ${id} with radius ${radius} and height ${height}; ${boundsText(b)}.`,
@@ -540,7 +540,7 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = worldAabb(newDoc.entities[id] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added sphere ${id} with radius ${radius}; ${boundsText(b)}.`,
@@ -649,7 +649,7 @@ export const addCone: CommandDefinition<AddConeParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = worldAabb(newDoc.entities[id] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added cone ${id} with base radius ${radius} and height ${height}; ${boundsText(b)}.`,
@@ -766,7 +766,7 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = worldAabb(newDoc.entities[id] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}; ${boundsText(b)}.`,
@@ -871,7 +871,7 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = worldAabb(newDoc.entities[id] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added wedge ${id} of size ${size.join('×')}; ${boundsText(b)}.`,
@@ -1000,7 +1000,7 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
       color,
     };
     const newDoc = withEntity(doc, entity);
-    const b = worldAabb(newDoc.entities[id] as Entity);
+    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     return {
       document: newDoc,
       summary: `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}; ${boundsText(b)}.`,

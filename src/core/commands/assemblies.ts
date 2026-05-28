@@ -21,7 +21,7 @@ import type { Component, Entity, InstanceEntity, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../../lib/id';
-import { applyEulerXYZ, isZeroRotation } from '../../lib/math3';
+import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
 
 // ---------------------------------------------------------------------------
 // expandInstance — pure world-space bake helper
@@ -32,7 +32,7 @@ import { applyEulerXYZ, isZeroRotation } from '../../lib/math3';
  *
  * For each entity in `component.entities`, applies `instance.scale` (default [1,1,1]),
  * rotates by `instance.rotation` (XYZ Euler — the same convention as
- * `lib/math3.applyEulerXYZ` and the viewport), then translates by `instance.position`.
+ * `lib/eulerRotation.applyEulerXYZ` and the viewport), then translates by `instance.position`.
  * Each returned entity receives a fresh id from `nextId`.
  *
  * Callers: `explode_instance` (produces real entities), scene bounds, and the

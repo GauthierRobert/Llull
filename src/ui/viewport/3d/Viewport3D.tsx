@@ -140,7 +140,14 @@ function ViewportStoreInvalidator(): null {
 // Camera initializer
 // ---------------------------------------------------------------------------
 
-/** Convert spherical CameraState → a cartesian THREE.Vector3 eye position. */
+/**
+ * Convert spherical CameraState → a cartesian THREE.Vector3 eye position.
+ *
+ * +Z-up right-handed convention:
+ *   polar=0   → camera directly above the target along +Z
+ *   polar=π/2 → camera in the XY plane (at target elevation)
+ *   azimuth   → angle in the XY plane from +Y axis toward +X
+ */
 function sphericalToCartesian(
   target: [number, number, number],
   azimuth: number,
@@ -150,8 +157,8 @@ function sphericalToCartesian(
   const sinPolar = Math.sin(polar);
   return [
     target[0] + distance * sinPolar * Math.sin(azimuth),
-    target[1] + distance * Math.cos(polar),
-    target[2] + distance * sinPolar * Math.cos(azimuth),
+    target[1] + distance * sinPolar * Math.cos(azimuth),
+    target[2] + distance * Math.cos(polar),
   ];
 }
 
@@ -244,7 +251,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   return (
     <>
       {/* ---- Camera + controls ---- */}
-      <PerspectiveCamera makeDefault fov={45} near={0.01} far={1e8} position={initialPosition} />
+      {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention). */}
+      <PerspectiveCamera makeDefault fov={45} near={0.01} far={1e8} position={initialPosition} up={[0, 0, 1]} />
       <OrbitControls
         makeDefault
         target={targetVec}
@@ -254,6 +262,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         dampingFactor={0.06}
         screenSpacePanning={false}
         enabled={orbitEnabled}
+        up={[0, 0, 1]}
       />
 
       {/* ---- Demand-mode invalidation: re-render on store/document changes ---- */}

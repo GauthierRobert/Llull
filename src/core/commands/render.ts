@@ -24,7 +24,8 @@ import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { computeSceneSnapshot } from './scene';
 import type { Bounds } from './scene';
-import { applyEulerXYZ as _applyEulerXYZ, isZeroRotation as _isZeroRotation } from '../../lib/math3';
+import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
+export { applyEulerXYZ } from '@lib/eulerRotation';
 
 // ---------------------------------------------------------------------------
 // Public result type — a second agent depends on these field names exactly.
@@ -118,21 +119,13 @@ function r2(n: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Re-export applyEulerXYZ so callers that imported it from render.ts keep working.
- * Implementation lives in lib/math3 to avoid an import cycle with scene.ts.
- *
- * @pure
- */
-export { _applyEulerXYZ as applyEulerXYZ };
-
-/**
  * Apply the same intrinsic XYZ Euler rotation to a direction vector (normal).
  * No translation — normals transform by the same rotation matrix.
  *
  * @pure
  */
 function rotateNormalXYZ(n: Vec3, euler: Vec3): Vec3 {
-  return _applyEulerXYZ(n, [0, 0, 0], euler);
+  return applyEulerXYZ(n, [0, 0, 0], euler);
 }
 
 /**
@@ -143,10 +136,10 @@ function rotateNormalXYZ(n: Vec3, euler: Vec3): Vec3 {
  * @pure
  */
 function applyRotation(polys: PreDepthPolygon[], position: Vec3, rotation: Vec3): PreDepthPolygon[] {
-  if (_isZeroRotation(rotation)) return polys;
+  if (isZeroRotation(rotation)) return polys;
   return polys.map((poly) => ({
     ...poly,
-    verts: poly.verts.map((v) => _applyEulerXYZ(v, position, rotation)),
+    verts: poly.verts.map((v) => applyEulerXYZ(v, position, rotation)),
     normal: rotateNormalXYZ(poly.normal, rotation),
   }));
 }
@@ -639,7 +632,7 @@ function tessellateEntity(e: Entity): PreDepthPolygon[] {
     case 'spline':   return tessellate2DSpline(e);
     case 'text':      return []; // render deferred to VT1 (viewport-engineer)
     case 'dimension': return []; // render deferred to VT2 (viewport-engineer)
-    case 'instance':  return []; // expanded form not yet tessellated; explode_instance to export
+    case 'instance':  return []; // expanded form not yet tessellated; use explode_instance to export
     default: {
       const exhaustive: never = e;
       void exhaustive;

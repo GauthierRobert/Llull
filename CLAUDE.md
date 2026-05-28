@@ -73,6 +73,7 @@ Multi-agent is the default workflow. Parallelize independent work; converge on r
 
 ## SKILLS (invoke when the trigger matches)
 
+- `design-model` — design a complete CAD model/assembly end-to-end by composing existing commands into a validated `build_project` plan, then measure/check/render/export
 - `add-command` — add a CAD operation (the most common task; UI + MCP in one)
 - `draw-2d` — add/extend 2D drafting (lines, arcs, polylines, dimensions, snapping, sketch→solid)
 - `parametric` — parameters, constraints, feature history (edit-and-regenerate)
