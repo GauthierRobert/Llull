@@ -43,6 +43,11 @@ export function TextMesh({ entity, selected, onSelect }: TextMeshProps): React.R
     onSelect(entity.id, additive);
   }
 
+  // TODO(W5H-followup): drei <Text> uses troika-three-text which compiles an SDF atlas
+  // per font on first render — this is a one-time cost but the atlas upload can spike
+  // frame time on scenes with many distinct text entities. Consider batching text into
+  // a single <Text> call per frame or switching to an instanced glyph renderer when
+  // text entity count is high (> ~50 text entities).
   return (
     <Text
       position={[position[0], position[1], position[2]]}

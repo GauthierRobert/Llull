@@ -11,7 +11,7 @@ export { useThemeStore } from './themeStore';
 export type { ThemeStoreState, Theme } from './themeStore';
 
 export { useViewportStore } from './viewportStore';
-export type { ViewportStoreState, DisplayMode, ClipAxis, ClipPlaneState } from './viewportStore';
+export type { ViewportStoreState, DisplayMode, ClipAxis, ClipPlaneState, QualityTier, QualityOverride } from './viewportStore';
 
 export { useNamedViewStore } from './namedViewStore';
 export type { NamedViewStoreState, NamedView, NamedViewCamera } from './namedViewStore';

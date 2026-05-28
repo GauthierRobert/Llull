@@ -6002,3 +6002,636 @@ describe('export revolution regression', () => {
     expect((gltf['asset'] as Record<string, unknown>)['version']).toBe('2.0');
   });
 });
+
+// ---------------------------------------------------------------------------
+// align
+// ---------------------------------------------------------------------------
+
+describe('align', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('aligns min-x of targets to reference min-x', () => {
+    let doc = createEmptyDocument();
+    const refR = execute(doc, 'add_box', { size: [2, 2, 2], position: [10, 0, 0] });
+    doc = refR.document;
+    const refId = refR.affected[0]!;
+
+    const tR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = tR.document;
+    const tId = tR.affected[0]!;
+
+    const result = execute(doc, 'align', { targetIds: [tId], edge: 'min-x', referenceId: refId });
+    expect(result.affected).toContain(tId);
+    // refId box: position [10,0,0], size [2,2,2] → bounds.min.x = 10 - 1 = 9
+    // tId should now have bounds.min.x = 9 → position.x = 9 + 1 = 10
+    expect(result.document.entities[tId]!.position[0]).toBeCloseTo(10);
+  });
+
+  it('aligns center-z of targets to reference center-z', () => {
+    let doc = createEmptyDocument();
+    const refR = execute(doc, 'add_box', { size: [2, 2, 4], position: [0, 0, 10] });
+    doc = refR.document;
+    const refId = refR.affected[0]!;
+
+    const tR = execute(doc, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
+    doc = tR.document;
+    const tId = tR.affected[0]!;
+
+    const result = execute(doc, 'align', { targetIds: [tId], edge: 'center-z', referenceId: refId });
+    expect(result.affected).toContain(tId);
+    // ref center-z = 10; target should now have position.z such that center = 10
+    expect(result.document.entities[tId]!.position[2]).toBeCloseTo(10);
+  });
+
+  it('returns affected:[] and unchanged doc when reference is missing', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'align', { targetIds: ['some-id'], edge: 'min-x', referenceId: 'no-such' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('no-such');
+  });
+
+  it('returns affected:[] when a target id is missing', () => {
+    let doc = createEmptyDocument();
+    const refR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = refR.document;
+    const result = execute(doc, 'align', { targetIds: ['ghost'], edge: 'max-x', referenceId: refR.affected[0]! });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const refR = execute(doc, 'add_box', { size: [2, 2, 2], position: [10, 0, 0] });
+    doc = refR.document;
+    const tR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = tR.document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'align', { targetIds: [tR.affected[0]!], edge: 'min-x', referenceId: refR.affected[0]! });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// distribute
+// ---------------------------------------------------------------------------
+
+describe('distribute', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('distributes 3 boxes with equal-spacing along x', () => {
+    let doc = createEmptyDocument();
+    // Place boxes at x=0, x=5, x=20 (not evenly spaced); distribute should move middle to x=10.
+    const r0 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = r0.document;
+    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [20, 0, 0] });
+    doc = r2.document;
+
+    const ids = [r0.affected[0]!, r1.affected[0]!, r2.affected[0]!];
+    const result = execute(doc, 'distribute', { targetIds: ids, axis: 'x', mode: 'equal-spacing' });
+    // Middle entity should be moved to center between 0 and 20 → x=10.
+    expect(result.affected).toContain(ids[1]);
+    expect(result.document.entities[ids[1]!]!.position[0]).toBeCloseTo(10);
+    // Anchors (first and last by position) should not appear in affected.
+    expect(result.affected).not.toContain(ids[0]);
+    expect(result.affected).not.toContain(ids[2]);
+  });
+
+  it('distributes 3 boxes with equal-gap along z', () => {
+    let doc = createEmptyDocument();
+    // size [2,2,2] boxes: place at z=0, z=3, z=20; equal-gap should space gaps evenly.
+    const r0 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = r0.document;
+    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 3] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 20] });
+    doc = r2.document;
+
+    const ids = [r0.affected[0]!, r1.affected[0]!, r2.affected[0]!];
+    const result = execute(doc, 'distribute', { targetIds: ids, axis: 'z', mode: 'equal-gap' });
+    expect(result.affected).toContain(ids[1]);
+    // totalSpan = (20+1)-(0-1)=22; entityWidths = 3*2=6; remaining=16; gap=8
+    // first right edge = 0+1=1; first entity ends at 1; gap=8; second entity center = 1+8+1=10
+    expect(result.document.entities[ids[1]!]!.position[2]).toBeCloseTo(10);
+  });
+
+  it('returns affected:[] when targetIds < 2', () => {
+    let doc = createEmptyDocument();
+    const r = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r.document;
+    const result = execute(doc, 'distribute', { targetIds: [r.affected[0]!], axis: 'x' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('at least 2');
+  });
+
+  it('returns affected:[] when an entity id is missing', () => {
+    let doc = createEmptyDocument();
+    const r = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = r.document;
+    const result = execute(doc, 'distribute', { targetIds: [r.affected[0]!, 'ghost'], axis: 'y' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const r0 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = r0.document;
+    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
+    doc = r1.document;
+    const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [20, 0, 0] });
+    doc = r2.document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'distribute', { targetIds: [r0.affected[0]!, r1.affected[0]!, r2.affected[0]!], axis: 'x' });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stack_on
+// ---------------------------------------------------------------------------
+
+describe('stack_on', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('stacks a box on top of another box along z (default)', () => {
+    let doc = createEmptyDocument();
+    // base: position [0,0,0], size [4,4,2] → bounds.max.z = 1
+    const baseR = execute(doc, 'add_box', { size: [4, 4, 2], position: [0, 0, 0] });
+    doc = baseR.document;
+    const baseId = baseR.affected[0]!;
+    // moving: position [0,0,0], size [2,2,2] → bounds.min.z = -1
+    const movR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = movR.document;
+    const movId = movR.affected[0]!;
+
+    const result = execute(doc, 'stack_on', { movingId: movId, baseId });
+    expect(result.affected).toEqual([movId]);
+    // After stacking: movingBounds.min.z should equal baseBounds.max.z = 1
+    // box center positioned so min.z = 1 → position.z = 1 + 1 = 2
+    expect(result.document.entities[movId]!.position[2]).toBeCloseTo(2);
+  });
+
+  it('stacks along x axis', () => {
+    let doc = createEmptyDocument();
+    const baseR = execute(doc, 'add_box', { size: [4, 2, 2], position: [0, 0, 0] });
+    doc = baseR.document;
+    const movR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = movR.document;
+
+    const result = execute(doc, 'stack_on', { movingId: movR.affected[0]!, baseId: baseR.affected[0]!, axis: 'x' });
+    expect(result.affected).toEqual([movR.affected[0]!]);
+    // base max-x = 0 + 4/2 = 2; moving min-x after move = 2 → position.x = 2 + 1 = 3
+    expect(result.document.entities[movR.affected[0]!]!.position[0]).toBeCloseTo(3);
+  });
+
+  it('returns affected:[] when moving entity is missing', () => {
+    let doc = createEmptyDocument();
+    const baseR = execute(doc, 'add_box', { size: [2, 2, 2] });
+    doc = baseR.document;
+    const result = execute(doc, 'stack_on', { movingId: 'ghost', baseId: baseR.affected[0]! });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('returns affected:[] when base entity is missing', () => {
+    let doc = createEmptyDocument();
+    const movR = execute(doc, 'add_box', { size: [2, 2, 2] });
+    doc = movR.document;
+    const result = execute(doc, 'stack_on', { movingId: movR.affected[0]!, baseId: 'ghost' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const baseR = execute(doc, 'add_box', { size: [4, 4, 2], position: [0, 0, 0] });
+    doc = baseR.document;
+    const movR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    doc = movR.document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'stack_on', { movingId: movR.affected[0]!, baseId: baseR.affected[0]! });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// array_along_path
+// ---------------------------------------------------------------------------
+
+describe('array_along_path', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('places count=5 copies of a box along a straight path', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = srcR.document;
+    const srcId = srcR.affected[0]!;
+
+    const path = [[0, 0, 0], [20, 0, 0]] as [number, number, number][];
+    const result = execute(doc, 'array_along_path', { sourceId: srcId, path, count: 5 });
+    expect(result.affected).toHaveLength(5);
+    expect(result.document.order).toHaveLength(6); // original + 5 copies
+
+    // First copy at x=0, last at x=20
+    const firstId = result.affected[0]!;
+    const lastId = result.affected[4]!;
+    expect(result.document.entities[firstId]!.position[0]).toBeCloseTo(0);
+    expect(result.document.entities[lastId]!.position[0]).toBeCloseTo(20);
+  });
+
+  it('places copies along a multi-segment polyline', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = srcR.document;
+    const srcId = srcR.affected[0]!;
+
+    // L-shaped path: (0,0,0)→(10,0,0)→(10,10,0); total length = 20
+    const path = [[0, 0, 0], [10, 0, 0], [10, 10, 0]] as [number, number, number][];
+    const result = execute(doc, 'array_along_path', { sourceId: srcId, path, count: 3 });
+    expect(result.affected).toHaveLength(3);
+
+    // First at (0,0,0), second at midpoint arc-length=10 → (10,0,0), third at (10,10,0)
+    const positions = result.affected.map((id) => result.document.entities[id]!.position);
+    expect(positions[0]![0]).toBeCloseTo(0);
+    expect(positions[1]![0]).toBeCloseTo(10);
+    expect(positions[1]![1]).toBeCloseTo(0);
+    expect(positions[2]![0]).toBeCloseTo(10);
+    expect(positions[2]![1]).toBeCloseTo(10);
+  });
+
+  it('places a single copy at the midpoint when count=1', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = srcR.document;
+    const result = execute(doc, 'array_along_path', {
+      sourceId: srcR.affected[0]!,
+      path: [[0, 0, 0], [10, 0, 0]],
+      count: 1,
+    });
+    expect(result.affected).toHaveLength(1);
+    expect(result.document.entities[result.affected[0]!]!.position[0]).toBeCloseTo(5);
+  });
+
+  it('returns affected:[] when source entity is missing', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'array_along_path', {
+      sourceId: 'ghost',
+      path: [[0, 0, 0], [10, 0, 0]],
+      count: 3,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('returns affected:[] when path has fewer than 2 points', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = srcR.document;
+    const result = execute(doc, 'array_along_path', {
+      sourceId: srcR.affected[0]!,
+      path: [[0, 0, 0]],
+      count: 3,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('2 points');
+  });
+
+  it('returns affected:[] when count < 1', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = srcR.document;
+    const result = execute(doc, 'array_along_path', {
+      sourceId: srcR.affected[0]!,
+      path: [[0, 0, 0], [10, 0, 0]],
+      count: 0,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('count');
+  });
+
+  it('is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = srcR.document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'array_along_path', {
+      sourceId: srcR.affected[0]!,
+      path: [[0, 0, 0], [10, 0, 0]],
+      count: 3,
+    });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// distribute_on_arc
+// ---------------------------------------------------------------------------
+
+describe('distribute_on_arc', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('places count=4 copies around a full circle in XY plane', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = srcR.document;
+    const srcId = srcR.affected[0]!;
+
+    const result = execute(doc, 'distribute_on_arc', {
+      sourceId: srcId,
+      center: [0, 0, 0],
+      normal: [0, 0, 1],
+      radius: 5,
+      startAngle: 0,
+      endAngle: Math.PI * 2,
+      count: 4,
+    });
+    expect(result.affected).toHaveLength(4);
+
+    // All copies should be at distance ≈ 5 from center in XY.
+    for (const id of result.affected) {
+      const pos = result.document.entities[id]!.position;
+      const dist = Math.sqrt(pos[0] ** 2 + pos[1] ** 2);
+      expect(dist).toBeCloseTo(5, 3);
+    }
+
+    // Angles should be 0, π/2, π, 3π/2.
+    const angles = result.affected.map((id) => {
+      const pos = result.document.entities[id]!.position;
+      return Math.atan2(pos[1], pos[0]);
+    });
+    expect(angles[0]).toBeCloseTo(0, 3);
+    expect(angles[1]).toBeCloseTo(Math.PI / 2, 3);
+  });
+
+  it('places count=1 copy at mid-arc angle', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_sphere', { radius: 1 });
+    doc = srcR.document;
+
+    const result = execute(doc, 'distribute_on_arc', {
+      sourceId: srcR.affected[0]!,
+      center: [0, 0, 0],
+      normal: [0, 0, 1],
+      radius: 10,
+      startAngle: 0,
+      endAngle: Math.PI,
+      count: 1,
+    });
+    expect(result.affected).toHaveLength(1);
+    // Mid-arc angle = π/2; position ≈ (0, 10, 0)
+    const pos = result.document.entities[result.affected[0]!]!.position;
+    expect(pos[0]).toBeCloseTo(0, 3);
+    expect(pos[1]).toBeCloseTo(10, 3);
+  });
+
+  it('returns affected:[] when source entity is missing', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'distribute_on_arc', {
+      sourceId: 'ghost',
+      center: [0, 0, 0],
+      normal: [0, 0, 1],
+      radius: 5,
+      startAngle: 0,
+      endAngle: Math.PI * 2,
+      count: 4,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('returns affected:[] when radius <= 0', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = srcR.document;
+    const result = execute(doc, 'distribute_on_arc', {
+      sourceId: srcR.affected[0]!,
+      center: [0, 0, 0],
+      normal: [0, 0, 1],
+      radius: 0,
+      startAngle: 0,
+      endAngle: Math.PI * 2,
+      count: 4,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('radius');
+  });
+
+  it('returns affected:[] when count < 1', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = srcR.document;
+    const result = execute(doc, 'distribute_on_arc', {
+      sourceId: srcR.affected[0]!,
+      center: [0, 0, 0],
+      normal: [0, 0, 1],
+      radius: 5,
+      startAngle: 0,
+      endAngle: Math.PI * 2,
+      count: 0,
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('count');
+  });
+
+  it('is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const srcR = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = srcR.document;
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'distribute_on_arc', {
+      sourceId: srcR.affected[0]!,
+      center: [0, 0, 0],
+      normal: [0, 0, 1],
+      radius: 5,
+      startAngle: 0,
+      endAngle: Math.PI * 2,
+      count: 4,
+    });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// build_project — repeat / for_each control-flow
+// ---------------------------------------------------------------------------
+
+describe('build_project repeat/for_each', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('repeat: creates 5 boxes using count literal', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'build_project', {
+      actions: [
+        {
+          repeat: { count: 5 },
+          step: { command: 'add_box', params: { size: [1, 1, 1] } },
+        },
+      ],
+    });
+    expect(result.document.order.length).toBe(5);
+    expect(result.affected).toHaveLength(5);
+  });
+
+  it('repeat: uses $i expression in params to position cubes', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'build_project', {
+      actions: [
+        {
+          repeat: { count: 3 },
+          step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=i * 3', 0, 0] } },
+        },
+      ],
+    });
+    expect(result.affected).toHaveLength(3);
+    // Positions should be at x=0, x=3, x=6.
+    const positions = result.affected.map((id) => result.document.entities[id]!.position[0]);
+    expect(positions[0]).toBeCloseTo(0);
+    expect(positions[1]).toBeCloseTo(3);
+    expect(positions[2]).toBeCloseTo(6);
+  });
+
+  it('repeat: count expression evaluated against doc.parameters', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'N', expression: '4' }).document;
+
+    const result = execute(doc, 'build_project', {
+      actions: [
+        {
+          repeat: { count: '=N + 1' },
+          step: { command: 'add_box', params: { size: [1, 1, 1] } },
+        },
+      ],
+    });
+    // N=4, count=5
+    expect(result.affected).toHaveLength(5);
+  });
+
+  it('repeat: count < 0 is a graceful no-op step', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'build_project', {
+      actions: [
+        {
+          repeat: { count: -1 },
+          step: { command: 'add_box', params: { size: [1, 1, 1] } },
+        },
+      ],
+      onError: 'continue',
+    });
+    // No entities created; step should be reported as failed.
+    expect(result.document.order).toHaveLength(0);
+    expect(result.affected).toHaveLength(0);
+  });
+
+  it('for_each: iterates over array of radii', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'build_project', {
+      actions: [
+        {
+          for_each: { values: [1, 2, 4], as: 'r' },
+          step: { command: 'add_sphere', params: { radius: '=$r' } },
+        },
+      ],
+    });
+    expect(result.affected).toHaveLength(3);
+    // Check radii: 1, 2, 4
+    const radii = result.affected.map((id) => {
+      const e = result.document.entities[id] as { radius: number };
+      return e.radius;
+    });
+    expect(radii[0]).toBeCloseTo(1);
+    expect(radii[1]).toBeCloseTo(2);
+    expect(radii[2]).toBeCloseTo(4);
+  });
+
+  it('for_each: exposes $i (index) in expressions', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'build_project', {
+      actions: [
+        {
+          for_each: { values: [10, 20, 30], as: 'val' },
+          step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=i * 5', 0, 0] } },
+        },
+      ],
+    });
+    expect(result.affected).toHaveLength(3);
+    const positions = result.affected.map((id) => result.document.entities[id]!.position[0]);
+    expect(positions[0]).toBeCloseTo(0);
+    expect(positions[1]).toBeCloseTo(5);
+    expect(positions[2]).toBeCloseTo(10);
+  });
+
+  it('for_each: non-array values resolved via expression string', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'set_parameter', { name: 'radius', expression: '7' }).document;
+
+    const result = execute(doc, 'build_project', {
+      actions: [
+        {
+          for_each: { values: '=radius', as: 'r' },
+          step: { command: 'add_sphere', params: { radius: '=$r' } },
+        },
+      ],
+    });
+    // Expression evaluates to scalar 7, wrapped as [7] → 1 iteration.
+    expect(result.affected).toHaveLength(1);
+    const e = result.document.entities[result.affected[0]!] as { radius: number };
+    expect(e.radius).toBeCloseTo(7);
+  });
+
+  it('for_each: non-array literal string (non-resolvable) is a graceful no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'build_project', {
+      actions: [
+        {
+          for_each: { values: '=unknown_param_xyz', as: 'r' },
+          step: { command: 'add_sphere', params: { radius: 1 } },
+        },
+      ],
+      onError: 'continue',
+    });
+    expect(result.document.order).toHaveLength(0);
+    expect(result.affected).toHaveLength(0);
+  });
+
+  it('build_project repeat/for_each is pure — input doc not mutated', () => {
+    const doc = createEmptyDocument();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'build_project', {
+      actions: [
+        {
+          repeat: { count: 3 },
+          step: { command: 'add_box', params: { size: [1, 1, 1] } },
+        },
+      ],
+    });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('abort on first repeat failure rolls back the whole document', () => {
+    const doc = createEmptyDocument();
+    // First action succeeds; repeat step creates a box but then the repeat itself
+    // uses a bad count expression which will fail → rollback.
+    const result = execute(doc, 'build_project', {
+      actions: [
+        { command: 'add_box', params: { size: [1, 1, 1] } },
+        {
+          repeat: { count: -2 },
+          step: { command: 'add_box', params: { size: [1, 1, 1] } },
+        },
+      ],
+      onError: 'abort',
+    });
+    // Rolled back: document should be unchanged.
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+  });
+});

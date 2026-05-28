@@ -3,6 +3,18 @@
  *
  * The 3D perspective viewport.
  *
+ * FRAME-TIME BUDGET (W5H)
+ * ───────────────────────
+ * Target: ≤ 16 ms median frame time on a 500-entity document on a mid-range
+ * laptop (Intel UHD / Apple M1-class GPU, 1080p, Chrome).
+ *
+ * Per-frame cost is auto-scaled to scene size via quality tiers (useRenderQuality):
+ *   High   (≤ 50 entities)   — PCSS 16 samples, 2048² shadow map, ContactShadows.
+ *   Medium (51–200 entities) — PCSS 8 samples, 1024² shadow map, ContactShadows.
+ *   Low    (> 200 entities)  — SoftShadows off, 1024² shadow map, no ContactShadows.
+ * User can override via the Quality selector in ViewportControls (default: Auto).
+ * The override is a viewer preference; it is never stored in CadDocument.
+ *
  * - A single r3f <Canvas frameloop="demand"> — renders only when invalidated,
  *   so idle scenes consume no GPU/CPU. Invalidation sources:
  *     • OrbitControls / TransformControls: drei calls invalidate() on 'change'.
@@ -28,7 +40,7 @@
  * - <ClippingPlane> (inside Canvas): syncs the viewport-store clip state to the
  *   three.js renderer's clippingPlanes + localClippingEnabled.
  * - <ViewportControls> (outside Canvas): display-mode segmented button + section
- *   plane UI; state is render-only in the viewport store.
+ *   plane UI + quality selector; state is render-only in the viewport store.
  *
  * This component is purely presentational: it reads from the store and never
  * mutates the document (PRIME DIRECTIVE). All changes go through dispatch.
@@ -64,6 +76,7 @@ import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
 import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
+import { useRenderQuality } from './useRenderQuality';
 
 // ---------------------------------------------------------------------------
 // StoreInvalidator — calls r3f invalidate() when the CAD store changes
@@ -118,16 +131,19 @@ function ViewportStoreInvalidator(): null {
     let prevMode    = useViewportStore.getState().displayMode;
     let prevClip    = useViewportStore.getState().clipPlane;
     let prevHidden  = useViewportStore.getState().hiddenEntityIds;
+    let prevQuality = useViewportStore.getState().qualityOverride;
 
     return useViewportStore.subscribe((state) => {
       if (
-        state.displayMode     !== prevMode   ||
-        state.clipPlane       !== prevClip   ||
-        state.hiddenEntityIds !== prevHidden
+        state.displayMode     !== prevMode    ||
+        state.clipPlane       !== prevClip    ||
+        state.hiddenEntityIds !== prevHidden  ||
+        state.qualityOverride !== prevQuality
       ) {
-        prevMode   = state.displayMode;
-        prevClip   = state.clipPlane;
-        prevHidden = state.hiddenEntityIds;
+        prevMode    = state.displayMode;
+        prevClip    = state.clipPlane;
+        prevHidden  = state.hiddenEntityIds;
+        prevQuality = state.qualityOverride;
         invalidate();
       }
     });
@@ -271,6 +287,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   const allEntityIds = useStore((s) => s.document.order);
   const { camera: cam } = document;
 
+  // R3 narrow selector: quality settings derived from entity count + user override.
+  const quality = useRenderQuality();
+
   const initialPosition = useMemo(
     () => sphericalToCartesian(cam.target as [number, number, number], cam.azimuth, cam.polar, cam.distance),
     // Only used for initial mount — intentionally not reactive to later cam changes.
@@ -341,22 +360,29 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       {/* ---- Animation player — evaluates document.animations per-frame ---- */}
       <AnimationPlayer />
 
-      {/* ---- IBL environment: studio preset for reflections/ambient; no background ---- */}
-      <Environment preset="studio" background={false} />
+      {/* ---- IBL environment: studio preset for reflections/ambient; no background.
+           Kept on across all quality tiers — it is a single texture sample (cheap)
+           and significantly improves material quality. ---- */}
+      {quality.environmentEnabled && <Environment preset="studio" background={false} />}
 
-      {/* ---- Soft shadow patch: PCSS-style softening on the shadow map ---- */}
-      <SoftShadows size={25} samples={16} focus={0.5} />
+      {/* ---- Soft shadow patch: PCSS-style softening on the shadow map.
+           Disabled in Low tier (softShadowSamples === 0) to save per-fragment cost.
+           Medium tier: 8 samples (halved from High's 16). ---- */}
+      {quality.softShadowSamples > 0 && (
+        <SoftShadows size={25} samples={quality.softShadowSamples} focus={0.5} />
+      )}
 
       {/* ---- Light rig ----
            hemisphere: warm ground / cool sky fill to avoid pure-black undersides.
            directional key: high-angle from front-right, casts shadows.
+             shadow-mapSize scales with quality tier (2048 High / 1024 Medium+Low).
            directional rim: cool back-left counter fill.  */}
       <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} />
       <directionalLight
         position={[8, 14, 6]}
         intensity={1.8}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
         shadow-camera-near={0.5}
         shadow-camera-far={200}
         shadow-camera-left={-30}
@@ -367,16 +393,19 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       />
       <directionalLight position={[-6, 4, -8]} intensity={0.4} color="#a8c8ff" />
 
-      {/* ---- Contact shadows: rendered once (frames=1) — safe under demand frameloop ---- */}
-      <ContactShadows
-        position={[0, -0.001, 0]}
-        opacity={0.55}
-        scale={40}
-        blur={2.5}
-        far={20}
-        frames={1}
-        color="#1a1e2a"
-      />
+      {/* ---- Contact shadows: rendered once (frames=1) — safe under demand frameloop.
+           Disabled in Low tier to avoid the extra render pass. ---- */}
+      {quality.contactShadowsEnabled && (
+        <ContactShadows
+          position={[0, -0.001, 0]}
+          opacity={0.55}
+          scale={40}
+          blur={2.5}
+          far={20}
+          frames={1}
+          color="#1a1e2a"
+        />
+      )}
 
       {/* ---- Ground grid ---- */}
       <Grid

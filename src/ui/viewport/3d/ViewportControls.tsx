@@ -17,7 +17,7 @@
 
 import React, { useCallback, useId } from 'react';
 import { useViewportStore, useStore } from '@ui/store';
-import type { DisplayMode, ClipAxis } from '@ui/store';
+import type { DisplayMode, ClipAxis, QualityOverride } from '@ui/store';
 
 // ---------------------------------------------------------------------------
 // 3D snap toggle
@@ -216,6 +216,52 @@ function AnimationTransportControls(): React.ReactElement | null {
 }
 
 // ---------------------------------------------------------------------------
+// Quality selector — Auto / High / Medium / Low
+// ---------------------------------------------------------------------------
+
+const QUALITY_OPTIONS: { value: QualityOverride; label: string; title: string }[] = [
+  { value: 'auto',   label: 'Auto',   title: 'Auto — tier scales with scene size (recommended)' },
+  { value: 'high',   label: 'High',   title: 'High — PCSS 16 samples, 2048² shadows (≤ 50 entities ideal)' },
+  { value: 'medium', label: 'Medium', title: 'Medium — PCSS 8 samples, 1024² shadows' },
+  { value: 'low',    label: 'Low',    title: 'Low — flat shadows, no contact shadows (best for 200+ entities)' },
+];
+
+function QualityControl(): React.ReactElement {
+  const qualityOverride    = useViewportStore((s) => s.qualityOverride);
+  const setQualityOverride = useViewportStore((s) => s.setQualityOverride);
+  const baseId             = useId();
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setQualityOverride(e.target.value as QualityOverride);
+    },
+    [setQualityOverride],
+  );
+
+  return (
+    <div className="vp-control-group" role="group" aria-label="Render quality settings">
+      <label htmlFor={`${baseId}-quality`} className="vp-clip-label">
+        Quality
+      </label>
+      <select
+        id={`${baseId}-quality`}
+        className="vp-clip-select"
+        value={qualityOverride}
+        onChange={handleChange}
+        aria-label="Render quality"
+        title="Render quality — controls shadow cost; Auto scales with scene size"
+      >
+        {QUALITY_OPTIONS.map(({ value, label, title }) => (
+          <option key={value} value={value} title={title}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Exported overlay
 // ---------------------------------------------------------------------------
 
@@ -225,6 +271,7 @@ export function ViewportControls(): React.ReactElement {
       <DisplayModeControl />
       <ClipPlaneControl />
       <Snap3DToggle />
+      <QualityControl />
       <AnimationTransportControls />
     </div>
   );

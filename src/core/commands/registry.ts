@@ -64,6 +64,8 @@ import { exportObj, exportGltf } from './export_formats';
 import { createComponent, insertInstance, explodeInstance } from './assemblies';
 import { clearDocument } from './document';
 import { setCamera, lookAt, fitView } from './camera';
+import { align, distribute, stackOn } from './place';
+import { arrayAlongPath, distributeOnArc } from './array_along_path';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -153,6 +155,11 @@ const definitions = [
   setCamera,
   lookAt,
   fitView,
+  align,
+  distribute,
+  stackOn,
+  arrayAlongPath,
+  distributeOnArc,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

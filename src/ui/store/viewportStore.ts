@@ -7,6 +7,7 @@
  *   - `displayMode` — shaded / wireframe / x-ray render mode.
  *   - `clipPlane`   — optional axis-aligned section plane for revealing solid interiors.
  *   - `hiddenEntityIds` — entity ids suppressed from the 3D render (UI-only visibility override).
+ *   - `qualityOverride` — user-selected render quality tier (or 'auto' to derive from entity count).
  *   - `animationPlaying` — global play/pause for `trigger:'auto'` animations.
  *   - `activeClickAnimationIds` — set of `trigger:'click'` animation ids currently toggled on.
  *   - `animationResetNonce` — bumped by `resetAnimations()` to tell the player to zero its phase accumulators.
@@ -25,6 +26,20 @@ import type { EntityId } from '@core/model/types';
 
 /** How all solid surfaces are rendered in the 3D viewport. */
 export type DisplayMode = 'shaded' | 'wireframe' | 'xray';
+
+/**
+ * Render quality tier — controls shadow map resolution, PCSS sample count,
+ * and contact-shadow presence. 'auto' derives the tier from entity count.
+ *
+ * Thresholds (entity count from document.order.length):
+ *   High   : ≤ 50   — PCSS 16 samples, 2048² shadow map, ContactShadows on.
+ *   Medium : 51–200 — PCSS 8 samples, 1024² shadow map, ContactShadows on.
+ *   Low    : > 200  — SoftShadows off, 1024² shadow map, ContactShadows off.
+ */
+export type QualityTier = 'high' | 'medium' | 'low';
+
+/** User choice: explicit tier or 'auto' (derive from entity count). */
+export type QualityOverride = QualityTier | 'auto';
 
 /** Which world axis the section plane is normal to. */
 export type ClipAxis = 'x' | 'y' | 'z';
@@ -64,6 +79,14 @@ export interface ViewportStoreState {
    * and does NOT touch the server document. A local viewer convenience.
    */
   hiddenLayerIds: ReadonlySet<string>;
+
+  /**
+   * User-selected quality override. Default: 'auto'.
+   * 'auto' derives the tier from document.order.length via deriveQualityTier().
+   * Explicit values pin the tier regardless of entity count.
+   * Stored as a viewer preference — never serialised into CadDocument.
+   */
+  qualityOverride: QualityOverride;
 
   /**
    * Whether 3D object snapping is active during gizmo translate drags.
@@ -126,6 +149,9 @@ export interface ViewportStoreState {
   /** Toggle 3D object snapping on/off. */
   toggleSnap3d(): void;
 
+  /** Set the quality override ('high' | 'medium' | 'low' | 'auto'). */
+  setQualityOverride(quality: QualityOverride): void;
+
   // ---- Animation actions -------------------------------------------------
 
   /** Toggle global animation playback (Play ↔ Pause for `trigger:'auto'` animations). */
@@ -168,6 +194,7 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   hiddenEntityIds: new Set<EntityId>(),
   hiddenLayerIds: new Set<string>(),
   snap3dEnabled: true,
+  qualityOverride: 'auto',
 
   // Animation runtime defaults
   animationPlaying: false,
@@ -218,6 +245,10 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
 
   toggleSnap3d(): void {
     set((state) => ({ snap3dEnabled: !state.snap3dEnabled }));
+  },
+
+  setQualityOverride(quality: QualityOverride): void {
+    set({ qualityOverride: quality });
   },
 
   // ---- Animation actions -------------------------------------------------
