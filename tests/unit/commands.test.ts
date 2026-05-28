@@ -7017,4 +7017,412 @@ describe('build_project repeat/for_each', () => {
     expect(typeof data.converged).toBe('boolean');
     expect(data.iterations).toBeGreaterThan(0);
   });
+
+  // ── add_mate ──────────────────────────────────────────────────────────────
+
+  it('add_mate (coincident): happy path — adds constraint and solve_constraints converges', () => {
+    let doc = createEmptyDocument();
+    // Create two components and insert instances at different positions
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = boxA.document;
+    const compA = execute(doc, 'create_component', { name: 'CompA', entityIds: [boxA.affected[0]!] });
+    doc = compA.document;
+    const instA = compA.affected[0]!;
+
+    // Move instance A to [2, 0, 0]
+    doc = execute(doc, 'move_entity', { id: instA, delta: [2, 0, 0] }).document;
+
+    const boxB = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = boxB.document;
+    const compB = execute(doc, 'create_component', { name: 'CompB', entityIds: [boxB.affected[0]!] });
+    doc = compB.document;
+    const instB = compB.affected[0]!;
+
+    // Move instance B to [8, 0, 0]
+    doc = execute(doc, 'move_entity', { id: instB, delta: [8, 0, 0] }).document;
+
+    // Verify they start apart
+    expect(doc.entities[instA]!.position[0]).toBe(2);
+    expect(doc.entities[instB]!.position[0]).toBe(8);
+
+    // Add coincident mate
+    const mateResult = execute(doc, 'add_mate', {
+      kind: 'coincident',
+      a: { instanceId: instA },
+      b: { instanceId: instB },
+    });
+    expect(mateResult.affected).toHaveLength(1);
+    const mateId = mateResult.affected[0]!;
+    doc = mateResult.document;
+
+    // Verify constraint stored
+    expect(doc.constraints[mateId]).toBeDefined();
+    expect(doc.constraints[mateId]!.kind).toBe('coincident');
+    expect(doc.constraintOrder).toContain(mateId);
+
+    // Solve — instances should converge toward the same XY position
+    const solved = execute(doc, 'solve_constraints', {});
+    const posA = solved.document.entities[instA]!.position;
+    const posB = solved.document.entities[instB]!.position;
+    const dist = Math.sqrt((posA[0] - posB[0]) ** 2 + (posA[1] - posB[1]) ** 2);
+    expect(dist).toBeLessThan(0.01);
+  });
+
+  it('add_mate (distance): happy path — instances kept apart at target value', () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = boxA.document;
+    const compA = execute(doc, 'create_component', { name: 'PartA', entityIds: [boxA.affected[0]!] });
+    doc = compA.document;
+    const instA = compA.affected[0]!;
+
+    const boxB = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = boxB.document;
+    const compB = execute(doc, 'create_component', { name: 'PartB', entityIds: [boxB.affected[0]!] });
+    doc = compB.document;
+    const instB = compB.affected[0]!;
+
+    // Start them far apart
+    doc = execute(doc, 'move_entity', { id: instA, delta: [0, 0, 0] }).document;
+    doc = execute(doc, 'move_entity', { id: instB, delta: [20, 0, 0] }).document;
+
+    const mateResult = execute(doc, 'add_mate', {
+      kind: 'distance',
+      a: { instanceId: instA },
+      b: { instanceId: instB },
+      value: 5,
+    });
+    expect(mateResult.affected).toHaveLength(1);
+    doc = mateResult.document;
+
+    // Constraint stored with value
+    const mateId = mateResult.affected[0]!;
+    const storedConstraint = doc.constraints[mateId]!;
+    expect(storedConstraint.kind).toBe('distance');
+    expect((storedConstraint as { value: unknown }).value).toBe(5);
+
+    // Solve — distance should approach 5
+    const solved = execute(doc, 'solve_constraints', {});
+    const posA = solved.document.entities[instA]!.position;
+    const posB = solved.document.entities[instB]!.position;
+    const dist = Math.sqrt((posA[0] - posB[0]) ** 2 + (posA[1] - posB[1]) ** 2);
+    expect(dist).toBeGreaterThan(3);
+    expect(dist).toBeLessThan(7);
+  });
+
+  it('add_mate: is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxA.document;
+    const compA = execute(doc, 'create_component', { name: 'CA', entityIds: [boxA.affected[0]!] });
+    doc = compA.document;
+    const instA = compA.affected[0]!;
+
+    const boxB = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxB.document;
+    const compB = execute(doc, 'create_component', { name: 'CB', entityIds: [boxB.affected[0]!] });
+    doc = compB.document;
+    const instB = compB.affected[0]!;
+
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_mate', { kind: 'coincident', a: { instanceId: instA }, b: { instanceId: instB } });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('add_mate: unknown kind → graceful no-op with explanatory summary', () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxA.document;
+    const compA = execute(doc, 'create_component', { name: 'CA', entityIds: [boxA.affected[0]!] });
+    doc = compA.document;
+    const instA = compA.affected[0]!;
+
+    const boxB = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxB.document;
+    const compB = execute(doc, 'create_component', { name: 'CB', entityIds: [boxB.affected[0]!] });
+    doc = compB.document;
+    const instB = compB.affected[0]!;
+
+    const result = execute(doc, 'add_mate', {
+      kind: 'weld',
+      a: { instanceId: instA },
+      b: { instanceId: instB },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('weld');
+  });
+
+  it('add_mate: unknown instanceId → graceful no-op with explanatory summary', () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxA.document;
+    const compA = execute(doc, 'create_component', { name: 'CA', entityIds: [boxA.affected[0]!] });
+    doc = compA.document;
+    const instA = compA.affected[0]!;
+
+    const result = execute(doc, 'add_mate', {
+      kind: 'coincident',
+      a: { instanceId: instA },
+      b: { instanceId: 'no-such-instance' },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('no-such-instance');
+  });
+
+  it('add_mate: distance without value → graceful no-op with explanatory summary', () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxA.document;
+    const compA = execute(doc, 'create_component', { name: 'CA', entityIds: [boxA.affected[0]!] });
+    doc = compA.document;
+    const instA = compA.affected[0]!;
+
+    const boxB = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxB.document;
+    const compB = execute(doc, 'create_component', { name: 'CB', entityIds: [boxB.affected[0]!] });
+    doc = compB.document;
+    const instB = compB.affected[0]!;
+
+    const result = execute(doc, 'add_mate', {
+      kind: 'distance',
+      a: { instanceId: instA },
+      b: { instanceId: instB },
+      // value intentionally omitted
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('value');
+  });
+
+  it('add_mate: a.instanceId references a non-instance entity → graceful no-op', () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxA.document;
+    const boxId = boxA.affected[0]!;
+
+    const boxB = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxB.document;
+    const compB = execute(doc, 'create_component', { name: 'CB', entityIds: [boxB.affected[0]!] });
+    doc = compB.document;
+    const instB = compB.affected[0]!;
+
+    // boxId is a box, not an instance
+    const result = execute(doc, 'add_mate', {
+      kind: 'coincident',
+      a: { instanceId: boxId },
+      b: { instanceId: instB },
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain(boxId);
+  });
+
+  it('add_mate: duplicate id → graceful no-op', () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxA.document;
+    const compA = execute(doc, 'create_component', { name: 'CA', entityIds: [boxA.affected[0]!] });
+    doc = compA.document;
+    const instA = compA.affected[0]!;
+
+    const boxB = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxB.document;
+    const compB = execute(doc, 'create_component', { name: 'CB', entityIds: [boxB.affected[0]!] });
+    doc = compB.document;
+    const instB = compB.affected[0]!;
+
+    doc = execute(doc, 'add_mate', {
+      kind: 'coincident',
+      a: { instanceId: instA },
+      b: { instanceId: instB },
+      id: 'mate-fixed-id',
+    }).document;
+
+    // Second call with the same explicit id
+    const result = execute(doc, 'add_mate', {
+      kind: 'coincident',
+      a: { instanceId: instA },
+      b: { instanceId: instB },
+      id: 'mate-fixed-id',
+    });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('add_mate: round-trip through save_document/load_document preserves mate constraint', async () => {
+    let doc = createEmptyDocument();
+    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxA.document;
+    const compA = execute(doc, 'create_component', { name: 'CA', entityIds: [boxA.affected[0]!] });
+    doc = compA.document;
+    const instA = compA.affected[0]!;
+
+    const boxB = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = boxB.document;
+    const compB = execute(doc, 'create_component', { name: 'CB', entityIds: [boxB.affected[0]!] });
+    doc = compB.document;
+    const instB = compB.affected[0]!;
+
+    const mated = execute(doc, 'add_mate', {
+      kind: 'coincident',
+      a: { instanceId: instA },
+      b: { instanceId: instB },
+      id: 'mate-rt',
+    });
+    doc = mated.document;
+    expect(doc.constraints['mate-rt']).toBeDefined();
+
+    // Serialize and reload
+    const { serializeDocument } = await import('@core/commands/persistence');
+    const json = serializeDocument(doc);
+    const loaded = execute(createEmptyDocument(), 'load_document', { json });
+    expect(loaded.document.constraints['mate-rt']).toBeDefined();
+    expect(loaded.document.constraints['mate-rt']!.kind).toBe('coincident');
+  });
+
+  // ── bill_of_materials ─────────────────────────────────────────────────────
+
+  it('bill_of_materials: 0 instances → empty rows and zero totals', () => {
+    let doc = createEmptyDocument();
+    // Add some raw geometry (no instances)
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+
+    const result = execute(doc, 'bill_of_materials', {});
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    const data = result.data as { rows: unknown[]; totalInstances: number; distinctComponents: number };
+    expect(data.rows).toHaveLength(0);
+    expect(data.totalInstances).toBe(0);
+    expect(data.distinctComponents).toBe(0);
+  });
+
+  it('bill_of_materials: is pure — input document is not mutated', () => {
+    let doc = createEmptyDocument();
+    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = box.document;
+    const comp = execute(doc, 'create_component', { name: 'Widget', entityIds: [box.affected[0]!] });
+    doc = comp.document;
+
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'bill_of_materials', {});
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('bill_of_materials: single component with 2 instances → count=2', () => {
+    let doc = createEmptyDocument();
+    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = box.document;
+    const comp = execute(doc, 'create_component', { name: 'Bolt', entityIds: [box.affected[0]!] });
+    doc = comp.document;
+    const compId = Object.keys(doc.components)[0]!;
+
+    // Insert a second instance of the same component
+    doc = execute(doc, 'insert_instance', { componentId: compId }).document;
+
+    const result = execute(doc, 'bill_of_materials', {});
+    const data = result.data as {
+      rows: Array<{ componentId: string; componentName: string; count: number; perEntityKindCounts: Record<string, number> }>;
+      totalInstances: number;
+      distinctComponents: number;
+    };
+    expect(data.totalInstances).toBe(2);
+    expect(data.distinctComponents).toBe(1);
+    expect(data.rows).toHaveLength(1);
+    expect(data.rows[0]!.componentName).toBe('Bolt');
+    expect(data.rows[0]!.count).toBe(2);
+    // The component contains 1 box entity
+    expect(data.rows[0]!.perEntityKindCounts['box']).toBe(1);
+  });
+
+  it('bill_of_materials: mixed components → grouped counts with correct names', () => {
+    let doc = createEmptyDocument();
+
+    // Component 1: "Wheel" — 1 cylinder
+    const cyl = execute(doc, 'add_cylinder', { radius: 1, height: 0.5 });
+    doc = cyl.document;
+    const wheelComp = execute(doc, 'create_component', { name: 'Wheel', entityIds: [cyl.affected[0]!] });
+    doc = wheelComp.document;
+    const wheelCompId = Object.keys(doc.components)[0]!;
+
+    // Component 2: "Hub" — 1 sphere
+    const sph = execute(doc, 'add_sphere', { radius: 0.5 });
+    doc = sph.document;
+    const hubComp = execute(doc, 'create_component', { name: 'Hub', entityIds: [sph.affected[0]!] });
+    doc = hubComp.document;
+    const hubCompId = Object.keys(doc.components).find((id) => id !== wheelCompId)!;
+
+    // After create_component each component already has 1 instance.
+    // Insert one more of each to get 2 + 2.
+    doc = execute(doc, 'insert_instance', { componentId: wheelCompId }).document;
+    doc = execute(doc, 'insert_instance', { componentId: hubCompId }).document;
+
+    const result = execute(doc, 'bill_of_materials', {});
+    const data = result.data as {
+      rows: Array<{ componentId: string; componentName: string; count: number; perEntityKindCounts: Record<string, number> }>;
+      totalInstances: number;
+      distinctComponents: number;
+    };
+
+    expect(data.totalInstances).toBe(4); // 2 wheels + 2 extra hubs + 1 initial wheel inst + 1 initial hub inst = 4
+    expect(data.distinctComponents).toBe(2);
+
+    const wheelRow = data.rows.find((r) => r.componentName === 'Wheel')!;
+    const hubRow = data.rows.find((r) => r.componentName === 'Hub')!;
+
+    expect(wheelRow).toBeDefined();
+    expect(wheelRow.count).toBe(2);
+    expect(wheelRow.perEntityKindCounts['cylinder']).toBe(1);
+
+    expect(hubRow).toBeDefined();
+    expect(hubRow.count).toBe(2);
+    expect(hubRow.perEntityKindCounts['sphere']).toBe(1);
+  });
+
+  it('bill_of_materials: orphan instance (missing componentId) → warning row, no throw', () => {
+    let doc = createEmptyDocument();
+
+    // Manually inject an instance whose componentId does not exist in doc.components
+    const orphanInst = {
+      id: 'orphan-inst-1',
+      kind: 'instance' as const,
+      componentId: 'ghost-comp-id',
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+      layerId: 'layer-default',
+      color: '#c8553d',
+    };
+    doc = {
+      ...doc,
+      entities: { ...doc.entities, 'orphan-inst-1': orphanInst },
+      order: [...doc.order, 'orphan-inst-1'],
+    };
+
+    const result = execute(doc, 'bill_of_materials', {});
+    expect(result.affected).toHaveLength(0);
+    const data = result.data as {
+      rows: Array<{ componentId: string; componentName: string; count: number; orphan?: boolean }>;
+      totalInstances: number;
+      distinctComponents: number;
+    };
+    expect(data.totalInstances).toBe(1);
+    expect(data.distinctComponents).toBe(0); // orphan rows don't count
+    expect(data.rows).toHaveLength(1);
+    expect(data.rows[0]!.orphan).toBe(true);
+    expect(data.rows[0]!.componentName).toBe('(missing)');
+    expect(data.rows[0]!.componentId).toBe('ghost-comp-id');
+  });
+
+  it('bill_of_materials: summary contains instance count and component count', () => {
+    let doc = createEmptyDocument();
+    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = box.document;
+    const comp = execute(doc, 'create_component', { name: 'Bracket', entityIds: [box.affected[0]!] });
+    doc = comp.document;
+
+    const result = execute(doc, 'bill_of_materials', {});
+    expect(result.summary).toContain('1');
+    expect(result.summary).toContain('Bracket');
+  });
 });

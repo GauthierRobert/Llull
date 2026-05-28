@@ -67,6 +67,7 @@ import { setCamera, lookAt, fitView } from './camera';
 import { align, distribute, stackOn } from './place';
 import { arrayAlongPath, distributeOnArc } from './array_along_path';
 import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } from './constraints';
+import { addMate, billOfMaterials } from './mates';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -165,6 +166,8 @@ const definitions = [
   deleteConstraint,
   updateConstraint,
   solveConstraints,
+  addMate,
+  billOfMaterials,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
