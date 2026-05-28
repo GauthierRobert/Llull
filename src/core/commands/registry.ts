@@ -68,6 +68,7 @@ import { align, distribute, stackOn } from './place';
 import { arrayAlongPath, distributeOnArc } from './array_along_path';
 import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } from './constraints';
 import { addMate, billOfMaterials } from './mates';
+import { addJoint, deleteJoint, setJointValue, addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './joints';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -168,6 +169,13 @@ const definitions = [
   solveConstraints,
   addMate,
   billOfMaterials,
+  addJoint,
+  deleteJoint,
+  setJointValue,
+  addDriveRelation,
+  deleteDriveRelation,
+  evaluateMotion,
+  bakeMotion,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(

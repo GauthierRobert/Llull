@@ -2096,6 +2096,323 @@ describe('render_view', () => {
     expect(e.height).toBeCloseTo(10);
     expect(scaled.summary).toContain('height');
   });
+
+  // ---------------------------------------------------------------------------
+  // KN1 — kinematic joints + drive relations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Helper: build a minimal doc with two InstanceEntities.
+   * Returns { doc, idA, idB } where idA and idB are instance ids.
+   */
+  function makeDocWithInstances(): { doc: ReturnType<typeof createEmptyDocument>; idA: string; idB: string } {
+    let doc = createEmptyDocument();
+    // Build a Component out of a real entity (create_component requires entityIds).
+    const seed = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = seed.document;
+    const seedId = seed.affected[0]!;
+    const compResult = execute(doc, 'create_component', { name: 'Part', entityIds: [seedId] });
+    doc = compResult.document;
+    // create_component replaces the source entities with a single instance.
+    const compId = Object.keys(doc.components)[0]!;
+    const idA = compResult.affected[0]!;
+    const instB = execute(doc, 'insert_instance', { componentId: compId, position: [2, 0, 0] });
+    doc = instB.document;
+    const idB = instB.affected[0]!;
+    return { doc, idA, idB };
+  }
+
+  it('add_joint — revolute happy path: creates joint, appends to jointOrder', () => {
+    const { doc, idA, idB } = makeDocWithInstances();
+    const result = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' });
+    expect(result.affected).toHaveLength(1);
+    const jid = result.affected[0]!;
+    expect(result.document.joints[jid]).toBeDefined();
+    expect(result.document.joints[jid]!.kind).toBe('revolute');
+    expect(result.document.jointOrder).toContain(jid);
+    expect(result.summary).toContain(jid);
+  });
+
+  it('add_joint — prismatic happy path: creates joint with Vec3 axis', () => {
+    const { doc, idA, idB } = makeDocWithInstances();
+    const result = execute(doc, 'add_joint', {
+      kind: 'prismatic',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: [0, 1, 0],
+    });
+    expect(result.affected).toHaveLength(1);
+    const jid = result.affected[0]!;
+    expect(result.document.joints[jid]!.kind).toBe('prismatic');
+    expect((result.document.joints[jid] as Extract<typeof result.document.joints[string], { kind: 'prismatic' }>)!.displacement).toBe(0);
+  });
+
+  it('add_joint — failure: unknown instanceId a is a no-op', () => {
+    const { doc, idB } = makeDocWithInstances();
+    const result = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: 'ghost' }, b: { instanceId: idB }, axis: 'x' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('add_joint — failure: unknown instanceId b is a no-op', () => {
+    const { doc, idA } = makeDocWithInstances();
+    const result = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: 'ghost' }, axis: 'y' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('ghost');
+  });
+
+  it('add_joint — failure: invalid kind is a no-op', () => {
+    const { doc, idA, idB } = makeDocWithInstances();
+    const result = execute(doc, 'add_joint', { kind: 'weld', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('add_joint — failure: invalid axis is a no-op', () => {
+    const { doc, idA, idB } = makeDocWithInstances();
+    const result = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'diagonal' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('is pure — add_joint does not mutate input doc', () => {
+    const { doc, idA, idB } = makeDocWithInstances();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' });
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('set_joint_value — numeric value updates revolute angle', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    const result = execute(doc, 'set_joint_value', { id: jid, value: Math.PI / 2 });
+    expect(result.affected).toEqual([jid]);
+    const joint = result.document.joints[jid]!;
+    expect(joint.kind).toBe('revolute');
+    expect((joint as Extract<typeof joint, { kind: 'revolute' }>).angle).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('set_joint_value — expression string resolves via doc.parameters', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'set_parameter', { name: 'angle', expression: '1.5708' }).document;
+    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    const result = execute(doc, 'set_joint_value', { id: jid, value: 'angle' });
+    expect(result.affected).toEqual([jid]);
+    const joint = result.document.joints[jid]! as Extract<(typeof result.document.joints)[string], { kind: 'revolute' }>;
+    expect(joint.angle).toBeCloseTo(1.5708, 3);
+  });
+
+  it('set_joint_value — failure: unknown joint id is a no-op', () => {
+    const { doc } = makeDocWithInstances();
+    const result = execute(doc, 'set_joint_value', { id: 'no-such-joint', value: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('delete_joint — removes joint and cascades dependent drive relations', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    // Add a second joint so we can add a drive relation
+    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    // Add a drive relation from jid1 → jid2
+    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 2 }).document;
+    const drid = doc.driveRelationOrder[0]!;
+    expect(doc.driveRelations[drid]).toBeDefined();
+
+    // Delete jid1 — must cascade-remove the drive relation
+    const result = execute(doc, 'delete_joint', { id: jid1 });
+    expect(result.document.joints[jid1]).toBeUndefined();
+    expect(result.document.jointOrder).not.toContain(jid1);
+    expect(result.document.driveRelations[drid]).toBeUndefined();
+    expect(result.summary).toContain(drid);
+  });
+
+  it('delete_joint — failure: unknown joint id is a no-op', () => {
+    const { doc } = makeDocWithInstances();
+    const result = execute(doc, 'delete_joint', { id: 'ghost-joint' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('add_drive_relation — ratio applied: driver=π/2, ratio=2 → driven=π', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'set_joint_value', { id: jid1, value: Math.PI / 2 }).document;
+
+    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 2 }).document;
+    const drid = doc.driveRelationOrder[0]!;
+    expect(doc.driveRelations[drid]).toBeDefined();
+
+    // evaluate_motion should propagate: jid2 = (π/2) * 2 = π
+    const evalResult = execute(doc, 'evaluate_motion', {});
+    expect(evalResult.document).toBe(doc); // query — no mutation
+    const data = evalResult.data as { resolvedJoints: Record<string, number> };
+    expect(data.resolvedJoints[jid2]).toBeCloseTo(Math.PI, 5);
+  });
+
+  it('add_drive_relation — cycle detection rejects A→B→A', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    // jid1 → jid2
+    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 1 }).document;
+    // jid2 → jid1 should be rejected (cycle)
+    const result = execute(doc, 'add_drive_relation', { driver: jid2, driven: jid1, ratio: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('cycle');
+  });
+
+  it('add_drive_relation — failure: self-coupling is a no-op', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    const result = execute(doc, 'add_drive_relation', { driver: jid, driven: jid, ratio: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('same joint');
+  });
+
+  it('add_drive_relation — failure: unknown driver joint is a no-op', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+
+    const result = execute(doc, 'add_drive_relation', { driver: 'ghost', driven: jid, ratio: 1 });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('delete_drive_relation — removes coupling, leaves joints intact', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 3 }).document;
+    const drid = doc.driveRelationOrder[0]!;
+
+    const result = execute(doc, 'delete_drive_relation', { id: drid });
+    expect(result.document.driveRelations[drid]).toBeUndefined();
+    expect(result.document.driveRelationOrder).not.toContain(drid);
+    // Joints still exist
+    expect(result.document.joints[jid1]).toBeDefined();
+    expect(result.document.joints[jid2]).toBeDefined();
+  });
+
+  it('delete_drive_relation — failure: unknown id is a no-op', () => {
+    const { doc } = makeDocWithInstances();
+    const result = execute(doc, 'delete_drive_relation', { id: 'ghost-dr' });
+    expect(result.affected).toHaveLength(0);
+    expect(result.document).toBe(doc);
+  });
+
+  it('evaluate_motion — no joints returns empty data without mutation', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'evaluate_motion', {});
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+    const data = result.data as { resolvedJoints: Record<string, number>; instancePositions: Record<string, unknown> };
+    expect(Object.keys(data.resolvedJoints)).toHaveLength(0);
+    expect(Object.keys(data.instancePositions)).toHaveLength(0);
+  });
+
+  it('evaluate_motion — does not mutate doc even when joints are present', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'set_joint_value', { id: jid, value: Math.PI / 4 }).document;
+
+    const snapshot = JSON.stringify(doc);
+    const result = execute(doc, 'evaluate_motion', {});
+    expect(JSON.stringify(doc)).toBe(snapshot);      // input not mutated
+    expect(result.document).toBe(doc);               // same reference returned
+  });
+
+  it('evaluate_motion — returns position delta for prismatic joint', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'x' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'set_joint_value', { id: jid, value: 5 }).document;
+
+    const result = execute(doc, 'evaluate_motion', {});
+    const data = result.data as { instancePositions: Record<string, [number, number, number]> };
+    // Instance a is at [0,0,0]; b should move to [0+5, 0, 0] = [5, 0, 0]
+    expect(data.instancePositions[idB]).toBeDefined();
+    expect(data.instancePositions[idB]![0]).toBeCloseTo(5, 5);
+  });
+
+  it('bake_motion — updates instance positions in the document', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'set_joint_value', { id: jid, value: 3 }).document;
+
+    const result = execute(doc, 'bake_motion', {});
+    expect(result.affected).toContain(idB);
+    // Instance a is at [0,0,0]; b.position should be [0, 3, 0]
+    expect(result.document.entities[idB]!.position[1]).toBeCloseTo(3, 5);
+  });
+
+  it('bake_motion — no joints is a no-op', () => {
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'bake_motion', {});
+    expect(result.document).toBe(doc);
+    expect(result.affected).toHaveLength(0);
+  });
+
+  it('bake_motion — is pure: does not mutate input doc', () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'set_joint_value', { id: jid, value: 1 }).document;
+
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'bake_motion', {});
+    expect(JSON.stringify(doc)).toBe(snapshot);
+  });
+
+  it('round-trip save/load preserves joints and driveRelations', async () => {
+    const { doc: d0, idA, idB } = makeDocWithInstances();
+    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'x' }).document;
+    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
+    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 0.5, offset: 1 }).document;
+    const drid = doc.driveRelationOrder[0]!;
+
+    // Save then reload
+    const { serializeDocument } = await import('@core/commands/persistence');
+    const json = serializeDocument(doc);
+    const loaded = execute(createEmptyDocument(), 'load_document', { json });
+    const reloaded = loaded.document;
+
+    expect(reloaded.joints[jid1]).toBeDefined();
+    expect(reloaded.joints[jid2]).toBeDefined();
+    expect(reloaded.driveRelations[drid]).toBeDefined();
+    expect(reloaded.driveRelations[drid]!.ratio).toBe(0.5);
+    expect(reloaded.driveRelations[drid]!.offset).toBe(1);
+    expect(reloaded.jointOrder).toContain(jid1);
+    expect(reloaded.driveRelationOrder).toContain(drid);
+  });
 });
 
 // ---------------------------------------------------------------------------

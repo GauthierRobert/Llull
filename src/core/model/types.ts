@@ -745,6 +745,87 @@ export type Constraint =
   | DistanceConstraint
   | AngleConstraint;
 
+// ---------------------------------------------------------------------------
+// Kinematic joints — connect two InstanceEntity frames to form a mechanism.
+// ---------------------------------------------------------------------------
+
+/**
+ * A MateRef used by a joint: identifies an InstanceEntity and its named frame.
+ * Reuses the same shape as MateRef in mates.ts; redeclared here so types.ts has
+ * no cross-command dependency.
+ */
+export interface JointMateRef {
+  /** Id of the InstanceEntity in doc.entities. */
+  readonly instanceId: string;
+  /** Frame selector. Defaults to 'origin'. */
+  readonly frame?: 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
+}
+
+/**
+ * A revolute joint: instance `b` rotates around `axis` relative to instance `a`.
+ * `angle` is the current joint value in radians.
+ *
+ * @invariant axis must be 'x'|'y'|'z' or a Vec3 unit vector
+ * @see add_joint, set_joint_value, evaluate_motion, bake_motion
+ */
+export interface RevoluteJoint {
+  readonly id: string;
+  readonly kind: 'revolute';
+  readonly a: JointMateRef;
+  readonly b: JointMateRef;
+  /** Rotation axis: 'x'|'y'|'z' shorthand or an explicit Vec3 unit vector. */
+  axis: 'x' | 'y' | 'z' | Vec3;
+  /** Current joint angle in radians. */
+  angle: number;
+}
+
+/**
+ * A prismatic joint: instance `b` slides along `axis` relative to instance `a`.
+ * `displacement` is the current joint value in document units.
+ *
+ * @invariant axis must be 'x'|'y'|'z' or a Vec3 unit vector
+ * @see add_joint, set_joint_value, evaluate_motion, bake_motion
+ */
+export interface PrismaticJoint {
+  readonly id: string;
+  readonly kind: 'prismatic';
+  readonly a: JointMateRef;
+  readonly b: JointMateRef;
+  /** Slide axis: 'x'|'y'|'z' shorthand or an explicit Vec3 unit vector. */
+  axis: 'x' | 'y' | 'z' | Vec3;
+  /** Current joint displacement in document units. */
+  displacement: number;
+}
+
+/** Discriminated union of all joint types. */
+export type Joint = RevoluteJoint | PrismaticJoint;
+
+/** All joint kind literals (used for validation). */
+export type JointKind = Joint['kind'];
+
+/**
+ * A coupling between two joints: `driven = driver * ratio + offset`.
+ *
+ * This models gear trains, belt drives, cam followers, and linkages where
+ * one joint's value is a linear function of another's.
+ *
+ * @invariant driver and driven must exist in doc.joints
+ * @invariant driver !== driven (no self-coupling)
+ * @invariant the drive graph is acyclic
+ * @see add_drive_relation, delete_drive_relation, evaluate_motion
+ */
+export interface DriveRelation {
+  readonly id: string;
+  /** Id of the driving joint (source of motion). */
+  driver: string;
+  /** Id of the driven joint (receives motion). */
+  driven: string;
+  /** Gear/belt ratio: driven_value = driver_value * ratio + offset. */
+  ratio: number;
+  /** Optional phase or linear offset. Default: 0. */
+  offset?: number;
+}
+
 export interface CadDocument {
   entities: Record<EntityId, Entity>;
   /** Z-order / creation order of entity ids. */
@@ -831,6 +912,30 @@ export interface CadDocument {
    * Initialized as [] in createEmptyDocument.
    */
   constraintOrder: string[];
+  /**
+   * Kinematic joints connecting pairs of InstanceEntity frames to form a mechanism.
+   * Each joint is either revolute (rotation) or prismatic (translation).
+   * Keyed by joint id. Initialized as {} in createEmptyDocument.
+   * @see add_joint, delete_joint, set_joint_value, evaluate_motion, bake_motion
+   */
+  joints: Record<string, Joint>;
+  /**
+   * Ordered joint ids — mirrors the `entities`/`order` pattern.
+   * Initialized as [] in createEmptyDocument.
+   */
+  jointOrder: string[];
+  /**
+   * Drive relations coupling joint values: driven = driver * ratio + offset.
+   * Model gear trains, belt drives, linkages. Keyed by drive relation id.
+   * Initialized as {} in createEmptyDocument.
+   * @see add_drive_relation, delete_drive_relation, evaluate_motion
+   */
+  driveRelations: Record<string, DriveRelation>;
+  /**
+   * Ordered drive relation ids — mirrors the `entities`/`order` pattern.
+   * Initialized as [] in createEmptyDocument.
+   */
+  driveRelationOrder: string[];
 }
 
 /**
@@ -905,5 +1010,9 @@ export function createEmptyDocument(): CadDocument {
     components: {},
     constraints: {},
     constraintOrder: [],
+    joints: {},
+    jointOrder: [],
+    driveRelations: {},
+    driveRelationOrder: [],
   };
 }

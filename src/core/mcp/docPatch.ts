@@ -28,6 +28,8 @@ import type {
   DocumentUnit,
   FeatureStep,
   EntityId,
+  Joint,
+  DriveRelation,
 } from '../model/types';
 
 // ---------------------------------------------------------------------------
@@ -99,6 +101,14 @@ export interface DocPatch {
   constraints?: Record<string, unknown>;
   /** Full constraintOrder array — present only when it changed. */
   constraintOrder?: string[];
+  /** Full joints map — present only when any joint changed. */
+  joints?: Record<string, Joint>;
+  /** Full jointOrder array — present only when it changed. */
+  jointOrder?: string[];
+  /** Full driveRelations map — present only when any drive relation changed. */
+  driveRelations?: Record<string, DriveRelation>;
+  /** Full driveRelationOrder array — present only when it changed. */
+  driveRelationOrder?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +204,10 @@ export function computeDocPatch(prev: CadDocument, next: CadDocument): DocPatch 
   if (prev.displayPrecision !== next.displayPrecision)      patch.displayPrecision = next.displayPrecision;
   if (!jsonEqual(prev.constraints, next.constraints))       patch.constraints = next.constraints as Record<string, unknown>;
   if (!jsonEqual(prev.constraintOrder, next.constraintOrder)) patch.constraintOrder = next.constraintOrder;
+  if (!jsonEqual(prev.joints, next.joints))                 patch.joints = next.joints;
+  if (!jsonEqual(prev.jointOrder, next.jointOrder))         patch.jointOrder = next.jointOrder;
+  if (!jsonEqual(prev.driveRelations, next.driveRelations)) patch.driveRelations = next.driveRelations;
+  if (!jsonEqual(prev.driveRelationOrder, next.driveRelationOrder)) patch.driveRelationOrder = next.driveRelationOrder;
 
   return patch;
 }
@@ -255,7 +269,11 @@ export function applyDocPatch(doc: CadDocument, patch: DocPatch): CadDocument {
     camera:           patch.camera           ?? doc.camera,
     units:            patch.units            ?? doc.units,
     displayPrecision: patch.displayPrecision ?? doc.displayPrecision,
-    constraints:      (patch.constraints as typeof doc.constraints | undefined) ?? doc.constraints,
-    constraintOrder:  patch.constraintOrder ?? doc.constraintOrder,
+    constraints:        (patch.constraints as typeof doc.constraints | undefined) ?? doc.constraints,
+    constraintOrder:    patch.constraintOrder  ?? doc.constraintOrder,
+    joints:             patch.joints           ?? doc.joints,
+    jointOrder:         patch.jointOrder       ?? doc.jointOrder,
+    driveRelations:     patch.driveRelations   ?? doc.driveRelations,
+    driveRelationOrder: patch.driveRelationOrder ?? doc.driveRelationOrder,
   };
 }

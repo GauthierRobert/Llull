@@ -16,6 +16,9 @@ import type {
   DocumentUnit,
   EntityKind,
   FeatureStep,
+  Joint,
+  JointKind,
+  DriveRelation,
   Layer,
   CameraState,
   Vec3,
@@ -294,6 +297,87 @@ const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
   'coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle',
 ]);
 
+/** All legal joint kinds (must stay in sync with JointKind union in types.ts). */
+const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>([
+  'revolute', 'prismatic',
+]);
+
+/**
+ * Validate a JointMateRef embedded object. Returns error string or null.
+ */
+function validateJointMateRef(id: string, field: string, v: unknown): string | null {
+  if (!isRecord(v)) return `joint '${id}': ${field} must be an object`;
+  if (typeof v['instanceId'] !== 'string' || (v['instanceId'] as string).length === 0) {
+    return `joint '${id}': ${field}.instanceId must be a non-empty string`;
+  }
+  if ('frame' in v) {
+    const f = v['frame'];
+    if (f !== 'origin' && f !== 'axis-x' && f !== 'axis-y' && f !== 'axis-z') {
+      return `joint '${id}': ${field}.frame must be origin|axis-x|axis-y|axis-z, got '${String(f)}'`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Validate an axis field ('x'|'y'|'z' or a 3-element finite-number array).
+ * Returns error string or null.
+ */
+function validateJointAxis(id: string, axis: unknown): string | null {
+  if (axis === 'x' || axis === 'y' || axis === 'z') return null;
+  if (Array.isArray(axis) && axis.length === 3 && (axis as unknown[]).every((c) => typeof c === 'number' && Number.isFinite(c))) {
+    return null;
+  }
+  return `joint '${id}': axis must be 'x', 'y', 'z', or a [x,y,z] finite-number array, got ${JSON.stringify(axis)}`;
+}
+
+/**
+ * Validate a Joint entry. Returns a descriptive error string on failure, or `null` on success.
+ */
+function validateJointValue(id: string, v: unknown): string | null {
+  if (!isRecord(v)) return `joint '${id}' is not an object`;
+  if (typeof v['id'] !== 'string') return `joint '${id}': id field must be a string`;
+  const kind = v['kind'];
+  if (typeof kind !== 'string' || !VALID_JOINT_KINDS.has(kind)) {
+    return `joint '${id}': unknown kind '${String(kind)}'. Allowed: revolute, prismatic.`;
+  }
+  const refErrA = validateJointMateRef(id, 'a', v['a']);
+  if (refErrA !== null) return refErrA;
+  const refErrB = validateJointMateRef(id, 'b', v['b']);
+  if (refErrB !== null) return refErrB;
+  const axisErr = validateJointAxis(id, v['axis']);
+  if (axisErr !== null) return axisErr;
+  if (kind === 'revolute') {
+    if (typeof v['angle'] !== 'number' || !Number.isFinite(v['angle'] as number)) {
+      return `joint '${id}' (revolute): angle must be a finite number`;
+    }
+  } else {
+    if (typeof v['displacement'] !== 'number' || !Number.isFinite(v['displacement'] as number)) {
+      return `joint '${id}' (prismatic): displacement must be a finite number`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Validate a DriveRelation entry. Returns a descriptive error string on failure, or `null` on success.
+ */
+function validateDriveRelationValue(id: string, v: unknown): string | null {
+  if (!isRecord(v)) return `driveRelation '${id}' is not an object`;
+  if (typeof v['id'] !== 'string') return `driveRelation '${id}': id field must be a string`;
+  if (typeof v['driver'] !== 'string' || (v['driver'] as string).length === 0)
+    return `driveRelation '${id}': driver must be a non-empty string`;
+  if (typeof v['driven'] !== 'string' || (v['driven'] as string).length === 0)
+    return `driveRelation '${id}': driven must be a non-empty string`;
+  if (typeof v['ratio'] !== 'number' || !Number.isFinite(v['ratio'] as number))
+    return `driveRelation '${id}': ratio must be a finite number`;
+  if ('offset' in v && v['offset'] !== undefined) {
+    if (typeof v['offset'] !== 'number' || !Number.isFinite(v['offset'] as number))
+      return `driveRelation '${id}': offset must be a finite number when present`;
+  }
+  return null;
+}
+
 /**
  * Validate a Constraint entry. Returns a descriptive error string on failure, or `null` on success.
  */
@@ -423,6 +507,24 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
     }
   }
 
+  // Joints (optional field — only validate if present)
+  if (isRecord(v['joints'])) {
+    const joints = v['joints'] as Record<string, unknown>;
+    for (const [jid, joint] of Object.entries(joints)) {
+      const err = validateJointValue(jid, joint);
+      if (err !== null) errors.push(err);
+    }
+  }
+
+  // DriveRelations (optional field — only validate if present)
+  if (isRecord(v['driveRelations'])) {
+    const drs = v['driveRelations'] as Record<string, unknown>;
+    for (const [drid, dr] of Object.entries(drs)) {
+      const err = validateDriveRelationValue(drid, dr);
+      if (err !== null) errors.push(err);
+    }
+  }
+
   return errors;
 }
 
@@ -503,6 +605,24 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     ? (raw['constraintOrder'] as string[])
     : [];
 
+  // Joints (added in KN1 — kinematic joints)
+  const joints: Record<string, Joint> = isRecord(raw['joints'])
+    ? (raw['joints'] as Record<string, Joint>)
+    : {};
+
+  const jointOrder: string[] = Array.isArray(raw['jointOrder'])
+    ? (raw['jointOrder'] as string[])
+    : [];
+
+  // DriveRelations (added in KN1 — drive relations)
+  const driveRelations: Record<string, DriveRelation> = isRecord(raw['driveRelations'])
+    ? (raw['driveRelations'] as Record<string, DriveRelation>)
+    : {};
+
+  const driveRelationOrder: string[] = Array.isArray(raw['driveRelationOrder'])
+    ? (raw['driveRelationOrder'] as string[])
+    : [];
+
   return {
     ...raw,
     units,
@@ -517,6 +637,10 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     components,
     constraints,
     constraintOrder,
+    joints,
+    jointOrder,
+    driveRelations,
+    driveRelationOrder,
   };
 }
 
