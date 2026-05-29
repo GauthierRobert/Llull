@@ -70,6 +70,7 @@ import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } f
 import { addMate, billOfMaterials } from './mates';
 import { addJoint, deleteJoint, setJointValue, addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './joints';
 import { motionStudy } from './motion_study';
+import { addSpurGear } from './gears';
 
 // Using `unknown` for params here; each definition narrows its own type internally.
 const definitions = [
@@ -178,6 +179,7 @@ const definitions = [
   evaluateMotion,
   bakeMotion,
   motionStudy,
+  addSpurGear,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
