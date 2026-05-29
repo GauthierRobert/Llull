@@ -17,6 +17,7 @@ import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { sampleInvolute } from './gears';
 
 /** Clone the document shallowly with a new entity added. Keeps commands pure. */
 function withEntity(doc: CadDocument, entity: Entity): CadDocument {
@@ -642,6 +643,216 @@ export const drawSpline: CommandDefinition<DrawSplineParams> = {
     return {
       document: withEntity(doc, entity),
       summary: `Drew spline ${id} with ${safePoints.length} points${closed ? ' (closed)' : ''}.`,
+      affected: [id],
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// draw_involute
+// ---------------------------------------------------------------------------
+
+interface DrawInvoluteParams {
+  baseRadius: number;
+  startAngle?: number;
+  endAngle: number;
+  samples?: number;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+  name?: string;
+}
+
+/** Format a number compactly for the summary string. */
+function fmtN(v: number): string {
+  return parseFloat(v.toFixed(4)).toString();
+}
+
+/**
+ * @command draw_involute
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 open polyline entity tracing an involute curve
+ * @invariant baseRadius > 0; samples >= 2; endAngle > startAngle; all numerics finite
+ * @failure baseRadius <= 0, samples < 2, endAngle <= startAngle, or any non-finite numeric -> no-op, affected:[]
+ */
+export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
+  name: 'draw_involute',
+  description:
+    'Draw an open 2D involute curve sampled as a polyline in the local work plane. ' +
+    'The involute of a circle: x(t) = baseRadius*(cos t + t*sin t), y(t) = baseRadius*(sin t − t*cos t). ' +
+    'baseRadius is the base circle radius (must be > 0). ' +
+    'startAngle and endAngle are the involute parameter t at the curve start and end (endAngle must be > startAngle). ' +
+    'samples is the number of points on the curve (minimum 2; default 24). ' +
+    'At t=0 the curve originates at (baseRadius, 0); radial distance from origin at t is baseRadius*sqrt(1+t²). ' +
+    'The curve is open (not closed) and can be fed to other commands or used standalone as a reference curve. ' +
+    'position is [x,y,z] world-space placement of the work-plane origin (default [0,0,0]). ' +
+    'rotation is extrinsic XYZ Euler angles in radians (default [0,0,0]).',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      baseRadius: {
+        type: 'number',
+        description:
+          'Base circle radius of the involute. Must be > 0. ' +
+          'Controls the curvature: smaller baseRadius gives a more tightly wound curve.',
+      },
+      startAngle: {
+        type: 'number',
+        description:
+          'Involute parameter t at the start of the curve, in radians. Defaults to 0. ' +
+          'At t=0 the curve starts at (baseRadius, 0). Must be < endAngle.',
+      },
+      endAngle: {
+        type: 'number',
+        description:
+          'Involute parameter t at the end of the curve, in radians. Must be > startAngle. ' +
+          'The radial distance from origin at the endpoint is baseRadius*sqrt(1 + endAngle²).',
+      },
+      samples: {
+        type: 'number',
+        description:
+          'Number of points sampled along the curve (inclusive of both endpoints). ' +
+          'Minimum 2. Default 24. Higher values give a smoother polyline.',
+      },
+      position: {
+        type: 'array',
+        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        items: { type: 'number' },
+      },
+      rotation: {
+        type: 'array',
+        description:
+          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].',
+        items: { type: 'number' },
+      },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#4a90d9". Defaults to "#4a90d9".',
+      },
+      name: {
+        type: 'string',
+        description: 'Optional display name for the entity (shown in the scene tree).',
+      },
+    },
+    required: ['baseRadius', 'endAngle'],
+  },
+  run: (
+    doc,
+    {
+      baseRadius,
+      startAngle = 0,
+      endAngle,
+      samples = 24,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0],
+      color = '#4a90d9',
+      name,
+    },
+  ): CommandResult => {
+    // --- Validate all numerics are finite ---
+    if (!Number.isFinite(baseRadius)) {
+      return {
+        document: doc,
+        summary: `draw_involute: baseRadius must be finite, got ${String(baseRadius)}.`,
+        affected: [],
+      };
+    }
+    if (!Number.isFinite(startAngle)) {
+      return {
+        document: doc,
+        summary: `draw_involute: startAngle must be finite, got ${String(startAngle)}.`,
+        affected: [],
+      };
+    }
+    if (!Number.isFinite(endAngle)) {
+      return {
+        document: doc,
+        summary: `draw_involute: endAngle must be finite, got ${String(endAngle)}.`,
+        affected: [],
+      };
+    }
+    if (!Number.isFinite(samples)) {
+      return {
+        document: doc,
+        summary: `draw_involute: samples must be finite, got ${String(samples)}.`,
+        affected: [],
+      };
+    }
+
+    // --- Validate domain ---
+    if (baseRadius <= 0) {
+      return {
+        document: doc,
+        summary: `draw_involute: baseRadius must be > 0, got ${baseRadius}.`,
+        affected: [],
+      };
+    }
+    const samplesInt = Math.round(samples);
+    if (samplesInt < 2) {
+      return {
+        document: doc,
+        summary: `draw_involute: samples must be >= 2, got ${samples}.`,
+        affected: [],
+      };
+    }
+    if (endAngle <= startAngle) {
+      return {
+        document: doc,
+        summary: `draw_involute: endAngle (${endAngle}) must be > startAngle (${startAngle}).`,
+        affected: [],
+      };
+    }
+
+    // --- Resolve position/rotation (clamp non-finite to 0) ---
+    const resolvedPos: Vec3 =
+      Array.isArray(position) && position.length === 3 &&
+      Number.isFinite((position as number[])[0]) &&
+      Number.isFinite((position as number[])[1]) &&
+      Number.isFinite((position as number[])[2])
+        ? [(position as number[])[0]!, (position as number[])[1]!, (position as number[])[2]!]
+        : [0, 0, 0];
+
+    const resolvedRot: Vec3 =
+      Array.isArray(rotation) && rotation.length === 3 &&
+      Number.isFinite((rotation as number[])[0]) &&
+      Number.isFinite((rotation as number[])[1]) &&
+      Number.isFinite((rotation as number[])[2])
+        ? [(rotation as number[])[0]!, (rotation as number[])[1]!, (rotation as number[])[2]!]
+        : [0, 0, 0];
+
+    // --- Sample the involute using the shared helper from gears.ts ---
+    const rawPoints = sampleInvolute(baseRadius, startAngle, endAngle, samplesInt);
+    const pts: ReadonlyArray<Vec2> = rawPoints.map(([x, y]) => [x, y] as Vec2);
+
+    // --- Compute 2D AABB for summary ---
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of pts) {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+
+    // --- Mint entity id and build open polyline ---
+    const id = nextId('inv');
+    const entity: Entity = {
+      id,
+      kind: 'polyline',
+      points: pts,
+      closed: false,
+      position: resolvedPos,
+      rotation: resolvedRot,
+      layerId: DEFAULT_LAYER_ID,
+      color,
+      ...(name !== undefined && name !== '' ? { name } : {}),
+    };
+
+    return {
+      document: withEntity(doc, entity),
+      summary:
+        `Drew involute ${id}: baseRadius=${fmtN(baseRadius)} t=[${fmtN(startAngle)}, ${fmtN(endAngle)}] ` +
+        `samples=${samplesInt} AABB x=[${fmtN(minX)}, ${fmtN(maxX)}] y=[${fmtN(minY)}, ${fmtN(maxY)}].`,
       affected: [id],
     };
   },

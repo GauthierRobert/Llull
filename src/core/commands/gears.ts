@@ -18,19 +18,25 @@ import { rotatedEntityBounds } from './scene';
 // ---------------------------------------------------------------------------
 
 /**
- * Sample one involute flank of a gear tooth.
+ * Sample points along the involute of a circle with base radius `baseR`.
  *
- * The involute of a circle with base radius `rb` at parameter `t`:
- *   x(t) = rb * (cos t + t * sin t)
- *   y(t) = rb * (sin t - t * cos t)
+ * Parametric equations:
+ *   x(t) = baseR * (cos t + t * sin t)
+ *   y(t) = baseR * (sin t - t * cos t)
  *
- * @param rb      Base circle radius.
- * @param tStart  Start parameter (clamped near root circle when undercut occurs).
- * @param tEnd    End parameter where involute reaches the addendum circle.
- * @param samples Number of points to generate (inclusive of endpoints).
- * @returns Array of [x, y] points along the involute.
+ * The curve is open and traces from `tStart` to `tEnd` linearly across `samples` points
+ * (`samples - 1` segments). At t=0 the involute starts at `(baseR, 0)`.
+ * The distance from the origin at parameter t is `baseR * sqrt(1 + t²)`.
+ *
+ * Exported so `draw_involute` and `add_spur_gear` share one implementation.
+ *
+ * @param baseR   Base circle radius (must be > 0).
+ * @param tStart  Start parameter t.
+ * @param tEnd    End parameter t (must be > tStart for a non-degenerate curve).
+ * @param samples Number of points to generate (inclusive of both endpoints; minimum 2).
+ * @returns ReadonlyArray of [x, y] points sampled linearly in t.
  */
-function sampleInvolute(
+export function sampleInvolute(
   rb: number,
   tStart: number,
   tEnd: number,
