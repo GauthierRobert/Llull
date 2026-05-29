@@ -10,7 +10,9 @@ import { createEmptyDocument } from '@core/model/types';
 import type { InstanceEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/commands/scene';
+import { expandInstance } from '@core/commands/assemblies';
 import { __resetIdCounter } from '@lib/id';
+import type { Component } from '@core/model/types';
 
 describe('assemblies', () => {
   beforeEach(() => __resetIdCounter());
@@ -429,5 +431,75 @@ describe('assemblies', () => {
     const scaled = execute(doc, 'scale_entity', { id: instanceId, factor: 3 });
     const instance = scaled.document.entities[instanceId] as InstanceEntity;
     expect(instance.scale).toEqual([3, 3, 3]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // expandInstance — deterministic id mapping (deferred-nits Item B)
+  // ---------------------------------------------------------------------------
+
+  it('expandInstance returns byte-identical ids on repeated calls (deterministic)', () => {
+    // Build one instance + one component, then expand twice. The expanded
+    // entity ids must match across calls — the prior implementation called
+    // nextId() per expansion, so render-memo recomputes minted fresh ids
+    // every frame, breaking React key stability and downstream determinism.
+    let doc = createEmptyDocument();
+    const box = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = box.document;
+    const boxId = box.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'Brick', entityIds: [boxId] });
+    doc = comp.document;
+    const instanceId = comp.affected[0]!;
+
+    const instance = doc.entities[instanceId] as InstanceEntity;
+    const component = doc.components[instance.componentId] as Component;
+
+    const a = expandInstance(instance, component).map((e) => e.id);
+    const b = expandInstance(instance, component).map((e) => e.id);
+    expect(a).toEqual(b);
+    expect(a.length).toBeGreaterThan(0);
+  });
+
+  it('expandInstance — different instances of the same component get different ids', () => {
+    let doc = createEmptyDocument();
+    const box = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = box.document;
+    const boxId = box.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'Brick', entityIds: [boxId] });
+    doc = comp.document;
+    const inst1Id = comp.affected[0]!;
+    const inst2 = execute(doc, 'insert_instance', {
+      componentId: (doc.entities[inst1Id] as InstanceEntity).componentId,
+      position: [5, 0, 0],
+    });
+    doc = inst2.document;
+    const inst2Id = inst2.affected[0]!;
+
+    const instance1 = doc.entities[inst1Id] as InstanceEntity;
+    const instance2 = doc.entities[inst2Id] as InstanceEntity;
+    const component = doc.components[instance1.componentId] as Component;
+
+    const ids1 = expandInstance(instance1, component).map((e) => e.id);
+    const ids2 = expandInstance(instance2, component).map((e) => e.id);
+    // No id should appear in both arrays — instances are namespaced apart.
+    const overlap = ids1.filter((id) => ids2.includes(id));
+    expect(overlap).toHaveLength(0);
+  });
+
+  it('expandInstance — expanded ids include both the instance id and source entity id', () => {
+    let doc = createEmptyDocument();
+    const box = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    doc = box.document;
+    const boxId = box.affected[0]!;
+    const comp = execute(doc, 'create_component', { name: 'Brick', entityIds: [boxId] });
+    doc = comp.document;
+    const instanceId = comp.affected[0]!;
+
+    const instance = doc.entities[instanceId] as InstanceEntity;
+    const component = doc.components[instance.componentId] as Component;
+    const expanded = expandInstance(instance, component);
+    expect(expanded.length).toBe(1);
+    const expandedId = expanded[0]!.id;
+    expect(expandedId).toContain(instanceId);
+    expect(expandedId).not.toBe(boxId); // not the raw source id
   });
 });

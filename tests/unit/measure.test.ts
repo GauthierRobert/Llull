@@ -689,6 +689,138 @@ describe('measure commands', () => {
       execute(doc, 'measure_volume', { entityId: r.affected[0]! });
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
+
+    // -------------------------------------------------------------------------
+    // A — Pappus volume for revolution entities
+    // -------------------------------------------------------------------------
+
+    /** Inject a RevolutionEntity directly (no command needed for unit tests). */
+    function makeRevolution(
+      profile: ReadonlyArray<readonly [number, number]>,
+      angle: number,
+      axis: readonly [number, number, number] = [0, 1, 0],
+    ): CadDocument {
+      const doc = createEmptyDocument();
+      const entity = {
+        id: 'rev-test',
+        kind: 'revolution' as const,
+        position: [0, 0, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        layerId: 'layer-default',
+        color: '#c8553d',
+        profile,
+        axis: axis as [number, number, number],
+        angle,
+        segments: 32,
+      };
+      return {
+        ...doc,
+        entities: { ...doc.entities, 'rev-test': entity },
+        order: [...doc.order, 'rev-test'],
+      };
+    }
+
+    it('A1 happy: square ring profile revolved 2π (torus-like) — Pappus V = 2π·xc·A', () => {
+      // Profile: [(2,0),(4,0),(4,2),(2,2)] — a 2×2 square at x∈[2,4]
+      // A = 4, x_centroid = 3 (midpoint of [2,4])
+      // V = 2π · 3 · 4 = 24π ≈ 75.398
+      const profile: ReadonlyArray<readonly [number, number]> = [[2, 0], [4, 0], [4, 2], [2, 2]];
+      const doc = makeRevolution(profile, 2 * Math.PI);
+      const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
+      expect(result.affected).toEqual([]);
+      expect(result.document).toBe(doc);
+      const d = result.data as { volume: number; unit: string };
+      expect(d.volume).toBeCloseTo(24 * Math.PI, 6);
+      expect(d.unit).toBe('mm³');
+      expect(result.summary).toContain('rev-test');
+    });
+
+    it('A2 happy: right-triangle profile revolved 2π — Pappus V matches manual calculation', () => {
+      // Profile: [(1,0),(3,0),(1,2)] — right triangle with base 2 along x, height 2 along y
+      // A = (1/2)·2·2 = 2
+      // x_centroid = (1+3+1)/3 = 5/3
+      // V = 2π · (5/3) · 2 = 20π/3 ≈ 20.944
+      const profile: ReadonlyArray<readonly [number, number]> = [[1, 0], [3, 0], [1, 2]];
+      const doc = makeRevolution(profile, 2 * Math.PI);
+      const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
+      const d = result.data as { volume: number; unit: string };
+      expect(d.volume).toBeCloseTo((20 * Math.PI) / 3, 6);
+    });
+
+    it('A3 happy: partial revolution (sweepAngle = π) gives half the full-revolution volume', () => {
+      const profile: ReadonlyArray<readonly [number, number]> = [[2, 0], [4, 0], [4, 2], [2, 2]];
+      const docFull = makeRevolution(profile, 2 * Math.PI);
+      const docHalf = makeRevolution(profile, Math.PI);
+      const full = (execute(docFull, 'measure_volume', { entityId: 'rev-test' }).data as { volume: number }).volume;
+      const half = (execute(docHalf, 'measure_volume', { entityId: 'rev-test' }).data as { volume: number }).volume;
+      expect(half).toBeCloseTo(full / 2, 6);
+    });
+
+    it('A4 happy: missing sweepAngle (undefined entity angle) treated as 2π', () => {
+      // Use the square profile and assert the result equals the 2π case.
+      const profile: ReadonlyArray<readonly [number, number]> = [[2, 0], [4, 0], [4, 2], [2, 2]];
+      const doc = createEmptyDocument();
+      // Build entity without the `angle` field to simulate an absent value — cast is intentional.
+      const entity = {
+        id: 'rev-no-angle',
+        kind: 'revolution' as const,
+        position: [0, 0, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number],
+        layerId: 'layer-default',
+        color: '#c8553d',
+        profile,
+        axis: [0, 1, 0] as [number, number, number],
+        angle: undefined as unknown as number, // deliberately absent
+        segments: 32,
+      };
+      const docWithEntity = {
+        ...doc,
+        entities: { ...doc.entities, 'rev-no-angle': entity },
+        order: [...doc.order, 'rev-no-angle'],
+      };
+      const result = execute(docWithEntity, 'measure_volume', { entityId: 'rev-no-angle' });
+      const d = result.data as { volume: number; unit: string };
+      // Should treat missing angle as 2π → same result as A1
+      expect(d.volume).toBeCloseTo(24 * Math.PI, 6);
+    });
+
+    it('A5 failure: profile crossing axis (x < 0) falls back to bbox approx with caveat summary', () => {
+      // A profile with one point at negative x crosses the revolution axis.
+      const profile: ReadonlyArray<readonly [number, number]> = [[-1, 0], [2, 0], [2, 2], [-1, 2]];
+      const doc = makeRevolution(profile, 2 * Math.PI);
+      const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
+      expect(result.affected).toEqual([]);
+      expect(result.document).toBe(doc);
+      // Data must still be present (bbox approximation, not a hard no-op).
+      expect(result.data).toBeDefined();
+      const d = result.data as { volume: number; unit: string };
+      expect(d.volume).toBeGreaterThan(0);
+      // Summary must note the approximation.
+      expect(result.summary).toContain('approximation');
+    });
+
+    it('A5b boundary: profile tangent to axis (x_min == 0) takes the Pappus path, not the bbox fallback', () => {
+      // A profile touching the axis at x=0 is NOT crossing it (Pappus is well-defined
+      // when x >= 0 with equality allowed). This pins the inequality used in the
+      // axis-crossing guard: `x < 0` (strict), not `x <= 0`.
+      // Profile: triangle with one vertex on the axis. Vertices: (0,0)(2,0)(2,2).
+      // Area = 2; centroid_x = (0+2+2)/3 = 4/3.
+      // V (full revolution) = 2π · (4/3) · 2 = 16π/3 ≈ 16.755.
+      const profile: ReadonlyArray<readonly [number, number]> = [[0, 0], [2, 0], [2, 2]];
+      const doc = makeRevolution(profile, 2 * Math.PI);
+      const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
+      const d = result.data as { volume: number; unit: string };
+      expect(d.volume).toBeCloseTo((16 * Math.PI) / 3, 6);
+      expect(result.summary).not.toContain('approximation');
+    });
+
+    it('A6 purity: revolution entity — input doc not mutated', () => {
+      const profile: ReadonlyArray<readonly [number, number]> = [[2, 0], [4, 0], [4, 2], [2, 2]];
+      const doc = makeRevolution(profile, 2 * Math.PI);
+      const snapshot = JSON.stringify(doc);
+      execute(doc, 'measure_volume', { entityId: 'rev-test' });
+      expect(JSON.stringify(doc)).toBe(snapshot);
+    });
   });
 
   // ---------------------------------------------------------------------------

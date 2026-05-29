@@ -26,6 +26,7 @@ import { computeSceneSnapshot } from './scene';
 import type { Bounds } from './scene';
 import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
 export { applyEulerXYZ } from '@lib/eulerRotation';
+import { SEG_CIRCLE, SEG_SPHERE_LAT, SEG_SPHERE_LON, SEG_TORUS_TUBE, circlePoints as _circlePoints } from './tessellation';
 
 // ---------------------------------------------------------------------------
 // Public result type — a second agent depends on these field names exactly.
@@ -260,19 +261,11 @@ function tintHex(hex: string, factor: number): string {
 // Tessellation helpers
 // ---------------------------------------------------------------------------
 
-const SEG_CIRCLE = 24; // segments for circles/cylinders/cones/torus
-const SEG_SPHERE_LAT = 12;
-const SEG_SPHERE_LON = 16;
-const SEG_TORUS_TUBE = 12;
+// SEG_CIRCLE, SEG_SPHERE_LAT, SEG_SPHERE_LON, SEG_TORUS_TUBE imported from tessellation.ts
 
-/** Points on a circle in the XY plane at height `cz` (Z-up). */
+/** Points on a circle in the XY plane at height `cz` (Z-up). Delegates to shared tessellation helper. */
 function circlePoints(cx: number, cy: number, cz: number, r: number, segments: number): Vec3[] {
-  const pts: Vec3[] = [];
-  for (let i = 0; i < segments; i++) {
-    const a = (2 * Math.PI * i) / segments;
-    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a), cz]);
-  }
-  return pts;
+  return _circlePoints(cx, cy, cz, r, segments);
 }
 
 /** Compute outward face normal for a polygon (using the first 3 verts). */

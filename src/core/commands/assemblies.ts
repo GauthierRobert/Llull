@@ -23,6 +23,20 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../../lib/id';
 import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
 
+/**
+ * Build a deterministic expanded-entity id from the instance id and the
+ * source entity id.  The double-colon delimiter cannot appear in real
+ * nextId-generated ids (which use base-36 chars only), so collisions with
+ * real document entity ids are impossible.
+ *
+ * Same inputs → same output (pure, no side effects).
+ *
+ * @pure
+ */
+function expandedId(instanceId: string, sourceEntityId: string): string {
+  return `expanded::${instanceId}::${sourceEntityId}`;
+}
+
 // ---------------------------------------------------------------------------
 // expandInstance — pure world-space bake helper
 // ---------------------------------------------------------------------------
@@ -81,7 +95,7 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
 
       return {
         ...childEntity,
-        id: nextId(childEntity.kind),
+        id: expandedId(instance.id, childEntity.id),
         position: worldPos,
         rotation: worldRot,
       } as Entity;

@@ -13,6 +13,7 @@ import { is3D } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { applyEulerXYZ } from './render';
 import { expandInstance } from './assemblies';
+import { SEG_CIRCLE, SEG_SPHERE_LAT, SEG_SPHERE_LON, SEG_TORUS_TUBE, circlePoints, earClipTriangulate } from './tessellation';
 
 // ---------------------------------------------------------------------------
 // Internal math helpers (pure)
@@ -51,31 +52,13 @@ function facetNormal(v0: Vec3, v1: Vec3, v2: Vec3): Vec3 {
 export type Triangle = readonly [Vec3, Vec3, Vec3];
 
 // ---------------------------------------------------------------------------
-// Shared tessellation constants (mirror render.ts values for consistency)
-// ---------------------------------------------------------------------------
-
-const SEG_CIRCLE = 24;
-const SEG_SPHERE_LAT = 12;
-const SEG_SPHERE_LON = 16;
-const SEG_TORUS_TUBE = 12;
-
-// ---------------------------------------------------------------------------
 // Geometry helpers
 // ---------------------------------------------------------------------------
 
-/** Points on a circle in the XY plane at height cz (Z-up). */
-function circlePoints(cx: number, cy: number, cz: number, r: number, segs: number): Vec3[] {
-  const pts: Vec3[] = [];
-  for (let i = 0; i < segs; i++) {
-    const a = (2 * Math.PI * i) / segs;
-    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a), cz]);
-  }
-  return pts;
-}
-
 /**
- * Triangulate a convex/simple polygon fan from first vertex.
- * Polygon assumed CCW when viewed from outside.
+ * Triangulate a convex polygon as a fan from the first vertex.
+ * Only correct for strictly convex polygons — use earClipTriangulateVerts for
+ * general (possibly non-convex) profiles.
  */
 function fanTriangulate(verts: Vec3[]): Triangle[] {
   const tris: Triangle[] = [];
@@ -83,6 +66,21 @@ function fanTriangulate(verts: Vec3[]): Triangle[] {
     tris.push([verts[0]!, verts[i]!, verts[i + 1]!]);
   }
   return tris;
+}
+
+/**
+ * Triangulate a general (convex or non-convex) polygon using ear-clipping.
+ * `verts` are 3D points that share the same Z plane — only XY is used for
+ * the ear test; Z is preserved in the output triangles.
+ *
+ * Falls back to fan-triangulation for degenerate inputs (< 3 verts).
+ */
+function earClipTriangulateVerts(verts: Vec3[]): Triangle[] {
+  if (verts.length < 3) return [];
+  // Project to 2D for the ear-clip test (all verts share the same Z plane).
+  const pts2d: Array<readonly [number, number]> = verts.map((v) => [v[0], v[1]] as const);
+  const indexTris = earClipTriangulate(pts2d);
+  return indexTris.map(([ia, ib, ic]) => [verts[ia]!, verts[ib]!, verts[ic]!] as Triangle);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,10 +284,10 @@ function triangulateExtrusion(e: { position: Vec3; profile: ReadonlyArray<readon
 
   const tris: Triangle[] = [];
 
-  // Bottom cap (reversed = face down)
-  tris.push(...fanTriangulate([...bottom].reverse()));
+  // Bottom cap (reversed = face down) — ear-clip handles non-convex profiles correctly.
+  tris.push(...earClipTriangulateVerts([...bottom].reverse()));
   // Top cap
-  tris.push(...fanTriangulate([...top]));
+  tris.push(...earClipTriangulateVerts([...top]));
   // Side quads → 2 tris each
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;

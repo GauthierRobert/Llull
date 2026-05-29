@@ -705,7 +705,9 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
     "'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), " +
     "'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), " +
     "'wedge' (w×h×d / 2 — half the enclosing box), " +
-    "'pyramid' (baseWidth × baseDepth × height / 3). " +
+    "'pyramid' (baseWidth × baseDepth × height / 3), " +
+    "'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; " +
+    "falls back to bounding-box approximation if the profile crosses the revolution axis). " +
     'Returns data: { volume, unit } where unit is the cubed document unit (e.g. "mm³"). ' +
     '2D shape entities are rejected. Does not modify the document.',
   paramsSchema: {
@@ -715,7 +717,7 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
         type: 'string',
         description:
           "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', " +
-          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
+          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
       },
     },
     required: ['entityId'],
@@ -761,12 +763,66 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
         // V = baseWidth × baseDepth × height / 3
         volume = (e.baseWidth * e.baseDepth * e.height) / 3;
         break;
+      case 'revolution': {
+        // Pappus's centroid theorem (second kind):
+        //   V = sweepAngle × |x_centroid| × A_profile
+        //
+        // Convention from types.ts / revolve_profile: profile points are
+        // [radialOffset, axialOffset] where x (radialOffset) is the perpendicular
+        // distance from the revolution axis.  The axis vector stored in e.axis
+        // selects which world axes map to radial/axial, but for the volume
+        // formula only the profile-plane centroid matters — x_centroid IS the
+        // centroid's distance from the revolution axis.
+        //
+        // Guard: Pappus requires the profile NOT to cross the revolution axis
+        // (x < 0 would mean points on the other side of the axis).  When any
+        // profile x is negative we fall back to a bounding-box approximation
+        // and include a caveat in the summary.
+        const prof = e.profile;
+        const profN = prof.length;
+        let profileArea = 0;
+        let cx = 0;
+        for (let pi = 0; pi < profN; pi++) {
+          const [xi, yi] = prof[pi]!;
+          const [xj, yj] = prof[(pi + 1) % profN]!;
+          const cross = xi * yj - xj * yi;
+          profileArea += cross;
+          cx += (xi + xj) * cross;
+        }
+        profileArea = Math.abs(profileArea) / 2;
+        // Check for axis-crossing (any point with negative radial offset).
+        const crossesAxis = prof.some(([x]) => x < 0);
+        if (crossesAxis) {
+          // Fallback: bounding-box approximation (same as pre-fix behaviour).
+          const b = entityBounds(e);
+          volume = (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]);
+          const data: MeasureVolumeData = { volume, unit: volumeUnit };
+          return {
+            document: doc,
+            summary:
+              `Volume of ${entityId} ≈ ${volume.toFixed(doc.displayPrecision)} ${volumeUnit} ` +
+              `(bounding-box approximation — profile crosses revolution axis; Pappus requires profile x ≥ 0).`,
+            affected: [],
+            data,
+          };
+        }
+        if (profileArea < 1e-12) {
+          volume = 0;
+          break;
+        }
+        const sweepAngle = e.angle ?? (2 * Math.PI);
+        // centroid x = (1/(6·A)) · Σ (xi+xj)(xi·yj − xj·yi)  — but we need |x_c|
+        const xCentroid = Math.abs(cx / (6 * profileArea));
+        // V = sweepAngle · x_centroid · A_profile
+        volume = sweepAngle * xCentroid * profileArea;
+        break;
+      }
       default:
         return {
           document: doc,
           summary:
             `measure_volume: entity '${entityId}' is kind '${e.kind}'; ` +
-            "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
+            "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
           affected: [],
         };
     }
