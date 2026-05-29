@@ -13,7 +13,7 @@ import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
 import { addBox, addCylinder, addSphere, addCone, addTorus, addWedge, addPyramid, extrude, move, deleteEntity } from './geometry';
 import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
-import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint, drawEllipse, drawSpline, drawInvolute } from './draw2d';
+import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint, drawEllipse, drawSpline, drawInvolute, drawBeltAround } from './draw2d';
 import { loadDocument } from './persistence';
 import { extrudeSketch, revolveProfile } from './profile';
 import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit';
@@ -181,6 +181,7 @@ const definitions = [
   motionStudy,
   addSpurGear,
   drawInvolute,
+  drawBeltAround,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const byName = new Map<string, CommandDefinition<unknown>>(
