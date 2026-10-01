@@ -62,7 +62,7 @@
   --color-submit-hover:  oklch(0.36 0.10 245);
 
   /* Typography */
-  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Geist Sans', 'Geist', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, Consolas, monospace;
 
   /* Shape */

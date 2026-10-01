@@ -31,6 +31,7 @@ import type {
   ArcEntity,
   EllipseEntity,
 } from '@core/model/types';
+import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -452,6 +453,7 @@ export function DimensionRenderer2D({
     <group position={[posX, posY, posZ]}>
       {data.group && <primitive object={data.group} />}
       <Text
+        font={TEXT_FONT_URL}
         position={[data.textX, data.textY, 0.01]}
         fontSize={TEXT_HEIGHT}
         color={dimColor}

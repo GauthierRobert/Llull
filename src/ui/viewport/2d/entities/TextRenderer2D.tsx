@@ -16,6 +16,7 @@
 
 import { Text } from '@react-three/drei';
 import type { TextEntity } from '@core/model/types';
+import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 
 interface TextRenderer2DProps {
   entity: TextEntity;
@@ -40,6 +41,7 @@ export function TextRenderer2D({ entity, selected }: TextRenderer2DProps): React
 
   return (
     <Text
+      font={TEXT_FONT_URL}
       position={[position[0], position[1], position[2]]}
       rotation={[0, 0, rotZ]}
       fontSize={height}

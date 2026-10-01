@@ -27,6 +27,7 @@ import * as THREE from 'three';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import type { Constraint, Joint, Vec3 } from '@core/model/types';
+import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -110,6 +111,7 @@ function ConstraintLine({ constraint, entities }: ConstraintLineProps): React.Re
     <>
       <lineSegments geometry={geometry} material={material} renderOrder={998} />
       <Text
+        font={TEXT_FONT_URL}
         position={[midpoint.x, midpoint.y + 0.25, midpoint.z]}
         fontSize={0.35}
         color={CONSTRAINT_COLOR}
