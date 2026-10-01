@@ -112,7 +112,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 
 ## Phase 7 — wind refinement, concrete foundations, site and fabrication deliverables
 
-- [ ] **I28 — Internal pressure cases.** Wind with cpi = +0.2 and −0.3 (EN 1991-1-4 §7.2.9) on
+- [x] **I28 — Internal pressure cases.** Wind with cpi = +0.2 and −0.3 (EN 1991-1-4 §7.2.9) on
       walls and roof of every frame, both directions; columns take the net (cpe − cpi) pressure.
 - [ ] **I29 — RC pad footing design.** `design_footings` (EN 1992-1-1): bending at the column
       face → bottom reinforcement both ways (bar diameter / spacing, minimum steel), one-way shear,

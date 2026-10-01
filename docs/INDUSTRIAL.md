@@ -40,7 +40,8 @@ stiffness method, pinned bases, section properties from the profile outline — 
   self-weight at the crane brackets;
 - **S** — snow (`snowLoad`, kN/m²);
 - **W** — wind (`windPressure` = peak velocity pressure qp, kN/m², default 0 = off): windward wall
-  +0.8, leeward −0.5, roof uplift −0.8 (incl. cpi), from the left and from the right;
+  +0.8, leeward −0.5, roof −0.6, each with internal pressure cpi +0.2 and −0.3, from the left and
+  from the right;
 - **C** — overhead cranes, read from the runway capacity (`add_crane_runway` / the hall `crane`
   option, or `craneCapacity` to override, 0 to ignore): maximum / minimum wheel reactions with
   dynamic factors and a 10 % lateral surge, applied at the brackets with their eccentricity.

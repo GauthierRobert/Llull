@@ -17,8 +17,27 @@ import { fromMm } from '../model';
 import { findProfile, sectionProperties } from '../steel/profiles';
 import { E_STEEL } from './steelDesign';
 
-/** G dead, S snow, WL / WR wind from the left (+x) / right, CL / CR crane at the left / right rail. */
-export type LoadCase = 'G' | 'S' | 'WL' | 'WR' | 'CL' | 'CR';
+/**
+ * G dead, S snow, WL / WR wind from the left (+x) / right with internal pressure cpi = +0.2,
+ * WLs / WRs the same with internal suction cpi = −0.3, CL / CR crane at the left / right rail.
+ */
+export type LoadCase = 'G' | 'S' | 'WL' | 'WR' | 'WLs' | 'WRs' | 'CL' | 'CR';
+
+export interface WindCase {
+  readonly loadCase: 'WL' | 'WR' | 'WLs' | 'WRs';
+  readonly from: 'left' | 'right';
+  readonly internalPressure: number;
+  /** Combination label, e.g. "W→" or "W←(cpi−0.3)". */
+  readonly label: string;
+}
+
+/** The four wind cases (EN 1991-1-4 §7.2.9: cpi +0.2 / −0.3 when openings are not dominant). */
+export const WIND_CASES: ReadonlyArray<WindCase> = [
+  { loadCase: 'WL', from: 'left', internalPressure: 0.2, label: 'W→' },
+  { loadCase: 'WR', from: 'right', internalPressure: 0.2, label: 'W←' },
+  { loadCase: 'WLs', from: 'left', internalPressure: -0.3, label: 'W→(cpi−0.3)' },
+  { loadCase: 'WRs', from: 'right', internalPressure: -0.3, label: 'W←(cpi−0.3)' },
+];
 
 /** Uniform member load per unit length, global components (N/mm). */
 export type CaseLoads = Partial<Record<LoadCase, { readonly qx: number; readonly qy: number }>>;
@@ -74,8 +93,8 @@ export interface FrameLoads {
   readonly craneCapacity?: number;
 }
 
-/** Simplified external pressure coefficients (EN 1991-1-4 duopitch, h/d ≤ 1, cpi +0.2 on the roof). */
-export const WIND_COEFFICIENTS = { windward: 0.8, leeward: 0.5, roofUplift: 0.8 } as const;
+/** Simplified external pressure coefficients (EN 1991-1-4: walls D / E, duopitch roof average). */
+export const WIND_COEFFICIENTS = { windward: 0.8, leeward: 0.5, roofSuction: 0.6 } as const;
 
 /** Crane capacity (t) from the runway note written by add_crane_runway ("Crane 10 t, …"). */
 export function craneCapacityOf(member: SteelMemberElement): number | null {
@@ -241,8 +260,17 @@ export function framesOf(
         loads: {
           G: { qx: 0, qy: -(perLength(loads.deadLoad) + selfWeight(rafter.profile)) },
           S: { qx: 0, qy: -perLength(loads.snowLoad) },
-          WL: { qx: 0, qy: perLength(WIND_COEFFICIENTS.roofUplift * loads.windPressure) },
-          WR: { qx: 0, qy: perLength(WIND_COEFFICIENTS.roofUplift * loads.windPressure) },
+          ...Object.fromEntries(
+            WIND_CASES.map((windCase) => [
+              windCase.loadCase,
+              {
+                qx: 0,
+                qy: perLength(
+                  (WIND_COEFFICIENTS.roofSuction + windCase.internalPressure) * loads.windPressure,
+                ),
+              },
+            ]),
+          ),
         },
         lengths: {
           major: length,
@@ -342,13 +370,26 @@ export function framesOf(
         topNode,
       ];
       const outer = near(x, low) ? 'left' : near(x, high) ? 'right' : null;
-      const wind = (side: 'left' | 'right'): { qx: number; qy: number } | undefined => {
-        if (outer === null) return undefined;
-        const coefficient = outer === side ? WIND_COEFFICIENTS.windward : WIND_COEFFICIENTS.leeward;
-        const direction = side === 'left' ? 1 : -1;
-        return { qx: direction * area(coefficient * loads.windPressure) * tributary, qy: 0 };
-      };
-      const [windLeft, windRight] = [wind('left'), wind('right')];
+      // Net wall pressure in the wind direction: windward cpe − cpi, leeward |cpe| + cpi (outward).
+      const windLoads: CaseLoads =
+        outer === null
+          ? {}
+          : Object.fromEntries(
+              WIND_CASES.map((windCase) => {
+                const coefficient =
+                  outer === windCase.from
+                    ? WIND_COEFFICIENTS.windward - windCase.internalPressure
+                    : WIND_COEFFICIENTS.leeward + windCase.internalPressure;
+                const direction = windCase.from === 'left' ? 1 : -1;
+                return [
+                  windCase.loadCase,
+                  {
+                    qx: direction * area(coefficient * loads.windPressure) * tributary,
+                    qy: 0,
+                  },
+                ];
+              }),
+            );
       chain.slice(1).forEach((node, index) => {
         analysis.push({
           geometry: {
@@ -364,8 +405,7 @@ export function framesOf(
           ends: [index === 0, index === chain.length - 2],
           loads: {
             G: { qx: 0, qy: -selfWeight(column.profile) },
-            ...(windLeft ? { WL: windLeft } : {}),
-            ...(windRight ? { WR: windRight } : {}),
+            ...windLoads,
           },
           lengths: { major: height, minor: height, lateralTorsional: railGap },
         });
@@ -469,7 +509,7 @@ export interface BaseReaction {
   >;
 }
 
-const LOAD_CASES: ReadonlyArray<LoadCase> = ['G', 'S', 'WL', 'WR', 'CL', 'CR'];
+const LOAD_CASES: ReadonlyArray<LoadCase> = ['G', 'S', 'WL', 'WR', 'WLs', 'WRs', 'CL', 'CR'];
 
 /**
  * Characteristic base reactions of every analysed frame column, per load case (first-order).

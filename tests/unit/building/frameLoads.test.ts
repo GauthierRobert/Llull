@@ -145,7 +145,8 @@ describe('load combinations', () => {
     const doc = hall();
     const calm = check(doc, { snowLoad: 0 });
     const windy = check(doc, { snowLoad: 0, windPressure: 1.0 });
-    expect(windy.combinations).toHaveLength(6);
+    expect(windy.combinations).toHaveLength(10);
+    expect(windy.combinations).toContain('1.0G+1.5W←(cpi−0.3)');
     expect(windy.combinations).toContain('1.0G+1.5W→');
     expect(row(windy, 'SC5', 'column').utilisation).toBeGreaterThan(
       row(calm, 'SC5', 'column').utilisation,
@@ -185,7 +186,7 @@ describe('load combinations', () => {
       heavier.rows.find((candidate) => candidate.check.startsWith('rail-level'))!.utilisation,
     );
     const both = check(doc, { windPressure: 0.8 });
-    expect(both.combinations).toHaveLength(22);
+    expect(both.combinations).toHaveLength(38);
     expect(both.combinations).toContain('1.35G+1.35C(right)+0.75S+0.9W→');
     expect(both.combinations).toContain('1.35G+1.5W←+0.75S+1.35C(left)');
     // Crane reactions enter below the column tops: they lower αcr (storey-wise Horne).
@@ -260,9 +261,29 @@ describe('design_portal_frames with wind and crane', () => {
   it('designs a crane hall under wind so every check passes', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 6000 } });
     const result = execute(doc, 'design_portal_frames', { windPressure: 0.7 });
-    expect(result.summary).toMatch(/Designed 6 frame\(s\) for 22 ULS combination\(s\)/);
+    expect(result.summary).toMatch(/Designed 6 frame\(s\) for 38 ULS combination\(s\)/);
     const after = check(result.document, { windPressure: 0.7 });
     expect(after.maxUtilisation).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('internal pressure (EN 1991-1-4 §7.2.9)', () => {
+  it('loads the windward column harder with internal suction and lifts the roof more with pressure', () => {
+    const doc = hall();
+    const building = doc.building!;
+    const reactions = baseReactions(doc, building, building.levelOrder[0]!, {
+      deadLoad: 0.5,
+      snowLoad: 0.8,
+      windPressure: 1,
+    }).filter((reaction) => reaction.frame === 'frame 3');
+    // Same net sway (cpi acts on both walls): equal total horizontal reaction.
+    const total = (key: 'WL' | 'WLs'): number =>
+      reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.horizontal, 0);
+    expect(total('WLs')).toBeCloseTo(total('WL'), 0);
+    // Roof uplift 0.6 + 0.2 = 0.8 vs 0.6 − 0.3 = 0.3.
+    const uplift = (key: 'WL' | 'WLs'): number =>
+      reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.vertical, 0);
+    expect(uplift('WL') / uplift('WLs')).toBeCloseTo(0.8 / 0.3, 1);
   });
 });
 

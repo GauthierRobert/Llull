@@ -221,14 +221,14 @@ test.describe('industrial workflow', () => {
     await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
     await page.getByTestId('frame-check').click();
     const summary = page.getByTestId('frame-check-summary');
-    await expect(summary).toContainText('22 ULS combination(s)');
+    await expect(summary).toContainText('38 ULS combination(s)');
     await expect(summary).toContainText('qp = 0.7 kN/m²');
     await expect(summary).toContainText('min αcr');
     await expect(
       page.getByTestId('frame-check-row').filter({ hasText: 'deflection' }).first(),
     ).toBeVisible();
     await page.getByTestId('frame-design').click();
-    await expect(status(page)).toContainText('Designed 6 frame(s) for 22 ULS combination(s)');
+    await expect(status(page)).toContainText('Designed 6 frame(s) for 38 ULS combination(s)');
     await page.getByTestId('frame-check').click();
     await expect(summary).toContainText('all OK');
   });

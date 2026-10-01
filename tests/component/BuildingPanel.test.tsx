@@ -217,7 +217,7 @@ describe('BuildingPanel', () => {
     });
     fireEvent.click(screen.getByTestId('frame-check'));
     expect(screen.getByTestId('frame-check-summary')).toHaveTextContent(
-      /Checked 3 frame\(s\).*6 ULS combination\(s\).*S = 1 kN\/m², qp = 0\.6 kN\/m²/,
+      /Checked 3 frame\(s\).*10 ULS combination\(s\).*S = 1 kN\/m², qp = 0\.6 kN\/m²/,
     );
     const rows = screen.getAllByTestId('frame-check-row');
     expect(rows.length).toBeGreaterThan(0);

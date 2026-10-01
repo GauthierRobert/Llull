@@ -21,6 +21,7 @@ import { connectionSolids } from './evaluate';
 import {
   framesOf,
   solveCombination,
+  WIND_CASES,
   type FrameLoads,
   type FrameModel,
   type LoadCase,
@@ -59,13 +60,26 @@ function ultimateCombinations(wind: boolean, crane: boolean): Combination[] {
     { name: '1.35G+1.5S (→)', factors: { G: 1.35, S: 1.5 }, sway: 1 },
     { name: '1.35G+1.5S (←)', factors: { G: 1.35, S: 1.5 }, sway: -1 },
   ];
+  const winds = WIND_CASES.map((windCase) => ({
+    load: windCase.loadCase,
+    label: windCase.label,
+    sway: windCase.from === 'left' ? (1 as const) : (-1 as const),
+  }));
   if (wind) {
-    combinations.push(
-      { name: '1.35G+1.5W→+0.75S', factors: { G: 1.35, WL: 1.5, S: 0.75 }, sway: 1 },
-      { name: '1.35G+1.5W←+0.75S', factors: { G: 1.35, WR: 1.5, S: 0.75 }, sway: -1 },
-      { name: '1.0G+1.5W→', factors: { G: 1, WL: 1.5 }, sway: 1 },
-      { name: '1.0G+1.5W←', factors: { G: 1, WR: 1.5 }, sway: -1 },
-    );
+    for (const direction of winds) {
+      combinations.push(
+        {
+          name: `1.35G+1.5${direction.label}+0.75S`,
+          factors: { G: 1.35, [direction.load]: 1.5, S: 0.75 },
+          sway: direction.sway,
+        },
+        {
+          name: `1.0G+1.5${direction.label}`,
+          factors: { G: 1, [direction.load]: 1.5 },
+          sway: direction.sway,
+        },
+      );
+    }
   }
   if (crane) {
     // Crane leading (with and without snow, alone or with either wind), then wind leading with the
@@ -73,10 +87,6 @@ function ultimateCombinations(wind: boolean, crane: boolean): Combination[] {
     const sides = [
       { load: 'CL', label: 'C(left)', sway: 1 },
       { load: 'CR', label: 'C(right)', sway: -1 },
-    ] as const;
-    const winds = [
-      { load: 'WL', label: 'W→', sway: 1 },
-      { load: 'WR', label: 'W←', sway: -1 },
     ] as const;
     for (const side of sides) {
       for (const snow of [0.75, 0]) {
@@ -427,8 +437,11 @@ export function checkFrames(
     }[] = [];
     if (wind) {
       swayCases.push(
-        { name: 'SLS W→', factors: { WL: 1 }, crane: false },
-        { name: 'SLS W←', factors: { WR: 1 }, crane: false },
+        ...WIND_CASES.map((windCase) => ({
+          name: `SLS ${windCase.label}`,
+          factors: { [windCase.loadCase]: 1 },
+          crane: false,
+        })),
       );
     }
     if (frame.craneNodes.length > 0) {
@@ -495,7 +508,7 @@ export const FRAME_LOAD_PROPERTIES = {
     type: 'number',
     description:
       'Peak velocity pressure qp, kN/m² (EN 1991-1-4; e.g. 0.6–1.0). Default 0 = wind not applied. ' +
-      'Coefficients: windward wall +0.8, leeward −0.5, roof uplift −0.8 (incl. cpi).',
+      'Coefficients: walls cpe +0.8 / −0.5, roof −0.6, each with internal pressure cpi +0.2 and −0.3.',
   },
   craneCapacity: {
     type: 'number',
