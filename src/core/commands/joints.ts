@@ -375,6 +375,7 @@ export const addJoint: CommandDefinition<AddJointParams> = {
             enum: ['origin', 'axis-x', 'axis-y', 'axis-z'],
           },
         },
+        required: ['instanceId'],
       },
       b: {
         type: 'object',
@@ -390,6 +391,7 @@ export const addJoint: CommandDefinition<AddJointParams> = {
             enum: ['origin', 'axis-x', 'axis-y', 'axis-z'],
           },
         },
+        required: ['instanceId'],
       },
       axis: {
         type: 'string',

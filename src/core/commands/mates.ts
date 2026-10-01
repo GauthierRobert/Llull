@@ -147,6 +147,7 @@ export const addMate: CommandDefinition<AddMateParams> = {
             enum: ['origin', 'axis-x', 'axis-y', 'axis-z'],
           },
         },
+        required: ['instanceId'],
       },
       b: {
         type: 'object',
@@ -161,6 +162,7 @@ export const addMate: CommandDefinition<AddMateParams> = {
             enum: ['origin', 'axis-x', 'axis-y', 'axis-z'],
           },
         },
+        required: ['instanceId'],
       },
       value: {
         type: 'string',

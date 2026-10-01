@@ -249,6 +249,7 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
             description: 'Maximum distance from point to entity centroid. Must be > 0.',
           },
         },
+        required: ['point', 'radius'],
       },
       insideBBox: {
         type: 'array',

@@ -332,6 +332,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
           },
           profile: { type: 'string', description: 'Runway section. Default HEB300.' },
         },
+        required: ['railHeight'],
       },
       levelId: { type: 'string', description: 'Level id. Default: the active level.' },
     },

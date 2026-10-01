@@ -138,3 +138,15 @@ Each step ships with unit tests and is covered by the Playwright suite.
       stress under the wheel σoz = Fz / (leff tw), leff from the rail + flange inertia
       (EN 1993-6 §5.7.1), static check and fatigue of the web-to-flange junction under wheel
       passages (detail category per EN 1993-1-9 Tab. 8.10).
+
+## Phase 9 — crane actions per EN 1991-3, multi-span wind, schema strictness
+
+- [x] **I35 — Nested schema `required`.** Object parameters (e.g. `clayLayer`, `crane`) declare
+      their required fields in the MCP tool schema, not only in prose.
+- [ ] **I36 — Crane load groups.** EN 1991-3 §2: dynamic factors φ1, φ2 (hoisting class HC1–HC4),
+      φ4, φ5; drive forces HL (longitudinal) and HT (transverse, from the acceleration of the
+      drive), skewing forces HS (§2.7.4); load groups 1–6 (Tab. 2.2) as crane cases of the frame and
+      runway checks, replacing the 10 % surge simplification.
+- [ ] **I37 — Multi-span roof wind.** EN 1991-1-4 §7.2.7: windward span with the duopitch
+      coefficients, downwind spans reduced (factor 0.6 on suction for the downwind roofs per
+      Fig. 7.10), internal valleys; frame and purlin checks use them.

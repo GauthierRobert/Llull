@@ -99,6 +99,7 @@ export const setWallLayers: CommandDefinition<SetWallLayersParams> = {
               description: 'Default structure.',
             },
           },
+          required: ['material', 'thickness'],
         },
       },
     },

@@ -804,6 +804,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
               "Preconsolidation pressure σ'p in kPa (> 0). Default: normally consolidated.",
           },
         },
+        required: ['topDepth', 'thickness', 'compressionIndex', 'voidRatio'],
       },
       tieCapacity: {
         type: 'number',

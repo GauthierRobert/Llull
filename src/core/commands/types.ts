@@ -118,6 +118,8 @@ export interface ParamSpec {
   items?: ParamItemSpec;
   /** For `type: 'object'`: named child properties, each a full `ParamSpec`. */
   properties?: Record<string, ParamSpec>;
+  /** For `type: 'object'`: child properties that must be present (JSON Schema `required`). */
+  required?: readonly string[];
 }
 
 /**
@@ -130,4 +132,5 @@ export interface ParamItemSpec {
   enum?: readonly (string | number)[];
   items?: ParamItemSpec;
   properties?: Record<string, ParamSpec>;
+  required?: readonly string[];
 }
