@@ -1,7 +1,7 @@
 /**
  * @layer ui/panels/building
  *
- * StructuralSection — roof loads → read-only check_portal_frames (utilisation list, click selects
+ * StructuralSection — roof / wind loads → read-only check_portal_frames (utilisation list, click selects
  * the element) and design_portal_frames (dispatched; up-sizes sections and bolt groups).
  */
 
@@ -24,9 +24,14 @@ export function StructuralSection(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [deadLoad, setDeadLoad] = useState('0.5');
   const [snowLoad, setSnowLoad] = useState('0.8');
+  const [windPressure, setWindPressure] = useState('0');
   const [computed, setReport] = useState<Report | null>(null);
   const report = computed !== null && computed.building === building ? computed : null;
-  const loads = { deadLoad: Number(deadLoad), snowLoad: Number(snowLoad) };
+  const loads = {
+    deadLoad: Number(deadLoad),
+    snowLoad: Number(snowLoad),
+    windPressure: Number(windPressure),
+  };
 
   const runCheck = (): void => {
     const result = execute(useStore.getState().document, 'check_portal_frames', loads);
@@ -55,6 +60,13 @@ export function StructuralSection(): React.ReactElement {
           aria-label="Snow load (kN/m²)"
           title="Snow load, kN/m²"
         />
+        <input
+          type="number"
+          value={windPressure}
+          onChange={(event) => setWindPressure(event.target.value)}
+          aria-label="Wind pressure qp (kN/m²)"
+          title="Peak velocity pressure qp, kN/m² (0 = no wind)"
+        />
         <button
           type="button"
           className="btn btn--primary btn--sm"
@@ -79,7 +91,7 @@ export function StructuralSection(): React.ReactElement {
           </p>
           <ul className="panel__list" aria-label="Utilisations">
             {report.rows.map((row) => (
-              <li key={row.elementId} className="panel__row">
+              <li key={`${row.frame}:${row.elementId}:${row.kind}`} className="panel__row">
                 <button
                   type="button"
                   className="building-row-btn"
@@ -88,7 +100,7 @@ export function StructuralSection(): React.ReactElement {
                 >
                   <span className="chip">{row.utilisation > 1 ? 'FAIL' : 'OK'}</span>
                   <span className="panel__row-main">
-                    {row.mark} · {row.frame}
+                    {row.mark} {row.kind} · {row.frame}
                   </span>
                   <span className="panel__row-meta">{row.utilisation.toFixed(2)}</span>
                 </button>

@@ -71,7 +71,25 @@ Each step ships with unit tests and is covered by the Playwright suite.
       area). Members are checked for cross-section resistance (EN 1993-1-1 §6.2: N/Npl,Rd +
       M/Mpl,Rd), moment connections for bolt tension and shear (EN 1993-1-8 Tab. 3.4, elastic
       bolt-group distribution about the compression flange). Utilisations per element, failures
-      listed. (Not covered: wind, crane actions, member buckling, serviceability.)
+      listed. (Wind, crane, buckling and serviceability: Phase 5.)
 - [x] **I19 — Weld detailing.** Fillet welds of end plates and haunches sized for full strength
       (throat a = 0.55 t for S355, EN 1993-1-8 §4.5 simplified): weld length and throat in the
       connection schedule, weld length and deposited weld metal in the takeoff.
+
+## Phase 5 — load cases, stability and serviceability
+
+- [x] **I20 — Wind and crane actions.** `windPressure` (peak velocity pressure qp): windward wall
+      +0.8, leeward −0.5, roof uplift −0.8 (incl. cpi), both directions. Crane actions read from the
+      runway capacity (or `craneCapacity`): vertical wheel reactions at maximum / minimum hook
+      approach with dynamic factors φ1 = 1.1, φ2 = 1.15, lateral surge 10 %, applied at the brackets
+      with their eccentricity; runway self-weight in G.
+- [x] **I21 — EN 1990 combinations.** 1.35G+1.5S, 1.35G+1.5W+0.75S, 1.0G+1.5W (uplift) and
+      1.35G+1.35C+0.75S(+0.9W), each direction; worst row per element with its governing
+      combination.
+- [x] **I22 — Stability.** Sway imperfections φ = φ0 αh αm (EN 1993-1-1 §5.3.2), Horne αcr
+      (§5.2.1(4)), sway moments amplified by 1/(1 − 1/αcr) when αcr < 10, frame fails when αcr < 3.
+      Member flexural buckling with the §6.3.3 interaction (buckling curves by section shape;
+      columns full height, rafters between purlins).
+- [x] **I23 — Serviceability.** Rafter deflection under snow ≤ span/200, eaves sway under wind
+      ≤ h/150, rail-level sway under crane ≤ h/400 (EN 1993-6). `design_portal_frames` stiffens
+      rafters and columns together for sway / stability failures.

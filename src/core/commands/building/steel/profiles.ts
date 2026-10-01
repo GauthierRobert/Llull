@@ -417,6 +417,8 @@ export interface SectionProperties {
   readonly elasticModulus: number;
   /** Plastic section modulus (about the equal-area axis), mm³. */
   readonly plasticModulus: number;
+  /** Second moment of area about the weak (vertical) axis through the centroid, mm⁴. */
+  readonly minorInertia: number;
 }
 
 type Point = readonly [number, number];
@@ -481,6 +483,22 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
     );
   const centroid = total.first / total.area;
   const inertia = total.second - total.area * centroid ** 2;
+  const minor = loops
+    .map((loop, index) =>
+      signed(
+        loop.map(([x, y]): Point => [y, x]),
+        index === 0 ? 1 : -1,
+      ),
+    )
+    .reduce(
+      (sum, m) => ({
+        area: sum.area + m.area,
+        first: sum.first + m.first,
+        second: sum.second + m.second,
+      }),
+      { area: 0, first: 0, second: 0 },
+    );
+  const minorInertia = minor.second - (minor.first * minor.first) / minor.area;
   const ys = outer.map((point) => point[1]);
   const extreme = Math.max(Math.max(...ys) - centroid, centroid - Math.min(...ys));
   // Equal-area (plastic) axis by bisection, then Wpl = Σ |first moment| of both halves about it.
@@ -507,5 +525,11 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
     }
     return part;
   }, 0);
-  return { area: total.area, inertia, elasticModulus: inertia / extreme, plasticModulus };
+  return {
+    area: total.area,
+    inertia,
+    elasticModulus: inertia / extreme,
+    plasticModulus,
+    minorInertia,
+  };
 }

@@ -38,7 +38,8 @@ import { addBasePlates } from './industrial/plates';
 import { addCurvedWall } from './curvedWalls';
 import { setWallLayers } from './wallLayers';
 import { addMomentConnections } from './industrial/connections';
-import { checkPortalFrames, designPortalFrames } from './industrial/frameCheck';
+import { checkPortalFrames } from './industrial/frameCheck';
+import { designPortalFrames } from './industrial/frameDesign';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 export const buildingCommands = [

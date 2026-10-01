@@ -65,6 +65,44 @@ describe('solveFrame', () => {
     expect(result.members[0]!.axial[0]).toBeCloseTo((q * L) / 2, 3);
   });
 
+  it('reports the in-span deflection of a single member (5qL⁴/384EI)', () => {
+    const [L, q, I] = [6000, -10, 8.356e7];
+    const result = solveFrame(
+      [
+        { x: 0, y: 0, restraint: pinned },
+        { x: L, y: 0, restraint: [false, true, false] },
+      ],
+      [{ a: 0, b: 1, E, A: 5380, I, load: { qx: 0, qy: q } }],
+    )!;
+    expect(result.members[0]!.maxDisplacement.y).toBeCloseTo(
+      Math.abs((5 * q * L ** 4) / (384 * E * I)),
+      3,
+    );
+  });
+
+  it('applies node loads: cantilever tip force (PL³/3EI) and moment (ML²/2EI)', () => {
+    const [L, P, M, I] = [3000, -2000, 5e6, 1e7];
+    const tip = (load: { fx: number; fy: number; mz: number }): number =>
+      solveFrame(
+        [
+          { x: 0, y: 0, restraint: fixed },
+          { x: L, y: 0, restraint: free, load },
+        ],
+        [{ a: 0, b: 1, E, A: 1e4, I }],
+      )!.displacements[1]![1];
+    expect(tip({ fx: 0, fy: P, mz: 0 })).toBeCloseTo((P * L ** 3) / (3 * E * I), 6);
+    expect(tip({ fx: 0, fy: 0, mz: M })).toBeCloseTo((M * L * L) / (2 * E * I), 6);
+    const sway = solveFrame(
+      [
+        { x: 0, y: 0, restraint: fixed },
+        { x: 0, y: L, restraint: free, load: { fx: P, fy: 0, mz: 0 } },
+      ],
+      [{ a: 0, b: 1, E, A: 1e4, I }],
+    )!;
+    expect(sway.displacements[1]![0]).toBeCloseTo((P * L ** 3) / (3 * E * I), 6);
+    expect(sway.members[0]!.maxDisplacement.x).toBeCloseTo(Math.abs((P * L ** 3) / (3 * E * I)), 6);
+  });
+
   it('returns null for a mechanism or a degenerate member', () => {
     expect(
       solveFrame(

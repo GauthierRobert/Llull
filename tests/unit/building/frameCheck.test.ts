@@ -1,12 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  boltResistance,
-  nextProfile,
-  yieldStrength,
-  type CheckRow,
-} from '@core/commands/building/industrial/frameCheck';
+import type { CheckRow } from '@core/commands/building/industrial/frameCheck';
+import { nextProfile } from '@core/commands/building/industrial/frameDesign';
+import { boltResistance, yieldStrength } from '@core/commands/building/industrial/steelDesign';
 import { connectionWelds } from '@core/commands/building/industrial/connections';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import type { TakeoffLine } from '@core/commands/building/quantities';
@@ -43,7 +40,7 @@ describe('check_portal_frames', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
     expect(result.document).toBe(doc);
     expect(result.summary).toMatch(
-      /^Checked 6 frame\(s\), 42 element\(s\) at ULS 1\.35 G \+ 1\.5 S/,
+      /^Checked 6 frame\(s\), \d+ check\(s\) over 2 ULS combination\(s\) \+ SLS \(G = 0\.5 kN\/m² \+ self-weight, S = 0\.8 kN\/m², no wind/,
     );
     const rows = (result.data as { rows: CheckRow[] }).rows;
     // Internal frame (6 m bay): eaves moment ≈ 491 kNm, IPE450 rafter at ≈ 0.88.
@@ -58,7 +55,7 @@ describe('check_portal_frames', () => {
     // Default bolt groups are under-sized at the apex of internal frames.
     expect(rows.some((row) => row.kind === 'connection' && row.utilisation > 1)).toBe(true);
     expect((result.data as { csv: string }).csv.split('\n')[0]).toBe(
-      'Frame,Mark,Type,N (kN),M (kNm),V (kN),Utilisation,Status,Check',
+      'Frame,Mark,Type,N (kN),M (kNm),V (kN),Utilisation,Status,Combination,Check',
     );
   });
 
@@ -145,12 +142,13 @@ describe('structural review regressions', () => {
         row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('eaves'),
     );
     expect(eaves).toHaveLength(2);
-    expect(eaves.every((row) => (row.forces?.moment ?? 0) < 0)).toBe(true);
-    expect(eaves[0]!.forces!.moment).toBeCloseTo(eaves[1]!.forces!.moment, 0);
+    expect(eaves.every((row) => row.forces!.every((force) => force.moment < 0))).toBe(true);
+    // Left eaves under the → imperfection mirrors the right eaves under ←.
+    expect(eaves[0]!.forces![0]!.moment / eaves[1]!.forces![1]!.moment).toBeCloseTo(1, 2);
     const apex = rows.filter(
       (row) => row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('apex'),
     );
-    expect(apex.every((row) => (row.forces?.moment ?? 0) > 0)).toBe(true);
+    expect(apex.every((row) => row.forces!.every((force) => force.moment > 0))).toBe(true);
   });
 
   it('re-seats purlins, rails and gable posts and keeps gable posts unchanged', () => {
@@ -161,7 +159,7 @@ describe('structural review regressions', () => {
     });
     const result = execute(doc, 'design_portal_frames', {});
     expect(result.summary).toMatch(/gable posts are not analysed/);
-    expect(result.summary).toMatch(/Cross-section and bolt checks only/);
+    expect(result.summary).toMatch(/No lateral-torsional buckling/);
     const members = (d: CadDocument): SteelMemberElement[] =>
       Object.values(d.building!.elements).flatMap((e) => (e.category === 'member' ? [e] : []));
     const before = new Map(members(doc).map((m) => [m.id, m]));

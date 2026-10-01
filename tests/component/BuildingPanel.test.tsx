@@ -212,15 +212,22 @@ describe('BuildingPanel', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     fireEvent.change(screen.getByLabelText('Snow load (kN/m²)'), { target: { value: '1.0' } });
+    fireEvent.change(screen.getByLabelText('Wind pressure qp (kN/m²)'), {
+      target: { value: '0.6' },
+    });
     fireEvent.click(screen.getByTestId('frame-check'));
     expect(screen.getByTestId('frame-check-summary')).toHaveTextContent(
-      /Checked 3 frame\(s\).*S = 1 kN\/m²/,
+      /Checked 3 frame\(s\).*6 ULS combination\(s\).*S = 1 kN\/m², qp = 0\.6 kN\/m²/,
     );
     const rows = screen.getAllByTestId('frame-check-row');
     expect(rows.length).toBeGreaterThan(0);
     fireEvent.click(rows[0]!);
     expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
     fireEvent.click(screen.getByTestId('frame-design'));
-    expect(dispatch).toHaveBeenCalledWith('design_portal_frames', { deadLoad: 0.5, snowLoad: 1 });
+    expect(dispatch).toHaveBeenCalledWith('design_portal_frames', {
+      deadLoad: 0.5,
+      snowLoad: 1,
+      windPressure: 0.6,
+    });
   });
 });

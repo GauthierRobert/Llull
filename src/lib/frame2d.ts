@@ -11,6 +11,8 @@ export interface FrameNode {
   readonly y: number;
   /** Restrained [ux, uy, rotation]. */
   readonly restraint: readonly [boolean, boolean, boolean];
+  /** Point load at the node: forces (global x, y) and moment (counter-clockwise +). */
+  readonly load?: { readonly fx: number; readonly fy: number; readonly mz: number };
 }
 
 export interface FrameMember {
@@ -34,6 +36,8 @@ export interface MemberResult {
   readonly maxMoment: number;
   /** Largest |axial force| along the member. */
   readonly maxAxial: number;
+  /** Largest |global displacement| along the member (x, y), including the in-span deflection. */
+  readonly maxDisplacement: { readonly x: number; readonly y: number };
 }
 
 export interface FrameResult {
@@ -191,6 +195,12 @@ export function solveFrame(
       F[dof] = (F[dof] as number) + (loads[index] as number);
     });
   }
+  nodes.forEach((node, index) => {
+    if (!node.load) return;
+    F[3 * index] = (F[3 * index] as number) + node.load.fx;
+    F[3 * index + 1] = (F[3 * index + 1] as number) + node.load.fy;
+    F[3 * index + 2] = (F[3 * index + 2] as number) + node.load.mz;
+  });
   const free: number[] = [];
   nodes.forEach((node, index) => {
     node.restraint.forEach((restrained, axis) => {
@@ -238,9 +248,34 @@ export function solveFrame(
     );
     const [Na, Va, Ma, Nb, , Mb] = end as [number, number, number, number, number, number];
     const momentAt = (x: number): number => -Ma + Va * x + (local.qTransverse * x * x) / 2;
+    const L = local.length;
+    const ei = member.E * member.I;
+    // Hermite interpolation of the end displacements + the fixed-end deflection of the load.
+    const transverseAt = (x: number): number => {
+      const t = x / L;
+      return (
+        (1 - 3 * t * t + 2 * t ** 3) * (d[1] as number) +
+        (t - 2 * t * t + t ** 3) * L * (d[2] as number) +
+        (3 * t * t - 2 * t ** 3) * (d[4] as number) +
+        (-t * t + t ** 3) * L * (d[5] as number) +
+        (local.qTransverse * x * x * (L - x) ** 2) / (24 * ei)
+      );
+    };
     let maxMoment = 0;
+    const maxDisplacement = { x: 0, y: 0 };
     for (let step = 0; step <= 40; step++) {
-      maxMoment = Math.max(maxMoment, Math.abs(momentAt((local.length * step) / 40)));
+      const x = (L * step) / 40;
+      maxMoment = Math.max(maxMoment, Math.abs(momentAt(x)));
+      const axialDisplacement = (d[0] as number) + ((d[3] as number) - (d[0] as number)) * (x / L);
+      const transverse = transverseAt(x);
+      maxDisplacement.x = Math.max(
+        maxDisplacement.x,
+        Math.abs(local.c * axialDisplacement - local.s * transverse),
+      );
+      maxDisplacement.y = Math.max(
+        maxDisplacement.y,
+        Math.abs(local.s * axialDisplacement + local.c * transverse),
+      );
     }
     return {
       axial: [-Na, Nb],
@@ -248,6 +283,7 @@ export function solveFrame(
       moment: [-Ma, Mb],
       maxMoment,
       maxAxial: Math.max(Math.abs(Na), Math.abs(Nb)),
+      maxDisplacement,
     };
   });
   return {

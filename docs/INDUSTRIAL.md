@@ -33,17 +33,38 @@ Building panel, _Check clashes_ lists them; click a row to select both elements.
 ## Structural check and design
 
 `check_portal_frames` (read-only) solves every portal frame of a level as a 2D frame (direct
-stiffness method, pinned bases, section properties from the profile outline (no root radii, ≈ 4–5 % conservative)) under ULS
-1.35 G + 1.5 S — roof dead load + member self-weight + snow on the tributary width — and checks
-member cross-sections (N/Npl + M/Mpl, EN 1993-1-1 §6.2) and moment-connection bolt groups (grade
-8.8 bolt tension / shear, EN 1993-1-8 Tab. 3.4, elastic distribution about the compression flange).
-`design_portal_frames` iterates: it up-sizes failing rafter / column sections uniformly (next
-heavier profile, then IPE → HEA / HEB) and picks the bolt diameter and row count of each connection
-type, then reports the changes and final utilisations. Connections also carry full-strength fillet
-weld sizes (throat 0.55 t) in their schedule and weld length / metal in the takeoff.
+stiffness method, pinned bases, section properties from the profile outline — no root radii,
+≈ 4–5 % conservative; haunches are not counted as stiffening) for every EN 1990 combination of:
 
-Not covered: wind, crane actions, member buckling, deflections. This is a preliminary design aid,
-not a substitute for the engineer of record.
+- **G** — roof dead load (`deadLoad`, kN/m²) on the tributary width + member self-weight + runway
+  self-weight at the crane brackets;
+- **S** — snow (`snowLoad`, kN/m²);
+- **W** — wind (`windPressure` = peak velocity pressure qp, kN/m², default 0 = off): windward wall
+  +0.8, leeward −0.5, roof uplift −0.8 (incl. cpi), from the left and from the right;
+- **C** — overhead cranes, read from the runway capacity (`add_crane_runway` / the hall `crane`
+  option, or `craneCapacity` to override, 0 to ignore): maximum / minimum wheel reactions with
+  dynamic factors and a 10 % lateral surge, applied at the brackets with their eccentricity.
+
+Combinations: 1.35G+1.5S, 1.35G+1.5W+0.75S, 1.0G+1.5W (uplift), 1.35G+1.35C+0.75S(+0.9W), each in
+both directions. Every combination includes sway imperfections (EN 1993-1-1 §5.3.2); the frame's
+elastic critical factor αcr is estimated with Horne's method, sway moments are amplified by
+1/(1 − 1/αcr) when αcr < 10 and the frame fails when αcr < 3.
+
+Checks, worst per element with the governing combination: member cross-section (§6.2), flexural
+buckling with N–M interaction (§6.3.3; columns over their full height, rafters between purlins),
+moment-connection bolt groups (grade 8.8 tension / shear, EN 1993-1-8, for every combination —
+uplift reverses the apex moment), sway stability, and serviceability: rafter deflection under snow
+≤ span/200, eaves sway under wind ≤ h/150, rail-level sway under crane ≤ h/400 (EN 1993-6).
+
+`design_portal_frames` iterates with the same loads: it up-sizes failing rafter / column sections
+uniformly (next heavier profile, then IPE → HEA / HEB), stiffens rafters and columns together when
+a frame fails on sway or stability, picks the bolt diameter and row count of each connection type
+against all combinations, and reports the changes and final utilisations. Connections also carry
+full-strength fillet weld sizes in their schedule and weld length / metal in the takeoff.
+
+Not covered: lateral-torsional buckling, fatigue (crane classes), gable / bracing systems, base
+plate and footing design, local wind zones. This is a preliminary design aid, not a substitute for
+the engineer of record.
 
 ## Quantities and fabrication lists
 

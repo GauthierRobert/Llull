@@ -207,4 +207,29 @@ test.describe('industrial workflow', () => {
     );
     expect(schedule.text.split('\n')[1]).toMatch(/,a9 flanges \/ a6 web · \d+\.\d m$/);
   });
+
+  test('I20–I23 — wind and crane combinations, buckling, sway stability, deflections', async ({
+    page,
+  }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', {
+      span: '24000',
+      length: '30000',
+      cladding: 'false',
+      craneRailHeight: '6000',
+    });
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('frame-check').click();
+    const summary = page.getByTestId('frame-check-summary');
+    await expect(summary).toContainText('8 ULS combination(s)');
+    await expect(summary).toContainText('qp = 0.7 kN/m²');
+    await expect(summary).toContainText('min αcr');
+    await expect(
+      page.getByTestId('frame-check-row').filter({ hasText: 'deflection' }).first(),
+    ).toBeVisible();
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s) for 8 ULS combination(s)');
+    await page.getByTestId('frame-check').click();
+    await expect(summary).toContainText('all OK');
+  });
 });
