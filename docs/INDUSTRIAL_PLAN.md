@@ -53,5 +53,5 @@ Each step ships with unit tests and is covered by the Playwright suite.
       `IfcMechanicalFastener`.
 - [x] **I15 — DXF hatches.** Cut walls, concrete columns and steel sections in `export_dxf` plans
       get ANSI31 / solid hatch patterns (R12-compatible LINE / SOLID entities on `*-PATT` layers).
-- [ ] **I16 — Curved walls.** `add_curved_wall` (arc through start / mid / end): evaluation, plan,
+- [x] **I16 — Curved walls.** `add_curved_wall` (arc through start / mid / end): evaluation, plan,
       quantities, DXF arcs and IFC.

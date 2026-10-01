@@ -199,6 +199,13 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'wall':
     case 'beam':
       return { ...element, start: shift(element.start), end: shift(element.end) };
+    case 'curvedWall':
+      return {
+        ...element,
+        start: shift(element.start),
+        through: shift(element.through),
+        end: shift(element.end),
+      };
     case 'slab':
       return {
         ...element,
@@ -337,6 +344,7 @@ interface CopyLevelElementsParams {
 
 const COPYABLE = [
   'wall',
+  'curvedWall',
   'slab',
   'column',
   'beam',

@@ -76,6 +76,7 @@ const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string
   pipe: 'PL',
   tray: 'CT',
   plate: 'BP',
+  curvedWall: 'W',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */
@@ -115,8 +116,14 @@ export function nextMark(
   category: Exclude<BimCategory, 'grid' | 'room'>,
 ): string {
   const prefix = MARK_PREFIX[category];
+  // Categories sharing a prefix (straight and curved walls) share one numbering.
   const marks = Object.values(building.elements)
-    .filter((element) => element.category === category)
+    .filter(
+      (element) =>
+        element.category !== 'grid' &&
+        element.category !== 'room' &&
+        MARK_PREFIX[element.category] === prefix,
+    )
     .map((element) => element.mark);
   return `${prefix}${highestIndex(marks, prefix) + 1}`;
 }
@@ -223,7 +230,12 @@ export function followLevelHeight(
 ): BuildingElement {
   const same = (value: number): boolean => Math.abs(value - oldHeight) <= oldHeight * 1e-9;
   if (oldHeight === newHeight) return element;
-  if ((element.category === 'wall' || element.category === 'column') && same(element.height)) {
+  if (
+    (element.category === 'wall' ||
+      element.category === 'curvedWall' ||
+      element.category === 'column') &&
+    same(element.height)
+  ) {
     return { ...element, height: newHeight };
   }
   if (element.category === 'stair' && same(element.riserCount * element.riserHeight)) {

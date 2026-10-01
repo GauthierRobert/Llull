@@ -222,6 +222,39 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     },
   },
   {
+    id: 'curvedWall',
+    label: 'Curved wall',
+    fields: [
+      num('x1', 'Start X', '0'),
+      num('y1', 'Start Y', '0'),
+      num('xm', 'Through X', '3000'),
+      num('ym', 'Through Y', '1500'),
+      num('x2', 'End X', '6000'),
+      num('y2', 'End Y', '0'),
+      num('thickness', 'Thickness', '200'),
+      num('height', 'Height', '', true),
+      {
+        key: 'material',
+        label: 'Material',
+        kind: 'select',
+        defaultValue: 'concrete',
+        options: MATERIALS,
+      },
+    ],
+    build: (values, context) => {
+      const reader = new FieldReader(values);
+      return result(reader, 'add_curved_wall', {
+        start: [reader.number('x1'), reader.number('y1')],
+        through: [reader.number('xm'), reader.number('ym')],
+        end: [reader.number('x2'), reader.number('y2')],
+        thickness: reader.number('thickness'),
+        height: reader.optionalNumber('height'),
+        material: reader.text('material'),
+        ...onLevel(context),
+      });
+    },
+  },
+  {
     id: 'door',
     label: 'Door',
     fields: [

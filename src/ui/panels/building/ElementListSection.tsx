@@ -28,6 +28,7 @@ const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string>> = {
   pipe: 'Pipe',
   tray: 'Tray',
   plate: 'Plate',
+  curvedWall: 'Curved wall',
 };
 
 function describe(element: BuildingElement): string {
@@ -61,6 +62,8 @@ function describe(element: BuildingElement): string {
       return `Ø${element.diameter} · ${element.service}`;
     case 'tray':
       return `${element.width}×${element.height} · ${element.system}`;
+    case 'curvedWall':
+      return `${element.material} · ${element.thickness}`;
     case 'plate':
       return `${element.length}×${element.width}×${element.thickness} · ${element.boltCount}×M${element.boltDiameter}`;
   }

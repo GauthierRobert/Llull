@@ -22,6 +22,7 @@ import { MEMBER_LAYER } from './entities';
 import { sweepFrame } from './mesh';
 import { findProfile, profileOutline } from './steel/profiles';
 import { plateLayout } from './industrial/evaluate';
+import { curvedWallBand } from './curvedWallGeometry';
 
 export type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
 
@@ -597,6 +598,24 @@ export function buildPlanDrawing(
         walls.push(element);
         primitives.push(...wallPrimitives(building, element, cutHeight));
         break;
+      case 'curvedWall': {
+        const band = curvedWallBand(element);
+        if (!band) break;
+        const cut =
+          element.baseOffset <= cutHeight && cutHeight < element.baseOffset + element.height;
+        primitives.push(
+          cut
+            ? {
+                type: 'polygon',
+                layer: layerName('wall'),
+                style: 'cut',
+                fill: 'hatch',
+                points: band,
+              }
+            : { type: 'polygon', layer: layerName('wall'), style: 'hidden', points: band },
+        );
+        break;
+      }
       case 'slab':
         primitives.push({
           type: 'polygon',

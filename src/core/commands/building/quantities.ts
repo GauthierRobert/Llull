@@ -20,6 +20,7 @@ import { findProfile } from './steel/profiles';
 import { polygonNormal } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
 import { plateMass } from './industrial/plates';
+import { curvedWallLength } from './curvedWallGeometry';
 
 export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
@@ -155,6 +156,30 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       'm3',
       `Walls, ${wall.material} — volume`,
       scale.volume(quantities.volume),
+    );
+  }
+  for (const wall of elementsOf(building, 'curvedWall')) {
+    const length = curvedWallLength(wall);
+    takeoff.add(
+      'wall',
+      wall.material,
+      'm',
+      `Walls, ${wall.material} — length`,
+      scale.length(length),
+    );
+    takeoff.add(
+      'wall',
+      wall.material,
+      'm2',
+      `Walls, ${wall.material} — net face area`,
+      scale.area(length * wall.height),
+    );
+    takeoff.add(
+      'wall',
+      wall.material,
+      'm3',
+      `Walls, ${wall.material} — volume`,
+      scale.volume(length * wall.height * wall.thickness),
     );
   }
   for (const category of ['door', 'window'] as const) {
@@ -405,20 +430,36 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           'Net area (m²)',
           'Volume (m³)',
         ],
-        rows: elementsOf(building, 'wall').map((wall) => {
-          const quantities = wallQuantities(building, wall);
-          return [
-            wall.mark,
-            levelName(building, wall.levelId),
-            round(quantities.length),
-            wall.thickness,
-            wall.height,
-            wall.material,
-            openingsOf(building, wall.id).length,
-            round(scale.area(quantities.netArea)),
-            round(scale.volume(quantities.volume)),
-          ];
-        }),
+        rows: [
+          ...elementsOf(building, 'wall').map((wall) => {
+            const quantities = wallQuantities(building, wall);
+            return [
+              wall.mark,
+              levelName(building, wall.levelId),
+              round(quantities.length),
+              wall.thickness,
+              wall.height,
+              wall.material,
+              openingsOf(building, wall.id).length,
+              round(scale.area(quantities.netArea)),
+              round(scale.volume(quantities.volume)),
+            ];
+          }),
+          ...elementsOf(building, 'curvedWall').map((wall) => {
+            const length = curvedWallLength(wall);
+            return [
+              wall.mark,
+              levelName(building, wall.levelId),
+              round(length),
+              wall.thickness,
+              wall.height,
+              wall.material,
+              0,
+              round(scale.area(length * wall.height)),
+              round(scale.volume(length * wall.height * wall.thickness)),
+            ];
+          }),
+        ],
       };
     case 'door':
     case 'window':

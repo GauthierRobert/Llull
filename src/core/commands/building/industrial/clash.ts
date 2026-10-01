@@ -3,13 +3,14 @@
  * @layer core/commands/building/industrial
  */
 
-import type { CadDocument, Vec3 } from '../../../model/types';
+import type { CadDocument, Vec2, Vec3 } from '../../../model/types';
 import type { BimCategory, BuildingElement, BuildingModel } from '../../../model/building';
 import type { CommandDefinition, CommandResult } from '../../types';
 import { fromMm, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import { sweepFrame } from '../mesh';
 import { findProfile } from '../steel/profiles';
 import { atLevel } from './evaluate';
+import { arcPoints, curvedWallArc } from '../curvedWallGeometry';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
 export interface OrientedBox {
@@ -123,6 +124,25 @@ export function elementBoxes(
         });
       }
       return boxes;
+    }
+    case 'curvedWall': {
+      const arc = curvedWallArc(element);
+      if (!level || !arc) return [];
+      const points = arcPoints(arc, arc.radius);
+      const z = level.elevation + element.baseOffset + element.height / 2;
+      return points.slice(1).map((point, index): OrientedBox => {
+        const previous = points[index] as Vec2;
+        const angle = Math.atan2(point[1] - previous[1], point[0] - previous[0]);
+        return {
+          center: [(point[0] + previous[0]) / 2, (point[1] + previous[1]) / 2, z],
+          axes: zRotated(angle),
+          half: [
+            Math.hypot(point[0] - previous[0], point[1] - previous[1]) / 2,
+            element.thickness / 2,
+            element.height / 2,
+          ],
+        };
+      });
     }
     case 'equipment': {
       if (!level) return [];
@@ -301,6 +321,7 @@ export function findClashes(
         other.category !== 'member' &&
         other.category !== 'column' &&
         other.category !== 'wall' &&
+        other.category !== 'curvedWall' &&
         other.category !== 'stair'
       )
         continue;

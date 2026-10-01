@@ -44,6 +44,7 @@ import {
 } from '../../../lib/polygon';
 import { fromMm, toMetres } from './model';
 import { prismMesh } from './mesh';
+import { evaluateCurvedWall } from './curvedWallGeometry';
 import {
   evaluateEquipment,
   evaluateFooting,
@@ -552,6 +553,8 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluatePipe(leveled, level);
     case 'tray':
       return evaluateTray(context.doc, leveled, level);
+    case 'curvedWall':
+      return evaluateCurvedWall(leveled, level);
     case 'plate': {
       const member = building.elements[leveled.memberId];
       return member?.category === 'member'

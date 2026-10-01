@@ -35,6 +35,7 @@ import { addCraneRunway, addPortalFrameBuilding } from './industrial/portal';
 import { checkClashes } from './industrial/clash';
 import { addCableTray } from './industrial/trays';
 import { addBasePlates } from './industrial/plates';
+import { addCurvedWall } from './curvedWalls';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 export const buildingCommands = [
@@ -80,6 +81,7 @@ export const buildingCommands = [
   addPipeRun,
   addCableTray,
   addBasePlates,
+  addCurvedWall,
   addCraneRunway,
   addPortalFrameBuilding,
   checkClashes,

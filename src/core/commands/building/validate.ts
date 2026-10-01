@@ -24,6 +24,7 @@ const CATEGORIES: ReadonlySet<string> = new Set([
   'pipe',
   'tray',
   'plate',
+  'curvedWall',
 ]);
 
 /** Numeric fields each category must carry (finite numbers). */
@@ -44,6 +45,7 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   pipe: ['diameter'],
   tray: ['width', 'height'],
   plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
+  curvedWall: ['thickness', 'height', 'baseOffset'],
 };
 
 /** Fields that must be strictly positive. */
@@ -60,6 +62,7 @@ const POSITIVE: Readonly<Record<string, ReadonlyArray<string>>> = {
   pipe: ['diameter'],
   tray: ['width', 'height'],
   plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
+  curvedWall: ['thickness', 'height'],
 };
 
 /** Plan-point fields each category must carry. */
@@ -80,6 +83,7 @@ const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
   pipe: [],
   tray: [],
   plate: [],
+  curvedWall: ['start', 'through', 'end'],
 };
 
 const isPoint = (value: unknown): boolean =>
@@ -180,6 +184,7 @@ function elementErrors(
     pipe: ['service', 'material'],
     tray: ['system'],
     plate: ['material'],
+    curvedWall: ['material'],
   };
   for (const field of textFields[category] ?? []) {
     if (typeof element[field] !== 'string') {

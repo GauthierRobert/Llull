@@ -15,6 +15,7 @@ import type {
   PipeElement,
   CableTrayElement,
   BasePlateElement,
+  CurvedWallElement,
   SteelMemberElement,
   BuildingLevel,
   OpeningElement,
@@ -27,6 +28,7 @@ import { fileSlug, getBuilding, noChange, toMetres } from './model';
 import { wallExtent, wallFrame, type WallExtent } from './evaluate';
 import { sweepFrame } from './mesh';
 import { panelFrame, plateLayout, trayOutline } from './industrial/evaluate';
+import { curvedWallBand } from './curvedWallGeometry';
 import { findProfile, type SteelProfile } from './steel/profiles';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
@@ -192,6 +194,25 @@ function exportWall(
     `IFCWALL('${context.guid(wall.id)}',$,${ifcString(wall.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(wall.height))])},${ifcString(wall.id)},.STANDARD.)`,
   );
   return { ref, material: wall.material, placement: local };
+}
+
+function exportCurvedWall(
+  context: Context,
+  wall: CurvedWallElement,
+  storeyPlacement: string,
+): Exported | null {
+  const { mm } = context;
+  const band = curvedWallBand(wall);
+  if (!band) return null;
+  const local = placement(context, storeyPlacement, 0, 0, mm(wall.baseOffset));
+  const profile = polygonProfile(
+    context,
+    band.map(([x, y]): Vec2 => [mm(x), mm(y)]),
+  );
+  const ref = context.writer.add(
+    `IFCWALL('${context.guid(wall.id)}',$,${ifcString(wall.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(wall.height))])},${ifcString(wall.id)},.STANDARD.)`,
+  );
+  return { ref, material: wall.material };
 }
 
 function exportOpening(
@@ -712,6 +733,14 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
         if (industrial) {
           contained.push(industrial.ref);
           record(industrial);
+        }
+        continue;
+      }
+      if (element.category === 'curvedWall') {
+        const exported = exportCurvedWall(context, element, storeyPlacement);
+        if (exported) {
+          contained.push(exported.ref);
+          record(exported);
         }
         continue;
       }

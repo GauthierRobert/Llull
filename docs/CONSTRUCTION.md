@@ -24,6 +24,7 @@ The plan and status of this work: [`CONSTRUCTION_PLAN.md`](CONSTRUCTION_PLAN.md)
 | --- | --- | --- |
 | Structural grid | `add_grid_system`, `add_grid_line` | Numbered axes along X, lettered along Y (I and O skipped). |
 | Wall | `add_wall`, `draw_walls`, `update_wall` | Plan centerline, thickness, height (default: level height), material. L / T / X joints close automatically. Also drawn with the **Wall** tool in the 2D view (Enter to finish, click the first point to close). |
+| Curved wall | `add_curved_wall` | Arc centreline from start through a point to end; thickness, height, base offset, material. Counted with walls in quantities and the wall schedule; hatched cut in plans, IfcWall in IFC. No hosted openings or automatic joins. |
 | Door / window | `add_door`, `add_window`, `update_opening` | Hosted by a wall: cut it exactly, travel with it, refused if they do not fit or overlap. Doors draw their swing in plan. |
 | Slab / roof / foundation | `add_slab` | From a boundary or a closed loop of walls (`wallFace`: outer / center / inner). Top at level + offset. |
 | Slab opening | `add_slab_opening`, `delete_slab_opening` | Stair wells (from a `stairId`: the floor slab above is found automatically), shafts, risers. Deducted from quantities, crossed in plan, IfcOpeningElement in IFC. |
@@ -56,6 +57,6 @@ The *Building* panel shows the live takeoff + estimate and downloads CSV files.
 
 ## Known limits
 
-- Walls are straight; curved walls and wall layers (build-ups) are not modelled yet.
+- Curved walls do not host doors / windows or join other walls; wall layers (build-ups) are not modelled yet.
 - Plans cut every element of the level at 1.2 m; elevations and sections come from `export_elevation_sheet` (see [`INDUSTRIAL.md`](INDUSTRIAL.md)).
 - DXF hatches are written as R12 LINE / SOLID entities (no associative HATCH objects).

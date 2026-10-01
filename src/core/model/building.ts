@@ -26,7 +26,8 @@ export type BimCategory =
   | 'equipment'
   | 'pipe'
   | 'tray'
-  | 'plate';
+  | 'plate'
+  | 'curvedWall';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -247,6 +248,19 @@ export interface BasePlateElement extends ElementBase {
   material: string;
 }
 
+/** A curved wall: centreline arc from `start` through `through` to `end` (plan). */
+export interface CurvedWallElement extends ElementBase {
+  readonly category: 'curvedWall';
+  levelId: string;
+  start: Vec2;
+  through: Vec2;
+  end: Vec2;
+  thickness: number;
+  height: number;
+  baseOffset: number;
+  material: string;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -262,7 +276,8 @@ export type BuildingElement =
   | EquipmentElement
   | PipeElement
   | CableTrayElement
-  | BasePlateElement;
+  | BasePlateElement
+  | CurvedWallElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */
