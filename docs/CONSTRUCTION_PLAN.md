@@ -10,7 +10,7 @@ Revit / ArchiCAD (levels, hosted openings, schedules, IFC), AutoCAD Architecture
 ## Design (respects the architecture laws)
 
 - **Constructive vs evaluated (L8).** A new optional `CadDocument.building` holds the
-  *constructive* building model: levels, grid lines, walls, openings, slabs, columns,
+  _constructive_ building model: levels, grid lines, walls, openings, slabs, columns,
   beams, stairs, rooms and project info. Every building command edits that model and
   then re-evaluates it into ordinary entities (`box`, `extrusion`, `line`, `arc`, `text`,
   …). No new entity kinds ⇒ rendering, selection, STL/STEP/OBJ export, measure and
@@ -55,7 +55,7 @@ Playwright end-to-end suite (`npm run test:e2e`).
       tags, overall dimensions; print to PDF from the browser.
 - [x] **S10 — IFC export.** `export_ifc` — IFC4 (ISO 16739) with project / site /
       building / storeys, walls, slabs, columns, beams, doors, windows, stairs, spaces.
-- [x] **S11 — UI.** A *Building* panel: project info, levels (active level), element
+- [x] **S11 — UI.** A _Building_ panel: project info, levels (active level), element
       tools with parameter forms, quantity / cost table, schedule CSV, DXF / IFC / sheet
       downloads.
 - [x] **S12 — Verification.** Unit tests for every command, Playwright e2e covering the
@@ -70,3 +70,5 @@ Playwright end-to-end suite (`npm run test:e2e`).
 - [x] **S14 — Openings in curved walls.** Doors and windows hosted by curved walls (offset
       along the arc): the wall is cut, the opening follows the curve's tangent, quantities
       deduct the openings, plan / IFC show them.
+- [x] **S15 — Curved-to-straight wall joins.** A straight wall ending on a curved wall's end is
+      trimmed / extended against the curved wall's end tangent, like straight-wall L / T joins.

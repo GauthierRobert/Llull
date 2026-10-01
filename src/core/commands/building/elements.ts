@@ -288,7 +288,20 @@ export const moveBuildingElement: CommandDefinition<MoveBuildingElementParams> =
     if (strayOpenings.length > 0) {
       return noChange(
         doc,
-        `move_building_element refused: ${strayOpenings.join(', ')} are hosted (by a wall or a steel column) — slide openings with update_opening (offset) or move their host.`,
+        `move_building_element refused: ${strayOpenings.join(', ')} follow their host (a wall, a steel column or a rafter) — slide openings with update_opening (offset) or move the host.`,
+      );
+    }
+    // A column moved without its rafter would leave the eaves connection detached.
+    const detached = Object.values(building.elements).filter(
+      (element) =>
+        element.category === 'connection' &&
+        known.includes(element.otherId) &&
+        !known.includes(element.rafterId),
+    );
+    if (detached.length > 0) {
+      return noChange(
+        doc,
+        `move_building_element refused: moment connection(s) ${detached.map((element) => element.id).join(', ')} tie the moved member(s) to rafters that are not moved — move the rafters too, or delete the connections first.`,
       );
     }
     let next = building;
@@ -422,6 +435,7 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
     for (const targetLevelId of targets) {
       if (targetLevelId === sourceLevelId) continue;
       const levelIndex = next.levelOrder.indexOf(targetLevelId);
+      const copiedIds = new Map<string, string>();
       for (const element of sourceElements) {
         const id = nextElementId(next, element.category);
         const mark =
@@ -441,6 +455,7 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
           ),
         );
         created.push(id);
+        copiedIds.set(element.id, id);
         for (const hostedId of building.elementOrder) {
           const hosted = building.elements[hostedId];
           if (
@@ -461,6 +476,27 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
           );
           created.push(copyId);
         }
+      }
+      // Moment connections follow when both connected members were copied.
+      for (const connectionId of building.elementOrder) {
+        const connection = building.elements[connectionId];
+        if (connection?.category !== 'connection') continue;
+        const [rafterId, otherId] = [
+          copiedIds.get(connection.rafterId),
+          copiedIds.get(connection.otherId),
+        ];
+        if (rafterId === undefined || otherId === undefined) continue;
+        const copyId = nextElementId(next, 'connection');
+        next = withElement(next, {
+          ...connection,
+          id: copyId,
+          mark: nextMark(next, 'connection'),
+          levelId: targetLevelId,
+          rafterId,
+          otherId,
+          entityIds: [],
+        });
+        created.push(copyId);
       }
     }
     const issues = openingFitIssues(next, new Set(targets));

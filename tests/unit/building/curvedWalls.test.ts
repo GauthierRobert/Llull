@@ -241,3 +241,89 @@ describe('openings in curved walls', () => {
     expect(buildingErrors(doc.building)).toEqual([]);
   });
 });
+
+describe('curved wall opening review regressions', () => {
+  it('re-checks curved-wall openings when the level height shrinks', () => {
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_window', {
+      wallId: 'curvedWall-1',
+      width: 1200,
+      height: 1200,
+      sillHeight: 1500,
+    }).document;
+    const result = execute(doc, 'update_level', { levelId: 'level-1', height: 2000 });
+    expect(result.summary).toMatch(/refused|exceeds/);
+    expect(wallOf(result.document).height).toBe(3000);
+  });
+
+  it('deepens the IFC void so it cuts through the arc at the jambs', () => {
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', {
+      start: [-3000, 0],
+      through: [0, 3000],
+      end: [3000, 0],
+      thickness: 200,
+    }).document;
+    doc = execute(doc, 'add_door', { wallId: 'curvedWall-1', width: 2000 }).document;
+    const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
+    // Sagitta of a 2 m opening on R = 3 m: 3000 − √(3000² − 1000²) ≈ 171.6 mm (each side).
+    const voids = [...ifc.matchAll(/IFCRECTANGLEPROFILEDEF\(\.AREA\.,\$,#\d+,2000\.,([\d.]+)\)/g)];
+    expect(Number(voids[0]?.[1])).toBeGreaterThan(200 + 2 * 171);
+  });
+});
+
+describe('straight walls joining curved walls', () => {
+  it('extends a straight wall over a curved wall end (L corner)', async () => {
+    const { wallExtent } = await import('@core/commands/building/evaluate');
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_wall', { start: [-5000, 0], end: [-9000, 0], thickness: 200 }).document;
+    const wall = doc.building!.elements['wall-1']!;
+    expect(wall.category === 'wall' && wallExtent(doc.building!, wall)).toEqual({
+      start: -150,
+      end: 4000,
+    });
+  });
+
+  it('stops a straight wall at the face of an arc (T junction)', async () => {
+    const { wallExtent } = await import('@core/commands/building/evaluate');
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_wall', { start: [0, 9000], end: [0, 5000], thickness: 200 }).document;
+    const wall = doc.building!.elements['wall-1']!;
+    const extent = wall.category === 'wall' ? wallExtent(doc.building!, wall) : null;
+    expect(extent?.start).toBe(0);
+    expect(extent?.end).toBeCloseTo(4000 - 150, 6);
+  });
+});
+
+describe('curved / straight corner review regressions', () => {
+  it('closes the corner the same way in metre documents', async () => {
+    const { wallExtent } = await import('@core/commands/building/evaluate');
+    let doc = execute(createEmptyDocument(), 'set_units', { units: 'm' }).document;
+    doc = execute(doc, 'add_curved_wall', {
+      start: [-5, 0],
+      through: [0, 5],
+      end: [5, 0],
+      thickness: 0.3,
+    }).document;
+    doc = execute(doc, 'add_wall', { start: [5, 0], end: [9, 0], thickness: 0.2 }).document;
+    const wall = doc.building!.elements['wall-1']!;
+    const extent = wall.category === 'wall' ? wallExtent(doc.building!, wall) : null;
+    expect(extent?.start).toBeCloseTo(-0.15, 9);
+  });
+
+  it('trims the curved wall end so the corner does not overlap', async () => {
+    const { curvedWallExtent, curvedWallLength } =
+      await import('@core/commands/building/curvedWallGeometry');
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_wall', { start: [-5000, 0], end: [-9000, 0], thickness: 200 }).document;
+    const extent = curvedWallExtent(doc.building!, wallOf(doc));
+    expect(extent.start).toBeCloseTo(100, 6);
+    expect(extent.end).toBeCloseTo(curvedWallLength(wallOf(doc)), 6);
+    const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
+    // Curved 300 × 3000 over (L − 100) + straight 200 × 3000 over (4000 + 150).
+    const expected = (Math.PI * 5000 - 100) * 0.3 * 3 * 1e-3 + 4150 * 0.2 * 3 * 1e-3;
+    expect(lines.find((line) => line.key === 'wall.concrete.m3')?.quantity).toBeCloseTo(
+      expected,
+      2,
+    );
+  });
+});

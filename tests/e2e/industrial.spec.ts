@@ -190,4 +190,95 @@ test.describe('industrial workflow', () => {
       expect(ifc.text).toContain(entity);
     }
   });
+
+  test('I18–I19 — frame check, automatic design, welds', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', { span: '24000', length: '30000', cladding: 'false' });
+    await page.getByTestId('frame-check').click();
+    await expect(page.getByTestId('frame-check-summary')).toContainText('Checked 6 frame(s)');
+    await expect(page.getByTestId('frame-check-summary')).toContainText('failure(s)');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s)');
+    await page.getByTestId('frame-check').click();
+    await expect(page.getByTestId('frame-check-summary')).toContainText('all OK');
+    await page.getByLabel('Schedule').selectOption('connection');
+    const schedule = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Schedule CSV' }).click(),
+    );
+    expect(schedule.text.split('\n')[1]).toMatch(/,a9 flanges \/ a6 web · \d+\.\d m$/);
+  });
+
+  test('I20–I23 — wind and crane combinations, buckling, sway stability, deflections', async ({
+    page,
+  }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', {
+      span: '24000',
+      length: '30000',
+      cladding: 'false',
+      craneRailHeight: '6000',
+    });
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('frame-check').click();
+    const summary = page.getByTestId('frame-check-summary');
+    await expect(summary).toContainText('66 ULS combination(s)');
+    await expect(summary).toContainText('qp = 0.7 kN/m²');
+    await expect(summary).toContainText('min αcr');
+    await expect(
+      page.getByTestId('frame-check-row').filter({ hasText: 'deflection' }).first(),
+    ).toBeVisible();
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s) for 66 ULS combination(s)');
+    await page.getByTestId('frame-check').click();
+    await expect(summary).toContainText('all OK');
+  });
+
+  test('I24–I27 — bracing, foundations and crane runway checks', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', {
+      span: '24000',
+      length: '30000',
+      cladding: 'false',
+      craneRailHeight: '6000',
+    });
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    const summary = page.getByTestId('frame-check-summary');
+    await page.getByTestId('bracing-check').click();
+    await expect(summary).toContainText('Bracing check (qp 0.7 kN/m²');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('purlin-check').click();
+    await expect(summary).toContainText('Purlin check (qp');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('foundation-check').click();
+    await expect(summary).toContainText('Checked 12 footing(s)');
+    await page.getByTestId('runway-check').click();
+    await expect(summary).toContainText('crane runway beam(s)');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('frame-check-row').first().click();
+    await expect(page.getByTestId('frame-check-row').first()).toContainText('CB');
+  });
+
+  test('I28–I31 — footing design, anchor bolt plan and DSTV NC files', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', { span: '24000', length: '30000', cladding: 'false' });
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('footing-design').click();
+    await expect(status(page)).toContainText('Designed 12 of 12 footing(s)');
+    await page.getByLabel('Schedule').selectOption('footing');
+    const schedule = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Schedule CSV' }).click(),
+    );
+    expect(schedule.text).toMatch(/H\d+ @ \d+ B1\/B2/);
+    const plan = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Anchor plan' }).click(),
+    );
+    expect(plan.name).toMatch(/anchor-plan/);
+    expect(plan.text).toContain('A+6000/1');
+    const nc = await downloadText(page, () =>
+      page.getByRole('button', { name: 'NC files (DSTV)' }).click(),
+    );
+    expect(nc.name).toMatch(/\.nc1$/);
+    expect(nc.text).toMatch(/^ST/m);
+    await expect(page.getByTestId('building-export-status')).toContainText('DSTV NC1:');
+  });
 });

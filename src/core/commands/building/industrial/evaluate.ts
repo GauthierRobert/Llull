@@ -431,7 +431,13 @@ export function connectionSolids(
     },
   ];
   if (connection.kind === 'apex' && other) {
-    const far = into(other, other.start[2] >= other.end[2] ? 'start' : 'end');
+    const distanceTo = (point: Vec3): number =>
+      Math.hypot(point[0] - joint[0], point[1] - joint[1], point[2] - joint[2]);
+    const nearerEnd =
+      distanceTo(atLevel(level, other.start)) <= distanceTo(atLevel(level, other.end))
+        ? 'start'
+        : 'end';
+    const far = into(other, nearerEnd);
     if (far) {
       solids.push({
         part: 'plate-2',

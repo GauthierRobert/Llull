@@ -45,7 +45,12 @@ import {
 } from '../../../lib/polygon';
 import { fromMm, toMetres } from './model';
 import { prismMesh } from './mesh';
-import { evaluateCurvedWall, tangentWall } from './curvedWallGeometry';
+import {
+  arcOffsetOf,
+  curvedWallExtent,
+  evaluateCurvedWall,
+  tangentWall,
+} from './curvedWallGeometry';
 import {
   evaluateEquipment,
   evaluateFooting,
@@ -146,7 +151,15 @@ export function endAdjustment(
   const frame = wallFrame(wall);
   const away: Vec2 = end === 'start' ? frame.direction : [-frame.direction[0], -frame.direction[1]];
   const ownIndex = building.elementOrder.indexOf(wall.id);
-  for (const other of wallsOnLevel(building, wall.levelId)) {
+  // Curved walls take part through their tangent at the arc point nearest this wall end.
+  const curved = new Set<string>();
+  const tangents = building.elementOrder.flatMap((id) => {
+    const element = building.elements[id];
+    if (element?.category !== 'curvedWall' || element.levelId !== wall.levelId) return [];
+    curved.add(element.id);
+    return [tangentWall(element, arcOffsetOf(element, point))];
+  });
+  for (const other of [...wallsOnLevel(building, wall.levelId), ...tangents]) {
     if (other.id === wall.id) continue;
     const otherFrame = wallFrame(other);
     const sine = Math.abs(away[0] * otherFrame.direction[1] - away[1] * otherFrame.direction[0]);
@@ -160,7 +173,10 @@ export function endAdjustment(
       ) / sine;
     const atOtherStart = distance(point, other.start) <= tolerance;
     if (atOtherStart || distance(point, other.end) <= tolerance) {
-      if (building.elementOrder.indexOf(other.id) < ownIndex) return retraction;
+      // A curved wall keeps its square end: the straight wall always closes the corner.
+      if (!curved.has(other.id) && building.elementOrder.indexOf(other.id) < ownIndex) {
+        return retraction;
+      }
       const otherAway: Vec2 = atOtherStart
         ? otherFrame.direction
         : [-otherFrame.direction[0], -otherFrame.direction[1]];
@@ -565,7 +581,12 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluateConnection(context.doc, leveled, members, level);
     }
     case 'curvedWall':
-      return evaluateCurvedWall(leveled, level, openingsOf(building, leveled.id));
+      return evaluateCurvedWall(
+        leveled,
+        level,
+        openingsOf(building, leveled.id),
+        curvedWallExtent(building, leveled),
+      );
     case 'plate': {
       const member = building.elements[leveled.memberId];
       return member?.category === 'member'

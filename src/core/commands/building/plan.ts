@@ -24,7 +24,7 @@ import { findProfile, profileOutline } from './steel/profiles';
 import { plateLayout } from './industrial/evaluate';
 import {
   curvedBandBetween,
-  curvedWallBand,
+  curvedWallExtent,
   curvedWallPieces,
   tangentWall,
 } from './curvedWallGeometry';
@@ -667,7 +667,8 @@ export function buildPlanDrawing(
         primitives.push(...wallPrimitives(building, element, cutHeight));
         break;
       case 'curvedWall': {
-        const band = curvedWallBand(element);
+        const extent = curvedWallExtent(building, element);
+        const band = curvedBandBetween(element, extent.start, extent.end);
         if (!band) break;
         const openings = openingsOf(building, element.id);
         const localCut = cutHeight - element.baseOffset;
@@ -680,7 +681,7 @@ export function buildPlanDrawing(
           });
           break;
         }
-        for (const piece of curvedWallPieces(element, openings)) {
+        for (const piece of curvedWallPieces(element, openings, extent)) {
           if (!(piece.z0 <= localCut && localCut < piece.z1)) continue;
           const points = curvedBandBetween(element, piece.s0, piece.s1);
           if (points) {

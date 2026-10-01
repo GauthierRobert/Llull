@@ -31,6 +31,7 @@ import { regenerateBuilding } from '../evaluate';
 import { findProfile, STEEL_PROFILES, type SteelProfile } from '../steel/profiles';
 import { panelFrame } from './evaluate';
 import { refitPlates } from './plates';
+import { dropStaleConnections } from './connections';
 
 export const MEMBER_ROLES: ReadonlyArray<MemberRole> = [
   'column',
@@ -333,7 +334,8 @@ export const updateSteelMember: CommandDefinition<UpdateSteelMemberParams> = {
       ...(note !== undefined ? { note } : {}),
     };
     const refit = refitPlates(doc, withElement(building, updated), updated, member.profile);
-    const document = regenerateBuilding(doc, refit.building);
+    const joints = dropStaleConnections(refit.building, memberId, fromMm(doc, 10));
+    const document = regenerateBuilding(doc, joints.building);
     const plateNote =
       refit.resized.length > 0
         ? ` Base plate(s) ${refit.resized.join(', ')} re-sized.`
@@ -342,7 +344,9 @@ export const updateSteelMember: CommandDefinition<UpdateSteelMemberParams> = {
           : '';
     return {
       document,
-      summary: `Updated ${updated.role} ${updated.mark} (${memberId}): ${profileSummary(section)}.${plateNote}`,
+      summary:
+        `Updated ${updated.role} ${updated.mark} (${memberId}): ${profileSummary(section)}.${plateNote}` +
+        `${joints.removed.length > 0 ? ` Moment connection(s) ${joints.removed.join(', ')} removed (joint no longer exists).` : ''}`,
       affected: elementAffected(document, [memberId, ...refit.resized]),
     };
   },

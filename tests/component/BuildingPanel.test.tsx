@@ -206,4 +206,74 @@ describe('BuildingPanel', () => {
     expect(click).toHaveBeenCalledTimes(2);
     click.mockRestore();
   });
+
+  it('checks the portal frames and dispatches their design', () => {
+    localDispatch('add_portal_frame_building', { span: 18000, length: 12000, cladding: false });
+    const dispatch = spyDispatch();
+    render(<BuildingPanel />);
+    fireEvent.change(screen.getByLabelText('Snow load (kN/m²)'), { target: { value: '1.0' } });
+    fireEvent.change(screen.getByLabelText('Wind pressure qp (kN/m²)'), {
+      target: { value: '0.6' },
+    });
+    fireEvent.click(screen.getByTestId('frame-check'));
+    expect(screen.getByTestId('frame-check-summary')).toHaveTextContent(
+      /Checked 3 frame\(s\).*10 ULS combination\(s\).*S = 1 kN\/m², qp = 0\.6 kN\/m²/,
+    );
+    const rows = screen.getAllByTestId('frame-check-row');
+    expect(rows.length).toBeGreaterThan(0);
+    fireEvent.click(rows[0]!);
+    expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId('frame-design'));
+    fireEvent.click(screen.getByTestId('footing-design'));
+    expect(dispatch).toHaveBeenCalledWith('design_footings', {
+      deadLoad: 0.5,
+      snowLoad: 1,
+      windPressure: 0.6,
+    });
+    expect(dispatch).toHaveBeenCalledWith('design_portal_frames', {
+      deadLoad: 0.5,
+      snowLoad: 1,
+      windPressure: 0.6,
+    });
+  });
+
+  it('runs the bracing, foundation and crane runway checks', () => {
+    localDispatch('add_portal_frame_building', {
+      span: 18000,
+      length: 12000,
+      cladding: false,
+      crane: { capacity: 5, railHeight: 5000 },
+    });
+    render(<BuildingPanel />);
+    const summary = (): HTMLElement => screen.getByTestId('frame-check-summary');
+    fireEvent.click(screen.getByTestId('bracing-check'));
+    expect(summary()).toHaveTextContent(/^Bracing check/);
+    fireEvent.click(screen.getByTestId('foundation-check'));
+    expect(summary()).toHaveTextContent(/^Checked \d+ footing\(s\)/);
+    fireEvent.click(screen.getByTestId('runway-check'));
+    expect(summary()).toHaveTextContent(/crane runway beam\(s\)/);
+    const rows = screen.getAllByTestId('frame-check-row');
+    expect(rows[0]).toHaveTextContent(/^(OK|FAIL)CB\d+/);
+    fireEvent.click(rows[0]!);
+    expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
+  });
+
+  it('exports the anchor bolt plan and the DSTV NC files of a hall', () => {
+    localDispatch('add_portal_frame_building', { span: 12000, length: 12000, cladding: false });
+    const createObjectURL = vi.fn(() => 'blob:x');
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    render(<BuildingPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Anchor plan' }));
+    expect(screen.getByTestId('building-export-status')).toHaveTextContent(
+      /^Anchor plan .*anchor bolt\(s\)/,
+    );
+    expect(click).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'NC files (DSTV)' }));
+    expect(screen.getByTestId('building-export-status')).toHaveTextContent(/^DSTV NC1: (\d+) file/);
+    expect(click.mock.calls.length).toBeGreaterThan(5);
+    click.mockRestore();
+  });
 });

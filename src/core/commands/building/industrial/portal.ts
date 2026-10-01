@@ -301,7 +301,11 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       columnProfile: { type: 'string', description: 'Default HEA400.' },
       rafterProfile: { type: 'string', description: 'Default IPE450.' },
       purlinProfile: { type: 'string', description: 'Default C200x75x2.5.' },
-      railProfile: { type: 'string', description: 'Side rails. Default C150x65x2.0.' },
+      railProfile: {
+        type: 'string',
+        description:
+          'Side rails. Default C200x75x2.5 (passes check_purlins at qp 0.6 on 6 m bays).',
+      },
       braceProfile: { type: 'string', description: 'Bracing. Default CHS76.1x3.6.' },
       gablePostProfile: { type: 'string', description: 'Gable wind posts. Default HEA200.' },
       purlinSpacing: { type: 'number', description: 'Along the slope. Default 1800 mm.' },
@@ -328,6 +332,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
           },
           profile: { type: 'string', description: 'Runway section. Default HEB300.' },
         },
+        required: ['railHeight'],
       },
       levelId: { type: 'string', description: 'Level id. Default: the active level.' },
     },
@@ -377,7 +382,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       column: params.columnProfile ?? 'HEA400',
       rafter: params.rafterProfile ?? 'IPE450',
       purlin: params.purlinProfile ?? 'C200x75x2.5',
-      rail: params.railProfile ?? 'C150x65x2.0',
+      rail: params.railProfile ?? 'C200x75x2.5',
       brace: params.braceProfile ?? 'CHS76.1x3.6',
       gable: params.gablePostProfile ?? 'HEA200',
     };

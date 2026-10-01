@@ -447,6 +447,7 @@ export const addConstraint: CommandDefinition<AddConstraintParams> = {
                 enum: ['start', 'end', 'center', 'mid'],
               },
             },
+            required: ['entityId'],
           },
           b: {
             type: 'object',
@@ -461,6 +462,7 @@ export const addConstraint: CommandDefinition<AddConstraintParams> = {
                 enum: ['start', 'end', 'center', 'mid'],
               },
             },
+            required: ['entityId'],
           },
           value: {
             type: 'string',
@@ -470,6 +472,7 @@ export const addConstraint: CommandDefinition<AddConstraintParams> = {
               '("width", "height / 2"). Angle is in radians.',
           },
         },
+        required: ['kind', 'a', 'b'],
       },
       id: {
         type: 'string',
@@ -637,6 +640,7 @@ export const updateConstraint: CommandDefinition<UpdateConstraintParams> = {
                 enum: ['start', 'end', 'center', 'mid'],
               },
             },
+            required: ['entityId'],
           },
           b: {
             type: 'object',
@@ -649,6 +653,7 @@ export const updateConstraint: CommandDefinition<UpdateConstraintParams> = {
                 enum: ['start', 'end', 'center', 'mid'],
               },
             },
+            required: ['entityId'],
           },
         },
       },

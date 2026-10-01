@@ -128,3 +128,24 @@ describe('stricter building validation', () => {
     expect(loaded.document.entities['wall-1:body-0']).toBeDefined();
   });
 });
+
+describe('footing reinforcement validation', () => {
+  const footingWith = (reinforcement: unknown): unknown => {
+    const building = JSON.parse(
+      JSON.stringify(
+        execute(createEmptyDocument(), 'add_footing', { location: [0, 0] }).document.building,
+      ),
+    );
+    const footing = Object.values(building.elements)[0] as Record<string, unknown>;
+    footing['reinforcement'] = reinforcement;
+    return building;
+  };
+
+  it('accepts valid bars and rejects malformed ones', () => {
+    expect(buildingErrors(footingWith({ barDiameter: 12, spacing: 150, cover: 50 }))).toEqual([]);
+    expect(buildingErrors(footingWith({ barDiameter: 0, spacing: 150, cover: 50 })).join()).toMatch(
+      /reinforcement must have/,
+    );
+    expect(buildingErrors(footingWith('H12')).join()).toMatch(/reinforcement must have/);
+  });
+});

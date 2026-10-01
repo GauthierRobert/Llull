@@ -38,6 +38,15 @@ import { addBasePlates } from './industrial/plates';
 import { addCurvedWall } from './curvedWalls';
 import { setWallLayers } from './wallLayers';
 import { addMomentConnections } from './industrial/connections';
+import { checkPortalFrames } from './industrial/frameCheck';
+import { designPortalFrames } from './industrial/frameDesign';
+import { checkBracing } from './industrial/bracingCheck';
+import { foundationCheck } from './industrial/foundationCheck';
+import { designFootings } from './industrial/footingDesign';
+import { exportNcFiles } from './industrial/ncExport';
+import { checkPurlins } from './industrial/purlinCheck';
+import { exportAnchorPlan } from './industrial/anchorPlan';
+import { runwayCheck } from './industrial/runwayCheck';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 export const buildingCommands = [
@@ -86,6 +95,15 @@ export const buildingCommands = [
   addCurvedWall,
   setWallLayers,
   addMomentConnections,
+  checkPortalFrames,
+  designPortalFrames,
+  checkBracing,
+  foundationCheck,
+  designFootings,
+  exportNcFiles,
+  checkPurlins,
+  exportAnchorPlan,
+  runwayCheck,
   addCraneRunway,
   addPortalFrameBuilding,
   checkClashes,

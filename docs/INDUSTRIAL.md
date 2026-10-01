@@ -30,6 +30,79 @@ an equipment's maintenance zone, with element ids and penetration depth. Steel-t
 and pipe connections (a pipe end inside equipment or on another pipe) are not clashes. In the
 Building panel, _Check clashes_ lists them; click a row to select both elements.
 
+## Structural check and design
+
+`check_portal_frames` (read-only) solves every portal frame of a level as a 2D frame (direct
+stiffness method, pinned bases, section properties from the profile outline — no root radii,
+≈ 4–5 % conservative; haunches are not counted as stiffening) for every EN 1990 combination of:
+
+- **G** — roof dead load (`deadLoad`, kN/m²) on the tributary width + member self-weight + runway
+  self-weight at the crane brackets;
+- **S** — snow (`snowLoad`, kN/m²);
+- **W** — wind (`windPressure` = peak velocity pressure qp, kN/m², default 0 = off): windward wall
+  +0.8, leeward −0.5, roof −0.6, each with internal pressure cpi +0.2 and −0.3, from the left and
+  from the right;
+- **C** — overhead cranes, read from the runway capacity (`add_crane_runway` / the hall `crane`
+  option, or `craneCapacity` to override, 0 to ignore): maximum / minimum wheel reactions with
+  dynamic factors and a 10 % lateral surge, applied at the brackets with their eccentricity.
+
+Combinations: 1.35G+1.5S, 1.35G+1.5W+0.75S, 1.0G+1.5W (uplift); with cranes, crane-leading
+1.35G+1.35C(+0.75S)(+0.9W, either direction) and wind-leading 1.35G+1.5W+0.75S+1.35C — crane at
+either rail, each wind direction. Every combination includes sway imperfections (EN 1993-1-1
+§5.3.2) applied where column compression enters (column tops and crane brackets). The elastic
+critical factor αcr is estimated with Horne's method per column storey; outside Horne's scope
+(roof slope > 26° or rafter N > 0.09 Ncr) the modified estimate 0.8 αH (1 − N/Ncr) is used. All
+moments are amplified by 1/(1 − 1/αcr) when αcr < 10 (conservative) and the frame fails when
+αcr < 3.
+
+Checks, worst per element with the governing combination: member cross-section (§6.2), flexural
+buckling with N–M interaction (§6.3.3; columns over their full height, rafters between purlins),
+moment-connection bolt groups (grade 8.8 tension / shear, EN 1993-1-8, for every combination —
+uplift reverses the apex moment), sway stability, and serviceability: rafter deflection under snow
+≤ span/200, eaves sway under wind ≤ h/150, rail-level sway under crane ≤ h/400 (EN 1993-6).
+
+`design_portal_frames` iterates with the same loads: it up-sizes failing rafter / column sections
+uniformly (next heavier profile, then IPE → HEA / HEB), stiffens rafters and columns together when
+a frame fails on sway or stability, picks the bolt diameter and row count of each connection type
+against all combinations, and reports the changes and final utilisations. Connections also carry
+full-strength fillet weld sizes in their schedule and weld length / metal in the takeoff.
+
+Lateral-torsional buckling uses Mcr from the section (It, Iw) with the compression flange
+restrained at the purlins (rafters) and side rails (columns) — fly braces assumed.
+
+Companion checks, all read-only and driven by the same loads:
+
+- `check_bracing` — longitudinal wind on the gables (and frame stability forces) → roof and wall
+  X-bracing as tension-only diagonals, eaves struts in compression, gable posts in bending.
+- `check_purlins` — roof purlins and wall rails per bay under dead + snow and wind with the
+  EN 1991-1-4 zones (roof F / G / H / I, walls A / B / C / D, cpi ±): bending (uplift with the free
+  flange reduced), shear, deflection span/200 (purlins) and span/150 (rails).
+- `check_foundations` — characteristic base reactions per load case → pad footing soil bearing
+  (effective width), uplift (EQU), sliding, base plate concrete bearing and anchor bolts. With a
+  ground slab the frame thrust is tied through it (tie-force row, slab friction against sliding);
+  `thrustTie: false` makes each pad resist its own reaction.
+- `check_crane_runways` — runway beams under two moving wheels: biaxial bending (top flange takes
+  the surge), shear, lateral-torsional buckling, L/600 deflections (EN 1993-6) and fatigue with the
+  damage-equivalent factor of the crane class (S2–S4, detail category 71).
+
+`design_footings` designs the pad footings (EN 1992-1-1, C25/30, B500): bottom mat both ways from
+bending at the base plate face (minimum steel, bar H12–H25 at 100–250 mm), one-way shear and
+punching at 2d; footings that fail shear or punching are reported "increase thickness". The bars
+go to the footing schedule and the rebar mass to the takeoff. `check_foundations` adds elastic
+settlement (`soilModulus`, 25 mm) and differential settlement between frame columns (L/500).
+
+## Site and fabrication deliverables
+
+- `export_anchor_plan` — anchor bolt setting-out plan (SVG): grids, footings, base plates and every
+  anchor bolt dimensioned from the grid lines, with a bolt schedule (grid reference with offset,
+  bolts, embedment, projection, top of concrete / grout).
+- `export_nc_files` — DSTV NC1 files for CNC saw-drill and plate lines: one file per distinct part
+  (profile, length, pitched cuts, bolt holes; base and end plates with their contour and holes),
+  with quantities.
+
+Not covered: cold-formed section local buckling (effective widths), wind on irregular shapes, dynamic crane analysis. This is a preliminary design aid, not a substitute for
+the engineer of record.
+
 ## Quantities and fabrication lists
 
 `quantity_takeoff` adds steel **mass per profile (kg)**, length per profile, **paint / coating

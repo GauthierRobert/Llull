@@ -2,16 +2,16 @@
 
 llull can move a model in and out of three forms:
 
-| Form | Direction | Fidelity | Needs |
-| ---- | --------- | -------- | ----- |
-| **Parametric code**: CadQuery, build123d, OpenSCAD, FreeCAD macro | export | Exact and parametric: parameters, expressions and feature order | nothing (pure TypeScript) |
-| **Parametric code**: CadQuery / build123d | import | Exact and parametric when the script uses the llull runtime; any other script imports as meshes | server Python bridge + `LLULL_ALLOW_CODE_EXECUTION=1` |
-| **STEP** (AP214) | export | Exact B-rep (OpenCascade), names and colours kept | server Python bridge |
-| **STEP** | import | Each solid becomes a mesh entity with its STEP name and colour | server Python bridge |
+| Form                                                              | Direction | Fidelity                                                                                        | Needs                                                 |
+| ----------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **Parametric code**: CadQuery, build123d, OpenSCAD, FreeCAD macro | export    | Exact and parametric: parameters, expressions and feature order                                 | nothing (pure TypeScript)                             |
+| **Parametric code**: CadQuery / build123d                         | import    | Exact and parametric when the script uses the llull runtime; any other script imports as meshes | server Python bridge + `LLULL_ALLOW_CODE_EXECUTION=1` |
+| **STEP** (AP214)                                                  | export    | Exact B-rep (OpenCascade), names and colours kept                                               | server Python bridge                                  |
+| **STEP**                                                          | import    | Each solid becomes a mesh entity with its STEP name and colour                                  | server Python bridge                                  |
 
 ## Why code is the main format
 
-A llull document is a *recipe*: parameters plus a feature history (architecture L8).
+A llull document is a _recipe_: parameters plus a feature history (architecture L8).
 `export_code` writes that recipe out as source code:
 
 ```python
@@ -92,14 +92,14 @@ pip install -r server/python/requirements.txt     # CadQuery (OpenCascade)
 LLULL_PYTHON=python3 npm --prefix server run dev   # python3 is the default
 ```
 
-| Variable | Default | Meaning |
-| -------- | ------- | ------- |
-| `LLULL_PYTHON` | `python3` | Python that has CadQuery. `off` disables the bridge. |
-| `LLULL_PYTHON_BUILD123D` | `LLULL_PYTHON` | Python that has build123d. build123d and CadQuery pin different OCP versions, so give each its own virtualenv. |
-| `LLULL_PYTHON_TIMEOUT_MS` | `120000` | Per-request timeout. The process is killed after it. |
-| `LLULL_EXCHANGE_DIR` | unset | Directory that the tools' `path` arguments resolve inside (no `..` or absolute paths). `export_step` also saves `<name>.step` there. |
-| `LLULL_ALLOW_CODE_EXECUTION` | unset | `1` enables `import_code`. **It runs arbitrary Python with server privileges.** Enable it only on a machine whose MCP clients you trust. |
-| `LLULL_BODY_LIMIT` | `2mb` | Raise it to send large STEP files inline as base64, or use `path` instead. |
+| Variable                     | Default        | Meaning                                                                                                                                  |
+| ---------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `LLULL_PYTHON`               | `python3`      | Python that has CadQuery. `off` disables the bridge.                                                                                     |
+| `LLULL_PYTHON_BUILD123D`     | `LLULL_PYTHON` | Python that has build123d. build123d and CadQuery pin different OCP versions, so give each its own virtualenv.                           |
+| `LLULL_PYTHON_TIMEOUT_MS`    | `120000`       | Per-request timeout. The process is killed after it.                                                                                     |
+| `LLULL_EXCHANGE_DIR`         | unset          | Directory that the tools' `path` arguments resolve inside (no `..` or absolute paths). `export_step` also saves `<name>.step` there.     |
+| `LLULL_ALLOW_CODE_EXECUTION` | unset          | `1` enables `import_code`. **It runs arbitrary Python with server privileges.** Enable it only on a machine whose MCP clients you trust. |
+| `LLULL_BODY_LIMIT`           | `2mb`          | Raise it to send large STEP files inline as base64, or use `path` instead.                                                               |
 
 Each bridge process runs with these limits:
 
@@ -117,12 +117,12 @@ a hostile document loaded with `load_document` cannot inject code into `export_s
 
 ### MCP tools
 
-| Tool | What it does |
-| ---- | ------------ |
-| `export_code` | Registry command (works offline, also in the UI). Returns `data.text`. |
+| Tool          | What it does                                                                                                                             |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `export_code` | Registry command (works offline, also in the UI). Returns `data.text`.                                                                   |
 | `export_step` | `export_code` (CadQuery), evaluated by OpenCascade. Returns `structuredContent.stepBase64` and saves into `LLULL_EXCHANGE_DIR` when set. |
-| `import_step` | `stepBase64` or `path`, producing `import_mesh` (undoable). |
-| `import_code` | `code` or `path`, `language`, `mode: replace / append`. Produces `apply_code_trace` (undoable). |
+| `import_step` | `stepBase64` or `path`, producing `import_mesh` (undoable).                                                                              |
+| `import_code` | `code` or `path`, `language`, `mode: replace / append`. Produces `apply_code_trace` (undoable).                                          |
 
 HTTP downloads for the browser: `GET /export/code?language=cadquery|build123d|openscad|freecad`
 and `GET /export/step` (503 when the bridge is not configured).

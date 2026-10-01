@@ -407,3 +407,129 @@ export function profileOutline(profile: SteelProfile): ProfileOutline {
       return { outer: circle(h / 2, false), holes: [circle(h / 2 - tw, true)] };
   }
 }
+
+export interface SectionProperties {
+  /** Area, mm². */
+  readonly area: number;
+  /** Second moment of area about the strong (horizontal) axis through the centroid, mm⁴. */
+  readonly inertia: number;
+  /** Elastic section modulus, mm³. */
+  readonly elasticModulus: number;
+  /** Plastic section modulus (about the equal-area axis), mm³. */
+  readonly plasticModulus: number;
+  /** Second moment of area about the weak (vertical) axis through the centroid, mm⁴. */
+  readonly minorInertia: number;
+}
+
+type Point = readonly [number, number];
+
+/** Signed area, first and second moments (∫y dA, ∫y² dA) of a polygon. */
+function moments(points: ReadonlyArray<Point>): { area: number; first: number; second: number } {
+  let [area, first, second] = [0, 0, 0];
+  points.forEach((current, index) => {
+    const next = points[(index + 1) % points.length] as Point;
+    const cross = current[0] * next[1] - next[0] * current[1];
+    area += cross / 2;
+    first += ((current[1] + next[1]) * cross) / 6;
+    second += ((current[1] ** 2 + current[1] * next[1] + next[1] ** 2) * cross) / 12;
+  });
+  return { area, first, second };
+}
+
+/** The part of a polygon above (side 1) or below (side −1) the line y = level. */
+function clipAt(points: ReadonlyArray<Point>, level: number, side: 1 | -1): Point[] {
+  const inside = (point: Point): boolean => side * (point[1] - level) >= 0;
+  const result: Point[] = [];
+  points.forEach((current, index) => {
+    const next = points[(index + 1) % points.length] as Point;
+    if (inside(current)) result.push(current);
+    if (inside(current) !== inside(next)) {
+      const t = (level - current[1]) / (next[1] - current[1]);
+      result.push([current[0] + t * (next[0] - current[0]), level]);
+    }
+  });
+  return result;
+}
+
+/**
+ * Exact section properties from the profile outline (bending about the axis perpendicular to
+ * the depth h). Units: mm.
+ * @pure
+ */
+export function sectionProperties(profile: SteelProfile): SectionProperties {
+  const { outer, holes } = profileOutline(profile);
+  const loops = [outer, ...holes];
+  const signed = (
+    loop: ReadonlyArray<Point>,
+    sign: number,
+  ): { area: number; first: number; second: number } => {
+    const m = moments(loop);
+    const orientation = Math.sign(m.area) || 1;
+    return {
+      area: sign * orientation * m.area,
+      first: sign * orientation * m.first,
+      second: sign * orientation * m.second,
+    };
+  };
+  const total = loops
+    .map((loop, index) => signed(loop, index === 0 ? 1 : -1))
+    .reduce(
+      (sum, m) => ({
+        area: sum.area + m.area,
+        first: sum.first + m.first,
+        second: sum.second + m.second,
+      }),
+      { area: 0, first: 0, second: 0 },
+    );
+  const centroid = total.first / total.area;
+  const inertia = total.second - total.area * centroid ** 2;
+  const minor = loops
+    .map((loop, index) =>
+      signed(
+        loop.map(([x, y]): Point => [y, x]),
+        index === 0 ? 1 : -1,
+      ),
+    )
+    .reduce(
+      (sum, m) => ({
+        area: sum.area + m.area,
+        first: sum.first + m.first,
+        second: sum.second + m.second,
+      }),
+      { area: 0, first: 0, second: 0 },
+    );
+  const minorInertia = minor.second - (minor.first * minor.first) / minor.area;
+  const ys = outer.map((point) => point[1]);
+  const extreme = Math.max(Math.max(...ys) - centroid, centroid - Math.min(...ys));
+  // Equal-area (plastic) axis by bisection, then Wpl = Σ |first moment| of both halves about it.
+  const areaAbove = (level: number): number =>
+    loops.reduce((sum, loop, index) => {
+      const part = clipAt(loop, level, 1);
+      return part.length < 3 ? sum : sum + signed(part, index === 0 ? 1 : -1).area;
+    }, 0);
+  let [low, high] = [Math.min(...ys), Math.max(...ys)];
+  for (let step = 0; step < 60; step++) {
+    const middle = (low + high) / 2;
+    if (areaAbove(middle) > total.area / 2) low = middle;
+    else high = middle;
+  }
+  const axis = (low + high) / 2;
+  const plasticModulus = loops.reduce((sum, loop, index) => {
+    const sign = index === 0 ? 1 : -1;
+    let part = sum;
+    for (const side of [1, -1] as const) {
+      const piece = clipAt(loop, axis, side);
+      if (piece.length < 3) continue;
+      const m = signed(piece, sign);
+      part += side * (m.first - axis * m.area);
+    }
+    return part;
+  }, 0);
+  return {
+    area: total.area,
+    inertia,
+    elasticModulus: inertia / extreme,
+    plasticModulus,
+    minorInertia,
+  };
+}
