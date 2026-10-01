@@ -334,4 +334,32 @@ test.describe('industrial workflow', () => {
     await page.getByTestId('bracing-check').click();
     await expect(summary).toContainText('all OK');
   });
+
+  test('full design workflow — fixed-base crane hall passes every check', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', {
+      span: '24000',
+      length: '30000',
+      cladding: 'false',
+      craneRailHeight: '6000',
+      columnBase: 'fixed',
+    });
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s)');
+    await page.getByTestId('purlin-design').click();
+    await page.getByTestId('footing-design').click();
+    await expect(status(page)).toContainText('Designed 12 of 12 footing(s)');
+    const summary = page.getByTestId('frame-check-summary');
+    for (const check of [
+      'frame-check',
+      'bracing-check',
+      'purlin-check',
+      'foundation-check',
+      'runway-check',
+    ]) {
+      await page.getByTestId(check).click();
+      await expect(summary).toContainText('all OK');
+    }
+  });
 });

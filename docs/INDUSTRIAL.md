@@ -91,6 +91,19 @@ punching at 2d; footings that fail shear or punching are reported "increase thic
 go to the footing schedule and the rebar mass to the takeoff. `check_foundations` adds elastic
 settlement (`soilModulus`, 25 mm) and differential settlement between frame columns (L/500).
 
+### Design workflow
+
+Run the design commands in order — each one sizes what the next one checks:
+
+1. `design_portal_frames` — frame sections, connection bolt groups, fixed base plates (M + N).
+2. `design_purlins` — purlin and side rail profiles.
+3. `design_footings` — pad plan size, thickness and reinforcement from the final base reactions.
+4. Verify with `check_portal_frames`, `check_bracing`, `check_purlins`, `check_foundations` and
+   `check_crane_runways` using the same loads.
+
+Crane halls are best built with `columnBase: 'fixed'`: rail-level sway (h/400) otherwise drives
+pinned frames to very heavy sections.
+
 ## Site and fabrication deliverables
 
 - `export_anchor_plan` — anchor bolt setting-out plan (SVG): grids, footings, base plates and every
