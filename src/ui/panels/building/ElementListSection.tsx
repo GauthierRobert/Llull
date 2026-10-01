@@ -26,6 +26,7 @@ const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string>> = {
   panel: 'Panel',
   equipment: 'Equipment',
   pipe: 'Pipe',
+  tray: 'Tray',
 };
 
 function describe(element: BuildingElement): string {
@@ -57,6 +58,8 @@ function describe(element: BuildingElement): string {
       return element.name;
     case 'pipe':
       return `Ø${element.diameter} · ${element.service}`;
+    case 'tray':
+      return `${element.width}×${element.height} · ${element.system}`;
   }
 }
 

@@ -13,6 +13,7 @@ import type {
   MemberRole,
   PanelElement,
   PipeElement,
+  CableTrayElement,
   SteelMemberElement,
   BuildingLevel,
   OpeningElement,
@@ -24,7 +25,7 @@ import { toCounterClockwise } from '../../../lib/polygon';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
 import { wallExtent, wallFrame, type WallExtent } from './evaluate';
 import { sweepFrame } from './mesh';
-import { panelFrame } from './industrial/evaluate';
+import { panelFrame, trayOutline } from './industrial/evaluate';
 import { findProfile, type SteelProfile } from './steel/profiles';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
@@ -301,7 +302,13 @@ const MEMBER_CLASS: Readonly<Record<MemberRole, { entity: string; type: string }
 
 function exportIndustrial(
   context: Context,
-  element: SteelMemberElement | FootingElement | PanelElement | EquipmentElement | PipeElement,
+  element:
+    | SteelMemberElement
+    | FootingElement
+    | PanelElement
+    | EquipmentElement
+    | PipeElement
+    | CableTrayElement,
   storeyPlacement: string,
 ): Exported | null {
   const { mm, writer } = context;
@@ -394,6 +401,32 @@ function exportIndustrial(
         `IFCPIPESEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(element.service)},$,${local},${shape(context, solids)},${ifcString(element.id)},.RIGIDSEGMENT.)`,
       );
       return { ref, material: element.material };
+    }
+    case 'tray': {
+      const local = placement(context, storeyPlacement, 0, 0, 0);
+      const profile = polygonProfile(
+        context,
+        trayOutline(mm(element.width), mm(element.height), 2),
+      );
+      const solids: string[] = [];
+      for (let index = 0; index + 1 < element.points.length; index++) {
+        const start = mm3(element.points[index] as Vec3);
+        const frame = sweepFrame(start, mm3(element.points[index + 1] as Vec3));
+        if (!frame) continue;
+        const axes = writer.add(
+          `IFCAXIS2PLACEMENT3D(${point3(context, start[0], start[1], start[2])},${direction(context, frame.d)},${direction(context, frame.u)})`,
+        );
+        solids.push(
+          writer.add(
+            `IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(frame.length)})`,
+          ),
+        );
+      }
+      if (solids.length === 0) return null;
+      const ref = writer.add(
+        `IFCCABLECARRIERSEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(element.system)},$,${local},${shape(context, solids)},${ifcString(element.id)},.CABLETRAYSEGMENT.)`,
+      );
+      return { ref, material: 'galvanized steel' };
     }
   }
 }
@@ -630,7 +663,8 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
         element.category === 'footing' ||
         element.category === 'panel' ||
         element.category === 'equipment' ||
-        element.category === 'pipe'
+        element.category === 'pipe' ||
+        element.category === 'tray'
       ) {
         const industrial = exportIndustrial(context, element, storeyPlacement);
         if (industrial) {

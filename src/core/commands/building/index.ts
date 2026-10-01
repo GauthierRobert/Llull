@@ -33,6 +33,7 @@ import {
 import { addEquipment, addPipeRun } from './industrial/equipment';
 import { addCraneRunway, addPortalFrameBuilding } from './industrial/portal';
 import { checkClashes } from './industrial/clash';
+import { addCableTray } from './industrial/trays';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 export const buildingCommands = [
@@ -76,6 +77,7 @@ export const buildingCommands = [
   addPanel,
   addEquipment,
   addPipeRun,
+  addCableTray,
   addCraneRunway,
   addPortalFrameBuilding,
   checkClashes,

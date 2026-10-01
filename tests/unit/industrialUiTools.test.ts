@@ -30,13 +30,22 @@ describe('industrial tools', () => {
       length: '24000',
       craneRailHeight: '5000',
     });
-    for (const id of ['member', 'footing', 'panel', 'craneRunway', 'equipment', 'pipe']) {
+    for (const id of ['member', 'footing', 'panel', 'craneRunway', 'equipment', 'pipe', 'tray']) {
       doc = apply(doc, id, id === 'footing' ? { underColumns: 'false' } : {});
     }
     const categories = new Set(
       Object.values(doc.building!.elements).map((element) => element.category),
     );
-    for (const category of ['member', 'footing', 'panel', 'equipment', 'pipe', 'slab', 'grid']) {
+    for (const category of [
+      'member',
+      'footing',
+      'panel',
+      'equipment',
+      'pipe',
+      'tray',
+      'slab',
+      'grid',
+    ]) {
       expect(categories.has(category as never), category).toBe(true);
     }
     const crane = Object.values(doc.building!.elements).filter(

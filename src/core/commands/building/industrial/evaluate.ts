@@ -1,5 +1,6 @@
 /**
- * Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes.
+ * Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes,
+ * cable trays.
  * @layer core/commands/building/industrial
  * @pure
  */
@@ -7,6 +8,7 @@
 import type { CadDocument, Entity, SphereEntity, Vec2, Vec3 } from '../../../model/types';
 import type {
   BuildingLevel,
+  CableTrayElement,
   EquipmentElement,
   FootingElement,
   MemberRole,
@@ -196,6 +198,44 @@ export function evaluatePipe(pipe: PipeElement, level: BuildingLevel): Entity[] 
       radius,
     };
     entities.push(joint);
+  }
+  return entities;
+}
+
+/** Open-top U outline (x across the width, +y up), sheet thickness `sheet`. Counter-clockwise. */
+export function trayOutline(width: number, height: number, sheet: number): Vec2[] {
+  const [w, h, t] = [width / 2, height / 2, Math.min(sheet, width / 4, height / 2)];
+  return [
+    [-w, -h],
+    [w, -h],
+    [w, h],
+    [w - t, h],
+    [w - t, -h + t],
+    [-w + t, -h + t],
+    [-w + t, h],
+    [-w, h],
+  ];
+}
+
+export function evaluateTray(
+  doc: Pick<CadDocument, 'units'>,
+  tray: CableTrayElement,
+  level: BuildingLevel,
+): Entity[] {
+  const outline = trayOutline(tray.width, tray.height, fromMm(doc, 2));
+  const points = tray.points.map((point) => atLevel(level, point));
+  const entities: Entity[] = [];
+  for (let index = 0; index + 1 < points.length; index++) {
+    const mesh = sweepMesh(outline, [], points[index] as Vec3, points[index + 1] as Vec3, 0, 1);
+    if (!mesh) continue;
+    entities.push(
+      meshEntity(
+        tray,
+        { part: `segment-${index}`, label: `Cable tray ${tray.mark} ${tray.system}` },
+        mesh,
+        colorForMaterial('galvanized steel', '#a07c2c'),
+      ),
+    );
   }
   return entities;
 }

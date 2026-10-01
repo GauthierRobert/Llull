@@ -46,7 +46,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
       solid black, concrete / masonry hatched, other materials grey (as in Revit / Tekla sections).
 - [x] **I12 — Multi-span halls.** `add_portal_frame_building` `spans: [...]` — several spans side by
       side with internal columns on shared column lines, valley gutters between the roofs.
-- [ ] **I13 — Cable trays.** `add_cable_tray` (3D route, width, height, system), clash detection,
+- [x] **I13 — Cable trays.** `add_cable_tray` (3D route, width, height, system), clash detection,
       takeoff (m by system), plan symbol, IFC `IfcCableCarrierSegment`.
 - [ ] **I14 — Steel connections.** `add_base_plates`: base plates with anchor bolts under every steel
       column foot; plate steel mass and bolt counts in the takeoff; IFC `IfcPlate` /

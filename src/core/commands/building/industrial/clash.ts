@@ -108,6 +108,22 @@ export function elementBoxes(
       }
       return boxes;
     }
+    case 'tray': {
+      if (!level) return [];
+      const boxes: OrientedBox[] = [];
+      for (let index = 0; index + 1 < element.points.length; index++) {
+        const start = atLevel(level, element.points[index] as Vec3);
+        const end = atLevel(level, element.points[index + 1] as Vec3);
+        const frame = sweepFrame(start, end);
+        if (!frame) continue;
+        boxes.push({
+          center: [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2],
+          axes: [frame.u, frame.v, frame.d],
+          half: [element.width / 2, element.height / 2, frame.length / 2],
+        });
+      }
+      return boxes;
+    }
     case 'equipment': {
       if (!level) return [];
       const [length, width, height] = element.size;
@@ -153,7 +169,7 @@ export function elementBoxes(
 /** Category pairs that are checked (structure–structure joints are intentional and skipped). */
 function relevant(a: BimCategory, b: BimCategory): boolean {
   const active = (category: BimCategory): boolean =>
-    category === 'pipe' || category === 'equipment';
+    category === 'pipe' || category === 'tray' || category === 'equipment';
   if (active(a) || active(b)) return true;
   return (a === 'member') !== (b === 'member');
 }
@@ -166,9 +182,9 @@ export interface Clash {
   readonly depth: number;
 }
 
-/** World-space centreline of a pipe (empty when its level is missing). */
+/** World-space centreline of a pipe or cable tray (empty when its level is missing). */
 function pipeWorldPoints(building: BuildingModel, pipe: BuildingElement): Vec3[] {
-  if (pipe.category !== 'pipe') return [];
+  if (pipe.category !== 'pipe' && pipe.category !== 'tray') return [];
   const level = building.levels[pipe.levelId];
   return level ? pipe.points.map((point) => atLevel(level, point)) : [];
 }
@@ -210,9 +226,11 @@ function connected(
   boxA: OrientedBox,
   boxB: OrientedBox,
 ): boolean {
-  if (a.category === 'pipe' && b.category === 'pipe') {
+  const runSize = (run: BuildingElement): number =>
+    run.category === 'pipe' ? run.diameter : run.category === 'tray' ? run.width : 0;
+  if (a.category === b.category && (a.category === 'pipe' || a.category === 'tray')) {
     const [pointsA, pointsB] = [pipeWorldPoints(building, a), pipeWorldPoints(building, b)];
-    const tolerance = Math.max(a.diameter, b.diameter);
+    const tolerance = Math.max(runSize(a), runSize(b));
     return (
       pipeEnds(pointsA).some((point) => distanceToPolyline(point, pointsB) <= tolerance) ||
       pipeEnds(pointsB).some((point) => distanceToPolyline(point, pointsA) <= tolerance)
@@ -272,7 +290,12 @@ export function findClashes(
       ],
     };
     for (const other of solids) {
-      if (other.elementId === solid.elementId || other.category === 'pipe') continue;
+      if (
+        other.elementId === solid.elementId ||
+        other.category === 'pipe' ||
+        other.category === 'tray'
+      )
+        continue;
       if (
         other.category !== 'equipment' &&
         other.category !== 'member' &&
@@ -310,9 +333,9 @@ export const checkClashes: CommandDefinition<CheckClashesParams> = {
   name: 'check_clashes',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, equipment, steel ' +
+    'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel ' +
     'members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. ' +
-    'Steel-to-steel joints and pipe connections (a pipe end inside equipment, or on another pipe) are not ' +
+    'Steel-to-steel joints and run connections (a pipe end inside equipment, a pipe / tray ending on another) are not ' +
     'reported. Returns element ids, kind and penetration depth (document units; summary in mm).',
   paramsSchema: {
     type: 'object',

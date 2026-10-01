@@ -261,4 +261,30 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       });
     },
   },
+  {
+    id: 'tray',
+    label: 'Cable tray',
+    group: GROUP,
+    fields: [
+      {
+        key: 'points',
+        label: 'Route x,y,z; …',
+        kind: 'text',
+        defaultValue: '2000,4000,5000; 20000,4000,5000',
+      },
+      num('width', 'Width', '300'),
+      num('height', 'Side height', '60'),
+      { key: 'system', label: 'System', kind: 'text', defaultValue: 'power' },
+    ],
+    build: (values, context) => {
+      const reader = new FieldReader(values);
+      return result(reader, 'add_cable_tray', {
+        points: reader.pointList('points', 2),
+        width: reader.number('width'),
+        height: reader.number('height'),
+        system: reader.text('system') || undefined,
+        ...onLevel(context),
+      });
+    },
+  },
 ];

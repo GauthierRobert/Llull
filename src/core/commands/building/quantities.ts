@@ -18,6 +18,7 @@ import { getBuilding, lengthOf, toMetres } from './model';
 import { openingsOf, wallExtent } from './evaluate';
 import { findProfile } from './steel/profiles';
 import { polygonNormal } from './industrial/evaluate';
+import { trayLength } from './industrial/trays';
 
 export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
@@ -283,6 +284,16 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       scale.length(pipeLength(pipe)),
     );
   }
+  for (const tray of elementsOf(building, 'tray')) {
+    const size = `${tray.width}×${tray.height}`;
+    takeoff.add(
+      'tray',
+      `${tray.system} ${size}`,
+      'm',
+      `Cable tray ${tray.system} ${size} — length`,
+      scale.length(trayLength(tray)),
+    );
+  }
   return takeoff.result();
 }
 
@@ -333,7 +344,8 @@ export type ScheduleKind =
   | 'footing'
   | 'panel'
   | 'equipment'
-  | 'pipe';
+  | 'pipe'
+  | 'tray';
 
 export interface Schedule {
   readonly kind: ScheduleKind;
@@ -624,6 +636,28 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           round(scale.length(pipeLength(pipe)), 2),
           Math.max(0, pipe.points.length - 2),
           levelName(building, pipe.levelId),
+        ]),
+      };
+    case 'tray':
+      return {
+        kind,
+        columns: [
+          'Mark',
+          'System',
+          `Width (${unit})`,
+          `Height (${unit})`,
+          'Length (m)',
+          'Bends',
+          'Level',
+        ],
+        rows: elementsOf(building, 'tray').map((tray) => [
+          tray.mark,
+          tray.system,
+          tray.width,
+          tray.height,
+          round(scale.length(trayLength(tray)), 2),
+          Math.max(0, tray.points.length - 2),
+          levelName(building, tray.levelId),
         ]),
       };
   }

@@ -50,6 +50,7 @@ import {
   evaluateMember,
   evaluatePanel,
   evaluatePipe,
+  evaluateTray,
 } from './industrial/evaluate';
 
 import {
@@ -548,6 +549,8 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluateEquipment(leveled, level);
     case 'pipe':
       return evaluatePipe(leveled, level);
+    case 'tray':
+      return evaluateTray(context.doc, leveled, level);
   }
 }
 

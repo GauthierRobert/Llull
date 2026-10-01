@@ -22,6 +22,7 @@ const CATEGORIES: ReadonlySet<string> = new Set([
   'panel',
   'equipment',
   'pipe',
+  'tray',
 ]);
 
 /** Numeric fields each category must carry (finite numbers). */
@@ -40,6 +41,7 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   panel: ['thickness'],
   equipment: ['angle', 'clearance', 'weight'],
   pipe: ['diameter'],
+  tray: ['width', 'height'],
 };
 
 /** Fields that must be strictly positive. */
@@ -54,6 +56,7 @@ const POSITIVE: Readonly<Record<string, ReadonlyArray<string>>> = {
   footing: ['width', 'length', 'thickness'],
   panel: ['thickness'],
   pipe: ['diameter'],
+  tray: ['width', 'height'],
 };
 
 /** Plan-point fields each category must carry. */
@@ -72,6 +75,7 @@ const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
   panel: [],
   equipment: ['location'],
   pipe: [],
+  tray: [],
 };
 
 const isPoint = (value: unknown): boolean =>
@@ -170,6 +174,7 @@ function elementErrors(
     panel: ['material'],
     equipment: ['name'],
     pipe: ['service', 'material'],
+    tray: ['system'],
   };
   for (const field of textFields[category] ?? []) {
     if (typeof element[field] !== 'string') {
@@ -181,7 +186,8 @@ function elementErrors(
     ['points', 2],
   ] as const) {
     const expected =
-      (category === 'panel' && field === 'corners') || (category === 'pipe' && field === 'points');
+      (category === 'panel' && field === 'corners') ||
+      ((category === 'pipe' || category === 'tray') && field === 'points');
     const value = element[field];
     if (expected && !(Array.isArray(value) && value.length >= minimum && value.every(isPoint3))) {
       errors.push(`building element ${key}: ${field} must be ≥ ${minimum} [x, y, z] points`);

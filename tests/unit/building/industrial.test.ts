@@ -796,3 +796,133 @@ describe('multi-span halls', () => {
     );
   });
 });
+
+describe('add_cable_tray', () => {
+  function trayDoc(): CadDocument {
+    return execute(createEmptyDocument(), 'add_cable_tray', {
+      points: [
+        [0, 0, 4000],
+        [6000, 0, 4000],
+        [6000, 3000, 4000],
+      ],
+      width: 400,
+      height: 100,
+      system: 'data',
+    }).document;
+  }
+
+  it('routes a U-section tray and reports its length', () => {
+    const before = createEmptyDocument();
+    const snapshot = JSON.stringify(before);
+    const result = execute(before, 'add_cable_tray', {
+      points: [
+        [0, 0, 4000],
+        [6000, 0, 4000],
+        [6000, 3000, 4000],
+      ],
+      width: 400,
+      height: 100,
+      system: 'data',
+    });
+    expect(JSON.stringify(before)).toBe(snapshot);
+    expect(result.summary).toBe('Added data cable tray CT1 (tray-1) 400×100, 9.00 m.');
+    expect(result.affected[0]).toBe('tray-1');
+    expect(element(result.document, 'tray-1').entityIds).toEqual([
+      'tray-1:segment-0',
+      'tray-1:segment-1',
+    ]);
+    expect(result.document.entities['tray-1:segment-0']?.layerId).toBeDefined();
+    const defaults = execute(createEmptyDocument(), 'add_cable_tray', {
+      points: [
+        [0, 0],
+        [1000, 0],
+      ],
+    });
+    expect(element(defaults.document, 'tray-1')).toMatchObject({
+      width: 300,
+      height: 60,
+      system: 'power',
+    });
+  });
+
+  it.each([
+    [{ points: [[0, 0, 0]] }],
+    [
+      {
+        points: [
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
+      },
+    ],
+    [
+      {
+        points: [
+          [0, 0, 0],
+          [1, 0, 0],
+        ],
+        width: 0,
+      },
+    ],
+    [
+      {
+        points: [
+          [0, 0, 0],
+          [1, 0, 0],
+        ],
+        levelId: 'nope',
+      },
+    ],
+    [{ points: 'x' }],
+  ])('rejects %j', (params) => {
+    const result = execute(createEmptyDocument(), 'add_cable_tray', params);
+    expect(result.affected).toEqual([]);
+    expect(result.summary).toMatch(/add_cable_tray failed/);
+  });
+
+  it('feeds takeoff, schedule, plan, IFC, clashes and survives save / load', () => {
+    let doc = trayDoc();
+    const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
+    expect(lines.find((line) => line.key === 'tray.data 400×100.m')?.quantity).toBeCloseTo(9);
+    const schedule = execute(doc, 'building_schedule', { kind: 'tray' }).data as {
+      rows: unknown[][];
+    };
+    expect(schedule.rows).toEqual([['CT1', 'data', 400, 100, 9, 1, 'Level 0']]);
+    const plan = buildPlanDrawing(doc, undefined)!;
+    const edges = plan.primitives.filter((p) => p.type === 'polyline' && p.layer === 'E-TRAY');
+    expect(edges).toHaveLength(2);
+    expect(edges[0]?.type === 'polyline' && edges[0].points[1]).toEqual([5800, 200]);
+    expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toContain('.CABLETRAYSEGMENT.');
+    // A tee into the run is a connection; a beam through it is a clash.
+    doc = run(doc, 'add_cable_tray', {
+      points: [
+        [3000, 0, 4000],
+        [3000, -5000, 4000],
+      ],
+    });
+    expect(execute(doc, 'check_clashes', {}).summary).toBe('No clashes found.');
+    doc = run(doc, 'add_steel_member', {
+      profile: 'IPE300',
+      start: [1000, -2000, 4000],
+      end: [1000, 2000, 4000],
+    });
+    expect(execute(doc, 'check_clashes', {}).summary).toMatch(/1 hard clash.*SB1 × CT1|CT1 × SB1/);
+    const loaded = execute(createEmptyDocument(), 'load_document', {
+      json: serializeDocument(doc),
+    });
+    expect(loaded.document.building?.elements['tray-1']).toEqual(doc.building?.elements['tray-1']);
+    expect(buildingErrors(doc.building)).toEqual([]);
+  });
+
+  it('moves with move_building_element', () => {
+    let doc = trayDoc();
+    doc = run(doc, 'move_building_element', { elementIds: ['tray-1'], delta: [1000, 0] });
+    expect(element(doc, 'tray-1').category === 'tray' && element(doc, 'tray-1')).toMatchObject({
+      points: [
+        [1000, 0, 4000],
+        [7000, 0, 4000],
+        [7000, 3000, 4000],
+      ],
+    });
+  });
+});

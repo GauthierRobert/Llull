@@ -34,6 +34,7 @@ const SCHEDULES = [
   'panel',
   'equipment',
   'pipe',
+  'tray',
 ] as const;
 
 interface EstimateData {

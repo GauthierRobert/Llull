@@ -345,12 +345,35 @@ function stairPrimitives(
   return primitives;
 }
 
+/** Both edges of a plan polyline offset by ±`half` (mitred at the bends). */
+function offsetPolyline(points: ReadonlyArray<Vec2>, half: number): Vec2[][] {
+  const normalOf = (a: Vec2, b: Vec2): Vec2 => {
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [-(b[1] - a[1]) / length, (b[0] - a[0]) / length];
+  };
+  return [1, -1].map((side) =>
+    points.map((point, index): Vec2 => {
+      const previous = points[index - 1];
+      const next = points[index + 1];
+      const before = previous ? normalOf(previous, point) : null;
+      const after = next ? normalOf(point, next) : null;
+      const [nx, ny] =
+        before && after
+          ? [before[0] + after[0], before[1] + after[1]]
+          : ((before ?? after ?? [0, 0]) as Vec2);
+      const along = before && after ? 1 + before[0] * after[0] + before[1] * after[1] : 1;
+      const factor = (side * half) / (before && after ? Math.max(along, 0.2) : 1);
+      return [point[0] + nx * factor, point[1] + ny * factor];
+    }),
+  );
+}
+
 /** Plan symbols of industrial elements (cut at `cutHeight` above the level). */
 function industrialPrimitives(
   doc: PlanSource,
   element: Extract<
     BuildingElement,
-    { category: 'member' | 'footing' | 'panel' | 'equipment' | 'pipe' }
+    { category: 'member' | 'footing' | 'panel' | 'equipment' | 'pipe' | 'tray' }
   >,
   cutHeight: number,
 ): PlanPrimitive[] {
@@ -481,6 +504,24 @@ function industrialPrimitives(
         },
       ];
     }
+    case 'tray': {
+      const points = element.points.map(flat);
+      const layer = layerName('tray');
+      const [a, b] = [points[0] as Vec2, points[1] as Vec2];
+      return [
+        ...offsetPolyline(points, element.width / 2).map(
+          (side): PlanPrimitive => ({ type: 'polyline', layer, style: 'hidden', points: side }),
+        ),
+        {
+          type: 'text',
+          layer,
+          style: 'annotation',
+          at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + element.width / 2 + fromMm(doc, 150)],
+          height: fromMm(doc, 180),
+          content: `${element.mark} ${element.system} ${element.width}×${element.height}`,
+        },
+      ];
+    }
   }
 }
 
@@ -578,6 +619,7 @@ export function buildPlanDrawing(
       case 'panel':
       case 'equipment':
       case 'pipe':
+      case 'tray':
         primitives.push(...industrialPrimitives(doc, element, cutHeight));
         break;
       case 'room': {

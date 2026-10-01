@@ -74,6 +74,7 @@ const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string
   panel: 'CL',
   equipment: 'EQ',
   pipe: 'PL',
+  tray: 'CT',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */

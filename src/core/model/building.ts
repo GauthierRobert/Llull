@@ -24,7 +24,8 @@ export type BimCategory =
   | 'footing'
   | 'panel'
   | 'equipment'
-  | 'pipe';
+  | 'pipe'
+  | 'tray';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -216,6 +217,18 @@ export interface PipeElement extends ElementBase {
   material: string;
 }
 
+/** A cable tray run through 3D points (z = tray centre, relative to the level). */
+export interface CableTrayElement extends ElementBase {
+  readonly category: 'tray';
+  levelId: string;
+  points: Vec3[];
+  width: number;
+  /** Side height of the U section. */
+  height: number;
+  /** Cable system, e.g. "power", "data", "instrumentation". */
+  system: string;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -229,7 +242,8 @@ export type BuildingElement =
   | FootingElement
   | PanelElement
   | EquipmentElement
-  | PipeElement;
+  | PipeElement
+  | CableTrayElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */

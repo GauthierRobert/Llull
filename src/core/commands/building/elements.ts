@@ -228,6 +228,7 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'panel':
       return { ...element, corners: element.corners.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
     case 'pipe':
+    case 'tray':
       return { ...element, points: element.points.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
     case 'door':
     case 'window':
@@ -350,6 +351,7 @@ const COPYABLE = [
   'panel',
   'equipment',
   'pipe',
+  'tray',
 ] as const;
 
 /**
