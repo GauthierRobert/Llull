@@ -76,7 +76,7 @@ describe('check_crane_runways', () => {
     const doc = hall();
     const s2 = find(rowsOf(doc, { craneClass: 'S2' }), 'fatigue').utilisation;
     const s4 = find(rowsOf(doc, { craneClass: 'S4' }), 'fatigue').utilisation;
-    expect(s4 / s2).toBeCloseTo(0.794 / 0.397, 1);
+    expect(s4 / s2).toBeCloseTo(0.5 / 0.315, 2);
   });
 
   it('increases moment with a short wheelBase and uses single-wheel PL/4 when long', () => {
@@ -141,5 +141,18 @@ describe('check_crane_runways', () => {
     expect(result.summary).toMatch(/no crane runway beam/);
     const empty = createEmptyDocument();
     expect(runwayCheck.run(empty, {}).summary).toMatch(/failed/);
+  });
+});
+
+describe('metre documents', () => {
+  it('gives the same utilisations in a document drawn in metres', () => {
+    const metres = execute({ ...createEmptyDocument(), units: 'm' }, 'add_portal_frame_building', {
+      span: 24,
+      length: 30,
+      crane: { capacity: 10, railHeight: 6 },
+    }).document;
+    const max = (doc: CadDocument): number =>
+      (runwayCheck.run(doc, {}).data as { maxUtilisation: number }).maxUtilisation;
+    expect(max(metres)).toBeCloseTo(max(hall()), 6);
   });
 });

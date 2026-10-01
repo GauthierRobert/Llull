@@ -47,7 +47,8 @@ const DEFLECTION_RATIO = 600;
 const FATIGUE_PHI = 1.05;
 const FATIGUE_CATEGORY = 71; // N/mm²
 const GAMMA_MF = 1.15;
-const CLASSES: Readonly<Record<CraneClass, number>> = { S2: 0.397, S3: 0.575, S4: 0.794 };
+/** Damage-equivalent factors λ for normal stresses (EN 1991-3 Tab. 2.12). */
+const CLASSES: Readonly<Record<CraneClass, number>> = { S2: 0.315, S3: 0.397, S4: 0.5 };
 
 /** Maximum moment (N·mm) of two wheel loads P at spacing a on a simply supported span L. */
 export function wheelMoment(load: number, spacing: number, span: number): number {
@@ -183,8 +184,8 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     'flange only (Wpl,z/2), and shear; (2) ltb - χLT from Mcr (C1 = 1.13, Lcr = span, I-sections ' +
     'only, 0.85 Mcr for the top-flange load application); (3) SLS EN 1993-6 §7.3 - vertical and ' +
     'lateral deflection <= L/600 under characteristic wheel loads (P / 1.15, two-wheel exact ' +
-    'midspan formula); (4) fatigue EN 1993-1-9 - ΔσE2 = λ φfat Δσ at the bottom flange, λ = 0.397 / ' +
-    '0.575 / 0.794 for class S2 / S3 / S4, φfat 1.05, detail category 71, γMf 1.15, γFf 1.0. ' +
+    'midspan formula); (4) fatigue EN 1993-1-9 - ΔσE2 = λ φfat Δσ at the bottom flange, λ = 0.315 / ' +
+    '0.397 / 0.500 (normal stresses, EN 1991-3 Tab. 2.12) for class S2 / S3 / S4, φfat 1.05, detail category 71, γMf 1.15, γFf 1.0. ' +
     'Utilisation > 1 fails. Not covered: local web / rail effects, torsion, continuity, ' +
     'connections - not a substitute for the engineer of record.',
   paramsSchema: {

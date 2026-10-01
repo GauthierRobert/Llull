@@ -33,12 +33,19 @@ const CHECKS = [
   { command: 'check_crane_runways', label: 'Runways', testId: 'runway-check' },
 ] as const;
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null;
+}
+
 function toReportRows(data: unknown): ReportRow[] {
-  const rows = (data as { rows?: unknown } | undefined)?.rows;
+  const rows: unknown = isRecord(data) ? data.rows : undefined;
   if (!Array.isArray(rows)) return [];
-  return rows.flatMap((row: Record<string, unknown>, index): ReportRow[] => {
-    const text = (key: string): string => (typeof row[key] === 'string' ? row[key] : '');
-    if (typeof row.utilisation !== 'number') return [];
+  return rows.flatMap((row: unknown, index): ReportRow[] => {
+    if (!isRecord(row) || typeof row.utilisation !== 'number') return [];
+    const text = (key: string): string => {
+      const value = row[key];
+      return typeof value === 'string' ? value : '';
+    };
     const label = [text('mark') || text('column'), text('kind') || text('check'), text('frame')]
       .filter((part) => part !== '')
       .join(' · ');

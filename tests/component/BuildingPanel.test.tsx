@@ -230,4 +230,25 @@ describe('BuildingPanel', () => {
       windPressure: 0.6,
     });
   });
+
+  it('runs the bracing, foundation and crane runway checks', () => {
+    localDispatch('add_portal_frame_building', {
+      span: 18000,
+      length: 12000,
+      cladding: false,
+      crane: { capacity: 5, railHeight: 5000 },
+    });
+    render(<BuildingPanel />);
+    const summary = (): HTMLElement => screen.getByTestId('frame-check-summary');
+    fireEvent.click(screen.getByTestId('bracing-check'));
+    expect(summary()).toHaveTextContent(/^Bracing check/);
+    fireEvent.click(screen.getByTestId('foundation-check'));
+    expect(summary()).toHaveTextContent(/^Checked \d+ footing\(s\)/);
+    fireEvent.click(screen.getByTestId('runway-check'));
+    expect(summary()).toHaveTextContent(/crane runway beam\(s\)/);
+    const rows = screen.getAllByTestId('frame-check-row');
+    expect(rows[0]).toHaveTextContent(/^(OK|FAIL)CB\d+/);
+    fireEvent.click(rows[0]!);
+    expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
+  });
 });
