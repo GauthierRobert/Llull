@@ -155,6 +155,22 @@ describe('export_anchor_plan', () => {
     expect(Math.min(...horizontalRuns.map((run) => Number(run[1])))).toBeLessThanOrEqual(top - 8);
   });
 
+  it('still dimensions the bolt spacing for an odd bolt count', () => {
+    const doc = hall();
+    const building = doc.building;
+    if (!building) throw new Error('no building');
+    const elements = { ...building.elements };
+    for (const [id, element] of Object.entries(elements)) {
+      if (element.category === 'plate') elements[id] = { ...element, boltCount: 5 };
+    }
+    const odd = { ...doc, building: { ...building, elements } };
+    const withOdd = anchorPlan.run(odd, {}).data as AnchorData;
+    const dims = (svg: string): number => svg.match(/class="dim"/g)?.length ?? 0;
+    const baseline = anchorPlan.run(hall(), {}).data as AnchorData;
+    expect(dims(withOdd.svg)).toBe(dims(baseline.svg));
+    expect(withOdd.boltCount).toBe(withOdd.svg.match(/<circle /g)?.length);
+  });
+
   it('is a graceful no-op without plates', () => {
     const doc = createEmptyDocument();
     const result = anchorPlan.run(doc, {});

@@ -493,7 +493,7 @@ export const exportAnchorPlan: CommandDefinition<AnchorPlanParams> = {
       }
       // Bolt spacing of the first (typical) group.
       if (index === 0) {
-        const perRow = Math.max(1, plate.boltCount / 2);
+        const perRow = Math.max(1, Math.floor(placed.bolts.length / 2));
         const [first, second, across] = [placed.bolts[0], placed.bolts[1], placed.bolts[perRow]];
         if (first && second && perRow > 1) {
           canvas.dimension(
