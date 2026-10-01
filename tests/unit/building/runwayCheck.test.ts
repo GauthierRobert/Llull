@@ -7,6 +7,7 @@ import {
   wheelShear,
   type RunwayCheckRow,
 } from '@core/commands/building/industrial/runwayCheck';
+import { craneActions } from '@core/commands/building/industrial/frameModel';
 import { __resetIdCounter } from '@lib/id';
 
 function hall(capacity = 10): CadDocument {
@@ -43,8 +44,8 @@ describe('check_crane_runways', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(data.failures).toEqual([]);
-    expect(data.rows.length % 6).toBe(0);
-    for (const kind of ['strength', 'ltb', 'deflection', 'fatigue']) {
+    expect(data.rows.length % 8).toBe(0);
+    for (const kind of ['strength', 'ltb', 'deflection', 'fatigue', 'local']) {
       expect(data.rows.some((row) => row.kind === kind)).toBe(true);
     }
     expect(find(data.rows, 'deflection', 'vertical').unit).toBe('mm');
@@ -141,6 +142,59 @@ describe('check_crane_runways', () => {
     expect(result.summary).toMatch(/no crane runway beam/);
     const empty = createEmptyDocument();
     expect(runwayCheck.run(empty, {}).summary).toMatch(/failed/);
+  });
+});
+
+describe('local wheel stresses (EN 1993-6 §5.7.1)', () => {
+  const stress = (rows: RunwayCheckRow[]): RunwayCheckRow => find(rows, 'local', 'σoz');
+  const fatigue = (rows: RunwayCheckRow[]): RunwayCheckRow => find(rows, 'local', 'fatigue');
+
+  it('matches a hand calculation for HEB300 + A55', () => {
+    const rows = rowsOf(hall());
+    expect(rows[0]?.profile).toBe('HEB300');
+    // beff = min(300, 55+65+19) = 139; If = 139*19^3/12; Irf = 0.75*1.78e6 + If; leff = 3.25 (Irf/11)^(1/3)
+    const irf = 0.75 * 1.78e6 + (139 * 19 ** 3) / 12;
+    const leff = 3.25 * (irf / 11) ** (1 / 3);
+    expect(leff).toBeCloseTo(164.1, 0);
+    const wheel = craneActions(10).max / 2;
+    const sigma = (1.35 * wheel) / (leff * 11);
+    expect(stress(rows).value).toBeCloseTo(sigma, 1);
+    expect(stress(rows).limit).toBe(355);
+    expect(stress(rows).check).toContain('leff 164 mm');
+    expect(stress(rows).check).toContain('EN 1993-6 §5.7.1');
+  });
+
+  it('lowers σoz with a heavier rail', () => {
+    const doc = hall();
+    const light = stress(rowsOf(doc, { railSize: 'flat50x30' })).value;
+    const heavy = stress(rowsOf(doc, { railSize: 'A100' })).value;
+    expect(heavy).toBeLessThan(light);
+  });
+
+  it('uses category 71 when welded, raising the local fatigue utilisation', () => {
+    const doc = hall();
+    const rolled = fatigue(rowsOf(doc));
+    const welded = fatigue(rowsOf(doc, { welded: true }));
+    expect(rolled.check).toContain('cat 160');
+    expect(welded.check).toContain('cat 71');
+    expect(welded.utilisation / rolled.utilisation).toBeCloseTo(160 / 71, 1);
+  });
+
+  it('passes the local checks for a 32 t crane on HEB300 (the beam fails elsewhere)', () => {
+    // 32 t: σoz ≈ 158 N/mm² vs fy 355 (util ~0.45): the 11 mm web is not governing; LTB is.
+    const rows = rowsOf(hall(), { craneCapacity: 32 });
+    expect(stress(rows).utilisation).toBeGreaterThan(0.4);
+    expect(stress(rows).utilisation).toBeLessThan(1);
+    expect(fatigue(rows).utilisation).toBeLessThan(1);
+    expect(find(rows, 'ltb').utilisation).toBeGreaterThan(1);
+  });
+
+  it('is a no-op for a bad railSize', () => {
+    const doc = hall();
+    const result = runwayCheck.run(doc, { railSize: 'X9' as 'A55' });
+    expect(result.document).toBe(doc);
+    expect(result.data).toBeUndefined();
+    expect(result.summary).toMatch(/^check_crane_runways failed: railSize/);
   });
 });
 
