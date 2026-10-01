@@ -521,7 +521,8 @@ export const FRAME_LOAD_PROPERTIES = {
     type: 'number',
     description:
       'Peak velocity pressure qp, kN/m² (EN 1991-1-4; e.g. 0.6–1.0). Default 0 = wind not applied. ' +
-      'Coefficients: walls cpe +0.8 / −0.5, roof −0.6, each with internal pressure cpi +0.2 and −0.3.',
+      'Coefficients: walls cpe +0.8 / −0.5, roof −0.6 (monopitch roofs, EN 1991-1-4 Tab. 7.3a zone H: −0.6 with ' +
+      'wind on the low eaves, −0.8 on the high eaves), each with internal pressure cpi +0.2 and −0.3.',
   },
   craneCapacity: {
     type: 'number',

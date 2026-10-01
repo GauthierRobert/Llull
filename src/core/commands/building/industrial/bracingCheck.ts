@@ -331,13 +331,17 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       const atWall = panel.roof && (near(xLow, x0) || near(xHigh, x1));
       if (atWall) {
         const wallX = near(xLow, x0) ? x0 : x1;
+        // Eaves level of this wall (monopitch: the low and the high eaves differ).
+        const eavesZ = Math.min(
+          ...rafterEnds.filter((point) => near(point[0], wallX)).map((point) => point[2]),
+        );
         const eavesStrut = members.find(
           ({ member: candidate, start: s, end: e }) =>
             candidate.role === 'purlin' &&
             Math.abs(s[0] - wallX) < EAVES_X_TOLERANCE &&
             near(Math.min(s[1], e[1]), bayStart) &&
             near(Math.max(s[1], e[1]), bayEnd) &&
-            Math.abs(s[2] - Math.min(...rafterEnds.map((point) => point[2]))) < EAVES_Z_TOLERANCE,
+            Math.abs(s[2] - eavesZ) < EAVES_Z_TOLERANCE,
         );
         const reaction = bayForce / 2;
         const fyEaves = eavesStrut ? yieldStrength(eavesStrut.member.material) : 0;

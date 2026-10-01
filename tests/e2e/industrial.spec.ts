@@ -310,4 +310,28 @@ test.describe('industrial workflow', () => {
     // Moment bases need wider pads than the generated ones: the check reports the eccentric pressure.
     await expect(page.getByTestId('frame-check-summary')).toContainText('overturning EQU');
   });
+
+  test('I39 — a monopitch hall is generated, designed and checked', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', {
+      span: '24000',
+      length: '30000',
+      roofType: 'monopitch',
+      cladding: 'false',
+    });
+    await expect(status(page)).toContainText('eaves 7.00 m, high eaves 9.52 m');
+    await expect(status(page)).toContainText('monopitch roof');
+    await expect(elementRows(page, 'connection')).toHaveCount(12);
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.5');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s)');
+    await page.getByTestId('frame-check').click();
+    const summary = page.getByTestId('frame-check-summary');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('purlin-check').click();
+    await expect(summary).toContainText('Purlin check (qp 0.5 kN/m²');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('bracing-check').click();
+    await expect(summary).toContainText('all OK');
+  });
 });

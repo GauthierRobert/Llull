@@ -158,7 +158,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
       crane halls), carry base moments into `baseReactions`, size the base plate and anchor bolts
       for M + N (EN 1993-1-8 §6.2.8, T-stub tension zone simplified), and the footing checks /
       design take the moment (eccentric bearing, overturning).
-- [ ] **I39 — Monopitch roofs.** `add_portal_frame_building` `roofType: 'duopitch' | 'monopitch'`
+- [x] **I39 — Monopitch roofs.** `add_portal_frame_building` `roofType: 'duopitch' | 'monopitch'`
       (single slope from the low to the high eaves); wind with EN 1991-1-4 Tab. 7.3a monopitch
       coefficients (zones F / G / H for wind on the high and the low eaves) in the frame and purlin
       checks; elevations, IFC and quantities work unchanged.

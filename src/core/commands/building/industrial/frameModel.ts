@@ -113,6 +113,12 @@ export interface FrameLoads {
 /** Simplified external pressure coefficients (EN 1991-1-4: walls D / E, duopitch roof average). */
 export const WIND_COEFFICIENTS = { windward: 0.8, leeward: 0.5, roofSuction: 0.6 } as const;
 
+/**
+ * Monopitch roof suction per wind direction, EN 1991-1-4 Tab. 7.3a (pitch 5–15°), zone H as the
+ * frame average: θ = 0° (wind on the low eaves) H −0.6, θ = 180° (wind on the high eaves) H −0.8.
+ */
+export const MONOPITCH_ROOF_SUCTION = { lowEaves: 0.6, highEaves: 0.8 } as const;
+
 /** Crane capacity (t) from the runway note written by add_crane_runway ("Crane 10 t, …"). */
 export function craneCapacityOf(member: SteelMemberElement): number | null {
   const value = Number(/^Crane\s+(\d+(?:\.\d+)?)\s*t\b/.exec(member.note ?? '')?.[1]);
@@ -391,10 +397,28 @@ export function framesOf(
       // Roof loads per horizontal length, spread along the rafter.
       const perLength = (kN: number): number => (area(kN) * tributary * Math.abs(x1 - x0)) / length;
       const spanIndex = valleys.filter((valley) => valley < (x0 + x1) / 2).length;
-      const roofSuction = (windCase: WindCase): number =>
-        spanIndex === (windCase.from === 'left' ? 0 : valleys.length)
+      // A monopitch rafter has no partner meeting it at its high end (no apex).
+      const highEnd = (point: readonly number[], other: readonly number[]): boolean =>
+        (point[2] ?? 0) >= (other[2] ?? 0);
+      const sharesApex = candidate.rafters.some((other) => {
+        if (other.id === rafter.id) return false;
+        const [mine, theirs] = [
+          highEnd(rafter.start, rafter.end) ? rafter.start : rafter.end,
+          highEnd(other.start, other.end) ? other.start : other.end,
+        ];
+        return mine.every((value, axis) => near(mm(value), mm(theirs[axis] ?? 0)));
+      });
+      const risesRight = z1 > z0;
+      const roofSuction = (windCase: WindCase): number => {
+        if (!sharesApex) {
+          return (windCase.from === 'left') === risesRight
+            ? MONOPITCH_ROOF_SUCTION.lowEaves
+            : MONOPITCH_ROOF_SUCTION.highEaves;
+        }
+        return spanIndex === (windCase.from === 'left' ? 0 : valleys.length)
           ? WIND_COEFFICIENTS.roofSuction
           : DOWNWIND_ROOF_FACTOR * WIND_COEFFICIENTS.roofSuction;
+      };
       const stations = [x0, x1, ...purlins.filter((x) => x > x0 && x < x1)].sort((a, b) => a - b);
       const purlinGap = Math.max(
         ...stations.slice(1).map((x, index) => x - (stations[index] as number)),

@@ -52,6 +52,16 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('baySpacing', 'Bay spacing', '6000'),
       num('eaveHeight', 'Eave height', '7000'),
       num('roofPitch', 'Roof pitch (°)', '6'),
+      {
+        key: 'roofType',
+        label: 'Roof type',
+        kind: 'select',
+        defaultValue: 'duopitch',
+        options: [
+          ['duopitch', 'Duopitch'],
+          ['monopitch', 'Monopitch (low eaves left)'],
+        ],
+      },
       profileField('columnProfile', 'Columns', 'HEA400', true),
       profileField('rafterProfile', 'Rafters', 'IPE450', true),
       num('craneRailHeight', 'Crane rail height', '', true),
@@ -84,6 +94,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         baySpacing: reader.number('baySpacing'),
         eaveHeight: reader.number('eaveHeight'),
         roofPitch: reader.number('roofPitch'),
+        roofType: reader.text('roofType'),
         columnProfile: reader.text('columnProfile'),
         rafterProfile: reader.text('rafterProfile'),
         crane:

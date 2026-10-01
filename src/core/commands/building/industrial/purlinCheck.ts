@@ -28,6 +28,12 @@ const CPI_PRESSURE = 0.3;
 const CPE_ROOF = { F: -1.7, G: -1.2, 'H/I': -0.6 } as const;
 /** cpe,10 of the roof zones for wind along the ridge (θ = 90°, EN 1991-1-4 Tab. 7.4b, pitch 5-15 deg). */
 const CPE_ROOF_ALONG = { F: -1.6, G: -1.3, H: -0.7, I: -0.6 } as const;
+/** cpe,10 of the monopitch roof zones, pitch 5-15 deg (EN 1991-1-4 Tab. 7.3a): θ = 0° wind on the low eaves. */
+const CPE_MONOPITCH_LOW = { F: -1.7, G: -1.2, H: -0.6 } as const;
+/** Monopitch, θ = 180° (wind on the high eaves). */
+const CPE_MONOPITCH_HIGH = { F: -2.3, G: -1.3, H: -0.8 } as const;
+/** Monopitch, θ = 90° (wind along the slope's eaves). */
+const CPE_MONOPITCH_ALONG = { F: -1.6, G: -1.8, H: -0.6, I: -0.5 } as const;
 /** cpe,10 of the wall zones. */
 const CPE_WALL = { A: -1.2, B: -0.8, C: -0.5, D: 0.8 } as const;
 const PURLIN_DEFLECTION_RATIO = 200;
@@ -278,7 +284,9 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
     '-1.6 / G -1.3 / H -0.7 / I -0.6; F and G within e/10 of a gable, F within e/4 of the eaves, H up to ' +
     'e/2); multi-span halls (valleys between roofs, EN 1991-1-4 Fig. 7.10 simplified): spans between ' +
     'two valleys are downwind of the windward span for either wind direction and use zone H/I with ' +
-    'cpe × 0.6 for θ = 0°; the worst zone touching the member applies to its whole length. The ' +
+    'cpe × 0.6 for θ = 0°; monopitch halls (no ridge) use EN 1991-1-4 Tab. 7.3a instead: θ = 0° (wind on the low ' +
+    'eaves) F -1.7 / G -1.2 / H -0.6, θ = 180° (wind on the high eaves) F -2.3 / G -1.3 / H -0.8 with the zones ' +
+    'measured from the low / high eaves, θ = 90° F -1.6 / G -1.8 / H -0.6 / I -0.5; the worst zone touching the member applies to its whole length. The ' +
     'bottom flange is in compression: χLT from §6.3.2.3 for I sections with Lcr = span/2, simplified ' +
     'EN 1993-1-3 §10.1 value for cold-formed C sections (0.6 for spans > 6 m, else 0.75), assuming one ' +
     'row of anti-sag bars at mid-span; (3) shear; (4) deflection under characteristic dead + snow ≤ ' +
@@ -378,6 +386,20 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
         .filter(({ member }) => member.role === 'rafter')
         .map(({ start, end }) => ({ start, end })),
     );
+    // Monopitch hall: no two rafters meet at their high ends (no ridge).
+    const rafterHighEnds = members
+      .filter(({ member }) => member.role === 'rafter')
+      .map(({ start, end }) => (start[2] >= end[2] ? start : end));
+    const monopitch =
+      rafterHighEnds.length > 0 &&
+      rafterHighEnds.every(
+        (point, index) =>
+          !rafterHighEnds.some(
+            (other, otherIndex) =>
+              otherIndex !== index &&
+              Math.hypot(point[0] - other[0], point[1] - other[1], point[2] - other[2]) <= 10,
+          ),
+      );
     const width = x1 - x0;
     const depth = yEnd - y0;
     const eAcross = Math.min(depth, 2 * height);
@@ -426,6 +448,9 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
         const eavesEnd = slope.reduce((low, purlin) =>
           purlin.start[2] < low.start[2] ? purlin : low,
         );
+        const highEnd = slope.reduce((top, purlin) =>
+          purlin.start[2] > top.start[2] ? purlin : top,
+        );
         const gaps = slope.slice(1).map((purlin, index) => {
           const before = slope[index] as Located;
           return Math.hypot(purlin.start[0] - before.start[0], purlin.start[2] - before.start[2]);
@@ -470,10 +495,41 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
               ? 'H'
               : 'I';
           const acrossCpe = CPE_ROOF[acrossZone] * (downwindSpan ? DOWNWIND_ROOF_FACTOR : 1);
-          const [zone, cpe] =
+          let [zone, cpe, direction]: [string, number, string] =
             acrossCpe <= CPE_ROOF_ALONG[alongZone]
-              ? ([acrossZone, acrossCpe] as const)
-              : ([alongZone, CPE_ROOF_ALONG[alongZone]] as const);
+              ? [acrossZone, acrossCpe, '']
+              : [alongZone, CPE_ROOF_ALONG[alongZone], ''];
+          if (monopitch) {
+            const monopitchZone = (distance: number): 'F' | 'G' | 'H' =>
+              distance <= eAcross / 10 + TOLERANCE ? (nearGable(eAcross / 4) ? 'F' : 'G') : 'H';
+            const lowZone = monopitchZone(horizontalEaves);
+            const highZone = monopitchZone(Math.abs(purlin.start[0] - highEnd.start[0]));
+            const options = [
+              {
+                zone: lowZone,
+                cpe: CPE_MONOPITCH_LOW[lowZone],
+                direction: ' (θ = 0°, wind on the low eaves)',
+              },
+              {
+                zone: highZone,
+                cpe: CPE_MONOPITCH_HIGH[highZone],
+                direction: ' (θ = 180°, wind on the high eaves)',
+              },
+              {
+                zone: alongZone,
+                cpe: CPE_MONOPITCH_ALONG[alongZone],
+                direction: ' (θ = 90°, wind along the eaves)',
+              },
+            ];
+            const governingOption = options.reduce((worstCase, option) =>
+              option.cpe < worstCase.cpe ? option : worstCase,
+            );
+            [zone, cpe, direction] = [
+              governingOption.zone,
+              governingOption.cpe,
+              governingOption.direction,
+            ];
+          }
 
           const wind = windPressure * (Math.abs(cpe) + CPI_SUCTION) * trib;
           const gravityVerdicts = beamVerdicts(purlin.profile, fy, purlin.length, {
@@ -492,7 +548,7 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
             serviceabilityLabel: 'SLS',
             deflectionRatio: PURLIN_DEFLECTION_RATIO,
             reduction: freeFlangeReduction(purlin.profile, fy, purlin.length),
-            bendingLabel: `uplift bending zone ${zone} cpe ${cpe} (free flange, Lcr span/2)`,
+            bendingLabel: `uplift bending zone ${zone} cpe ${cpe}${direction} (free flange, Lcr span/2)`,
           });
           const worst = governing([...gravityVerdicts, ...uplift.slice(0, 2)]);
           rows.push({
@@ -648,6 +704,7 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
         maxUtilisation: worst?.utilisation ?? 0,
         failures: failures.map((row) => row.elementId),
         zones,
+        roofType: monopitch ? 'monopitch' : 'duopitch',
         edgeDistanceAcrossRidge: eAcross,
         edgeDistanceAlongRidge: eAlong,
       },
