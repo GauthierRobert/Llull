@@ -251,4 +251,23 @@ describe('BuildingPanel', () => {
     fireEvent.click(rows[0]!);
     expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
   });
+
+  it('exports the anchor bolt plan and the DSTV NC files of a hall', () => {
+    localDispatch('add_portal_frame_building', { span: 12000, length: 12000, cladding: false });
+    const createObjectURL = vi.fn(() => 'blob:x');
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    render(<BuildingPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Anchor plan' }));
+    expect(screen.getByTestId('building-export-status')).toHaveTextContent(
+      /^Anchor plan .*anchor bolt\(s\)/,
+    );
+    expect(click).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'NC files (DSTV)' }));
+    expect(screen.getByTestId('building-export-status')).toHaveTextContent(/^DSTV NC1: (\d+) file/);
+    expect(click.mock.calls.length).toBeGreaterThan(5);
+    click.mockRestore();
+  });
 });

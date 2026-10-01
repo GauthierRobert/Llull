@@ -2,7 +2,8 @@
  * @layer ui/panels/building
  *
  * BuildingExportsSection — downloads of the read-only exporters: DXF plan, IFC4 model, the
- * printable SVG plan sheet and elevation / section sheets (paper + scale). Presentation only.
+ * printable SVG plan sheet, elevation / section sheets and anchor bolt plan (paper + scale) and
+ * DSTV NC1 fabrication files (one download per part). Presentation only.
  */
 
 import React, { useState } from 'react';
@@ -39,6 +40,14 @@ export function BuildingExportsSection(): React.ReactElement {
     setStatus(result.summary);
   };
 
+  const exportNcFiles = (): void => {
+    const result = execute(document, 'export_nc_files', {});
+    const files = (result.data as { files?: ReadonlyArray<{ name: string; content: string }> })
+      ?.files;
+    for (const file of files ?? []) downloadText(file.content, file.name, 'text/plain');
+    setStatus(result.summary);
+  };
+
   return (
     <PanelSection title="Deliverables" collapsible testId="building-exports">
       <div className="building-inline-form">
@@ -72,6 +81,15 @@ export function BuildingExportsSection(): React.ReactElement {
           }
         >
           Plan sheet
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() =>
+            run('export_anchor_plan', { paper, ...scaleParams }, 'svg', 'image/svg+xml')
+          }
+        >
+          Anchor plan
         </button>
       </div>
       <div className="building-inline-form">
@@ -139,6 +157,9 @@ export function BuildingExportsSection(): React.ReactElement {
           onClick={() => run('export_ifc', {}, 'ifc', 'application/x-step')}
         >
           IFC (BIM)
+        </button>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={exportNcFiles}>
+          NC files (DSTV)
         </button>
       </div>
       {status !== '' && (
