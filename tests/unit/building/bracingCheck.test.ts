@@ -273,3 +273,64 @@ describe('check_bracing', () => {
     expect(q).toBeCloseTo(9, 1);
   });
 });
+
+describe('check_bracing crane longitudinal path', () => {
+  const crane = { crane: { capacity: 10, railHeight: 6000 } };
+  const wallDiagonals = (rows: BracingRow[]): BracingRow[] =>
+    rows.filter((row) => row.group.startsWith('wall bracing') && row.check.startsWith('tension'));
+  type CraneData = {
+    crane: {
+      design: number;
+      governing: string;
+      driveGroup1: number;
+      bufferGroup7: number;
+      foundationHorizontalY: { perColumn: number; total: number }[];
+    } | null;
+  };
+
+  it('raises the wall bracing utilisation versus a hall without a crane', () => {
+    const plain = wallDiagonals(rowsOf(hall()));
+    const craned = wallDiagonals(rowsOf(hall(crane)));
+    expect(plain.length).toBeGreaterThan(0);
+    expect(craned.length).toBe(plain.length);
+    expect(Math.max(...craned.map((row) => row.utilisation))).toBeGreaterThan(
+      Math.max(...plain.map((row) => row.utilisation)),
+    );
+    expect((checkBracing.run(hall(), {}).data as CraneData).crane).toBeNull();
+  });
+
+  it('reports the crane longitudinal rows and foundation forces', () => {
+    const result = checkBracing.run(hall(crane), {});
+    const data = result.data as CraneData;
+    const rows = (result.data as { rows: BracingRow[] }).rows;
+    const craneRows = rows.filter((row) =>
+      row.check.startsWith('crane longitudinal (group 1 / group 7)'),
+    );
+    expect(craneRows.length).toBeGreaterThanOrEqual(2);
+    expect(data.crane?.design).toBeCloseTo(
+      Math.max(data.crane?.driveGroup1 ?? 0, data.crane?.bufferGroup7 ?? 0),
+      9,
+    );
+    expect(data.crane?.bufferGroup7).toBeCloseTo(23.1, 0);
+    expect(data.crane?.governing).toBe('group 7');
+    expect(data.crane?.foundationHorizontalY.length).toBe(craneRows.length);
+    for (const entry of data.crane?.foundationHorizontalY ?? []) {
+      expect(entry.perColumn).toBeCloseTo(entry.total / 2, 9);
+    }
+  });
+
+  it('scales with travelSpeed and is a no-op on bad crane params', () => {
+    const doc = hall(crane);
+    const design = (travelSpeed: number): number =>
+      (checkBracing.run(doc, { travelSpeed }).data as CraneData).crane?.bufferGroup7 ?? 0;
+    expect(design(0.6) / design(0.3)).toBeCloseTo(2, 6);
+    for (const params of [{ travelSpeed: 0 }, { bufferStiffness: -5 }, { craneCapacity: 0 }]) {
+      const result = checkBracing.run(doc, params);
+      expect(result.document).toBe(doc);
+      expect(result.data).toBeUndefined();
+      expect(result.summary).toMatch(/failed/);
+    }
+    const override = checkBracing.run(hall(), { craneCapacity: 10 }).data as CraneData;
+    expect(override.crane).toBeNull();
+  });
+});

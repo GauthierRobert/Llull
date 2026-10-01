@@ -180,7 +180,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
       flat roofs (EN 1991-1-4 §7.2.3, pitch < 5°), monopitch Tab. 7.3a and duopitch Tab. 7.4a/b
       over −5°…45° with linear interpolation, including the positive-pressure cases on steep
       windward slopes; frame, purlin and bracing checks read from it.
-- [ ] **I44 — Longitudinal crane actions.** Drive forces HL (group 1), buffer forces HB (load
+- [x] **I44 — Longitudinal crane actions.** Drive forces HL (group 1), buffer forces HB (load
       group 7, EN 1991-3 §2.11, φ7) and the test load (group 8, φ6): runway end stops, runway
       beams in axial load, and the wall bracing of the crane bay (`check_bracing` adds the crane
       longitudinal force path to the foundations).
