@@ -22,6 +22,7 @@
 
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { revolutionPolygons } from '../geometry/revolution';
 import { computeSceneSnapshot } from './scene';
 import type { Bounds } from './scene';
 import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
@@ -476,66 +477,9 @@ function tessellateRevolution(e: {
   segments: number;
   color: string;
 }): PreDepthPolygon[] {
-  if (e.profile.length < 3) return [];
-  const { profile, angle, segments, color } = e;
-  const [px, py, pz] = e.position;
-  const [ax, ay, az] = e.axis;
-  const absX = Math.abs(ax), absY = Math.abs(ay), absZ = Math.abs(az);
-
-  // Map a [radial, axial] profile point to a 3D world point at a given sweep angle `theta`.
-  // Basis choice: for each primary axis, the radial plane is the two orthogonal axes.
-  function profileToWorld(r: number, a: number, theta: number): Vec3 {
-    const cosT = Math.cos(theta);
-    const sinT = Math.sin(theta);
-    if (absZ >= absX && absZ >= absY) {
-      // Z-axis revolution: axial=Z, radial sweeps in XY
-      return [px + r * cosT, py + r * sinT, pz + a];
-    } else if (absY >= absX) {
-      // Y-axis revolution: axial=Y, radial sweeps in XZ
-      return [px + r * cosT, py + a, pz + r * sinT];
-    } else {
-      // X-axis revolution: axial=X, radial sweeps in YZ
-      return [px + a, py + r * cosT, pz + r * sinT];
-    }
-  }
-
-  const n = profile.length;
-  const isFull = angle >= 2 * Math.PI - 1e-6;
-  const polys: PreDepthPolygon[] = [];
-
-  // Build rings: one ring per segment step (segments+1 total for open, segments for full).
-  const ringCount = isFull ? segments : segments + 1;
-  const rings: Vec3[][] = [];
-  for (let s = 0; s < ringCount; s++) {
-    const theta = (angle * s) / segments;
-    const ring: Vec3[] = [];
-    for (let i = 0; i < n; i++) {
-      const [r, a] = profile[i]!;
-      ring.push(profileToWorld(r, a, theta));
-    }
-    rings.push(ring);
-  }
-
-  // Stitch side quads between consecutive rings.
-  const numRings = rings.length;
-  for (let s = 0; s < segments; s++) {
-    const ringA = rings[s]!;
-    const ringB = rings[(s + 1) % numRings]!;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      polys.push(makePolygon([ringA[i]!, ringA[j]!, ringB[j]!, ringB[i]!], color));
-    }
-  }
-
-  // End caps for partial revolutions.
-  if (!isFull) {
-    // Start cap (theta=0): profile ring at s=0, winding reversed for outward normal.
-    polys.push(makePolygon([...rings[0]!].reverse(), color));
-    // End cap (theta=angle): profile ring at s=segments.
-    polys.push(makePolygon([...rings[segments]!], color));
-  }
-
-  return polys;
+  return revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position).map((vertices) =>
+    makePolygon(vertices, e.color),
+  );
 }
 
 /** Extrusion: closed XY profile at position, extruded +Z by depth. */

@@ -13,6 +13,7 @@ import { is3D } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { applyEulerXYZ } from './render';
 import { expandInstance } from './assemblies';
+import { revolutionTriangles } from '../geometry/revolution';
 import { SEG_CIRCLE, SEG_SPHERE_LAT, SEG_SPHERE_LON, SEG_TORUS_TUBE, circlePoints, earClipTriangulate } from './tessellation';
 
 // ---------------------------------------------------------------------------
@@ -327,15 +328,6 @@ function applyRotationToTriangles(tris: Triangle[], position: Vec3, rotation: Ve
   );
 }
 
-/**
- * Triangulate a surface of revolution (mirrors tessellateRevolution in render.ts,
- * outputting Triangle[] instead of PreDepthPolygon[]).
- *
- * Coordinate conventions match render.ts:
- *   Z-axis revolution: radial→X, axial→Z (default/Z-up)
- *   Y-axis revolution: radial→X, axial→Y
- *   X-axis revolution: radial→Y, axial→X
- */
 function triangulateRevolution(e: {
   position: Vec3;
   profile: ReadonlyArray<readonly [number, number]>;
@@ -344,58 +336,7 @@ function triangulateRevolution(e: {
   segments: number;
   rotation: Vec3;
 }): Triangle[] {
-  if (e.profile.length < 3) return [];
-  const { profile, angle, segments } = e;
-  const [px, py, pz] = e.position;
-  const [ax, ay, az] = e.axis;
-  const absX = Math.abs(ax), absY = Math.abs(ay), absZ = Math.abs(az);
-
-  function profileToWorld(r: number, a: number, theta: number): Vec3 {
-    const cosT = Math.cos(theta);
-    const sinT = Math.sin(theta);
-    if (absZ >= absX && absZ >= absY) {
-      return [px + r * cosT, py + r * sinT, pz + a];
-    } else if (absY >= absX) {
-      return [px + r * cosT, py + a, pz + r * sinT];
-    } else {
-      return [px + a, py + r * cosT, pz + r * sinT];
-    }
-  }
-
-  const n = profile.length;
-  const isFull = angle >= 2 * Math.PI - 1e-6;
-  const ringCount = isFull ? segments : segments + 1;
-  const rings: Vec3[][] = [];
-  for (let s = 0; s < ringCount; s++) {
-    const theta = (angle * s) / segments;
-    const ring: Vec3[] = [];
-    for (let i = 0; i < n; i++) {
-      const [r, a] = profile[i]!;
-      ring.push(profileToWorld(r, a, theta));
-    }
-    rings.push(ring);
-  }
-
-  const tris: Triangle[] = [];
-  const numRings = rings.length;
-
-  // Stitch side quads between consecutive rings → 2 triangles each
-  for (let s = 0; s < segments; s++) {
-    const ringA = rings[s]!;
-    const ringB = rings[(s + 1) % numRings]!;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      tris.push([ringA[i]!, ringA[j]!, ringB[j]!]);
-      tris.push([ringA[i]!, ringB[j]!, ringB[i]!]);
-    }
-  }
-
-  // End caps for partial revolutions
-  if (!isFull) {
-    tris.push(...fanTriangulate([...rings[0]!].reverse()));
-    tris.push(...fanTriangulate([...rings[segments]!]));
-  }
-
+  const tris = revolutionTriangles(e.profile, e.axis, e.angle, e.segments, e.position);
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 

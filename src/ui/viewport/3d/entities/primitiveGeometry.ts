@@ -7,6 +7,7 @@
  */
 
 import * as THREE from 'three';
+import { revolutionTriangles } from '@core/geometry/revolution';
 import { radialSegmentsForDiag, cylinderDiag, sphereDiag, torusDiag } from '../lodSegments';
 
 /** Cylinder: axis along +Z, centered at the origin. */
@@ -129,9 +130,7 @@ export function buildWedgeGeometry(w: number, h: number, d: number): THREE.Buffe
 
 /**
  * Surface of revolution in the entity-local frame (origin = entity.position, no axis quaternion).
- * Mirrors core triangulateRevolution (export.ts) / tessellateRevolution (render.ts) exactly:
- * theta = angle * s / segments from +X counter-clockwise; the dominant axis component picks
- * the frame (Z: radial XY / axial Z, Y: radial XZ / axial Y, X: radial YZ / axial X).
+ * Sampling comes from core/geometry/revolution (shared with export.ts + render.ts).
  */
 export function buildRevolutionGeometry(
   profile: ReadonlyArray<readonly [number, number]>,
@@ -141,42 +140,9 @@ export function buildRevolutionGeometry(
 ): THREE.BufferGeometry {
   const geo = new THREE.BufferGeometry();
   if (profile.length < 3) return geo;
-  const absX = Math.abs(axis[0]), absY = Math.abs(axis[1]), absZ = Math.abs(axis[2]);
-  const toLocal = (r: number, a: number, theta: number): [number, number, number] => {
-    const c = Math.cos(theta), s = Math.sin(theta);
-    if (absZ >= absX && absZ >= absY) return [r * c, r * s, a];
-    if (absY >= absX) return [r * c, a, r * s];
-    return [a, r * c, r * s];
-  };
-
-  const n = profile.length;
-  const isFull = angle >= 2 * Math.PI - 1e-6;
-  const ringCount = isFull ? segments : segments + 1;
-  const rings: Array<Array<[number, number, number]>> = [];
-  for (let s = 0; s < ringCount; s++) {
-    const theta = (angle * s) / segments;
-    rings.push(profile.map(([r, a]) => toLocal(r, a, theta)));
-  }
-
   const out: number[] = [];
-  const tri = (a: readonly number[], b: readonly number[], c: readonly number[]): void => {
-    out.push(a[0]!, a[1]!, a[2]!, b[0]!, b[1]!, b[2]!, c[0]!, c[1]!, c[2]!);
-  };
-  const fan = (ring: ReadonlyArray<readonly number[]>): void => {
-    for (let i = 1; i + 1 < ring.length; i++) tri(ring[0]!, ring[i]!, ring[i + 1]!);
-  };
-  for (let s = 0; s < segments; s++) {
-    const ringA = rings[s]!;
-    const ringB = rings[(s + 1) % rings.length]!;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      tri(ringA[i]!, ringA[j]!, ringB[j]!);
-      tri(ringA[i]!, ringB[j]!, ringB[i]!);
-    }
-  }
-  if (!isFull) {
-    fan([...rings[0]!].reverse());
-    fan(rings[segments]!);
+  for (const [a, b, c] of revolutionTriangles(profile, axis, angle, segments)) {
+    out.push(...a, ...b, ...c);
   }
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(out), 3));
   geo.computeVertexNormals();
