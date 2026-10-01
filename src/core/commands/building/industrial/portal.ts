@@ -225,6 +225,7 @@ export const addCraneRunway: CommandDefinition<AddCraneRunwayParams> = {
 interface PortalHallParams {
   origin?: Vec2;
   span?: number;
+  spans?: number[];
   length?: number;
   baySpacing?: number;
   eaveHeight?: number;
@@ -263,7 +264,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
   name: 'add_portal_frame_building',
   description:
     'Generate a pre-engineered steel hall (factory / warehouse) in one step: portal frames every baySpacing ' +
-    'along Y (columns + pitched rafters spanning X), gable posts, purlins and side rails, X-bracing in the ' +
+    'along Y (columns + pitched rafters spanning X; several spans side by side with spans: [...]), gable posts, purlins and side rails, X-bracing in the ' +
     'end bays (roof and walls), pad footings under every column, roof / wall / gable cladding, a ground ' +
     'slab and optionally an overhead crane runway on brackets. All sizes in document units, roofPitch in ' +
     'degrees. Defaults: 24 m span, 48 m long, 6 m bays, 7 m eaves, 6° roof, HEA400 columns, IPE450 rafters.',
@@ -278,6 +279,13 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       span: {
         type: 'number',
         description: 'Clear span between column axes (X). Default 24000 mm.',
+      },
+      spans: {
+        type: 'array',
+        items: { type: 'number' },
+        description:
+          'Multi-span hall: widths of side-by-side spans along X (internal columns on shared lines, ' +
+          'valley between roofs). Overrides span.',
       },
       length: { type: 'number', description: 'Hall length (Y). Default 48000 mm.' },
       baySpacing: {
@@ -316,13 +324,28 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
   run: (doc, params): CommandResult => {
     const mm = (value: number): number => fromMm(doc, value);
     const origin = params.origin ?? [0, 0];
-    const span = params.span ?? mm(24000);
+    const span = params.spans ? Math.max(...params.spans) : (params.span ?? mm(24000));
     const hallLength = params.length ?? mm(48000);
     const targetBay = params.baySpacing ?? mm(6000);
     const eave = params.eaveHeight ?? mm(7000);
     const pitchDegrees = params.roofPitch ?? 6;
     const purlinSpacing = params.purlinSpacing ?? mm(1800);
     const railSpacing = params.railSpacing ?? mm(1800);
+    if (
+      params.spans !== undefined &&
+      !(
+        Array.isArray(params.spans) &&
+        params.spans.length >= 1 &&
+        params.spans.length <= 10 &&
+        params.spans.every((width) => isFiniteNumber(width) && width > 0)
+      )
+    ) {
+      return noChange(
+        doc,
+        'add_portal_frame_building failed: spans must be 1–10 widths, each > 0.',
+      );
+    }
+    const spanCount = params.spans?.length ?? 1;
     const sizes = [span, hallLength, targetBay, eave, purlinSpacing, railSpacing];
     if (!isVec2(origin) || sizes.some((value) => !(isFiniteNumber(value) && value > 0))) {
       return noChange(
@@ -378,8 +401,8 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
     const pitch = (pitchDegrees * Math.PI) / 180;
     const estimatedMembers =
       bays *
-      (6 +
-        2 * (Math.ceil(span / 2 / Math.cos(pitch) / purlinSpacing) + 1) +
+      (6 * spanCount +
+        2 * spanCount * (Math.ceil(span / 2 / Math.cos(pitch) / purlinSpacing) + 1) +
         2 * Math.ceil(eave / railSpacing));
     if (estimatedMembers > MAX_GENERATED_MEMBERS) {
       return noChange(
@@ -387,62 +410,102 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         `add_portal_frame_building failed: about ${estimatedMembers} members — over the ${MAX_GENERATED_MEMBERS} limit; increase baySpacing, purlinSpacing or railSpacing.`,
       );
     }
-    const [x0, x1, xm] = [origin[0], origin[0] + span, origin[0] + span / 2];
+    const spanWidths = params.spans ?? [span];
+    const columnLines = spanWidths.reduce<number[]>(
+      (lines, width) => [...lines, (lines[lines.length - 1] as number) + width],
+      [origin[0]],
+    );
+    const spanBounds = spanWidths.map((_, index): readonly [number, number] => [
+      columnLines[index] as number,
+      columnLines[index + 1] as number,
+    ]);
+    const x0 = columnLines[0] as number;
+    const x1 = columnLines[columnLines.length - 1] as number;
+    const totalWidth = x1 - x0;
     const ys = Array.from({ length: bays + 1 }, (_, index) => origin[1] + index * bay);
-    const ridge = eave + (span / 2) * Math.tan(pitch);
+    const ridgeOf = ([a, b]: readonly [number, number]): number =>
+      eave + ((b - a) / 2) * Math.tan(pitch);
+    const ridge = Math.max(...spanBounds.map(ridgeOf));
+    /** Roof-line height above x (eave at the column lines, ridge mid-span). */
+    const roofLine = (x: number): number => {
+      const [a, b] =
+        spanBounds.find(([from, to]) => x >= from && x <= to) ??
+        (x < x0
+          ? (spanBounds[0] as readonly [number, number])
+          : (spanBounds[spanBounds.length - 1] as readonly [number, number]));
+      return eave + Math.min(x - a, b - x) * Math.tan(pitch);
+    };
     const y0 = ys[0] as number;
     const yEnd = ys[ys.length - 1] as number;
     const h = (profile: SteelProfile): number => mm(profile.h);
     const specs: MemberSpec[] = [];
 
-    // Portal frames.
+    // Portal frames: columns on every column line, a duo-pitch rafter pair per span.
     for (const y of ys) {
-      specs.push(
-        { role: 'column', profile: p.column.name, start: [x0, y, 0], end: [x0, y, eave] },
-        { role: 'column', profile: p.column.name, start: [x1, y, 0], end: [x1, y, eave] },
-        { role: 'rafter', profile: p.rafter.name, start: [x0, y, eave], end: [xm, y, ridge] },
-        { role: 'rafter', profile: p.rafter.name, start: [x1, y, eave], end: [xm, y, ridge] },
-      );
-    }
-    // Gable wind posts at both ends (≈ 6 m centres), up to the rafter underside.
-    const posts = Math.max(0, Math.ceil(span / mm(6000)) - 1);
-    for (const y of [y0, yEnd]) {
-      for (let index = 1; index <= posts; index++) {
-        const x = x0 + (span * index) / (posts + 1);
-        const roofZ =
-          eave + Math.min(x - x0, x1 - x) * Math.tan(pitch) - h(p.rafter) / 2 / Math.cos(pitch);
-        // Wind posts span out of the gable plane: strong axis along Y.
-        specs.push({
-          role: 'column',
-          profile: p.gable.name,
-          start: [x, y, 0],
-          end: [x, y, roofZ],
-          roll: Math.PI / 2,
-        });
+      for (const x of columnLines) {
+        specs.push({ role: 'column', profile: p.column.name, start: [x, y, 0], end: [x, y, eave] });
+      }
+      for (const bounds of spanBounds) {
+        const [a, b] = bounds;
+        const middle = (a + b) / 2;
+        specs.push(
+          {
+            role: 'rafter',
+            profile: p.rafter.name,
+            start: [a, y, eave],
+            end: [middle, y, ridgeOf(bounds)],
+          },
+          {
+            role: 'rafter',
+            profile: p.rafter.name,
+            start: [b, y, eave],
+            end: [middle, y, ridgeOf(bounds)],
+          },
+        );
       }
     }
-    // Purlins on both slopes, one per bay.
-    const slopeLength = span / 2 / Math.cos(pitch);
-    const purlinCount = Math.max(1, Math.ceil(slopeLength / purlinSpacing));
-    const lift = h(p.rafter) / 2 + h(p.purlin) / 2;
-    for (const side of [-1, 1] as const) {
-      const fromX = side === -1 ? x0 : x1;
-      for (let index = 0; index <= purlinCount; index++) {
-        const t = (index * slopeLength) / purlinCount;
-        const x = fromX - side * t * Math.cos(pitch) + side * lift * Math.sin(pitch);
-        const z = eave + t * Math.sin(pitch) + lift * Math.cos(pitch);
-        for (let j = 0; j < bays; j++) {
+    // Gable wind posts at both ends (≈ 6 m centres per span), up to the rafter underside.
+    for (const [a, b] of spanBounds) {
+      const posts = Math.max(0, Math.ceil((b - a) / mm(6000)) - 1);
+      for (const y of [y0, yEnd]) {
+        for (let index = 1; index <= posts; index++) {
+          const x = a + ((b - a) * index) / (posts + 1);
+          const roofZ = roofLine(x) - h(p.rafter) / 2 / Math.cos(pitch);
+          // Wind posts span out of the gable plane: strong axis along Y.
           specs.push({
-            role: 'purlin',
-            profile: p.purlin.name,
-            start: [x, ys[j] as number, z],
-            end: [x, ys[j + 1] as number, z],
-            roll: side === -1 ? pitch : -pitch,
+            role: 'column',
+            profile: p.gable.name,
+            start: [x, y, 0],
+            end: [x, y, roofZ],
+            roll: Math.PI / 2,
           });
         }
       }
     }
-    // Side rails, outboard of the columns.
+    // Purlins on both slopes of every span, one per bay.
+    const lift = h(p.rafter) / 2 + h(p.purlin) / 2;
+    for (const [a, b] of spanBounds) {
+      const slopeLength = (b - a) / 2 / Math.cos(pitch);
+      const purlinCount = Math.max(1, Math.ceil(slopeLength / purlinSpacing));
+      for (const side of [-1, 1] as const) {
+        const fromX = side === -1 ? a : b;
+        for (let index = 0; index <= purlinCount; index++) {
+          const t = (index * slopeLength) / purlinCount;
+          const x = fromX - side * t * Math.cos(pitch) + side * lift * Math.sin(pitch);
+          const z = eave + t * Math.sin(pitch) + lift * Math.cos(pitch);
+          for (let j = 0; j < bays; j++) {
+            specs.push({
+              role: 'purlin',
+              profile: p.purlin.name,
+              start: [x, ys[j] as number, z],
+              end: [x, ys[j + 1] as number, z],
+              roll: side === -1 ? pitch : -pitch,
+            });
+          }
+        }
+      }
+    }
+    // Side rails, outboard of the outer columns.
     const railOffset = h(p.column) / 2 + h(p.rail) / 2;
     for (let z = railSpacing; z < eave - railSpacing / 3; z += railSpacing) {
       for (const [x, roll] of [
@@ -460,14 +523,31 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         }
       }
     }
-    // X-bracing in the end bays: roof (each slope) and side walls.
+    // X-bracing in the end bays: every roof slope and both outer walls.
     const endBays = bays >= 3 ? [0, bays - 1] : [0];
     for (const j of endBays) {
       const [ya, yb] = [ys[j] as number, ys[j + 1] as number];
-      for (const [fromX] of [[x0], [x1]] as const) {
+      for (const bounds of spanBounds) {
+        const middle = (bounds[0] + bounds[1]) / 2;
+        for (const fromX of bounds) {
+          specs.push(
+            {
+              role: 'brace',
+              profile: p.brace.name,
+              start: [fromX, ya, eave],
+              end: [middle, yb, ridgeOf(bounds)],
+            },
+            {
+              role: 'brace',
+              profile: p.brace.name,
+              start: [fromX, yb, eave],
+              end: [middle, ya, ridgeOf(bounds)],
+            },
+          );
+        }
+      }
+      for (const fromX of [x0, x1]) {
         specs.push(
-          { role: 'brace', profile: p.brace.name, start: [fromX, ya, eave], end: [xm, yb, ridge] },
-          { role: 'brace', profile: p.brace.name, start: [fromX, yb, eave], end: [xm, ya, ridge] },
           { role: 'brace', profile: p.brace.name, start: [fromX, ya, 0], end: [fromX, yb, eave] },
           { role: 'brace', profile: p.brace.name, start: [fromX, yb, 0], end: [fromX, ya, eave] },
         );
@@ -478,7 +558,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
     let building = resolution.building;
     const used = new Set(gridLabels(building));
     const overrun = mm(1500);
-    for (const x of [x0, x1]) {
+    for (const x of columnLines) {
       const label = nextFreeLabel(used, false);
       used.add(label);
       building = addGrid(building, label, [x, y0 - overrun], [x, yEnd + overrun]);
@@ -506,7 +586,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         );
       const inset = h(p.column) / 2 + mm(500);
       const runway: MemberSpec[] = [];
-      for (const x of [x0 + inset, x1 - inset]) {
+      for (const x of spanBounds.flatMap(([a, b]) => [a + inset, b - inset])) {
         runway.push(
           ...runwayMembers(doc, building, levelId, {
             start: [x, y0],
@@ -567,52 +647,55 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       const wallX0 = x0 - railOffset - h(p.rail) / 2;
       const wallX1 = x1 + railOffset + h(p.rail) / 2;
       const roofLift = h(p.rafter) / 2 + h(p.purlin);
-      const roofZ = (x: number): number =>
-        eave + Math.min(x - x0, x1 - x) * Math.tan(pitch) + roofLift / Math.cos(pitch);
+      const roofZ = (x: number): number => roofLine(x) + roofLift / Math.cos(pitch);
       const edge = mm(200);
       const [ya, yb] = [y0 - edge, yEnd + edge];
-      const panels: Array<{ corners: Vec3[]; role: 'roof' | 'wall'; outward: Vec3 }> = [
-        {
-          role: 'roof',
-          outward: [-Math.sin(pitch), 0, Math.cos(pitch)],
-          corners: [
-            [wallX0, ya, roofZ(wallX0)],
-            [wallX0, yb, roofZ(wallX0)],
-            [xm, yb, roofZ(xm)],
-            [xm, ya, roofZ(xm)],
-          ],
-        },
-        {
-          role: 'roof',
-          outward: [Math.sin(pitch), 0, Math.cos(pitch)],
-          corners: [
-            [xm, ya, roofZ(xm)],
-            [xm, yb, roofZ(xm)],
-            [wallX1, yb, roofZ(wallX1)],
-            [wallX1, ya, roofZ(wallX1)],
-          ],
-        },
-        {
+      const panels: Array<{ corners: Vec3[]; role: 'roof' | 'wall'; outward: Vec3 }> = [];
+      const profileLine: Vec2[] = [];
+      spanBounds.forEach(([a, b], index) => {
+        const left = index === 0 ? wallX0 : a;
+        const right = index === spanBounds.length - 1 ? wallX1 : b;
+        const middle = (a + b) / 2;
+        profileLine.push([left, roofZ(left)], [middle, roofZ(middle)]);
+        if (index === spanBounds.length - 1) profileLine.push([right, roofZ(right)]);
+        panels.push(
+          {
+            role: 'roof',
+            outward: [-Math.sin(pitch), 0, Math.cos(pitch)],
+            corners: [
+              [left, ya, roofZ(left)],
+              [left, yb, roofZ(left)],
+              [middle, yb, roofZ(middle)],
+              [middle, ya, roofZ(middle)],
+            ],
+          },
+          {
+            role: 'roof',
+            outward: [Math.sin(pitch), 0, Math.cos(pitch)],
+            corners: [
+              [middle, ya, roofZ(middle)],
+              [middle, yb, roofZ(middle)],
+              [right, yb, roofZ(right)],
+              [right, ya, roofZ(right)],
+            ],
+          },
+        );
+      });
+      for (const [x, outward] of [
+        [wallX0, -1],
+        [wallX1, 1],
+      ] as const) {
+        panels.push({
           role: 'wall',
-          outward: [-1, 0, 0],
+          outward: [outward, 0, 0],
           corners: [
-            [wallX0, ya, 0],
-            [wallX0, yb, 0],
-            [wallX0, yb, roofZ(wallX0)],
-            [wallX0, ya, roofZ(wallX0)],
+            [x, ya, 0],
+            [x, yb, 0],
+            [x, yb, roofZ(x)],
+            [x, ya, roofZ(x)],
           ],
-        },
-        {
-          role: 'wall',
-          outward: [1, 0, 0],
-          corners: [
-            [wallX1, ya, 0],
-            [wallX1, yb, 0],
-            [wallX1, yb, roofZ(wallX1)],
-            [wallX1, ya, roofZ(wallX1)],
-          ],
-        },
-      ];
+        });
+      }
       for (const [y, outward] of [
         [ya, -1],
         [yb, 1],
@@ -623,9 +706,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
           corners: [
             [wallX0, y, 0],
             [wallX1, y, 0],
-            [wallX1, y, roofZ(wallX1)],
-            [xm, y, roofZ(xm)],
-            [wallX0, y, roofZ(wallX0)],
+            ...[...profileLine].reverse().map(([x, z]): Vec3 => [x, y, z]),
           ],
         });
       }
@@ -648,12 +729,19 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
     return {
       document,
       summary:
-        `Added portal-frame hall ${toMetres(doc, span).toFixed(1)} × ${toMetres(doc, hallLength).toFixed(1)} m, ` +
+        `Added portal-frame hall ${toMetres(doc, totalWidth).toFixed(1)} × ${toMetres(doc, hallLength).toFixed(1)} m` +
+        `${spanWidths.length > 1 ? ` (${spanWidths.length} spans)` : ''}, ` +
         `${bays + 1} frames at ${toMetres(doc, bay).toFixed(2)} m, eaves ${toMetres(doc, eave).toFixed(2)} m, ridge ${toMetres(doc, ridge).toFixed(2)} m: ` +
         `${memberCount} steel members (${tonnes.toFixed(1)} t)` +
         `${params.crane ? `, crane runway ${params.crane.capacity ?? 10} t` : ''}, ${gridCount} grid lines, ${ids.length - memberCount - gridCount} other element(s).`,
       affected: elementAffected(document, ids),
-      data: { elementIds: ids, steelTonnes: tonnes, frames: bays + 1, baySpacing: bay },
+      data: {
+        elementIds: ids,
+        steelTonnes: tonnes,
+        frames: bays + 1,
+        baySpacing: bay,
+        spans: spanWidths.length,
+      },
     };
   },
 };

@@ -45,6 +45,15 @@ describe('industrial tools', () => {
     expect(crane.length).toBeGreaterThan(0);
   });
 
+  it('builds a multi-span hall from a list of widths', () => {
+    const hall = tool('hall').build(
+      { ...defaultValues(tool('hall')), spans: '20000, 25000' },
+      context,
+    );
+    expect(hall.ok && hall.params).toMatchObject({ spans: [20000, 25000] });
+    expect(hall.ok && 'span' in hall.params).toBe(false);
+  });
+
   it('converts degrees and omits blank optional fields', () => {
     const member = tool('member').build({ ...defaultValues(tool('member')), roll: '90' }, context);
     expect(member.ok && member.params['roll']).toBeCloseTo(Math.PI / 2);

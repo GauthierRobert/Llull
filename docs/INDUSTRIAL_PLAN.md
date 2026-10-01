@@ -39,3 +39,19 @@ Each step ships with unit tests and is covered by the Playwright suite.
 - [x] **I10 — UI + verification.** Industrial tools in the Building panel (hall generator, member,
       equipment, pipe, clash check, steel list, elevations), Playwright workflow tests, docs and MCP
       prompt.
+
+## Phase 2 — closing the remaining gaps
+
+- [x] **I11 — Section poché.** Cut faces in `export_elevation_sheet` sections are filled: steel
+      solid black, concrete / masonry hatched, other materials grey (as in Revit / Tekla sections).
+- [x] **I12 — Multi-span halls.** `add_portal_frame_building` `spans: [...]` — several spans side by
+      side with internal columns on shared column lines, valley gutters between the roofs.
+- [ ] **I13 — Cable trays.** `add_cable_tray` (3D route, width, height, system), clash detection,
+      takeoff (m by system), plan symbol, IFC `IfcCableCarrierSegment`.
+- [ ] **I14 — Steel connections.** `add_base_plates`: base plates with anchor bolts under every steel
+      column foot; plate steel mass and bolt counts in the takeoff; IFC `IfcPlate` /
+      `IfcMechanicalFastener`.
+- [ ] **I15 — DXF hatches.** Cut walls, concrete columns and steel sections in `export_dxf` plans
+      get ANSI31 / solid hatch patterns (R12-compatible LINE / SOLID entities on `*-PATT` layers).
+- [ ] **I16 — Curved walls.** `add_curved_wall` (arc through start / mid / end): evaluation, plan,
+      quantities, DXF arcs and IFC.

@@ -47,6 +47,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('x', 'Origin X', '0'),
       num('y', 'Origin Y', '0'),
       num('span', 'Span (X)', '24000'),
+      { key: 'spans', label: 'Multi-span widths', kind: 'text', defaultValue: '' },
       num('length', 'Length (Y)', '48000'),
       num('baySpacing', 'Bay spacing', '6000'),
       num('eaveHeight', 'Eave height', '7000'),
@@ -64,7 +65,9 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       const railHeight = reader.optionalNumber('craneRailHeight');
       return result(reader, 'add_portal_frame_building', {
         origin: [reader.number('x'), reader.number('y')],
-        span: reader.number('span'),
+        ...(reader.text('spans') === ''
+          ? { span: reader.number('span') }
+          : { spans: reader.numberList('spans') }),
         length: reader.number('length'),
         baySpacing: reader.number('baySpacing'),
         eaveHeight: reader.number('eaveHeight'),

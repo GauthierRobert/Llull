@@ -744,3 +744,55 @@ describe('review regressions', () => {
     ]);
   });
 });
+
+describe('multi-span halls', () => {
+  it('shares internal columns between spans and roofs each span separately', () => {
+    const result = execute(createEmptyDocument(), 'add_portal_frame_building', {
+      spans: [12000, 18000],
+      length: 12000,
+      eaveHeight: 6000,
+      roofPitch: 5,
+    });
+    const doc = result.document;
+    expect(result.summary).toMatch(/30\.0 × 12\.0 m \(2 spans\)/);
+    expect(result.data).toMatchObject({ spans: 2, frames: 3 });
+    const members = elementsOf(doc, 'member');
+    const frameColumns = members.filter(
+      (m) => m.category === 'member' && m.role === 'column' && m.profile === 'HEA400',
+    );
+    expect(frameColumns).toHaveLength(3 * 3);
+    expect(members.filter((m) => m.category === 'member' && m.role === 'rafter')).toHaveLength(
+      3 * 4,
+    );
+    const grids = elementsOf(doc, 'grid').map((g) => g.mark);
+    expect(grids.slice(0, 3)).toEqual(['A', 'B', 'C']);
+    // 2 roof panels per span + 2 side walls + 2 gables (one polygon following both roofs).
+    const panels = elementsOf(doc, 'panel');
+    expect(panels).toHaveLength(8);
+    const gable = panels.find(
+      (panel) => panel.category === 'panel' && panel.role === 'wall' && panel.corners.length > 4,
+    );
+    expect(gable?.category === 'panel' && gable.corners).toHaveLength(2 + 5);
+    expect(doc.entities[`${gable!.id}:body`]?.kind).toBe('mesh');
+    expect(execute(doc, 'check_clashes', {}).summary).toBe('No clashes found.');
+    expect(buildingErrors(doc.building)).toEqual([]);
+  });
+
+  it('puts a crane runway in every span', () => {
+    const doc = execute(createEmptyDocument(), 'add_portal_frame_building', {
+      spans: [15000, 15000],
+      length: 12000,
+      crane: { railHeight: 5000 },
+    }).document;
+    const runway = elementsOf(doc, 'member').filter(
+      (m) => m.category === 'member' && m.role === 'crane',
+    );
+    expect(new Set(runway.map((m) => (m.category === 'member' ? m.start[0] : 0))).size).toBe(4);
+  });
+
+  it.each([[[]], [[0, 10000]], [Array(11).fill(6000)], ['12000']])('rejects spans %j', (spans) => {
+    expect(execute(createEmptyDocument(), 'add_portal_frame_building', { spans }).summary).toMatch(
+      /spans must be 1–10 widths/,
+    );
+  });
+});

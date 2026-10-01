@@ -55,9 +55,19 @@ interface DrawItem {
   readonly edges: Array<readonly [Vec2, Vec2]>;
 }
 
+/** Poché class of a cut region. */
+export type CutMaterial = 'steel' | 'concrete' | 'other';
+
+/** Filled cut face of one entity: closed loops (even-odd, so hollow sections stay hollow). */
+export interface CutRegion {
+  readonly material: CutMaterial;
+  readonly loops: Vec2[][];
+}
+
 export interface ElevationDrawing {
   readonly items: DrawItem[];
   readonly cutLines: Array<readonly [Vec2, Vec2]>;
+  readonly cutRegions: CutRegion[];
   /** [minU, minZ, maxU, maxZ] of the projected geometry. */
   readonly bounds: readonly [number, number, number, number];
   readonly projection: Projection;
@@ -149,6 +159,49 @@ function faceEdges(faces: ReadonlyArray<Face>): Map<number, Array<readonly [Vec3
   return edges;
 }
 
+const CONCRETE_CATEGORIES: ReadonlySet<string> = new Set([
+  'wall',
+  'slab',
+  'column',
+  'beam',
+  'stair',
+  'footing',
+]);
+
+function cutMaterial(category: string | null): CutMaterial {
+  if (category === 'member') return 'steel';
+  return category !== null && CONCRETE_CATEGORIES.has(category) ? 'concrete' : 'other';
+}
+
+/** Chains cut segments into loops by shared endpoints (open chains are kept as polygons). */
+export function chainLoops(segments: ReadonlyArray<readonly [Vec2, Vec2]>): Vec2[][] {
+  const key = (p: Vec2): string => `${Math.round(p[0] * 100)},${Math.round(p[1] * 100)}`;
+  const byPoint = new Map<string, number[]>();
+  segments.forEach(([a, b], index) => {
+    for (const point of [a, b])
+      byPoint.set(key(point), [...(byPoint.get(key(point)) ?? []), index]);
+  });
+  const used = new Set<number>();
+  const loops: Vec2[][] = [];
+  segments.forEach(([a, b], start) => {
+    if (used.has(start)) return;
+    used.add(start);
+    const loop: Vec2[] = [a, b];
+    let current = b;
+    for (;;) {
+      const next = (byPoint.get(key(current)) ?? []).find((index) => !used.has(index));
+      if (next === undefined) break;
+      used.add(next);
+      const [p, q] = segments[next] as readonly [Vec2, Vec2];
+      current = key(p) === key(current) ? q : p;
+      if (key(current) === key(a)) break;
+      loop.push(current);
+    }
+    if (loop.length >= 3) loops.push(loop);
+  });
+  return loops;
+}
+
 function categoryOf(tags: ReadonlyArray<string> | undefined): string | null {
   return tags?.includes('bim') === true ? (tags[1] ?? null) : null;
 }
@@ -178,6 +231,7 @@ export function buildElevationDrawing(
   );
   const items: DrawItem[] = [];
   const cutLines: Array<readonly [Vec2, Vec2]> = [];
+  const cutRegions: CutRegion[] = [];
   const bounds = [Infinity, Infinity, -Infinity, -Infinity];
   const grow = (point: Vec2): void => {
     bounds[0] = Math.min(bounds[0] as number, point[0]);
@@ -196,6 +250,7 @@ export function buildElevationDrawing(
       if (normal) faces.push({ triangle, normal, front: dot(normal, toViewer) > 1e-6 });
     }
     const edges = faceEdges(faces);
+    const entityCuts: Array<readonly [Vec2, Vec2]> = [];
     faces.forEach((face, index) => {
       if (limit !== Infinity) {
         const crossing: Vec3[] = [];
@@ -210,6 +265,7 @@ export function buildElevationDrawing(
           const segment = [project(a), project(b)] as const;
           segment.forEach(grow);
           cutLines.push(segment);
+          entityCuts.push(segment);
         }
       }
       if (!face.front) return;
@@ -229,12 +285,15 @@ export function buildElevationDrawing(
         edges: visibleEdges,
       });
     });
+    const loops = chainLoops(entityCuts);
+    if (loops.length > 0) cutRegions.push({ material: cutMaterial(category), loops });
   }
   if (items.length === 0 && cutLines.length === 0) return null;
   items.sort((a, b) => a.depth - b.depth);
   return {
     items,
     cutLines,
+    cutRegions,
     bounds: bounds as unknown as readonly [number, number, number, number],
     projection,
   };
@@ -314,6 +373,10 @@ export function buildElevationSheet(
     );
     for (const edge of item.edges) view.push(line(edge, 'edge'));
   }
+  for (const region of drawing.cutRegions) {
+    const path = region.loops.map((loop) => `M${points(loop).replace(/ /g, 'L')}Z`).join('');
+    view.push(`<path d="${path}" fill-rule="evenodd" class="poche-${region.material}"/>`);
+  }
   for (const cut of drawing.cutLines) view.push(line(cut, 'section'));
 
   const building = getBuilding(doc);
@@ -370,7 +433,8 @@ export function buildElevationSheet(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
     `<title>${escapeXml(title)}</title>`,
     SHEET_STYLE,
-    `<style>.edge{stroke:#000;stroke-width:0.18;stroke-linecap:round}.section{stroke:#000;stroke-width:0.5;stroke-linecap:round}.ground{stroke:#000;stroke-width:0.7}.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:4 1 1 1}</style>`,
+    `<style>.edge{stroke:#000;stroke-width:0.18;stroke-linecap:round}.section{stroke:#000;stroke-width:0.5;stroke-linecap:round}.ground{stroke:#000;stroke-width:0.7}.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:4 1 1 1}.poche-steel{fill:#1a1a1a}.poche-concrete{fill:url(#hatch-concrete)}.poche-other{fill:#9a9a9a}</style>`,
+    `<defs><pattern id="hatch-concrete" width="1.5" height="1.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.5" height="1.5" fill="#d9d9d9"/><line x1="0" y1="0" x2="0" y2="1.5" stroke="#000" stroke-width="0.12"/></pattern></defs>`,
     `<rect width="${width}" height="${height}" fill="#fff"/>`,
     `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
     `<g id="view">${view.join('')}</g>`,

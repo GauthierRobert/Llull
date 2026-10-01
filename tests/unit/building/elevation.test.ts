@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildElevationDrawing, type ElevationSheet } from '@core/commands/building/elevation';
+import {
+  buildElevationDrawing,
+  chainLoops,
+  type ElevationSheet,
+} from '@core/commands/building/elevation';
 import { __resetIdCounter } from '@lib/id';
 
 function hall(): CadDocument {
@@ -126,5 +130,65 @@ describe('export_elevation_sheet', () => {
     expect(execute(createEmptyDocument(), 'export_elevation_sheet', {}).summary).toMatch(
       /no 3D geometry/,
     );
+  });
+});
+
+describe('section poché', () => {
+  it('chains cut segments into closed loops', () => {
+    const loops = chainLoops([
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      [
+        [1, 1],
+        [0, 1],
+      ],
+      [
+        [1, 0],
+        [1, 1],
+      ],
+      [
+        [0, 1],
+        [0, 0],
+      ],
+      [
+        [5, 5],
+        [6, 5],
+      ],
+    ]);
+    expect(loops).toEqual([
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
+    ]);
+  });
+
+  it('fills cut steel solid, concrete hatched and hollow sections even-odd', () => {
+    let doc = execute(createEmptyDocument(), 'add_steel_member', {
+      profile: 'SHS100x5',
+      role: 'column',
+      start: [0, 0, 0],
+      end: [0, 0, 3000],
+    }).document;
+    doc = execute(doc, 'add_footing', { location: [3000, 0] }).document;
+    const drawing = buildElevationDrawing(doc, { direction: 'south', cutAt: 0 })!;
+    const steel = drawing.cutRegions.find((region) => region.material === 'steel')!;
+    expect(steel.loops).toHaveLength(2);
+    expect(drawing.cutRegions.some((region) => region.material === 'concrete')).toBe(true);
+    const sheet = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 })
+      .data as ElevationSheet;
+    expect(sheet.svg).toContain('class="poche-steel"');
+    expect(sheet.svg).toContain('class="poche-concrete"');
+    expect(sheet.svg).toContain('id="hatch-concrete"');
+  });
+
+  it('greys out other materials', () => {
+    const doc = box();
+    const drawing = buildElevationDrawing(doc, { direction: 'south', cutAt: 0 })!;
+    expect(drawing.cutRegions.map((region) => region.material)).toEqual(['other']);
   });
 });
