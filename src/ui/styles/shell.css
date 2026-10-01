@@ -142,7 +142,9 @@
 .tab--active {
   background: var(--surface-1);
   color: var(--fg);
-  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--border);
 }
 
 .tab--disabled {
@@ -233,7 +235,9 @@
   margin-left: var(--space-1);
   background: var(--accent);
   color: var(--accent-fg);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 oklch(1 0 0 / 0.15);
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 1px 0 oklch(1 0 0 / 0.15);
 }
 
 .mcp-connect-trigger:hover {

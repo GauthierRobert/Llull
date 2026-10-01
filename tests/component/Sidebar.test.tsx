@@ -69,3 +69,32 @@ describe('Sidebar', () => {
     expect(screen.getByRole('tab', { name: 'Layers' }).textContent).toContain('1');
   });
 });
+
+describe('Sidebar — keyboard', () => {
+  beforeEach(() => {
+    useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+    useLayoutStore.setState({ sidebarTab: 'layers', sidebarOpen: true });
+  });
+
+  it('only the current tab is in the Tab order (roving tabindex)', () => {
+    render(<Sidebar />);
+    expect(screen.getByRole('tab', { name: 'Layers' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('arrow keys and Home/End move focus between tabs', () => {
+    render(<Sidebar />);
+    const layers = screen.getByRole('tab', { name: 'Layers' });
+    layers.focus();
+    fireEvent.keyDown(layers, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Assembly' }));
+    fireEvent.keyDown(document.activeElement as Element, { key: 'End' });
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Materials' }));
+    fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(layers);
+    fireEvent.keyDown(layers, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Materials' }));
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Home' });
+    expect(document.activeElement).toBe(layers);
+  });
+});

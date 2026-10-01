@@ -379,8 +379,7 @@
   pointer-events: none;
 }
 
-.vp-tool-dock > *,
-.vp-tool-dock .vp-hint {
+.vp-tool-dock > :not(.vp-hint) {
   pointer-events: auto;
 }
 

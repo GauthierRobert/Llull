@@ -306,11 +306,14 @@
 
 /* ---- Forms -------------------------------------------------------------- */
 
-/* Sticky footer form, pinned to the bottom of the scrolling panel */
+/* Sticky footer form, pinned to the bottom of the scrolling panel; capped so a
+   tall form never hides the list above it on short windows. */
 .panel__form {
   position: sticky;
   bottom: 0;
   z-index: 2;
+  max-height: 45%;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -345,10 +348,6 @@
 .field input[type='number'] {
   flex: 1 1 0;
   min-width: 0;
-}
-
-.field--mono input {
-  font-family: var(--font-mono);
 }
 
 .field input[type='range'] {

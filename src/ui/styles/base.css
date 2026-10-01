@@ -52,7 +52,9 @@ kbd {
 }
 
 :focus-visible {
-  outline: none;
+  /* Transparent outline keeps a visible ring in forced-colors mode. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
 

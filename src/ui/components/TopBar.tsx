@@ -70,7 +70,6 @@ function SidebarToggle(): React.ReactElement {
       type="button"
       className={`icon-btn${sidebarOpen ? ' icon-btn--active' : ''}`}
       onClick={toggleSidebar}
-      aria-pressed={sidebarOpen}
       aria-label={label}
       title={label}
     >
@@ -88,7 +87,6 @@ function InspectorToggle(): React.ReactElement {
       type="button"
       className={`icon-btn${inspectorOpen ? ' icon-btn--active' : ''}`}
       onClick={toggleInspector}
-      aria-pressed={inspectorOpen}
       aria-label={label}
       title={label}
     >

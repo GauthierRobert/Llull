@@ -61,10 +61,12 @@ function useTabCount(tab: SidebarTab): number {
 interface RailButtonProps {
   spec: SidebarTabSpec;
   active: boolean;
+  /** Roving tabindex: exactly one rail button is in the Tab order. */
+  focusable: boolean;
   onSelect: (tab: SidebarTab) => void;
 }
 
-function RailButton({ spec, active, onSelect }: RailButtonProps): React.ReactElement {
+function RailButton({ spec, active, focusable, onSelect }: RailButtonProps): React.ReactElement {
   const count = useTabCount(spec.tab);
   return (
     <button
@@ -72,6 +74,7 @@ function RailButton({ spec, active, onSelect }: RailButtonProps): React.ReactEle
       role="tab"
       id={`sidebar-tab-${spec.tab}`}
       aria-selected={active}
+      tabIndex={focusable ? 0 : -1}
       aria-controls={active ? 'sidebar-panel' : undefined}
       aria-label={spec.label}
       title={spec.label}
@@ -107,6 +110,31 @@ function ActivePanel({ tab }: { tab: SidebarTab }): React.ReactElement {
   }
 }
 
+/** ARIA tabs pattern: Arrow Up/Down move focus between rail tabs, Home/End jump to the ends. */
+function handleRailKeyDown(e: React.KeyboardEvent<HTMLElement>): void {
+  const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
+  if (current === -1) return;
+  const last = tabs.length - 1;
+  const next =
+    e.key === 'ArrowDown'
+      ? current === last
+        ? 0
+        : current + 1
+      : e.key === 'ArrowUp'
+        ? current === 0
+          ? last
+          : current - 1
+        : e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? last
+            : null;
+  if (next === null) return;
+  e.preventDefault();
+  tabs[next]?.focus();
+}
+
 export function Sidebar(): React.ReactElement {
   const sidebarTab = useLayoutStore((s) => s.sidebarTab);
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen);
@@ -119,12 +147,14 @@ export function Sidebar(): React.ReactElement {
         role="tablist"
         aria-orientation="vertical"
         aria-label="Document browser"
+        onKeyDown={handleRailKeyDown}
       >
         {TABS.map((spec) => (
           <RailButton
             key={spec.tab}
             spec={spec}
             active={sidebarOpen && spec.tab === sidebarTab}
+            focusable={spec.tab === sidebarTab}
             onSelect={selectSidebarTab}
           />
         ))}

@@ -436,12 +436,12 @@ function SceneContents({
         <ContactShadows
           position={[0, 0, -0.001]}
           rotation={GROUND_PLANE_ROTATION}
-          opacity={0.55}
+          opacity={palette.contactShadowOpacity}
           scale={40}
           blur={2.5}
           far={20}
           frames={1}
-          color={palette.contactShadow}
+          color="#1a1e2a"
         />
       )}
 

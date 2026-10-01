@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useLayoutStore } from '@ui/store';
 
 describe('layoutStore', () => {
@@ -29,5 +29,34 @@ describe('layoutStore', () => {
   it('toggles the sidebar', () => {
     useLayoutStore.getState().toggleSidebar();
     expect(useLayoutStore.getState().sidebarOpen).toBe(false);
+  });
+});
+
+describe('layoutStore — persisted layout parsing', () => {
+  it('falls back to defaults for corrupt or invalid stored layout', async () => {
+    localStorage.setItem('llull-layout', JSON.stringify({ sidebarTab: 'nope', sidebarOpen: 3 }));
+    vi.resetModules();
+    const fresh = await import('@ui/store/layoutStore');
+    expect(fresh.useLayoutStore.getState().sidebarTab).toBe('layers');
+    expect(fresh.useLayoutStore.getState().sidebarOpen).toBe(true);
+
+    localStorage.setItem('llull-layout', '{not json');
+    vi.resetModules();
+    const again = await import('@ui/store/layoutStore');
+    expect(again.useLayoutStore.getState().inspectorOpen).toBe(true);
+  });
+
+  it('restores a valid stored layout', async () => {
+    localStorage.setItem(
+      'llull-layout',
+      JSON.stringify({ sidebarTab: 'history', sidebarOpen: false, inspectorOpen: false }),
+    );
+    vi.resetModules();
+    const fresh = await import('@ui/store/layoutStore');
+    expect(fresh.useLayoutStore.getState()).toMatchObject({
+      sidebarTab: 'history',
+      sidebarOpen: false,
+      inspectorOpen: false,
+    });
   });
 });

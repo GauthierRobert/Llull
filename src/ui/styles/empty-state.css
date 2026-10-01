@@ -106,21 +106,6 @@
   color: var(--fg);
 }
 
-.empty-state__hint {
-  margin-top: var(--space-4);
-  font-size: var(--text-xs);
-  color: var(--fg-subtle);
-}
-
-.empty-state__hint kbd {
-  padding: 1px 5px;
-  font-size: var(--text-2xs);
-  color: var(--fg-muted);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-}
-
 @keyframes empty-state-in {
   from {
     opacity: 0;

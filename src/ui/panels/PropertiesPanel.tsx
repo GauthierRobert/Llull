@@ -99,7 +99,6 @@ function EntityVisibilityToggle({ entityId }: { entityId: string }): React.React
     <button
       type="button"
       className={`icon-btn props-visibility-btn${isHidden ? ' props-visibility-btn--hidden' : ''}`}
-      aria-pressed={isHidden}
       aria-label={label}
       title={label}
       onClick={() => toggleVisibility(entityId)}
@@ -112,6 +111,23 @@ function EntityVisibilityToggle({ entityId }: { entityId: string }): React.React
 // ---------------------------------------------------------------------------
 // Kind-specific dimension rows
 // ---------------------------------------------------------------------------
+
+const DIMENSIONED_KINDS: ReadonlySet<Entity['kind']> = new Set<Entity['kind']>([
+  'box',
+  'cylinder',
+  'sphere',
+  'circle',
+  'extrusion',
+  'arc',
+  'rectangle',
+  'line',
+  'polyline',
+]);
+
+/** Kept in sync with the cases EntityDimensions renders. */
+function hasDimensions(entity: Entity): boolean {
+  return DIMENSIONED_KINDS.has(entity.kind);
+}
 
 function EntityDimensions({ entity }: { entity: Entity }): React.ReactElement | null {
   switch (entity.kind) {
@@ -178,7 +194,6 @@ function EntityDimensions({ entity }: { entity: Entity }): React.ReactElement | 
 // ---------------------------------------------------------------------------
 
 function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
-  const hasDimensions = EntityDimensions({ entity }) !== null;
   return (
     <section className="props-detail" aria-label="Selection">
       <div className="props-summary">
@@ -203,7 +218,7 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
         </PropRow>
       </PanelSection>
 
-      {hasDimensions && (
+      {hasDimensions(entity) && (
         <PanelSection title="Geometry">
           <EntityDimensions entity={entity} />
         </PanelSection>
