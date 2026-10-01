@@ -262,6 +262,8 @@ export interface BasePlateElement extends ElementBase {
   boltCount: number;
   boltDiameter: number;
   material: string;
+  /** Base fixity of the column in the frame analysis; absent = pinned. */
+  fixity?: 'pinned' | 'fixed';
 }
 
 /** A curved wall: centreline arc from `start` through `through` to `end` (plan). */

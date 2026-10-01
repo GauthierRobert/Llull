@@ -18,6 +18,7 @@ import {
 import { baseReactions, type BaseReaction } from './frameModel';
 import {
   combine,
+  footingMoment,
   findFooting,
   findPlate,
   ultimateCombinations,
@@ -301,9 +302,9 @@ function netLoads(
   leverM: number,
 ): Load[] {
   return combinations.flatMap((combination) => {
-    const { v, h } = combine(reaction, combination.factors);
+    const { v, h, m } = combine(reaction, combination.factors);
     return v > 0
-      ? [{ combination: combination.name, normal: v, moment: Math.abs(h) * leverM }]
+      ? [{ combination: combination.name, normal: v, moment: footingMoment(m, h, leverM) }]
       : [];
   });
 }
@@ -333,7 +334,7 @@ export const designFootings: CommandDefinition<FrameLoadParams> = {
     'soil pressure inside it deducted (§6.4). If shear or punching fails with every standard mat the footing is reported ' +
     'as "increase thickness" and its reinforcement is not set (an old one is removed). The takeoff ' +
     'then reports `footing.rebar.kg` and the footing schedule a Reinforcement column. ' +
-    'Simplifications: pinned bases, bending in the frame plane (x) from the horizontal reaction, ' +
+    'Simplifications: bending in the frame plane (x) from the horizontal reaction and, for fixed column bases, the base moment (eccentric pressure), ' +
     'uniform pressure across the other side, no uplift (tension) design, bar anchorage not checked. ' +
     'Preliminary design, not a substitute for a structural engineer.',
   paramsSchema: {

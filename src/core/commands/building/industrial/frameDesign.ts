@@ -21,6 +21,7 @@ import {
 } from '../model';
 import { regenerateBuilding } from '../evaluate';
 import { refitPlates } from './plates';
+import { designFixedPlates } from './plateDesign';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
 import { connectionSolids } from './evaluate';
 import { sweepFrame } from '../mesh';
@@ -241,6 +242,11 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
         changed.add(original.id);
       }
     }
+    const plates = designFixedPlates(current, building, levelId, loads, targetUtilisation);
+    building = plates.building;
+    if (plates.changed.length > 0) changes.push(...plates.descriptions);
+    for (const id of plates.changed) changed.add(id);
+    if (plates.unresolved > 0) limited = true;
     if (changed.size === 0) {
       const final = checkFrames(doc, levelId, loads);
       const worst = Math.max(0, ...final.rows.map((row) => row.utilisation));

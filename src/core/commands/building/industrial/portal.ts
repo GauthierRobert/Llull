@@ -242,6 +242,7 @@ interface PortalHallParams {
   railSpacing?: number;
   footings?: boolean;
   basePlates?: boolean;
+  columnBase?: 'pinned' | 'fixed';
   connections?: boolean;
   cladding?: boolean;
   floorSlab?: boolean;
@@ -319,6 +320,14 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         type: 'boolean',
         description: 'Base plates with 4 M24 anchor bolts under every column. Default true.',
       },
+      columnBase: {
+        type: 'string',
+        enum: ['pinned', 'fixed'],
+        description:
+          "Column base fixity: 'pinned' (default) or 'fixed' (rotation restrained in the frame analysis: " +
+          'stiffer sway, base moments in the reactions and footing / base plate M+N checks; requires basePlates; ' +
+          'size the plates with design_portal_frames).',
+      },
       cladding: { type: 'boolean', description: 'Roof, side and gable cladding. Default true.' },
       floorSlab: { type: 'boolean', description: 'Ground-bearing slab. Default true.' },
       crane: {
@@ -376,6 +385,19 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       return noChange(
         doc,
         'add_portal_frame_building failed: roofPitch must be in [0, 45) degrees.',
+      );
+    }
+    const columnBase = params.columnBase ?? 'pinned';
+    if (columnBase !== 'pinned' && columnBase !== 'fixed') {
+      return noChange(
+        doc,
+        "add_portal_frame_building failed: columnBase must be 'pinned' or 'fixed'.",
+      );
+    }
+    if (columnBase === 'fixed' && params.basePlates === false) {
+      return noChange(
+        doc,
+        "add_portal_frame_building failed: columnBase 'fixed' needs base plates (basePlates must not be false).",
       );
     }
     const names = {
@@ -606,14 +628,20 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       ids.push(...connections.ids);
     }
     if (params.basePlates !== false) {
-      const plates = appendBasePlates(
-        doc,
-        building,
-        columnsWithoutPlates(building, null, new Set(membersAdded.ids)),
-        {},
-      );
-      building = plates.building;
-      ids.push(...plates.ids);
+      const unplated = columnsWithoutPlates(building, null, new Set(membersAdded.ids));
+      // Fixed bases apply to frame columns only: gable wind posts (rolled about the vertical axis) stay pinned.
+      const groups =
+        columnBase === 'fixed'
+          ? ([
+              [unplated.filter((column) => column.roll === 0), 'fixed'],
+              [unplated.filter((column) => column.roll !== 0), 'pinned'],
+            ] as const)
+          : ([[unplated, 'pinned']] as const);
+      for (const [columns, fixity] of groups) {
+        const plates = appendBasePlates(doc, building, columns, { fixity });
+        building = plates.building;
+        ids.push(...plates.ids);
+      }
     }
     // Crane runway on both sides, inboard of the columns.
     if (params.crane) {
@@ -773,6 +801,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         `${spanWidths.length > 1 ? ` (${spanWidths.length} spans)` : ''}, ` +
         `${bays + 1} frames at ${toMetres(doc, bay).toFixed(2)} m, eaves ${toMetres(doc, eave).toFixed(2)} m, ridge ${toMetres(doc, ridge).toFixed(2)} m: ` +
         `${memberCount} steel members (${tonnes.toFixed(1)} t)` +
+        `${columnBase === 'fixed' ? ', fixed column bases' : ''}` +
         `${params.crane ? `, crane runway ${params.crane.capacity ?? 10} t` : ''}, ${gridCount} grid lines, ${ids.length - memberCount - gridCount} other element(s).`,
       affected: elementAffected(document, ids),
       data: {

@@ -33,7 +33,7 @@ Building panel, _Check clashes_ lists them; click a row to select both elements.
 ## Structural check and design
 
 `check_portal_frames` (read-only) solves every portal frame of a level as a 2D frame (direct
-stiffness method, pinned bases, section properties from the profile outline — no root radii,
+stiffness method, pinned bases (or fixed with `columnBase: 'fixed'`), section properties from the profile outline — no root radii,
 ≈ 4–5 % conservative; haunches are not counted as stiffening) for every EN 1990 combination of:
 
 - **G** — roof dead load (`deadLoad`, kN/m²) on the tributary width + member self-weight + runway

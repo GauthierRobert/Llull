@@ -634,7 +634,7 @@ export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
   annotations: { readOnly: true, idempotent: true },
   description:
     'Structural check of the steel portal frames of a level. Each frame (rafters in a vertical ' +
-    'plane + the columns under them, pinned bases) is solved as a 2D frame (direct stiffness, ' +
+    "plane + the columns under them; bases pinned, or fixed when the base plates have columnBase 'fixed') is solved as a 2D frame (direct stiffness, " +
     'section properties from the profile outline, no root radii) for every EN 1990 combination of ' +
     'dead G (deadLoad + self-weight), snow S, wind W (windPressure, both directions, incl. uplift) ' +
     'and crane C (from add_crane_runway capacity, EN 1991-3 load groups 1 and 5: wheel reactions by statics ' +

@@ -281,4 +281,33 @@ test.describe('industrial workflow', () => {
     expect(nc.text).toMatch(/^ST/m);
     await expect(page.getByTestId('building-export-status')).toContainText('DSTV NC1:');
   });
+
+  test('I38 — a fixed-base crane hall designs lighter than a pinned one', async ({ page }) => {
+    await openBuilding(page);
+    const hallFields = {
+      span: '24000',
+      length: '30000',
+      cladding: 'false',
+      craneRailHeight: '6000',
+    };
+    await applyTool(page, 'hall', hallFields);
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s)');
+    await expect(page.getByTestId('takeoff-member.HEB500.kg')).toBeVisible();
+
+    await openBuilding(page);
+    await applyTool(page, 'hall', { ...hallFields, columnBase: 'fixed' });
+    await expect(status(page)).toContainText('fixed column bases');
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('fixed bases: plate');
+    await expect(page.getByTestId('takeoff-member.HEB500.kg')).toHaveCount(0);
+    await expect(page.getByTestId('takeoff-member.HEA400.kg')).toBeVisible();
+    await page.getByTestId('frame-check').click();
+    await expect(page.getByTestId('frame-check-summary')).toContainText('all OK');
+    await page.getByTestId('foundation-check').click();
+    // Moment bases need wider pads than the generated ones: the check reports the eccentric pressure.
+    await expect(page.getByTestId('frame-check-summary')).toContainText('overturning EQU');
+  });
 });

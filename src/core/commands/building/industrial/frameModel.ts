@@ -369,6 +369,11 @@ export function framesOf(
     const nodeLoads: NodeCaseLoad[] = [];
     const free: FrameNode['restraint'] = [false, false, false];
     const purlins = purlinXs(y);
+    const fixedColumns = new Set(
+      Object.values(building.elements).flatMap((element) =>
+        element.category === 'plate' && element.fixity === 'fixed' ? [element.memberId] : [],
+      ),
+    );
     const valleys = valleyLines(
       candidate.rafters.map((rafter) => ({
         start: rafter.start.map(mm),
@@ -514,7 +519,7 @@ export function framesOf(
         craneNodes.push({ node: nodeAt(x, z, free), height: z - zBottom, elementId: column.id });
       }
       const chain = [
-        nodeAt(x, zBottom, [true, true, false]),
+        nodeAt(x, zBottom, fixedColumns.has(column.id) ? [true, true, true] : [true, true, false]),
         ...[...new Set(splits)].sort((a, b) => a - b).map((z) => nodeAt(x, z, free)),
         topNode,
       ];
@@ -689,9 +694,15 @@ export function solveCombination(
 export interface BaseReaction {
   readonly frame: string;
   readonly columnId: string;
-  /** Characteristic support reaction per load case, N: horizontal (+x) and vertical (+ up). */
+  /**
+   * Characteristic support reaction per load case on the column: horizontal (N, +x), vertical
+   * (N, + up) and base moment (N·mm, counter-clockwise +; 0 for pinned bases).
+   */
   readonly cases: Partial<
-    Record<LoadCase, { readonly horizontal: number; readonly vertical: number }>
+    Record<
+      LoadCase,
+      { readonly horizontal: number; readonly vertical: number; readonly moment: number }
+    >
   >;
 }
 
@@ -729,12 +740,17 @@ export function baseReactions(
       if (member.role !== 'column' || !member.ends[0] || !a || !b) return [];
       const length = Math.hypot(b.x - a.x, b.y - a.y);
       const [c, s] = [(b.x - a.x) / length, (b.y - a.y) / length];
-      const cases: Partial<Record<LoadCase, { horizontal: number; vertical: number }>> = {};
+      const cases: BaseReaction['cases'] = {};
+      const fixed = frame.nodes[member.geometry.a]?.restraint[2] === true;
       for (const { loadCase, result } of results) {
         const forces = result?.members[index];
         if (!forces) continue;
         const [axial, shear] = [-forces.axial[0], forces.shear[0]];
-        cases[loadCase] = { horizontal: c * axial - s * shear, vertical: s * axial + c * shear };
+        cases[loadCase] = {
+          horizontal: c * axial - s * shear,
+          vertical: s * axial + c * shear,
+          moment: fixed ? -forces.moment[0] : 0,
+        };
       }
       return [{ frame: frame.label, columnId: member.elementId, cases }];
     });

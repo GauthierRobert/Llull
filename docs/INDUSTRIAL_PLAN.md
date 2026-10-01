@@ -153,7 +153,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 
 ## Phase 10 — fixed bases, monopitch roofs
 
-- [ ] **I38 — Fixed column bases.** `add_portal_frame_building` / base plates: `columnBase:
+- [x] **I38 — Fixed column bases.** `add_portal_frame_building` / base plates: `columnBase:
       'pinned' | 'fixed'`. Fixed bases restrain rotation in the frame analysis (sway stiffness for
       crane halls), carry base moments into `baseReactions`, size the base plate and anchor bolts
       for M + N (EN 1993-1-8 §6.2.8, T-stub tension zone simplified), and the footing checks /
