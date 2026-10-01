@@ -87,3 +87,44 @@ describe('buildingErrors', () => {
     expect(result.summary).toMatch(/thickness must be a finite number/);
   });
 });
+
+describe('stricter building validation', () => {
+  it.each([
+    [
+      'negative thickness',
+      () => mutate((b) => (b.elements['wall-1'].thickness = -5)),
+      /thickness must be > 0/,
+    ],
+    [
+      'dangling host',
+      () => mutate((b) => (b.elements['door-1'].hostId = 'wall-99')),
+      /is not a wall/,
+    ],
+    ['bad counters', () => mutate((b) => (b.counters = { wall: 'x' })), /counters/],
+    ['bad uid', () => mutate((b) => (b.uid = 4)), /uid must be a string/],
+    [
+      'negative sill',
+      () => mutate((b) => (b.elements['window-1'].sillHeight = -1)),
+      /sillHeight must be >= 0/,
+    ],
+    [
+      'fractional risers',
+      () => mutate((b) => (b.elements['stair-1'].riserCount = 2.5)),
+      /riserCount/,
+    ],
+  ])('rejects %s', (_label, build, message) => {
+    expect(buildingErrors(build()).join('\n')).toMatch(message);
+  });
+
+  it('load_document regenerates building geometry from the model', () => {
+    const tampered = JSON.parse(serializeDocument(house)) as {
+      document: { entities: Record<string, unknown>; order: string[] };
+    };
+    delete tampered.document.entities['wall-1:body-0'];
+    tampered.document.order = tampered.document.order.filter((id) => id !== 'wall-1:body-0');
+    const loaded = execute(createEmptyDocument(), 'load_document', {
+      json: JSON.stringify(tampered),
+    });
+    expect(loaded.document.entities['wall-1:body-0']).toBeDefined();
+  });
+});

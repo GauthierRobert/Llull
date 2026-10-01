@@ -15,10 +15,8 @@ import type {
   CylinderEntity,
   Entity,
   ExtrusionEntity,
-  Layer,
   LineEntity,
   MeshData,
-  MeshSolidEntity,
   PolylineEntity,
   TextEntity,
   Vec2,
@@ -26,7 +24,6 @@ import type {
 } from '../../model/types';
 import type {
   BeamElement,
-  BimCategory,
   BuildingElement,
   BuildingLevel,
   BuildingModel,
@@ -46,88 +43,28 @@ import {
   toCounterClockwise,
 } from '../../../lib/polygon';
 import { fromMm, toMetres } from './model';
-import { triangulatePolygon } from '../../../lib/triangulate';
+import { prismMesh } from './mesh';
+import {
+  evaluateEquipment,
+  evaluateFooting,
+  evaluateMember,
+  evaluatePanel,
+  evaluatePipe,
+} from './industrial/evaluate';
 
-/** AIA / US National CAD Standard layer per category. */
-export const CATEGORY_LAYER: Readonly<Record<BimCategory, { name: string; color: string }>> = {
-  grid: { name: 'S-GRID', color: '#d04a4a' },
-  wall: { name: 'A-WALL', color: '#8a8a8a' },
-  door: { name: 'A-DOOR', color: '#8b5a2b' },
-  window: { name: 'A-GLAZ', color: '#4a90c2' },
-  slab: { name: 'S-SLAB', color: '#9a9a90' },
-  column: { name: 'S-COLS', color: '#6d6d6d' },
-  beam: { name: 'S-BEAM', color: '#7d8a96' },
-  stair: { name: 'A-FLOR-STRS', color: '#a08060' },
-  room: { name: 'A-AREA', color: '#3c8d5a' },
-};
-
-export function layerIdFor(category: BimCategory): string {
-  return `layer-${CATEGORY_LAYER[category].name}`;
-}
-
-const MATERIAL_COLOR: Readonly<Record<string, string>> = {
-  concrete: '#b4b2aa',
-  masonry: '#b0623a',
-  brick: '#b0623a',
-  block: '#a7a39a',
-  timber: '#c19a6b',
-  wood: '#c19a6b',
-  steel: '#7d8a96',
-  glass: '#8ec9e8',
-  gypsum: '#e6e2d8',
-  drywall: '#e6e2d8',
-  stone: '#9c968a',
-};
-
-export function colorForMaterial(material: string, fallback: string): string {
-  return MATERIAL_COLOR[material.toLowerCase()] ?? fallback;
-}
+import {
+  base,
+  CATEGORY_LAYER,
+  colorForMaterial,
+  ensureLayers,
+  meshEntity,
+  orientedBox,
+} from './entities';
+export { CATEGORY_LAYER, colorForMaterial, layerIdFor } from './entities';
 
 interface EvaluationContext {
   readonly doc: CadDocument;
   readonly building: BuildingModel;
-}
-
-interface EntityStub {
-  readonly part: string;
-  readonly label: string;
-}
-
-function base(
-  element: BuildingElement,
-  stub: EntityStub,
-  position: Vec3,
-  rotation: Vec3,
-  color: string,
-): {
-  id: string;
-  position: Vec3;
-  rotation: Vec3;
-  layerId: string;
-  color: string;
-  name: string;
-  tags: string[];
-} {
-  return {
-    id: `${element.id}:${stub.part}`,
-    position,
-    rotation,
-    layerId: layerIdFor(element.category),
-    color,
-    name: `${stub.label}`,
-    tags: ['bim', element.category, `element:${element.id}`],
-  };
-}
-
-function orientedBox(
-  element: BuildingElement,
-  stub: EntityStub,
-  center: Vec3,
-  angle: number,
-  size: Vec3,
-  color: string,
-): BoxEntity {
-  return { ...base(element, stub, center, [0, 0, angle], color), kind: 'box', size };
 }
 
 // ---------------------------------------------------------------------------
@@ -188,10 +125,12 @@ function wallsOnLevel(building: BuildingModel, levelId: string): WallElement[] {
 }
 
 /**
- * Plan extension (+) or retraction (−) at one wall end so joints close cleanly (butt joints):
- * at an L/X joint the earlier wall extends to the other's outer face and the later wall retracts
- * to the earlier one's inner face; at a T joint the abutting wall retracts to the through wall.
- * Values are mitred for any angle θ between the walls: (t_other / 2) / sin θ ± (t_self / 2) / |tan θ|.
+ * Plan extension (+) or retraction (−) at one wall end so joints close cleanly (square-cut butt
+ * joints). With φ the angle between the two walls' away-from-joint directions:
+ * - L/X joint, earlier wall: its OUTER edge reaches the other wall's outer face —
+ *   (t_other/2 + (t_self/2)·cos φ) / sin φ (signed cos: ≈ (t/2)·cot(φ/2) for obtuse joints);
+ * - later wall at an L/X joint, or abutting wall at a T joint: retracts to the other wall's near
+ *   face without leaving a gap — −(t_other/2 − (t_self/2)·|cos φ|) / sin φ.
  */
 export function endAdjustment(
   building: BuildingModel,
@@ -207,20 +146,25 @@ export function endAdjustment(
     const otherFrame = wallFrame(other);
     const sine = Math.abs(away[0] * otherFrame.direction[1] - away[1] * otherFrame.direction[0]);
     if (sine < 0.05) continue;
-    const cotangent =
-      Math.abs(away[0] * otherFrame.direction[0] + away[1] * otherFrame.direction[1]) / sine;
-    const reach = other.thickness / 2 / sine;
-    const skew = (wall.thickness / 2) * cotangent;
     const tolerance = Math.max(Math.min(wall.thickness, other.thickness) * 0.05, 1e-9);
-    const atOtherEnd =
-      distance(point, other.start) <= tolerance || distance(point, other.end) <= tolerance;
-    if (atOtherEnd) {
-      const otherIndex = building.elementOrder.indexOf(other.id);
-      return ownIndex < otherIndex ? reach + skew : -(reach - skew);
+    const retraction =
+      -(
+        other.thickness / 2 -
+        (wall.thickness / 2) *
+          Math.abs(away[0] * otherFrame.direction[0] + away[1] * otherFrame.direction[1])
+      ) / sine;
+    const atOtherStart = distance(point, other.start) <= tolerance;
+    if (atOtherStart || distance(point, other.end) <= tolerance) {
+      if (building.elementOrder.indexOf(other.id) < ownIndex) return retraction;
+      const otherAway: Vec2 = atOtherStart
+        ? otherFrame.direction
+        : [-otherFrame.direction[0], -otherFrame.direction[1]];
+      const cosine = away[0] * otherAway[0] + away[1] * otherAway[1];
+      return (other.thickness / 2 + (wall.thickness / 2) * cosine) / sine;
     }
     const projection = projectOntoSegment(point, other.start, other.end);
     if (projection.distance <= tolerance && projection.t > 0 && projection.t < 1) {
-      return -(reach - skew);
+      return retraction;
     }
   }
   return 0;
@@ -375,23 +319,8 @@ export function slabMesh(
   openings: ReadonlyArray<ReadonlyArray<Vec2>>,
   bottom: number,
   top: number,
-): MeshData {
-  const { vertices, triangles } = triangulatePolygon(boundary, openings);
-  const count = vertices.length;
-  const positions: number[] = [];
-  for (const z of [top, bottom]) for (const [x, y] of vertices) positions.push(x, y, z);
-  const indices: number[] = [];
-  for (const [a, b, c] of triangles) indices.push(a, b, c, c + count, b + count, a + count);
-  let ringStart = 0;
-  for (const ringLength of [boundary.length, ...openings.map((opening) => opening.length)]) {
-    for (let index = 0; index < ringLength; index++) {
-      const current = ringStart + index;
-      const next = ringStart + ((index + 1) % ringLength);
-      indices.push(current + count, next + count, next, current + count, next, current);
-    }
-    ringStart += ringLength;
-  }
-  return { positions, indices };
+): MeshData | null {
+  return prismMesh(boundary, openings, ([x, y], side) => [x, y, side === 1 ? top : bottom]);
 }
 
 function evaluateSlab(slab: SlabElement, level: BuildingLevel): Entity[] {
@@ -399,14 +328,9 @@ function evaluateSlab(slab: SlabElement, level: BuildingLevel): Entity[] {
   const stub = { part: 'body', label: `${slab.role === 'roof' ? 'Roof' : 'Slab'} ${slab.mark}` };
   const color = colorForMaterial(slab.material, '#b4b2aa');
   const openings = slab.openings ?? [];
-  if (openings.length > 0) {
-    const mesh: MeshSolidEntity = {
-      ...base(slab, stub, [0, 0, 0], [0, 0, 0], color),
-      kind: 'mesh',
-      mesh: slabMesh(slab.boundary, openings, bottom, bottom + slab.thickness),
-    };
-    return [mesh];
-  }
+  const mesh =
+    openings.length > 0 ? slabMesh(slab.boundary, openings, bottom, bottom + slab.thickness) : null;
+  if (mesh) return [meshEntity(slab, stub, mesh, color)];
   const extrusion: ExtrusionEntity = {
     ...base(slab, stub, [0, 0, bottom], [0, 0, 0], color),
     kind: 'extrusion',
@@ -614,24 +538,17 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluateStair(leveled, level);
     case 'room':
       return evaluateRoom(context, leveled, level);
+    case 'member':
+      return evaluateMember(context.doc, leveled, level);
+    case 'footing':
+      return evaluateFooting(leveled, level);
+    case 'panel':
+      return evaluatePanel(leveled, level);
+    case 'equipment':
+      return evaluateEquipment(leveled, level);
+    case 'pipe':
+      return evaluatePipe(leveled, level);
   }
-}
-
-function ensureLayers(
-  layers: Record<string, Layer>,
-  layerOrder: string[],
-  categories: ReadonlySet<BimCategory>,
-): { layers: Record<string, Layer>; layerOrder: string[] } {
-  let nextLayers = layers;
-  let nextOrder = layerOrder;
-  for (const category of categories) {
-    const id = layerIdFor(category);
-    if (nextLayers[id]) continue;
-    const { name, color } = CATEGORY_LAYER[category];
-    nextLayers = { ...nextLayers, [id]: { id, name, visible: true, locked: false, color } };
-    nextOrder = [...nextOrder, id];
-  }
-  return { layers: nextLayers, layerOrder: nextOrder };
 }
 
 /**
@@ -654,7 +571,7 @@ export function regenerateBuilding(doc: CadDocument, building: BuildingModel): C
   const order = doc.order.filter((id) => !staleIds.has(id));
   const context: EvaluationContext = { doc, building };
   const elements: BuildingModel['elements'] = {};
-  const usedCategories = new Set<BimCategory>();
+  const usedLayers = new Set<string>();
   for (const elementId of building.elementOrder) {
     const element = building.elements[elementId];
     if (!element) continue;
@@ -663,10 +580,10 @@ export function regenerateBuilding(doc: CadDocument, building: BuildingModel): C
       entities[entity.id] = entity;
       order.push(entity.id);
     }
-    if (generated.length > 0) usedCategories.add(element.category);
+    for (const entity of generated) usedLayers.add(entity.layerId);
     elements[elementId] = { ...element, entityIds: generated.map((entity) => entity.id) };
   }
-  const { layers, layerOrder } = ensureLayers(doc.layers, doc.layerOrder, usedCategories);
+  const { layers, layerOrder } = ensureLayers(doc.layers, doc.layerOrder, usedLayers);
   return {
     ...doc,
     entities,

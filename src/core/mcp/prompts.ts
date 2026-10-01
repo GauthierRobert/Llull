@@ -410,7 +410,8 @@ const designBuilding: PromptTemplate = {
           `11. Deliver: \`export_plan_sheet\` { paper: "A3", scale: 100 }, \`export_dxf\` { levelId }, \`export_ifc\`.\n\n` +
           `Edit parametrically with \`update_wall\`, \`update_opening\`, \`update_level\`, \`move_building_element\`, ` +
           `\`delete_building_element\` — never edit the generated entities (ids "<elementId>:<part>"); they are regenerated. ` +
-          `For a quick start, \`add_building_template\` { template: "house" | "office" } creates a complete building.`,
+          `For a quick start, \`add_building_template\` { template: "house" | "office" } creates a complete building. ` +
+          `In \`build_project\`, a building step's \`$alias\` is the ELEMENT id (e.g. wall-3, usable as wallId); \`$alias[1]\` is its first generated entity.`,
       ),
     ];
   },

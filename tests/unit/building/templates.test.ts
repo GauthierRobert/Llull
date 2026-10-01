@@ -51,3 +51,73 @@ describe('add_building_template', () => {
     expect(twice.summary).toMatch(/6 level\(s\), 37 building element/);
   });
 });
+
+describe('second review regressions', () => {
+  it('templates still work after elements and levels were deleted (B1)', () => {
+    let doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+    }).document;
+    doc = execute(doc, 'add_door', { wallId: 'wall-1' }).document;
+    doc = execute(doc, 'add_stair', { start: [500, 500] }).document;
+    doc = execute(doc, 'add_level', {}).document;
+    doc = execute(doc, 'delete_building_element', { elementIds: ['wall-1', 'stair-1'] }).document;
+    doc = execute(doc, 'delete_level', { levelId: 'level-2' }).document;
+    for (const template of ['house', 'office']) {
+      const result = execute(doc, 'add_building_template', { template, origin: [50000, 0] });
+      expect(result.summary, template).toMatch(/template: /);
+    }
+  });
+
+  it('solve_constraints still runs in a document with a building (B2)', () => {
+    let doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+    }).document;
+    doc = execute(doc, 'draw_line', { start: [0, 5000], end: [1000, 5000] }).document;
+    const a = doc.order[doc.order.length - 1]!;
+    doc = execute(doc, 'draw_line', { start: [2000, 6000], end: [3000, 6000] }).document;
+    const b = doc.order[doc.order.length - 1]!;
+    const constrained = execute(doc, 'add_constraint', {
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a, kind: 'end' },
+        b: { entityId: b, kind: 'start' },
+      },
+    });
+    expect(constrained.summary).not.toMatch(/failed/);
+    const solved = execute(constrained.document, 'solve_constraints', {});
+    expect(solved.summary).not.toMatch(/rejected/);
+    expect(solved.document).not.toBe(constrained.document);
+  });
+
+  it('copies of generated geometry are refused and never resolve to the element (H1)', async () => {
+    const { buildingElementOf } = await import('@core/commands/building');
+    const doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+    }).document;
+    expect(execute(doc, 'duplicate_entity', { id: 'wall-1:body-0' }).summary).toMatch(/rejected/);
+    expect(buildingElementOf(doc, 'wall-1:body-0')).toBe('wall-1');
+    const forged = {
+      ...doc,
+      entities: { ...doc.entities, x: { ...doc.entities['wall-1:body-0']!, id: 'x' } },
+    };
+    expect(buildingElementOf(forged, 'x')).toBeNull();
+  });
+
+  it('the building uid survives history replay and is not burned by reads (H3)', () => {
+    let doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+    }).document;
+    doc = execute(doc, 'add_wall', { start: [0, 3000], end: [4000, 3000] }).document;
+    const uid = doc.building!.uid;
+    expect(uid).toBeDefined();
+    const replayed = execute(doc, 'replay_history', {}).document;
+    expect(replayed.building!.uid).toBe(uid);
+    expect(
+      execute(createEmptyDocument(), 'describe_building', {}).document.building,
+    ).toBeUndefined();
+  });
+});

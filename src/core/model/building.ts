@@ -7,8 +7,7 @@
  * @see docs/CONSTRUCTION.md, src/core/building/evaluate.ts
  */
 
-import type { Vec2 } from './types';
-import { nextId } from '../../lib/id';
+import type { Vec2, Vec3 } from './types';
 
 /** Building element categories (Revit/IFC-like). */
 export type BimCategory =
@@ -20,7 +19,12 @@ export type BimCategory =
   | 'column'
   | 'beam'
   | 'stair'
-  | 'room';
+  | 'room'
+  | 'member'
+  | 'footing'
+  | 'panel'
+  | 'equipment'
+  | 'pipe';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -143,6 +147,75 @@ export interface RoomElement extends ElementBase {
   boundary: Vec2[];
 }
 
+/** Structural role of a steel member (drives layer, mark prefix and IFC class). */
+export type MemberRole = 'column' | 'rafter' | 'beam' | 'brace' | 'purlin' | 'rail' | 'crane';
+
+/**
+ * A steel member: a catalogue section swept from `start` to `end` (z relative to the level).
+ * `roll` rotates the section about its axis (radians).
+ */
+export interface SteelMemberElement extends ElementBase {
+  readonly category: 'member';
+  levelId: string;
+  role: MemberRole;
+  profile: string;
+  start: Vec3;
+  end: Vec3;
+  roll: number;
+  material: string;
+  /** Free note carried to schedules, e.g. "Crane 10 t, hook 6.5 m". */
+  note?: string;
+}
+
+/** A concrete pad footing; its TOP sits at level elevation + `topOffset` (usually negative). */
+export interface FootingElement extends ElementBase {
+  readonly category: 'footing';
+  levelId: string;
+  location: Vec2;
+  width: number;
+  length: number;
+  thickness: number;
+  topOffset: number;
+  material: string;
+}
+
+/** A planar cladding / roofing / sandwich panel through 3D `corners` (z relative to the level). */
+export interface PanelElement extends ElementBase {
+  readonly category: 'panel';
+  levelId: string;
+  role: 'roof' | 'wall';
+  corners: Vec3[];
+  thickness: number;
+  material: string;
+}
+
+/** A machine / process equipment footprint with its maintenance clearance zone. */
+export interface EquipmentElement extends ElementBase {
+  readonly category: 'equipment';
+  levelId: string;
+  name: string;
+  location: Vec2;
+  /** Plan rotation (radians). */
+  angle: number;
+  /** [length along its x, width along its y, height]. */
+  size: Vec3;
+  /** Free space required around the footprint for operation / maintenance. */
+  clearance: number;
+  /** Operating weight in kg (0 when unknown). */
+  weight: number;
+}
+
+/** A pipe run through 3D points (z relative to the level). */
+export interface PipeElement extends ElementBase {
+  readonly category: 'pipe';
+  levelId: string;
+  points: Vec3[];
+  diameter: number;
+  /** Fluid / service, e.g. "compressed air", "cooling water". */
+  service: string;
+  material: string;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -151,7 +224,12 @@ export type BuildingElement =
   | ColumnElement
   | BeamElement
   | StairElement
-  | RoomElement;
+  | RoomElement
+  | SteelMemberElement
+  | FootingElement
+  | PanelElement
+  | EquipmentElement
+  | PipeElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */
@@ -174,7 +252,6 @@ export interface BuildingModel {
 
 export function createEmptyBuilding(): BuildingModel {
   return {
-    uid: nextId('building'),
     project: {
       name: 'Untitled project',
       client: '',

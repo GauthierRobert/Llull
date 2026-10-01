@@ -159,7 +159,12 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
     let outline: Vec2[] | null = null;
     let wallLevelId: string | undefined;
     if (boundary !== undefined) {
-      outline = isVec2List(boundary, 3) ? boundary.map(toVec2) : null;
+      outline = isVec2List(boundary, 3)
+        ? boundary.map(toVec2).filter((point, index, points) => {
+            const previous = points[(index - 1 + points.length) % points.length] as Vec2;
+            return index === 0 ? true : point[0] !== previous[0] || point[1] !== previous[1];
+          })
+        : null;
     } else if (Array.isArray(wallIds)) {
       const walls = wallIds.map((id) => building.elements[id]);
       if (walls.every((wall): wall is WallElement => wall?.category === 'wall')) {

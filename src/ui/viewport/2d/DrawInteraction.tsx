@@ -78,7 +78,7 @@ export function DrawInteraction({
   );
 
   // Invisible ground-plane geometry (shared with SnapIndicator but separate instance).
-  const geo = useMemo(() => new THREE.PlaneGeometry(100000, 100000), []);
+  const geo = useMemo(() => new THREE.PlaneGeometry(1e8, 1e8), []);
   const mat = useMemo(
     () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
     [],

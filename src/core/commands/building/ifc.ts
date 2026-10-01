@@ -5,9 +5,15 @@
  * @layer core/commands/building
  */
 
-import type { CadDocument, Vec2 } from '../../model/types';
+import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type {
   BuildingElement,
+  EquipmentElement,
+  FootingElement,
+  MemberRole,
+  PanelElement,
+  PipeElement,
+  SteelMemberElement,
   BuildingLevel,
   OpeningElement,
   SlabElement,
@@ -17,6 +23,9 @@ import type { CommandDefinition, CommandResult } from '../types';
 import { toCounterClockwise } from '../../../lib/polygon';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
 import { wallExtent, wallFrame, type WallExtent } from './evaluate';
+import { sweepFrame } from './mesh';
+import { panelFrame } from './industrial/evaluate';
+import { findProfile, type SteelProfile } from './steel/profiles';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
 
@@ -228,6 +237,167 @@ function exportOpening(
   return { ref, material: opening.material };
 }
 
+function direction(context: Context, [x, y, z]: Vec3): string {
+  return context.writer.add(`IFCDIRECTION((${ifcReal(x)},${ifcReal(y)},${ifcReal(z)}))`);
+}
+
+/** Local placement at `origin` (mm) with local Z = `axis` and local X = `reference`. */
+function framePlacement(
+  context: Context,
+  relativeTo: string,
+  origin: Vec3,
+  axis: Vec3,
+  reference: Vec3,
+): string {
+  const axes = context.writer.add(
+    `IFCAXIS2PLACEMENT3D(${point3(context, origin[0], origin[1], origin[2])},${direction(context, axis)},${direction(context, reference)})`,
+  );
+  return context.writer.add(`IFCLOCALPLACEMENT(${relativeTo},${axes})`);
+}
+
+/** IFC parametric profile definition of a catalogue section (dimensions in mm). */
+function steelProfileDef(context: Context, profile: SteelProfile): string {
+  const position = context.writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
+  const name = ifcString(profile.name);
+  const r = ifcReal;
+  switch (profile.shape) {
+    case 'I':
+      return context.writer.add(
+        `IFCISHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.b)},${r(profile.h)},${r(profile.tw)},${r(profile.tf)},$,$,$)`,
+      );
+    case 'U':
+      return context.writer.add(
+        `IFCUSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},${r(profile.tf)},$,$,$)`,
+      );
+    case 'C':
+      return context.writer.add(
+        `IFCCSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},${r(profile.lip)},$)`,
+      );
+    case 'L':
+      return context.writer.add(
+        `IFCLSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},$,$,$)`,
+      );
+    case 'SHS':
+    case 'RHS':
+      return context.writer.add(
+        `IFCRECTANGLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.b)},${r(profile.h)},${r(profile.tw)},$,$)`,
+      );
+    case 'CHS':
+      return context.writer.add(
+        `IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.h / 2)},${r(profile.tw)})`,
+      );
+  }
+}
+
+const MEMBER_CLASS: Readonly<Record<MemberRole, { entity: string; type: string }>> = {
+  column: { entity: 'IFCCOLUMN', type: '.COLUMN.' },
+  rafter: { entity: 'IFCBEAM', type: '.BEAM.' },
+  beam: { entity: 'IFCBEAM', type: '.BEAM.' },
+  crane: { entity: 'IFCBEAM', type: '.BEAM.' },
+  brace: { entity: 'IFCMEMBER', type: '.BRACE.' },
+  purlin: { entity: 'IFCMEMBER', type: '.PURLIN.' },
+  rail: { entity: 'IFCMEMBER', type: '.MEMBER.' },
+};
+
+function exportIndustrial(
+  context: Context,
+  element: SteelMemberElement | FootingElement | PanelElement | EquipmentElement | PipeElement,
+  storeyPlacement: string,
+): Exported | null {
+  const { mm, writer } = context;
+  const guid = context.guid(element.id);
+  const mm3 = ([x, y, z]: Vec3): Vec3 => [mm(x), mm(y), mm(z)];
+  switch (element.category) {
+    case 'member': {
+      const profile = findProfile(element.profile);
+      const frame = sweepFrame(element.start, element.end, element.roll);
+      if (!profile || !frame) return null;
+      const local = framePlacement(context, storeyPlacement, mm3(element.start), frame.d, frame.u);
+      const solid = extrusion(context, steelProfileDef(context, profile), mm(frame.length));
+      const { entity, type } = MEMBER_CLASS[element.role];
+      const ref = writer.add(
+        `${entity}('${guid}',$,${ifcString(element.mark)},${ifcString(element.note ?? '')},${ifcString(profile.name)},${local},${shape(context, [solid])},${ifcString(element.id)},${type})`,
+      );
+      return { ref, material: element.material };
+    }
+    case 'footing': {
+      const local = placement(
+        context,
+        storeyPlacement,
+        mm(element.location[0]),
+        mm(element.location[1]),
+        mm(element.topOffset - element.thickness),
+      );
+      const profile = rectangleProfile(context, [0, 0], mm(element.width), mm(element.length));
+      const ref = writer.add(
+        `IFCFOOTING('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(element.thickness))])},${ifcString(element.id)},.PAD_FOOTING.)`,
+      );
+      return { ref, material: element.material };
+    }
+    case 'panel': {
+      const frame = panelFrame(element.corners.map(mm3));
+      if (!frame) return null;
+      const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      const outline = element.corners.map(mm3).map((corner): Vec2 => {
+        const offset: Vec3 = [
+          corner[0] - frame.origin[0],
+          corner[1] - frame.origin[1],
+          corner[2] - frame.origin[2],
+        ];
+        return [dot(offset, frame.e1), dot(offset, frame.e2)];
+      });
+      const local = framePlacement(context, storeyPlacement, frame.origin, frame.normal, frame.e1);
+      const solid = extrusion(context, polygonProfile(context, outline), mm(element.thickness));
+      const ref = writer.add(
+        `IFCCOVERING('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, [solid])},${ifcString(element.id)},${element.role === 'roof' ? '.ROOFING.' : '.CLADDING.'})`,
+      );
+      return { ref, material: element.material };
+    }
+    case 'equipment': {
+      const [length, width, height] = element.size;
+      const local = placement(
+        context,
+        storeyPlacement,
+        mm(element.location[0]),
+        mm(element.location[1]),
+        0,
+        element.angle,
+      );
+      const profile = rectangleProfile(context, [0, 0], mm(length), mm(width));
+      const ref = writer.add(
+        `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [extrusion(context, profile, mm(height))])},${ifcString(element.id)},.ELEMENT.)`,
+      );
+      return { ref, material: null };
+    }
+    case 'pipe': {
+      const local = placement(context, storeyPlacement, 0, 0, 0);
+      const position = writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
+      const circle = writer.add(
+        `IFCCIRCLEPROFILEDEF(.AREA.,$,${position},${ifcReal(mm(element.diameter) / 2)})`,
+      );
+      const solids: string[] = [];
+      for (let index = 0; index + 1 < element.points.length; index++) {
+        const start = mm3(element.points[index] as Vec3);
+        const frame = sweepFrame(start, mm3(element.points[index + 1] as Vec3));
+        if (!frame) continue;
+        const axes = writer.add(
+          `IFCAXIS2PLACEMENT3D(${point3(context, start[0], start[1], start[2])},${direction(context, frame.d)},${direction(context, frame.u)})`,
+        );
+        solids.push(
+          writer.add(
+            `IFCEXTRUDEDAREASOLID(${circle},${axes},${context.zAxis},${ifcReal(frame.length)})`,
+          ),
+        );
+      }
+      if (solids.length === 0) return null;
+      const ref = writer.add(
+        `IFCPIPESEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(element.service)},$,${local},${shape(context, solids)},${ifcString(element.id)},.RIGIDSEGMENT.)`,
+      );
+      return { ref, material: element.material };
+    }
+  }
+}
+
 const SLAB_TYPE: Readonly<Record<SlabElement['role'], string>> = {
   floor: '.FLOOR.',
   roof: '.ROOF.',
@@ -236,7 +406,7 @@ const SLAB_TYPE: Readonly<Record<SlabElement['role'], string>> = {
 
 function exportOther(
   context: Context,
-  element: Exclude<BuildingElement, WallElement | OpeningElement | { category: 'grid' }>,
+  element: Extract<BuildingElement, { category: 'slab' | 'column' | 'beam' | 'stair' | 'room' }>,
   level: BuildingLevel,
   storeyPlacement: string,
 ): Exported & { isSpace: boolean } {
@@ -452,6 +622,20 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
           ) {
             record(exportOpening(context, opening, element, wall, contained));
           }
+        }
+        continue;
+      }
+      if (
+        element.category === 'member' ||
+        element.category === 'footing' ||
+        element.category === 'panel' ||
+        element.category === 'equipment' ||
+        element.category === 'pipe'
+      ) {
+        const industrial = exportIndustrial(context, element, storeyPlacement);
+        if (industrial) {
+          contained.push(industrial.ref);
+          record(industrial);
         }
         continue;
       }

@@ -21,6 +21,11 @@ const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string>> = {
   beam: 'Beam',
   stair: 'Stair',
   room: 'Room',
+  member: 'Steel',
+  footing: 'Footing',
+  panel: 'Panel',
+  equipment: 'Equipment',
+  pipe: 'Pipe',
 };
 
 function describe(element: BuildingElement): string {
@@ -42,6 +47,16 @@ function describe(element: BuildingElement): string {
       return `${element.riserCount} risers`;
     case 'grid':
       return 'axis';
+    case 'member':
+      return `${element.role} · ${element.profile}`;
+    case 'footing':
+      return `${element.width}×${element.length}×${element.thickness}`;
+    case 'panel':
+      return `${element.role} · ${element.material}`;
+    case 'equipment':
+      return element.name;
+    case 'pipe':
+      return `Ø${element.diameter} · ${element.service}`;
   }
 }
 

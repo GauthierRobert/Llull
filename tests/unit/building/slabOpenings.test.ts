@@ -37,7 +37,7 @@ describe('slabMesh', () => {
       [rect(2, 2, 4, 5) as Array<[number, number]>, rect(6, 1, 9, 3) as Array<[number, number]>],
       0,
       0.5,
-    );
+    )!;
     const edges = new Map<string, number>();
     let volume = 0;
     const p = (index: number): [number, number, number] => [
@@ -168,5 +168,37 @@ describe('polygon predicates', () => {
     expect(segmentsIntersect([0, 0], [1, 0], [1, 0], [2, 0])).toBe(false);
     expect(pointInPolygon([1, 1], rect(0, 0, 2, 2) as Array<[number, number]>)).toBe(true);
     expect(pointInPolygon([3, 1], rect(0, 0, 2, 2) as Array<[number, number]>)).toBe(false);
+  });
+});
+
+describe('slab opening clearances', () => {
+  it('refuses openings touching the slab edge or another opening', () => {
+    let doc = run(createEmptyDocument(), 'add_slab', { boundary: rect(0, 0, 10000, 8000) });
+    expect(
+      execute(doc, 'add_slab_opening', { slabId: 'slab-1', boundary: rect(0, 5000, 1000, 6000) })
+        .summary,
+    ).toMatch(/not strictly inside|keep a gap/);
+    doc = run(doc, 'add_slab_opening', {
+      slabId: 'slab-1',
+      boundary: rect(2000, 2000, 3000, 3000),
+    });
+    expect(
+      execute(doc, 'add_slab_opening', { slabId: 'slab-1', boundary: rect(3000, 2000, 4000, 3000) })
+        .summary,
+    ).toMatch(/keep a gap|overlaps/);
+  });
+
+  it('drops repeated boundary vertices', () => {
+    const doc = run(createEmptyDocument(), 'add_slab', {
+      boundary: [
+        [0, 0],
+        [1000, 0],
+        [1000, 0],
+        [1000, 1000],
+        [0, 1000],
+      ],
+    });
+    const slab = doc.building!.elements['slab-1']!;
+    expect(slab.category === 'slab' && slab.boundary).toHaveLength(4);
   });
 });

@@ -315,13 +315,10 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
     if (lengthOf(updated.start, updated.end) <= 0) {
       return noChange(doc, 'update_wall failed: start and end would coincide.');
     }
-    const openings = openingsOf(building, wallId);
-    const extent = wallExtent(withElement(building, updated), updated);
-    for (const opening of openings) {
-      const error = openingFitError(updated, opening, openings, extent);
-      if (error) return noChange(doc, `update_wall refused: ${error}.`);
-    }
-    const document = regenerateBuilding(doc, withElement(building, updated));
+    const next = withElement(building, updated);
+    const issues = openingFitIssues(next, new Set([wall.levelId, updated.levelId]));
+    if (issues.length > 0) return noChange(doc, `update_wall refused: ${issues[0]}.`);
+    const document = regenerateBuilding(doc, next);
     return {
       document,
       summary:
@@ -331,3 +328,21 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
     };
   },
 };
+
+/**
+ * Every hosted opening on `levelIds` that no longer fits its wall's built extent / height.
+ * @pure
+ */
+export function openingFitIssues(building: BuildingModel, levelIds: ReadonlySet<string>): string[] {
+  const issues: string[] = [];
+  for (const element of Object.values(building.elements)) {
+    if (element.category !== 'wall' || !levelIds.has(element.levelId)) continue;
+    const openings = openingsOf(building, element.id);
+    const extent = wallExtent(building, element);
+    for (const opening of openings) {
+      const error = openingFitError(element, opening, openings, extent);
+      if (error) issues.push(error);
+    }
+  }
+  return issues;
+}

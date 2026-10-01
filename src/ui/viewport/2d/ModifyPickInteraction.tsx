@@ -49,7 +49,7 @@ export function ModifyPickInteraction({
   const document = useStore((s) => s.document);
   const { invalidate } = useThree();
 
-  const geo = useMemo(() => new THREE.PlaneGeometry(100000, 100000), []);
+  const geo = useMemo(() => new THREE.PlaneGeometry(1e8, 1e8), []);
   const mat = useMemo(
     () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
     [],

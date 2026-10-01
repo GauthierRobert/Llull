@@ -319,21 +319,32 @@ describe('built wall extents', () => {
     expect(execute(doc, 'add_door', { wallId: 'wall-2', offset: 600 }).document).not.toBe(doc);
   });
 
-  it('mitres non-perpendicular joints so the corner closes', () => {
-    const angle = Math.PI / 3;
+  it.each([120, 150, 170])('extends the outer edge only at a %i° joint (no spikes)', (degrees) => {
+    const turn = Math.PI - (degrees * Math.PI) / 180;
     let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
     doc = run(doc, 'add_wall', {
       start: [4000, 0],
-      end: [4000 + 3000 * Math.cos(angle), 3000 * Math.sin(angle)],
+      end: [4000 + 3000 * Math.cos(turn), 3000 * Math.sin(turn)],
     });
-    const sine = Math.sin(angle);
-    const cotangent = Math.cos(angle) / sine;
-    // Away from the joint the walls make 120°: |cot| = cot 60°.
+    const phi = (degrees * Math.PI) / 180;
+    // Equal 200 mm walls: the earlier wall reaches (t/2)·cot(φ/2) past the joint.
     expect(endAdjustment(doc.building!, wall(doc, 'wall-1'), 'end')).toBeCloseTo(
-      100 / sine + 100 * cotangent,
+      100 / Math.tan(phi / 2),
     );
     expect(endAdjustment(doc.building!, wall(doc, 'wall-2'), 'start')).toBeCloseTo(
-      -(100 / sine - 100 * cotangent),
+      -(100 - 100 * Math.abs(Math.cos(phi))) / Math.sin(phi),
+    );
+  });
+
+  it('acute joints reach the far face', () => {
+    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    doc = run(doc, 'add_wall', {
+      start: [4000, 0],
+      end: [4000 - 3000 * Math.cos(Math.PI / 3), 3000 * Math.sin(Math.PI / 3)],
+    });
+    const phi = Math.PI / 3;
+    expect(endAdjustment(doc.building!, wall(doc, 'wall-1'), 'end')).toBeCloseTo(
+      (100 + 100 * Math.cos(phi)) / Math.sin(phi),
     );
   });
 

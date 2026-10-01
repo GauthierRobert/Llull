@@ -3,7 +3,7 @@
  * @layer core/commands/building
  */
 
-import type { Vec2 } from '../../model/types';
+import type { Vec2, Vec3 } from '../../model/types';
 import type {
   BuildingElement,
   BuildingModel,
@@ -28,6 +28,7 @@ import {
 } from './model';
 import { regenerateBuilding } from './evaluate';
 import { wallLoop } from './structure';
+import { openingFitIssues } from './walls';
 
 interface AddRoomParams {
   name: string;
@@ -214,6 +215,19 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
       return { ...element, location: shift(element.location) };
     case 'stair':
       return { ...element, start: shift(element.start) };
+    case 'member':
+      return {
+        ...element,
+        start: [element.start[0] + dx, element.start[1] + dy, element.start[2]],
+        end: [element.end[0] + dx, element.end[1] + dy, element.end[2]],
+      };
+    case 'footing':
+    case 'equipment':
+      return { ...element, location: shift(element.location) };
+    case 'panel':
+      return { ...element, corners: element.corners.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
+    case 'pipe':
+      return { ...element, points: element.points.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
     case 'door':
     case 'window':
       return element;
@@ -276,6 +290,14 @@ export const moveBuildingElement: CommandDefinition<MoveBuildingElementParams> =
       const element = building.elements[id] as BuildingElement;
       next = withElement(next, translated(element, delta[0], delta[1]));
     }
+    const movedLevels = new Set(
+      known.flatMap((id) => {
+        const element = building.elements[id];
+        return element && 'levelId' in element ? [element.levelId] : [];
+      }),
+    );
+    const issues = openingFitIssues(next, movedLevels);
+    if (issues.length > 0) return noChange(doc, `move_building_element refused: ${issues[0]}.`);
     const document = regenerateBuilding(doc, next);
     const moved = withHostedOpenings(building, known);
     return {
@@ -315,7 +337,19 @@ interface CopyLevelElementsParams {
   categories?: string[];
 }
 
-const COPYABLE = ['wall', 'slab', 'column', 'beam', 'stair', 'room'] as const;
+const COPYABLE = [
+  'wall',
+  'slab',
+  'column',
+  'beam',
+  'stair',
+  'room',
+  'member',
+  'footing',
+  'panel',
+  'equipment',
+  'pipe',
+] as const;
 
 /**
  * @command copy_level_elements
@@ -408,6 +442,8 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
         }
       }
     }
+    const issues = openingFitIssues(next, new Set(targets));
+    if (issues.length > 0) return noChange(doc, `copy_level_elements refused: ${issues[0]}.`);
     const document = regenerateBuilding(doc, next);
     return {
       document,

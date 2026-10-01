@@ -16,6 +16,7 @@ import {
   withLevel,
 } from './model';
 import { regenerateBuilding } from './evaluate';
+import { openingFitIssues } from './walls';
 
 interface AddLevelParams {
   name?: string;
@@ -149,12 +150,15 @@ export const updateLevel: CommandDefinition<UpdateLevelParams> = {
           : element,
       ]),
     );
-    const document = regenerateBuilding(doc, {
+    const next: BuildingModel = {
       ...building,
       levels,
       levelOrder: sortLevelOrder(levels),
       elements,
-    });
+    };
+    const issues = openingFitIssues(next, new Set([levelId]));
+    if (issues.length > 0) return noChange(doc, `update_level refused: ${issues[0]}.`);
+    const document = regenerateBuilding(doc, next);
     return {
       document,
       summary: `Level ${levelId} "${updated.name}": elevation ${updated.elevation}, height ${updated.height} ${doc.units}.`,

@@ -9,6 +9,7 @@ import type { CommandDefinition, CommandResult } from '../types';
 import {
   isValidPolygon,
   pointInPolygon,
+  projectOntoSegment,
   polygonArea,
   segmentsIntersect,
 } from '../../../lib/polygon';
@@ -64,6 +65,23 @@ export function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>
       edges(slab.boundary).some(([r, s]) => segmentsIntersect(p, q, r, s)),
     );
   if (!inside) return `the opening is not strictly inside slab ${slab.mark}`;
+  const xs = slab.boundary.map((point) => point[0]);
+  const ys = slab.boundary.map((point) => point[1]);
+  const gap =
+    Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 1e-3;
+  const loops = [slab.boundary, ...(slab.openings ?? [])];
+  const tooClose = loops.some((loop) =>
+    edges(loop).some(
+      ([a, b]) =>
+        opening.some((point) => projectOntoSegment(point, a, b).distance < gap) ||
+        edges(opening).some(([c, d]) =>
+          [a, b].some((point) => projectOntoSegment(point, c, d).distance < gap),
+        ),
+    ),
+  );
+  if (tooClose) {
+    return `the opening comes within ${gap.toFixed(1)} of the slab edge or another opening (keep a gap)`;
+  }
   const clash = (slab.openings ?? []).findIndex((existing) => polygonsTouch(existing, opening));
   if (clash >= 0) return `the opening overlaps opening #${clash} of slab ${slab.mark}`;
   return triangulatePolygon(slab.boundary, [...(slab.openings ?? []), opening]).complete

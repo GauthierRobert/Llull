@@ -11,6 +11,7 @@ import type {
   BuildingModel,
 } from '../../model/building';
 import { createEmptyBuilding } from '../../model/building';
+import { nextId } from '../../../lib/id';
 import type { CommandResult } from '../types';
 
 export const METRES_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
@@ -68,6 +69,11 @@ const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string
   column: 'C',
   beam: 'B',
   stair: 'ST',
+  member: 'M',
+  footing: 'F',
+  panel: 'CL',
+  equipment: 'EQ',
+  pipe: 'PL',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */
@@ -85,8 +91,9 @@ function issued(building: BuildingModel, prefix: string, keys: ReadonlyArray<str
   return Math.max(highestIndex(keys, `${prefix}-`), building.counters?.[prefix] ?? 0);
 }
 
-/** Records that id "<prefix>-<n>" was issued. */
-function withCounter(building: BuildingModel, id: string): BuildingModel {
+/** Records that id "<prefix>-<n>" was issued (and gives a new building its unique uid). */
+function withCounter(source: BuildingModel, id: string): BuildingModel {
+  const building = source.uid === undefined ? { ...source, uid: nextId('building') } : source;
   const match = /^(.*)-(\d+)$/.exec(id);
   if (!match) return building;
   const [, prefix = '', number = '0'] = match;

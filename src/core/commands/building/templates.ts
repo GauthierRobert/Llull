@@ -5,7 +5,7 @@
 
 import type { CadDocument, Vec2 } from '../../model/types';
 import type { CommandDefinition, CommandResult } from '../types';
-import { elementAffected, fromMm, getBuilding, highestIndex, isVec2, noChange } from './model';
+import { elementAffected, fromMm, getBuilding, isVec2, noChange } from './model';
 import { addLevel, setProjectInfo } from './levels';
 import { addGridSystem } from './grid';
 import { addWall, drawWalls } from './walls';
@@ -19,7 +19,16 @@ type Step = (doc: CadDocument) => CommandResult;
 
 export type BuildingTemplate = 'house' | 'office';
 
-function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step[] {
+/**
+ * Template steps. Ids are looked up in `created` (filled by the run loop with the element / level ids
+ * each step actually created, per kind, in order) — never predicted.
+ */
+function steps(
+  doc: CadDocument,
+  template: BuildingTemplate,
+  origin: Vec2,
+  created: Record<string, string[]>,
+): Step[] {
   const mm = (value: number): number => fromMm(doc, value);
   const at = (x: number, y: number): Vec2 => [origin[0] + mm(x), origin[1] + mm(y)];
   const rectangle = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
@@ -29,21 +38,12 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step
     at(x0, y1),
   ];
   const building = getBuilding(doc);
-  const base = (prefix: string): number =>
-    highestIndex(
-      prefix === 'level-' ? Object.keys(building.levels) : Object.keys(building.elements),
-      prefix,
-    );
-  const [levelBase, wallBase, doorBase, stairBase] = [
-    base('level-'),
-    base('wall-'),
-    base('door-'),
-    base('stair-'),
-  ];
-  const level = (offset: number): string => `level-${levelBase + offset}`;
-  const wall = (offset: number): string => `wall-${wallBase + offset}`;
-  const door = (offset: number): string => `door-${doorBase + offset}`;
-  const perimeter = [wall(1), wall(2), wall(3), wall(4)];
+  const nth = (kind: string, n: number): string => created[kind]?.[n - 1] ?? `missing-${kind}-${n}`;
+  const level = (n: number): string => nth('level', n);
+  const wall = (n: number): string => nth('wall', n);
+  const door = (n: number): string => nth('door', n);
+  const stair = (n: number): string => nth('stair', n);
+  const perimeter = (): string[] => [wall(1), wall(2), wall(3), wall(4)];
   const naming: Step[] =
     building.project.name === 'Untitled project'
       ? [
@@ -93,7 +93,7 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step
       (d) => addWindow.run(d, { wallId: wall(3), offset: mm(2500), width: mm(1800) }),
       (d) => addWindow.run(d, { wallId: wall(3), offset: mm(7500), width: mm(1800) }),
       (d) => addWindow.run(d, { wallId: wall(4), offset: mm(4000), width: mm(1400) }),
-      (d) => addSlab.run(d, { wallIds: perimeter, thickness: mm(200) }),
+      (d) => addSlab.run(d, { wallIds: perimeter(), thickness: mm(200) }),
       (d) =>
         addStair.run(d, { start: at(5400, 6900), angle: 0, width: mm(900), treadDepth: mm(250) }),
       (d) => addRoom.run(d, { name: 'Living room', boundary: rectangle(150, 150, 4950, 7850) }),
@@ -105,7 +105,7 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step
           categories: ['wall', 'slab'],
         }),
       (d) => deleteBuildingElement.run(d, { elementIds: [door(3)] }),
-      (d) => addSlabOpening.run(d, { stairId: `stair-${stairBase + 1}` }),
+      (d) => addSlabOpening.run(d, { stairId: stair(1) }),
       (d) => addWindow.run(d, { wallId: wall(6), offset: mm(2500), width: mm(1400) }),
       (d) =>
         addRoom.run(d, {
@@ -180,7 +180,7 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step
       addWindow.run(d, { wallId: wall(1), offset: mm(3750), width: mm(3000), height: mm(1800) }),
     (d) =>
       addWindow.run(d, { wallId: wall(1), offset: mm(18750), width: mm(3000), height: mm(1800) }),
-    (d) => addSlab.run(d, { wallIds: perimeter, thickness: mm(250) }),
+    (d) => addSlab.run(d, { wallIds: perimeter(), thickness: mm(250) }),
     (d) =>
       addStair.run(d, { start: at(16000, 9000), angle: 0, width: mm(1200), treadDepth: mm(280) }),
     (d) => addRoom.run(d, { name: 'Open office', boundary: rectangle(125, 125, 22375, 7300) }),
@@ -192,7 +192,7 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step
         categories: ['wall', 'column', 'beam', 'slab', 'room'],
       }),
     (d) => deleteBuildingElement.run(d, { elementIds: [door(2), door(3)] }),
-    (d) => addSlabOpening.run(d, { stairId: `stair-${stairBase + 1}` }),
+    (d) => addSlabOpening.run(d, { stairId: stair(1) }),
     ...[2, 3].map(
       (floor): Step =>
         (d) =>
@@ -255,7 +255,9 @@ export const addBuildingTemplate: CommandDefinition<AddBuildingTemplateParams> =
     if (!isVec2(origin))
       return noChange(doc, 'add_building_template failed: origin must be [x, y].');
     let current = doc;
-    for (const [index, step] of steps(doc, template, origin).entries()) {
+    const created: Record<string, string[]> = {};
+    for (const [index, step] of steps(doc, template, origin, created).entries()) {
+      const before = getBuilding(current);
       const result = step(current);
       if (result.document === current) {
         return noChange(
@@ -264,16 +266,25 @@ export const addBuildingTemplate: CommandDefinition<AddBuildingTemplateParams> =
         );
       }
       current = result.document;
+      const after = getBuilding(current);
+      const fresh = [
+        ...after.levelOrder.filter((id) => before.levels[id] === undefined),
+        ...after.elementOrder.filter((id) => before.elements[id] === undefined),
+      ];
+      for (const id of fresh) {
+        const kind = id.replace(/-\d+$/, '');
+        created[kind] = [...(created[kind] ?? []), id];
+      }
     }
     current = fitView.run(current, { direction: 'iso' }).document;
     const building = getBuilding(current);
     const before = new Set(Object.keys(getBuilding(doc).elements));
-    const created = building.elementOrder.filter((id) => !before.has(id));
+    const newElements = building.elementOrder.filter((id) => !before.has(id));
     return {
       document: current,
-      summary: `Added ${template} template: ${building.levelOrder.length} level(s), ${created.length} building element(s).`,
-      affected: elementAffected(current, created),
-      data: { elementIds: created },
+      summary: `Added ${template} template: ${building.levelOrder.length} level(s), ${newElements.length} building element(s).`,
+      affected: elementAffected(current, newElements),
+      data: { elementIds: newElements },
     };
   },
 };
