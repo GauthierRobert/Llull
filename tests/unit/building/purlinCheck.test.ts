@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { findProfile } from '@core/commands/building/steel/profiles';
 import {
   checkPurlins,
+  effectiveModulusRatio,
   type PurlinRow,
   type ZoneSummary,
 } from '@core/commands/building/industrial/purlinCheck';
@@ -64,6 +66,32 @@ const interior = (rows: PurlinRow[]): PurlinRow[] =>
   rows.filter((row) => row.check.includes('tributary 1724'));
 
 beforeEach(() => __resetIdCounter());
+
+describe('effectiveModulusRatio', () => {
+  it('reduces a slender C, keeps C200x75x2.5 fully effective and a stocky section gross', () => {
+    const base = findProfile('C200x75x2.5');
+    if (!base) throw new Error('profile');
+    // hand check C200x75x2.5, S350: eps 0.819; flange lp = 28 / 46.5 = 0.60 (<0.673, rho 1);
+    // web lp = 79 / 113.7 = 0.695 -> rho = (0.695 - 0.11) / 0.695^2 = 1.2 -> 1: fully effective
+    expect(effectiveModulusRatio(base, 350)).toEqual({ ratio: 1, flangeRho: 1, webRho: 1 });
+    // slender: t = 1.2: flange lp 1.30 -> rho 0.64 x 0.9, web lp 1.46 -> rho 0.64
+    const slender = effectiveModulusRatio({ ...base, tw: 1.2, tf: 1.2 }, 350);
+    expect(slender.flangeRho).toBeCloseTo(0.575, 2);
+    expect(slender.webRho).toBeCloseTo(0.64, 1);
+    expect(slender.ratio).toBeLessThan(0.95);
+    expect(slender.ratio).toBeGreaterThan(0.6);
+    const stocky = effectiveModulusRatio({ ...base, tw: 10, tf: 10 }, 235);
+    expect(stocky.ratio).toBeCloseTo(1, 6);
+  });
+
+  it('lowers the resistance of a slender purlin in check_purlins', () => {
+    const base = findProfile('C200x75x2.5');
+    if (!base) throw new Error('profile');
+    expect(effectiveModulusRatio(base, 460).ratio).toBeLessThanOrEqual(1);
+    const doc = hall({ purlinProfile: 'C150x65x2.0' });
+    expect(check(doc).rows.length).toBeGreaterThan(0);
+  });
+});
 
 describe('check_purlins', () => {
   it('checks the default hall without touching the document', () => {

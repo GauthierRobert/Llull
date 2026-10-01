@@ -98,11 +98,88 @@ interface Verdict {
 const round = (value: number, digits = 2): number =>
   Math.round(value * 10 ** digits) / 10 ** digits;
 
-/** Design bending resistance, N·mm: Wpl fy for I sections, Wel fy for cold-formed / other shapes. */
+/** EN 1993-1-5 §4.4 plate reduction ρ for slenderness λp with the 0.055 (3 + ψ) term. */
+function plateReduction(slenderness: number, psiTerm: number): number {
+  return slenderness <= 0.673 ? 1 : Math.min(1, (slenderness - psiTerm) / slenderness ** 2);
+}
+
+interface Segment {
+  readonly area: number;
+  /** Distance of the segment centre above mid-depth, mm. */
+  readonly y: number;
+  /** Own second moment about its centre, mm⁴ (vertical segments only). */
+  readonly inertia: number;
+}
+
+function sectionModulus(segments: readonly Segment[], top: number): number {
+  const area = segments.reduce((sum, segment) => sum + segment.area, 0);
+  const axis = segments.reduce((sum, segment) => sum + segment.area * segment.y, 0) / area;
+  const inertia = segments.reduce(
+    (sum, segment) => sum + segment.inertia + segment.area * (segment.y - axis) ** 2,
+    0,
+  );
+  return inertia / (top - axis);
+}
+
+/**
+ * Effective / gross section modulus of a cold-formed C in strong-axis bending (thin-walled model,
+ * compression flange on top; symmetric so gravity and uplift share the ratio).
+ * Flange: internal element, kσ = 4, bp = b - 2t, ρ·bp split at the flange ends, extra 0.9 when λp > 0.673.
+ * Web: ψ = -1, kσ = 23.9, compression zone h/2, ρ·hc split 0.4 / 0.6 (EN 1993-1-5 Tab. 4.1).
+ * Lips fully effective (no distortional buckling χd); neutral axis shift not iterated.
+ * @returns ratio <= 1 and the flange / web reduction factors
+ */
+export function effectiveModulusRatio(
+  profile: SteelProfile,
+  fy: number,
+): { ratio: number; flangeRho: number; webRho: number } {
+  const t = profile.tw;
+  const epsilon = Math.sqrt(235 / fy);
+  const web = profile.h - t;
+  const flange = profile.b - t;
+  const lip = Math.max(0, profile.lip - t / 2);
+  const flangeSlenderness = (profile.b - 2 * t) / t / (28.4 * epsilon * Math.sqrt(4));
+  const webSlenderness = web / t / (28.4 * epsilon * Math.sqrt(23.9));
+  const flangeRho = plateReduction(flangeSlenderness, 0.22) * (flangeSlenderness > 0.673 ? 0.9 : 1);
+  const webRho = plateReduction(webSlenderness, 0.11);
+  const half = web / 2;
+  const vertical = (length: number, y: number): Segment => ({
+    area: t * length,
+    y,
+    inertia: (t * length ** 3) / 12,
+  });
+  const horizontal = (length: number, y: number): Segment => ({ area: t * length, y, inertia: 0 });
+  const bottom = (): Segment[] => [horizontal(flange, -half), vertical(lip, -half + lip / 2)];
+  const gross: Segment[] = [
+    ...bottom(),
+    horizontal(flange, half),
+    vertical(lip, half - lip / 2),
+    vertical(web, 0),
+  ];
+  const effectiveZone = (webRho * web) / 2;
+  const upperPart = 0.4 * effectiveZone;
+  const lowerPart = 0.6 * effectiveZone;
+  const effective: Segment[] = [
+    ...bottom(),
+    horizontal(flangeRho * flange, half),
+    vertical(lip, half - lip / 2),
+    vertical(web / 2, -half / 2),
+    vertical(upperPart, half - upperPart / 2),
+    vertical(lowerPart, lowerPart / 2),
+  ];
+  const top = half + t / 2;
+  return {
+    ratio: Math.min(1, sectionModulus(effective, top) / sectionModulus(gross, top)),
+    flangeRho,
+    webRho,
+  };
+}
+
+/** Design bending resistance, N·mm: Wpl fy for I, Weff fy for cold-formed C, Wel fy otherwise. */
 function bendingResistance(profile: SteelProfile, fy: number): number {
-  return profile.shape === 'I'
-    ? sectionResistance(profile, fy).moment
-    : sectionProperties(profile).elasticModulus * fy;
+  if (profile.shape === 'I') return sectionResistance(profile, fy).moment;
+  const elastic = sectionProperties(profile).elasticModulus * fy;
+  return profile.shape === 'C' ? elastic * effectiveModulusRatio(profile, fy).ratio : elastic;
 }
 
 /** χLT of the free flange: I sections by EN 1993-1-1 §6.3.2.3, cold-formed C by the simplified §10.1 value. */
@@ -200,8 +277,8 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
     'row of anti-sag bars at mid-span; (3) shear; (4) deflection under characteristic dead + snow ≤ ' +
     'span/200. Rails: horizontal wind on the strong axis, zones A -1.2 (within e/5 of a gable) / B ' +
     '-0.8 (within e) / C -0.5, with cpi +0.2, and pressure D +0.8 with cpi -0.3; bending, shear, ' +
-    'deflection under characteristic wind ≤ span/150. Cold-formed sections use the elastic modulus ' +
-    '(no effective-section reduction); weak-axis, torsion and cladding self-weight on rails are not ' +
+    'deflection under characteristic wind ≤ span/150. Cold-formed C sections use an effective section ' +
+    'modulus (EN 1993-1-3 §5.5 / 1993-1-5 §4.4, simplified: flange kσ 4 with 0.9 when λp > 0.673, web ψ -1, lips fully effective, no distortional buckling); weak-axis, torsion and cladding self-weight on rails are not ' +
     'checked. Returns one row per member with its governing check; values > 1 fail. Preliminary - ' +
     'not a substitute for the engineer of record.',
   paramsSchema: {
