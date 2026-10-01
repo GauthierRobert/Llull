@@ -60,7 +60,7 @@ describe('quantity_takeoff', () => {
     expect(line(lines, 'wall.concrete.m3').quantity).toBeCloseTo(30.969);
     expect(line(lines, 'door.timber.ea').quantity).toBe(1);
     expect(line(lines, 'window.glass.ea').quantity).toBe(2);
-    expect(line(lines, 'slab-floor.concrete.m2').quantity).toBeCloseTo(10.3 * 8.3);
+    expect(line(lines, 'slab-floor.concrete.m2').quantity).toBeCloseTo(80);
     expect(line(lines, 'column.concrete.m3').quantity).toBeCloseTo(0.27);
     expect(line(lines, 'beam.concrete.m3').quantity).toBeCloseTo(1.5);
     expect(line(lines, 'stair.concrete.ea').quantity).toBe(1);

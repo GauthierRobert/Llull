@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "llull — a modern, MCP-first 3D CAD app whose every operation is one command drivable by UI, AI, or any MCP agent.",
+  "description": "llull \u2014 a modern, MCP-first 3D CAD app whose every operation is one command drivable by UI, AI, or any MCP agent.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,10 +12,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"scripts/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"scripts/**/*.ts\" playwright.config.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"scripts/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"scripts/**/*.ts\" playwright.config.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",

@@ -214,7 +214,7 @@ export function DrawPreview({
       if (collectedPoints.length === 1) {
         geo = buildLineGeo(collectedPoints[0]!, cursor);
       }
-    } else if (activeTool === 'polyline') {
+    } else if (activeTool === 'polyline' || activeTool === 'wall') {
       if (collectedPoints.length >= 1) {
         geo = buildPolylineGeo(collectedPoints, cursor);
       } else {

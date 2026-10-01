@@ -28,11 +28,13 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera, MapControls } from '@react-three/drei';
+import { ZoomExtents2D } from './ZoomExtents2D';
 import * as THREE from 'three';
 import type { MapControls as MapControlsImpl } from 'three-stdlib';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { Entities2D } from './Entities2D';
+import { BuildingPlan2D } from './BuildingPlan2D';
 import { SnapIndicator } from './SnapIndicator';
 import { DrawInteraction } from './DrawInteraction';
 import { DrawTools } from './DrawTools';
@@ -365,6 +367,9 @@ function SceneContents2D({
       {/* ---- Demand-mode invalidation: re-render on store/document changes ---- */}
       <StoreInvalidator2D />
 
+      {/* ---- Frame the document on mount and on fit_view / camera changes ---- */}
+      <ZoomExtents2D />
+
       {/* ---- Per-frame rebase check — keeps float32 coords small ---- */}
       <RenderOriginSyncer2D />
 
@@ -386,6 +391,7 @@ function SceneContents2D({
            the same offset group so pointer e.point resolves in document
            space — matching the snap candidate frame (architecture L7).  ---- */}
       <group position={groupOffset}>
+        <BuildingPlan2D />
         <Entities2D document={document} />
 
         {/* Snap indicator: shown when no draw or modify tool is active */}

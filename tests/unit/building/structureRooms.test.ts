@@ -34,6 +34,7 @@ describe('add_slab', () => {
     let doc = perimeter();
     doc = run(doc, 'add_slab', {
       wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'],
+      wallFace: 'outer',
       role: 'roof',
       offset: 3000,
     });
@@ -67,6 +68,21 @@ describe('add_slab', () => {
     expect(execute(doc, 'add_slab', { boundary: SQUARE, levelId: 'q' }).summary).toMatch(
       /unknown level/,
     );
+  });
+
+  it('add_slab from all level walls ignores T-joined partitions', () => {
+    let doc = perimeter();
+    doc = run(doc, 'add_wall', { start: [3000, 0], end: [3000, 4000], thickness: 100 });
+    doc = run(doc, 'add_wall', { start: [3000, 2000], end: [6000, 2000], thickness: 100 });
+    const result = execute(doc, 'add_slab', {
+      wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4', 'wall-5', 'wall-6'],
+    });
+    expect(result.summary).toMatch(/area 24000000\.000/);
+    const inner = execute(doc, 'add_slab', {
+      wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'],
+      wallFace: 'inner',
+    });
+    expect(inner.summary).toMatch(/area 22040000\.000/);
   });
 
   it('wallLoop rejects disconnected walls', () => {

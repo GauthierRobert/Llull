@@ -23,6 +23,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useStore } from '@ui/store';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useNamedViewStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
@@ -64,9 +65,11 @@ export function NamedViewsInner(): null {
   const getCameraSnapshot = useCallback((): NamedViewCamera | null => {
     const orbit = controls as OrbitControlsImpl | null;
     if (!orbit) return null;
+    // Named views are stored in world space; the camera lives in render space.
+    const [ox, oy, oz] = useStore.getState().renderOrigin;
     return {
-      position: [camera.position.x, camera.position.y, camera.position.z],
-      target: [orbit.target.x, orbit.target.y, orbit.target.z],
+      position: [camera.position.x + ox, camera.position.y + oy, camera.position.z + oz],
+      target: [orbit.target.x + ox, orbit.target.y + oy, orbit.target.z + oz],
     };
   }, [camera, controls]);
 
@@ -78,8 +81,9 @@ export function NamedViewsInner(): null {
       const orbit = controls as OrbitControlsImpl | null;
       if (!orbit) return;
 
-      const targetVec = new THREE.Vector3(target[0], target[1], target[2]);
-      camera.position.set(position[0], position[1], position[2]);
+      const [ox, oy, oz] = useStore.getState().renderOrigin;
+      const targetVec = new THREE.Vector3(target[0] - ox, target[1] - oy, target[2] - oz);
+      camera.position.set(position[0] - ox, position[1] - oy, position[2] - oz);
       camera.lookAt(targetVec);
       orbit.target.copy(targetVec);
 

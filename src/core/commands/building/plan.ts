@@ -84,6 +84,9 @@ export interface PlanDrawing {
 
 export const DIMENSION_LAYER = 'A-ANNO-DIMS';
 
+/** The document slices a plan depends on. */
+export type PlanSource = Pick<CadDocument, 'building' | 'units'>;
+
 function layerName(category: BimCategory): string {
   return CATEGORY_LAYER[category].name;
 }
@@ -224,7 +227,7 @@ export function boundsOf(
 }
 
 /** Dimension text in millimetres (construction convention). */
-export function dimensionLabel(doc: CadDocument, value: number): string {
+export function dimensionLabel(doc: PlanSource, value: number): string {
   return String(Math.round(toMetres(doc, value) * 1000));
 }
 
@@ -234,7 +237,7 @@ function dimension(a: Vec2, b: Vec2, offset: number, label: string): PlanPrimiti
 
 /** Overall wall extents + grid spacing chains. */
 function dimensionPrimitives(
-  doc: CadDocument,
+  doc: PlanSource,
   building: BuildingModel,
   walls: ReadonlyArray<WallElement>,
 ): PlanPrimitive[] {
@@ -288,7 +291,7 @@ function dimensionPrimitives(
 }
 
 function stairPrimitives(
-  doc: CadDocument,
+  doc: PlanSource,
   stair: Extract<BuildingModel['elements'][string], { category: 'stair' }>,
 ): PlanPrimitive[] {
   const direction: Vec2 = [Math.cos(stair.angle), Math.sin(stair.angle)];
@@ -342,7 +345,7 @@ function stairPrimitives(
  * @failure no such level -> null
  */
 export function buildPlanDrawing(
-  doc: CadDocument,
+  doc: PlanSource,
   levelId: string | undefined,
   options: { cutHeight?: number; dimensions?: boolean } = {},
 ): PlanDrawing | null {

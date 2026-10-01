@@ -22,16 +22,16 @@ export const METRES_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
 };
 
 /** Converts a length given in millimetres into the document's units. */
-export function fromMm(doc: CadDocument, millimetres: number): number {
+export function fromMm(doc: Pick<CadDocument, 'units'>, millimetres: number): number {
   return (millimetres * 0.001) / METRES_PER_UNIT[doc.units];
 }
 
 /** Converts a length in document units to metres. */
-export function toMetres(doc: CadDocument, value: number): number {
+export function toMetres(doc: Pick<CadDocument, 'units'>, value: number): number {
   return value * METRES_PER_UNIT[doc.units];
 }
 
-export function getBuilding(doc: CadDocument): BuildingModel {
+export function getBuilding(doc: Pick<CadDocument, 'building'>): BuildingModel {
   return doc.building ?? createEmptyBuilding();
 }
 
@@ -70,7 +70,8 @@ const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string
   stair: 'ST',
 };
 
-function highestIndex(keys: ReadonlyArray<string>, prefix: string): number {
+/** Largest integer N among keys "<prefix>N" (0 when none). */
+export function highestIndex(keys: ReadonlyArray<string>, prefix: string): number {
   let highest = 0;
   for (const key of keys) {
     if (!key.startsWith(prefix)) continue;

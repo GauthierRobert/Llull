@@ -20,6 +20,7 @@ import { addRoom, deleteBuildingElement, moveBuildingElement, copyLevelElements 
 import { exportDxf } from './dxf';
 import { exportPlanSheet } from './sheet';
 import { exportIfc } from './ifc';
+import { addBuildingTemplate } from './templates';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 export const buildingCommands = [
@@ -52,4 +53,5 @@ export const buildingCommands = [
   exportDxf,
   exportPlanSheet,
   exportIfc,
+  addBuildingTemplate,
 ] as ReadonlyArray<CommandDefinition<unknown>>;

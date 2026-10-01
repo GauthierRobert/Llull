@@ -31,6 +31,7 @@ export type DrawToolKind =
   | 'none'
   | 'line'
   | 'polyline'
+  | 'wall'
   | 'circle'
   | 'rectangle'
   | 'point'
@@ -60,6 +61,26 @@ export interface UseDrawToolResult extends DrawToolState {
   cancel: () => void;
 }
 
+/**
+ * Wall-chain params: clicking the first point again closes the loop (the repeated
+ * vertex is dropped and `closed` is set).
+ */
+export function wallChainParams(
+  points: ReadonlyArray<Vec2>,
+  closed: boolean,
+): { points: Vec2[]; closed: boolean } {
+  const first = points[0];
+  const last = points[points.length - 1];
+  const returnsToStart =
+    points.length >= 4 &&
+    first !== undefined &&
+    last !== undefined &&
+    Math.hypot(last[0] - first[0], last[1] - first[1]) < 1e-9;
+  return returnsToStart
+    ? { points: points.slice(0, -1), closed: true }
+    : { points: [...points], closed };
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -85,10 +106,14 @@ export function useDrawTool(): UseDrawToolResult {
         setCollectedPoints([]);
         return;
       }
-      dispatch('draw_polyline', { points: collectedPoints, closed });
+      if (activeTool === 'wall') {
+        dispatch('draw_walls', wallChainParams(collectedPoints, closed));
+      } else {
+        dispatch('draw_polyline', { points: collectedPoints, closed });
+      }
       setCollectedPoints([]);
     },
-    [collectedPoints, dispatch],
+    [activeTool, collectedPoints, dispatch],
   );
 
   const finishSpline = useCallback(
@@ -128,7 +153,8 @@ export function useDrawTool(): UseDrawToolResult {
           break;
         }
 
-        case 'polyline': {
+        case 'polyline':
+        case 'wall': {
           // Each click appends a vertex; finishPolyline() or Enter commits.
           setCollectedPoints((prev) => [...prev, point]);
           break;
@@ -208,7 +234,7 @@ export function useDrawTool(): UseDrawToolResult {
       if (e.key === 'Escape') {
         cancel();
       } else if (e.key === 'Enter') {
-        if (activeTool === 'polyline') finishPolyline(false);
+        if (activeTool === 'polyline' || activeTool === 'wall') finishPolyline(false);
         else if (activeTool === 'spline') finishSpline(false);
       }
     };

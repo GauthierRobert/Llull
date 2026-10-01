@@ -32,6 +32,7 @@ const TOOL_BUTTONS: ToolButton[] = [
   { tool: 'none', label: 'Select', hint: 'Esc', icon: 'cursor' },
   { tool: 'line', label: 'Line', hint: 'L', icon: 'drawLine' },
   { tool: 'polyline', label: 'Polyline', hint: 'P', icon: 'drawPolyline' },
+  { tool: 'wall', label: 'Wall', hint: 'W', icon: 'wall' },
   { tool: 'circle', label: 'Circle', hint: 'C', icon: 'drawCircle' },
   { tool: 'ellipse', label: 'Ellipse', hint: 'E', icon: 'drawEllipse' },
   { tool: 'rectangle', label: 'Rectangle', hint: 'R', icon: 'drawRectangle' },
@@ -41,6 +42,7 @@ const TOOL_BUTTONS: ToolButton[] = [
 
 const TOOL_HINTS: Partial<Record<DrawToolKind, string>> = {
   polyline: 'Click to add points. Enter to finish, Esc to cancel.',
+  wall: 'Click wall centerline points. Enter to finish; click the first point again to close the loop.',
   spline: 'Click to add through-points. Enter or double-click to finish, Esc to cancel.',
   line: 'Click start, then end point.',
   circle: 'Click center, then radius point.',

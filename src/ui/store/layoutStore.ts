@@ -8,6 +8,7 @@
 import { create } from 'zustand';
 
 export type SidebarTab =
+  | 'building'
   | 'layers'
   | 'assembly'
   | 'mechanisms'
@@ -17,6 +18,7 @@ export type SidebarTab =
   | 'materials';
 
 const SIDEBAR_TABS: readonly SidebarTab[] = [
+  'building',
   'layers',
   'assembly',
   'mechanisms',

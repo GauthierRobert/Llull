@@ -109,7 +109,7 @@ export function DrawInteraction({
 
   const handleDoubleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {
-      if (activeTool !== 'polyline' && activeTool !== 'spline') return;
+      if (activeTool !== 'polyline' && activeTool !== 'spline' && activeTool !== 'wall') return;
       e.stopPropagation();
       onDoubleClick();
     },

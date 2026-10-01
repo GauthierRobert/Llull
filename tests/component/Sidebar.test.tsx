@@ -15,6 +15,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { Sidebar } from '@ui/components/Sidebar';
 
 const TAB_LABELS = [
+  'Building',
   'Layers',
   'Assembly',
   'Mechanisms',
@@ -90,11 +91,12 @@ describe('Sidebar — keyboard', () => {
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Assembly' }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'End' });
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Materials' }));
+    const building = screen.getByRole('tab', { name: 'Building' });
     fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
-    expect(document.activeElement).toBe(layers);
-    fireEvent.keyDown(layers, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(building);
+    fireEvent.keyDown(building, { key: 'ArrowUp' });
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Materials' }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'Home' });
-    expect(document.activeElement).toBe(layers);
+    expect(document.activeElement).toBe(building);
   });
 });

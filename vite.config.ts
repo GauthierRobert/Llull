@@ -52,7 +52,7 @@ export default defineConfig(({ command }) => ({
     // and contain full repo copies; never scan them for tests.
     // `server/**` has its own node-env vitest config — keep it out of the app
     // (jsdom) suite so the two never cross-contaminate.
-    exclude: [...configDefaults.exclude, '.claude/worktrees/**', 'server/**'],
+    exclude: [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'tests/e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

@@ -41,14 +41,34 @@ function positiveOrUndefined(value: number | undefined): boolean {
 }
 
 /**
- * Chains walls that share endpoints into a closed centerline loop.
+ * Drops walls with a free endpoint (one touching no other wall's endpoint) until none remain —
+ * removes partitions T-joined to a perimeter so the enclosing loop is left.
+ */
+function pruneDanglingWalls(walls: ReadonlyArray<WallElement>, tolerance: number): WallElement[] {
+  let kept = [...walls];
+  for (;;) {
+    const joined = (point: Vec2, self: WallElement): boolean =>
+      kept.some(
+        (other) =>
+          other !== self &&
+          (distance(other.start, point) <= tolerance || distance(other.end, point) <= tolerance),
+      );
+    const next = kept.filter((wall) => joined(wall.start, wall) && joined(wall.end, wall));
+    if (next.length === kept.length) return kept;
+    kept = next;
+  }
+}
+
+/**
+ * Chains walls that share endpoints into a closed centerline loop (dangling partitions ignored).
  * @failure walls do not form exactly one closed loop -> null
  */
 export function wallLoop(walls: ReadonlyArray<WallElement>): Vec2[] | null {
-  const first = walls[0];
-  if (!first || walls.length < 3) return null;
-  const tolerance = Math.max(first.thickness * 0.05, 1e-9);
-  const remaining = walls.slice(1);
+  const tolerance = Math.max((walls[0]?.thickness ?? 0) * 0.05, 1e-9);
+  const pruned = pruneDanglingWalls(walls, tolerance);
+  const first = pruned[0];
+  if (!first || pruned.length < 3) return null;
+  const remaining = pruned.slice(1);
   const loop: Vec2[] = [first.start];
   let cursor = first.end;
   while (remaining.length > 0) {
@@ -67,6 +87,7 @@ export function wallLoop(walls: ReadonlyArray<WallElement>): Vec2[] | null {
 interface AddSlabParams {
   boundary?: Vec2[];
   wallIds?: string[];
+  wallFace?: 'outer' | 'center' | 'inner';
   levelId?: string;
   thickness?: number;
   offset?: number;
@@ -84,7 +105,7 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
   name: 'add_slab',
   description:
     'Add a floor, roof or foundation slab whose TOP sits at the level elevation + offset. Give either ' +
-    'a plan boundary polygon or wallIds forming a closed loop (the slab then reaches the outer wall faces).',
+    'a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace).',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -97,6 +118,12 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
         type: 'array',
         items: { type: 'string' },
         description: 'Alternative to boundary: wall ids forming a closed loop.',
+      },
+      wallFace: {
+        type: 'string',
+        enum: ['outer', 'center', 'inner'],
+        description:
+          'With wallIds: slab edge at the outer wall faces, the wall centerlines (default — the slab bears into the walls), or the inner faces.',
       },
       levelId: LEVEL_ID_PROPERTY,
       thickness: { type: 'number', description: 'Slab thickness (> 0). Default 200 mm.' },
@@ -116,7 +143,16 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
   },
   run: (
     doc,
-    { boundary, wallIds, levelId, thickness, offset = 0, role = 'floor', material },
+    {
+      boundary,
+      wallIds,
+      wallFace = 'center',
+      levelId,
+      thickness,
+      offset = 0,
+      role = 'floor',
+      material,
+    },
   ): CommandResult => {
     const building = getBuilding(doc);
     let outline: Vec2[] | null = null;
@@ -127,7 +163,9 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
       if (walls.every((wall): wall is WallElement => wall?.category === 'wall')) {
         const loop = wallLoop(walls);
         const halfThickness = Math.max(...walls.map((wall) => wall.thickness)) / 2;
-        outline = loop ? offsetPolygon(loop, halfThickness).map(toVec2) : null;
+        const shift =
+          wallFace === 'outer' ? halfThickness : wallFace === 'inner' ? -halfThickness : 0;
+        outline = loop ? (shift === 0 ? loop : offsetPolygon(loop, shift)).map(toVec2) : null;
       }
     }
     if (!outline || !isValidPolygon(outline)) {
