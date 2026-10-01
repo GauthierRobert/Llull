@@ -66,6 +66,14 @@ export function wallQuantities(building: BuildingModel, wall: WallElement): Wall
   return { length, grossArea, openingArea, netArea, volume: netArea * wall.thickness };
 }
 
+/** Slab plan area minus its openings (document units²). */
+export function slabNetArea(slab: Extract<BuildingElement, { category: 'slab' }>): number {
+  return (slab.openings ?? []).reduce(
+    (area, opening) => area - polygonArea(opening),
+    polygonArea(slab.boundary),
+  );
+}
+
 export function stairVolume(stair: Extract<BuildingElement, { category: 'stair' }>): number {
   const stepCountSum = (stair.riserCount * (stair.riserCount + 1)) / 2;
   return stair.treadDepth * stair.width * stair.riserHeight * stepCountSum;
@@ -158,7 +166,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
     }
   }
   for (const slab of elementsOf(building, 'slab')) {
-    const area = polygonArea(slab.boundary);
+    const area = slabNetArea(slab);
     const material = `${slab.material}`;
     takeoff.add(
       'slab',
@@ -343,7 +351,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           'Volume (m³)',
         ],
         rows: elementsOf(building, 'slab').map((slab) => {
-          const area = polygonArea(slab.boundary);
+          const area = slabNetArea(slab);
           return [
             slab.mark,
             levelName(building, slab.levelId),

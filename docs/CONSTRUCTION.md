@@ -26,6 +26,7 @@ The plan and status of this work: [`CONSTRUCTION_PLAN.md`](CONSTRUCTION_PLAN.md)
 | Wall | `add_wall`, `draw_walls`, `update_wall` | Plan centerline, thickness, height (default: level height), material. L / T / X joints close automatically. Also drawn with the **Wall** tool in the 2D view (Enter to finish, click the first point to close). |
 | Door / window | `add_door`, `add_window`, `update_opening` | Hosted by a wall: cut it exactly, travel with it, refused if they do not fit or overlap. Doors draw their swing in plan. |
 | Slab / roof / foundation | `add_slab` | From a boundary or a closed loop of walls (`wallFace`: outer / center / inner). Top at level + offset. |
+| Slab opening | `add_slab_opening`, `delete_slab_opening` | Stair wells (from a `stairId`: the floor slab above is found automatically), shafts, risers. Deducted from quantities, crossed in plan, IfcOpeningElement in IFC. |
 | Column | `add_column` | Rectangular or circular; one location or every grid intersection. |
 | Beam | `add_beam` | Top under the next floor by default. |
 | Stair | `add_stair` | Equal risers from the level height; reports the Blondel rule 2R + G (600–650 mm). |
@@ -55,6 +56,6 @@ The *Building* panel shows the live takeoff + estimate and downloads CSV files.
 
 ## Known limits
 
-- Walls are straight; curved walls, wall layers (build-ups) and slab openings (shafts, stair wells) are not modelled yet.
+- Walls are straight; curved walls and wall layers (build-ups) are not modelled yet.
 - Plans cut every element of the level at 1.2 m; sections and elevations are not generated yet.
 - The DXF has no hatch entities (wall poché is drawn as closed outlines).

@@ -251,6 +251,18 @@ function exportOther(
       const ref = writer.add(
         `IFCSLAB('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(element.thickness))])},${ifcString(element.id)},${SLAB_TYPE[element.role]})`,
       );
+      (element.openings ?? []).forEach((opening, index) => {
+        const voidProfile = polygonProfile(
+          context,
+          opening.map(([x, y]): Vec2 => [mm(x), mm(y)]),
+        );
+        const voidRef = writer.add(
+          `IFCOPENINGELEMENT('${ifcGuid(`${element.id}:void-${index}`)}',$,${ifcString(`${element.mark} opening ${index + 1}`)},$,$,${placement(context, local, 0, 0, 0)},${shape(context, [extrusion(context, voidProfile, mm(element.thickness) + 20, 0, 0, -10)])},$,.OPENING.)`,
+        );
+        writer.add(
+          `IFCRELVOIDSELEMENT('${ifcGuid(`${element.id}:voids-${index}`)}',$,$,$,${ref},${voidRef})`,
+        );
+      });
       return { ref, material: element.material, isSpace: false };
     }
     case 'column': {

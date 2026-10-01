@@ -9,31 +9,55 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingModel } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { ELEMENT_TOOLS, defaultValues, type ElementTool, type ToolField } from './elementTools';
+import {
+  ELEMENT_TOOLS,
+  defaultValues,
+  type ElementListKind,
+  type ElementTool,
+  type ToolField,
+} from './elementTools';
 
-interface WallOption {
+interface ElementOption {
   readonly id: string;
   readonly label: string;
 }
 
-function wallsOnLevel(building: BuildingModel | undefined): WallOption[] {
-  if (!building) return [];
-  return building.elementOrder.flatMap((id) => {
+type ElementOptions = Readonly<Record<ElementListKind, ReadonlyArray<ElementOption>>>;
+
+const NO_OPTIONS: ElementOptions = { walls: [], stairs: [], slabs: [] };
+
+/** Active level's walls and stairs, and every slab (stair wells cut the slab above). */
+function elementOptions(building: BuildingModel | undefined): ElementOptions {
+  if (!building) return NO_OPTIONS;
+  const options: Record<ElementListKind, ElementOption[]> = { walls: [], stairs: [], slabs: [] };
+  for (const id of building.elementOrder) {
     const element = building.elements[id];
-    if (element?.category !== 'wall' || element.levelId !== building.activeLevelId) return [];
-    const length = Math.hypot(element.end[0] - element.start[0], element.end[1] - element.start[1]);
-    return [{ id, label: `${element.mark} · ${Math.round(length)} long` }];
-  });
+    if (!element) continue;
+    const onActiveLevel = 'levelId' in element && element.levelId === building.activeLevelId;
+    if (element.category === 'wall' && onActiveLevel) {
+      const length = Math.hypot(
+        element.end[0] - element.start[0],
+        element.end[1] - element.start[1],
+      );
+      options.walls.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
+    } else if (element.category === 'stair' && onActiveLevel) {
+      options.stairs.push({ id, label: `${element.mark} · ${element.riserCount} risers` });
+    } else if (element.category === 'slab') {
+      const level = building.levels[element.levelId]?.name ?? element.levelId;
+      options.slabs.push({ id, label: `${element.mark} · ${element.role} · ${level}` });
+    }
+  }
+  return options;
 }
 
 interface FieldInputProps {
   field: ToolField;
   value: string;
-  walls: ReadonlyArray<WallOption>;
+  lists: ElementOptions;
   onChange: (key: string, value: string) => void;
 }
 
-function FieldInput({ field, value, walls, onChange }: FieldInputProps): React.ReactElement {
+function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.ReactElement {
   const testId = `tool-field-${field.key}`;
   if (field.kind === 'checkbox') {
     return (
@@ -49,9 +73,11 @@ function FieldInput({ field, value, walls, onChange }: FieldInputProps): React.R
     );
   }
   if (field.kind === 'select') {
-    const options =
-      field.options === 'walls'
-        ? walls.map((wall): readonly [string, string] => [wall.id, wall.label])
+    const live = typeof field.options === 'string' ? lists[field.options] : null;
+    const options = live
+      ? live.map((option): readonly [string, string] => [option.id, option.label])
+      : typeof field.options === 'string'
+        ? []
         : (field.options ?? []);
     return (
       <label className="field">
@@ -61,9 +87,7 @@ function FieldInput({ field, value, walls, onChange }: FieldInputProps): React.R
           onChange={(event) => onChange(field.key, event.target.value)}
           data-testid={testId}
         >
-          {field.options === 'walls' && (
-            <option value="">{walls.length === 0 ? 'No walls on level' : 'Choose…'}</option>
-          )}
+          {live && <option value="">{live.length === 0 ? 'None available' : 'Choose…'}</option>}
           {options.map(([optionValue, label]) => (
             <option key={optionValue} value={optionValue}>
               {label}
@@ -96,7 +120,7 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const [values, setValues] = useState<Record<string, string>>(() => defaultValues(tool));
   const [error, setError] = useState('');
-  const walls = useMemo(() => wallsOnLevel(building), [building]);
+  const lists = useMemo(() => elementOptions(building), [building]);
 
   const handleChange = (key: string, value: string): void => {
     setValues((previous) => ({ ...previous, [key]: value }));
@@ -107,7 +131,7 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
     event.preventDefault();
     const outcome = tool.build(values, {
       levelId: building?.activeLevelId ?? null,
-      wallIds: walls.map((wall) => wall.id),
+      wallIds: lists.walls.map((wall) => wall.id),
     });
     if (!outcome.ok) {
       setError(outcome.reason);
@@ -127,7 +151,7 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
           key={field.key}
           field={field}
           value={values[field.key] ?? ''}
-          walls={walls}
+          lists={lists}
           onChange={handleChange}
         />
       ))}

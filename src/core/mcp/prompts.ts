@@ -402,7 +402,7 @@ const designBuilding: PromptTemplate = {
           `(endpoints on another wall join automatically).\n` +
           `5. \`add_door\` / \`add_window\` { wallId, offset | at, width, height, sillHeight } — hosted; refused if they do not fit.\n` +
           `6. \`add_slab\` { wallIds } (or boundary), \`add_column\` { atGridIntersections: true }, \`add_beam\`, \`add_stair\` ` +
-          `(the summary checks the 2R+G comfort rule).\n` +
+          `(the summary checks the 2R+G comfort rule); \`add_slab_opening\` { stairId } cuts the stair well above.\n` +
           `7. \`add_room\` { name, wallIds | boundary } for each space.\n` +
           `8. Repeat a typical floor with \`copy_level_elements\`; roof = \`add_slab\` { role: "roof" } on the top level.\n` +
           `9. Inspect with \`describe_building\`, \`quantity_takeoff\`, \`building_schedule\` { kind }.\n` +

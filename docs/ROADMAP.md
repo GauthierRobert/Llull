@@ -73,7 +73,8 @@ AI control — there is no in-app AI bridge).**
 - [x] Quantity takeoff, schedules, cost estimate
 - [x] DXF (R12) plans, scaled SVG plan sheets with title block, IFC4 export
 - [x] Building panel, 2D Wall tool, per-level floor plan in the 2D view, starter templates
-- [ ] Curved walls, wall build-ups, slab openings, sections / elevations, DXF hatches
+- [x] Slab openings (stair wells, shafts)
+- [ ] Curved walls, wall build-ups, sections / elevations, DXF hatches
 
 ## Later
 - [ ] Materials library (physical + visual / rendering)

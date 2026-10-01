@@ -111,3 +111,30 @@ export function lineIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2)
   const t = ((b1[0] - a1[0]) * d2y - (b1[1] - a1[1]) * d2x) / denominator;
   return [a1[0] + t * d1x, a1[1] + t * d1y];
 }
+
+/** Even-odd point-in-polygon test (points on the boundary may go either way). */
+export function pointInPolygon(point: Point2, polygon: ReadonlyArray<Point2>): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i] as Point2;
+    const [xj, yj] = polygon[j] as Point2;
+    if (
+      yi > point[1] !== yj > point[1] &&
+      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** True when segments a1–a2 and b1–b2 cross at a single interior point (touching ends excluded). */
+export function segmentsIntersect(a1: Point2, a2: Point2, b1: Point2, b2: Point2): boolean {
+  const orient = (p: Point2, q: Point2, r: Point2): number =>
+    (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const d1 = orient(b1, b2, a1);
+  const d2 = orient(b1, b2, a2);
+  const d3 = orient(a1, a2, b1);
+  const d4 = orient(a1, a2, b2);
+  return d1 * d2 < 0 && d3 * d4 < 0;
+}

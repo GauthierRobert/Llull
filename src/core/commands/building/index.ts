@@ -21,6 +21,7 @@ import { exportDxf } from './dxf';
 import { exportPlanSheet } from './sheet';
 import { exportIfc } from './ifc';
 import { addBuildingTemplate } from './templates';
+import { addSlabOpening, deleteSlabOpening } from './slabOpenings';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 export const buildingCommands = [
@@ -42,6 +43,8 @@ export const buildingCommands = [
   addColumn,
   addBeam,
   addStair,
+  addSlabOpening,
+  deleteSlabOpening,
   addRoom,
   deleteBuildingElement,
   moveBuildingElement,

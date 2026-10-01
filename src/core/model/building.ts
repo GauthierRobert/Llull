@@ -92,6 +92,8 @@ export interface SlabElement extends ElementBase {
   offset: number;
   role: SlabRole;
   material: string;
+  /** Voids through the slab (stair wells, shafts), as plan polygons inside the boundary. */
+  openings?: Vec2[][];
 }
 
 /** A vertical column standing on its level. */

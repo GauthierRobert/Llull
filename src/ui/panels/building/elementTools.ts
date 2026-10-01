@@ -7,13 +7,16 @@
 
 export type FieldKind = 'number' | 'text' | 'select' | 'checkbox';
 
+/** Live element lists a select field can offer. */
+export type ElementListKind = 'walls' | 'stairs' | 'slabs';
+
 export interface ToolField {
   readonly key: string;
   readonly label: string;
   readonly kind: FieldKind;
   readonly defaultValue: string;
-  /** For 'select': [value, label] pairs; 'walls' is filled with the active level's walls. */
-  readonly options?: ReadonlyArray<readonly [string, string]> | 'walls';
+  /** For 'select': [value, label] pairs, or a live list (active level's walls / stairs, all slabs). */
+  readonly options?: ReadonlyArray<readonly [string, string]> | ElementListKind;
   /** Optional numeric fields may be left blank → the command default applies. */
   readonly optional?: boolean;
 }
@@ -144,13 +147,10 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'perimeter',
     label: 'Perimeter walls',
     fields: [
-      ...RECTANGLE_FIELDS.map((field) =>
-        field.key === 'x2'
-          ? { ...field, defaultValue: '10000' }
-          : field.key === 'y2'
-            ? { ...field, defaultValue: '8000' }
-            : field,
-      ),
+      num('x1', 'X1', '0'),
+      num('y1', 'Y1', '0'),
+      num('x2', 'X2', '10000'),
+      num('y2', 'Y2', '8000'),
       num('thickness', 'Thickness', '300'),
       num('height', 'Height', '', true),
       {
@@ -297,6 +297,44 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
         offset: reader.number('offset'),
         role: reader.text('role'),
         ...onLevel(context),
+      });
+    },
+  },
+  {
+    id: 'slabOpening',
+    label: 'Slab opening',
+    fields: [
+      {
+        key: 'source',
+        label: 'Opening',
+        kind: 'select',
+        defaultValue: 'stair',
+        options: [
+          ['stair', 'Stair well (slab above)'],
+          ['rectangle', 'Rectangle in slab'],
+        ],
+      },
+      { key: 'stairId', label: 'Stair', kind: 'select', defaultValue: '', options: 'stairs' },
+      { key: 'slabId', label: 'Slab', kind: 'select', defaultValue: '', options: 'slabs' },
+      num('x1', 'X1', '1000'),
+      num('y1', 'Y1', '1000'),
+      num('x2', 'X2', '3000'),
+      num('y2', 'Y2', '2000'),
+      num('margin', 'Margin', '100'),
+    ],
+    build: (values) => {
+      const reader = new FieldReader(values);
+      if (reader.text('source') === 'stair') {
+        if (reader.text('stairId') === '') return { ok: false, reason: 'Pick a stair first.' };
+        return result(reader, 'add_slab_opening', {
+          stairId: reader.text('stairId'),
+          margin: reader.number('margin'),
+        });
+      }
+      if (reader.text('slabId') === '') return { ok: false, reason: 'Pick a slab first.' };
+      return result(reader, 'add_slab_opening', {
+        slabId: reader.text('slabId'),
+        boundary: rectangle(reader),
       });
     },
   },

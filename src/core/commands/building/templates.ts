@@ -12,6 +12,7 @@ import { addWall, drawWalls } from './walls';
 import { addDoor, addWindow } from './openings';
 import { addBeam, addColumn, addSlab, addStair } from './structure';
 import { addRoom, copyLevelElements, deleteBuildingElement } from './elements';
+import { addSlabOpening } from './slabOpenings';
 import { fitView } from '../camera';
 
 type Step = (doc: CadDocument) => CommandResult;
@@ -33,7 +34,12 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step
       prefix === 'level-' ? Object.keys(building.levels) : Object.keys(building.elements),
       prefix,
     );
-  const [levelBase, wallBase, doorBase] = [base('level-'), base('wall-'), base('door-')];
+  const [levelBase, wallBase, doorBase, stairBase] = [
+    base('level-'),
+    base('wall-'),
+    base('door-'),
+    base('stair-'),
+  ];
   const level = (offset: number): string => `level-${levelBase + offset}`;
   const wall = (offset: number): string => `wall-${wallBase + offset}`;
   const door = (offset: number): string => `door-${doorBase + offset}`;
@@ -99,6 +105,7 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step
           categories: ['wall', 'slab'],
         }),
       (d) => deleteBuildingElement.run(d, { elementIds: [door(3)] }),
+      (d) => addSlabOpening.run(d, { stairId: `stair-${stairBase + 1}` }),
       (d) => addWindow.run(d, { wallId: wall(6), offset: mm(2500), width: mm(1400) }),
       (d) =>
         addRoom.run(d, {
@@ -185,6 +192,7 @@ function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2): Step
         categories: ['wall', 'column', 'beam', 'slab', 'room'],
       }),
     (d) => deleteBuildingElement.run(d, { elementIds: [door(2), door(3)] }),
+    (d) => addSlabOpening.run(d, { stairId: `stair-${stairBase + 1}` }),
     ...[2, 3].map(
       (floor): Step =>
         (d) =>

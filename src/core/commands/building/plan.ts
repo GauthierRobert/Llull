@@ -371,6 +371,27 @@ export function buildPlanDrawing(
           style: 'thin',
           points: element.boundary,
         });
+        for (const opening of element.openings ?? []) {
+          const far = opening[Math.floor(opening.length / 2)] as Vec2;
+          const near = opening[Math.floor(opening.length / 2) - 1] as Vec2;
+          primitives.push(
+            { type: 'polygon', layer: layerName('slab'), style: 'thin', points: opening },
+            {
+              type: 'line',
+              layer: layerName('slab'),
+              style: 'thin',
+              a: opening[0] as Vec2,
+              b: far,
+            },
+            {
+              type: 'line',
+              layer: layerName('slab'),
+              style: 'thin',
+              a: opening[opening.length - 1] as Vec2,
+              b: near,
+            },
+          );
+        }
         break;
       case 'column': {
         const [x, y] = element.location;

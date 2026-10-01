@@ -17,6 +17,8 @@ import type {
   ExtrusionEntity,
   Layer,
   LineEntity,
+  MeshData,
+  MeshSolidEntity,
   PolylineEntity,
   TextEntity,
   Vec2,
@@ -44,6 +46,7 @@ import {
   toCounterClockwise,
 } from '../../../lib/polygon';
 import { fromMm, toMetres } from './model';
+import { triangulatePolygon } from '../../../lib/triangulate';
 
 /** AIA / US National CAD Standard layer per category. */
 export const CATEGORY_LAYER: Readonly<Record<BimCategory, { name: string; color: string }>> = {
@@ -351,15 +354,46 @@ function evaluateOpening(
 // Slabs, columns, beams, stairs
 // ---------------------------------------------------------------------------
 
+/** Watertight world-space mesh of a slab with voids: triangulated top / bottom + side walls. */
+export function slabMesh(
+  boundary: ReadonlyArray<Vec2>,
+  openings: ReadonlyArray<ReadonlyArray<Vec2>>,
+  bottom: number,
+  top: number,
+): MeshData {
+  const { vertices, triangles } = triangulatePolygon(boundary, openings);
+  const count = vertices.length;
+  const positions: number[] = [];
+  for (const z of [top, bottom]) for (const [x, y] of vertices) positions.push(x, y, z);
+  const indices: number[] = [];
+  for (const [a, b, c] of triangles) indices.push(a, b, c, c + count, b + count, a + count);
+  let ringStart = 0;
+  for (const ringLength of [boundary.length, ...openings.map((opening) => opening.length)]) {
+    for (let index = 0; index < ringLength; index++) {
+      const current = ringStart + index;
+      const next = ringStart + ((index + 1) % ringLength);
+      indices.push(current + count, next + count, next, current + count, next, current);
+    }
+    ringStart += ringLength;
+  }
+  return { positions, indices };
+}
+
 function evaluateSlab(slab: SlabElement, level: BuildingLevel): Entity[] {
+  const bottom = level.elevation + slab.offset - slab.thickness;
+  const stub = { part: 'body', label: `${slab.role === 'roof' ? 'Roof' : 'Slab'} ${slab.mark}` };
+  const color = colorForMaterial(slab.material, '#b4b2aa');
+  const openings = slab.openings ?? [];
+  if (openings.length > 0) {
+    const mesh: MeshSolidEntity = {
+      ...base(slab, stub, [0, 0, 0], [0, 0, 0], color),
+      kind: 'mesh',
+      mesh: slabMesh(slab.boundary, openings, bottom, bottom + slab.thickness),
+    };
+    return [mesh];
+  }
   const extrusion: ExtrusionEntity = {
-    ...base(
-      slab,
-      { part: 'body', label: `${slab.role === 'roof' ? 'Roof' : 'Slab'} ${slab.mark}` },
-      [0, 0, level.elevation + slab.offset - slab.thickness],
-      [0, 0, 0],
-      colorForMaterial(slab.material, '#b4b2aa'),
-    ),
+    ...base(slab, stub, [0, 0, bottom], [0, 0, 0], color),
     kind: 'extrusion',
     profile: toCounterClockwise(slab.boundary),
     depth: slab.thickness,

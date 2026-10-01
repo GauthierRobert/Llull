@@ -10,7 +10,7 @@ describe('building element tools', () => {
   it.each(ELEMENT_TOOLS.map((tool) => [tool.id, tool] as const))(
     '%s defaults build a call to a registered command',
     (_id, tool) => {
-      const values = { ...defaultValues(tool), wallId: 'wall-1', name: 'Room' };
+      const values = { ...defaultValues(tool), wallId: 'wall-1', stairId: 'stair-1', name: 'Room' };
       const outcome = tool.build(values, context);
       expect(outcome.ok).toBe(true);
       if (outcome.ok) expect(getCommand(outcome.command)).toBeDefined();
@@ -99,5 +99,31 @@ describe('wallChainParams', () => {
       ],
       closed: false,
     });
+  });
+});
+
+describe('slab opening tool', () => {
+  const tool = ELEMENT_TOOLS.find((candidate) => candidate.id === 'slabOpening')!;
+  const context = { levelId: 'level-1', wallIds: [] };
+
+  it('cuts a stair well or a rectangle and asks for the missing pick', () => {
+    expect(tool.build(defaultValues(tool), context)).toEqual({
+      ok: false,
+      reason: 'Pick a stair first.',
+    });
+    expect(tool.build({ ...defaultValues(tool), stairId: 'stair-1' }, context)).toEqual({
+      ok: true,
+      command: 'add_slab_opening',
+      params: { stairId: 'stair-1', margin: 100 },
+    });
+    const rectangle = { ...defaultValues(tool), source: 'rectangle' };
+    expect(tool.build(rectangle, context)).toEqual({ ok: false, reason: 'Pick a slab first.' });
+    const cut = tool.build({ ...rectangle, slabId: 'slab-1' }, context);
+    expect(cut.ok && cut.params['boundary']).toEqual([
+      [1000, 1000],
+      [3000, 1000],
+      [3000, 2000],
+      [1000, 2000],
+    ]);
   });
 });

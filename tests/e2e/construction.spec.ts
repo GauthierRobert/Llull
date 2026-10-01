@@ -157,6 +157,25 @@ test.describe('construction workflow', () => {
     await expect(status(page)).toContainText('2R+G');
   });
 
+  test('S5 — stair well cut through the slab above', async ({ page }) => {
+    await openBuilding(page);
+    await shell(page);
+    await page.getByLabel('New level name').fill('First floor');
+    await page.getByRole('button', { name: 'Add level', exact: true }).click();
+    await applyTool(page, 'slab', {
+      source: 'rectangle',
+      x1: '0',
+      y1: '0',
+      x2: '10000',
+      y2: '8000',
+    });
+    await page.getByRole('button', { name: 'Activate level Ground floor' }).click();
+    await applyTool(page, 'stair', { x: '1000', y: '6500' });
+    await applyTool(page, 'slabOpening', { source: 'stair', stairId: 'stair-1' });
+    await expect(status(page)).toContainText('Cut opening #1');
+    await expect(status(page)).toContainText('in slab SL1');
+  });
+
   test('S6 — rooms with area tags', async ({ page }) => {
     await openBuilding(page);
     await shell(page);
