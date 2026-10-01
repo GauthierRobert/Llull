@@ -4,6 +4,7 @@ import type { BuildingElement, FootingElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
 import {
   designFootings,
+  designMat,
   type FootingDesignRow,
 } from '@core/commands/building/industrial/footingDesign';
 import {
@@ -179,6 +180,49 @@ describe('design_footings', () => {
   });
 });
 
+describe('punching perimeters and bending limit', () => {
+  it('checks every perimeter within 2d and reports the governing distance', () => {
+    const doc = withFootings(hall(), { thickness: 300, width: 1500, length: 1500 });
+    const rows = design(doc, { snowLoad: 3 });
+    const effective = 300 - 50 - 12;
+    for (const row of rows.filter((item) => item.status === 'designed')) {
+      expect(row.punchingDistance).toBeGreaterThan(0);
+      expect(row.punchingDistance).toBeLessThan(2 * effective);
+    }
+    const mat = designMat(
+      { widthMm: 1500, lengthMm: 1500, thicknessMm: 300, faceXmm: 300, faceYmm: 300, leverM: 0.5 },
+      [{ combination: 'x', normal: 500, moment: 0 }],
+    ).chosen;
+    // Closer perimeters (a < 2d) carry the enhanced vRd,c·2d/a but a shorter perimeter: they govern.
+    expect(mat?.punchingDistance).toBeGreaterThan(0);
+    expect(mat?.punchingDistance).toBeLessThan(2 * (300 - 50 - (mat?.diameter ?? 0)));
+    const summary = designFootings.run(doc, { snowLoad: 3 }).summary;
+    expect(summary).toMatch(/punching [\d.]+ at a=\d+ mm/);
+  });
+
+  it('distinguishes a bending-limited footing from a shear / punching failure', () => {
+    const result = designMat(
+      {
+        widthMm: 2500,
+        lengthMm: 2500,
+        thicknessMm: 1000,
+        faceXmm: 1400,
+        faceYmm: 1400,
+        leverM: 0.5,
+      },
+      [{ combination: 'x', normal: 16000, moment: 8000 }],
+    );
+    expect(result.chosen).toBeNull();
+    expect(result.bendingLimited).toBe(true);
+    const thin = designMat(
+      { widthMm: 1500, lengthMm: 1500, thicknessMm: 150, faceXmm: 300, faceYmm: 300, leverM: 0.5 },
+      [{ combination: 'x', normal: 2000, moment: 0 }],
+    );
+    expect(thin.chosen).toBeNull();
+    expect(thin.bendingLimited).toBe(false);
+  });
+});
+
 describe('footing reinforcement in the takeoff and schedule', () => {
   it('adds footing.rebar.kg with 10% laps and a Reinforcement schedule column', () => {
     const plain = hall();
@@ -215,6 +259,8 @@ describe('check_foundations settlement', () => {
     const settlement = rows.filter((row) => row.check.startsWith('settlement'));
     expect(settlement.length).toBeGreaterThan(0);
     expect(settlement[0]?.unit).toBe('mm');
+    expect(settlement[0]?.check).toContain('Is 0.88');
+    expect(settlement[0]?.check).toContain('net q = q − 18 kN/m³ × founding depth');
     expect(settlement[0]?.limit).toBe(25);
     expect(settlement[0]?.utilisation).toBeCloseTo((settlement[0]?.value ?? 0) / 25, 6);
     expect(settlement[0]?.combination).toBe('G+S');

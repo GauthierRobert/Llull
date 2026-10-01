@@ -73,8 +73,8 @@ const TOLERANCE_METRES = 0.1;
 const DEFAULT_TIE_CAPACITY = 175;
 const DEFAULT_SOIL_MODULUS = 20; // MPa
 const POISSON_RATIO = 0.3;
-/** Influence factor of a rigid square footing (elastic half-space). */
-const SETTLEMENT_INFLUENCE = 1.12;
+/** Influence factor of a rigid square footing (elastic half-space; flexible centre = 1.12). */
+const SETTLEMENT_INFLUENCE = 0.88;
 const SETTLEMENT_LIMIT_MM = 25;
 const DIFFERENTIAL_RATIO = 500;
 
@@ -201,7 +201,7 @@ function worst(candidates: Candidate[]): Candidate | null {
 }
 
 /**
- * Elastic settlement (mm) of a pad under SLS G+S: s = q B (1 − ν²) Is / Es, q = (V + footing + backfill) / area.
+ * Elastic settlement (mm) of a pad under SLS G+S: s = q B (1 − ν²) Is / Es, Is 0.88 (rigid square), q = (V + footing + backfill) / area − 18 kN/m³ × founding depth.
  * @pure
  */
 export function footingSettlement(
@@ -216,10 +216,9 @@ export function footingSettlement(
   const backfill = Math.max(0, -toMetres(doc, footing.topOffset));
   const area = widthX * lengthY;
   const { v } = combine(reaction, { G: 1, S: 1 });
-  const pressure = Math.max(
-    0,
-    (v + (CONCRETE_UNIT_WEIGHT * thickness + BACKFILL_UNIT_WEIGHT * backfill) * area) / area,
-  );
+  const gross =
+    (v + (CONCRETE_UNIT_WEIGHT * thickness + BACKFILL_UNIT_WEIGHT * backfill) * area) / area;
+  const pressure = Math.max(0, gross - BACKFILL_UNIT_WEIGHT * (thickness + backfill));
   return (
     ((pressure * Math.min(widthX, lengthY) * (1 - POISSON_RATIO ** 2) * SETTLEMENT_INFLUENCE) /
       (soilModulus * 1000)) *
@@ -326,7 +325,7 @@ function footingRows(
   const settlement = footingSettlement(doc, reaction, footing, soilModulus);
   rows.push(
     row(
-      `settlement (elastic, Es ${soilModulus} MPa, rigid square Is ${SETTLEMENT_INFLUENCE}, nu ${POISSON_RATIO})`,
+      `settlement (elastic, Es ${soilModulus} MPa, rigid square Is ${SETTLEMENT_INFLUENCE}, nu ${POISSON_RATIO}, net q = q − 18 kN/m³ × founding depth)`,
       {
         value: settlement,
         limit: SETTLEMENT_LIMIT_MM,
@@ -626,7 +625,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
     'in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), always grade 8.8. Simplifications: pinned ' +
     'bases (no moment), horizontal force taken at the plate level, bending in the smaller footing ' +
     'side, no biaxial effects, no backfill reduction for the column, no friction in the anchor ' +
-    'shear check, no footing reinforcement or punching (see design_footings). (5) Elastic settlement of each pad under SLS G+S, s = q B (1 − ν²) Is / Es (Is 1.12 rigid square, ν 0.3, Es = `soilModulus`, default 20 MPa) vs 25 mm, plus the worst differential settlement between adjacent columns of a frame vs L/500. Returns one row per check ' +
+    'shear check, no footing reinforcement or punching (see design_footings). (5) Elastic settlement of each pad under SLS G+S, s = q B (1 − ν²) Is / Es (net pressure q − 18 kN/m³ × founding depth, i.e. footing + backfill weight replaces excavated soil; Is 0.88 rigid square, ν 0.3, Es = `soilModulus`, default 20 MPa) vs 25 mm, plus the worst differential settlement between adjacent columns of a frame vs L/500. Returns one row per check ' +
     'and column (worst combination); utilisation > 1 fails. Not a substitute for a geotechnical ' +
     'or structural engineer.',
   paramsSchema: {

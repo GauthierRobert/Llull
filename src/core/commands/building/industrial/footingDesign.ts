@@ -1,6 +1,6 @@
 /**
  * RC pad footing design (EN 1992-1-1, C25/30, B500): bottom mat from bending at the column / base
- * plate face, one-way shear at d, punching at 2d; reinforcement is stored on the footing.
+ * plate face, one-way shear at d, punching at every perimeter within 2d; reinforcement is stored on the footing.
  * @layer core/commands/building/industrial
  */
 
@@ -40,6 +40,8 @@ const NU = 0.6 * (1 - FCK / 250);
 const V_RD_MAX = 0.4 * NU * FCD;
 const FALLBACK_COLUMN_MM = 300;
 const INTEGRATION_STEPS = 200;
+/** Control perimeters checked at a = 2d·i/PUNCHING_STEPS (EN 1992-1-1 §6.4.4(2)). */
+const PUNCHING_STEPS = 20;
 
 export interface FootingDesignRow {
   readonly id: string;
@@ -55,11 +57,13 @@ export interface FootingDesignRow {
   readonly asProvided: number | null;
   readonly shearUtilisation: number;
   readonly punchingUtilisation: number;
+  /** Distance a (mm) from the face of the governing punching perimeter (<= 2d). */
+  readonly punchingDistance: number;
   readonly combination: string;
   readonly note: string;
 }
 
-interface Geometry {
+export interface Geometry {
   /** Plan sizes and thickness, mm. */
   readonly widthMm: number;
   readonly lengthMm: number;
@@ -71,7 +75,7 @@ interface Geometry {
   readonly leverM: number;
 }
 
-interface Load {
+export interface Load {
   readonly combination: string;
   /** Net vertical (kN, compression +) and base moment (kN·m). */
   readonly normal: number;
@@ -85,7 +89,7 @@ interface Envelope {
   readonly shearX: number;
   readonly shearY: number;
   /** Punching stress (N/mm²) at u1 and at the column face. */
-  readonly punching: number;
+  readonly punching: ReadonlyArray<number>;
   readonly faceStress: number;
   readonly combination: string;
 }
@@ -144,7 +148,7 @@ function envelope(geometry: Geometry, loads: ReadonlyArray<Load>, effectiveMm: n
     momentY: 0,
     shearX: 0,
     shearY: 0,
-    punching: 0,
+    punching: Array.from({ length: PUNCHING_STEPS }, () => 0),
     faceStress: 0,
     combination: '-',
   };
@@ -158,20 +162,25 @@ function envelope(geometry: Geometry, loads: ReadonlyArray<Load>, effectiveMm: n
     const momentY = (meanY * armY ** 2) / 2;
     const shearY = meanY * Math.max(0, armY - depthM);
     const [columnX, columnY] = [faceX, faceY];
-    const control = 2 * depthM;
-    const inside = columnX * columnY + 2 * control * (columnX + columnY) + Math.PI * control ** 2;
-    const reduced = Math.max(0, load.normal - profile.mean * inside);
     const beta = 1 + (1.8 * profile.eccentricity) / (columnX + 4 * depthM);
-    const u1 = 2 * (faceX + faceY) * 1000 + 4 * Math.PI * effectiveMm;
+    const stresses = Array.from({ length: PUNCHING_STEPS }, (_, index) => {
+      const distance = (2 * depthM * (index + 1)) / PUNCHING_STEPS;
+      const inside = Math.min(
+        columnX * columnY + 2 * distance * (columnX + columnY) + Math.PI * distance ** 2,
+        widthM * lengthM,
+      );
+      const reduced = Math.max(0, load.normal - profile.mean * inside);
+      const perimeter = 2 * (faceX + faceY) * 1000 + 2 * Math.PI * distance * 1000;
+      return (beta * reduced * 1000) / (perimeter * effectiveMm);
+    });
     const u0 = 2 * (faceX + faceY) * 1000;
-    const punching = (beta * reduced * 1000) / (u1 * effectiveMm);
     const faceStress = (beta * load.normal * 1000) / (u0 * effectiveMm);
     result = {
       momentX: Math.max(result.momentX, momentX),
       momentY: Math.max(result.momentY, momentY),
       shearX: Math.max(result.shearX, shearX),
       shearY: Math.max(result.shearY, shearY),
-      punching: Math.max(result.punching, punching),
+      punching: result.punching.map((value, index) => Math.max(value, stresses[index] ?? 0)),
       faceStress: Math.max(result.faceStress, faceStress),
       combination: momentX + momentY >= governingScore ? load.combination : result.combination,
     };
@@ -205,13 +214,14 @@ function concreteShear(
   return { vRd: (stress * 1000 * effectiveMm) / 1000, stress, k, rho };
 }
 
-interface Attempt {
+export interface Attempt {
   readonly diameter: number;
   readonly spacing: number;
   readonly asRequired: number;
   readonly asProvided: number;
   readonly shear: number;
   readonly punching: number;
+  readonly punchingDistance: number;
   readonly combination: string;
 }
 
@@ -220,11 +230,12 @@ const CANDIDATES = BAR_DIAMETERS_MM.flatMap((diameter) =>
 ).sort((a, b) => a.mass - b.mass || b.spacing - a.spacing);
 
 /** Lightest standard mat that satisfies flexure, minimum steel, shear and punching; else the closest attempt. */
-function designMat(
+export function designMat(
   geometry: Geometry,
   loads: ReadonlyArray<Load>,
-): { chosen: Attempt | null; closest: Attempt | null } {
+): { chosen: Attempt | null; closest: Attempt | null; bendingLimited: boolean } {
   let closest: Attempt | null = null;
+  let bendingLimited = false;
   for (const candidate of CANDIDATES) {
     const effective = geometry.thicknessMm - COVER_MM - candidate.diameter;
     if (effective <= 0) continue;
@@ -236,7 +247,16 @@ function designMat(
       requiredX === null || requiredY === null ? null : Math.max(requiredX, requiredY, minimum);
     const { vRd, stress } = concreteShear(candidate.mass, effective);
     const shear = Math.max(demand.shearX, demand.shearY) / vRd;
-    const punching = Math.max(demand.punching / stress, demand.faceStress / V_RD_MAX);
+    let punching = demand.faceStress / V_RD_MAX;
+    let punchingDistance = 0;
+    demand.punching.forEach((demandStress, index) => {
+      const distance = (2 * effective * (index + 1)) / PUNCHING_STEPS;
+      const utilisation = demandStress / (stress * ((2 * effective) / distance));
+      if (utilisation > punching) {
+        punching = utilisation;
+        punchingDistance = distance;
+      }
+    });
     const attempt: Attempt = {
       diameter: candidate.diameter,
       spacing: candidate.spacing,
@@ -244,16 +264,18 @@ function designMat(
       asProvided: candidate.mass,
       shear,
       punching,
+      punchingDistance,
       combination: demand.combination,
     };
     if (closest === null || Math.max(shear, punching) < Math.max(closest.shear, closest.punching)) {
       closest = attempt;
     }
-    if (flexure !== null && candidate.mass >= flexure && shear <= 1 && punching <= 1) {
-      return { chosen: attempt, closest };
+    if (flexure !== null && shear <= 1 && punching <= 1) {
+      if (candidate.mass >= flexure) return { chosen: attempt, closest, bendingLimited };
+      bendingLimited = true;
     }
   }
-  return { chosen: null, closest };
+  return { chosen: null, closest, bendingLimited };
 }
 
 function geometryOf(
@@ -307,8 +329,8 @@ export const designFootings: CommandDefinition<FrameLoadParams> = {
     'bending at the face of the base plate (else the column profile), d = h − 50 mm cover − φ, ' +
     'z ≤ 0.95d with K ≤ 0.167, As,min = 0.26 fctm/fyk b d; the lightest bar φ12/16/20/25 at ' +
     '100–250 mm spacing (same both ways) satisfying As, shear VRd,c at d from the face ' +
-    '(§6.2.2, CRd,c 0.12) and punching at the 2d perimeter with the soil pressure inside it ' +
-    'deducted (§6.4). If shear or punching fails with every standard mat the footing is reported ' +
+    '(§6.2.2, CRd,c 0.12) and punching at every control perimeter a ≤ 2d from the face (§6.4.4, vRd,c·2d/a) with the ' +
+    'soil pressure inside it deducted (§6.4). If shear or punching fails with every standard mat the footing is reported ' +
     'as "increase thickness" and its reinforcement is not set (an old one is removed). The takeoff ' +
     'then reports `footing.rebar.kg` and the footing schedule a Reinforcement column. ' +
     'Simplifications: pinned bases, bending in the frame plane (x) from the horizontal reaction, ' +
@@ -357,12 +379,13 @@ export const designFootings: CommandDefinition<FrameLoadParams> = {
           asProvided: null,
           shearUtilisation: 0,
           punchingUtilisation: 0,
+          punchingDistance: 0,
           combination: '-',
           note: 'no ULS combination with net compression; reinforcement not set',
         });
         continue;
       }
-      const { chosen, closest } = designMat(geometry, net);
+      const { chosen, closest, bendingLimited } = designMat(geometry, net);
       const { reinforcement: previous, ...bare } = footing;
       if (chosen) {
         const reinforcement = {
@@ -388,6 +411,7 @@ export const designFootings: CommandDefinition<FrameLoadParams> = {
           asProvided: chosen.asProvided,
           shearUtilisation: chosen.shear,
           punchingUtilisation: chosen.punching,
+          punchingDistance: chosen.punchingDistance,
           combination: chosen.combination,
           note: '',
         });
@@ -407,9 +431,11 @@ export const designFootings: CommandDefinition<FrameLoadParams> = {
         asProvided: null,
         shearUtilisation: closest?.shear ?? 0,
         punchingUtilisation: closest?.punching ?? 0,
+        punchingDistance: closest?.punchingDistance ?? 0,
         combination: closest?.combination ?? '-',
-        note:
-          closest === null || !Number.isFinite(closest.asRequired)
+        note: bendingLimited
+          ? 'bending needs more than H25 @ 100 — increase thickness or size'
+          : closest === null || !Number.isFinite(closest.asRequired)
             ? 'bending exceeds the singly-reinforced limit (K > 0.167)'
             : 'shear or punching fails with every standard mat',
       });
@@ -427,7 +453,7 @@ export const designFootings: CommandDefinition<FrameLoadParams> = {
     const maxShear = maxOf((row) => row.shearUtilisation);
     const maxPunching = maxOf((row) => row.punchingUtilisation);
     const format = (row: FootingDesignRow): string =>
-      `${row.mark} H${row.barDiameter} @ ${row.spacing} (As ${round(row.asRequired, 0)} ≤ ${round(row.asProvided ?? 0, 0)} mm²/m, shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)})`;
+      `${row.mark} H${row.barDiameter} @ ${row.spacing} (As ${round(row.asRequired, 0)} ≤ ${round(row.asProvided ?? 0, 0)} mm²/m, shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)}${row.punchingDistance > 0 ? ` at a=${round(row.punchingDistance, 0)} mm` : ''})`;
     const document = changed.length > 0 ? { ...doc, building: next } : doc;
     return {
       document,
