@@ -109,6 +109,45 @@ function pitchCut(member: SteelMemberElement): number {
   return round2((Math.atan2(Math.abs(dz), horizontal) * 180) / Math.PI);
 }
 
+/** Length (document units) removed from a member by the end plates welded to its ends. */
+function endPlateCutback(
+  doc: CadDocument,
+  member: SteelMemberElement,
+  direction: Vec3,
+  connections: ReadonlyArray<MomentConnectionElement>,
+  members: Readonly<Record<string, SteelMemberElement | undefined>>,
+  levels: Readonly<Record<string, BuildingLevel | undefined>>,
+): number {
+  const ends = { start: 0, end: 0 };
+  const [start, end] = [
+    atLevel(levels[member.levelId] as BuildingLevel, member.start),
+    atLevel(levels[member.levelId] as BuildingLevel, member.end),
+  ];
+  const squaredDistance = (a: Vec3, b: Vec3): number => dot(minus(a, b), minus(a, b));
+  for (const connection of connections) {
+    const level = levels[connection.levelId];
+    if (!level || (connection.rafterId !== member.id && connection.otherId !== member.id)) continue;
+    const plates = connectionSolids(doc, connection, members, level)?.filter((solid) =>
+      solid.part.startsWith('plate'),
+    );
+    for (const solid of plates ?? []) {
+      const atStart = squaredDistance(solid.origin, start) <= squaredDistance(solid.origin, end);
+      const into: Vec3 = atStart ? direction : [-direction[0], -direction[1], -direction[2]];
+      const joint = atStart ? start : end;
+      const slope = dot(into, solid.along);
+      if (slope <= 1e-6) continue;
+      const hosted =
+        connection.rafterId === member.id
+          ? solid.part === 'plate'
+          : connection.kind === 'apex' && solid.part === 'plate-2';
+      if (!hosted) continue;
+      const cutback = dot(minus(solid.origin, joint), into) + solid.depth / slope;
+      ends[atStart ? 'start' : 'end'] = Math.max(ends[atStart ? 'start' : 'end'], cutback);
+    }
+  }
+  return ends.start + ends.end;
+}
+
 function memberHoles(
   doc: CadDocument,
   member: SteelMemberElement,
@@ -387,14 +426,18 @@ export const exportNcFiles: CommandDefinition<ExportNcFilesParams> = {
         grade: element.material,
         profileName: profile.name,
         code: CODE_BY_SHAPE[profile.shape],
-        length: round2(frame.length / fromMm(doc, 1)),
+        length: round2(
+          (frame.length -
+            endPlateCutback(doc, element, frame.d, allConnections, allMembers, building.levels)) /
+            fromMm(doc, 1),
+        ),
         height: profile.h,
         flangeWidth: profile.b,
         flangeThickness: profile.tf,
         webThickness: profile.tw,
         massPerMetre: profile.massPerMetre,
         paintPerMetre: round2(profile.perimeter / 1000),
-        cuts: [cut, cut, cut, cut],
+        cuts: [cut, cut, 0, 0],
         holes: memberHoles(doc, element, profile, allConnections, allMembers, building.levels),
         contour: [],
         sourceIds: [element.id],
@@ -459,8 +502,8 @@ export const exportNcFiles: CommandDefinition<ExportNcFilesParams> = {
               );
               return {
                 face: 'o',
-                x: round2(mm(cx - minX)),
-                y: round2(mm(cy - minY)),
+                x: round2(mm(cy - minY)),
+                y: round2(mm(cx - minX)),
                 diameter: round2(mm(element.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM),
               };
             });

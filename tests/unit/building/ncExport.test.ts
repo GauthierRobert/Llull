@@ -6,6 +6,8 @@ import {
   type NcExport,
   type NcFile,
 } from '@core/commands/building/industrial/ncExport';
+import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
+import { findProfile } from '@core/commands/building/steel/profiles';
 import { __resetIdCounter } from '@lib/id';
 
 const HALL = { span: 24000, length: 30000 };
@@ -85,10 +87,11 @@ describe('export_nc_files', () => {
     expect(stField(file, 6)).toBe('IPE450');
     expect(stField(file, 7)).toBe('I');
     const [length, height, width, tf, tw] = [8, 9, 10, 11, 12].map((i) => Number(stField(file, i)));
-    expect(length).toBeCloseTo(Math.hypot(12000, 1261.25), 1);
+    expect(length).toBeLessThan(Math.hypot(12000, 1261.25));
     expect([height, width, tf, tw]).toEqual([450, 190, 14.6, 9.4]);
     const cuts = [16, 17, 18, 19].map((i) => Number(stField(file, i)));
-    expect(cuts.every((cut) => cut > 5 && cut < 8)).toBe(true);
+    expect(cuts.slice(0, 2).every((cut) => cut > 5 && cut < 8)).toBe(true);
+    expect(cuts.slice(2)).toEqual([0, 0]);
     const mass = Number(stField(file, 14));
     expect(mass).toBeGreaterThan(70);
   });
@@ -242,5 +245,50 @@ describe('export_nc_files', () => {
     );
     const broken = { ...doc, building: { ...building, elements } };
     expect(run(broken).data).toBeUndefined();
+  });
+
+  it('keeps every plate hole inside the plate contour', () => {
+    const plates = files(hall()).filter((file) => file.kind === 'plate');
+    expect(plates.length).toBeGreaterThan(0);
+    for (const file of plates) {
+      const [length, width] = [8, 9].map((i) => Number(stField(file, i)));
+      const contour = block(file, 'AK');
+      const maxX = Math.max(...contour.map((row) => Number(row[1])));
+      const maxY = Math.max(...contour.map((row) => Number(row[2])));
+      expect([maxX, maxY]).toEqual([length, width]);
+      for (const [, x, y] of block(file, 'BO')) {
+        expect(Number(x)).toBeGreaterThan(0);
+        expect(Number(x)).toBeLessThan(maxX);
+        expect(Number(y)).toBeGreaterThan(0);
+        expect(Number(y)).toBeLessThan(maxY);
+      }
+    }
+  });
+
+  it('cuts rafters back to the end plates at eaves and apex', () => {
+    const doc = hall();
+    const elements = Object.values(doc.building?.elements ?? {});
+    const rafter = elements.find(
+      (e) => e.category === 'member' && e.role === 'rafter',
+    ) as SteelMemberElement;
+    const node = Math.hypot(
+      rafter.end[0] - rafter.start[0],
+      rafter.end[1] - rafter.start[1],
+      rafter.end[2] - rafter.start[2],
+    );
+    const eaves = elements.find(
+      (e) => e.category === 'connection' && e.kind === 'eaves' && e.rafterId === rafter.id,
+    ) as MomentConnectionElement;
+    const column = doc.building?.elements[eaves.otherId] as SteelMemberElement;
+    const hcol = findProfile(column.profile)?.h ?? 0;
+    const cos = Math.hypot(rafter.end[0] - rafter.start[0], rafter.end[1] - rafter.start[1]) / node;
+    const eavesCut = (hcol / 2 + eaves.plateThickness) / cos;
+    const apex = elements.find(
+      (e) => e.category === 'connection' && e.kind === 'apex' && e.rafterId === rafter.id,
+    ) as MomentConnectionElement | undefined;
+    const apexCut = apex ? apex.plateThickness / cos : 0;
+    const file = files(doc).find((f) => f.sourceIds.includes(rafter.id)) as NcFile;
+    expect(file.length).toBeCloseTo(node - eavesCut - apexCut, 0);
+    expect(Math.abs(file.length - (node - eavesCut - apexCut))).toBeLessThan(1);
   });
 });
