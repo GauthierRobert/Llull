@@ -61,8 +61,14 @@ export const SHEET_STYLE = [
   `.thin{fill:none;stroke:#000;stroke-width:0.18}.hidden{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:1.5 1}`,
   `.dim{stroke:#000;stroke-width:0.13}.frame{fill:none;stroke:#000;stroke-width:0.5}.frame-thin{fill:none;stroke:#000;stroke-width:0.25}`,
   `.solid{fill:#000;stroke:#000;stroke-width:0.25}.label{fill:#555}text{fill:#000}`,
+  `.cut-hatch{fill:url(#hatch-concrete);stroke:#000;stroke-width:0.35}`,
   `</style>`,
 ].join('');
+
+/** Shared fill patterns: ANSI31-style 45° hatch for concrete / masonry cuts. */
+export const SHEET_DEFS =
+  `<defs><pattern id="hatch-concrete" width="1.5" height="1.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
+  `<rect width="1.5" height="1.5" fill="#d9d9d9"/><line x1="0" y1="0" x2="0" y2="1.5" stroke="#000" stroke-width="0.12"/></pattern></defs>`;
 
 class SheetPainter {
   readonly parts: string[] = [];
@@ -110,11 +116,18 @@ class SheetPainter {
 
   paint(primitive: PlanPrimitive): void {
     switch (primitive.type) {
-      case 'polygon':
+      case 'polygon': {
+        if (primitive.fill === 'hatch') {
+          this.parts.push(`<polygon points="${this.points(primitive.points)}" class="cut-hatch"/>`);
+          return;
+        }
+        const loops = [primitive.points, ...(primitive.holes ?? [])];
+        const path = loops.map((loop) => `M${this.points(loop).replace(/ /g, 'L')}Z`).join('');
         this.parts.push(
-          `<polygon points="${this.points(primitive.points)}" ${this.styleOf(primitive.style, true)}/>`,
+          `<path d="${path}" fill-rule="evenodd" ${this.styleOf(primitive.style, true)}/>`,
         );
         return;
+      }
       case 'polyline':
         this.parts.push(
           `<polyline points="${this.points(primitive.points)}" ${this.styleOf(primitive.style, false)}/>`,
@@ -307,6 +320,7 @@ export function buildPlanSheet(doc: CadDocument, options: SheetOptions): PlanShe
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
     `<title>${escapeXml(title)}</title>`,
     SHEET_STYLE,
+    SHEET_DEFS,
     `<rect width="${width}" height="${height}" fill="#fff"/>`,
     `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
     `<g id="plan">${painter.parts.join('')}</g>`,

@@ -25,12 +25,18 @@ import { plateLayout } from './industrial/evaluate';
 
 export type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
 
+/** Area fill of a cut: concrete / masonry hatch (ANSI31) or solid (steel). */
+export type PlanFill = 'hatch' | 'solid';
+
 export type PlanPrimitive =
   | {
       readonly type: 'polygon';
       readonly layer: string;
       readonly style: PlanStyle;
       readonly points: Vec2[];
+      readonly fill?: PlanFill;
+      /** Holes excluded from the fill (their outlines are separate primitives). */
+      readonly holes?: Vec2[][];
     }
   | {
       readonly type: 'polyline';
@@ -136,6 +142,7 @@ function wallPrimitives(
         type: 'polygon',
         layer: layerName('wall'),
         style: 'cut',
+        fill: 'hatch',
         points: band(wall, cursor, left, half),
       });
     }
@@ -146,6 +153,7 @@ function wallPrimitives(
       type: 'polygon',
       layer: layerName('wall'),
       style: 'cut',
+      fill: 'hatch',
       points: band(wall, cursor, finish, half),
     });
   }
@@ -400,7 +408,14 @@ function industrialPrimitives(
           );
         const { outer, holes } = profileOutline(profile);
         return [
-          { type: 'polygon', layer, style: 'cut', points: section(outer) },
+          {
+            type: 'polygon',
+            layer,
+            style: 'cut',
+            points: section(outer),
+            fill: 'solid',
+            holes: holes.map(section),
+          },
           ...holes.map(
             (hole): PlanPrimitive => ({
               type: 'polygon',
@@ -626,6 +641,7 @@ export function buildPlanDrawing(
                 type: 'polygon',
                 layer: layerName('column'),
                 style: 'cut',
+                fill: 'hatch',
                 points: band(
                   { start: [x - element.width / 2, y], end: [x + element.width / 2, y] },
                   0,

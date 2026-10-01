@@ -322,3 +322,54 @@ describe('DXF drafting text and extents', () => {
     expect(dxf).toMatch(/\$EXTMAX\n10\n50000\n20\n20000/);
   });
 });
+
+describe('cut fills (hatches)', () => {
+  it('marks wall and column cuts as hatched and steel sections as solid with holes', () => {
+    let doc = house();
+    doc = run(doc, 'add_column', { location: [20000, 20000] });
+    doc = run(doc, 'add_steel_member', {
+      profile: 'SHS100x5',
+      role: 'column',
+      start: [25000, 20000, 0],
+      end: [25000, 20000, 3000],
+    });
+    const primitives = buildPlanDrawing(doc, undefined)!.primitives;
+    const fills = (layer: string): Array<string | undefined> =>
+      primitives.flatMap((p) => (p.type === 'polygon' && p.layer === layer ? [p.fill] : []));
+    expect(new Set(fills('A-WALL'))).toEqual(new Set(['hatch']));
+    expect(fills('S-COLS')).toContain('hatch');
+    const steel = primitives.find((p) => p.type === 'polygon' && p.fill === 'solid');
+    expect(steel?.type === 'polygon' && steel.holes).toHaveLength(1);
+  });
+
+  it('writes ANSI31 lines and SOLID fills on -PATT layers in the DXF', () => {
+    let doc = house();
+    doc = run(doc, 'add_steel_member', {
+      profile: 'HEA300',
+      role: 'column',
+      start: [25000, 20000, 0],
+      end: [25000, 20000, 3000],
+    });
+    doc = run(doc, 'add_column', { location: [30000, 20000], shape: 'circular', width: 400 });
+    const data = execute(doc, 'export_dxf', { levelId: 'level-1' }).data as DxfExport;
+    expect(data.layers).toEqual(expect.arrayContaining(['A-WALL-PATT', 'S-COLS-PATT']));
+    expect(data.dxf).toMatch(/0\nSOLID\n8\nS-COLS-PATT\n/);
+    expect(data.dxf).toMatch(/0\nLINE\n8\nA-WALL-PATT\n/);
+    // Pattern layers are grey (ACI 8) in the layer table.
+    expect(data.dxf).toMatch(/2\nA-WALL-PATT\n70\n0\n62\n8\n/);
+  });
+
+  it('hatches cut walls and keeps steel section holes open on the SVG sheet', () => {
+    let doc = house();
+    doc = run(doc, 'add_steel_member', {
+      profile: 'SHS100x5',
+      role: 'column',
+      start: [2000, 2000, 0],
+      end: [2000, 2000, 3000],
+    });
+    const sheet = execute(doc, 'export_plan_sheet', {}).data as PlanSheet;
+    expect(sheet.svg).toContain('id="hatch-concrete"');
+    expect(sheet.svg).toContain('class="cut-hatch"');
+    expect(sheet.svg).toMatch(/<path d="M[^"]+ZM[^"]+Z" fill-rule="evenodd" class="cut"/);
+  });
+});

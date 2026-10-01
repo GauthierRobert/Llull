@@ -6,8 +6,10 @@
 import type { CadDocument, DocumentUnit, Entity, Vec2 } from '../../model/types';
 import { is2D } from '../../model/types';
 import type { CommandDefinition, CommandResult } from '../types';
-import { fileSlug, getBuilding, noChange } from './model';
-import { buildPlanDrawing, DIMENSION_LAYER, type PlanPrimitive } from './plan';
+import { hatchSegments } from '../../../lib/hatch';
+import { triangulatePolygon } from '../../../lib/triangulate';
+import { fileSlug, fromMm, getBuilding, noChange } from './model';
+import { buildPlanDrawing, DIMENSION_LAYER, type PlanFill, type PlanPrimitive } from './plan';
 
 /** AutoCAD $INSUNITS codes. */
 const INSUNITS: Readonly<Record<DocumentUnit, number>> = { in: 1, ft: 2, mm: 4, cm: 5, m: 6 };
@@ -69,7 +71,8 @@ class DxfWriter {
 
   private start(type: string, layer: string): void {
     const name = dxfLayerName(layer);
-    if (!this.layers.has(name)) this.layers.set(name, LAYER_COLOR[name] ?? 7);
+    if (!this.layers.has(name))
+      this.layers.set(name, LAYER_COLOR[name] ?? (name.endsWith('-PATT') ? 8 : 7));
     this.pair(0, type);
     this.pair(8, name);
     this.entityCount += 1;
@@ -139,6 +142,15 @@ class DxfWriter {
     this.pair(8, name);
   }
 
+  /** Filled triangle (R12 SOLID; the fourth corner repeats the third). */
+  solid(layer: string, a: Vec2, b: Vec2, c: Vec2): void {
+    this.start('SOLID', layer);
+    this.point(10, a);
+    this.point(11, b);
+    this.point(12, c);
+    this.point(13, c);
+  }
+
   point2(layer: string, at: Vec2): void {
     this.start('POINT', layer);
     this.point(10, at);
@@ -192,10 +204,49 @@ function writeDimension(
   );
 }
 
-function writePrimitive(writer: DxfWriter, primitive: PlanPrimitive): void {
+/** Pattern layer of a cut layer, e.g. A-WALL → A-WALL-PATT (AIA / NCS). */
+const patternLayer = (layer: string): string => `${layer}-PATT`;
+
+/** ANSI31 (45° lines) for concrete / masonry, SOLID triangles for steel. */
+function writeFill(
+  writer: DxfWriter,
+  layer: string,
+  outer: ReadonlyArray<Vec2>,
+  holes: ReadonlyArray<ReadonlyArray<Vec2>>,
+  fill: PlanFill,
+  hatchSpacing: number,
+): void {
+  if (fill === 'hatch') {
+    for (const [a, b] of hatchSegments([outer, ...holes], Math.PI / 4, hatchSpacing)) {
+      writer.line(patternLayer(layer), a, b);
+    }
+    return;
+  }
+  const { vertices, triangles } = triangulatePolygon(outer, holes);
+  for (const [i, j, k] of triangles) {
+    writer.solid(
+      patternLayer(layer),
+      vertices[i] as Vec2,
+      vertices[j] as Vec2,
+      vertices[k] as Vec2,
+    );
+  }
+}
+
+function writePrimitive(writer: DxfWriter, primitive: PlanPrimitive, hatchSpacing: number): void {
   switch (primitive.type) {
     case 'polygon':
       writer.polyline(primitive.layer, primitive.points, true);
+      if (primitive.fill !== undefined) {
+        writeFill(
+          writer,
+          primitive.layer,
+          primitive.points,
+          primitive.holes ?? [],
+          primitive.fill,
+          hatchSpacing,
+        );
+      }
       return;
     case 'polyline':
       writer.polyline(primitive.layer, primitive.points, false);
@@ -214,6 +265,16 @@ function writePrimitive(writer: DxfWriter, primitive: PlanPrimitive): void {
       return;
     case 'circle':
       writer.circle(primitive.layer, primitive.center, primitive.radius);
+      if (primitive.style === 'cut') {
+        const ring = Array.from({ length: 32 }, (_, index): Vec2 => {
+          const angle = (index / 32) * Math.PI * 2;
+          return [
+            primitive.center[0] + primitive.radius * Math.cos(angle),
+            primitive.center[1] + primitive.radius * Math.sin(angle),
+          ];
+        });
+        writeFill(writer, primitive.layer, ring, [], 'hatch', hatchSpacing);
+      }
       return;
     case 'text':
       writer.text(primitive.layer, primitive.at, primitive.height, primitive.content, 'center');
@@ -443,7 +504,8 @@ export function buildDxf(
   if (building.levelOrder.length > 0 || options.levelId !== undefined) {
     const plan = buildPlanDrawing(doc, options.levelId);
     if (!plan) return null;
-    for (const primitive of plan.primitives) writePrimitive(writer, primitive);
+    const hatchSpacing = fromMm(doc, 150);
+    for (const primitive of plan.primitives) writePrimitive(writer, primitive, hatchSpacing);
     levelLabel = plan.level.name;
   }
   if (options.includeDrafting !== false) writeDrafting(writer, doc);

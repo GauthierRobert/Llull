@@ -50,12 +50,12 @@ The *Building* panel shows the live takeoff + estimate and downloads CSV files.
 | Output | Command | Opens in |
 | --- | --- | --- |
 | Plan sheet | `export_plan_sheet` { levelId, paper A4–A0, scale } | Any browser; print to PDF at 100 % for a true-scale drawing. Title block from `set_project_info`, north arrow, scale bar, dimensions. |
-| DXF | `export_dxf` { levelId } | AutoCAD, BricsCAD, DraftSight, LibreCAD, QCAD, Revit… (R12 ASCII, AIA layers, cut at 1.2 m). |
+| DXF | `export_dxf` { levelId } | AutoCAD, BricsCAD, DraftSight, LibreCAD, QCAD, Revit… (R12 ASCII, AIA layers, cut at 1.2 m; cut walls / concrete columns hatched ANSI31 and steel sections solid on `*-PATT` layers). |
 | IFC4 | `export_ifc` | Revit, ArchiCAD, Tekla, Solibri, BIMcollab, Navisworks, BlenderBIM… Walls with real openings (IfcOpeningElement + fills), slabs, columns, beams, stairs, spaces, materials; stable GlobalIds. Validated with IfcOpenShell (schema + EXPRESS rules). |
 | Native | Save / Open (JSON) | llull — the building model round-trips. |
 
 ## Known limits
 
 - Walls are straight; curved walls and wall layers (build-ups) are not modelled yet.
-- Plans cut every element of the level at 1.2 m; sections and elevations are not generated yet.
-- The DXF has no hatch entities (wall poché is drawn as closed outlines).
+- Plans cut every element of the level at 1.2 m; elevations and sections come from `export_elevation_sheet` (see [`INDUSTRIAL.md`](INDUSTRIAL.md)).
+- DXF hatches are written as R12 LINE / SOLID entities (no associative HATCH objects).

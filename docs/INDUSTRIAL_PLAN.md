@@ -51,7 +51,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 - [x] **I14 — Steel connections.** `add_base_plates`: base plates with anchor bolts under every steel
       column foot; plate steel mass and bolt counts in the takeoff; IFC `IfcPlate` /
       `IfcMechanicalFastener`.
-- [ ] **I15 — DXF hatches.** Cut walls, concrete columns and steel sections in `export_dxf` plans
+- [x] **I15 — DXF hatches.** Cut walls, concrete columns and steel sections in `export_dxf` plans
       get ANSI31 / solid hatch patterns (R12-compatible LINE / SOLID entities on `*-PATT` layers).
 - [ ] **I16 — Curved walls.** `add_curved_wall` (arc through start / mid / end): evaluation, plan,
       quantities, DXF arcs and IFC.
