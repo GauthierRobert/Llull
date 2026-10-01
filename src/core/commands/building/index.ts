@@ -45,6 +45,7 @@ import { foundationCheck } from './industrial/foundationCheck';
 import { designFootings } from './industrial/footingDesign';
 import { exportNcFiles } from './industrial/ncExport';
 import { checkPurlins } from './industrial/purlinCheck';
+import { designPurlins } from './industrial/purlinDesign';
 import { exportAnchorPlan } from './industrial/anchorPlan';
 import { runwayCheck } from './industrial/runwayCheck';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
@@ -102,6 +103,7 @@ export const buildingCommands = [
   designFootings,
   exportNcFiles,
   checkPurlins,
+  designPurlins,
   exportAnchorPlan,
   runwayCheck,
   addCraneRunway,

@@ -228,6 +228,43 @@ describe('check_bracing', () => {
     expect((result.data as { failures: string[] }).failures.length).toBeGreaterThan(0);
   });
 
+  it('reports the same eaves-strut force on single- and two-span halls (internal lines are unbraced)', () => {
+    const eavesOf = (spans: number[], roofType: string): BracingRow[] =>
+      rowsOf(hall({ span: undefined, spans, length: 30000, roofType }), {
+        windPressure: 0.7,
+      }).filter((row) => /eaves strut/.test(row.check));
+    for (const roofType of ['monopitch', 'duopitch']) {
+      const single = eavesOf([24000], roofType);
+      const double = eavesOf([12000, 12000], roofType);
+      expect(double).toHaveLength(4);
+      for (const row of double) {
+        // monopitch: identical gable; duopitch: the ridge of two 12 m spans is lower (smaller gable)
+        expect(row.force).toBeCloseTo(single[0]?.force ?? 0, roofType === 'monopitch' ? 6 : -1);
+        expect(row.check).toMatch(/outer wall line, independent of the number of spans/);
+      }
+    }
+    // the larger monopitch gable loads the default C200x75x2.5 eaves purlin harder than a duopitch one
+    const monopitch = eavesOf([12000, 12000], 'monopitch');
+    expect(monopitch[0]?.force).toBeGreaterThan(eavesOf([12000, 12000], 'duopitch')[0]?.force ?? 0);
+    // a heavier eaves purlin carries it
+    const heavy = rowsOf(
+      hall({
+        span: undefined,
+        spans: [12000, 12000],
+        length: 30000,
+        roofType: 'monopitch',
+        purlinProfile: 'C300x90x3.0',
+      }),
+      { windPressure: 1 },
+    ).filter((row) => /eaves strut/.test(row.check));
+    const light = rowsOf(
+      hall({ span: undefined, spans: [12000, 12000], length: 30000, roofType: 'monopitch' }),
+      { windPressure: 1 },
+    ).filter((row) => /eaves strut/.test(row.check));
+    expect(light.every((row) => row.utilisation > 1)).toBe(true);
+    expect(heavy.every((row) => row.utilisation < 1)).toBe(true);
+  });
+
   it('applies net pressure 1.0 to gable posts', () => {
     const post = rowsOf(hall(), { windPressure: 1 }).find((row) => row.kind === 'gable-post');
     expect(post?.check).toMatch(/q (\d+\.\d+) kN\/m/);

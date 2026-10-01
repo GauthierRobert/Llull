@@ -119,7 +119,13 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
     'walls: panel shear V = w·(W/2 − d) (w = bay force / W, d = distance of the panel edge from the ' +
     'nearest wall), so wall-side panels carry about half the bay force. Struts: wall = column, Lcr = ' +
     'column height; roof = rafter, Lcr = purlin gap along the rafter; plus the eaves purlin carrying ' +
-    'the truss reaction (bay force / 2) with Lcr = bay length (row flagged utilisation 99 if absent).' +
+    'the truss reaction (bay force / 2) with Lcr = bay length (row flagged utilisation 99 if absent). ' +
+    'On multi-span halls the internal column lines carry no wall bracing, so the roof truss still spans ' +
+    'the full hall width and the reaction (bay force / 2) acts at the two OUTER wall lines only: the ' +
+    'eaves-strut force equals that of a single-span hall of the same gable area (it grows with the gable, ' +
+    'e.g. a monopitch gable is larger than a duopitch one), and a light eaves purlin such as the default ' +
+    'C200x75x2.5 over a 6 m bay (about 36 kN) can fail at qp above about 0.7 kN/m²: fit a heavier eaves ' +
+    'purlin (update_steel_member) rather than treating the force as an error.' +
     ' Rows are grouped (roof bracing, wall bracing per side, gable posts); utilisation > 1 ' +
     'fails. Not covered: frame action, uplift, self-weight, connections - a preliminary check.',
   paramsSchema: {
@@ -360,7 +366,7 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
           momentResistance: 0,
           utilisation: eavesStrut ? reaction / eavesResistance : NO_MEMBER_UTILISATION,
           check: eavesStrut
-            ? `eaves strut ${eavesStrut.member.profile} compression ${reaction.toFixed(1)} kN (truss reaction) ≤ χ·Npl,Rd ${eavesResistance.toFixed(1)} kN (minor axis, Lcr ${dy.toFixed(0)} mm bay)`
+            ? `eaves strut ${eavesStrut.member.profile} compression ${reaction.toFixed(1)} kN (truss reaction at the outer wall line, independent of the number of spans) ≤ χ·Npl,Rd ${eavesResistance.toFixed(1)} kN (minor axis, Lcr ${dy.toFixed(0)} mm bay)`
             : `no eaves strut found at x ${round(wallX, 0)} mm in bay ${panel.bay} mm: truss reaction ${reaction.toFixed(1)} kN has no compression member`,
         });
       }
