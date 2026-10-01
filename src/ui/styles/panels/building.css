@@ -1,0 +1,85 @@
+/* Building (AEC/BIM) panel */
+
+.building-panel {
+  overflow-y: auto;
+}
+
+.building-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.building-form select,
+.building-panel .field select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.building-inline-form,
+.building-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.building-inline-form input,
+.building-inline-form select {
+  flex: 1 1 80px;
+  min-width: 0;
+}
+
+.building-row-btn {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.building-summary {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  overflow-wrap: anywhere;
+}
+
+.building-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+
+.building-table th,
+.building-table td {
+  padding: 3px var(--space-3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.building-table__number {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.building-table tfoot th,
+.building-table tfoot td {
+  font-weight: 600;
+  border-bottom: 0;
+}
+
+.building-tool-picker {
+  padding: var(--space-2) var(--space-3) 0;
+}

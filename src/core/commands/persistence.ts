@@ -28,6 +28,8 @@ import type {
   Recipe,
 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { buildingErrors } from './building/validate';
+import { regenerateBuilding } from './building/evaluate';
 import { isRecord } from '../../lib/isRecord';
 
 // ---------------------------------------------------------------------------
@@ -591,6 +593,9 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
     }
   }
 
+  // Building model (optional field — validated when present)
+  if (v['building'] !== undefined) errors.push(...buildingErrors(v['building']));
+
   // DriveRelations (optional field — only validate if present)
   if (isRecord(v['driveRelations'])) {
     const drs = v['driveRelations'] as Record<string, unknown>;
@@ -820,7 +825,9 @@ export const loadDocument: CommandDefinition<LoadDocumentParams> = {
   run: (doc, { json }): CommandResult => {
     let parsed: CadDocument;
     try {
-      parsed = deserializeDocument(json);
+      const raw = deserializeDocument(json);
+      // Re-evaluate the building so generated geometry always matches its constructive model.
+      parsed = raw.building ? regenerateBuilding(raw, raw.building) : raw;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { document: doc, summary: message, affected: [] };

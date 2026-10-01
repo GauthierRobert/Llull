@@ -49,7 +49,7 @@ export function ModifyPickInteraction({
   const document = useStore((s) => s.document);
   const { invalidate } = useThree();
 
-  const geo = useMemo(() => new THREE.PlaneGeometry(100000, 100000), []);
+  const geo = useMemo(() => new THREE.PlaneGeometry(1e8, 1e8), []);
   const mat = useMemo(
     () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
     [],
@@ -78,7 +78,8 @@ export function ModifyPickInteraction({
 
       e.stopPropagation();
 
-      const worldPick: Vec2 = [e.point.x, e.point.y];
+      const [originX, originY] = useStore.getState().renderOrigin;
+      const worldPick: Vec2 = [e.point.x + originX, e.point.y + originY];
       const toleranceSq = tolerance * tolerance;
 
       let bestId: string | null = null;

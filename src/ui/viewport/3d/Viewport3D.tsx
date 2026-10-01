@@ -213,6 +213,8 @@ function CameraReactor(): null {
     const orbit = controls as OrbitControlsImpl | null;
     if (!orbit) return;
 
+    // The camera lives in render space (world − renderOrigin), like the entity group.
+    const [ox, oy, oz] = useStore.getState().renderOrigin;
     const newPos = sphericalToCartesian(
       docCamera.target as [number, number, number],
       docCamera.azimuth,
@@ -220,8 +222,8 @@ function CameraReactor(): null {
       docCamera.distance,
     );
 
-    camera.position.set(newPos[0], newPos[1], newPos[2]);
-    orbit.target.set(docCamera.target[0], docCamera.target[1], docCamera.target[2]);
+    camera.position.set(newPos[0] - ox, newPos[1] - oy, newPos[2] - oz);
+    orbit.target.set(docCamera.target[0] - ox, docCamera.target[1] - oy, docCamera.target[2] - oz);
 
     // Sync OrbitControls internal spherical state to new position/target.
     orbit.update();
@@ -229,6 +231,32 @@ function CameraReactor(): null {
     invalidate();
   }, [docCamera, camera, controls, invalidate]);
 
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// AdaptiveClipping — near/far planes that follow the orbit distance
+// ---------------------------------------------------------------------------
+
+/**
+ * Keeps depth precision usable from millimetre parts to building-scale models (1e4–1e5 units in
+ * mm): near/far track the camera→target distance at a fixed 1:4e6 ratio. Updates the projection
+ * only when the distance changed by more than 10 %.
+ */
+function AdaptiveClipping(): null {
+  const { camera, controls } = useThree();
+  const lastDistance = useRef(0);
+  useFrame(() => {
+    const target = (controls as OrbitControlsImpl | null)?.target;
+    if (!target) return;
+    const distance = camera.position.distanceTo(target);
+    if (Math.abs(distance - lastDistance.current) <= lastDistance.current * 0.1) return;
+    lastDistance.current = distance;
+    const perspective = camera as THREE.PerspectiveCamera;
+    perspective.near = Math.max(distance / 2000, 1e-3);
+    perspective.far = Math.max(distance * 2000, 1e3);
+    perspective.updateProjectionMatrix();
+  });
   return null;
 }
 
@@ -243,7 +271,7 @@ function CameraReactor(): null {
  * threshold is newly crossed, not every frame (react.md R6/R9).
  */
 function RenderOriginSyncer(): null {
-  const { controls } = useThree();
+  const { camera, controls } = useThree();
   const renderOrigin = useStore((s) => s.renderOrigin);
   const setRenderOrigin = useStore((s) => s.setRenderOrigin);
 
@@ -264,9 +292,24 @@ function RenderOriginSyncer(): null {
     const orbitTarget = (controls as OrbitControlsImpl).target;
     if (!orbitTarget) return;
 
-    const camTarget: [number, number, number] = [orbitTarget.x, orbitTarget.y, orbitTarget.z];
-    if (shouldRebase(camTarget, originRef.current)) {
-      const newOrigin = snapOriginToTarget(camTarget);
+    // Orbit target is render-space; its world position is target + renderOrigin.
+    const origin = originRef.current;
+    const worldTarget: [number, number, number] = [
+      orbitTarget.x + origin[0],
+      orbitTarget.y + origin[1],
+      orbitTarget.z + origin[2],
+    ];
+    if (shouldRebase(worldTarget, origin)) {
+      const newOrigin = snapOriginToTarget(worldTarget);
+      const delta = new THREE.Vector3(
+        newOrigin[0] - origin[0],
+        newOrigin[1] - origin[1],
+        newOrigin[2] - origin[2],
+      );
+      // Shift camera + target with the entity group so the view does not jump.
+      camera.position.sub(delta);
+      orbitTarget.sub(delta);
+      (controls as OrbitControlsImpl).update();
       originRef.current = newOrigin; // update ref immediately to prevent repeat calls
       setRenderOrigin(newOrigin);
     }
@@ -369,6 +412,7 @@ function SceneContents({
 
       {/* ---- Per-frame rebase check — no setState per frame ---- */}
       <RenderOriginSyncer />
+      <AdaptiveClipping />
 
       {/* ---- View preset camera driver — reads store via props to avoid Canvas re-render ---- */}
       <ViewPresetsInner

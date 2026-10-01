@@ -148,3 +148,12 @@ value in `data`. See the `measure` skill (`measure_distance`, `volume_of`, ...).
 - `selection ⊆ keys(entities)`; deleting an entity removes it from `order` AND `selection`.
 - `position`/`rotation` are length-3; `color` is a hex string.
 - New entity default layer = `DEFAULT_LAYER_ID` unless a command specifies otherwise.
+
+## Building (AEC/BIM) — `CadDocument.building?` (src/core/model/building.ts)
+
+Constructive building model (levels, elements, project info, cost rates). Building commands
+(`src/core/commands/building/`) edit it and call `regenerateBuilding()`, which replaces the
+evaluated entities (ids `<elementId>:<part>`, tag `bim`). No new entity kinds. Categories: grid,
+wall, door, window, slab, column, beam, stair, room (architecture) + member, footing, panel,
+equipment, pipe (industrial; `building/industrial/`, profiles in `building/steel/`). Guides:
+`docs/CONSTRUCTION.md`, `docs/INDUSTRIAL.md`.

@@ -67,6 +67,27 @@ AI control — there is no in-app AI bridge).**
 - [ ] 2D drawings generated from 3D: orthographic / section / detail views
 - [ ] GD&T, dimension styles, title blocks, sheets (paper space)
 
+## Construction (AEC / BIM) — see docs/CONSTRUCTION_PLAN.md
+- [x] Levels, structural grids, project info
+- [x] Parametric walls (auto joins), hosted doors / windows, slabs, columns, beams, stairs, rooms
+- [x] Quantity takeoff, schedules, cost estimate
+- [x] DXF (R12) plans, scaled SVG plan sheets with title block, IFC4 export
+- [x] Building panel, 2D Wall tool, per-level floor plan in the 2D view, starter templates
+- [x] Slab openings (stair wells, shafts)
+- [x] Sections / elevations (`export_elevation_sheet`)
+- [x] DXF hatches (R12 LINE / SOLID pattern layers)
+- [x] Curved walls (`add_curved_wall`)
+- [x] Wall build-ups (`set_wall_layers`)
+- [x] Openings in curved walls
+
+## Industrial (factory builders) — see docs/INDUSTRIAL_PLAN.md
+- [x] Steel profile catalogue, steel members, portal-frame hall generator, crane runways
+- [x] Pad footings, cladding panels, process equipment, pipe runs
+- [x] Clash detection, steel tonnage / paint / cut lists, IFC steel export
+- [x] Multi-span halls, cable trays, base plates with anchor bolts, section poché
+- [x] Moment connections (end plates, haunches, bolts)
+- [ ] Weld detailing, connection design checks (bolt / plate capacity)
+
 ## Later
 - [ ] Materials library (physical + visual / rendering)
 - [ ] Simulation / CAE (FEA, thermal, motion)

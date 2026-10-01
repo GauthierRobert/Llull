@@ -11,3 +11,5 @@ coverage
 .playwright-mcp
 server/.autosave.json
 *.tsbuildinfo
+test-results
+playwright-report

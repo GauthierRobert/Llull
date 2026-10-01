@@ -23,6 +23,7 @@
 
 import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
+import { useStore } from '@ui/store';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
 import { useSnap } from './useSnap';
@@ -318,7 +319,7 @@ interface GroundPlaneProps {
 }
 
 function GroundPlane({ onMove, onLeave }: GroundPlaneProps): React.ReactElement {
-  const geo = useMemo(() => new THREE.PlaneGeometry(100000, 100000), []);
+  const geo = useMemo(() => new THREE.PlaneGeometry(1e8, 1e8), []);
   const mat = useMemo(
     () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
     [],
@@ -334,7 +335,9 @@ function GroundPlane({ onMove, onLeave }: GroundPlaneProps): React.ReactElement 
   const handleMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
-      onMove(e.point.x, e.point.y);
+      // Hit points are render-space; snapping works in document space.
+      const [originX, originY] = useStore.getState().renderOrigin;
+      onMove(e.point.x + originX, e.point.y + originY);
     },
     [onMove],
   );

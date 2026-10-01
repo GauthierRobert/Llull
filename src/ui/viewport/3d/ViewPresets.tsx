@@ -145,12 +145,15 @@ export function ViewPresetsInner({
       if (!orbit) return;
 
       const dir = new THREE.Vector3(direction[0], direction[1], direction[2]).normalize();
-      const newPos = target.clone().addScaledVector(dir, distance);
+      // `target` is world space; the camera lives in render space (world − renderOrigin).
+      const [ox, oy, oz] = useStore.getState().renderOrigin;
+      const renderTarget = target.clone().sub(new THREE.Vector3(ox, oy, oz));
+      const newPos = renderTarget.clone().addScaledVector(dir, distance);
 
       camera.up.set(0, 0, 1);
       camera.position.copy(newPos);
-      camera.lookAt(target);
-      orbit.target.copy(target);
+      camera.lookAt(renderTarget);
+      orbit.target.copy(renderTarget);
 
       // P1: must call both update() and invalidate() under frameloop="demand".
       // update() syncs OrbitControls internal spherical state; invalidate()

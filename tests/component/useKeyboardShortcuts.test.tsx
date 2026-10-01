@@ -8,6 +8,7 @@ import { render, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
+import { execute } from '@core/commands/registry';
 
 function Harness(): React.ReactElement {
   useKeyboardShortcuts();
@@ -45,6 +46,20 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(window, { key: 'Delete' });
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenCalledWith('delete_entities', { ids: ['a', 'b'] });
+  });
+
+  it('Delete routes generated building geometry to delete_building_element', () => {
+    const walled = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [1000, 0],
+    }).document;
+    useStore.setState({ document: { ...walled, selection: ['wall-1:body-0', 'a'] } });
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'Delete' });
+    expect(dispatch.mock.calls).toEqual([
+      ['delete_building_element', { elementIds: ['wall-1'] }],
+      ['delete_entities', { ids: ['a'] }],
+    ]);
   });
 
   it('ignores auto-repeat and already-handled key events', () => {

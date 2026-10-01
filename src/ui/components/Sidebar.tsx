@@ -2,7 +2,7 @@
  * @layer ui/components
  *
  * Sidebar — vertical icon rail + the one document browser panel it selects
- * (layers, assembly, mechanisms, parameters, history, configurations, materials).
+ * (building, layers, assembly, mechanisms, parameters, history, configurations, materials).
  * Tab state lives in useLayoutStore (presentation only — never document state).
  */
 
@@ -18,6 +18,7 @@ import { ParametersPanel } from '@ui/panels/ParametersPanel';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
+import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 
 interface SidebarTabSpec {
   tab: SidebarTab;
@@ -26,6 +27,7 @@ interface SidebarTabSpec {
 }
 
 const TABS: readonly SidebarTabSpec[] = [
+  { tab: 'building', label: 'Building', icon: 'building' },
   { tab: 'layers', label: 'Layers', icon: 'layers' },
   { tab: 'assembly', label: 'Assembly', icon: 'assembly' },
   { tab: 'mechanisms', label: 'Mechanisms', icon: 'mechanism' },
@@ -40,6 +42,8 @@ function useTabCount(tab: SidebarTab): number {
   return useStore((s) => {
     const doc = s.document;
     switch (tab) {
+      case 'building':
+        return doc.building?.elementOrder.length ?? 0;
       case 'layers':
         return doc.layerOrder.length;
       case 'assembly':
@@ -93,6 +97,8 @@ function RailButton({ spec, active, focusable, onSelect }: RailButtonProps): Rea
 
 function ActivePanel({ tab }: { tab: SidebarTab }): React.ReactElement {
   switch (tab) {
+    case 'building':
+      return <BuildingPanel className="sidebar-panel" />;
     case 'layers':
       return <LayersPanel className="sidebar-panel" />;
     case 'assembly':

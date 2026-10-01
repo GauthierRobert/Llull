@@ -367,10 +367,120 @@ const parametricPart: PromptTemplate = {
 };
 
 // ---------------------------------------------------------------------------
+// Template: design_building
+// ---------------------------------------------------------------------------
+
+/**
+ * @prompt design_building
+ * Guides an agent through the construction (AEC/BIM) workflow: levels → grid → walls →
+ * openings → slabs/structure → rooms → quantities/cost → DXF / plan sheet / IFC deliverables.
+ */
+const designBuilding: PromptTemplate = {
+  descriptor: {
+    name: 'design_building',
+    description:
+      'Workflow for designing a building with the construction commands: levels, structural grid, ' +
+      'walls with doors/windows, slabs, columns, beams, stairs, rooms, then quantity takeoff, cost ' +
+      'estimate and DXF / plan-sheet / IFC deliverables.',
+    arguments: [
+      {
+        name: 'brief',
+        description: 'What to build, e.g. "2-storey house 10 x 8 m".',
+        required: false,
+      },
+    ],
+  },
+  buildMessages({ brief = 'a two-storey house, 10 m x 8 m' }) {
+    return [
+      userMsg(`Design ${brief} in llull and produce the construction deliverables.`),
+      assistantMsg(
+        `**Construction workflow (all lengths in document units — default mm)**\n\n` +
+          `1. \`set_project_info\` (name, client, address, author, drawingNumber) — fills title blocks and IFC.\n` +
+          `2. \`add_level\` per storey (elevation stacks automatically; height = floor-to-floor).\n` +
+          `3. \`add_grid_system\` { xSpacings, ySpacings } — numbered / lettered axes.\n` +
+          `4. \`draw_walls\` { points, closed: true, thickness, material } for the envelope; \`add_wall\` for partitions ` +
+          `(endpoints on another wall join automatically); \`add_curved_wall\` { start, through, end } for arcs; \`set_wall_layers\` for build-ups (render + insulation + structure + lining).\n` +
+          `5. \`add_door\` / \`add_window\` { wallId, offset | at, width, height, sillHeight } — hosted; refused if they do not fit.\n` +
+          `6. \`add_slab\` { wallIds } (or boundary), \`add_column\` { atGridIntersections: true }, \`add_beam\`, \`add_stair\` ` +
+          `(the summary checks the 2R+G comfort rule); \`add_slab_opening\` { stairId } cuts the stair well above.\n` +
+          `7. \`add_room\` { name, wallIds | boundary } for each space.\n` +
+          `8. Repeat a typical floor with \`copy_level_elements\`; roof = \`add_slab\` { role: "roof" } on the top level.\n` +
+          `9. Inspect with \`describe_building\`, \`quantity_takeoff\`, \`building_schedule\` { kind }.\n` +
+          `10. Price with \`set_cost_rates\` { rates: { "wall.masonry.m3": 210, "slab-floor.concrete.m3": 190, ... } } then \`estimate_cost\`.\n` +
+          `11. Deliver: \`export_plan_sheet\` { paper: "A3", scale: 100 }, \`export_dxf\` { levelId }, \`export_ifc\`.\n\n` +
+          `Edit parametrically with \`update_wall\`, \`update_opening\`, \`update_level\`, \`move_building_element\`, ` +
+          `\`delete_building_element\` — never edit the generated entities (ids "<elementId>:<part>"); they are regenerated. ` +
+          `For a quick start, \`add_building_template\` { template: "house" | "office" } creates a complete building. ` +
+          `In \`build_project\`, a building step's \`$alias\` is the ELEMENT id (e.g. wall-3, usable as wallId); \`$alias[1]\` is its first generated entity.`,
+      ),
+    ];
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Template: design_factory
+// ---------------------------------------------------------------------------
+
+/**
+ * @prompt design_factory
+ * Guides an agent through the industrial (factory builder) workflow: steel portal hall → crane →
+ * process equipment & piping → clash check → steel takeoff → elevations / plan / IFC deliverables.
+ */
+const designFactory: PromptTemplate = {
+  descriptor: {
+    name: 'design_factory',
+    description:
+      'Workflow for designing a factory / industrial hall: steel portal frames, crane runway, ' +
+      'footings, cladding, machines with clearances, pipe runs, clash detection, steel tonnage and ' +
+      'fabrication lists, then elevations, plan sheet and IFC deliverables.',
+    arguments: [
+      {
+        name: 'brief',
+        description: 'What to build, e.g. "30 x 60 m machining hall with a 16 t crane".',
+        required: false,
+      },
+    ],
+  },
+  buildMessages({ brief = 'a 24 m x 48 m production hall with a 10 t overhead crane' }) {
+    return [
+      userMsg(
+        `Design ${brief} in llull and produce the fabrication and construction deliverables.`,
+      ),
+      assistantMsg(
+        `**Industrial workflow (all lengths in document units — default mm)**\n\n` +
+          `1. \`set_project_info\` (name, client, drawingNumber) — fills title blocks and IFC.\n` +
+          `2. \`list_steel_profiles\` { family } — IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L with kg/m.\n` +
+          `3. \`add_portal_frame_building\` { span, length, baySpacing, eaveHeight, roofPitch, columnProfile, ` +
+          `rafterProfile, crane: { railHeight, capacity } } — grids, frames, gable posts, purlins, rails, bracing, ` +
+          `footings, slab and cladding in one undoable step.\n` +
+          `4. Adjust: \`update_steel_member\` { memberId, profile } to upsize, \`add_steel_member\` for mezzanines / ` +
+          `platforms, \`add_crane_runway\`, \`add_footing\` { underColumns: true }, \`add_base_plates\`, \`add_moment_connections\`, \`add_panel\` for extra cladding.\n` +
+          `5. Process: \`add_equipment\` { name, location, size, clearance, weight } for each machine, ` +
+          `\`add_pipe_run\` { points, diameter, service } for utilities, \`add_cable_tray\` { points, width, system } for cabling.\n` +
+          `6. Coordinate: \`check_clashes\` — fix every hard clash and clearance violation with ` +
+          `\`move_building_element\` or \`update_steel_member\`, then re-check.\n` +
+          `7. Quantities: \`quantity_takeoff\` (steel kg per profile, paint m², concrete m³, cladding m², pipe m), ` +
+          `\`building_schedule\` { kind: "member" } for the cut list, then \`set_cost_rates\` and \`estimate_cost\`.\n` +
+          `8. Drawings: \`export_elevation_sheet\` { direction, exclude: ["panel"] } for frame elevations, ` +
+          `{ cutAt } for sections, \`export_plan_sheet\`, \`export_dxf\`, and \`export_ifc\` for the steel detailer.\n\n` +
+          `Never edit generated entities (ids "<elementId>:<part>"); change the element and it is regenerated. ` +
+          `\`describe_building\` summarises the model before delivery.`,
+      ),
+    ];
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
-const TEMPLATES: ReadonlyArray<PromptTemplate> = [modelBracket, orthographicSetup, parametricPart];
+const TEMPLATES: ReadonlyArray<PromptTemplate> = [
+  modelBracket,
+  orthographicSetup,
+  parametricPart,
+  designBuilding,
+  designFactory,
+];
 
 const TEMPLATE_MAP = new Map<string, PromptTemplate>(TEMPLATES.map((t) => [t.descriptor.name, t]));
 

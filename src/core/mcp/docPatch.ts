@@ -13,6 +13,7 @@
  * Delta shape — tailored to CadDocument fields; not generic JSON-patch.
  */
 
+import type { BuildingModel } from '../model/building';
 import type {
   CadDocument,
   Entity,
@@ -95,6 +96,8 @@ export interface DocPatch {
   camera?: CameraState;
   /** Document units — present only when it changed. */
   units?: DocumentUnit;
+  /** Full building model — present only when it changed; null when it was removed. */
+  building?: BuildingModel | null;
   /** Display precision — present only when it changed. */
   displayPrecision?: number;
   /** Full constraints map — present only when any constraint changed. */
@@ -202,6 +205,7 @@ export function computeDocPatch(prev: CadDocument, next: CadDocument): DocPatch 
   if (!jsonEqual(prev.components, next.components)) patch.components = next.components;
   if (!jsonEqual(prev.camera, next.camera)) patch.camera = next.camera;
   if (prev.units !== next.units) patch.units = next.units;
+  if (!jsonEqual(prev.building, next.building)) patch.building = next.building ?? null;
   if (prev.displayPrecision !== next.displayPrecision)
     patch.displayPrecision = next.displayPrecision;
   if (!jsonEqual(prev.constraints, next.constraints))
@@ -256,7 +260,9 @@ export function applyDocPatch(doc: CadDocument, patch: DocPatch): CadDocument {
       : [...doc.featureHistory, ...patch.featureHistoryAppended];
   }
 
+  const building = patch.building === undefined ? doc.building : (patch.building ?? undefined);
   return {
+    ...(building !== undefined ? { building } : {}),
     entities,
     order: patch.order ?? doc.order,
     selection: patch.selection ?? doc.selection,

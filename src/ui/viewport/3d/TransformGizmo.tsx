@@ -340,7 +340,8 @@ export function TransformGizmo({
     return () => ctrl.removeEventListener('dragging-changed', handleDraggingChanged);
   }, [handleDraggingChanged]);
 
-  if (!entity || !selectedId) return null;
+  // Generated building geometry is edited through its element (Building panel), not the gizmo.
+  if (!entity || !selectedId || entity.tags?.includes('bim') === true) return null;
 
   // Compute the render-space position for initial group placement.
   const rp = toRenderPosition(entity.position, renderOrigin);

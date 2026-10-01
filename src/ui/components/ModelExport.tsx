@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
+import { downloadBlob as download } from '@ui/download';
 
 type ExportFormat = 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step';
 
@@ -20,16 +21,6 @@ const FORMATS: ReadonlyArray<{ value: ExportFormat; label: string }> = [
   { value: 'freecad', label: 'FreeCAD macro' },
   { value: 'step', label: 'STEP (.step)' },
 ];
-
-function download(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = window.document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  // Revoking synchronously can cancel the download in some browsers.
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
 
 export function ModelExport(): React.ReactElement {
   const document = useStore((s) => s.document);

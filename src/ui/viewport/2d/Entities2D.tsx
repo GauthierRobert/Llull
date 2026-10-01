@@ -76,6 +76,8 @@ export function Entities2D({ document }: Entities2DProps): React.ReactElement {
         const entity = entities[id];
         if (!entity) return null;
         if (!is2D(entity)) return null;
+        // Building annotations are drawn per level by BuildingPlan2D.
+        if (entity.tags?.includes('bim') === true) return null;
 
         // Respect layer visibility (document) and the local layer-hide filter (UI).
         const layer = layers[entity.layerId];
