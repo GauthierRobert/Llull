@@ -7,7 +7,11 @@ import {
   memberBuckling,
   sectionResistance,
 } from '@core/commands/building/industrial/steelDesign';
-import { craneActions, craneCapacityOf } from '@core/commands/building/industrial/frameModel';
+import {
+  baseReactions,
+  craneActions,
+  craneCapacityOf,
+} from '@core/commands/building/industrial/frameModel';
 import { findProfile, sectionProperties } from '@core/commands/building/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';
 import { __resetIdCounter } from '@lib/id';
@@ -221,5 +225,33 @@ describe('design_portal_frames with wind and crane', () => {
     expect(result.summary).toMatch(/Designed 6 frame\(s\) for 22 ULS combination\(s\)/);
     const after = check(result.document, { windPressure: 0.7 });
     expect(after.maxUtilisation).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('baseReactions', () => {
+  it('balances the applied loads per case', () => {
+    const doc = hall();
+    const building = doc.building!;
+    const reactions = baseReactions(
+      doc,
+      building,
+      building.activeLevelId ?? building.levelOrder[0]!,
+      {
+        deadLoad: 0.5,
+        snowLoad: 0.8,
+        windPressure: 1,
+      },
+    );
+    const frame = reactions.filter((reaction) => reaction.frame === 'frame 3');
+    expect(frame).toHaveLength(2);
+    // Snow 0.8 kN/m² × 6 m × 24 m on plan.
+    const snow = frame.reduce((sum, reaction) => sum + reaction.cases.S!.vertical, 0);
+    expect(snow / 1000).toBeCloseTo(0.8 * 6 * 24, 0);
+    // Wind on both walls (0.8 + 0.5) × 1 kN/m² × 6 m × eaves height, resisted horizontally.
+    const horizontal = frame.reduce((sum, reaction) => sum + reaction.cases.WL!.horizontal, 0);
+    expect(horizontal / 1000).toBeCloseTo(-(0.8 + 0.5) * 6 * 7, 0);
+    expect(
+      frame.every((reaction) => reaction.cases.WL!.vertical < reaction.cases.G!.vertical),
+    ).toBe(true);
   });
 });

@@ -18,7 +18,13 @@ import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
 import { findProfile } from '../steel/profiles';
 import { toCsv } from '../quantities';
 import { connectionSolids } from './evaluate';
-import { framesOf, type FrameLoads, type FrameModel, type LoadCase } from './frameModel';
+import {
+  framesOf,
+  solveCombination,
+  type FrameLoads,
+  type FrameModel,
+  type LoadCase,
+} from './frameModel';
 import { boltResistance, memberBuckling, sectionResistance, yieldStrength } from './steelDesign';
 
 export interface CheckRow {
@@ -100,46 +106,6 @@ function ultimateCombinations(wind: boolean, crane: boolean): Combination[] {
     }
   }
   return combinations;
-}
-
-type NodeForce = { readonly node: number; readonly fx: number };
-
-function solveCombination(
-  frame: FrameModel,
-  factors: Partial<Record<LoadCase, number>>,
-  extra: ReadonlyArray<NodeForce> = [],
-): FrameResult | null {
-  const nodeLoads = frame.nodes.map(() => ({ fx: 0, fy: 0, mz: 0 }));
-  for (const load of frame.nodeLoads) {
-    const factor = factors[load.loadCase] ?? 0;
-    const target = nodeLoads[load.node];
-    if (!target || factor === 0) continue;
-    target.fx += factor * load.fx;
-    target.fy += factor * load.fy;
-    target.mz += factor * load.mz;
-  }
-  for (const force of extra) {
-    const target = nodeLoads[force.node];
-    if (target) target.fx += force.fx;
-  }
-  return solveFrame(
-    frame.nodes.map((node, index) => ({
-      ...node,
-      load: nodeLoads[index] ?? { fx: 0, fy: 0, mz: 0 },
-    })),
-    frame.members.map((member) => {
-      let [qx, qy] = [0, 0];
-      for (const [loadCase, load] of Object.entries(member.loads) as [
-        LoadCase,
-        { qx: number; qy: number },
-      ][]) {
-        const factor = factors[loadCase] ?? 0;
-        qx += factor * load.qx;
-        qy += factor * load.qy;
-      }
-      return { ...member.geometry, load: { qx, qy } };
-    }),
-  );
 }
 
 interface UltimateResult {
