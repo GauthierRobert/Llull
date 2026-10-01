@@ -16,10 +16,18 @@ import { bucklingReduction, E_STEEL, sectionResistance, yieldStrength } from './
 const GAMMA_Q = 1.5;
 /** EN 1990 6.10 permanent action factor for the equivalent stabilising force. */
 const GAMMA_G = 1.35;
-/** EN 1991-1-4 gable: windward pressure 0.8 + leeward suction 0.5. */
+/** EN 1991-1-4 whole gable (frame): windward pressure 0.8 + leeward suction 0.5. */
 const CP_GABLE = 0.8 + 0.5;
+/** Gable post on one wall: net pressure cpe + cpi = 0.8 + 0.2 (EN 1991-1-4). */
+const CP_POST = 0.8 + 0.2;
 /** EN 1993-1-1 §5.3.3 bracing equivalent force ratio (simplified 1/200). */
 const STABILITY_RATIO = 1 / 200;
+/** Utilisation reported when a required member is missing (always a failure). */
+const NO_MEMBER_UTILISATION = 99;
+/** Eaves purlin sits within this of the wall line in x (lift of the purlin off the rafter), mm. */
+const EAVES_X_TOLERANCE = 200;
+/** Eaves purlin sits within this of the eaves level in z, mm. */
+const EAVES_Z_TOLERANCE = 400;
 /** Position tolerance, mm. */
 const TOLERANCE = 1;
 
@@ -65,6 +73,7 @@ const near = (a: number, b: number): boolean => Math.abs(a - b) <= TOLERANCE;
 /** Flexural buckling imperfection factor about the minor axis (EN 1993-1-1 Tab. 6.1/6.2). */
 function minorImperfection(profile: SteelProfile): number {
   if (profile.shape === 'I') return profile.h / profile.b > 1.2 ? 0.34 : 0.49;
+  if (profile.shape === 'C') return 0.34;
   return profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS'
     ? 0.21
     : 0.49;
@@ -105,8 +114,13 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
     'Diagonals are tension-only: one per X carries the panel shear / cos θ, checked against ' +
     'Npl,Rd = A·fy (γM0 = 1, net = gross for welded ends). The transverse component is carried in ' +
     'compression by the rafter (roof) or column (wall), checked for minor-axis buckling χ·Npl,Rd ' +
-    'with Lcr = bay length. Gable posts: simply supported bending q·tributary·h²/8 vs Mpl and ' +
-    'shear. Rows are grouped (roof bracing, wall bracing per side, gable posts); utilisation > 1 ' +
+    'with Lcr = bay length. Gable posts: net pressure cpe + cpi = 0.8 + 0.2 = 1.0 on one wall, simply supported bending ' +
+    'q·tributary·h²/8 vs Mpl and shear. The roof truss spans the full hall width on the two outer ' +
+    'walls: panel shear V = w·(W/2 − d) (w = bay force / W, d = distance of the panel edge from the ' +
+    'nearest wall), so wall-side panels carry about half the bay force. Struts: wall = column, Lcr = ' +
+    'column height; roof = rafter, Lcr = purlin gap along the rafter; plus the eaves purlin carrying ' +
+    'the truss reaction (bay force / 2) with Lcr = bay length (row flagged utilisation 99 if absent).' +
+    ' Rows are grouped (roof bracing, wall bracing per side, gable posts); utilisation > 1 ' +
     'fails. Not covered: frame action, uplift, self-weight, connections - a preliminary check.',
   paramsSchema: {
     type: 'object',
@@ -114,7 +128,7 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       windPressure: {
         type: 'number',
         description:
-          'Peak velocity pressure qp, kN/m² (EN 1991-1-4). Default 0.6. Gable coefficient 0.8 + 0.5.',
+          'Peak velocity pressure qp, kN/m² (EN 1991-1-4). Default 0.6. Frame gable coefficient 0.8 + 0.5; gable posts use net cpe + cpi = 0.8 + 0.2.',
       },
       deadLoad: {
         type: 'number',
@@ -209,11 +223,32 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       panels.set(key, panel);
     }
     const bays = new Set([...panels.values()].map((panel) => panel.bay));
-    const bayRoofPanels = (bay: string): number =>
-      [...panels.values()].filter((panel) => panel.bay === bay && panel.roof).length;
     const bayWallPanels = (bay: string): number =>
       [...panels.values()].filter((panel) => panel.bay === bay && !panel.roof).length;
     const bayForce = roofForce / bays.size;
+
+    // Roof strut = rafter braced laterally by purlins: largest purlin gap along the slope.
+    const purlins = members.filter(({ member }) => member.role === 'purlin');
+    const purlinGapAlong = (rafter: Located, bayStart: number, bayEnd: number): number => {
+      const [from, to] = [
+        Math.min(rafter.start[0], rafter.end[0]),
+        Math.max(rafter.start[0], rafter.end[0]),
+      ];
+      const slope = Math.hypot(rafter.end[0] - rafter.start[0], rafter.end[2] - rafter.start[2]);
+      const cosine = Math.abs(rafter.end[0] - rafter.start[0]) / slope;
+      const positions = purlins
+        .filter(
+          ({ start: s, end: e }) =>
+            near(Math.min(s[1], e[1]), bayStart) &&
+            near(Math.max(s[1], e[1]), bayEnd) &&
+            s[0] >= from - EAVES_X_TOLERANCE &&
+            s[0] <= to + EAVES_X_TOLERANCE,
+        )
+        .map(({ start: s }) => s[0])
+        .sort((a, b) => a - b);
+      const gaps = positions.slice(1).map((position, index) => position - (positions[index] ?? 0));
+      return gaps.length === 0 ? slope : Math.max(...gaps) / cosine;
+    };
 
     const rows: BracingRow[] = [];
     const sorted = [...panels.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
@@ -232,8 +267,12 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       ];
       if (dy < TOLERANCE) continue;
       const length = Math.hypot(dx, dy, dz);
-      const panelCount = panel.roof ? bayRoofPanels(panel.bay) : bayWallPanels(panel.bay);
-      const shear = bayForce / panelCount;
+      const xLow = Math.min(start[0], end[0]);
+      const xHigh = Math.max(start[0], end[0]);
+      const hallWidth = x1 - x0;
+      const shear = panel.roof
+        ? (bayForce * (hallWidth / 2 - Math.max(0, Math.min(xLow - x0, x1 - xHigh)))) / hallWidth
+        : bayForce / bayWallPanels(panel.bay);
       const tension = (shear * length) / dy;
       const fy = yieldStrength(member.material);
       const npl = sectionResistance(profile, fy).axial / 1000;
@@ -253,8 +292,6 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       });
       // Compression strut: rafter (roof) / column (wall) at either end of the bay.
       const [bayStart, bayEnd] = [Math.min(start[1], end[1]), Math.max(start[1], end[1])];
-      const xLow = Math.min(start[0], end[0]);
-      const xHigh = Math.max(start[0], end[0]);
       const strut = panel.roof
         ? rafters.find(
             ({ start: s, end: e }) =>
@@ -269,23 +306,60 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
               near(s[0], start[0]) &&
               (near(s[1], bayStart) || near(s[1], bayEnd)),
           );
-      if (!strut) continue;
-      const compression = panel.roof ? (shear * dx) / dy : (shear * dz) / dy;
-      const strutFy = yieldStrength(strut.member.material);
-      const strutResistance = bucklingResistance(strut.profile, strutFy, dy) / 1000;
-      rows.push({
-        group: panel.group,
-        elementId: strut.member.id,
-        elementIds: [strut.member.id],
-        mark: strut.member.mark,
-        kind: 'strut',
-        force: compression,
-        resistance: strutResistance,
-        moment: 0,
-        momentResistance: 0,
-        utilisation: compression / strutResistance,
-        check: `${panel.roof ? 'rafter' : 'column'} ${strut.member.profile} compression ${compression.toFixed(1)} kN ≤ χ·Npl,Rd ${strutResistance.toFixed(1)} kN (minor axis, Lcr ${dy.toFixed(0)} mm)`,
-      });
+      if (strut) {
+        const compression = panel.roof ? (shear * dx) / dy : (shear * dz) / dy;
+        const strutFy = yieldStrength(strut.member.material);
+        const purlinGap = purlinGapAlong(strut, bayStart, bayEnd);
+        const strutLength = panel.roof ? purlinGap : dz;
+        const strutResistance = bucklingResistance(strut.profile, strutFy, strutLength) / 1000;
+        rows.push({
+          group: panel.group,
+          elementId: strut.member.id,
+          elementIds: [strut.member.id],
+          mark: strut.member.mark,
+          kind: 'strut',
+          force: compression,
+          resistance: strutResistance,
+          moment: 0,
+          momentResistance: 0,
+          utilisation: compression / strutResistance,
+          check: `${panel.roof ? 'rafter' : 'column'} ${strut.member.profile} compression ${compression.toFixed(1)} kN ≤ χ·Npl,Rd ${strutResistance.toFixed(1)} kN (minor axis, Lcr ${strutLength.toFixed(0)} mm${panel.roof ? ', purlin gap' : ', column height'})`,
+        });
+      }
+
+      // Eaves purlin at the wall end of the roof truss: carries the truss reaction in compression.
+      const atWall = panel.roof && (near(xLow, x0) || near(xHigh, x1));
+      if (atWall) {
+        const wallX = near(xLow, x0) ? x0 : x1;
+        const eavesStrut = members.find(
+          ({ member: candidate, start: s, end: e }) =>
+            candidate.role === 'purlin' &&
+            Math.abs(s[0] - wallX) < EAVES_X_TOLERANCE &&
+            near(Math.min(s[1], e[1]), bayStart) &&
+            near(Math.max(s[1], e[1]), bayEnd) &&
+            Math.abs(s[2] - Math.min(...rafterEnds.map((point) => point[2]))) < EAVES_Z_TOLERANCE,
+        );
+        const reaction = bayForce / 2;
+        const fyEaves = eavesStrut ? yieldStrength(eavesStrut.member.material) : 0;
+        const eavesResistance = eavesStrut
+          ? bucklingResistance(eavesStrut.profile, fyEaves, dy) / 1000
+          : 0;
+        rows.push({
+          group: panel.group,
+          elementId: eavesStrut?.member.id ?? member.id,
+          elementIds: [eavesStrut?.member.id ?? member.id],
+          mark: eavesStrut?.member.mark ?? member.mark,
+          kind: 'strut',
+          force: reaction,
+          resistance: eavesResistance,
+          moment: 0,
+          momentResistance: 0,
+          utilisation: eavesStrut ? reaction / eavesResistance : NO_MEMBER_UTILISATION,
+          check: eavesStrut
+            ? `eaves strut ${eavesStrut.member.profile} compression ${reaction.toFixed(1)} kN (truss reaction) ≤ χ·Npl,Rd ${eavesResistance.toFixed(1)} kN (minor axis, Lcr ${dy.toFixed(0)} mm bay)`
+            : `no eaves strut found at x ${round(wallX, 0)} mm in bay ${panel.bay} mm: truss reaction ${reaction.toFixed(1)} kN has no compression member`,
+        });
+      }
     }
 
     // Gable wind posts: columns in a gable plane that do not meet a rafter end (frame columns do).
@@ -307,7 +381,7 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
         const right = inPlane[index + 1]?.start[0] ?? post.start[0];
         const tributary = (right - left) / 2 / 1000;
         const height = Math.abs(post.end[2] - post.start[2]) / 1000;
-        const load = GAMMA_Q * windPressure * CP_GABLE * tributary;
+        const load = GAMMA_Q * windPressure * CP_POST * tributary;
         const fy = yieldStrength(post.member.material);
         const resistance = sectionResistance(post.profile, fy);
         const moment = (load * height * height) / 8;

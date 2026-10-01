@@ -179,4 +179,60 @@ describe('check_bracing', () => {
       expect(values[0]).toBeGreaterThan(0);
     }
   });
+
+  it('distributes roof truss shear over a multi-span hall (end panels carry ~bayForce/2)', () => {
+    const doc = hall({ spans: [20000, 20000, 20000], length: 12000 });
+    const result = checkBracing.run(doc, {});
+    const data = result.data as { rows: BracingRow[]; roofForce: number; bracedBays: number };
+    const roof = data.rows.filter((row) => row.kind === 'diagonal' && row.group === 'roof bracing');
+    expect(roof).toHaveLength(6);
+    const forces = roof.map((row) => row.force).sort((a, b) => a - b);
+    const bayForce = data.roofForce / data.bracedBays;
+    const largest = forces[forces.length - 1] ?? 0;
+    const smallest = forces[0] ?? 0;
+    expect(largest / smallest).toBeGreaterThanOrEqual(2.99);
+    expect(largest / smallest).toBeLessThan(5.5);
+    // wall-side panel: V = bayForce / 2; diagonal = V / cos θ, cos θ = bay / length
+    const length = Math.hypot(10000, 6000, 10000 * Math.tan((6 * Math.PI) / 180));
+    expect(largest).toBeCloseTo(((bayForce / 2) * length) / 6000, 0);
+  });
+
+  it('uses column height and purlin gap as strut buckling lengths', () => {
+    const rows = rowsOf(hall(), { windPressure: 0 });
+    const wall = rows.find((row) => row.kind === 'strut' && row.group.startsWith('wall'));
+    const roof = rows.find(
+      (row) => row.kind === 'strut' && row.group === 'roof bracing' && /rafter/.test(row.check),
+    );
+    expect(wall?.check).toMatch(/Lcr 7000 mm, column height/);
+    expect(roof?.check).toMatch(/purlin gap/);
+    expect(Number(/Lcr (\d+) mm/.exec(roof?.check ?? '')?.[1])).toBeLessThan(2000);
+  });
+
+  it('checks the eaves purlin and flags a missing one with utilisation 99', () => {
+    const doc = hall();
+    const eaves = rowsOf(doc).filter((row) => /eaves strut/.test(row.check));
+    // 2 end bays x 2 walls
+    expect(eaves).toHaveLength(4);
+    for (const row of eaves) {
+      expect(row.kind).toBe('strut');
+      expect(row.force).toBeGreaterThan(0);
+      expect(row.resistance).toBeGreaterThan(0);
+      expect(row.check).toMatch(/Lcr 6000 mm bay/);
+    }
+    const missing = rowsOf(without(doc, 'purlin')).filter((row) =>
+      /no eaves strut found/.test(row.check),
+    );
+    expect(missing).toHaveLength(4);
+    expect(missing.every((row) => row.utilisation === 99)).toBe(true);
+    const result = checkBracing.run(without(doc, 'purlin'), {});
+    expect((result.data as { failures: string[] }).failures.length).toBeGreaterThan(0);
+  });
+
+  it('applies net pressure 1.0 to gable posts', () => {
+    const post = rowsOf(hall(), { windPressure: 1 }).find((row) => row.kind === 'gable-post');
+    expect(post?.check).toMatch(/q (\d+\.\d+) kN\/m/);
+    const q = Number(/q (\d+\.\d+) kN\/m/.exec(post?.check ?? '')?.[1]);
+    // 1.5 · qp 1.0 · cp 1.0 · tributary 6 m
+    expect(q).toBeCloseTo(9, 1);
+  });
 });
