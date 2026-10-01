@@ -14,6 +14,13 @@ llull is developed **AI-first**: the [`CLAUDE.md`](CLAUDE.md) entrypoint and the
 [`.claude/`](.claude) directory (rules, agents, skills, hooks) are first-class
 project artifacts. Read [`CLAUDE.md`](CLAUDE.md) before contributing with an agent.
 
+## For construction companies
+
+llull includes a building (AEC / BIM) workspace: levels, structural grids, parametric walls with
+hosted doors and windows, slabs, columns, beams, stairs and rooms; quantity takeoff, schedules and
+cost estimates; and deliverables the industry opens — scaled plan sheets with title block, DXF for
+AutoCAD users and IFC4 for BIM coordination. See [`docs/CONSTRUCTION.md`](docs/CONSTRUCTION.md).
+
 ## Stack
 
 | Concern        | Choice                                   | Why |
@@ -44,6 +51,7 @@ explains the command-layer pattern that the entire project depends on.
 npm install
 npm run dev          # start the app at http://localhost:5173
 npm run check        # typecheck + lint + test (run before every commit)
+npm run test:e2e     # Playwright end-to-end tests in Chromium (starts the dev server)
 ```
 
 Optional backend (the MCP host):

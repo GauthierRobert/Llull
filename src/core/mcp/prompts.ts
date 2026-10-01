@@ -367,10 +367,65 @@ const parametricPart: PromptTemplate = {
 };
 
 // ---------------------------------------------------------------------------
+// Template: design_building
+// ---------------------------------------------------------------------------
+
+/**
+ * @prompt design_building
+ * Guides an agent through the construction (AEC/BIM) workflow: levels → grid → walls →
+ * openings → slabs/structure → rooms → quantities/cost → DXF / plan sheet / IFC deliverables.
+ */
+const designBuilding: PromptTemplate = {
+  descriptor: {
+    name: 'design_building',
+    description:
+      'Workflow for designing a building with the construction commands: levels, structural grid, ' +
+      'walls with doors/windows, slabs, columns, beams, stairs, rooms, then quantity takeoff, cost ' +
+      'estimate and DXF / plan-sheet / IFC deliverables.',
+    arguments: [
+      {
+        name: 'brief',
+        description: 'What to build, e.g. "2-storey house 10 x 8 m".',
+        required: false,
+      },
+    ],
+  },
+  buildMessages({ brief = 'a two-storey house, 10 m x 8 m' }) {
+    return [
+      userMsg(`Design ${brief} in llull and produce the construction deliverables.`),
+      assistantMsg(
+        `**Construction workflow (all lengths in document units — default mm)**\n\n` +
+          `1. \`set_project_info\` (name, client, address, author, drawingNumber) — fills title blocks and IFC.\n` +
+          `2. \`add_level\` per storey (elevation stacks automatically; height = floor-to-floor).\n` +
+          `3. \`add_grid_system\` { xSpacings, ySpacings } — numbered / lettered axes.\n` +
+          `4. \`draw_walls\` { points, closed: true, thickness, material } for the envelope; \`add_wall\` for partitions ` +
+          `(endpoints on another wall join automatically).\n` +
+          `5. \`add_door\` / \`add_window\` { wallId, offset | at, width, height, sillHeight } — hosted; refused if they do not fit.\n` +
+          `6. \`add_slab\` { wallIds } (or boundary), \`add_column\` { atGridIntersections: true }, \`add_beam\`, \`add_stair\` ` +
+          `(the summary checks the 2R+G comfort rule).\n` +
+          `7. \`add_room\` { name, wallIds | boundary } for each space.\n` +
+          `8. Repeat a typical floor with \`copy_level_elements\`; roof = \`add_slab\` { role: "roof" } on the top level.\n` +
+          `9. Inspect with \`describe_building\`, \`quantity_takeoff\`, \`building_schedule\` { kind }.\n` +
+          `10. Price with \`set_cost_rates\` { rates: { "wall.masonry.m3": 210, "slab-floor.concrete.m3": 190, ... } } then \`estimate_cost\`.\n` +
+          `11. Deliver: \`export_plan_sheet\` { paper: "A3", scale: 100 }, \`export_dxf\` { levelId }, \`export_ifc\`.\n\n` +
+          `Edit parametrically with \`update_wall\`, \`update_opening\`, \`update_level\`, \`move_building_element\`, ` +
+          `\`delete_building_element\` — never edit the generated entities (ids "<elementId>:<part>"); they are regenerated. ` +
+          `For a quick start, \`add_building_template\` { template: "house" | "office" } creates a complete building.`,
+      ),
+    ];
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
-const TEMPLATES: ReadonlyArray<PromptTemplate> = [modelBracket, orthographicSetup, parametricPart];
+const TEMPLATES: ReadonlyArray<PromptTemplate> = [
+  modelBracket,
+  orthographicSetup,
+  parametricPart,
+  designBuilding,
+];
 
 const TEMPLATE_MAP = new Map<string, PromptTemplate>(TEMPLATES.map((t) => [t.descriptor.name, t]));
 

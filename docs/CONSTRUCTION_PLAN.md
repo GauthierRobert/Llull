@@ -32,7 +32,7 @@ Revit / ArchiCAD (levels, hosted openings, schedules, IFC), AutoCAD Architecture
 Each step ships with unit tests (happy + failure path, purity) and is covered by the
 Playwright end-to-end suite (`npm run test:e2e`).
 
-- [ ] **S0 — Plan + e2e infrastructure.** This document; `@playwright/test`,
+- [x] **S0 — Plan + e2e infrastructure.** This document; `@playwright/test`,
       `playwright.config.ts`, `tests/e2e/`.
 - [x] **S1 — Building model, levels, project info.** `add_level`, `update_level`,
       `delete_level`, `set_project_info`, `describe_building`.
@@ -55,8 +55,8 @@ Playwright end-to-end suite (`npm run test:e2e`).
       tags, overall dimensions; print to PDF from the browser.
 - [x] **S10 — IFC export.** `export_ifc` — IFC4 (ISO 16739) with project / site /
       building / storeys, walls, slabs, columns, beams, doors, windows, stairs, spaces.
-- [ ] **S11 — UI.** A *Building* panel: project info, levels (active level), element
+- [x] **S11 — UI.** A *Building* panel: project info, levels (active level), element
       tools with parameter forms, quantity / cost table, schedule CSV, DXF / IFC / sheet
       downloads.
-- [ ] **S12 — Verification.** Unit tests for every command, Playwright e2e covering the
+- [x] **S12 — Verification.** Unit tests for every command, Playwright e2e covering the
       full workflow in a real browser, MCP prompt + docs (`docs/CONSTRUCTION.md`).

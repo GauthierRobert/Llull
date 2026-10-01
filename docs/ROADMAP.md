@@ -67,6 +67,14 @@ AI control — there is no in-app AI bridge).**
 - [ ] 2D drawings generated from 3D: orthographic / section / detail views
 - [ ] GD&T, dimension styles, title blocks, sheets (paper space)
 
+## Construction (AEC / BIM) — see docs/CONSTRUCTION_PLAN.md
+- [x] Levels, structural grids, project info
+- [x] Parametric walls (auto joins), hosted doors / windows, slabs, columns, beams, stairs, rooms
+- [x] Quantity takeoff, schedules, cost estimate
+- [x] DXF (R12) plans, scaled SVG plan sheets with title block, IFC4 export
+- [x] Building panel, 2D Wall tool, per-level floor plan in the 2D view, starter templates
+- [ ] Curved walls, wall build-ups, slab openings, sections / elevations, DXF hatches
+
 ## Later
 - [ ] Materials library (physical + visual / rendering)
 - [ ] Simulation / CAE (FEA, thermal, motion)

@@ -26,7 +26,7 @@ describe('listMcpPrompts()', () => {
   });
 
   it('returns exactly 3 registered templates', () => {
-    expect(listMcpPrompts()).toHaveLength(3);
+    expect(listMcpPrompts()).toHaveLength(4);
   });
 
   it('includes model_bracket', () => {
@@ -432,5 +432,17 @@ describe('build_project validate regression — parametric_part', () => {
       );
     }
     expect(data!.ok).toBe(true);
+  });
+});
+
+describe('design_building prompt', () => {
+  it('walks through the construction workflow and names only registered commands', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    const result = getMcpPrompt('design_building', { brief: 'a small office' });
+    expect(result!.messages[0]!.content.text).toContain('a small office');
+    const text = result!.messages[1]!.content.text;
+    const named = [...text.matchAll(/`([a-z_]+)`/g)].map((match) => match[1] as string);
+    expect(named.length).toBeGreaterThan(15);
+    for (const name of named) expect(getCommand(name), name).toBeDefined();
   });
 });
