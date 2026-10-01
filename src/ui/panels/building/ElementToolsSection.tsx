@@ -30,12 +30,17 @@ interface ElementOption {
 
 type ElementOptions = Readonly<Record<ElementListKind, ReadonlyArray<ElementOption>>>;
 
-const NO_OPTIONS: ElementOptions = { walls: [], stairs: [], slabs: [] };
+const NO_OPTIONS: ElementOptions = { walls: [], hosts: [], stairs: [], slabs: [] };
 
 /** Active level's walls and stairs, and every slab (stair wells cut the slab above). */
 function elementOptions(building: BuildingModel | undefined): ElementOptions {
   if (!building) return NO_OPTIONS;
-  const options: Record<ElementListKind, ElementOption[]> = { walls: [], stairs: [], slabs: [] };
+  const options: Record<ElementListKind, ElementOption[]> = {
+    walls: [],
+    hosts: [],
+    stairs: [],
+    slabs: [],
+  };
   for (const id of building.elementOrder) {
     const element = building.elements[id];
     if (!element) continue;
@@ -46,6 +51,9 @@ function elementOptions(building: BuildingModel | undefined): ElementOptions {
         element.end[1] - element.start[1],
       );
       options.walls.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
+      options.hosts.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
+    } else if (element.category === 'curvedWall' && onActiveLevel) {
+      options.hosts.push({ id, label: `${element.mark} · curved` });
     } else if (element.category === 'stair' && onActiveLevel) {
       options.stairs.push({ id, label: `${element.mark} · ${element.riserCount} risers` });
     } else if (element.category === 'slab') {

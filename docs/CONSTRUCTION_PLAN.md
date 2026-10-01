@@ -67,6 +67,6 @@ Playwright end-to-end suite (`npm run test:e2e`).
       (structure / insulation / finish, exterior → interior, like Revit wall types): wall
       thickness = sum of layers; per-layer quantities (m², m³ by material); layer lines inside
       the plan cut; IFC `IfcMaterialLayerSetUsage`. `set_wall_layers` edits an existing wall.
-- [ ] **S14 — Openings in curved walls.** Doors and windows hosted by curved walls (offset
+- [x] **S14 — Openings in curved walls.** Doors and windows hosted by curved walls (offset
       along the arc): the wall is cut, the opening follows the curve's tangent, quantities
       deduct the openings, plan / IFC show them.

@@ -4,7 +4,12 @@
  */
 
 import type { CadDocument, Vec2 } from '../../model/types';
-import type { OpeningElement, WallElement } from '../../model/building';
+import type {
+  BuildingModel,
+  CurvedWallElement,
+  OpeningElement,
+  WallElement,
+} from '../../model/building';
 import type { CommandDefinition, CommandResult, ParamSpec } from '../types';
 import { projectOntoSegment } from '../../../lib/polygon';
 import {
@@ -18,7 +23,8 @@ import {
   withElement,
   elementAffected,
 } from './model';
-import { openingsOf, regenerateBuilding, wallExtent, wallFrame } from './evaluate';
+import { openingsOf, regenerateBuilding, wallExtent, wallFrame, type WallExtent } from './evaluate';
+import { arcOffsetOf, curvedWallLength } from './curvedWallGeometry';
 import { openingFitError } from './walls';
 
 type OpeningKind = 'door' | 'window';
@@ -55,11 +61,18 @@ function resolveOffset(
   return wallFrame(wall).length / 2;
 }
 
+/** Built extent of a host wall along its axis (curved walls: the whole arc length). */
+function hostExtent(building: BuildingModel, host: WallElement | CurvedWallElement): WallExtent {
+  return host.category === 'wall'
+    ? wallExtent(building, host)
+    : { start: 0, end: curvedWallLength(host) };
+}
+
 function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParams): CommandResult {
   const name = `add_${kind}`;
   const building = getBuilding(doc);
   const wall = building.elements[params.wallId];
-  if (!wall || wall.category !== 'wall') {
+  if (!wall || (wall.category !== 'wall' && wall.category !== 'curvedWall')) {
     return noChange(
       doc,
       `${name} failed: no wall '${params.wallId}'. Use describe_building to list walls.`,
@@ -69,7 +82,18 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
   const width = params.width ?? fromMm(doc, defaults.width);
   const height = params.height ?? Math.min(fromMm(doc, defaults.height), wall.height);
   const sillHeight = params.sillHeight ?? fromMm(doc, defaults.sill);
-  const offset = resolveOffset(wall, params.offset, params.at);
+  const offset =
+    wall.category === 'wall'
+      ? resolveOffset(wall, params.offset, params.at)
+      : params.offset !== undefined
+        ? isFiniteNumber(params.offset)
+          ? params.offset
+          : null
+        : params.at !== undefined
+          ? isVec2(params.at)
+            ? arcOffsetOf(wall, params.at)
+            : null
+          : curvedWallLength(wall) / 2;
   if (
     offset === null ||
     !isFiniteNumber(width) ||
@@ -101,7 +125,7 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     wall,
     opening,
     openingsOf(building, wall.id),
-    wallExtent(building, wall),
+    hostExtent(building, wall),
   );
   if (fitError) return noChange(doc, `${name} failed: ${fitError}.`);
   const document = regenerateBuilding(doc, withElement(building, opening));
@@ -118,7 +142,10 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
 function openingSchema(kind: OpeningKind): Record<string, ParamSpec> {
   const defaults = DEFAULTS_MM[kind];
   const properties: Record<string, ParamSpec> = {
-    wallId: { type: 'string', description: 'Host wall element id, e.g. "wall-1".' },
+    wallId: {
+      type: 'string',
+      description: 'Host wall element id: a straight ("wall-1") or curved ("curvedWall-1") wall.',
+    },
     offset: {
       type: 'number',
       description:
@@ -228,7 +255,7 @@ export const updateOpening: CommandDefinition<UpdateOpeningParams> = {
       return noChange(doc, `update_opening failed: no door or window '${openingId}'.`);
     }
     const wall = building.elements[opening.hostId];
-    if (!wall || wall.category !== 'wall') {
+    if (!wall || (wall.category !== 'wall' && wall.category !== 'curvedWall')) {
       return noChange(doc, `update_opening failed: host wall '${opening.hostId}' is missing.`);
     }
     const updated: OpeningElement = {
@@ -256,7 +283,7 @@ export const updateOpening: CommandDefinition<UpdateOpeningParams> = {
       wall,
       updated,
       openingsOf(building, wall.id),
-      wallExtent(building, wall),
+      hostExtent(building, wall),
     );
     if (fitError) return noChange(doc, `update_opening refused: ${fitError}.`);
     const document = regenerateBuilding(doc, withElement(building, updated));

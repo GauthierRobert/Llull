@@ -7,6 +7,7 @@
 
 import type { CadDocument } from '../../model/types';
 import type {
+  CurvedWallElement,
   BimCategory,
   BuildingElement,
   BuildingModel,
@@ -130,6 +131,14 @@ class TakeoffAccumulator {
   }
 }
 
+/** Area of the openings hosted by a wall (for net face areas). */
+function curvedVoids(building: BuildingModel, wallId: string): number {
+  return openingsOf(building, wallId).reduce(
+    (sum, opening) => sum + opening.width * opening.height,
+    0,
+  );
+}
+
 /** Bill of quantities grouped by category × material × unit. */
 export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   const building = getBuilding(doc);
@@ -165,6 +174,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   }
   for (const wall of elementsOf(building, 'curvedWall')) {
     const length = curvedWallLength(wall);
+    const voids = curvedVoids(building, wall.id);
     takeoff.add(
       'wall',
       wall.material,
@@ -177,14 +187,14 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       wall.material,
       'm2',
       `Walls, ${wall.material} — net face area`,
-      scale.area(length * wall.height),
+      scale.area(length * wall.height - voids),
     );
     takeoff.add(
       'wall',
       wall.material,
       'm3',
       `Walls, ${wall.material} — volume`,
-      scale.volume(length * wall.height * wall.thickness),
+      scale.volume((length * wall.height - voids) * wall.thickness),
     );
   }
   for (const category of ['door', 'window'] as const) {
@@ -411,9 +421,12 @@ function levelName(building: BuildingModel, levelId: string): string {
   return building.levels[levelId]?.name ?? levelId;
 }
 
-function hostOf(building: BuildingModel, opening: OpeningElement): WallElement | undefined {
+function hostOf(
+  building: BuildingModel,
+  opening: OpeningElement,
+): WallElement | CurvedWallElement | undefined {
   const wall = building.elements[opening.hostId];
-  return wall?.category === 'wall' ? wall : undefined;
+  return wall?.category === 'wall' || wall?.category === 'curvedWall' ? wall : undefined;
 }
 
 export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
@@ -459,9 +472,13 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
               wall.thickness,
               wall.height,
               wall.material,
-              0,
-              round(scale.area(length * wall.height)),
-              round(scale.volume(length * wall.height * wall.thickness)),
+              openingsOf(building, wall.id).length,
+              round(scale.area(length * wall.height - curvedVoids(building, wall.id))),
+              round(
+                scale.volume(
+                  (length * wall.height - curvedVoids(building, wall.id)) * wall.thickness,
+                ),
+              ),
             ];
           }),
         ],

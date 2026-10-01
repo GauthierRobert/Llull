@@ -25,10 +25,10 @@ import type {
 import type { CommandDefinition, CommandResult } from '../types';
 import { toCounterClockwise } from '../../../lib/polygon';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
-import { wallExtent, wallFrame, type WallExtent } from './evaluate';
+import { openingsOf, wallExtent, wallFrame, type WallExtent } from './evaluate';
 import { sweepFrame } from './mesh';
 import { panelFrame, plateLayout, trayOutline } from './industrial/evaluate';
-import { curvedWallBand } from './curvedWallGeometry';
+import { curvedWallBand, tangentWall } from './curvedWallGeometry';
 import { findProfile, type SteelProfile } from './steel/profiles';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
@@ -759,9 +759,24 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
       }
       if (element.category === 'curvedWall') {
         const exported = exportCurvedWall(context, element, storeyPlacement);
-        if (exported) {
-          contained.push(exported.ref);
-          record(exported);
+        if (!exported) continue;
+        contained.push(exported.ref);
+        record(exported);
+        for (const opening of openingsOf(building, element.id)) {
+          // Openings sit on the tangent to the arc at their offset.
+          const tangent = tangentWall(element, opening.offset);
+          const host = {
+            ref: exported.ref,
+            placement: placement(
+              context,
+              storeyPlacement,
+              context.mm(tangent.start[0]),
+              context.mm(tangent.start[1]),
+              context.mm(element.baseOffset),
+              wallFrame(tangent).angle,
+            ),
+          };
+          record(exportOpening(context, opening, tangent, host, contained));
         }
         continue;
       }

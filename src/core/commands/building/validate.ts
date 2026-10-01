@@ -247,7 +247,10 @@ function elementErrors(
   if (category === 'door' || category === 'window') {
     const hostId = element['hostId'];
     if (typeof hostId !== 'string') errors.push(`building element ${key}: hostId must be a string`);
-    else if (!isRecord(elements[hostId]) || elements[hostId]['category'] !== 'wall') {
+    else if (
+      !isRecord(elements[hostId]) ||
+      (elements[hostId]['category'] !== 'wall' && elements[hostId]['category'] !== 'curvedWall')
+    ) {
       errors.push(`building element ${key}: hostId '${hostId}' is not a wall`);
     }
   }

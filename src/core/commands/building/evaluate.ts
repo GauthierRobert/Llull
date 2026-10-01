@@ -44,7 +44,7 @@ import {
 } from '../../../lib/polygon';
 import { fromMm, toMetres } from './model';
 import { prismMesh } from './mesh';
-import { evaluateCurvedWall } from './curvedWallGeometry';
+import { evaluateCurvedWall, tangentWall } from './curvedWallGeometry';
 import {
   evaluateEquipment,
   evaluateFooting,
@@ -520,9 +520,10 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
   const { building } = context;
   if (element.category === 'grid') return evaluateGrid(context, element);
   if (element.category === 'door' || element.category === 'window') {
-    const wall = building.elements[element.hostId];
-    if (!wall || wall.category !== 'wall') return [];
-    const level = building.levels[wall.levelId];
+    const host = building.elements[element.hostId];
+    if (!host || (host.category !== 'wall' && host.category !== 'curvedWall')) return [];
+    const level = building.levels[host.levelId];
+    const wall = host.category === 'wall' ? host : tangentWall(host, element.offset);
     return level ? evaluateOpening(context, element, wall, level) : [];
   }
   const leveled = element as Exclude<BuildingElement, GridElement | OpeningElement>;
@@ -554,7 +555,7 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
     case 'tray':
       return evaluateTray(context.doc, leveled, level);
     case 'curvedWall':
-      return evaluateCurvedWall(leveled, level);
+      return evaluateCurvedWall(leveled, level, openingsOf(building, leveled.id));
     case 'plate': {
       const member = building.elements[leveled.memberId];
       return member?.category === 'member'

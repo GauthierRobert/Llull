@@ -165,3 +165,79 @@ describe('curved wall review regressions', () => {
     expect(elementBoxes(doc, doc.building!, thick)).toEqual([]);
   });
 });
+
+describe('openings in curved walls', () => {
+  function withDoor(): CadDocument {
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_door', { wallId: 'curvedWall-1', width: 1000 }).document;
+    return execute(doc, 'add_window', {
+      wallId: 'curvedWall-1',
+      at: [-4000, 3000],
+      width: 1200,
+    }).document;
+  }
+
+  it('hosts doors and windows along the arc and cuts the wall around them', () => {
+    const doc = withDoor();
+    const door = doc.building!.elements['door-1']!;
+    expect(door.category === 'door' && door.offset).toBeCloseTo((Math.PI * 5000) / 2);
+    const window = doc.building!.elements['window-1']!;
+    // The window is projected onto the arc nearest to [-4000, 3000] (angle 143.13° → 36.87° from the start).
+    expect(window.category === 'window' && window.offset).toBeCloseTo(
+      5000 * Math.atan2(3000, 4000),
+      0,
+    );
+    // Door leaf sits on the arc, oriented along the tangent (horizontal at the crown).
+    expect(doc.entities['door-1:leaf']).toMatchObject({ kind: 'box' });
+    const leaf = doc.entities['door-1:leaf'];
+    expect(leaf?.kind === 'box' && leaf.position[0]).toBeCloseTo(0, 6);
+    expect(leaf?.kind === 'box' && leaf.position[1]).toBeCloseTo(5000, 6);
+    // Full-height pieces between openings + sill / head pieces.
+    const bodies = Object.keys(doc.entities).filter((id) => id.startsWith('curvedWall-1:body'));
+    expect(bodies.length).toBe(3 + 1 + 2);
+  });
+
+  it('refuses openings that do not fit and moves / deletes them with the wall', () => {
+    let doc = withDoor();
+    expect(
+      execute(doc, 'add_door', { wallId: 'curvedWall-1', offset: 100, width: 1000 }).summary,
+    ).toMatch(/spans/);
+    expect(
+      execute(doc, 'add_window', { wallId: 'curvedWall-1', offset: 7854, width: 1200 }).summary,
+    ).toMatch(/overlaps/);
+    expect(execute(doc, 'add_door', { wallId: 'curvedWall-1', at: 'x' }).affected).toEqual([]);
+    expect(execute(doc, 'update_opening', { openingId: 'door-1', width: 1200 }).affected).toContain(
+      'door-1',
+    );
+    doc = execute(doc, 'move_building_element', {
+      elementIds: ['curvedWall-1'],
+      delta: [0, 1000],
+    }).document;
+    const leaf = doc.entities['door-1:leaf'];
+    expect(leaf?.kind === 'box' && leaf.position[1]).toBeCloseTo(6000, 6);
+    doc = execute(doc, 'delete_building_element', { elementIds: ['curvedWall-1'] }).document;
+    expect(doc.building!.elements['door-1']).toBeUndefined();
+  });
+
+  it('deducts openings from quantities and shows them in plan and IFC', () => {
+    const doc = withDoor();
+    const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
+    const gross = Math.PI * 5 * 3;
+    const net = gross - 1 * 2.1 - 1.2 * 1.2;
+    expect(lines.find((line) => line.key === 'wall.concrete.m2')?.quantity).toBeCloseTo(net, 2);
+    const schedule = execute(doc, 'building_schedule', { kind: 'wall' }).data as {
+      rows: unknown[][];
+    };
+    expect(schedule.rows[0]?.[6]).toBe(2);
+    const doors = execute(doc, 'building_schedule', { kind: 'door' }).data as { rows: unknown[][] };
+    expect(doors.rows[0]).toContain('W1');
+    const plan = buildPlanDrawing(doc, undefined)!.primitives;
+    expect(plan.filter((p) => p.type === 'polygon' && p.layer === 'A-WALL')).toHaveLength(3);
+    expect(plan.some((p) => p.type === 'arc' && p.layer === 'A-DOOR')).toBe(true);
+    expect(plan.filter((p) => p.type === 'line' && p.layer === 'A-GLAZ')).toHaveLength(3);
+    const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
+    expect(ifc).toContain('IFCDOOR(');
+    expect(ifc).toContain('IFCRELVOIDSELEMENT(');
+    expect(buildingErrors(doc.building)).toEqual([]);
+  });
+});

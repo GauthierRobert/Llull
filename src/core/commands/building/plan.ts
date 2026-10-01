@@ -22,7 +22,12 @@ import { MEMBER_LAYER } from './entities';
 import { sweepFrame } from './mesh';
 import { findProfile, profileOutline } from './steel/profiles';
 import { plateLayout } from './industrial/evaluate';
-import { curvedWallBand } from './curvedWallGeometry';
+import {
+  curvedBandBetween,
+  curvedWallBand,
+  curvedWallPieces,
+  tangentWall,
+} from './curvedWallGeometry';
 import { layerBoundaries } from './wallLayers';
 
 export type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
@@ -123,6 +128,57 @@ function isCut(opening: OpeningElement, cutHeight: number): boolean {
   return opening.sillHeight < cutHeight && opening.sillHeight + opening.height > cutHeight;
 }
 
+/** Plan symbol of a door (leaf + swing) or window (three lines) in a straight wall frame. */
+function openingSymbol(
+  wall: Pick<WallElement, 'start' | 'end' | 'thickness'>,
+  opening: OpeningElement,
+): PlanPrimitive[] {
+  const frame = wallFrame(wall);
+  const half = wall.thickness / 2;
+  const primitives: PlanPrimitive[] = [];
+  const left = opening.offset - opening.width / 2;
+  const right = opening.offset + opening.width / 2;
+  if (opening.category === 'window') {
+    for (const across of [-half, 0, half]) {
+      primitives.push({
+        type: 'line',
+        layer: layerName('window'),
+        style: 'thin',
+        a: pointAlong(wall, frame, left, across),
+        b: pointAlong(wall, frame, right, across),
+      });
+    }
+    return primitives;
+  }
+  const hinge = pointAlong(wall, frame, opening.swing === 'left' ? left : right, half);
+  const openAngle = frame.angle + Math.PI / 2;
+  const [startAngle, endAngle] =
+    opening.swing === 'left' ? [frame.angle, openAngle] : [openAngle, frame.angle + Math.PI];
+  primitives.push(
+    {
+      type: 'arc',
+      layer: layerName('door'),
+      style: 'thin',
+      center: hinge,
+      radius: opening.width,
+      startAngle,
+      endAngle,
+    },
+    {
+      type: 'line',
+      layer: layerName('door'),
+      style: 'thin',
+      a: hinge,
+      b: [
+        hinge[0] + Math.cos(openAngle) * opening.width,
+        hinge[1] + Math.sin(openAngle) * opening.width,
+      ],
+    },
+  );
+
+  return primitives;
+}
+
 function wallPrimitives(
   building: BuildingModel,
   wall: WallElement,
@@ -183,47 +239,7 @@ function wallPrimitives(
       }
     }
   }
-  for (const opening of openings) {
-    const left = opening.offset - opening.width / 2;
-    const right = opening.offset + opening.width / 2;
-    if (opening.category === 'window') {
-      for (const across of [-half, 0, half]) {
-        primitives.push({
-          type: 'line',
-          layer: layerName('window'),
-          style: 'thin',
-          a: pointAlong(wall, frame, left, across),
-          b: pointAlong(wall, frame, right, across),
-        });
-      }
-      continue;
-    }
-    const hinge = pointAlong(wall, frame, opening.swing === 'left' ? left : right, half);
-    const openAngle = frame.angle + Math.PI / 2;
-    const [startAngle, endAngle] =
-      opening.swing === 'left' ? [frame.angle, openAngle] : [openAngle, frame.angle + Math.PI];
-    primitives.push(
-      {
-        type: 'arc',
-        layer: layerName('door'),
-        style: 'thin',
-        center: hinge,
-        radius: opening.width,
-        startAngle,
-        endAngle,
-      },
-      {
-        type: 'line',
-        layer: layerName('door'),
-        style: 'thin',
-        a: hinge,
-        b: [
-          hinge[0] + Math.cos(openAngle) * opening.width,
-          hinge[1] + Math.sin(openAngle) * opening.width,
-        ],
-      },
-    );
-  }
+  for (const opening of openings) primitives.push(...openingSymbol(wall, opening));
   return primitives;
 }
 
@@ -653,19 +669,33 @@ export function buildPlanDrawing(
       case 'curvedWall': {
         const band = curvedWallBand(element);
         if (!band) break;
-        const cut =
-          element.baseOffset <= cutHeight && cutHeight < element.baseOffset + element.height;
-        primitives.push(
-          cut
-            ? {
-                type: 'polygon',
-                layer: layerName('wall'),
-                style: 'cut',
-                fill: 'hatch',
-                points: band,
-              }
-            : { type: 'polygon', layer: layerName('wall'), style: 'hidden', points: band },
-        );
+        const openings = openingsOf(building, element.id);
+        const localCut = cutHeight - element.baseOffset;
+        if (!(localCut >= 0 && localCut < element.height)) {
+          primitives.push({
+            type: 'polygon',
+            layer: layerName('wall'),
+            style: 'hidden',
+            points: band,
+          });
+          break;
+        }
+        for (const piece of curvedWallPieces(element, openings)) {
+          if (!(piece.z0 <= localCut && localCut < piece.z1)) continue;
+          const points = curvedBandBetween(element, piece.s0, piece.s1);
+          if (points) {
+            primitives.push({
+              type: 'polygon',
+              layer: layerName('wall'),
+              style: 'cut',
+              fill: 'hatch',
+              points,
+            });
+          }
+        }
+        for (const opening of openings) {
+          primitives.push(...openingSymbol(tangentWall(element, opening.offset), opening));
+        }
         break;
       }
       case 'slab':

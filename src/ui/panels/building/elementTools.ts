@@ -8,7 +8,7 @@
 export type FieldKind = 'number' | 'text' | 'select' | 'checkbox';
 
 /** Live element lists a select field can offer. */
-export type ElementListKind = 'walls' | 'stairs' | 'slabs';
+export type ElementListKind = 'walls' | 'hosts' | 'stairs' | 'slabs';
 
 export interface ToolField {
   readonly key: string;
@@ -296,7 +296,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'door',
     label: 'Door',
     fields: [
-      { key: 'wallId', label: 'Host wall', kind: 'select', defaultValue: '', options: 'walls' },
+      { key: 'wallId', label: 'Host wall', kind: 'select', defaultValue: '', options: 'hosts' },
       num('offset', 'Offset from start', '', true),
       num('width', 'Width', '900'),
       num('height', 'Height', '2100'),
@@ -327,7 +327,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'window',
     label: 'Window',
     fields: [
-      { key: 'wallId', label: 'Host wall', kind: 'select', defaultValue: '', options: 'walls' },
+      { key: 'wallId', label: 'Host wall', kind: 'select', defaultValue: '', options: 'hosts' },
       num('offset', 'Offset from start', '', true),
       num('width', 'Width', '1200'),
       num('height', 'Height', '1200'),

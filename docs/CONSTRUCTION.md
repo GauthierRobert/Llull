@@ -24,7 +24,7 @@ The plan and status of this work: [`CONSTRUCTION_PLAN.md`](CONSTRUCTION_PLAN.md)
 | --- | --- | --- |
 | Structural grid | `add_grid_system`, `add_grid_line` | Numbered axes along X, lettered along Y (I and O skipped). |
 | Wall | `add_wall`, `draw_walls`, `update_wall` | Plan centerline, thickness, height (default: level height), material. L / T / X joints close automatically. Also drawn with the **Wall** tool in the 2D view (Enter to finish, click the first point to close). |
-| Curved wall | `add_curved_wall` | Arc centreline from start through a point to end; thickness, height, base offset, material. Counted with walls in quantities and the wall schedule; hatched cut in plans, IfcWall in IFC. No hosted openings or automatic joins. |
+| Curved wall | `add_curved_wall` | Arc centreline from start through a point to end; thickness, height, base offset, material. Counted with walls in quantities and the wall schedule; hatched cut in plans, IfcWall in IFC. Hosts doors / windows (offset = distance along the arc; `at` snaps to the arc). No automatic joins. |
 | Wall build-up | `set_wall_layers` | Composite wall type: layers from the right-hand face (exterior of a counter-clockwise perimeter) inwards, each { material, thickness, function }. Thickness = sum; quantities per layer material; layer lines in plans; IFC material layer set. Changing the thickness with `update_wall` removes the build-up. |
 | Door / window | `add_door`, `add_window`, `update_opening` | Hosted by a wall: cut it exactly, travel with it, refused if they do not fit or overlap. Doors draw their swing in plan. |
 | Slab / roof / foundation | `add_slab` | From a boundary or a closed loop of walls (`wallFace`: outer / center / inner). Top at level + offset. |
@@ -58,6 +58,6 @@ The *Building* panel shows the live takeoff + estimate and downloads CSV files.
 
 ## Known limits
 
-- Curved walls do not host doors / windows or join other walls; walls are drawn with one hatch for the whole build-up (layer lines, not per-layer patterns).
+- Curved walls do not join other walls automatically; walls are drawn with one hatch for the whole build-up (layer lines, not per-layer patterns).
 - Plans cut every element of the level at 1.2 m; elevations and sections come from `export_elevation_sheet` (see [`INDUSTRIAL.md`](INDUSTRIAL.md)).
 - DXF hatches are written as R12 LINE / SOLID entities (no associative HATCH objects).
