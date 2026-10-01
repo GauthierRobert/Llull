@@ -14,6 +14,7 @@ import {
   buildConeGeometry,
   buildCylinderGeometry,
   buildPyramidGeometry,
+  buildRevolutionGeometry,
   buildSphereGeometry,
   buildTorusGeometry,
   buildWedgeGeometry,
@@ -113,4 +114,30 @@ describe('primitive bounds agreement (render / core bbox / export tessellation)'
     expect(cylinderBounds.min[2]).toBe(POSITION[2] - 3);
     expect(coneBounds.min[2]).toBe(POSITION[2]);
   });
+
+  const PROFILE: ReadonlyArray<readonly [number, number]> = [[1, 0], [3, 0], [3, 2], [1, 2]];
+  const SWEEPS: Array<[string, number]> = [['90deg', Math.PI / 2], ['180deg', Math.PI], ['270deg', 1.5 * Math.PI], ['360deg', 2 * Math.PI]];
+
+  for (const axis of [[0, 0, 1], [0, 1, 0], [1, 0, 0]] as const) {
+    for (const [label, angle] of SWEEPS) {
+      it(`revolution axis ${axis.join(',')} sweep ${label}: rendered == export tessellation, within core bounds`, () => {
+        const result = execute(createEmptyDocument(), 'revolve_profile', {
+          profile: PROFILE, axis, angle, segments: 24, position: POSITION,
+        });
+        const entity = result.document.entities[result.affected[0]!] as Entity;
+        expect(entity.kind).toBe('revolution');
+
+        const rendered = renderedBounds(buildRevolutionGeometry(PROFILE, axis, angle, 24), POSITION);
+        const tessellated = tessellatedBounds(entity);
+        const core = entityBounds(entity);
+
+        expectBoundsClose(rendered, tessellated, 1e-5);
+        // core bounds are the conservative full-sweep box: rendered must lie inside it.
+        for (let i = 0; i < 3; i++) {
+          expect(rendered.min[i]!).toBeGreaterThanOrEqual(core.min[i]! - 1e-5);
+          expect(rendered.max[i]!).toBeLessThanOrEqual(core.max[i]! + 1e-5);
+        }
+      });
+    }
+  }
 });

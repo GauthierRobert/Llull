@@ -3,15 +3,8 @@
  *
  * Render branch for `kind:'revolution'` entities.
  *
- * Builds a THREE.LatheGeometry from `entity.profile` (an array of [radial, axial]
- * points), rotating through `entity.angle` radians with `entity.segments` subdivisions.
- *
- * LatheGeometry rotates a profile around the +Y axis by default. The axis alignment
- * quaternion rotates that +Y sweep axis to match `entity.axis`:
- *   - [0,1,0] → Y-axis revolution (no rotation needed — LatheGeometry default).
- *   - [0,0,1] → Z-axis revolution (the doc Z-up default; axis is rotated from Y→Z).
- *   - [1,0,0] → X-axis revolution.
- *   - arbitrary Vec3 → setFromUnitVectors(Y, axisNorm).
+ * Builds geometry with buildRevolutionGeometry (primitiveGeometry.ts), which uses the same
+ * sweep convention as core tessellation/export (start +X, counter-clockwise, dominant-axis frame).
  *
  * Geometry is memoized on (profileKey, axis, angle, segments); disposed on unmount.
  * Material props reflect the active display mode (shaded/wireframe/xray) (R9).
@@ -25,6 +18,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { RevolutionEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
+import { buildRevolutionGeometry } from './primitiveGeometry';
 
 interface RevolutionMeshProps {
   entity: RevolutionEntity;
@@ -44,31 +38,6 @@ function axisKey(axis: RevolutionEntity['axis']): string {
   return `${axis[0]},${axis[1]},${axis[2]}`;
 }
 
-/**
- * Build a THREE.Quaternion that rotates the LatheGeometry's default sweep axis (+Y)
- * to align with the given axis direction.
- */
-function axisRotation(axis: RevolutionEntity['axis']): THREE.Quaternion {
-  const ax = axis[0];
-  const ay = axis[1];
-  const az = axis[2];
-  const axisVec = new THREE.Vector3(ax, ay, az);
-  const len = axisVec.length();
-  if (len < 1e-10) return new THREE.Quaternion(); // degenerate axis — identity
-
-  axisVec.divideScalar(len); // normalize in place
-  const yAxis = new THREE.Vector3(0, 1, 0);
-
-  // If axis is already +Y, no rotation is needed.
-  if (axisVec.dot(yAxis) > 1 - 1e-8) return new THREE.Quaternion();
-  // If axis is -Y, flip 180° around X.
-  if (axisVec.dot(yAxis) < -1 + 1e-8) {
-    return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
-  }
-
-  return new THREE.Quaternion().setFromUnitVectors(yAxis, axisVec);
-}
-
 export function RevolutionMesh({
   entity,
   selected,
@@ -80,23 +49,11 @@ export function RevolutionMesh({
   const pKey = profileKey(profile);
   const aKey = axisKey(axis);
 
-  /**
-   * Build LatheGeometry from the profile.
-   *
-   * LatheGeometry expects an array of Vector2 points that define the profile in
-   * the XY half-plane (X = radial distance from Y-axis, Y = axial height along Y-axis).
-   * Entity profile is [radialOffset, axialOffset], which maps directly to [x, y].
-   *
-   * Memoized on profile points, axis, angle, and segments.
-   */
-  const geometry = useMemo(() => {
-    if (profile.length < 2) return new THREE.BufferGeometry();
-
-    const points = profile.map(([r, a]) => new THREE.Vector2(Math.max(0, r), a));
-    const geo = new THREE.LatheGeometry(points, segments, 0, angle);
-    return geo;
+  const geometry = useMemo(
+    () => buildRevolutionGeometry(profile, axis, angle, segments),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pKey, aKey, angle, segments]);
+    [pKey, aKey, angle, segments],
+  );
 
   // Dispose geometry on unmount / geometry change (R9).
   useEffect(() => {
@@ -105,19 +62,6 @@ export function RevolutionMesh({
       geometry.dispose();
     };
   }, [geometry]);
-
-  // Compute the quaternion that maps LatheGeometry's +Y sweep axis to entity.axis.
-  // Memoized on axis only — does not depend on angle or profile.
-  const axisQuat = useMemo(() => axisRotation(axis), [aKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Combine axis alignment quaternion with entity's own Euler rotation.
-  const combinedRotation = useMemo(() => {
-    const entityEuler = new THREE.Euler(rotation[0], rotation[1], rotation[2], 'XYZ');
-    const entityQuat = new THREE.Quaternion().setFromEuler(entityEuler);
-    const combined = axisQuat.clone().multiply(entityQuat);
-    return new THREE.Euler().setFromQuaternion(combined, 'XYZ');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aKey, rotation[0], rotation[1], rotation[2]]);
 
   const matProps = useMaterialProps({
     color,
@@ -136,7 +80,7 @@ export function RevolutionMesh({
     onSelect(entity.id, additive);
   }
 
-  if (profile.length < 2) return null;
+  if (profile.length < 3) return null;
 
   return (
     <mesh
@@ -144,7 +88,7 @@ export function RevolutionMesh({
       name={entity.id}
       geometry={geometry}
       position={[position[0], position[1], position[2]]}
-      rotation={[combinedRotation.x, combinedRotation.y, combinedRotation.z]}
+      rotation={[rotation[0], rotation[1], rotation[2]]}
       onClick={handleClick}
       castShadow
       receiveShadow
