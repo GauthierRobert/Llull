@@ -22,7 +22,7 @@ import {
   type FrameLoadParams,
 } from './frameCheck';
 import { baseReactions, type BaseReaction, type FrameLoads, type LoadCase } from './frameModel';
-import { boltResistance } from './steelDesign';
+import { anchorBoltResistance } from './steelDesign';
 
 export interface FoundationRow {
   /** Column mark. */
@@ -54,6 +54,8 @@ interface Combination {
 const CONCRETE_UNIT_WEIGHT = 25; // kN/m³
 const BACKFILL_UNIT_WEIGHT = 18; // kN/m³
 const FRICTION = 0.45;
+/** EN 1997-1 DA2 partial factor on sliding resistance. */
+const GAMMA_R_H = 1.1;
 const FCD = 25 / 1.5; // C25/30, N/mm²
 const CONCENTRATION_FACTOR = 1.5;
 const BEARING_STRENGTH = (2 / 3) * FCD * CONCENTRATION_FACTOR; // N/mm²
@@ -239,9 +241,11 @@ function footingRows(
   if (wind) {
     const uplift: Candidate[] = [];
     const resisting = 0.9 * weights;
-    for (const combination of ultimateCombinations(wind, crane, true).filter((c) =>
-      /W/.test(c.name),
-    )) {
+    const equCombinations: Combination[] = [
+      { name: '0.9G+1.5W→', factors: { G: 0.9, WL: 1.5 } },
+      { name: '0.9G+1.5W←', factors: { G: 0.9, WR: 1.5 } },
+    ];
+    for (const combination of equCombinations) {
       const net = Math.max(0, -combine(reaction, combination.factors).v);
       uplift.push({
         value: net,
@@ -251,14 +255,14 @@ function footingRows(
       });
     }
     const upliftWorst = worst(uplift);
-    if (upliftWorst) rows.push(row('uplift EQU (0.9 Gstb >= net 1.0G+1.5W)', upliftWorst, 'kN'));
+    if (upliftWorst) rows.push(row('uplift EQU (0.9 Gstb vs 0.9G+1.5W)', upliftWorst, 'kN'));
   }
 
   const sliding: Candidate[] = [];
   for (const combination of ultimateCombinations(wind, crane, true)) {
     const { v } = combine(reaction, combination.factors);
     const h = slidingHorizontal(combination.factors);
-    const resistance = FRICTION * Math.max(0, v + weights + slabShare);
+    const resistance = (FRICTION * Math.max(0, v + weights + slabShare)) / GAMMA_R_H;
     const demand = Math.abs(h);
     sliding.push({
       value: demand,
@@ -273,7 +277,8 @@ function footingRows(
     });
   }
   const slidingWorst = worst(sliding);
-  if (slidingWorst) rows.push(row(`sliding (mu ${FRICTION})`, slidingWorst, 'kN'));
+  if (slidingWorst)
+    rows.push(row(`sliding (mu ${FRICTION}, gammaR,h ${GAMMA_R_H})`, slidingWorst, 'kN'));
   return rows;
 }
 
@@ -289,7 +294,7 @@ function plateRows(
   const toMm = (value: number): number => toMetres(doc, value) * 1000;
   const areaMm2 = toMm(plate.length) * toMm(plate.width);
   const bolts = Math.max(1, plate.boltCount);
-  const resistance = boltResistance(toMm(plate.boltDiameter));
+  const resistance = anchorBoltResistance(toMm(plate.boltDiameter));
   const [tensionLimit, shearLimit] = [resistance.tension / 1000, resistance.shear / 1000];
   const row = (check: string, best: Candidate, unit: string): FoundationRow => ({
     column: columnMark,
@@ -422,7 +427,7 @@ export function checkFoundations(
       const gravity = ultimateCombinations(
         wind,
         siblings.some((other) => hasCase(other, 'CL') || hasCase(other, 'CR')),
-        true,
+        false,
       ).filter((combination) => !/W/.test(combination.name));
       const tie = gravity
         .flatMap((combination) =>
@@ -495,12 +500,15 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
     'G+C, pressure = (V + footing 25 kN/m³ + backfill 18 kN/m³ above the footing up to the level) / ' +
     'area, with load eccentricity from H × (footing depth + backfill) reducing the width to B′ = B − 2e ' +
     '(Meyerhof) against `soilBearing` (kPa, default 150); (2) uplift EQU, 0.9 × (footing + backfill ' +
-    'weight) vs net uplift under 1.0G + 1.5W (only with windPressure > 0); (3) sliding, H vs μ = 0.45 ' +
-    '× (V + weights) under 1.0G + 1.5 S / W / 1.35 C, with the thrust shared across the frame columns ' +
-    'when thrustTie (a tie or slab is assumed to take the gravity thrust, checked against tieCapacity, and the ground slab weight adds its friction, shared per column); (4) base plate: concrete bearing under ' +
+    'weight) vs net uplift under 0.9G + 1.5W (only with windPressure > 0); (3) sliding, H vs ' +
+    'μ = 0.45 × (V + weights) / γR,h (γR,h = 1.1, EN 1997 DA2) under 1.0G + 1.5 S / W / 1.35 C, with ' +
+    'the thrust shared across the frame columns when thrustTie (a tie or slab is assumed to take ' +
+    'the gravity thrust, checked against tieCapacity under 1.35G + 1.5S / crane without wind, and ' +
+    'the ground slab weight adds its friction, shared per column); (4) base plate: concrete bearing under ' +
     '1.35G + 1.5S / wind / crane combinations vs fjd = 2/3 × 1.5 × fcd (C25/30, fcd 16.7 N/mm²) over ' +
     'the whole plate area, anchor tension (uplift shared by all bolts vs 0.9 fub As / 1.25) and ' +
-    'bolt shear + tension interaction (αv 0.6, Ft/1.4), always grade 8.8. Simplifications: pinned ' +
+    'bolt shear + tension interaction (shear αbc fub As / 1.25 with αbc = 0.44 − 0.0003 fyb, threads ' +
+    'in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), always grade 8.8. Simplifications: pinned ' +
     'bases (no moment), horizontal force taken at the plate level, bending in the smaller footing ' +
     'side, no biaxial effects, no backfill reduction for the column, no friction in the anchor ' +
     'shear check, no footing reinforcement or punching, no settlement. Returns one row per check ' +

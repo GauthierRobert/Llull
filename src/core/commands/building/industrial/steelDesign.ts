@@ -43,6 +43,35 @@ export function boltResistance(diameterMm: number): { tension: number; shear: nu
   };
 }
 
+/** Anchor bolt grade → [fub, fyb] N/mm². */
+const ANCHOR_GRADES: Readonly<Record<number, readonly [number, number]>> = {
+  4.6: [400, 240],
+  5.6: [500, 300],
+  8.8: [800, 640],
+  10.9: [1000, 900],
+};
+
+/**
+ * Design resistances of one anchor bolt, N: tension 0.9 fub As / γM2; shear (threads in the shear
+ * plane, EN 1993-1-8 §6.2.2(7)) αbc fub As / γM2 with αbc = 0.44 − 0.0003 fyb.
+ */
+export function anchorBoltResistance(
+  diameterMm: number,
+  grade = 8.8,
+): { tension: number; shear: number } {
+  const [fub, fyb] = ANCHOR_GRADES[grade] ?? (ANCHOR_GRADES[8.8] as readonly [number, number]);
+  const nominal = Object.keys(STRESS_AREA)
+    .map(Number)
+    .reduce((best, size) =>
+      Math.abs(size - diameterMm) < Math.abs(best - diameterMm) ? size : best,
+    );
+  const area = STRESS_AREA[nominal] as number;
+  return {
+    tension: (0.9 * fub * area) / GAMMA_M2,
+    shear: ((0.44 - 0.0003 * fyb) * fub * area) / GAMMA_M2,
+  };
+}
+
 /**
  * Cross-section resistances (EN 1993-1-1 §6.2, γM0 = 1): Npl, Mpl (class 1–2) or Mel (class 3),
  * Vpl with Av ≈ h·tw; classification of I-sections in bending (Tab. 5.2), other shapes class 1.

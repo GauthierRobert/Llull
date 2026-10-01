@@ -5,6 +5,11 @@ import {
   foundationCheck,
   type FoundationRow,
 } from '@core/commands/building/industrial/foundationCheck';
+import { baseReactions } from '@core/commands/building/industrial/frameModel';
+import {
+  anchorBoltResistance,
+  boltResistance,
+} from '@core/commands/building/industrial/steelDesign';
 import { __resetIdCounter } from '@lib/id';
 
 const HALL = { span: 24000, length: 30000 };
@@ -157,6 +162,59 @@ describe('check_foundations', () => {
       expect(result.data).toBeUndefined();
       expect(result.summary).toContain('check_foundations failed');
     }
+  });
+});
+
+describe('foundation check review fixes', () => {
+  it('uses M24 8.8 anchor shear alpha_bc = 0.44 - 0.0003 fyb', () => {
+    const resistance = anchorBoltResistance(24);
+    expect(resistance.shear).toBeCloseTo((0.248 * 800 * 353) / 1.25, 6);
+    expect(resistance.tension).toBeCloseTo((0.9 * 800 * 353) / 1.25, 6);
+    expect(resistance.shear).toBeLessThan(boltResistance(24).shear);
+    expect(anchorBoltResistance(24, 99)).toEqual(resistance);
+    expect(anchorBoltResistance(24, 10.9).tension).toBeGreaterThan(resistance.tension);
+  });
+
+  it('computes the thrust tie force with 1.35G on the gravity combination', () => {
+    const doc = hall();
+    const building = doc.building;
+    if (!building) throw new Error('no building');
+    const levelId = building.activeLevelId ?? building.levelOrder[0] ?? '';
+    const tieValue = (
+      deadLoad: number,
+    ): { value: number; combination: string; expected: number } => {
+      const row = rowsOf(doc, { deadLoad, snowLoad: 0, windPressure: 0 })
+        .filter((r) => r.check.startsWith('thrust tie force'))
+        .reduce((best, r) => (r.value > best.value ? r : best));
+      const reactions = baseReactions(doc, building, levelId, {
+        deadLoad,
+        snowLoad: 0,
+        windPressure: 0,
+      });
+      const expected = Math.max(
+        ...reactions
+          .filter((reaction) => reaction.columnId === row.elementId)
+          .map((reaction) => Math.abs(1.35 * (reaction.cases.G?.horizontal ?? 0)) / 1000),
+      );
+      return { value: row.value, combination: row.combination, expected };
+    };
+    const light = tieValue(0.3);
+    const heavy = tieValue(1.5);
+    expect(light.combination).toBe('1.35G+1.5S');
+    expect(light.value).toBeCloseTo(light.expected, 6);
+    expect(heavy.value).toBeCloseTo(heavy.expected, 6);
+    expect(heavy.value).toBeGreaterThan(light.value);
+  });
+
+  it('labels uplift EQU with 0.9G+1.5W and sliding with gammaR,h', () => {
+    const rows = rowsOf(hall(), { windPressure: 1 });
+    const uplift = rows.find((row) => row.check.startsWith('uplift'));
+    expect(uplift?.check).toContain('0.9 Gstb vs 0.9G+1.5W');
+    expect(uplift?.combination).toMatch(/^0\.9G\+1\.5W/);
+    const sliding = rows.find((row) => row.check.startsWith('sliding'));
+    expect(sliding?.check).toContain('gammaR,h 1.1');
+    expect(foundationCheck.description).toContain('γR,h = 1.1');
+    expect(foundationCheck.description).not.toContain('αv 0.6');
   });
 });
 
