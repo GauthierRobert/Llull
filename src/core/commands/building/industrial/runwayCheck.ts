@@ -19,23 +19,25 @@ import {
 
 export type CraneClass = 'S2' | 'S3' | 'S4';
 
+export type GirderType = 'rolled' | 'welded-full' | 'welded-fillet';
+
 export type RailSize = 'A45' | 'A55' | 'A65' | 'A75' | 'A100' | 'flat50x30';
 
-/** Approximate crane-rail data (DIN 536 Form A; flat bar 50x30): height mm, head width mm, kg/m, Ir mm⁴. */
+/** Approximate crane-rail data (DIN 536 Form A; flat bar 50x30): height mm, foot width mm, kg/m, Ir mm⁴. */
 export const RAILS: Readonly<
-  Record<RailSize, { height: number; head: number; mass: number; inertia: number }>
+  Record<RailSize, { height: number; foot: number; mass: number; inertia: number }>
 > = {
-  A45: { height: 55, head: 45, mass: 22.1, inertia: 90e4 },
-  A55: { height: 65, head: 55, mass: 31.8, inertia: 178e4 },
-  A65: { height: 75, head: 65, mass: 43.1, inertia: 319e4 },
-  A75: { height: 85, head: 75, mass: 56.2, inertia: 531e4 },
-  A100: { height: 95, head: 100, mass: 74.3, inertia: 856e4 },
-  flat50x30: { height: 30, head: 50, mass: 11.8, inertia: 11.25e4 },
+  A45: { height: 55, foot: 125, mass: 22.1, inertia: 90e4 },
+  A55: { height: 65, foot: 150, mass: 31.8, inertia: 178e4 },
+  A65: { height: 75, foot: 175, mass: 43.1, inertia: 319e4 },
+  A75: { height: 85, foot: 200, mass: 56.2, inertia: 531e4 },
+  A100: { height: 95, foot: 200, mass: 74.3, inertia: 856e4 },
+  flat50x30: { height: 30, foot: 50, mass: 11.8, inertia: 11.25e4 },
 };
 
 export interface RunwayCheckParams {
   railSize?: RailSize;
-  welded?: boolean;
+  girder?: GirderType;
   craneCapacity?: number;
   wheelBase?: number;
   craneClass?: CraneClass;
@@ -63,8 +65,12 @@ const FATIGUE_PHI = 1.05;
 const FATIGUE_CATEGORY = 71; // N/mm²
 const GAMMA_MF = 1.15;
 const GAMMA_M0 = 1;
-const LOCAL_CATEGORY_ROLLED = 160; // EN 1993-1-9 Tab. 8.10 detail 1 (rolled)
-const LOCAL_CATEGORY_WELDED = 71;
+/** EN 1993-1-9 Tab. 8.10: rolled 160; welded full-penetration tee-butt 71; fillet / partial penetration 36. */
+const LOCAL_CATEGORIES: Readonly<Record<GirderType, number>> = {
+  rolled: 160,
+  'welded-full': 71,
+  'welded-fillet': 36,
+};
 const LOCAL_LAMBDA_FACTOR = 1.26; // 2^(1/3): two stress cycles per wheel passage (EN 1993-6 §9.4.2)
 const RAIL_WEAR_INERTIA_FACTOR = 0.75; // simplified Ir reduction for 25 % head wear (EN 1993-6 §5.6.2(2))
 /** Damage-equivalent factors λ for normal stresses (EN 1991-3 Tab. 2.12). */
@@ -100,7 +106,7 @@ function checkBeam(
   wheelBase: number,
   craneClass: CraneClass,
   railSize: RailSize,
-  welded: boolean,
+  girder: GirderType,
 ): RunwayCheckRow[] {
   const profile = findProfile(beam.profile);
   if (!profile || !(span > 0)) return [];
@@ -154,15 +160,15 @@ function checkBeam(
     wheelMoment(characteristic, wheelBase, span) / (section.inertia / (profile.h / 2));
   const equivalentRange = CLASSES[craneClass] * FATIGUE_PHI * stressRange;
 
-  // EN 1993-6 §5.7.1, rail not welded (Tab. 5.1 case a): Irf = Ir,worn + If, separate inertias.
-  const effectiveWidth = Math.min(profile.b, rail.head + rail.height + profile.tf);
+  // EN 1993-6 §5.7.1, rail not rigidly fixed (Tab. 5.1 case b): Irf = Ir,worn + If,eff, separate inertias.
+  const effectiveWidth = Math.min(profile.b, rail.foot + rail.height + profile.tf);
   const flangeInertia = (effectiveWidth * profile.tf ** 3) / 12;
   const railFlangeInertia = RAIL_WEAR_INERTIA_FACTOR * rail.inertia + flangeInertia;
   const loadedLength = 3.25 * (railFlangeInertia / profile.tw) ** (1 / 3);
   const localStress = (GAMMA_ULS * wheel) / (loadedLength * profile.tw);
   const localRange = (characteristic * FATIGUE_PHI) / (loadedLength * profile.tw);
   const localLambda = CLASSES[craneClass] * LOCAL_LAMBDA_FACTOR;
-  const localCategory = welded ? LOCAL_CATEGORY_WELDED : LOCAL_CATEGORY_ROLLED;
+  const localCategory = LOCAL_CATEGORIES[girder];
 
   return [
     row(
@@ -233,9 +239,9 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     'lateral deflection <= L/600 under characteristic wheel loads (P / 1.15, two-wheel exact ' +
     'midspan formula); (4) fatigue EN 1993-1-9 - ΔσE2 = λ φfat Δσ at the bottom flange, λ = 0.315 / ' +
     '0.397 / 0.500 (normal stresses, EN 1991-3 Tab. 2.12) for class S2 / S3 / S4, φfat 1.05, detail category 71, γMf 1.15, γFf 1.0. ' +
-    '(5) local - EN 1993-6 §5.7.1: leff = 3.25 (Irf/tw)^(1/3), Irf = 0.75 Ir(rail, wear) + If (rail not ' +
-    'welded), beff = head + hr + tf <= b, σoz = 1.35 P / (leff tw) <= fy/γM0; local fatigue with λ x 1.26 ' +
-    '(2 cycles per passage), φfat 1.05, category 160 (rolled) or 71 (welded: true) / γMf 1.15. ' +
+    '(5) local - EN 1993-6 §5.7.1: leff = 3.25 (Irf/tw)^(1/3), Irf = 0.75 Ir(rail, wear) + If (rail not rigidly ' +
+    'fixed, Tab. 5.1 case b), beff = foot + hr + tf <= b, σoz = 1.35 P / (leff tw) <= fy/γM0; local fatigue with λ x 1.26 ' +
+    '(2 cycles per passage), φfat 1.05, category 160 (girder rolled) / 71 (welded-full, full-penetration) / 36 (welded-fillet) / γMf 1.15. ' +
     'Utilisation > 1 fails. Not covered: torsion, rail-wheel contact, continuity, ' +
     'connections - not a substitute for the engineer of record.',
   paramsSchema: {
@@ -264,10 +270,11 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
         description:
           'Crane rail (DIN 536 Form A, approximate section data, or flat bar 50x30). Its mass joins the runway self-weight and its inertia (75 % of Ir for wear) spreads the wheel load in the local web check. Default A55.',
       },
-      welded: {
-        type: 'boolean',
+      girder: {
+        type: 'string',
+        enum: ['rolled', 'welded-full', 'welded-fillet'],
         description:
-          'true if the runway is a welded plate girder: local web fatigue uses detail category 71 instead of 160 (rolled section). Default false.',
+          'Runway girder type for local web fatigue (EN 1993-1-9 Tab. 8.10): rolled section = detail category 160; welded-full = welded plate girder with full-penetration web-to-flange welds = 71; welded-fillet = fillet or partial-penetration welds = 36. Default rolled.',
       },
       levelId: { type: 'string', description: 'Level id. Default: the active level.' },
     },
@@ -279,7 +286,7 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
       wheelBase = 3000,
       craneClass = 'S3',
       railSize = 'A55',
-      welded = false,
+      girder = 'rolled',
     } = params;
     if (craneCapacity !== undefined && !(isFiniteNumber(craneCapacity) && craneCapacity > 0)) {
       return noChange(doc, 'check_crane_runways failed: craneCapacity must be a number > 0 (t).');
@@ -294,6 +301,12 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
       return noChange(
         doc,
         "check_crane_runways failed: railSize must be 'A45', 'A55', 'A65', 'A75', 'A100' or 'flat50x30'.",
+      );
+    }
+    if (!(girder in LOCAL_CATEGORIES)) {
+      return noChange(
+        doc,
+        "check_crane_runways failed: girder must be 'rolled', 'welded-full' or 'welded-fillet'.",
       );
     }
     const building = getBuilding(doc);
@@ -315,7 +328,7 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
         mm(element.end[1] - element.start[1]),
         mm(element.end[2] - element.start[2]),
       );
-      const beamRows = checkBeam(element, span, capacity, wheelBase, craneClass, railSize, welded);
+      const beamRows = checkBeam(element, span, capacity, wheelBase, craneClass, railSize, girder);
       if (beamRows.length === 0) continue;
       beams += 1;
       capacities.add(capacity);
