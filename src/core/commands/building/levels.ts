@@ -9,7 +9,7 @@ import {
   followLevelHeight,
   fromMm,
   getBuilding,
-  hostOf,
+  dependenciesOf,
   isFiniteNumber,
   nextLevelId,
   noChange,
@@ -212,8 +212,7 @@ export const deleteLevel: CommandDefinition<DeleteLevelParams> = {
         .map((element) => element.id),
     );
     for (const element of Object.values(building.elements)) {
-      const host = hostOf(element);
-      if (host !== null && onLevel.has(host)) onLevel.add(element.id);
+      if (dependenciesOf(element).some((id) => onLevel.has(id))) onLevel.add(element.id);
     }
     if (onLevel.size > 0 && !deleteElements) {
       return noChange(

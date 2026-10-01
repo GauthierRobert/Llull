@@ -24,6 +24,7 @@ import type {
 } from '../../model/types';
 import type {
   BeamElement,
+  SteelMemberElement,
   BuildingElement,
   BuildingLevel,
   BuildingModel,
@@ -53,6 +54,7 @@ import {
   evaluatePipe,
   evaluateTray,
   evaluatePlate,
+  evaluateConnection,
 } from './industrial/evaluate';
 
 import {
@@ -554,6 +556,14 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluatePipe(leveled, level);
     case 'tray':
       return evaluateTray(context.doc, leveled, level);
+    case 'connection': {
+      const members: Record<string, SteelMemberElement | undefined> = {};
+      for (const id of [leveled.rafterId, leveled.otherId]) {
+        const member = building.elements[id];
+        if (member?.category === 'member') members[id] = member;
+      }
+      return evaluateConnection(context.doc, leveled, members, level);
+    }
     case 'curvedWall':
       return evaluateCurvedWall(leveled, level, openingsOf(building, leveled.id));
     case 'plate': {

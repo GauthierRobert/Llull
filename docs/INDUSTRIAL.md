@@ -37,7 +37,7 @@ surface (m²)**, footing count and concrete volume, cladding area by role, equip
 pipe length by service and diameter, cable tray length by system and size, base plate mass and anchor bolt counts by diameter — all priceable with `set_cost_rates` (keys like
 `member.HEA400.kg`, `member.paint.m2`, `panel-roof.sandwich-panel.m2`). `building_schedule`
 kinds `member` (cut list: mark, role, profile, length, mass, grade), `footing`, `panel`,
-`equipment`, `pipe`, `tray` and `plate` (base plates with bolts and mass).
+`equipment`, `pipe`, `tray`, `plate` (base plates with bolts and mass) and `connection` (end plates, bolts, haunches, mass).
 
 ## Drawings and exchange
 

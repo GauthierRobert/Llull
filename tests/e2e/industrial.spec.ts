@@ -156,4 +156,38 @@ test.describe('industrial workflow', () => {
       expect(ifc.text).toContain(entity);
     }
   });
+
+  test('S13, S14, I17 — wall build-up, door in a curved wall, moment connections', async ({
+    page,
+  }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', { span: '18000', length: '12000', cladding: 'false' });
+    await expect(elementRows(page, 'connection')).toHaveCount(9);
+    await page.getByLabel('Schedule').selectOption('connection');
+    const schedule = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Schedule CSV' }).click(),
+    );
+    expect(schedule.text.split('\n')[1]).toMatch(/^MC1,eaves,RF1,SC1,25,8×M20,/);
+
+    await applyTool(page, 'wall', { x1: '30000', y1: '0', x2: '36000', y2: '0' });
+    await applyTool(page, 'wallLayers', {
+      allWalls: 'true',
+      layers: '20 render finish; 120 mineral-wool insulation; 200 masonry structure',
+    });
+    await expect(status(page)).toContainText('3-layer build-up (340 total');
+    await expect(page.getByTestId('takeoff-wall.mineral-wool.m3')).toBeVisible();
+
+    await applyTool(page, 'curvedWall', { x1: '40000', xm: '43000', ym: '3000', x2: '46000' });
+    const curved = page.locator('[data-testid^="element-row-curvedWall-"]');
+    await expect(curved).toHaveCount(1);
+    const curvedId = ((await curved.getAttribute('data-testid')) ?? '').replace('element-row-', '');
+    await applyTool(page, 'door', { wallId: curvedId });
+    await expect(status(page)).toContainText(`in wall W2`);
+    const ifc = await downloadText(page, () =>
+      page.getByRole('button', { name: 'IFC (BIM)' }).click(),
+    );
+    for (const entity of ['IFCMATERIALLAYERSETUSAGE(', "'END_PLATE'", 'IFCDOOR(']) {
+      expect(ifc.text).toContain(entity);
+    }
+  });
 });

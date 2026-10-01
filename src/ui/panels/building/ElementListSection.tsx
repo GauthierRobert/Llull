@@ -31,6 +31,7 @@ const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string>> = {
   tray: 'Tray',
   plate: 'Plate',
   curvedWall: 'Curved wall',
+  connection: 'Connection',
 };
 
 function describe(element: BuildingElement, units: DocumentUnit): string {
@@ -66,6 +67,8 @@ function describe(element: BuildingElement, units: DocumentUnit): string {
       return `${element.width}×${element.height} · ${element.system}`;
     case 'curvedWall':
       return `${element.material} · ${element.thickness}`;
+    case 'connection':
+      return `${element.kind} · ${2 * element.boltRows}×${boltSize({ units }, element.boltDiameter)}`;
     case 'plate':
       return `${element.length}×${element.width}×${element.thickness} · ${element.boltCount}×${boltSize({ units }, element.boltDiameter)}`;
   }

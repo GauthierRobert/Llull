@@ -85,7 +85,8 @@ AI control — there is no in-app AI bridge).**
 - [x] Pad footings, cladding panels, process equipment, pipe runs
 - [x] Clash detection, steel tonnage / paint / cut lists, IFC steel export
 - [x] Multi-span halls, cable trays, base plates with anchor bolts, section poché
-- [ ] Moment connections (end plates, haunches), bolt / weld detailing
+- [x] Moment connections (end plates, haunches, bolts)
+- [ ] Weld detailing, connection design checks (bolt / plate capacity)
 
 ## Later
 - [ ] Materials library (physical + visual / rendering)

@@ -32,6 +32,7 @@ import {
 } from './members';
 import { panelFrame } from './evaluate';
 import { appendBasePlates, columnsWithoutPlates } from './plates';
+import { appendConnections, findMomentJoints } from './connections';
 import { addGrid, gridLabels, nextFreeLabel } from '../grid';
 
 type MemberSpecs = Parameters<typeof appendMembers>[2];
@@ -241,6 +242,7 @@ interface PortalHallParams {
   railSpacing?: number;
   footings?: boolean;
   basePlates?: boolean;
+  connections?: boolean;
   cladding?: boolean;
   floorSlab?: boolean;
   crane?: { capacity?: number; railHeight: number; profile?: string };
@@ -305,6 +307,10 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       purlinSpacing: { type: 'number', description: 'Along the slope. Default 1800 mm.' },
       railSpacing: { type: 'number', description: 'Vertical. Default 1800 mm.' },
       footings: { type: 'boolean', description: 'Pad footings under columns. Default true.' },
+      connections: {
+        type: 'boolean',
+        description: 'Bolted end-plate moment connections (haunched eaves, apex). Default true.',
+      },
       basePlates: {
         type: 'boolean',
         description: 'Base plates with 4 M24 anchor bolts under every column. Default true.',
@@ -583,6 +589,17 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       return noChange(doc, `add_portal_frame_building failed: ${membersAdded.reason}.`);
     building = membersAdded.building;
     ids.push(...membersAdded.ids);
+    if (params.connections !== false) {
+      const connections = appendConnections(
+        doc,
+        building,
+        levelId,
+        findMomentJoints(building, levelId, new Set(membersAdded.ids), mm(10)),
+        {},
+      );
+      building = connections.building;
+      ids.push(...connections.ids);
+    }
     if (params.basePlates !== false) {
       const plates = appendBasePlates(
         doc,

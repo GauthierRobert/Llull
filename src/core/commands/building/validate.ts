@@ -28,6 +28,7 @@ const CATEGORIES: ReadonlySet<string> = new Set([
   'tray',
   'plate',
   'curvedWall',
+  'connection',
 ]);
 
 /** Numeric fields each category must carry (finite numbers). */
@@ -49,6 +50,7 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   tray: ['width', 'height'],
   plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
   curvedWall: ['thickness', 'height', 'baseOffset'],
+  connection: ['plateThickness', 'boltRows', 'boltDiameter', 'haunchLength'],
 };
 
 /** Fields that must be strictly positive. */
@@ -66,6 +68,7 @@ const POSITIVE: Readonly<Record<string, ReadonlyArray<string>>> = {
   tray: ['width', 'height'],
   plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
   curvedWall: ['thickness', 'height'],
+  connection: ['plateThickness', 'boltRows', 'boltDiameter'],
 };
 
 /** Plan-point fields each category must carry. */
@@ -87,6 +90,7 @@ const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
   tray: [],
   plate: [],
   curvedWall: ['start', 'through', 'end'],
+  connection: [],
 };
 
 const isPoint = (value: unknown): boolean =>
@@ -188,6 +192,7 @@ function elementErrors(
     tray: ['system'],
     plate: ['material'],
     curvedWall: ['material'],
+    connection: ['material'],
   };
   for (const field of textFields[category] ?? []) {
     if (typeof element[field] !== 'string') {
@@ -231,6 +236,21 @@ function elementErrors(
         1e-6 * Math.max(1, thickness)
     ) {
       errors.push(`building element ${key}: layer thicknesses must add up to the wall thickness`);
+    }
+  }
+  if (category === 'connection') {
+    for (const field of ['rafterId', 'otherId']) {
+      const id = element[field];
+      const member = typeof id === 'string' ? elements[id] : undefined;
+      if (!isRecord(member) || member['category'] !== 'member') {
+        errors.push(`building element ${key}: ${field} '${String(id)}' is not a steel member`);
+      }
+    }
+    if (element['kind'] !== 'eaves' && element['kind'] !== 'apex') {
+      errors.push(`building element ${key}: kind must be eaves or apex`);
+    }
+    if (element['end'] !== 'start' && element['end'] !== 'end') {
+      errors.push(`building element ${key}: end must be start or end`);
     }
   }
   if (category === 'plate') {

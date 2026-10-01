@@ -15,6 +15,7 @@ import { isValidPolygon, offsetPolygon, polygonArea } from '../../../lib/polygon
 import {
   getBuilding,
   hostOf,
+  dependenciesOf,
   isVec2,
   isVec2List,
   nextElementId,
@@ -131,8 +132,7 @@ export const addRoom: CommandDefinition<AddRoomParams> = {
 function withHostedOpenings(building: BuildingModel, ids: ReadonlyArray<string>): Set<string> {
   const result = new Set(ids);
   for (const element of Object.values(building.elements)) {
-    const host = hostOf(element);
-    if (host !== null && result.has(host)) result.add(element.id);
+    if (dependenciesOf(element).some((id) => result.has(id))) result.add(element.id);
   }
   return result;
 }
@@ -237,6 +237,7 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'door':
     case 'window':
     case 'plate':
+    case 'connection':
       return element;
   }
 }

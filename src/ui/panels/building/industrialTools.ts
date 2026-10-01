@@ -59,6 +59,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       { key: 'cladding', label: 'Roof & wall cladding', kind: 'checkbox', defaultValue: 'true' },
       { key: 'footings', label: 'Pad footings', kind: 'checkbox', defaultValue: 'true' },
       { key: 'basePlates', label: 'Base plates + anchors', kind: 'checkbox', defaultValue: 'true' },
+      { key: 'connections', label: 'Moment connections', kind: 'checkbox', defaultValue: 'true' },
       { key: 'floorSlab', label: 'Ground slab', kind: 'checkbox', defaultValue: 'true' },
     ],
     build: (values, context) => {
@@ -82,6 +83,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         cladding: reader.flag('cladding'),
         footings: reader.flag('footings'),
         basePlates: reader.flag('basePlates'),
+        connections: reader.flag('connections'),
         floorSlab: reader.flag('floorSlab'),
         ...onLevel(context),
       });
@@ -306,6 +308,25 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         margin: reader.number('margin'),
         boltCount: reader.number('boltCount'),
         boltDiameter: reader.number('boltDiameter'),
+        ...onLevel(context),
+      });
+    },
+  },
+  {
+    id: 'connections',
+    label: 'Moment connections',
+    group: GROUP,
+    fields: [
+      num('plateThickness', 'End plate t', '', true),
+      num('boltDiameter', 'Bolt Ø', '20'),
+      num('haunchLength', 'Haunch length', '', true),
+    ],
+    build: (values, context) => {
+      const reader = new FieldReader(values);
+      return result(reader, 'add_moment_connections', {
+        plateThickness: reader.optionalNumber('plateThickness'),
+        boltDiameter: reader.number('boltDiameter'),
+        haunchLength: reader.optionalNumber('haunchLength'),
         ...onLevel(context),
       });
     },

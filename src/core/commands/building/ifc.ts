@@ -16,8 +16,10 @@ import type {
   CableTrayElement,
   BasePlateElement,
   CurvedWallElement,
+  MomentConnectionElement,
   SteelMemberElement,
   BuildingLevel,
+  BuildingModel,
   OpeningElement,
   SlabElement,
   WallElement,
@@ -27,7 +29,13 @@ import { toCounterClockwise } from '../../../lib/polygon';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
 import { openingsOf, wallExtent, wallFrame, type WallExtent } from './evaluate';
 import { sweepFrame } from './mesh';
-import { panelFrame, plateLayout, trayOutline } from './industrial/evaluate';
+import {
+  connectionSolids,
+  panelFrame,
+  plateLayout,
+  trayOutline,
+  type ConnectionSolid,
+} from './industrial/evaluate';
 import { curvedWallBand, tangentWall } from './curvedWallGeometry';
 import { findProfile, type SteelProfile } from './steel/profiles';
 
@@ -473,6 +481,74 @@ function exportIndustrial(
   }
 }
 
+/** A moment connection: end plate(s) (IfcPlate), haunch (IfcMember), bolt group (fastener). */
+function exportConnection(
+  context: Context,
+  units: Pick<CadDocument, 'units'>,
+  connection: MomentConnectionElement,
+  building: BuildingModel,
+  level: BuildingLevel,
+  storeyPlacement: string,
+): Exported[] {
+  const { mm, writer } = context;
+  const members: Record<string, SteelMemberElement | undefined> = {};
+  for (const id of [connection.rafterId, connection.otherId]) {
+    const member = building.elements[id];
+    if (member?.category === 'member') members[id] = member;
+  }
+  const solids = connectionSolids(units, connection, members, level);
+  if (!solids) return [];
+  const solidOf = (solid: ConnectionSolid): { placement: string; body: string } => ({
+    placement: framePlacement(
+      context,
+      storeyPlacement,
+      [mm(solid.origin[0]), mm(solid.origin[1]), mm(solid.origin[2] - level.elevation)],
+      solid.along,
+      solid.x,
+    ),
+    body: extrusion(
+      context,
+      polygonProfile(
+        context,
+        solid.outline.map(([x, y]): Vec2 => [mm(x), mm(y)]),
+      ),
+      mm(solid.depth),
+    ),
+  });
+  const exported: Exported[] = [];
+  for (const solid of solids.filter((candidate) => !candidate.part.startsWith('bolt'))) {
+    const { placement: local, body } = solidOf(solid);
+    const haunch = solid.part === 'haunch';
+    const ref = writer.add(
+      haunch
+        ? `IFCMEMBER('${context.guid(`${connection.id}:${solid.part}`)}',$,${ifcString(`${connection.mark} haunch`)},$,'HAUNCH',${local},${shape(context, [body])},${ifcString(connection.id)},.USERDEFINED.)`
+        : `IFCPLATE('${context.guid(`${connection.id}:${solid.part}`)}',$,${ifcString(`${connection.mark} end plate`)},$,'END_PLATE',${local},${shape(context, [body])},${ifcString(connection.id)},.USERDEFINED.)`,
+    );
+    exported.push({ ref, material: connection.material });
+  }
+  // Bolts: one fastener product, each bolt its own extrusion in its own frame.
+  const bolts = solids.filter((solid) => solid.part.startsWith('bolt'));
+  if (bolts.length > 0) {
+    const items = bolts.map((bolt) => {
+      const axes = writer.add(
+        `IFCAXIS2PLACEMENT3D(${point3(context, mm(bolt.origin[0]), mm(bolt.origin[1]), mm(bolt.origin[2] - level.elevation))},${direction(context, bolt.along)},${direction(context, bolt.x)})`,
+      );
+      const profile = polygonProfile(
+        context,
+        bolt.outline.map(([x, y]): Vec2 => [mm(x), mm(y)]),
+      );
+      return writer.add(
+        `IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(mm(bolt.depth))})`,
+      );
+    });
+    const ref = writer.add(
+      `IFCMECHANICALFASTENER('${context.guid(`${connection.id}:bolts`)}',$,${ifcString(`${connection.mark} bolts`)},$,$,${placement(context, storeyPlacement, 0, 0, 0)},${shape(context, items)},$,${ifcReal(mm(connection.boltDiameter))},${ifcReal(mm(bolts[0]?.depth ?? 0))},.BOLT.)`,
+    );
+    exported.push({ ref, material: connection.material });
+  }
+  return exported;
+}
+
 /** A base plate (IfcPlate) and its anchor bolts (IfcMechanicalFastener). */
 function exportPlate(
   context: Context,
@@ -777,6 +853,20 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
             ),
           };
           record(exportOpening(context, opening, tangent, host, contained));
+        }
+        continue;
+      }
+      if (element.category === 'connection') {
+        for (const exported of exportConnection(
+          context,
+          doc,
+          element,
+          building,
+          level,
+          storeyPlacement,
+        )) {
+          contained.push(exported.ref);
+          record(exported);
         }
         continue;
       }

@@ -77,6 +77,7 @@ const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string
   tray: 'CT',
   plate: 'BP',
   curvedWall: 'W',
+  connection: 'MC',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */
@@ -244,8 +245,19 @@ export function followLevelHeight(
   return element;
 }
 
-/** Host of a hosted element: a door / window's wall, a base plate's column (else null). */
+/**
+ * Host of a hosted element: a door / window's wall, a base plate's column, a moment
+ * connection's rafter (else null). The element follows its host.
+ */
 export function hostOf(element: BuildingElement): string | null {
   if (element.category === 'door' || element.category === 'window') return element.hostId;
+  if (element.category === 'connection') return element.rafterId;
   return element.category === 'plate' ? element.memberId : null;
+}
+
+/** Every element an element cannot exist without (deleted along with any of them). */
+export function dependenciesOf(element: BuildingElement): string[] {
+  if (element.category === 'connection') return [element.rafterId, element.otherId];
+  const host = hostOf(element);
+  return host === null ? [] : [host];
 }

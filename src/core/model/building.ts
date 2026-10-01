@@ -27,7 +27,8 @@ export type BimCategory =
   | 'pipe'
   | 'tray'
   | 'plate'
-  | 'curvedWall';
+  | 'curvedWall'
+  | 'connection';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -274,6 +275,29 @@ export interface CurvedWallElement extends ElementBase {
   material: string;
 }
 
+/**
+ * A bolted end-plate moment connection of a portal frame: at the eaves (rafter → column, with a
+ * haunch under the rafter) or the apex (rafter → rafter). Geometry follows the rafter.
+ */
+export interface MomentConnectionElement extends ElementBase {
+  readonly category: 'connection';
+  levelId: string;
+  kind: 'eaves' | 'apex';
+  /** The rafter whose end is connected (host). */
+  rafterId: string;
+  /** Which end of the rafter. */
+  end: 'start' | 'end';
+  /** The column (eaves) or the other rafter (apex). */
+  otherId: string;
+  plateThickness: number;
+  /** Bolt rows (two bolts per row). */
+  boltRows: number;
+  boltDiameter: number;
+  /** Haunch length along the rafter (0 = none). */
+  haunchLength: number;
+  material: string;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -290,7 +314,8 @@ export type BuildingElement =
   | PipeElement
   | CableTrayElement
   | BasePlateElement
-  | CurvedWallElement;
+  | CurvedWallElement
+  | MomentConnectionElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */

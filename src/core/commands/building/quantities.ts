@@ -21,6 +21,7 @@ import { findProfile } from './steel/profiles';
 import { polygonNormal } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
 import { plateMass } from './industrial/plates';
+import { connectionMass } from './industrial/connections';
 import { boltSize } from './industrial/evaluate';
 import { curvedWallLength } from './curvedWallGeometry';
 
@@ -352,6 +353,29 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       plate.boltCount,
     );
   }
+  for (const connection of elementsOf(building, 'connection')) {
+    takeoff.add(
+      'connection',
+      connection.material,
+      'kg',
+      `Moment connections ${connection.material} — plates and haunches`,
+      connectionMass(doc, building, connection),
+    );
+    takeoff.add(
+      'connection',
+      connection.kind,
+      'ea',
+      `Moment connections, ${connection.kind} — count`,
+      1,
+    );
+    takeoff.add(
+      'connection',
+      `bolt ${boltSize(doc, connection.boltDiameter)}`,
+      'ea',
+      `Bolts ${boltSize(doc, connection.boltDiameter)} 8.8 — count`,
+      2 * connection.boltRows,
+    );
+  }
   return takeoff.result();
 }
 
@@ -404,7 +428,8 @@ export type ScheduleKind =
   | 'equipment'
   | 'pipe'
   | 'tray'
-  | 'plate';
+  | 'plate'
+  | 'connection';
 
 export interface Schedule {
   readonly kind: ScheduleKind;
@@ -764,6 +789,32 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           round(plateMass(doc, plate), 1),
           plate.material,
           levelName(building, plate.levelId),
+        ]),
+      };
+    case 'connection':
+      return {
+        kind,
+        columns: [
+          'Mark',
+          'Type',
+          'Rafter',
+          'Connected to',
+          'Plate t',
+          'Bolts',
+          'Haunch',
+          'Mass (kg)',
+          'Level',
+        ],
+        rows: elementsOf(building, 'connection').map((connection) => [
+          connection.mark,
+          connection.kind,
+          building.elements[connection.rafterId]?.mark ?? connection.rafterId,
+          building.elements[connection.otherId]?.mark ?? connection.otherId,
+          connection.plateThickness,
+          `${2 * connection.boltRows}×${boltSize(doc, connection.boltDiameter)}`,
+          round(connection.haunchLength, 1),
+          round(connectionMass(doc, building, connection), 1),
+          levelName(building, connection.levelId),
         ]),
       };
   }
