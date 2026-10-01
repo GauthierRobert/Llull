@@ -47,6 +47,26 @@ describe('load_document rejects malformed documents as a no-op', () => {
       },
     ],
     [
+      'selection references missing entity (rejected, not repaired)',
+      (d) => {
+        d['selection'] = ['ghost'];
+      },
+    ],
+    [
+      'entity record key differs from entity.id',
+      (d) => {
+        const e = d['entities'] as Record<string, Record<string, unknown>>;
+        e[Object.keys(e)[0]!]!['id'] = 'other-id';
+      },
+    ],
+    [
+      'order contains duplicate ids',
+      (d) => {
+        const order = d['order'] as string[];
+        d['order'] = [...order, ...order];
+      },
+    ],
+    [
       'featureHistory step malformed',
       (d) => {
         d['featureHistory'] = [null];

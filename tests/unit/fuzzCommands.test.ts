@@ -2,11 +2,19 @@
  * Fuzz contract: every registered command, given garbage params, must never throw,
  * never mutate the input document, and never emit non-finite numbers into the document.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { execute, listCommands } from '@core/commands/registry';
 import { __resetIdCounter } from '@lib/id';
+
+// The guard warns (with stack) when a command throws on garbage input; silence the expected noise.
+beforeAll(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+});
+afterAll(() => {
+  vi.restoreAllMocks();
+});
 
 const GARBAGE: unknown[] = [
   undefined,

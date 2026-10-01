@@ -9,7 +9,7 @@
  */
 
 import type { CadDocument, FeatureStep } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
 import { nextId } from '../../lib/id';
 import {
   addBox,
@@ -95,6 +95,7 @@ import {
 import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
+import { deleteEntities } from './deleteMany';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
   if (typeof value === 'number') return !Number.isFinite(value);
@@ -120,31 +121,61 @@ function hasMalformedPosition(entity: unknown): boolean {
   return position !== undefined && (!Array.isArray(position) || position.length !== 3);
 }
 
-/** True when any string in `value` is an Object.prototype key (`constructor`, `__proto__`, ...). */
-function containsPrototypeKey(value: unknown, depth = 0): boolean {
-  if (typeof value === 'string') return value in Object.prototype;
-  if (typeof value !== 'object' || value === null || depth > 6) return false;
-  return Object.values(value).some((v) => containsPrototypeKey(v, depth + 1));
+/** Param keys whose string values are looked up as keys in document records (ids). */
+const ID_LIKE_KEY = /^id$|Ids?$|^ids$/;
+
+/**
+ * True when an id-like param value is an Object.prototype key (`constructor`, `__proto__`, ...),
+ * which would alias plain-object entity-bag lookups. Free text (names, content) is never scanned.
+ */
+function hasPrototypeIdKey(value: unknown, keyHint = '', depth = 0): boolean {
+  if (typeof value === 'string') return ID_LIKE_KEY.test(keyHint) && value in Object.prototype;
+  if (typeof value !== 'object' || value === null || depth > 8) return false;
+  if (Array.isArray(value)) return value.some((v) => hasPrototypeIdKey(v, keyHint, depth + 1));
+  return Object.entries(value).some(([k, v]) => hasPrototypeIdKey(v, k, depth + 1));
+}
+
+const POSITION_CONTRACT = ' Format [x, y, z]; [x, y] is accepted and placed at z=0.';
+
+/** Append the position contract so the agent-visible schema matches `padPlanarPosition`. */
+function describePositionContract(schema: ParamsSchema): ParamsSchema {
+  const position = schema.properties['position'];
+  if (!position || position.type !== 'array') return schema;
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      position: { ...position, description: position.description + POSITION_CONTRACT },
+    },
+  };
+}
+
+function corruptionReason(entity: unknown): string | null {
+  if (containsNonFinite(entity)) return 'non-finite numbers (NaN/Infinity/undefined components)';
+  if (hasMalformedPosition(entity)) return 'a malformed position (must be a 3-number [x, y, z])';
+  return null;
 }
 
 /**
  * @pure
- * @failure run throws, params contain an Object.prototype key string (would alias entity-bag lookups),
- * or affected entities contain NaN/Infinity/undefined vector components or a non-Vec3 position -> no-op, affected:[]
+ * @failure run throws (warned with stack), id-like params equal an Object.prototype key
+ * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
+ * components or a non-Vec3 position -> no-op, affected:[]
  * @invariant non-object params are coerced to {} so field destructuring cannot throw;
- * a 2-number `position` is padded to [x, y, 0]
+ * a 2-number `position` is padded to [x, y, 0]; free-text params are never rejected
  */
 function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknown> {
   return {
     ...def,
+    paramsSchema: describePositionContract(def.paramsSchema),
     run: (doc, params): CommandResult => {
       const safeParams = padPlanarPosition(
         typeof params === 'object' && params !== null ? params : {},
       );
-      if (containsPrototypeKey(safeParams)) {
+      if (hasPrototypeIdKey(safeParams)) {
         return {
           document: doc,
-          summary: `${def.name} rejected: params contain a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id/name.`,
+          summary: `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
           affected: [],
         };
       }
@@ -152,25 +183,27 @@ function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknow
       try {
         result = def.run(doc, safeParams);
       } catch (error) {
+        console.warn(
+          `[llull] command '${def.name}' threw:`,
+          error instanceof Error ? (error.stack ?? error.message) : error,
+        );
         const reason = error instanceof Error ? error.message : String(error);
         return {
           document: doc,
-          summary: `${def.name} rejected invalid input: ${reason}`,
+          summary: `${def.name} failed: ${reason}; document unchanged.`,
           affected: [],
         };
       }
       if (result.document !== doc) {
-        const corrupted = result.affected.find(
-          (id) =>
-            containsNonFinite(result.document.entities[id]) ||
-            hasMalformedPosition(result.document.entities[id]),
-        );
-        if (corrupted !== undefined) {
-          return {
-            document: doc,
-            summary: `${def.name} rejected: result for ${corrupted} contains non-finite numbers (NaN/Infinity). Document unchanged.`,
-            affected: [],
-          };
+        for (const id of result.affected) {
+          const reason = corruptionReason(result.document.entities[id]);
+          if (reason !== null) {
+            return {
+              document: doc,
+              summary: `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`,
+              affected: [],
+            };
+          }
         }
       }
       return result;
@@ -289,6 +322,7 @@ const rawDefinitions = [
   drawInvolute,
   drawBeltAround,
   distributeAlongPath,
+  deleteEntities,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const definitions: ReadonlyArray<CommandDefinition<unknown>> = rawDefinitions.map(guardCommand);
