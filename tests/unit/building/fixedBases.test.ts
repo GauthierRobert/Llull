@@ -250,6 +250,52 @@ describe('footing eccentricity and overturning with a base moment', () => {
   });
 });
 
+describe('design_footings pad sizing', () => {
+  const footingIds = (doc: CadDocument): string[] =>
+    Object.values(doc.building!.elements).flatMap((element) =>
+      element.category === 'footing' ? [element.id] : [],
+    );
+  const padSizes = (doc: CadDocument): number[][] =>
+    Object.values(doc.building!.elements).flatMap((element) =>
+      element.category === 'footing' ? [[element.width, element.length, element.thickness]] : [],
+    );
+
+  it('sizes the pads of the fixed-base crane hall so every footing check passes', () => {
+    const doc = hall({ columnBase: 'fixed', crane: CRANE_HALL.crane });
+    const before = foundationRows(doc).filter((row) => row.check.startsWith('soil bearing'));
+    expect(Math.max(...before.map((row) => row.utilisation))).toBeGreaterThan(1);
+    const result = execute(doc, 'design_footings', { windPressure: 0.7 });
+    const rows = (result.data as { footings: FootingDesignRow[] }).footings;
+    expect(rows.every((row) => row.status === 'designed')).toBe(true);
+    expect(result.summary).toMatch(/F\d+ 1500×1500×600 → \d+×\d+×\d+ H\d+ @ \d+/);
+    const designedIds = rows.map((row) => row.id);
+    const after = foundationRows(result.document).filter((row) =>
+      designedIds.includes(row.elementId),
+    );
+    expect(after.some((row) => row.check.startsWith('overturning'))).toBe(true);
+    expect(Math.max(...after.map((row) => row.utilisation))).toBeLessThanOrEqual(1);
+    for (const row of rows) {
+      expect(row.sizeAfter[0]).toBeGreaterThan(row.sizeBefore[0]);
+      expect(row.sizeAfter[0]).toBe(row.sizeAfter[1]);
+    }
+    const volume = (document: CadDocument): number =>
+      (
+        execute(document, 'quantity_takeoff', {}).data as {
+          lines: Array<{ group: string; unit: string; quantity: number }>;
+        }
+      ).lines.find((line) => line.group === 'footing' && line.unit === 'm3')?.quantity ?? 0;
+    expect(volume(result.document)).toBeGreaterThan(volume(doc));
+  });
+
+  it('leaves the pinned default hall pads unchanged (reinforcement only)', () => {
+    const doc = hall({ crane: CRANE_HALL.crane });
+    const result = execute(doc, 'design_footings', { windPressure: 0.7 });
+    expect(padSizes(result.document)).toEqual(padSizes(doc));
+    expect(footingIds(result.document)).toEqual(footingIds(doc));
+    expect(result.summary).not.toContain('→');
+  });
+});
+
 describe('base plate under M + N', () => {
   const geometry = {
     length: 500,

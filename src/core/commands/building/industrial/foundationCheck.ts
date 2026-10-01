@@ -387,7 +387,8 @@ export function footingSettlementParts(
   return { elastic, consolidation, total: elastic + consolidation };
 }
 
-function footingRows(
+/** Footing check rows (bearing, uplift, overturning, sliding, settlement) of one column's pad. */
+export function footingRows(
   doc: CadDocument,
   reaction: BaseReaction,
   columnMark: string,
@@ -702,6 +703,49 @@ function differentialRows(
   return best ? [best] : [];
 }
 
+/** Weight (kN) of the ground slabs of a level (their friction is shared per column for tied frames). */
+export function groundSlabWeight(
+  doc: CadDocument,
+  building: BuildingModel,
+  levelId: string,
+): number {
+  return Object.values(building.elements).reduce(
+    (sum, element) =>
+      element.category === 'slab' && element.levelId === levelId
+        ? sum +
+          CONCRETE_UNIT_WEIGHT *
+            polygonArea(
+              element.boundary.map(([x, y]): [number, number] => [
+                toMetres(doc, x),
+                toMetres(doc, y),
+              ]),
+            ) *
+            toMetres(doc, element.thickness)
+        : sum,
+    0,
+  );
+}
+
+/** Horizontal force (kN) resisted by one pad: shared across the frame columns when `thrustTie`. */
+export function slidingHorizontalOf(
+  reactions: ReadonlyArray<BaseReaction>,
+  reaction: BaseReaction,
+  thrustTie: boolean,
+): (factors: Factors) => number {
+  const siblings = reactions.filter((other) => other.frame === reaction.frame);
+  return (factors) =>
+    thrustTie
+      ? siblings.reduce((sum, other) => sum + combine(other, factors).h, 0) / siblings.length
+      : combine(reaction, factors).h;
+}
+
+/** Tie / slab assumed by default when the level has a slab element. */
+export function defaultThrustTie(doc: CadDocument, levelId: string): boolean {
+  return Object.values(getBuilding(doc).elements).some(
+    (element) => element.category === 'slab' && element.levelId === levelId,
+  );
+}
+
 /**
  * Checks footings and base plates of the columns of a level.
  * @pure
@@ -724,24 +768,7 @@ export function checkFoundations(
   const reactions = baseReactions(doc, building, levelId, loads);
   const checkedFootings = new Set<string>();
   const tieDone = new Set<string>();
-  // Tied frames: the ground slab (cast around the columns) adds its friction, shared per column.
-  const slabWeight = thrustTie
-    ? Object.values(building.elements).reduce(
-        (sum, element) =>
-          element.category === 'slab' && element.levelId === levelId
-            ? sum +
-              CONCRETE_UNIT_WEIGHT *
-                polygonArea(
-                  element.boundary.map(([x, y]): [number, number] => [
-                    toMetres(doc, x),
-                    toMetres(doc, y),
-                  ]),
-                ) *
-                toMetres(doc, element.thickness)
-            : sum,
-        0,
-      )
-    : 0;
+  const slabWeight = thrustTie ? groundSlabWeight(doc, building, levelId) : 0;
   const settlements: Array<{
     frame: string;
     x: number;
@@ -754,10 +781,7 @@ export function checkFoundations(
     const column = building.elements[reaction.columnId];
     if (column?.category !== 'member') continue;
     const siblings = reactions.filter((other) => other.frame === reaction.frame);
-    const slidingHorizontal = (factors: Factors): number =>
-      thrustTie
-        ? siblings.reduce((sum, other) => sum + combine(other, factors).h, 0) / siblings.length
-        : combine(reaction, factors).h;
+    const slidingHorizontal = slidingHorizontalOf(reactions, reaction, thrustTie);
     const footing = findFooting(doc, building, levelId, column);
     const plate = findPlate(building, column.id);
     if (thrustTie && !tieDone.has(reaction.frame) && (footing || plate)) {
@@ -954,11 +978,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
         'check_foundations failed: tieCapacity must be a number > 0 (kN) and thrustTie a boolean.',
       );
     }
-    const thrustTie =
-      params.thrustTie ??
-      Object.values(getBuilding(doc).elements).some(
-        (element) => element.category === 'slab' && element.levelId === levelId,
-      );
+    const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
     const { rows, footings, plates, unchecked } = checkFoundations(
       doc,
       levelId,

@@ -165,7 +165,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 
 ## Phase 11 — automatic sizing of foundations and secondary steel
 
-- [ ] **I40 — Pad sizing.** `design_footings` sizes the pad plan dimensions and thickness (not only
+- [x] **I40 — Pad sizing.** `design_footings` sizes the pad plan dimensions and thickness (not only
       the reinforcement) so bearing (with base moments), overturning, uplift, sliding, shear and
       punching pass — essential for fixed bases.
 - [x] **I41 — Purlin / rail design.** `design_purlins`: up-sizes purlin and rail profiles (per zone

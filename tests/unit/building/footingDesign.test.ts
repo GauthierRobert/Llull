@@ -5,6 +5,7 @@ import { execute } from '@core/commands/registry';
 import {
   designFootings,
   designMat,
+  type FootingDesignParams,
   type FootingDesignRow,
 } from '@core/commands/building/industrial/footingDesign';
 import {
@@ -42,6 +43,15 @@ function withFootings(doc: CadDocument, patch: Partial<FootingElement>): CadDocu
 function design(doc: CadDocument, params: Record<string, unknown> = {}): FootingDesignRow[] {
   return (designFootings.run(doc, params).data as { footings: FootingDesignRow[] }).footings;
 }
+
+const analysedFootings = (before: CadDocument, after: CadDocument): FootingElement[] => {
+  const ids = new Set(
+    (designFootings.run(before, {}).data as { footings: FootingDesignRow[] }).footings.map(
+      (row) => row.id,
+    ),
+  );
+  return footingsOf(after).filter((footing) => ids.has(footing.id));
+};
 
 const steelMass = (doc: CadDocument): number =>
   footingsOf(doc).reduce((sum, footing) => {
@@ -96,27 +106,106 @@ describe('design_footings', () => {
     );
   });
 
-  it('fails a thin footing on punching / shear and leaves its reinforcement unset', () => {
-    const doc = hall();
-    const thin = withFootings(doc, { thickness: 150, width: 2500, length: 2500 });
+  it('grows a thin pad (plan and thickness) until shear and punching pass', () => {
+    const thin = withFootings(hall(), { thickness: 150, width: 2500, length: 2500 });
     const result = designFootings.run(thin, { snowLoad: 6 });
     const rows = (result.data as { footings: FootingDesignRow[] }).footings;
-    expect(rows.some((row) => row.status === 'failed')).toBe(true);
-    for (const row of rows.filter((item) => item.status === 'failed')) {
-      expect(row.barDiameter).toBeNull();
-      expect(Math.max(row.shearUtilisation, row.punchingUtilisation)).toBeGreaterThan(1);
+    expect(rows.every((row) => row.status === 'designed')).toBe(true);
+    for (const footing of analysedFootings(thin, result.document)) {
+      expect(footing.thickness).toBeGreaterThanOrEqual(300);
+      expect(footing.width).toBeGreaterThanOrEqual(2500);
+      expect(footing.length).toBe(footing.width);
+      expect(footing.topOffset).toBe(footingsOf(thin)[0]?.topOffset);
     }
-    expect(footingsOf(result.document).every((footing) => !footing.reinforcement)).toBe(true);
-    expect(result.summary).toMatch(/not reinforced — increase thickness/);
+    expect(result.summary).toMatch(/F\d+ 2500×2500×150 → \d+×\d+×\d+ H\d+ @ \d+/);
+    expect(analysedFootings(thin, result.document).every((footing) => footing.reinforcement)).toBe(
+      true,
+    );
   });
 
-  it('removes a stale reinforcement from a footing that now fails', () => {
-    const designed = designFootings.run(hall(), {}).document;
-    const thin = withFootings(designed, { thickness: 150, width: 2500, length: 2500 });
-    const result = designFootings.run(thin, { snowLoad: 6 });
-    expect(footingsOf(result.document).every((footing) => !footing.reinforcement)).toBe(true);
-    expect((result.data as { changes: string[] }).changes[0]).toContain('reinforcement removed');
-    expect(result.affected.length).toBeGreaterThan(0);
+  it('keeps the aspect ratio of a rectangular pad and never shrinks it', () => {
+    const rectangular = withFootings(hall(), { width: 1500, length: 3000, thickness: 150 });
+    const result = designFootings.run(rectangular, { snowLoad: 6 });
+    for (const footing of analysedFootings(rectangular, result.document)) {
+      expect(footing.length).toBe(2 * footing.width);
+      expect(footing.width).toBeGreaterThanOrEqual(1500);
+      expect(footing.length).toBeGreaterThanOrEqual(3000);
+    }
+  });
+
+  it('reports a footing with no passing size within 6 m / 1.5 m and leaves it unchanged', () => {
+    const reinforced = designFootings.run(hall(), {}).document;
+    const result = designFootings.run(reinforced, { snowLoad: 400 });
+    const rows = (result.data as { footings: FootingDesignRow[] }).footings;
+    expect(rows.every((row) => row.status === 'failed')).toBe(true);
+    for (const row of rows) {
+      expect(row.barDiameter).toBeNull();
+      expect(row.sizeAfter).toEqual(row.sizeBefore);
+      expect(row.note).toMatch(/no pad up to 6000×6000×1500 mm|within the size limits/);
+    }
+    expect(result.document).toBe(reinforced);
+    expect(result.affected).toEqual([]);
+    expect(result.summary).toMatch(/not sized — left unchanged/);
+  });
+
+  it('reports a footing whose size already exceeds the search range', () => {
+    const huge = withFootings(hall(), { width: 7000, length: 7000, thickness: 1600 });
+    const result = designFootings.run(huge, { snowLoad: 400 });
+    expect(result.document).toBe(huge);
+    expect(result.summary).toMatch(/not sized/);
+  });
+
+  it('shrinks only with allowShrink and an oversized pad still passes', () => {
+    const oversized = withFootings(hall(), { width: 5000, length: 5000, thickness: 1000 });
+    const kept = designFootings.run(oversized, {});
+    for (const footing of analysedFootings(oversized, kept.document)) {
+      expect([footing.width, footing.length, footing.thickness]).toEqual([5000, 5000, 1000]);
+    }
+    const shrunk = designFootings.run(oversized, { allowShrink: true });
+    for (const footing of analysedFootings(oversized, shrunk.document)) {
+      expect(footing.width * footing.length * footing.thickness).toBeLessThan(5000 * 5000 * 1000);
+    }
+    expect(shrunk.summary).toMatch(/F\d+ 5000×5000×1000 → \d+×\d+×\d+/);
+    const again = designFootings.run(shrunk.document, { allowShrink: true });
+    expect(again.affected).toEqual([]);
+    const rows = (
+      foundationCheck.run(shrunk.document, {}).data as { rows: FoundationRow[] }
+    ).rows.filter((row) => footingsOf(shrunk.document).some((f) => f.id === row.elementId));
+    expect(Math.max(...rows.map((row) => row.utilisation))).toBeLessThanOrEqual(1);
+  });
+
+  it('honours soilBearing, soilModulus, thrustTie and clayLayer and rejects bad values', () => {
+    const doc = hall();
+    const size = (params: Record<string, unknown>): number =>
+      footingsOf(designFootings.run(doc, params).document).reduce(
+        (sum, footing) => sum + footing.width * footing.length * footing.thickness,
+        0,
+      );
+    const baseline = size({});
+    expect(size({ soilBearing: 40 })).toBeGreaterThan(baseline);
+    expect(size({ soilModulus: 1.5 })).toBeGreaterThan(baseline);
+    expect(size({ thrustTie: false, windPressure: 1.5 })).toBeGreaterThanOrEqual(baseline);
+    const clay = { topDepth: 1, thickness: 3, compressionIndex: 0.33, voidRatio: 1 };
+    const withClay = designFootings.run(doc, { clayLayer: clay });
+    const clayRows = (withClay.data as { footings: FootingDesignRow[] }).footings;
+    const designedIds = clayRows.filter((row) => row.status === 'designed').map((row) => row.id);
+    expect(designedIds.length).toBeGreaterThan(0);
+    const checked = (
+      foundationCheck.run(withClay.document, { clayLayer: clay }).data as { rows: FoundationRow[] }
+    ).rows.filter((row) => designedIds.includes(row.elementId));
+    expect(Math.max(...checked.map((row) => row.utilisation))).toBeLessThanOrEqual(1);
+    expect(size({ clayLayer: clay })).toBeGreaterThan(baseline);
+    for (const params of [
+      { soilBearing: 0 },
+      { soilModulus: -1 },
+      { thrustTie: 'yes' },
+      { allowShrink: 1 },
+      { clayLayer: { topDepth: 1 } },
+    ] as Array<Record<string, unknown>>) {
+      const result = designFootings.run(doc, params as FootingDesignParams);
+      expect(result.document).toBe(doc);
+      expect(result.summary).toContain('design_footings failed');
+    }
   });
 
   it('is pure and stores bars in document units', () => {
@@ -163,13 +252,6 @@ describe('design_footings', () => {
     const rows = design(doc, { windPressure: 1.5, deadLoad: 0.1, snowLoad: 0 });
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((row) => row.status !== 'failed' || row.note.length > 0)).toBe(true);
-  });
-
-  it('flags bending beyond the singly-reinforced limit', () => {
-    const slender = withFootings(hall(), { thickness: 150, width: 6000, length: 6000 });
-    const rows = design(slender, { snowLoad: 8 });
-    expect(rows.some((row) => row.status === 'failed')).toBe(true);
-    expect(rows.some((row) => /K > 0\.167|shear or punching/.test(row.note))).toBe(true);
   });
 
   it('handles a heavily eccentric load with a triangular pressure block', () => {
