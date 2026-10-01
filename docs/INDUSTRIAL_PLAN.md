@@ -126,7 +126,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 
 ## Phase 8 — secondary steel, wind zones, soil and crane details
 
-- [ ] **I32 — Purlins and side rails.** `check_purlins`: roof purlins and wall rails as
+- [x] **I32 — Purlins and side rails.** `check_purlins`: roof purlins and wall rails as
       continuous / simply supported members between frames under dead + snow and wind with the
       EN 1991-1-4 roof zones F / G / H / I (edge and corner suction on the outer purlins) and wall
       zones A / B / D; bending, uplift with the free flange restrained only by the sheeting

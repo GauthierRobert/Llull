@@ -74,6 +74,9 @@ Companion checks, all read-only and driven by the same loads:
 
 - `check_bracing` — longitudinal wind on the gables (and frame stability forces) → roof and wall
   X-bracing as tension-only diagonals, eaves struts in compression, gable posts in bending.
+- `check_purlins` — roof purlins and wall rails per bay under dead + snow and wind with the
+  EN 1991-1-4 zones (roof F / G / H / I, walls A / B / C / D, cpi ±): bending (uplift with the free
+  flange reduced), shear, deflection span/200 (purlins) and span/150 (rails).
 - `check_foundations` — characteristic base reactions per load case → pad footing soil bearing
   (effective width), uplift (EQU), sliding, base plate concrete bearing and anchor bolts. With a
   ground slab the frame thrust is tied through it (tie-force row, slab friction against sliding);
@@ -97,7 +100,7 @@ settlement (`soilModulus`, 25 mm) and differential settlement between frame colu
   (profile, length, pitched cuts, bolt holes; base and end plates with their contour and holes),
   with quantities.
 
-Not covered: local roof zones (F/G/H/I), consolidation settlement, connection fatigue details. This is a preliminary design aid, not a substitute for
+Not covered: cold-formed section local buckling (effective widths), wind on irregular shapes, dynamic crane analysis. This is a preliminary design aid, not a substitute for
 the engineer of record.
 
 ## Quantities and fabrication lists

@@ -29,6 +29,7 @@ interface Report {
 const CHECKS = [
   { command: 'check_portal_frames', label: 'Check frames', testId: 'frame-check' },
   { command: 'check_bracing', label: 'Bracing', testId: 'bracing-check' },
+  { command: 'check_purlins', label: 'Purlins', testId: 'purlin-check' },
   { command: 'check_foundations', label: 'Foundations', testId: 'foundation-check' },
   { command: 'check_crane_runways', label: 'Runways', testId: 'runway-check' },
 ] as const;

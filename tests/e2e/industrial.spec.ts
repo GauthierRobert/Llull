@@ -246,6 +246,9 @@ test.describe('industrial workflow', () => {
     await page.getByTestId('bracing-check').click();
     await expect(summary).toContainText('Bracing check (qp 0.7 kN/m²');
     await expect(summary).toContainText('all OK');
+    await page.getByTestId('purlin-check').click();
+    await expect(summary).toContainText('Purlin check (qp');
+    await expect(summary).toContainText('all OK');
     await page.getByTestId('foundation-check').click();
     await expect(summary).toContainText('Checked 12 footing(s)');
     await page.getByTestId('runway-check').click();
