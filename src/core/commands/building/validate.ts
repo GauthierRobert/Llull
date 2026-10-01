@@ -7,6 +7,7 @@
 import { isRecord } from '../../../lib/isRecord';
 import { MEMBER_LAYER } from './entities';
 import { arcThrough } from './curvedWallGeometry';
+import { parseWallLayers } from './wallLayers';
 import { isVec2 } from './model';
 
 const CATEGORIES: ReadonlySet<string> = new Set([
@@ -219,6 +220,18 @@ function elementErrors(
     !arcThrough(element['start'], element['through'], element['end'])
   ) {
     errors.push(`building element ${key}: start, through and end are collinear`);
+  }
+  if (category === 'wall' && element['layers'] !== undefined) {
+    const layers = parseWallLayers(element['layers']);
+    const thickness = element['thickness'];
+    if (typeof layers === 'string') errors.push(`building element ${key}: ${layers}`);
+    else if (
+      typeof thickness === 'number' &&
+      Math.abs(layers.reduce((sum, layer) => sum + layer.thickness, 0) - thickness) >
+        1e-6 * Math.max(1, thickness)
+    ) {
+      errors.push(`building element ${key}: layer thicknesses must add up to the wall thickness`);
+    }
   }
   if (category === 'plate') {
     const memberId = element['memberId'];

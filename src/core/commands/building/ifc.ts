@@ -196,6 +196,26 @@ function exportWall(
   return { ref, material: wall.material, placement: local };
 }
 
+/** Material layer set usage for a layered wall (layers across local +Y, from −thickness/2). */
+function exportWallLayers(context: Context, wall: WallElement, wallRef: string): void {
+  const { mm, writer } = context;
+  const layers = (wall.layers ?? []).map((layer) => {
+    const material = writer.add(`IFCMATERIAL(${ifcString(layer.material)},$,$)`);
+    return writer.add(
+      `IFCMATERIALLAYER(${material},${ifcReal(mm(layer.thickness))},$,${ifcString(layer.material)},$,${ifcString(layer.function)},$)`,
+    );
+  });
+  const set = writer.add(
+    `IFCMATERIALLAYERSET((${layers.join(',')}),${ifcString(`${wall.mark} build-up`)},$)`,
+  );
+  const usage = writer.add(
+    `IFCMATERIALLAYERSETUSAGE(${set},.AXIS2.,.POSITIVE.,${ifcReal(-mm(wall.thickness) / 2)},$)`,
+  );
+  writer.add(
+    `IFCRELASSOCIATESMATERIAL('${context.guid(`rel:layers:${wall.id}`)}',$,$,$,(${wallRef}),${usage})`,
+  );
+}
+
 function exportCurvedWall(
   context: Context,
   wall: CurvedWallElement,
@@ -709,7 +729,8 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
       if (element.category === 'wall') {
         const wall = exportWall(context, element, wallExtent(building, element), storeyPlacement);
         contained.push(wall.ref);
-        record(wall);
+        if (element.layers) exportWallLayers(context, element, wall.ref);
+        else record(wall);
         for (const openingId of building.elementOrder) {
           const opening = building.elements[openingId];
           if (

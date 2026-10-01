@@ -60,3 +60,13 @@ Playwright end-to-end suite (`npm run test:e2e`).
       downloads.
 - [x] **S12 — Verification.** Unit tests for every command, Playwright e2e covering the
       full workflow in a real browser, MCP prompt + docs (`docs/CONSTRUCTION.md`).
+
+## Phase 2 — remaining gaps
+
+- [x] **S13 — Wall build-ups.** Optional `layers: [{ material, thickness, function }]` on walls
+      (structure / insulation / finish, exterior → interior, like Revit wall types): wall
+      thickness = sum of layers; per-layer quantities (m², m³ by material); layer lines inside
+      the plan cut; IFC `IfcMaterialLayerSetUsage`. `set_wall_layers` edits an existing wall.
+- [ ] **S14 — Openings in curved walls.** Doors and windows hosted by curved walls (offset
+      along the arc): the wall is cut, the opening follows the curve's tangent, quantities
+      deduct the openings, plan / IFC show them.

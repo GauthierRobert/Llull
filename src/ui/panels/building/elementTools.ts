@@ -255,6 +255,44 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     },
   },
   {
+    id: 'wallLayers',
+    label: 'Wall build-up',
+    fields: [
+      { key: 'allWalls', label: 'Every wall of the level', kind: 'checkbox', defaultValue: 'true' },
+      { key: 'wallId', label: 'Wall', kind: 'select', defaultValue: '', options: 'walls' },
+      {
+        key: 'layers',
+        label: 'Layers (outside → inside)',
+        kind: 'text',
+        defaultValue:
+          '20 render finish; 120 mineral-wool insulation; 200 concrete structure; 13 gypsum finish',
+      },
+    ],
+    build: (values, context) => {
+      const reader = new FieldReader(values);
+      const wallIds = reader.flag('allWalls')
+        ? [...context.wallIds]
+        : reader.text('wallId') === ''
+          ? []
+          : [reader.text('wallId')];
+      if (wallIds.length === 0) return { ok: false, reason: 'Pick a wall first.' };
+      const layers = reader
+        .text('layers')
+        .split(';')
+        .map((part) => part.trim().split(/\s+/))
+        .filter((words) => words.length >= 2)
+        .map(([thickness, material, fn]) => ({
+          thickness: Number(thickness),
+          material: material ?? '',
+          function: fn ?? 'structure',
+        }));
+      if (layers.length === 0 || layers.some((layer) => !(layer.thickness > 0))) {
+        return { ok: false, reason: 'Check: layers ("thickness material function; …")' };
+      }
+      return result(reader, 'set_wall_layers', { wallIds, layers });
+    },
+  },
+  {
     id: 'door',
     label: 'Door',
     fields: [

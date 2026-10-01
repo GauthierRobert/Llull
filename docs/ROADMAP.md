@@ -77,7 +77,8 @@ AI control — there is no in-app AI bridge).**
 - [x] Sections / elevations (`export_elevation_sheet`)
 - [x] DXF hatches (R12 LINE / SOLID pattern layers)
 - [x] Curved walls (`add_curved_wall`)
-- [ ] Wall build-ups (layers), openings in curved walls
+- [x] Wall build-ups (`set_wall_layers`)
+- [ ] Openings in curved walls
 
 ## Industrial (factory builders) — see docs/INDUSTRIAL_PLAN.md
 - [x] Steel profile catalogue, steel members, portal-frame hall generator, crane runways

@@ -23,6 +23,7 @@ import { sweepFrame } from './mesh';
 import { findProfile, profileOutline } from './steel/profiles';
 import { plateLayout } from './industrial/evaluate';
 import { curvedWallBand } from './curvedWallGeometry';
+import { layerBoundaries } from './wallLayers';
 
 export type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
 
@@ -157,6 +158,30 @@ function wallPrimitives(
       fill: 'hatch',
       points: band(wall, cursor, finish, half),
     });
+  }
+  // Build-up: a thin line along every layer boundary of each cut piece.
+  const boundaries = layerBoundaries(wall);
+  if (boundaries.length > 0) {
+    const pieces = primitives.flatMap((primitive) =>
+      primitive.type === 'polygon' ? [primitive.points] : [],
+    );
+    for (const piece of pieces) {
+      const along = piece.map(
+        (point) =>
+          (point[0] - wall.start[0]) * frame.direction[0] +
+          (point[1] - wall.start[1]) * frame.direction[1],
+      );
+      const [from, to] = [Math.min(...along), Math.max(...along)];
+      for (const across of boundaries) {
+        primitives.push({
+          type: 'line',
+          layer: layerName('wall'),
+          style: 'thin',
+          a: pointAlong(wall, frame, from, across),
+          b: pointAlong(wall, frame, to, across),
+        });
+      }
+    }
   }
   for (const opening of openings) {
     const left = opening.offset - opening.width / 2;

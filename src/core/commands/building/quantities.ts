@@ -144,20 +144,24 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       `Walls, ${wall.material} — length`,
       scale.length(quantities.length),
     );
-    takeoff.add(
-      'wall',
-      wall.material,
-      'm2',
-      `Walls, ${wall.material} — net face area`,
-      scale.area(quantities.netArea),
-    );
-    takeoff.add(
-      'wall',
-      wall.material,
-      'm3',
-      `Walls, ${wall.material} — volume`,
-      scale.volume(quantities.volume),
-    );
+    for (const layer of wall.layers ?? [
+      { material: wall.material, thickness: wall.thickness, function: 'structure' },
+    ]) {
+      takeoff.add(
+        'wall',
+        layer.material,
+        'm2',
+        `Walls, ${layer.material} — net face area`,
+        scale.area(quantities.netArea),
+      );
+      takeoff.add(
+        'wall',
+        layer.material,
+        'm3',
+        `Walls, ${layer.material} — volume`,
+        scale.volume((quantities.volume * layer.thickness) / wall.thickness),
+      );
+    }
   }
   for (const wall of elementsOf(building, 'curvedWall')) {
     const length = curvedWallLength(wall);

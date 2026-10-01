@@ -65,15 +65,28 @@ export interface GridElement extends ElementBase {
 }
 
 /** A straight wall. `start`/`end` are the plan centerline; height is measured from the level + baseOffset. */
+export type WallLayerFunction = 'structure' | 'insulation' | 'membrane' | 'air' | 'finish';
+
+/** One layer of a wall build-up. */
+export interface WallLayer {
+  material: string;
+  thickness: number;
+  function: WallLayerFunction;
+}
+
 export interface WallElement extends ElementBase {
   readonly category: 'wall';
   levelId: string;
   start: Vec2;
   end: Vec2;
+  /** Equals the sum of `layers` thicknesses when a build-up is set. */
   thickness: number;
   height: number;
   baseOffset: number;
+  /** Structural material (the build-up's first structure layer when layers are set). */
   material: string;
+  /** Build-up from the right-hand face (looking from start to end) to the left-hand face. */
+  layers?: WallLayer[];
 }
 
 /** A door or window hosted by a wall. `offset` = distance along the wall from its start to the opening center. */

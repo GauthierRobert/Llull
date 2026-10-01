@@ -302,8 +302,12 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
     if (levelId !== undefined && !building.levels[levelId]) {
       return noChange(doc, `update_wall failed: no level '${levelId}'.`);
     }
+    // A new overall thickness no longer matches a build-up: the wall becomes single-layer.
+    const { layers, ...single } = wall;
+    const keepLayers = thickness === undefined || thickness === wall.thickness;
     const updated: WallElement = {
-      ...wall,
+      ...single,
+      ...(keepLayers && layers ? { layers } : {}),
       start: start ? toVec2(start) : wall.start,
       end: end ? toVec2(end) : wall.end,
       thickness: thickness ?? wall.thickness,
@@ -323,7 +327,8 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
       document,
       summary:
         `Updated wall ${updated.mark} (${wallId}): [${updated.start.join(', ')}]→[${updated.end.join(', ')}], ` +
-        `thickness ${updated.thickness}, height ${updated.height}, ${updated.material}.`,
+        `thickness ${updated.thickness}, height ${updated.height}, ${updated.material}` +
+        `${!keepLayers && layers ? ' (build-up removed)' : ''}.`,
       affected: elementAffected(document, [wallId]),
     };
   },
