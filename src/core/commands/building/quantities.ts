@@ -16,8 +16,10 @@ import type {
 import { polygonArea, polygonPerimeter } from '../../../lib/polygon';
 import { getBuilding, lengthOf, toMetres } from './model';
 import { openingsOf, wallExtent } from './evaluate';
+import { findProfile } from './steel/profiles';
+import { polygonNormal } from './industrial/evaluate';
 
-export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea';
+export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
 export interface TakeoffLine {
   /** Stable rate key "<group>.<material>.<unit>", e.g. "wall.concrete.m3", "slab-roof.concrete.m2". */
@@ -228,7 +230,90 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       scale.area(polygonArea(room.boundary)),
     );
   }
+  for (const member of elementsOf(building, 'member')) {
+    const profile = findProfile(member.profile);
+    if (!profile) continue;
+    const metres = scale.length(memberLength(member));
+    takeoff.add(
+      'member',
+      profile.name,
+      'kg',
+      `Steel ${profile.name} — mass`,
+      metres * profile.massPerMetre,
+    );
+    takeoff.add('member', profile.name, 'm', `Steel ${profile.name} — length`, metres);
+    takeoff.add(
+      'member',
+      'paint',
+      'm2',
+      'Steel — paint / coating surface',
+      metres * profile.perimeter * 0.001,
+    );
+  }
+  for (const footing of elementsOf(building, 'footing')) {
+    takeoff.add('footing', footing.material, 'ea', `Pad footings, ${footing.material} — count`, 1);
+    takeoff.add(
+      'footing',
+      footing.material,
+      'm3',
+      `Pad footings, ${footing.material} — volume`,
+      scale.volume(footing.width * footing.length * footing.thickness),
+    );
+  }
+  for (const panel of elementsOf(building, 'panel')) {
+    takeoff.add(
+      'panel',
+      panel.material,
+      'm2',
+      `Cladding (${panel.role}), ${panel.material} — area`,
+      scale.area(panelArea(panel)),
+      `panel-${panel.role}`,
+    );
+  }
+  for (const equipment of elementsOf(building, 'equipment')) {
+    takeoff.add('equipment', equipment.name, 'ea', `Equipment ${equipment.name} — count`, 1);
+  }
+  for (const pipe of elementsOf(building, 'pipe')) {
+    const size = `Ø${pipe.diameter}`;
+    takeoff.add(
+      'pipe',
+      `${pipe.service} ${size}`,
+      'm',
+      `Pipe ${pipe.service} ${size} — length`,
+      scale.length(pipeLength(pipe)),
+    );
+  }
   return takeoff.result();
+}
+
+export function memberLength(member: Extract<BuildingElement, { category: 'member' }>): number {
+  const [dx, dy, dz] = [0, 1, 2].map(
+    (axis) => (member.end[axis] as number) - (member.start[axis] as number),
+  );
+  return Math.hypot(dx as number, dy as number, dz as number);
+}
+
+/** Steel mass of a member in kg. */
+export function memberMass(
+  doc: CadDocument,
+  member: Extract<BuildingElement, { category: 'member' }>,
+): number {
+  const profile = findProfile(member.profile);
+  return profile ? toMetres(doc, memberLength(member)) * profile.massPerMetre : 0;
+}
+
+export function pipeLength(pipe: Extract<BuildingElement, { category: 'pipe' }>): number {
+  return pipe.points.reduce((sum, point, index) => {
+    const previous = pipe.points[index - 1];
+    return previous
+      ? sum + Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2])
+      : sum;
+  }, 0);
+}
+
+/** True area of a planar 3D panel (half the Newell normal length). */
+export function panelArea(panel: Extract<BuildingElement, { category: 'panel' }>): number {
+  return Math.hypot(...polygonNormal(panel.corners)) / 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +328,12 @@ export type ScheduleKind =
   | 'slab'
   | 'column'
   | 'beam'
-  | 'stair';
+  | 'stair'
+  | 'member'
+  | 'footing'
+  | 'panel'
+  | 'equipment'
+  | 'pipe';
 
 export interface Schedule {
   readonly kind: ScheduleKind;
@@ -437,6 +527,103 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           stair.width,
           stair.material,
           round(scale.volume(stairVolume(stair))),
+        ]),
+      };
+    case 'member':
+      return {
+        kind,
+        columns: [
+          'Mark',
+          'Role',
+          'Profile',
+          `Length (${unit})`,
+          'Mass (kg)',
+          'Grade',
+          'Level',
+          'Note',
+        ],
+        rows: elementsOf(building, 'member').map((member) => [
+          member.mark,
+          member.role,
+          member.profile,
+          round(memberLength(member), 1),
+          round(memberMass(doc, member), 1),
+          member.material,
+          levelName(building, member.levelId),
+          member.note ?? '',
+        ]),
+      };
+    case 'footing':
+      return {
+        kind,
+        columns: ['Mark', 'Level', 'X', 'Y', `Size (${unit})`, `Top (${unit})`, 'Volume (m³)'],
+        rows: elementsOf(building, 'footing').map((footing) => [
+          footing.mark,
+          levelName(building, footing.levelId),
+          round(footing.location[0], 1),
+          round(footing.location[1], 1),
+          `${footing.width}×${footing.length}×${footing.thickness}`,
+          footing.topOffset,
+          round(scale.volume(footing.width * footing.length * footing.thickness)),
+        ]),
+      };
+    case 'panel':
+      return {
+        kind,
+        columns: ['Mark', 'Level', 'Role', 'Material', `Thickness (${unit})`, 'Area (m²)'],
+        rows: elementsOf(building, 'panel').map((panel) => [
+          panel.mark,
+          levelName(building, panel.levelId),
+          panel.role,
+          panel.material,
+          panel.thickness,
+          round(scale.area(panelArea(panel)), 2),
+        ]),
+      };
+    case 'equipment':
+      return {
+        kind,
+        columns: [
+          'Mark',
+          'Name',
+          'Level',
+          'X',
+          'Y',
+          `Size (${unit})`,
+          `Clearance (${unit})`,
+          'Weight (kg)',
+        ],
+        rows: elementsOf(building, 'equipment').map((equipment) => [
+          equipment.mark,
+          equipment.name,
+          levelName(building, equipment.levelId),
+          round(equipment.location[0], 1),
+          round(equipment.location[1], 1),
+          equipment.size.join('×'),
+          equipment.clearance,
+          equipment.weight,
+        ]),
+      };
+    case 'pipe':
+      return {
+        kind,
+        columns: [
+          'Mark',
+          'Service',
+          `Diameter (${unit})`,
+          'Material',
+          'Length (m)',
+          'Bends',
+          'Level',
+        ],
+        rows: elementsOf(building, 'pipe').map((pipe) => [
+          pipe.mark,
+          pipe.service,
+          pipe.diameter,
+          pipe.material,
+          round(scale.length(pipeLength(pipe)), 2),
+          Math.max(0, pipe.points.length - 2),
+          levelName(building, pipe.levelId),
         ]),
       };
   }

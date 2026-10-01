@@ -20,7 +20,7 @@ import {
 } from './model';
 import { regenerateBuilding } from './evaluate';
 
-function gridLabels(building: BuildingModel): Set<string> {
+export function gridLabels(building: BuildingModel): Set<string> {
   return new Set(
     Object.values(building.elements)
       .filter((element) => element.category === 'grid')
@@ -40,14 +40,19 @@ export function gridLetter(index: number): string {
   return label;
 }
 
-function nextFreeLabel(used: ReadonlySet<string>, numeric: boolean): string {
+export function nextFreeLabel(used: ReadonlySet<string>, numeric: boolean): string {
   for (let index = 0; ; index++) {
     const label = numeric ? String(index + 1) : gridLetter(index);
     if (!used.has(label)) return label;
   }
 }
 
-function addGrid(building: BuildingModel, label: string, start: Vec2, end: Vec2): BuildingModel {
+export function addGrid(
+  building: BuildingModel,
+  label: string,
+  start: Vec2,
+  end: Vec2,
+): BuildingModel {
   const element: GridElement = {
     id: nextElementId(building, 'grid'),
     category: 'grid',

@@ -13,7 +13,7 @@ import {
   type ScheduleKind,
 } from './quantities';
 
-const UNIT_LABEL = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea' } as const;
+const UNIT_LABEL = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' } as const;
 
 /**
  * @command quantity_takeoff
@@ -44,7 +44,7 @@ export const quantityTakeoff: CommandDefinition<Record<string, never>> = {
       lines.map((line) => [line.key, line.description, line.quantity, UNIT_LABEL[line.unit]]),
     );
     const highlights = lines
-      .filter((line) => line.unit === 'm3' || line.unit === 'ea')
+      .filter((line) => line.unit === 'm3' || line.unit === 'ea' || line.unit === 'kg')
       .map(
         (line) => `${line.description.split(' — ')[0]}: ${line.quantity} ${UNIT_LABEL[line.unit]}`,
       );
@@ -66,6 +66,11 @@ const SCHEDULE_KINDS: ReadonlyArray<ScheduleKind> = [
   'column',
   'beam',
   'stair',
+  'member',
+  'footing',
+  'panel',
+  'equipment',
+  'pipe',
 ];
 
 interface BuildingScheduleParams {
@@ -83,7 +88,7 @@ export const buildingSchedule: CommandDefinition<BuildingScheduleParams> = {
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, ' +
-    'slab, column, beam or stair — one row per element with mark, level, dimensions, material and ' +
+    'slab, column, beam, stair, member (steel cut list), footing, panel, equipment or pipe — one row per element with mark, level, dimensions, material and ' +
     'quantities. data.csv is spreadsheet-ready.',
   paramsSchema: {
     type: 'object',

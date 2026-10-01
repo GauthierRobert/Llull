@@ -150,7 +150,7 @@ export const listSteelProfiles: CommandDefinition<ListSteelProfilesParams> = {
   },
   run: (doc, { family }): CommandResult => {
     const profiles = STEEL_PROFILES.filter(
-      (profile) => family === undefined || profile.family === family,
+      (profile) => family === undefined || profile.family === family.trim().toUpperCase(),
     );
     return {
       document: doc,

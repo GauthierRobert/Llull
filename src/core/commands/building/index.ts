@@ -22,6 +22,16 @@ import { exportPlanSheet } from './sheet';
 import { exportIfc } from './ifc';
 import { addBuildingTemplate } from './templates';
 import { addSlabOpening, deleteSlabOpening } from './slabOpenings';
+import {
+  addFooting,
+  addPanel,
+  addSteelMember,
+  listSteelProfiles,
+  updateSteelMember,
+} from './industrial/members';
+import { addEquipment, addPipeRun } from './industrial/equipment';
+import { addCraneRunway, addPortalFrameBuilding } from './industrial/portal';
+import { checkClashes } from './industrial/clash';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 export const buildingCommands = [
@@ -57,6 +67,16 @@ export const buildingCommands = [
   exportPlanSheet,
   exportIfc,
   addBuildingTemplate,
+  listSteelProfiles,
+  addSteelMember,
+  updateSteelMember,
+  addFooting,
+  addPanel,
+  addEquipment,
+  addPipeRun,
+  addCraneRunway,
+  addPortalFrameBuilding,
+  checkClashes,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 /** Public read-only building API for the UI (plans, layers, quantities, integrity). */

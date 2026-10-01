@@ -9,6 +9,7 @@
 import type { CadDocument, Vec2 } from '../../model/types';
 import type {
   BimCategory,
+  BuildingElement,
   BuildingLevel,
   BuildingModel,
   OpeningElement,
@@ -17,6 +18,9 @@ import type {
 import { polygonArea, polygonCentroid } from '../../../lib/polygon';
 import { fromMm, getBuilding, toMetres } from './model';
 import { CATEGORY_LAYER, openingsOf, pointAlong, wallExtent, wallFrame } from './evaluate';
+import { MEMBER_LAYER } from './entities';
+import { sweepFrame } from './mesh';
+import { findProfile, profileOutline } from './steel/profiles';
 
 export type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
 
@@ -341,6 +345,147 @@ function stairPrimitives(
   return primitives;
 }
 
+/** Plan symbols of industrial elements (cut at `cutHeight` above the level). */
+function industrialPrimitives(
+  doc: PlanSource,
+  element: Extract<
+    BuildingElement,
+    { category: 'member' | 'footing' | 'panel' | 'equipment' | 'pipe' }
+  >,
+  cutHeight: number,
+): PlanPrimitive[] {
+  const flat = (point: readonly number[]): Vec2 => [point[0] as number, point[1] as number];
+  switch (element.category) {
+    case 'member': {
+      const layer = MEMBER_LAYER[element.role].name;
+      const frame = sweepFrame(element.start, element.end, element.roll);
+      const profile = findProfile(element.profile);
+      if (!frame || !profile) return [];
+      const [low, high] = [
+        Math.min(element.start[2], element.end[2]),
+        Math.max(element.start[2], element.end[2]),
+      ];
+      if (Math.abs(frame.d[2]) > 0.9 && low <= cutHeight && high >= cutHeight) {
+        const factor = fromMm(doc, 1);
+        const section = (points: ReadonlyArray<Vec2>): Vec2[] =>
+          points.map(
+            ([x, y]): Vec2 => [
+              element.start[0] + (frame.u[0] * x + frame.v[0] * y) * factor,
+              element.start[1] + (frame.u[1] * x + frame.v[1] * y) * factor,
+            ],
+          );
+        const { outer, holes } = profileOutline(profile);
+        return [
+          { type: 'polygon', layer, style: 'cut', points: section(outer) },
+          ...holes.map(
+            (hole): PlanPrimitive => ({
+              type: 'polygon',
+              layer,
+              style: 'thin',
+              points: section(hole),
+            }),
+          ),
+        ];
+      }
+      // Roof framing (purlins, rafters, roof bracing) and side rails belong to the roof / elevation drawings.
+      if (element.role === 'purlin' || element.role === 'rafter' || element.role === 'rail')
+        return [];
+      if (element.role === 'brace' && low > 2 * cutHeight) return [];
+      const [a, b] = [flat(element.start), flat(element.end)];
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-9) return [];
+      return [{ type: 'line', layer, style: 'hidden', a, b }];
+    }
+    case 'footing': {
+      const [x, y] = element.location;
+      const [hx, hy] = [element.width / 2, element.length / 2];
+      return [
+        {
+          type: 'polygon',
+          layer: layerName('footing'),
+          style: 'hidden',
+          points: [
+            [x - hx, y - hy],
+            [x + hx, y - hy],
+            [x + hx, y + hy],
+            [x - hx, y + hy],
+          ],
+        },
+      ];
+    }
+    case 'panel': {
+      if (element.role !== 'wall') return [];
+      const points = element.corners.map(flat);
+      const xs = points.map((point) => point[0]);
+      const ys = points.map((point) => point[1]);
+      return [
+        {
+          type: 'line',
+          layer: layerName('panel'),
+          style: 'thin',
+          a: [Math.min(...xs), Math.min(...ys)],
+          b: [Math.max(...xs), Math.max(...ys)],
+        },
+      ];
+    }
+    case 'equipment': {
+      const [length, width] = element.size;
+      const [cos, sin] = [Math.cos(element.angle), Math.sin(element.angle)];
+      const rectangle = (hx: number, hy: number): Vec2[] =>
+        (
+          [
+            [-hx, -hy],
+            [hx, -hy],
+            [hx, hy],
+            [-hx, hy],
+          ] as const
+        ).map(
+          ([x, y]): Vec2 => [
+            element.location[0] + x * cos - y * sin,
+            element.location[1] + x * sin + y * cos,
+          ],
+        );
+      const layer = layerName('equipment');
+      return [
+        { type: 'polygon', layer, style: 'thin', points: rectangle(length / 2, width / 2) },
+        ...(element.clearance > 0
+          ? [
+              {
+                type: 'polygon',
+                layer,
+                style: 'hidden',
+                points: rectangle(length / 2 + element.clearance, width / 2 + element.clearance),
+              } as PlanPrimitive,
+            ]
+          : []),
+        {
+          type: 'text',
+          layer,
+          style: 'annotation',
+          at: element.location,
+          height: fromMm(doc, 250),
+          content: `${element.mark} ${element.name}`,
+        },
+      ];
+    }
+    case 'pipe': {
+      const points = element.points.map(flat);
+      const layer = layerName('pipe');
+      const [a, b] = [points[0] as Vec2, points[1] as Vec2];
+      return [
+        { type: 'polyline', layer, style: 'thin', points },
+        {
+          type: 'text',
+          layer,
+          style: 'annotation',
+          at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + fromMm(doc, 200)],
+          height: fromMm(doc, 180),
+          content: `${element.mark} ${element.service} Ø${element.diameter}`,
+        },
+      ];
+    }
+  }
+}
+
 /**
  * Builds the plan of `levelId` (or the active / lowest level).
  * @failure no such level -> null
@@ -429,6 +574,13 @@ export function buildPlanDrawing(
         break;
       case 'stair':
         primitives.push(...stairPrimitives(doc, element));
+        break;
+      case 'member':
+      case 'footing':
+      case 'panel':
+      case 'equipment':
+      case 'pipe':
+        primitives.push(...industrialPrimitives(doc, element, cutHeight));
         break;
       case 'room': {
         const [cx, cy] = polygonCentroid(element.boundary);
