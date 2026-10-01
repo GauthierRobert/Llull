@@ -42,6 +42,7 @@ import { checkPortalFrames } from './industrial/frameCheck';
 import { designPortalFrames } from './industrial/frameDesign';
 import { checkBracing } from './industrial/bracingCheck';
 import { foundationCheck } from './industrial/foundationCheck';
+import { exportNcFiles } from './industrial/ncExport';
 import { runwayCheck } from './industrial/runwayCheck';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
@@ -95,6 +96,7 @@ export const buildingCommands = [
   designPortalFrames,
   checkBracing,
   foundationCheck,
+  exportNcFiles,
   runwayCheck,
   addCraneRunway,
   addPortalFrameBuilding,
