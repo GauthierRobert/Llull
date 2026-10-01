@@ -285,3 +285,44 @@ export function dropStaleConnections(
     removed: [...removed],
   };
 }
+
+export interface ConnectionWelds {
+  /** Fillet throat thickness of the flange welds, mm. */
+  readonly flangeThroat: number;
+  /** Fillet throat thickness of the web (and haunch) welds, mm. */
+  readonly webThroat: number;
+  /** Total weld length, mm. */
+  readonly length: number;
+  /** Deposited weld metal, kg. */
+  readonly metal: number;
+}
+
+/**
+ * Full-strength double fillet welds of the rafter (and haunch) to the end plate(s):
+ * throat a = 0.55 t for S355 (EN 1993-1-8 §4.5, simplified), rounded up to whole mm, ≥ 3 mm.
+ */
+export function connectionWelds(
+  doc: Pick<CadDocument, 'units'>,
+  building: BuildingModel,
+  connection: MomentConnectionElement,
+): ConnectionWelds | null {
+  const rafter = building.elements[connection.rafterId];
+  const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
+  if (!profile) return null;
+  const throat = (thickness: number): number => Math.max(3, Math.ceil(0.55 * thickness));
+  const [flangeThroat, webThroat] = [throat(profile.tf), throat(profile.tw)];
+  const flanges = 2 * (2 * profile.b - profile.tw);
+  const web = 2 * (profile.h - 2 * profile.tf);
+  const plates = connection.kind === 'apex' ? 2 : 1;
+  const haunch = connection.haunchLength / fromMm(doc, 1);
+  // Haunch: web to rafter flange both sides, haunch flange + web to the end plate.
+  const haunchWeb = haunch > 0 ? 2 * haunch + 2 * profile.h : 0;
+  const haunchFlange = haunch > 0 ? 2 * profile.b : 0;
+  const flangeLength = plates * flanges + haunchFlange;
+  const webLength = plates * web + haunchWeb;
+  const metal =
+    (flangeThroat ** 2 * flangeLength + webThroat ** 2 * webLength) *
+    STEEL_DENSITY_KG_PER_M3 *
+    1e-9;
+  return { flangeThroat, webThroat, length: flangeLength + webLength, metal };
+}

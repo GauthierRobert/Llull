@@ -58,6 +58,6 @@ The *Building* panel shows the live takeoff + estimate and downloads CSV files.
 
 ## Known limits
 
-- Curved walls do not join other walls automatically; walls are drawn with one hatch for the whole build-up (layer lines, not per-layer patterns).
+- Straight walls join curved walls (corner / T junction) but curved walls are not trimmed themselves; walls are drawn with one hatch for the whole build-up (layer lines, not per-layer patterns).
 - Plans cut every element of the level at 1.2 m; elevations and sections come from `export_elevation_sheet` (see [`INDUSTRIAL.md`](INDUSTRIAL.md)).
 - DXF hatches are written as R12 LINE / SOLID entities (no associative HATCH objects).

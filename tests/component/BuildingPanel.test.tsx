@@ -206,4 +206,21 @@ describe('BuildingPanel', () => {
     expect(click).toHaveBeenCalledTimes(2);
     click.mockRestore();
   });
+
+  it('checks the portal frames and dispatches their design', () => {
+    localDispatch('add_portal_frame_building', { span: 18000, length: 12000, cladding: false });
+    const dispatch = spyDispatch();
+    render(<BuildingPanel />);
+    fireEvent.change(screen.getByLabelText('Snow load (kN/m²)'), { target: { value: '1.0' } });
+    fireEvent.click(screen.getByTestId('frame-check'));
+    expect(screen.getByTestId('frame-check-summary')).toHaveTextContent(
+      /Checked 3 frame\(s\).*S = 1 kN\/m²/,
+    );
+    const rows = screen.getAllByTestId('frame-check-row');
+    expect(rows.length).toBeGreaterThan(0);
+    fireEvent.click(rows[0]!);
+    expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId('frame-design'));
+    expect(dispatch).toHaveBeenCalledWith('design_portal_frames', { deadLoad: 0.5, snowLoad: 1 });
+  });
 });

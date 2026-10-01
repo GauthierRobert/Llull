@@ -16,6 +16,7 @@ import { ElementListSection } from './ElementListSection';
 import { QuantitiesSection } from './QuantitiesSection';
 import { BuildingExportsSection } from './BuildingExportsSection';
 import { ClashSection } from './ClashSection';
+import { StructuralSection } from './StructuralSection';
 
 function StarterTemplates(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -80,6 +81,7 @@ export function BuildingPanel({ className }: { className?: string }): React.Reac
       <ElementToolsSection />
       <ElementListSection />
       <ClashSection />
+      <StructuralSection />
       <QuantitiesSection />
       <BuildingExportsSection />
     </div>

@@ -21,7 +21,7 @@ import { findProfile } from './steel/profiles';
 import { polygonNormal } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
 import { plateMass } from './industrial/plates';
-import { connectionMass } from './industrial/connections';
+import { connectionMass, connectionWelds, type ConnectionWelds } from './industrial/connections';
 import { boltSize } from './industrial/evaluate';
 import { curvedWallLength } from './curvedWallGeometry';
 
@@ -138,6 +138,13 @@ function curvedVoids(building: BuildingModel, wallId: string): number {
     (sum, opening) => sum + opening.width * opening.height,
     0,
   );
+}
+
+/** "a8 flanges / a5 web · 3.2 m" (empty without welds). */
+function weldLabel(welds: ConnectionWelds | null): string {
+  return welds
+    ? `a${welds.flangeThroat} flanges / a${welds.webThroat} web · ${(welds.length / 1000).toFixed(1)} m`
+    : '';
 }
 
 /** Bill of quantities grouped by category × material × unit. */
@@ -375,6 +382,11 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       `Bolts ${boltSize(doc, connection.boltDiameter)} 8.8 — count`,
       2 * connection.boltRows,
     );
+    const welds = connectionWelds(doc, building, connection);
+    if (welds) {
+      takeoff.add('connection', 'weld', 'm', 'Fillet welds — length', welds.length / 1000);
+      takeoff.add('connection', 'weld metal', 'kg', 'Fillet welds — weld metal', welds.metal);
+    }
   }
   return takeoff.result();
 }
@@ -815,6 +827,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           round(connection.haunchLength, 1),
           round(connectionMass(doc, building, connection), 1),
           levelName(building, connection.levelId),
+          weldLabel(connectionWelds(doc, building, connection)),
         ]),
       };
   }

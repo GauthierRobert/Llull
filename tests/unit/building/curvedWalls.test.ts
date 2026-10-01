@@ -270,3 +270,26 @@ describe('curved wall opening review regressions', () => {
     expect(Number(voids[0]?.[1])).toBeGreaterThan(200 + 2 * 171);
   });
 });
+
+describe('straight walls joining curved walls', () => {
+  it('extends a straight wall over a curved wall end (L corner)', async () => {
+    const { wallExtent } = await import('@core/commands/building/evaluate');
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_wall', { start: [-5000, 0], end: [-9000, 0], thickness: 200 }).document;
+    const wall = doc.building!.elements['wall-1']!;
+    expect(wall.category === 'wall' && wallExtent(doc.building!, wall)).toEqual({
+      start: -150,
+      end: 4000,
+    });
+  });
+
+  it('stops a straight wall at the face of an arc (T junction)', async () => {
+    const { wallExtent } = await import('@core/commands/building/evaluate');
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_wall', { start: [0, 9000], end: [0, 5000], thickness: 200 }).document;
+    const wall = doc.building!.elements['wall-1']!;
+    const extent = wall.category === 'wall' ? wallExtent(doc.building!, wall) : null;
+    expect(extent?.start).toBe(0);
+    expect(extent?.end).toBeCloseTo(4000 - 150, 6);
+  });
+});

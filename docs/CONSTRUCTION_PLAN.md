@@ -70,3 +70,5 @@ Playwright end-to-end suite (`npm run test:e2e`).
 - [x] **S14 — Openings in curved walls.** Doors and windows hosted by curved walls (offset
       along the arc): the wall is cut, the opening follows the curve's tangent, quantities
       deduct the openings, plan / IFC show them.
+- [x] **S15 — Curved-to-straight wall joins.** A straight wall ending on a curved wall's end is
+      trimmed / extended against the curved wall's end tangent, like straight-wall L / T joins.

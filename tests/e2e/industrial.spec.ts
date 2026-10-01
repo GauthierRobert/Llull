@@ -190,4 +190,21 @@ test.describe('industrial workflow', () => {
       expect(ifc.text).toContain(entity);
     }
   });
+
+  test('I18–I19 — frame check, automatic design, welds', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', { span: '24000', length: '30000', cladding: 'false' });
+    await page.getByTestId('frame-check').click();
+    await expect(page.getByTestId('frame-check-summary')).toContainText('Checked 6 frame(s)');
+    await expect(page.getByTestId('frame-check-summary')).toContainText('failure(s)');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s)');
+    await page.getByTestId('frame-check').click();
+    await expect(page.getByTestId('frame-check-summary')).toContainText('all OK');
+    await page.getByLabel('Schedule').selectOption('connection');
+    const schedule = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Schedule CSV' }).click(),
+    );
+    expect(schedule.text.split('\n')[1]).toMatch(/,a9 flanges \/ a6 web · \d+\.\d m$/);
+  });
 });
