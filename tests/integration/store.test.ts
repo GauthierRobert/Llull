@@ -38,7 +38,11 @@ function getState(): ReturnType<typeof useStore.getState> {
 }
 
 function resetStore(): void {
+  useStore.getState().setDocument(createEmptyDocument());
   useStore.setState({
+    localEditCounter: 0,
+    syncState: 'idle',
+    sseEverConnected: false,
     document: createEmptyDocument(),
     lastSummary: null,
     lastMeasure: null,
@@ -166,7 +170,10 @@ describe('CadStore — networked dispatch', () => {
 
   it('dispatch keeps liveStatus on HTTP 429 and surfaces the error in lastSummary', async () => {
     useStore.setState({ liveStatus: 'connected' });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429, json: () => Promise.resolve({}) }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 429, json: () => Promise.resolve({}) }),
+    );
 
     getState().dispatch('add_box', { size: [1, 1, 1] });
     await flushPromises();
@@ -436,7 +443,10 @@ describe('CadStore — offline fallback', () => {
 
   it('HTTP 4xx does NOT fall back locally', async () => {
     useStore.setState({ liveStatus: 'connected' });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({}) }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({}) }),
+    );
     getState().dispatch('add_box', { size: [1, 1, 1] });
     await flushPromises();
     expect(getState().document.order).toHaveLength(0);
@@ -486,5 +496,145 @@ describe('CadStore — offline fallback', () => {
     expect(spy).not.toHaveBeenCalled();
     expect(getState().document.order).toEqual(result.affected);
     expect(getState().localUndoStack).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sync races (select during push, failed push retry, patches, SSE-open network errors)
+// ---------------------------------------------------------------------------
+
+function httpFail(status: number): { ok: false; status: number; json: () => Promise<object> } {
+  return { ok: false, status, json: () => Promise.resolve({}) };
+}
+
+function okResponse(): { ok: true; json: () => Promise<ServerCommandResponse> } {
+  return { ok: true, json: () => Promise.resolve(DEFAULT_RESPONSE) };
+}
+
+function makeOfflineEdit(): void {
+  useStore.setState({ liveStatus: 'disconnected' });
+  getState().dispatch('add_box', { size: [1, 1, 1] });
+  useStore.setState({ liveStatus: 'connected' });
+}
+
+describe('CadStore — sync race fixes', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    resetStore();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    getState().setDocument(createEmptyDocument());
+  });
+
+  it('select during push does not leave the unsynced flag set', async () => {
+    makeOfflineEdit();
+    const spy = vi.fn().mockResolvedValue(okResponse());
+    vi.stubGlobal('fetch', spy);
+
+    getState().hydrateLiveDocument(createEmptyDocument());
+    const id = getState().document.order[0]!;
+    getState().select([id]);
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledOnce();
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+    expect(getState().syncState).toBe('idle');
+  });
+
+  it('failed push (HTTP 429) stays in local mode, then retry succeeds with backoff', async () => {
+    vi.useFakeTimers();
+    makeOfflineEdit();
+    const spy = vi.fn().mockResolvedValueOnce(httpFail(429)).mockResolvedValue(okResponse());
+    vi.stubGlobal('fetch', spy);
+
+    getState().hydrateLiveDocument(createEmptyDocument());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getState().syncState).toBe('failed');
+    expect(getState().hasUnsyncedLocalEdits).toBe(true);
+
+    // Dispatch while failed runs locally, no POST.
+    getState().dispatch('add_box', { size: [2, 2, 2] });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(getState().document.order).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(getState().syncState).toBe('idle');
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+    expect(getState().document.order).toHaveLength(2);
+  });
+
+  it('patch arriving while the push is in flight is applied, not dropped', async () => {
+    makeOfflineEdit();
+    let resolvePush: (value: unknown) => void = () => undefined;
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise((r) => (resolvePush = r))));
+    getState().hydrateLiveDocument(createEmptyDocument());
+    expect(getState().syncState).toBe('syncing');
+
+    const base = getState().document;
+    const extra = { ...base.entities[base.order[0]!]!, id: 'srv-1' };
+    getState().applyLivePatch({
+      entities: { added: { 'srv-1': extra }, changed: {}, removed: [] },
+      order: [...base.order, 'srv-1'],
+    });
+    expect(getState().document.entities['srv-1']).toBeDefined();
+
+    resolvePush(okResponse());
+    await flushPromises();
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+  });
+
+  it('POST network failure with SSE open neither goes offline nor runs locally', async () => {
+    useStore.getState().setLiveStatus('connected');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('flaky')));
+
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    await flushPromises();
+
+    expect(getState().liveStatus).toBe('connected');
+    expect(getState().document.order).toHaveLength(0);
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+    expect(getState().lastSummary).toContain('not applied');
+  });
+
+  it('online dispatch during pending sync runs locally and is included in the next push', async () => {
+    makeOfflineEdit();
+    const bodies: string[] = [];
+    const resolvers: Array<(v: unknown) => void> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        bodies.push(init.body as string);
+        return new Promise((r) => resolvers.push(r));
+      }),
+    );
+
+    getState().hydrateLiveDocument(createEmptyDocument());
+    getState().dispatch('add_box', { size: [3, 3, 3] });
+    expect(bodies).toHaveLength(1);
+    expect(getState().document.order).toHaveLength(2);
+
+    resolvers[0]!(okResponse());
+    await flushPromises();
+    expect(bodies).toHaveLength(2);
+    const second = JSON.parse(bodies[1]!) as { name: string; params: { json: string } };
+    expect(second.name).toBe('load_document');
+    expect(second.params.json).toBe(serializeDocument(getState().document));
+
+    resolvers[1]!(okResponse());
+    await flushPromises();
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+    expect(getState().syncState).toBe('idle');
+  });
+
+  it('setDocument resets the unsynced counter and flags', () => {
+    makeOfflineEdit();
+    getState().setDocument(createEmptyDocument());
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+    expect(getState().localEditCounter).toBe(0);
+    expect(getState().syncState).toBe('idle');
   });
 });

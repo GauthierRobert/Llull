@@ -9,16 +9,25 @@
  * the resulting document arrives over the /live SSE stream (`hydrateLiveDocument` /
  * `applyLivePatch`). Undo/redo are POST /undo and /redo; canUndo/canRedo come from responses.
  *
- * OFFLINE (local fallback, architecture L6): used when liveStatus is 'disconnected' OR a POST
- * fails with a NETWORK error (HTTP 4xx/5xx NEVER fall back — the server answered). dispatch runs
- * `execute(state.document, ...)` locally; undo/redo use a bounded local snapshot stack
- * (LOCAL_HISTORY_LIMIT). Local mutations set `hasUnsyncedLocalEdits`.
+ * LOCAL MODE (offline fallback, architecture L6): dispatch/undo/redo run locally (`execute` +
+ * bounded snapshot stack, LOCAL_HISTORY_LIMIT) when ANY of:
+ *   - liveStatus is 'disconnected' (SSE down); or a POST fails with a network error while
+ *     'connecting' and no SSE has ever connected (first dispatch races the first connect);
+ *   - syncState is not 'idle' (an offline->online push is pending, in flight, or failed);
+ *   - hasUnsyncedLocalEdits (local edits the server has not received).
+ * Connectivity is decided ONLY by the SSE hook (`setLiveStatus`). A POST network error while the
+ * SSE stream is open NEVER goes local (the command may have executed server-side -> duplicate) and
+ * never changes liveStatus: lastSummary reports "not applied — network error, retry". HTTP 4xx/5xx
+ * never fall back either.
  *
- * RECONCILIATION POLICY
- *   - No unsynced edits: server wins — snapshots hydrate the store; local stacks are cleared.
- *   - Unsynced edits: CLIENT WINS — on the first snapshot after (re)connect the local document is
- *     pushed with POST /command `load_document` (serializeDocument); the server echo then
- *     hydrates the store. If the push fails the local doc is kept and the flag stays set.
+ * RECONCILIATION (client wins). Every local mutation increments `localEditCounter`. On (re)connect
+ * the local doc is pushed via POST /command `load_document`; syncState 'syncing'. On success the
+ * unsynced flag clears only if the counter still equals the value captured at push start,
+ * otherwise the push repeats. On failure syncState='failed' and the push retries with exponential
+ * backoff while the client stays in local mode. Server patches/snapshots are never dropped while
+ * connected: patches always apply; snapshots hydrate only when there are no unsynced edits.
+ * A sync is recorded on the server as ONE `load_document` undo step that reverts ALL offline
+ * edits at once.
  *
  * Local-only state (never sent to the server, never part of CadDocument):
  *   - selection              — which entity ids the user has clicked
@@ -27,7 +36,7 @@
  *   - lastSummary            — human-readable feedback from the last server response
  *   - lastMeasure            — structured result of the last read-only query command
  *   - canUndo / canRedo      — enabled-state for undo/redo UI (server responses or local stacks)
- *   - hasUnsyncedLocalEdits  — local edits not yet pushed to the server
+ *   - hasUnsyncedLocalEdits / localEditCounter / syncState / sseEverConnected — sync bookkeeping
  *   - localUndoStack / localRedoStack — offline snapshot history
  */
 
@@ -51,6 +60,8 @@ export interface LastMeasure {
   /** The structured data returned by the command (typed per command, but stored as unknown here). */
   data: unknown;
 }
+
+export type SyncState = 'idle' | 'syncing' | 'failed';
 
 export interface CadStoreState {
   /** The live CAD document — single source of truth, hydrated by the /live SSE stream. */
@@ -104,6 +115,15 @@ export interface CadStoreState {
   /** True when local (offline) edits exist that the server has not received. */
   hasUnsyncedLocalEdits: boolean;
 
+  /** Monotonic count of local command executions / local undo-redo steps. Selection never bumps it. */
+  localEditCounter: number;
+
+  /** Offline->online push: 'idle' none, 'syncing' push pending/in flight, 'failed' awaiting retry. */
+  syncState: SyncState;
+
+  /** True once the SSE stream has opened at least once (distinguishes first connect from reconnect). */
+  sseEverConnected: boolean;
+
   /** Offline undo snapshots, oldest first, bounded by LOCAL_HISTORY_LIMIT. */
   localUndoStack: CadDocument[];
 
@@ -119,7 +139,7 @@ export interface CadStoreState {
    *
    * Fire-and-forget from the caller's perspective — returns void.
    * On success: updates lastSummary, lastMeasure (if data present), canUndo/canRedo.
-   * On network failure: sets liveStatus to 'disconnected'; HTTP errors leave liveStatus alone. Always sets lastSummary to an error message.
+   * On network error with SSE open: not applied, lastSummary says so. In local mode: runs locally.
    * The document is NEVER mutated here; it arrives via the /live SSE stream.
    *
    * This is the ONLY way the UI changes the document (PRIME DIRECTIVE).
@@ -216,20 +236,60 @@ export interface CadStoreState {
 const LOCAL_HISTORY_LIMIT = 100;
 const LOCAL_SUFFIX = ' (ran locally — offline)';
 
-/** Guards against concurrent reconnect pushes. */
+const SYNC_RETRY_BASE_MS = 1000;
+const SYNC_RETRY_MAX_MS = 30000;
+
+/** Guards against concurrent pushes. */
 let syncInFlight = false;
+let syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let syncAttempt = 0;
+
+function cancelSyncRetry(): void {
+  if (syncRetryTimer !== null) clearTimeout(syncRetryTimer);
+  syncRetryTimer = null;
+}
 
 function isNetworkError(err: unknown): boolean {
   return !(err instanceof ServerCommandError && err.kind === 'http');
 }
 
-function failureState(
+/** Commands must run locally (never POST) in this state. */
+function isLocalMode(state: CadStoreState): boolean {
+  return (
+    state.liveStatus === 'disconnected' || state.syncState !== 'idle' || state.hasUnsyncedLocalEdits
+  );
+}
+
+/** True when a failed POST means "server never reachable": safe to run locally. */
+function sseIsDown(state: CadStoreState): boolean {
+  return (
+    state.liveStatus === 'disconnected' ||
+    (state.liveStatus === 'connecting' && !state.sseEverConnected)
+  );
+}
+
+function postFailureMessage(err: unknown, what: string): string {
+  if (err instanceof ServerCommandError && err.kind === 'http') return err.message;
+  if (isNetworkError(err) && err instanceof ServerCommandError) {
+    return `${what} not applied — network error, retry.`;
+  }
+  return `${what} failed: ${String(err)}`;
+}
+
+/** Handle a failed POST: local fallback only when SSE is down; otherwise surface the error. */
+function handlePostFailure(
+  set: StoreSet,
+  get: StoreGet,
   err: unknown,
-  message: string,
-): { lastSummary: string; liveStatus?: 'disconnected' } {
-  return isNetworkError(err)
-    ? { lastSummary: message, liveStatus: 'disconnected' }
-    : { lastSummary: message };
+  what: string,
+  runLocal: () => void,
+): void {
+  if (isNetworkError(err) && sseIsDown(get())) {
+    set({ liveStatus: 'disconnected' });
+    runLocal();
+    return;
+  }
+  set({ lastSummary: postFailureMessage(err, what) });
 }
 
 type StoreSet = (
@@ -258,6 +318,7 @@ function runLocally(set: StoreSet, get: StoreGet, name: string, params: unknown)
     canUndo: true,
     canRedo: false,
     hasUnsyncedLocalEdits: true,
+    localEditCounter: state.localEditCounter + 1,
   });
 }
 
@@ -284,21 +345,33 @@ function stepLocalHistory(set: StoreSet, get: StoreGet, direction: 'undo' | 'red
     canUndo: undoStack.length > 0,
     canRedo: redoStack.length > 0,
     hasUnsyncedLocalEdits: true,
+    localEditCounter: state.localEditCounter + 1,
     lastSummary: `${direction === 'undo' ? 'Undid' : 'Redid'} last step.${LOCAL_SUFFIX}`,
   });
 }
 
-/** Client-wins reconcile: push the local document via `load_document`; the server echo hydrates. */
+/**
+ * Client-wins reconcile: push the local document via `load_document`. Repeats until the counter
+ * captured at push start equals the current counter; retries with backoff on failure.
+ */
 function pushLocalDocument(set: StoreSet, get: StoreGet): void {
   if (syncInFlight) return;
+  cancelSyncRetry();
   syncInFlight = true;
   const pushed = get().document;
+  const capturedCounter = get().localEditCounter;
+  set({ syncState: 'syncing' });
   void postCommand('load_document', { json: serializeDocument(pushed) })
     .then((response) => {
-      const stillSame = get().document === pushed;
+      syncInFlight = false;
+      syncAttempt = 0;
+      if (get().localEditCounter !== capturedCounter) {
+        pushLocalDocument(set, get);
+        return;
+      }
       set({
-        // Edits made during the push stay flagged so the next reconnect retries them.
-        hasUnsyncedLocalEdits: !stillSame,
+        hasUnsyncedLocalEdits: false,
+        syncState: 'idle',
         localUndoStack: [],
         localRedoStack: [],
         canUndo: response.canUndo,
@@ -307,12 +380,21 @@ function pushLocalDocument(set: StoreSet, get: StoreGet): void {
       });
     })
     .catch((err: unknown) => {
-      set({
-        lastSummary: `Could not sync offline edits: ${err instanceof Error ? err.message : String(err)}`,
-      });
-    })
-    .finally(() => {
       syncInFlight = false;
+      set({
+        syncState: 'failed',
+        lastSummary: `Could not sync offline edits (will retry): ${err instanceof Error ? err.message : String(err)}`,
+      });
+      if (get().liveStatus === 'disconnected') return;
+      const delay = Math.min(SYNC_RETRY_BASE_MS * 2 ** syncAttempt, SYNC_RETRY_MAX_MS);
+      syncAttempt += 1;
+      syncRetryTimer = setTimeout(() => {
+        syncRetryTimer = null;
+        const state = get();
+        if (state.hasUnsyncedLocalEdits && state.liveStatus !== 'disconnected') {
+          pushLocalDocument(set, get);
+        }
+      }, delay);
     });
 }
 
@@ -325,11 +407,14 @@ export const useStore = create<CadStoreState>()((set, get) => ({
   renderOrigin: [0, 0, 0],
   liveStatus: 'connecting' as const,
   hasUnsyncedLocalEdits: false,
+  localEditCounter: 0,
+  syncState: 'idle' as const,
+  sseEverConnected: false,
   localUndoStack: [],
   localRedoStack: [],
 
   dispatch(name: string, params?: unknown): void {
-    if (get().liveStatus === 'disconnected') {
+    if (isLocalMode(get())) {
       runLocally(set, get, name, params);
       return;
     }
@@ -350,21 +435,19 @@ export const useStore = create<CadStoreState>()((set, get) => ({
         }));
       })
       .catch((err: unknown) => {
-        if (isNetworkError(err)) {
-          set({ liveStatus: 'disconnected' });
-          runLocally(set, get, name, params);
-          return;
-        }
-        const message =
-          err instanceof ServerCommandError
-            ? err.message
-            : `Command '${name}' failed: ${String(err)}`;
-        set(failureState(err, message));
+        handlePostFailure(set, get, err, `Command '${name}'`, () =>
+          runLocally(set, get, name, params),
+        );
       });
   },
 
   setDocument(doc: CadDocument): void {
+    cancelSyncRetry();
+    syncAttempt = 0;
     set({
+      hasUnsyncedLocalEdits: false,
+      localEditCounter: 0,
+      syncState: 'idle',
       document: doc,
       lastSummary: null,
       canUndo: false,
@@ -375,7 +458,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
   },
 
   undo(): void {
-    if (get().liveStatus === 'disconnected') {
+    if (isLocalMode(get())) {
       stepLocalHistory(set, get, 'undo');
       return;
     }
@@ -388,19 +471,12 @@ export const useStore = create<CadStoreState>()((set, get) => ({
         });
       })
       .catch((err: unknown) => {
-        if (isNetworkError(err)) {
-          set({ liveStatus: 'disconnected' });
-          stepLocalHistory(set, get, 'undo');
-          return;
-        }
-        const message =
-          err instanceof ServerCommandError ? err.message : `Undo failed: ${String(err)}`;
-        set(failureState(err, message));
+        handlePostFailure(set, get, err, 'Undo', () => stepLocalHistory(set, get, 'undo'));
       });
   },
 
   redo(): void {
-    if (get().liveStatus === 'disconnected') {
+    if (isLocalMode(get())) {
       stepLocalHistory(set, get, 'redo');
       return;
     }
@@ -413,14 +489,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
         });
       })
       .catch((err: unknown) => {
-        if (isNetworkError(err)) {
-          set({ liveStatus: 'disconnected' });
-          stepLocalHistory(set, get, 'redo');
-          return;
-        }
-        const message =
-          err instanceof ServerCommandError ? err.message : `Redo failed: ${String(err)}`;
-        set(failureState(err, message));
+        handlePostFailure(set, get, err, 'Redo', () => stepLocalHistory(set, get, 'redo'));
       });
   },
 
@@ -471,7 +540,6 @@ export const useStore = create<CadStoreState>()((set, get) => ({
 
   applyLivePatch(patch: DocPatch): void {
     const state = get();
-    if (state.hasUnsyncedLocalEdits) return;
     const next = applyDocPatch(state.document, patch);
     // Preserve selection: filter out any ids removed by the patch.
     const removedSet = new Set(patch.entities.removed);
@@ -482,6 +550,17 @@ export const useStore = create<CadStoreState>()((set, get) => ({
   },
 
   setLiveStatus(status: 'connecting' | 'connected' | 'disconnected'): void {
-    set({ liveStatus: status });
+    set(
+      status === 'connected'
+        ? { liveStatus: status, sseEverConnected: true }
+        : { liveStatus: status },
+    );
+    if (status === 'disconnected') {
+      cancelSyncRetry();
+      syncAttempt = 0;
+      if (!syncInFlight && get().syncState !== 'idle') set({ syncState: 'idle' });
+    } else if (status === 'connected' && get().hasUnsyncedLocalEdits) {
+      pushLocalDocument(set, get);
+    }
   },
 }));
