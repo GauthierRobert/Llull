@@ -104,7 +104,7 @@ function StoreInvalidator2D(): null {
  * and the rebase check runs on those frames.
  */
 function RenderOriginSyncer2D(): null {
-  const { controls } = useThree();
+  const { camera, controls } = useThree();
   const renderOrigin = useStore((s) => s.renderOrigin);
   const setRenderOrigin = useStore((s) => s.setRenderOrigin);
 
@@ -120,9 +120,20 @@ function RenderOriginSyncer2D(): null {
 
     const ox = originRef.current[0];
     const oy = originRef.current[1];
+    // The pan target is render-space; its document position is target + origin.
+    const worldX = mapTarget.x + ox;
+    const worldY = mapTarget.y + oy;
 
-    if (shouldRebase2D(mapTarget.x, mapTarget.y, ox, oy)) {
-      const newOrigin = snapOrigin2D(mapTarget.x, mapTarget.y);
+    if (shouldRebase2D(worldX, worldY, ox, oy)) {
+      const newOrigin = snapOrigin2D(worldX, worldY);
+      const dx = newOrigin[0] - ox;
+      const dy = newOrigin[1] - oy;
+      // Shift camera + target with the entity group so the view does not jump.
+      camera.position.x -= dx;
+      camera.position.y -= dy;
+      mapTarget.x -= dx;
+      mapTarget.y -= dy;
+      (controls as MapControlsImpl).update();
       originRef.current = newOrigin;
       setRenderOrigin(newOrigin);
     }

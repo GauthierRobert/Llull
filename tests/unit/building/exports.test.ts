@@ -274,3 +274,51 @@ describe('export_ifc', () => {
     expect(ifcReal(1e21)).toBe('1.E+21');
   });
 });
+
+describe('identity', () => {
+  it('two projects never share IFC GlobalIds; one project keeps them stable', () => {
+    const a = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+    const b = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+    const guids = (doc: CadDocument): string[] =>
+      [
+        ...(execute(doc, 'export_ifc', {}).data as IfcExport).ifc.matchAll(
+          /\('([0-9A-Za-z_$]{22})'/g,
+        ),
+      ].map((match) => match[1]!);
+    const shared = guids(a).filter((guid) => guids(b).includes(guid));
+    expect(shared).toEqual([]);
+    expect(guids(a)).toEqual(guids(run(a, 'set_project_info', { client: 'X' })));
+  });
+
+  it('element and level numbers are never reused after a delete', () => {
+    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+    doc = run(doc, 'add_wall', { start: [0, 500], end: [1000, 500] });
+    doc = run(doc, 'delete_building_element', { elementIds: ['wall-2'] });
+    doc = run(doc, 'add_wall', { start: [0, 900], end: [1000, 900] });
+    expect(Object.keys(doc.building!.elements)).toEqual(['wall-1', 'wall-3']);
+    doc = run(doc, 'add_level', {});
+    doc = run(doc, 'delete_level', { levelId: 'level-2' });
+    doc = run(doc, 'add_level', {});
+    expect(doc.building!.levelOrder).toEqual(['level-1', 'level-3']);
+  });
+
+  it('escapes astral characters with \\X4\\', () => {
+    expect(ifcString('🏠')).toBe("'\\X4\\0001F3E0\\X0\\'");
+  });
+});
+
+describe('DXF drafting text and extents', () => {
+  it('keeps text rotation / alignment and covers drafting in $EXTMAX', () => {
+    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [1000, 0] });
+    doc = run(doc, 'add_text', {
+      content: 'Far note',
+      position: [50000, 20000, 0],
+      height: 250,
+      rotation: [0, 0, Math.PI / 2],
+      anchor: 'right',
+    });
+    const dxf = (execute(doc, 'export_dxf', {}).data as DxfExport).dxf;
+    expect(dxf).toMatch(/Far note\n50\n90\n72\n2\n11\n50000/);
+    expect(dxf).toMatch(/\$EXTMAX\n10\n50000\n20\n20000/);
+  });
+});

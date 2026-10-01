@@ -28,6 +28,7 @@ import type {
   Recipe,
 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { buildingErrors } from './building/validate';
 import { isRecord } from '../../lib/isRecord';
 
 // ---------------------------------------------------------------------------
@@ -590,6 +591,9 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
       if (err !== null) errors.push(err);
     }
   }
+
+  // Building model (optional field — validated when present)
+  if (v['building'] !== undefined) errors.push(...buildingErrors(v['building']));
 
   // DriveRelations (optional field — only validate if present)
   if (isRecord(v['driveRelations'])) {

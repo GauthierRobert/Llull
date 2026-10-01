@@ -131,6 +131,36 @@ test.describe('construction workflow', () => {
     await expect(elementRows(page, 'wall')).toHaveCount(6);
   });
 
+  test('S3 — the 2D Wall tool draws in document coordinates on a large building', async ({
+    page,
+  }) => {
+    await openBuilding(page);
+    await page.getByRole('button', { name: 'Starter office' }).click();
+    await page.getByRole('button', { name: '2D', exact: true }).click();
+    await page.getByRole('button', { name: 'Wall', exact: true }).click();
+    const canvas = page.locator('.viewport-2d-wrapper canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('2D canvas not visible');
+    await canvas.click({ position: { x: box.width * 0.45, y: box.height * 0.5 } });
+    await canvas.click({ position: { x: box.width * 0.55, y: box.height * 0.5 } });
+    await page.keyboard.press('Enter');
+    const saved = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Save project to a JSON file' }).click(),
+    );
+    const document = JSON.parse(saved.text) as {
+      document: { building: { elements: Record<string, { category: string; start?: number[] }> } };
+    };
+    const walls = Object.entries(document.document.building.elements).filter(
+      ([, element]) => element.category === 'wall',
+    );
+    const [, drawn] = walls[walls.length - 1]!;
+    // The office spans 0…22500 × 0…12500 mm; the view is centred on it.
+    expect(drawn.start![0]).toBeGreaterThan(5000);
+    expect(drawn.start![0]).toBeLessThan(17500);
+    expect(drawn.start![1]).toBeGreaterThan(2000);
+    expect(drawn.start![1]).toBeLessThan(10500);
+  });
+
   test('S4 — doors and windows hosted in walls', async ({ page }) => {
     await openBuilding(page);
     await shell(page);

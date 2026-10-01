@@ -28,6 +28,7 @@ import {
   resolveLevel,
   toVec2,
   withElement,
+  elementAffected,
 } from './model';
 import { regenerateBuilding } from './evaluate';
 
@@ -156,11 +157,16 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
   ): CommandResult => {
     const building = getBuilding(doc);
     let outline: Vec2[] | null = null;
+    let wallLevelId: string | undefined;
     if (boundary !== undefined) {
       outline = isVec2List(boundary, 3) ? boundary.map(toVec2) : null;
     } else if (Array.isArray(wallIds)) {
       const walls = wallIds.map((id) => building.elements[id]);
       if (walls.every((wall): wall is WallElement => wall?.category === 'wall')) {
+        if (new Set(walls.map((wall) => wall.levelId)).size > 1) {
+          return noChange(doc, 'add_slab failed: wallIds belong to different levels.');
+        }
+        wallLevelId = walls[0]?.levelId;
         const loop = wallLoop(walls);
         const halfThickness = Math.max(...walls.map((wall) => wall.thickness)) / 2;
         const shift =
@@ -178,7 +184,7 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
     if (!isFiniteNumber(resolvedThickness) || resolvedThickness <= 0 || !isFiniteNumber(offset)) {
       return noChange(doc, 'add_slab failed: thickness must be > 0 and offset finite.');
     }
-    const resolution = resolveLevel(doc, building, levelId);
+    const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
     if (!resolution.ok) return noChange(doc, `add_slab failed: ${resolution.reason}.`);
     const slab: SlabElement = {
       id: nextElementId(resolution.building, 'slab'),
@@ -196,7 +202,7 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
     return {
       document,
       summary: `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${polygonArea(outline).toFixed(3)} ${doc.units}², thickness ${resolvedThickness}.`,
-      affected: document.building?.elements[slab.id]?.entityIds ?? [],
+      affected: elementAffected(document, [slab.id]),
       data: { elementId: slab.id },
     };
   },
@@ -321,7 +327,7 @@ export const addColumn: CommandDefinition<AddColumnParams> = {
     return {
       document,
       summary: `Added ${ids.length} ${params.shape === 'circular' ? 'circular' : 'rectangular'} column(s) ${ids.join(', ')} on ${resolution.level.name}.`,
-      affected: ids.flatMap((id) => document.building?.elements[id]?.entityIds ?? []),
+      affected: elementAffected(document, ids),
       data: { elementIds: ids },
     };
   },
@@ -396,7 +402,7 @@ export const addBeam: CommandDefinition<AddBeamParams> = {
     return {
       document,
       summary: `Added beam ${beam.mark} (${beam.id}) ${resolvedWidth}×${resolvedDepth}, span ${lengthOf(start, end).toFixed(3)} ${doc.units}.`,
-      affected: document.building?.elements[beam.id]?.entityIds ?? [],
+      affected: elementAffected(document, [beam.id]),
       data: { elementId: beam.id },
     };
   },
@@ -489,10 +495,10 @@ export const addStair: CommandDefinition<AddStairParams> = {
     return {
       document,
       summary:
-        `Added stair ${stair.mark} (${stair.id}): ${count} risers of ${riserHeight.toFixed(1)}, tread ${resolvedTread}, ` +
+        `Added stair ${stair.mark} (${stair.id}): ${count} risers of ${Number(riserHeight.toPrecision(4))}, tread ${resolvedTread}, ` +
         `run ${(count * resolvedTread).toFixed(1)} ${doc.units}; 2R+G = ${blondelMm.toFixed(0)} mm` +
         `${blondelMm < 600 || blondelMm > 650 ? ' (outside the 600–650 mm comfort range)' : ''}.`,
-      affected: document.building?.elements[stair.id]?.entityIds ?? [],
+      affected: elementAffected(document, [stair.id]),
       data: { elementId: stair.id },
     };
   },

@@ -78,7 +78,8 @@ export function ModifyPickInteraction({
 
       e.stopPropagation();
 
-      const worldPick: Vec2 = [e.point.x, e.point.y];
+      const [originX, originY] = useStore.getState().renderOrigin;
+      const worldPick: Vec2 = [e.point.x + originX, e.point.y + originY];
       const toleranceSq = tolerance * tolerance;
 
       let bestId: string | null = null;

@@ -235,6 +235,32 @@ function CameraReactor(): null {
 }
 
 // ---------------------------------------------------------------------------
+// AdaptiveClipping — near/far planes that follow the orbit distance
+// ---------------------------------------------------------------------------
+
+/**
+ * Keeps depth precision usable from millimetre parts to building-scale models (1e4–1e5 units in
+ * mm): near/far track the camera→target distance at a fixed 1:4e6 ratio. Updates the projection
+ * only when the distance changed by more than 10 %.
+ */
+function AdaptiveClipping(): null {
+  const { camera, controls } = useThree();
+  const lastDistance = useRef(0);
+  useFrame(() => {
+    const target = (controls as OrbitControlsImpl | null)?.target;
+    if (!target) return;
+    const distance = camera.position.distanceTo(target);
+    if (Math.abs(distance - lastDistance.current) <= lastDistance.current * 0.1) return;
+    lastDistance.current = distance;
+    const perspective = camera as THREE.PerspectiveCamera;
+    perspective.near = Math.max(distance / 2000, 1e-3);
+    perspective.far = Math.max(distance * 2000, 1e3);
+    perspective.updateProjectionMatrix();
+  });
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // RenderOriginSyncer — per-frame rebase check (inside Canvas, no setState/frame)
 // ---------------------------------------------------------------------------
 
@@ -386,6 +412,7 @@ function SceneContents({
 
       {/* ---- Per-frame rebase check — no setState per frame ---- */}
       <RenderOriginSyncer />
+      <AdaptiveClipping />
 
       {/* ---- View preset camera driver — reads store via props to avoid Canvas re-render ---- */}
       <ViewPresetsInner
@@ -546,8 +573,6 @@ export function Viewport3D(): React.ReactElement {
         gl={{
           antialias: true,
           alpha: false,
-          // Building-scale models in mm span 1e4–1e5 units: keep depth precision usable.
-          logarithmicDepthBuffer: true,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.1,
         }}

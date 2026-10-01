@@ -127,3 +127,38 @@ describe('slab opening tool', () => {
     ]);
   });
 });
+
+describe('wallChainParams double-click', () => {
+  it('merges the duplicated last click of a double-click finish', () => {
+    expect(
+      wallChainParams(
+        [
+          [0, 0],
+          [4000, 0],
+          [4000, 3000],
+          [4000.2, 3000.1],
+        ],
+        false,
+      ),
+    ).toEqual({
+      points: [
+        [0, 0],
+        [4000, 0],
+        [4000, 3000],
+      ],
+      closed: false,
+    });
+    expect(
+      wallChainParams(
+        [
+          [0, 0],
+          [4000, 0],
+          [4000, 3000],
+          [0.1, 0],
+          [0.1, 0],
+        ],
+        false,
+      ).closed,
+    ).toBe(true);
+  });
+});

@@ -35,7 +35,7 @@ describe('add_wall', () => {
     expect(piece.layerId).toBe('layer-A-WALL');
     expect(piece.tags).toEqual(['bim', 'wall', 'element:wall-1']);
     expect(result.document.building!.levels['level-1']!.name).toBe('Level 0');
-    expect(result.affected).toEqual(['wall-1:body-0']);
+    expect(result.affected).toEqual(['wall-1', 'wall-1:body-0']);
     expect(result.summary).toMatch(/W1 \(wall-1\).*5000\.000 mm/);
   });
 
@@ -277,12 +277,98 @@ describe('wallPieces', () => {
           material: 'glass',
         },
       ],
-      0,
-      0,
+      { start: 0, end: 10 },
     );
     expect(pieces).toEqual([
       { s0: 0, s1: 4, z0: 0, z1: 3 },
       { s0: 6, s1: 10, z0: 0, z1: 3 },
     ]);
+  });
+});
+
+describe('feature-history replay keeps hosts linked', () => {
+  it('suppressing an earlier wall re-links a later window to its renumbered host', () => {
+    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    doc = run(doc, 'add_wall', { start: [0, 3000], end: [4000, 3000] });
+    doc = run(doc, 'add_window', { wallId: 'wall-2', offset: 2000 });
+    doc = run(doc, 'add_door', { wallId: 'wall-2', offset: 600 });
+    const firstWallStep = doc.featureHistory[0]!.id;
+    const result = execute(doc, 'set_step_suppressed', { stepId: firstWallStep, suppressed: true });
+    const building = result.document.building!;
+    expect(Object.keys(building.elements).sort()).toEqual(['door-1', 'wall-1', 'window-1']);
+    const window = building.elements['window-1']!;
+    expect(window.category === 'window' && window.hostId).toBe('wall-1');
+    expect(building.elements['wall-1']).toMatchObject({ start: [0, 3000] });
+  });
+});
+
+describe('built wall extents', () => {
+  it('quantities measure the abutting wall body at a T joint', async () => {
+    const { wallQuantities } = await import('@core/commands/building/quantities');
+    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [8000, 0] });
+    doc = run(doc, 'add_wall', { start: [4000, 0], end: [4000, 5000] });
+    expect(wallQuantities(doc.building!, wall(doc, 'wall-2')).length).toBeCloseTo(4900);
+  });
+
+  it('refuses an opening that would reach into the through wall', () => {
+    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [8000, 0] });
+    doc = run(doc, 'add_wall', { start: [4000, 0], end: [4000, 5000] });
+    expect(execute(doc, 'add_door', { wallId: 'wall-2', offset: 450 }).summary).toMatch(
+      /built from 100\.000 to 5000\.000/,
+    );
+    expect(execute(doc, 'add_door', { wallId: 'wall-2', offset: 600 }).document).not.toBe(doc);
+  });
+
+  it('mitres non-perpendicular joints so the corner closes', () => {
+    const angle = Math.PI / 3;
+    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    doc = run(doc, 'add_wall', {
+      start: [4000, 0],
+      end: [4000 + 3000 * Math.cos(angle), 3000 * Math.sin(angle)],
+    });
+    const sine = Math.sin(angle);
+    const cotangent = Math.cos(angle) / sine;
+    // Away from the joint the walls make 120°: |cot| = cot 60°.
+    expect(endAdjustment(doc.building!, wall(doc, 'wall-1'), 'end')).toBeCloseTo(
+      100 / sine + 100 * cotangent,
+    );
+    expect(endAdjustment(doc.building!, wall(doc, 'wall-2'), 'start')).toBeCloseTo(
+      -(100 / sine - 100 * cotangent),
+    );
+  });
+
+  it('clamps sill / head pieces to the built extent', () => {
+    const pieces = wallPieces(
+      {
+        id: 'w',
+        category: 'wall',
+        mark: 'W',
+        entityIds: [],
+        levelId: 'l',
+        start: [0, 0],
+        end: [10, 0],
+        thickness: 1,
+        height: 3,
+        baseOffset: 0,
+        material: 'concrete',
+      },
+      [
+        {
+          id: 'o',
+          category: 'window',
+          mark: 'O',
+          entityIds: [],
+          hostId: 'w',
+          offset: 1,
+          width: 2,
+          height: 1,
+          sillHeight: 1,
+          swing: 'left',
+          material: 'glass',
+        },
+      ],
+      { start: 0.5, end: 10 },
+    );
+    expect(pieces[0]).toEqual({ s0: 0.5, s1: 2, z0: 0, z1: 1 });
   });
 });

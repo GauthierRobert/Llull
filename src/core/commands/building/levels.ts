@@ -6,12 +6,14 @@
 import type { CommandDefinition, CommandResult } from '../types';
 import type { BuildingLevel, BuildingModel, ProjectInfo } from '../../model/building';
 import {
+  followLevelHeight,
   fromMm,
   getBuilding,
   isFiniteNumber,
   nextLevelId,
   noChange,
   sortLevelOrder,
+  withLevel,
 } from './model';
 import { regenerateBuilding } from './evaluate';
 
@@ -80,17 +82,14 @@ export const addLevel: CommandDefinition<AddLevelParams> = {
       elevation: resolvedElevation,
       height: resolvedHeight,
     };
-    const levels = { ...building.levels, [id]: level };
     const next: BuildingModel = {
-      ...building,
-      levels,
-      levelOrder: sortLevelOrder(levels),
+      ...withLevel(building, level),
       activeLevelId: makeActive || building.activeLevelId === null ? id : building.activeLevelId,
     };
     return {
       document: regenerateBuilding(doc, next),
       summary: `Added level ${id} "${level.name}" at elevation ${level.elevation} ${doc.units}, height ${level.height} ${doc.units}.`,
-      affected: [],
+      affected: [id],
       data: { levelId: id },
     };
   },
@@ -113,7 +112,8 @@ export const updateLevel: CommandDefinition<UpdateLevelParams> = {
   name: 'update_level',
   description:
     'Rename a level or change its elevation / floor-to-floor height. All walls, slabs, columns, ' +
-    'beams, stairs, doors, windows and rooms on the level move and regenerate accordingly.',
+    'beams, stairs, doors, windows and rooms on the level move and regenerate accordingly; walls and ' +
+    'columns at full storey height and stairs climbing the storey follow a new height.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -141,15 +141,24 @@ export const updateLevel: CommandDefinition<UpdateLevelParams> = {
       height: height ?? level.height,
     };
     const levels = { ...building.levels, [levelId]: updated };
+    const elements = Object.fromEntries(
+      Object.entries(building.elements).map(([id, element]) => [
+        id,
+        'levelId' in element && element.levelId === levelId
+          ? followLevelHeight(element, level.height, updated.height)
+          : element,
+      ]),
+    );
     const document = regenerateBuilding(doc, {
       ...building,
       levels,
       levelOrder: sortLevelOrder(levels),
+      elements,
     });
     return {
       document,
       summary: `Level ${levelId} "${updated.name}": elevation ${updated.elevation}, height ${updated.height} ${doc.units}.`,
-      affected: elementEntityIdsOnLevel(document.building, levelId),
+      affected: [levelId, ...elementEntityIdsOnLevel(document.building, levelId)],
     };
   },
 };
@@ -232,7 +241,7 @@ export const deleteLevel: CommandDefinition<DeleteLevelParams> = {
     return {
       document: regenerateBuilding(doc, next),
       summary: `Deleted level ${levelId} and ${onLevel.size} element(s).`,
-      affected: removedEntityIds,
+      affected: [levelId, ...onLevel, ...removedEntityIds],
     };
   },
 };

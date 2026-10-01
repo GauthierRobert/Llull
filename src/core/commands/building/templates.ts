@@ -5,7 +5,7 @@
 
 import type { CadDocument, Vec2 } from '../../model/types';
 import type { CommandDefinition, CommandResult } from '../types';
-import { fromMm, getBuilding, highestIndex, isVec2, noChange } from './model';
+import { elementAffected, fromMm, getBuilding, highestIndex, isVec2, noChange } from './model';
 import { addLevel, setProjectInfo } from './levels';
 import { addGridSystem } from './grid';
 import { addWall, drawWalls } from './walls';
@@ -272,7 +272,7 @@ export const addBuildingTemplate: CommandDefinition<AddBuildingTemplateParams> =
     return {
       document: current,
       summary: `Added ${template} template: ${building.levelOrder.length} level(s), ${created.length} building element(s).`,
-      affected: created.flatMap((id) => building.elements[id]?.entityIds ?? []),
+      affected: elementAffected(current, created),
       data: { elementIds: created },
     };
   },

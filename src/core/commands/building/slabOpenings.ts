@@ -21,8 +21,10 @@ import {
   toMetres,
   toVec2,
   withElement,
+  elementAffected,
 } from './model';
 import { regenerateBuilding } from './evaluate';
+import { triangulatePolygon } from '../../../lib/triangulate';
 
 /** Plan footprint of a stair run, grown by `margin` on every side. */
 export function stairFootprint(stair: StairElement, margin: number): Vec2[] {
@@ -63,7 +65,10 @@ export function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>
     );
   if (!inside) return `the opening is not strictly inside slab ${slab.mark}`;
   const clash = (slab.openings ?? []).findIndex((existing) => polygonsTouch(existing, opening));
-  return clash >= 0 ? `the opening overlaps opening #${clash} of slab ${slab.mark}` : null;
+  if (clash >= 0) return `the opening overlaps opening #${clash} of slab ${slab.mark}`;
+  return triangulatePolygon(slab.boundary, [...(slab.openings ?? []), opening]).complete
+    ? null
+    : `the slab outline with this opening cannot be meshed (simplify the opening shape)`;
 }
 
 /** A slab on a level whose elevation is the top of the stair, containing the stair footprint. */
@@ -169,7 +174,7 @@ export const addSlabOpening: CommandDefinition<AddSlabOpeningParams> = {
     return {
       document,
       summary: `Cut opening #${updated.openings?.length ?? 0} (${area.toFixed(2)} m²) in slab ${slab.mark} (${slab.id}).`,
-      affected: document.building?.elements[slab.id]?.entityIds ?? [],
+      affected: elementAffected(document, [slab.id]),
       data: { slabId: slab.id, openingIndex: (updated.openings?.length ?? 1) - 1 },
     };
   },
@@ -215,7 +220,7 @@ export const deleteSlabOpening: CommandDefinition<DeleteSlabOpeningParams> = {
     return {
       document,
       summary: `Removed opening #${index} from slab ${slab.mark}; ${remaining.length} left.`,
-      affected: document.building?.elements[slabId]?.entityIds ?? [],
+      affected: elementAffected(document, [slabId]),
     };
   },
 };

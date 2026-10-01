@@ -16,7 +16,7 @@ import type {
 } from '../../model/building';
 import { polygonArea, polygonCentroid } from '../../../lib/polygon';
 import { fromMm, getBuilding, toMetres } from './model';
-import { CATEGORY_LAYER, endAdjustment, openingsOf, pointAlong, wallFrame } from './evaluate';
+import { CATEGORY_LAYER, openingsOf, pointAlong, wallExtent, wallFrame } from './evaluate';
 
 export type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
 
@@ -119,8 +119,9 @@ function wallPrimitives(
   const half = wall.thickness / 2;
   const primitives: PlanPrimitive[] = [];
   const openings = openingsOf(building, wall.id);
-  let cursor = -endAdjustment(building, wall, 'start');
-  const finish = frame.length + endAdjustment(building, wall, 'end');
+  const extent = wallExtent(building, wall);
+  let cursor = extent.start;
+  const finish = extent.end;
   for (const opening of openings.filter((candidate) =>
     isCut(candidate, cutHeight - wall.baseOffset),
   )) {

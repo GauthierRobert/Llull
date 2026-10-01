@@ -15,7 +15,7 @@ import type {
 } from '../../model/building';
 import { polygonArea, polygonPerimeter } from '../../../lib/polygon';
 import { getBuilding, lengthOf, toMetres } from './model';
-import { openingsOf } from './evaluate';
+import { openingsOf, wallExtent } from './evaluate';
 
 export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea';
 
@@ -54,9 +54,10 @@ export interface WallQuantities {
   readonly volume: number;
 }
 
-/** Centerline-method wall quantities in document units (length, one-face areas, volume). */
+/** Wall quantities of the built body (joints applied) in document units: length, one-face areas, volume. */
 export function wallQuantities(building: BuildingModel, wall: WallElement): WallQuantities {
-  const length = lengthOf(wall.start, wall.end);
+  const extent = wallExtent(building, wall);
+  const length = extent.end - extent.start;
   const grossArea = length * wall.height;
   const openingArea = openingsOf(building, wall.id).reduce(
     (sum, opening) => sum + opening.width * opening.height,
@@ -431,7 +432,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           stair.mark,
           levelName(building, stair.levelId),
           stair.riserCount,
-          round(stair.riserHeight, 1),
+          round(stair.riserHeight),
           stair.treadDepth,
           stair.width,
           stair.material,

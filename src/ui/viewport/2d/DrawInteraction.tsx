@@ -17,11 +17,18 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
+import { useStore } from '@ui/store';
 import type { Vec2 } from '@core/model/types';
 import { useSnap } from './useSnap';
 import { DrawPreview, CollectedPointMarkers } from './DrawPreview';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { DrawToolKind } from './useDrawTool';
+
+/** three.js hit points are render-space (document − renderOrigin); input works in document space. */
+function toDocumentPoint(point: { x: number; y: number }): Vec2 {
+  const [ox, oy] = useStore.getState().renderOrigin;
+  return [point.x + ox, point.y + oy];
+}
 
 /** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
 const SNAP_TOLERANCE_PX = 12;
@@ -88,7 +95,7 @@ export function DrawInteraction({
     (e: ThreeEvent<PointerEvent>) => {
       if (activeTool === 'none') return;
       e.stopPropagation();
-      setRawCursor([e.point.x, e.point.y]);
+      setRawCursor(toDocumentPoint(e.point));
     },
     [activeTool],
   );
@@ -101,7 +108,7 @@ export function DrawInteraction({
     (e: ThreeEvent<MouseEvent>) => {
       if (activeTool === 'none') return;
       e.stopPropagation();
-      const pt: Vec2 = snappedCursor ?? [e.point.x, e.point.y];
+      const pt: Vec2 = snappedCursor ?? toDocumentPoint(e.point);
       onClickPoint(pt);
     },
     [activeTool, snappedCursor, onClickPoint],

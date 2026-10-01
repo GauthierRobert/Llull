@@ -8,6 +8,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
+import { buildingElementOf } from '@core/commands/building';
 
 export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -37,7 +38,18 @@ export function useKeyboardShortcuts(): void {
         const selection = state.document.selection;
         if (selection.length === 0) return;
         e.preventDefault();
-        state.dispatch('delete_entities', { ids: [...selection] });
+        // Generated building geometry is deleted through its element (walls take their openings).
+        const elementIds = new Set<string>();
+        const entityIds: string[] = [];
+        for (const id of selection) {
+          const elementId = buildingElementOf(state.document, id);
+          if (elementId === null) entityIds.push(id);
+          else elementIds.add(elementId);
+        }
+        if (elementIds.size > 0) {
+          state.dispatch('delete_building_element', { elementIds: [...elementIds] });
+        }
+        if (entityIds.length > 0) state.dispatch('delete_entities', { ids: entityIds });
       } else if (!modifier && e.key === 'Escape') {
         state.clearSelection();
       }

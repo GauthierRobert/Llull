@@ -8,6 +8,7 @@
  */
 
 import type { Vec2 } from './types';
+import { nextId } from '../../lib/id';
 
 /** Building element categories (Revit/IFC-like). */
 export type BimCategory =
@@ -153,6 +154,10 @@ export type BuildingElement =
   | RoomElement;
 
 export interface BuildingModel {
+  /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */
+  uid?: string;
+  /** Highest number ever issued per id prefix ("wall", "level", …), so deleted ids are never reused. */
+  counters?: Record<string, number>;
   project: ProjectInfo;
   levels: Record<string, BuildingLevel>;
   /** Levels sorted by ascending elevation. */
@@ -169,6 +174,7 @@ export interface BuildingModel {
 
 export function createEmptyBuilding(): BuildingModel {
   return {
+    uid: nextId('building'),
     project: {
       name: 'Untitled project',
       client: '',

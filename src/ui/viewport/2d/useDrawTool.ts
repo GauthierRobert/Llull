@@ -62,23 +62,28 @@ export interface UseDrawToolResult extends DrawToolState {
 }
 
 /**
- * Wall-chain params: clicking the first point again closes the loop (the repeated
- * vertex is dropped and `closed` is set).
+ * Wall-chain params: consecutive near-duplicate clicks (a double-click to finish adds the last
+ * point twice) are merged; clicking the first point again closes the loop.
  */
 export function wallChainParams(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
 ): { points: Vec2[]; closed: boolean } {
-  const first = points[0];
-  const last = points[points.length - 1];
+  const xs = points.map((point) => point[0]);
+  const ys = points.map((point) => point[1]);
+  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const tolerance = Math.max(diagonal * 1e-3, 1e-9);
+  const near = (a: Vec2, b: Vec2): boolean => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tolerance;
+  const distinct = points.filter(
+    (point, index) => index === 0 || !near(point, points[index - 1] as Vec2),
+  );
+  const first = distinct[0];
+  const last = distinct[distinct.length - 1];
   const returnsToStart =
-    points.length >= 4 &&
-    first !== undefined &&
-    last !== undefined &&
-    Math.hypot(last[0] - first[0], last[1] - first[1]) < 1e-9;
+    distinct.length >= 4 && first !== undefined && last !== undefined && near(first, last);
   return returnsToStart
-    ? { points: points.slice(0, -1), closed: true }
-    : { points: [...points], closed };
+    ? { points: distinct.slice(0, -1), closed: true }
+    : { points: distinct, closed };
 }
 
 // ---------------------------------------------------------------------------

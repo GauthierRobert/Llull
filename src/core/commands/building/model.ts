@@ -81,9 +81,23 @@ export function highestIndex(keys: ReadonlyArray<string>, prefix: string): numbe
   return highest;
 }
 
-/** Deterministic readable element id, e.g. "wall-3". */
+function issued(building: BuildingModel, prefix: string, keys: ReadonlyArray<string>): number {
+  return Math.max(highestIndex(keys, `${prefix}-`), building.counters?.[prefix] ?? 0);
+}
+
+/** Records that id "<prefix>-<n>" was issued. */
+function withCounter(building: BuildingModel, id: string): BuildingModel {
+  const match = /^(.*)-(\d+)$/.exec(id);
+  if (!match) return building;
+  const [, prefix = '', number = '0'] = match;
+  const value = Number(number);
+  if ((building.counters?.[prefix] ?? 0) >= value) return building;
+  return { ...building, counters: { ...building.counters, [prefix]: value } };
+}
+
+/** Readable element id never issued before in this building, e.g. "wall-3". */
 export function nextElementId(building: BuildingModel, category: BimCategory): string {
-  return `${category}-${highestIndex(Object.keys(building.elements), `${category}-`) + 1}`;
+  return `${category}-${issued(building, category, Object.keys(building.elements)) + 1}`;
 }
 
 /** Next schedule mark for a category, e.g. "W3", "D2". */
@@ -99,7 +113,13 @@ export function nextMark(
 }
 
 export function nextLevelId(building: BuildingModel): string {
-  return `level-${highestIndex(Object.keys(building.levels), 'level-') + 1}`;
+  return `level-${issued(building, 'level', Object.keys(building.levels)) + 1}`;
+}
+
+/** Returns a building with `level` inserted (or replaced), level order and counters updated. */
+export function withLevel(building: BuildingModel, level: BuildingLevel): BuildingModel {
+  const levels = { ...building.levels, [level.id]: level };
+  return withCounter({ ...building, levels, levelOrder: sortLevelOrder(levels) }, level.id);
 }
 
 export function sortLevelOrder(levels: Record<string, BuildingLevel>): string[] {
@@ -139,27 +159,20 @@ export function resolveLevel(
     elevation: 0,
     height: fromMm(doc, 3000),
   };
-  const levels = { ...building.levels, [level.id]: level };
-  return {
-    ok: true,
-    level,
-    building: {
-      ...building,
-      levels,
-      levelOrder: sortLevelOrder(levels),
-      activeLevelId: level.id,
-    },
-  };
+  return { ok: true, level, building: { ...withLevel(building, level), activeLevelId: level.id } };
 }
 
 /** Returns a building with `element` inserted (or replaced) by id. */
 export function withElement(building: BuildingModel, element: BuildingElement): BuildingModel {
   const exists = building.elements[element.id] !== undefined;
-  return {
-    ...building,
-    elements: { ...building.elements, [element.id]: element },
-    elementOrder: exists ? building.elementOrder : [...building.elementOrder, element.id],
-  };
+  return withCounter(
+    {
+      ...building,
+      elements: { ...building.elements, [element.id]: element },
+      elementOrder: exists ? building.elementOrder : [...building.elementOrder, element.id],
+    },
+    element.id,
+  );
 }
 
 export function lengthOf(start: Vec2, end: Vec2): number {
@@ -174,4 +187,38 @@ export function fileSlug(text: string, fallback: string): string {
     .replace(/[^A-Za-z0-9_-]+/g, '_')
     .replace(/^_+|_+$/g, '');
   return slug === '' ? fallback : slug;
+}
+
+/**
+ * `CommandResult.affected` for building commands: the element ids first (so history replay,
+ * recipes and build_project `$alias` re-link hosts and references), then their entity ids.
+ */
+export function elementAffected(
+  document: CadDocument,
+  elementIds: ReadonlyArray<string>,
+): string[] {
+  return [
+    ...elementIds,
+    ...elementIds.flatMap((id) => document.building?.elements[id]?.entityIds ?? []),
+  ];
+}
+
+/**
+ * Re-targets heights that follow the level height (walls / columns at full storey height, stairs
+ * climbing the whole storey) from `oldHeight` to `newHeight`; other elements are returned as is.
+ */
+export function followLevelHeight(
+  element: BuildingElement,
+  oldHeight: number,
+  newHeight: number,
+): BuildingElement {
+  const same = (value: number): boolean => Math.abs(value - oldHeight) <= oldHeight * 1e-9;
+  if (oldHeight === newHeight) return element;
+  if ((element.category === 'wall' || element.category === 'column') && same(element.height)) {
+    return { ...element, height: newHeight };
+  }
+  if (element.category === 'stair' && same(element.riserCount * element.riserHeight)) {
+    return { ...element, riserHeight: newHeight / element.riserCount };
+  }
+  return element;
 }

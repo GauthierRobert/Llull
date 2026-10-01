@@ -53,6 +53,15 @@ class DxfWriter {
   private readonly lines: string[] = [];
   readonly layers = new Map<string, number>();
   entityCount = 0;
+  private minX = Infinity;
+  private minY = Infinity;
+  private maxX = -Infinity;
+  private maxY = -Infinity;
+
+  /** Extents of every point written so far ([0,0,0,0] when empty). */
+  bounds(): readonly [number, number, number, number] {
+    return Number.isFinite(this.minX) ? [this.minX, this.minY, this.maxX, this.maxY] : [0, 0, 0, 0];
+  }
 
   private pair(code: number, value: string | number): void {
     this.lines.push(String(code), typeof value === 'number' ? fmt(value) : value);
@@ -67,6 +76,10 @@ class DxfWriter {
   }
 
   private point(base: number, [x, y]: Vec2): void {
+    this.minX = Math.min(this.minX, x);
+    this.minY = Math.min(this.minY, y);
+    this.maxX = Math.max(this.maxX, x);
+    this.maxY = Math.max(this.maxY, y);
     this.pair(base, x);
     this.pair(base + 10, y);
     this.pair(base + 20, 0);
@@ -97,7 +110,7 @@ class DxfWriter {
     at: Vec2,
     height: number,
     content: string,
-    centered: boolean,
+    align: 'left' | 'center' | 'right',
     rotation = 0,
   ): void {
     this.start('TEXT', layer);
@@ -105,8 +118,8 @@ class DxfWriter {
     this.pair(40, height);
     this.pair(1, dxfText(content));
     if (rotation !== 0) this.pair(50, (rotation * 180) / Math.PI);
-    if (centered) {
-      this.pair(72, 1);
+    if (align !== 'left') {
+      this.pair(72, align === 'center' ? 1 : 2);
       this.point(11, at);
     }
   }
@@ -174,7 +187,7 @@ function writeDimension(
     [middle[0] - Math.sin(angle) * lift, middle[1] + Math.cos(angle) * lift],
     primitive.offset * 0.25,
     primitive.label,
-    true,
+    'center',
     angle,
   );
 }
@@ -203,7 +216,7 @@ function writePrimitive(writer: DxfWriter, primitive: PlanPrimitive): void {
       writer.circle(primitive.layer, primitive.center, primitive.radius);
       return;
     case 'text':
-      writer.text(primitive.layer, primitive.at, primitive.height, primitive.content, true);
+      writer.text(primitive.layer, primitive.at, primitive.height, primitive.content, 'center');
       return;
     case 'dimension':
       writeDimension(writer, primitive);
@@ -279,7 +292,8 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
           [entity.position[0], entity.position[1]],
           entity.height,
           entity.content,
-          entity.anchor === 'center',
+          entity.anchor ?? 'left',
+          entity.rotation[2],
         );
         break;
       case 'point':
@@ -425,19 +439,17 @@ export function buildDxf(
 ): DxfExport | null {
   const building = getBuilding(doc);
   const writer = new DxfWriter();
-  let bounds: readonly [number, number, number, number] = [0, 0, 0, 0];
   let levelLabel = 'drafting';
   if (building.levelOrder.length > 0 || options.levelId !== undefined) {
     const plan = buildPlanDrawing(doc, options.levelId);
     if (!plan) return null;
     for (const primitive of plan.primitives) writePrimitive(writer, primitive);
-    bounds = plan.bounds;
     levelLabel = plan.level.name;
   }
   if (options.includeDrafting !== false) writeDrafting(writer, doc);
   const body = writer.entitiesSection();
   const dxf = [
-    ...header(doc, bounds),
+    ...header(doc, writer.bounds()),
     ...tables(writer.layers),
     '0',
     'SECTION',

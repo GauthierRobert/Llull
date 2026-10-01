@@ -58,3 +58,10 @@ export const buildingCommands = [
   exportIfc,
   addBuildingTemplate,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
+
+/** Public read-only building API for the UI (plans, layers, quantities, integrity). */
+export { buildPlanDrawing, type PlanPrimitive } from './plan';
+export { CATEGORY_LAYER } from './evaluate';
+export { fromMm } from './model';
+export { buildingElementOf } from './integrity';
+export type { CostLine } from './quantities';

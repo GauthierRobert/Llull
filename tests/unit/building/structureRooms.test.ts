@@ -169,7 +169,7 @@ describe('add_beam / add_stair', () => {
     const stair = result.document.building!.elements['stair-1']!;
     expect(stair).toMatchObject({ riserCount: 18 });
     expect(stair.category === 'stair' && stair.riserHeight).toBeCloseTo(166.67, 1);
-    expect(result.affected).toHaveLength(18);
+    expect(result.affected).toHaveLength(19);
     expect(result.summary).toMatch(/2R\+G = 613 mm\./);
     const steep = execute(createEmptyDocument(), 'add_stair', {
       start: [0, 0],
@@ -294,5 +294,90 @@ describe('rooms and element edits', () => {
       execute(doc, 'copy_level_elements', { sourceLevelId: 'level-1', targetLevelIds: ['level-2'] })
         .summary,
     ).toMatch(/nothing to copy/);
+  });
+});
+
+describe('level-aware edits', () => {
+  it('rooms and slabs from wallIds land on the walls’ level; mixed levels are refused', () => {
+    let doc = run(createEmptyDocument(), 'add_level', { name: 'L0' });
+    doc = run(doc, 'add_level', { name: 'L1' });
+    doc = run(doc, 'draw_walls', { points: SQUARE, closed: true, levelId: 'level-2' });
+    doc = run(doc, 'set_active_level', { levelId: 'level-1' });
+    const walls = ['wall-1', 'wall-2', 'wall-3', 'wall-4'];
+    const room = execute(doc, 'add_room', { name: 'Office', wallIds: walls });
+    expect(room.document.building!.elements['room-1']).toMatchObject({ levelId: 'level-2' });
+    const slab = execute(doc, 'add_slab', { wallIds: walls });
+    expect(slab.document.building!.elements['slab-1']).toMatchObject({ levelId: 'level-2' });
+    doc = run(doc, 'add_wall', { start: [0, 0], end: [1000, 0], levelId: 'level-1' });
+    expect(
+      execute(doc, 'add_room', { name: 'X', wallIds: ['wall-5', 'wall-2', 'wall-3'] }).summary,
+    ).toMatch(/different levels/);
+    expect(execute(doc, 'add_slab', { wallIds: ['wall-5', 'wall-2', 'wall-3'] }).summary).toMatch(
+      /different levels/,
+    );
+  });
+
+  it('full-height walls, columns and stairs follow a level height change and copies', () => {
+    let doc = run(createEmptyDocument(), 'add_level', {});
+    doc = run(doc, 'add_wall', { start: [0, 0], end: [4000, 0] });
+    doc = run(doc, 'add_wall', { start: [0, 2000], end: [4000, 2000], height: 1200 });
+    doc = run(doc, 'add_column', { location: [0, 1000] });
+    doc = run(doc, 'add_stair', { start: [500, 500] });
+    const raised = execute(doc, 'update_level', { levelId: 'level-1', height: 3600 }).document;
+    const elements = raised.building!.elements;
+    expect(elements['wall-1']).toMatchObject({ height: 3600 });
+    expect(elements['wall-2']).toMatchObject({ height: 1200 });
+    expect(elements['column-1']).toMatchObject({ height: 3600 });
+    const stair = elements['stair-1']!;
+    expect(stair.category === 'stair' && stair.riserCount * stair.riserHeight).toBeCloseTo(3600);
+    let copied = run(raised, 'add_level', { height: 2700 });
+    copied = run(copied, 'copy_level_elements', {
+      sourceLevelId: 'level-1',
+      targetLevelIds: ['level-2'],
+    });
+    expect(copied.building!.elements['wall-3']).toMatchObject({ height: 2700, levelId: 'level-2' });
+    expect(copied.building!.elements['wall-4']).toMatchObject({ height: 1200 });
+  });
+});
+
+describe('review follow-ups', () => {
+  it('refuses to move a hosted opening on its own', () => {
+    let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [4000, 0] });
+    doc = run(doc, 'add_door', { wallId: 'wall-1' });
+    expect(
+      execute(doc, 'move_building_element', { elementIds: ['door-1'], delta: [1, 0] }).summary,
+    ).toMatch(/hosted by walls — slide them with update_opening/);
+  });
+
+  it('slab openings travel with their slab', () => {
+    let doc = run(createEmptyDocument(), 'add_slab', { boundary: SQUARE });
+    doc = run(doc, 'add_slab_opening', {
+      slabId: 'slab-1',
+      boundary: [
+        [1000, 1000],
+        [2000, 1000],
+        [2000, 2000],
+        [1000, 2000],
+      ],
+    });
+    doc = run(doc, 'move_building_element', { elementIds: ['slab-1'], delta: [500, 0] });
+    const slab = doc.building!.elements['slab-1']!;
+    expect(slab.category === 'slab' && slab.openings?.[0]?.[0]).toEqual([1500, 1000]);
+  });
+
+  it('copied room numbers stay unique and readable', async () => {
+    const { copiedRoomNumber } = await import('@core/commands/building/elements');
+    let doc = run(createEmptyDocument(), 'add_level', {});
+    doc = run(doc, 'add_level', {});
+    doc = run(doc, 'add_room', { name: 'A', number: '003', boundary: SQUARE, levelId: 'level-1' });
+    doc = run(doc, 'add_room', {
+      name: 'Lobby',
+      number: 'Lobby',
+      boundary: SQUARE,
+      levelId: 'level-1',
+    });
+    expect(copiedRoomNumber(doc.building!, '003', 1)).toBe('103');
+    expect(copiedRoomNumber(doc.building!, 'Lobby', 1)).toBe('Lobby-L1');
+    expect(copiedRoomNumber(doc.building!, '003', 0)).toBe('003-2');
   });
 });

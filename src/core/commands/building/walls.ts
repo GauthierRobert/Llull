@@ -19,8 +19,9 @@ import {
   resolveLevel,
   toVec2,
   withElement,
+  elementAffected,
 } from './model';
-import { openingsOf, regenerateBuilding, wallFrame } from './evaluate';
+import { openingsOf, regenerateBuilding, wallExtent, wallFrame, type WallExtent } from './evaluate';
 
 /**
  * Why `opening` does not fit in `wall` (alongside `others`), or null when it fits.
@@ -30,13 +31,13 @@ export function openingFitError(
   wall: Pick<WallElement, 'start' | 'end' | 'height' | 'mark'>,
   opening: Pick<OpeningElement, 'id' | 'offset' | 'width' | 'height' | 'sillHeight' | 'mark'>,
   others: ReadonlyArray<OpeningElement>,
+  extent: WallExtent = { start: 0, end: wallFrame(wall).length },
 ): string | null {
-  const length = wallFrame(wall).length;
   const left = opening.offset - opening.width / 2;
   const right = opening.offset + opening.width / 2;
   const tolerance = 1e-9;
-  if (left < -tolerance || right > length + tolerance) {
-    return `${opening.mark} spans ${left.toFixed(3)}…${right.toFixed(3)} along wall ${wall.mark} of length ${length.toFixed(3)}`;
+  if (left < extent.start - tolerance || right > extent.end + tolerance) {
+    return `${opening.mark} spans ${left.toFixed(3)}…${right.toFixed(3)} but wall ${wall.mark} is built from ${extent.start.toFixed(3)} to ${extent.end.toFixed(3)} along its axis`;
   }
   if (opening.sillHeight + opening.height > wall.height + tolerance) {
     return `${opening.mark} top (${opening.sillHeight + opening.height}) exceeds wall ${wall.mark} height ${wall.height}`;
@@ -123,7 +124,7 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
       `Added ${walls.length} wall(s) ${walls.map((wall) => `${wall.mark} (${wall.id})`).join(', ')} ` +
       `on ${level?.name ?? 'level'}: total length ${totalLength.toFixed(3)} ${doc.units}, ` +
       `thickness ${first?.thickness ?? 0}, height ${first?.height ?? 0}, ${first?.material ?? ''}.`,
-    affected: walls.flatMap((wall) => wall.entityIds),
+    affected: elementAffected(document, build.wallIds),
     data: { wallIds: build.wallIds },
   };
 }
@@ -315,8 +316,9 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
       return noChange(doc, 'update_wall failed: start and end would coincide.');
     }
     const openings = openingsOf(building, wallId);
+    const extent = wallExtent(withElement(building, updated), updated);
     for (const opening of openings) {
-      const error = openingFitError(updated, opening, openings);
+      const error = openingFitError(updated, opening, openings, extent);
       if (error) return noChange(doc, `update_wall refused: ${error}.`);
     }
     const document = regenerateBuilding(doc, withElement(building, updated));
@@ -325,7 +327,7 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
       summary:
         `Updated wall ${updated.mark} (${wallId}): [${updated.start.join(', ')}]→[${updated.end.join(', ')}], ` +
         `thickness ${updated.thickness}, height ${updated.height}, ${updated.material}.`,
-      affected: document.building?.elements[wallId]?.entityIds ?? [],
+      affected: elementAffected(document, [wallId]),
     };
   },
 };

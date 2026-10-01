@@ -16,8 +16,9 @@ import {
   nextMark,
   noChange,
   withElement,
+  elementAffected,
 } from './model';
-import { openingsOf, regenerateBuilding, wallFrame } from './evaluate';
+import { openingsOf, regenerateBuilding, wallExtent, wallFrame } from './evaluate';
 import { openingFitError } from './walls';
 
 type OpeningKind = 'door' | 'window';
@@ -96,7 +97,12 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     swing: params.swing === 'right' ? 'right' : 'left',
     material: params.material?.trim() || defaults.material,
   };
-  const fitError = openingFitError(wall, opening, openingsOf(building, wall.id));
+  const fitError = openingFitError(
+    wall,
+    opening,
+    openingsOf(building, wall.id),
+    wallExtent(building, wall),
+  );
   if (fitError) return noChange(doc, `${name} failed: ${fitError}.`);
   const document = regenerateBuilding(doc, withElement(building, opening));
   return {
@@ -104,10 +110,7 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     summary:
       `Added ${kind} ${opening.mark} (${opening.id}) ${width}×${height} in wall ${wall.mark} at ` +
       `${offset.toFixed(3)} from its start, sill ${sillHeight}.`,
-    affected: [
-      ...(document.building?.elements[opening.id]?.entityIds ?? []),
-      ...(document.building?.elements[wall.id]?.entityIds ?? []),
-    ],
+    affected: elementAffected(document, [opening.id, wall.id]),
     data: { elementId: opening.id },
   };
 }
@@ -249,16 +252,18 @@ export const updateOpening: CommandDefinition<UpdateOpeningParams> = {
     ) {
       return noChange(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
     }
-    const fitError = openingFitError(wall, updated, openingsOf(building, wall.id));
+    const fitError = openingFitError(
+      wall,
+      updated,
+      openingsOf(building, wall.id),
+      wallExtent(building, wall),
+    );
     if (fitError) return noChange(doc, `update_opening refused: ${fitError}.`);
     const document = regenerateBuilding(doc, withElement(building, updated));
     return {
       document,
       summary: `Updated ${updated.category} ${updated.mark} (${openingId}): ${updated.width}×${updated.height} at ${updated.offset.toFixed(3)}, sill ${updated.sillHeight}.`,
-      affected: [
-        ...(document.building?.elements[openingId]?.entityIds ?? []),
-        ...(document.building?.elements[wall.id]?.entityIds ?? []),
-      ],
+      affected: elementAffected(document, [openingId, wall.id]),
     };
   },
 };

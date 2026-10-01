@@ -23,6 +23,8 @@ import {
   toMetres,
   toVec2,
   withElement,
+  elementAffected,
+  followLevelHeight,
 } from './model';
 import { regenerateBuilding } from './evaluate';
 import { wallLoop } from './structure';
@@ -75,11 +77,16 @@ export const addRoom: CommandDefinition<AddRoomParams> = {
     }
     const building = getBuilding(doc);
     let outline: Vec2[] | null = null;
+    let wallLevelId: string | undefined;
     if (boundary !== undefined) {
       outline = isVec2List(boundary, 3) ? boundary.map(toVec2) : null;
     } else if (Array.isArray(wallIds)) {
       const walls = wallIds.map((id) => building.elements[id]);
       if (walls.every((wall): wall is WallElement => wall?.category === 'wall')) {
+        if (new Set(walls.map((wall) => wall.levelId)).size > 1) {
+          return noChange(doc, 'add_room failed: wallIds belong to different levels.');
+        }
+        wallLevelId = walls[0]?.levelId;
         const loop = wallLoop(walls);
         const halfThickness = Math.max(...walls.map((wall) => wall.thickness)) / 2;
         outline = loop ? offsetPolygon(loop, -halfThickness).map(toVec2) : null;
@@ -91,7 +98,7 @@ export const addRoom: CommandDefinition<AddRoomParams> = {
         'add_room failed: give a boundary of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.',
       );
     }
-    const resolution = resolveLevel(doc, building, levelId);
+    const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
     if (!resolution.ok) return noChange(doc, `add_room failed: ${resolution.reason}.`);
     const levelIndex = resolution.building.levelOrder.indexOf(resolution.level.id);
     const roomsOnLevel = Object.values(resolution.building.elements).filter(
@@ -111,7 +118,7 @@ export const addRoom: CommandDefinition<AddRoomParams> = {
     return {
       document,
       summary: `Added room ${room.mark} "${room.name}" (${room.id}) on ${resolution.level.name}: ${squareMetres.toFixed(2)} m².`,
-      affected: document.building?.elements[room.id]?.entityIds ?? [],
+      affected: elementAffected(document, [room.id]),
       data: { elementId: room.id, areaSquareMetres: squareMetres },
     };
   },
@@ -181,7 +188,7 @@ export const deleteBuildingElement: CommandDefinition<DeleteBuildingElementParam
     return {
       document: regenerateBuilding(doc, next),
       summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.`,
-      affected: removedEntityIds,
+      affected: [...doomed, ...removedEntityIds],
     };
   },
 };
@@ -194,6 +201,13 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'beam':
       return { ...element, start: shift(element.start), end: shift(element.end) };
     case 'slab':
+      return {
+        ...element,
+        boundary: element.boundary.map(shift),
+        ...(element.openings
+          ? { openings: element.openings.map((opening) => opening.map(shift)) }
+          : {}),
+      };
     case 'room':
       return { ...element, boundary: element.boundary.map(shift) };
     case 'column':
@@ -244,6 +258,19 @@ export const moveBuildingElement: CommandDefinition<MoveBuildingElementParams> =
     if (known.length === 0) {
       return noChange(doc, 'move_building_element: none of the given ids is a building element.');
     }
+    const strayOpenings = known.filter((id) => {
+      const element = building.elements[id];
+      return (
+        (element?.category === 'door' || element?.category === 'window') &&
+        !known.includes(element.hostId)
+      );
+    });
+    if (strayOpenings.length > 0) {
+      return noChange(
+        doc,
+        `move_building_element refused: ${strayOpenings.join(', ')} are hosted by walls — slide them with update_opening (offset) or move their wall.`,
+      );
+    }
     let next = building;
     for (const id of known) {
       const element = building.elements[id] as BuildingElement;
@@ -254,10 +281,33 @@ export const moveBuildingElement: CommandDefinition<MoveBuildingElementParams> =
     return {
       document,
       summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.`,
-      affected: [...moved].flatMap((id) => document.building?.elements[id]?.entityIds ?? []),
+      affected: elementAffected(document, [...moved]),
     };
   },
 };
+
+/**
+ * Room number for a copy on the level at `levelIndex`: numeric numbers keep their last two digits
+ * under the level's hundred ("003" → "103"); other marks get a level suffix ("Lobby" → "Lobby-L1").
+ * A numeric suffix is appended until the number is unused.
+ */
+export function copiedRoomNumber(
+  building: BuildingModel,
+  mark: string,
+  levelIndex: number,
+): string {
+  const used = new Set(
+    Object.values(building.elements)
+      .filter((element) => element.category === 'room')
+      .map((element) => element.mark),
+  );
+  const base = /^\d+$/.test(mark)
+    ? String(levelIndex * 100 + (Number(mark) % 100)).padStart(3, '0')
+    : `${mark}-L${levelIndex}`;
+  let candidate = base;
+  for (let suffix = 2; used.has(candidate); suffix++) candidate = `${base}-${suffix}`;
+  return candidate;
+}
 
 interface CopyLevelElementsParams {
   sourceLevelId: string;
@@ -328,9 +378,18 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
         const id = nextElementId(next, element.category);
         const mark =
           element.category === 'room'
-            ? `${levelIndex}${element.mark.slice(-2)}`
+            ? copiedRoomNumber(next, element.mark, levelIndex)
             : nextMark(next, element.category);
-        next = withElement(next, { ...element, id, mark, levelId: targetLevelId, entityIds: [] });
+        const sourceHeight = building.levels[sourceLevelId]?.height ?? 0;
+        const targetHeight = next.levels[targetLevelId]?.height ?? sourceHeight;
+        next = withElement(
+          next,
+          followLevelHeight(
+            { ...element, id, mark, levelId: targetLevelId, entityIds: [] },
+            sourceHeight,
+            targetHeight,
+          ),
+        );
         created.push(id);
         if (element.category !== 'wall') continue;
         for (const openingId of building.elementOrder) {
@@ -353,7 +412,7 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
     return {
       document,
       summary: `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targets.join(', ')}: ${created.length} new element(s).`,
-      affected: created.flatMap((id) => document.building?.elements[id]?.entityIds ?? []),
+      affected: elementAffected(document, created),
       data: { elementIds: created },
     };
   },

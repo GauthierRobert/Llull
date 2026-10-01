@@ -16,6 +16,7 @@ import {
   noChange,
   toVec2,
   withElement,
+  elementAffected,
 } from './model';
 import { regenerateBuilding } from './evaluate';
 
@@ -100,7 +101,7 @@ export const addGridLine: CommandDefinition<AddGridLineParams> = {
     return {
       document,
       summary: `Added grid axis ${resolvedLabel} (${id}).`,
-      affected: document.building?.elements[id]?.entityIds ?? [],
+      affected: elementAffected(document, [id]),
       data: { elementId: id },
     };
   },
@@ -194,7 +195,7 @@ export const addGridSystem: CommandDefinition<AddGridSystemParams> = {
     return {
       document,
       summary: `Added grid system: axes ${created.join(', ')} spanning ${maxX - minX} × ${maxY - minY} ${doc.units}.`,
-      affected: createdIds.flatMap((id) => document.building?.elements[id]?.entityIds ?? []),
+      affected: elementAffected(document, createdIds),
       data: { elementIds: createdIds, labels: created },
     };
   },

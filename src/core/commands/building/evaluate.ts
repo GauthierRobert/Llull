@@ -188,9 +188,10 @@ function wallsOnLevel(building: BuildingModel, levelId: string): WallElement[] {
 }
 
 /**
- * Plan extension (+) or retraction (−) at one wall end so corners close cleanly:
- * at an L/X joint the earlier wall extends by half the other's thickness and the later wall
- * retracts by half the earlier one's; at a T joint the abutting wall retracts.
+ * Plan extension (+) or retraction (−) at one wall end so joints close cleanly (butt joints):
+ * at an L/X joint the earlier wall extends to the other's outer face and the later wall retracts
+ * to the earlier one's inner face; at a T joint the abutting wall retracts to the through wall.
+ * Values are mitred for any angle θ between the walls: (t_other / 2) / sin θ ± (t_self / 2) / |tan θ|.
  */
 export function endAdjustment(
   building: BuildingModel,
@@ -199,49 +200,64 @@ export function endAdjustment(
 ): number {
   const point = wall[end];
   const frame = wallFrame(wall);
+  const away: Vec2 = end === 'start' ? frame.direction : [-frame.direction[0], -frame.direction[1]];
   const ownIndex = building.elementOrder.indexOf(wall.id);
   for (const other of wallsOnLevel(building, wall.levelId)) {
     if (other.id === wall.id) continue;
     const otherFrame = wallFrame(other);
-    const cross =
-      frame.direction[0] * otherFrame.direction[1] - frame.direction[1] * otherFrame.direction[0];
-    if (Math.abs(cross) < 0.05) continue;
+    const sine = Math.abs(away[0] * otherFrame.direction[1] - away[1] * otherFrame.direction[0]);
+    if (sine < 0.05) continue;
+    const cotangent =
+      Math.abs(away[0] * otherFrame.direction[0] + away[1] * otherFrame.direction[1]) / sine;
+    const reach = other.thickness / 2 / sine;
+    const skew = (wall.thickness / 2) * cotangent;
     const tolerance = Math.max(Math.min(wall.thickness, other.thickness) * 0.05, 1e-9);
     const atOtherEnd =
       distance(point, other.start) <= tolerance || distance(point, other.end) <= tolerance;
     if (atOtherEnd) {
       const otherIndex = building.elementOrder.indexOf(other.id);
-      return ownIndex < otherIndex ? other.thickness / 2 : -other.thickness / 2;
+      return ownIndex < otherIndex ? reach + skew : -(reach - skew);
     }
     const projection = projectOntoSegment(point, other.start, other.end);
     if (projection.distance <= tolerance && projection.t > 0 && projection.t < 1) {
-      return -other.thickness / 2;
+      return -(reach - skew);
     }
   }
   return 0;
+}
+
+/** Along-wall interval [start, end] actually occupied by the wall body (joints applied). */
+export interface WallExtent {
+  readonly start: number;
+  readonly end: number;
+}
+
+export function wallExtent(building: BuildingModel, wall: WallElement): WallExtent {
+  const startAdjustment = endAdjustment(building, wall, 'start');
+  return {
+    start: startAdjustment === 0 ? 0 : -startAdjustment,
+    end: wallFrame(wall).length + endAdjustment(building, wall, 'end'),
+  };
 }
 
 /** Vertical rectangular pieces [s0,s1]×[z0,z1] (wall-local) left solid after cutting the openings. */
 export function wallPieces(
   wall: WallElement,
   openings: ReadonlyArray<OpeningElement>,
-  startAdjustment: number,
-  endAdjustmentValue: number,
+  extent: WallExtent,
 ): Array<{ s0: number; s1: number; z0: number; z1: number }> {
-  const length = wallFrame(wall).length;
   const pieces: Array<{ s0: number; s1: number; z0: number; z1: number }> = [];
-  let cursor = startAdjustment === 0 ? 0 : -startAdjustment;
-  const finish = length + endAdjustmentValue;
+  let cursor = extent.start;
   for (const opening of openings) {
-    const left = opening.offset - opening.width / 2;
-    const right = opening.offset + opening.width / 2;
+    const left = Math.max(opening.offset - opening.width / 2, extent.start);
+    const right = Math.min(opening.offset + opening.width / 2, extent.end);
     if (left > cursor) pieces.push({ s0: cursor, s1: left, z0: 0, z1: wall.height });
     if (opening.sillHeight > 0) pieces.push({ s0: left, s1: right, z0: 0, z1: opening.sillHeight });
     const head = opening.sillHeight + opening.height;
     if (head < wall.height) pieces.push({ s0: left, s1: right, z0: head, z1: wall.height });
     cursor = Math.max(cursor, right);
   }
-  if (finish > cursor) pieces.push({ s0: cursor, s1: finish, z0: 0, z1: wall.height });
+  if (extent.end > cursor) pieces.push({ s0: cursor, s1: extent.end, z0: 0, z1: wall.height });
   return pieces.filter((piece) => piece.s1 - piece.s0 > 1e-9 && piece.z1 - piece.z0 > 1e-9);
 }
 
@@ -256,8 +272,7 @@ function evaluateWall(
   const pieces = wallPieces(
     wall,
     openingsOf(context.building, wall.id),
-    endAdjustment(context.building, wall, 'start'),
-    endAdjustment(context.building, wall, 'end'),
+    wallExtent(context.building, wall),
   );
   return pieces.map((piece, index) => {
     const [x, y] = pointAlong(wall, frame, (piece.s0 + piece.s1) / 2);

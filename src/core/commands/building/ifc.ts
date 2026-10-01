@@ -16,7 +16,7 @@ import type {
 import type { CommandDefinition, CommandResult } from '../types';
 import { toCounterClockwise } from '../../../lib/polygon';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
-import { wallFrame } from './evaluate';
+import { wallExtent, wallFrame, type WallExtent } from './evaluate';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
 
@@ -46,6 +46,8 @@ export function ifcString(text: string): string {
     if (character === "'") out += "''";
     else if (character === '\\') out += '\\\\';
     else if (code >= 32 && code < 127) out += character;
+    else if (code > 0xffff)
+      out += `\\X4\\${code.toString(16).toUpperCase().padStart(8, '0')}\\X0\\`;
     else out += `\\X2\\${code.toString(16).toUpperCase().padStart(4, '0')}\\X0\\`;
   }
   return `'${out}'`;
@@ -83,6 +85,8 @@ class StepWriter {
 
 interface Context {
   readonly writer: StepWriter;
+  /** GlobalId for a seed, salted with the building uid. */
+  readonly guid: (seed: string) => string;
   readonly mm: (value: number) => number;
   readonly body: string;
   readonly zAxis: string;
@@ -154,6 +158,7 @@ interface Exported {
 function exportWall(
   context: Context,
   wall: WallElement,
+  extent: WallExtent,
   storeyPlacement: string,
 ): Exported & { placement: string } {
   const { mm } = context;
@@ -168,12 +173,12 @@ function exportWall(
   );
   const profile = rectangleProfile(
     context,
-    [mm(frame.length) / 2, 0],
-    mm(frame.length),
+    [mm((extent.start + extent.end) / 2), 0],
+    mm(extent.end - extent.start),
     mm(wall.thickness),
   );
   const ref = context.writer.add(
-    `IFCWALL('${ifcGuid(wall.id)}',$,${ifcString(wall.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(wall.height))])},${ifcString(wall.id)},.STANDARD.)`,
+    `IFCWALL('${context.guid(wall.id)}',$,${ifcString(wall.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(wall.height))])},${ifcString(wall.id)},.STANDARD.)`,
   );
   return { ref, material: wall.material, placement: local };
 }
@@ -195,10 +200,10 @@ function exportOpening(
     mm(wall.thickness) + 20,
   );
   const voidRef = writer.add(
-    `IFCOPENINGELEMENT('${ifcGuid(`${opening.id}:void`)}',$,${ifcString(`${opening.mark} opening`)},$,$,${voidPlacement},${shape(context, [extrusion(context, voidProfile, mm(opening.height))])},$,.OPENING.)`,
+    `IFCOPENINGELEMENT('${context.guid(`${opening.id}:void`)}',$,${ifcString(`${opening.mark} opening`)},$,$,${voidPlacement},${shape(context, [extrusion(context, voidProfile, mm(opening.height))])},$,.OPENING.)`,
   );
   writer.add(
-    `IFCRELVOIDSELEMENT('${ifcGuid(`${opening.id}:voids`)}',$,$,$,${host.ref},${voidRef})`,
+    `IFCRELVOIDSELEMENT('${context.guid(`${opening.id}:voids`)}',$,$,$,${host.ref},${voidRef})`,
   );
   const panelThickness = Math.min(mm(wall.thickness), opening.category === 'door' ? 40 : 24);
   const fillPlacement = placement(context, voidPlacement, 0, 0, 0);
@@ -209,14 +214,16 @@ function exportOpening(
     panelThickness,
   );
   const fillShape = shape(context, [extrusion(context, fillProfile, mm(opening.height))]);
-  const common = `'${ifcGuid(opening.id)}',$,${ifcString(opening.mark)},$,$,${fillPlacement},${fillShape},${ifcString(opening.id)},${ifcReal(mm(opening.height))},${ifcReal(mm(opening.width))}`;
+  const common = `'${context.guid(opening.id)}',$,${ifcString(opening.mark)},$,$,${fillPlacement},${fillShape},${ifcString(opening.id)},${ifcReal(mm(opening.height))},${ifcReal(mm(opening.width))}`;
   const ref =
     opening.category === 'door'
       ? writer.add(
           `IFCDOOR(${common},.DOOR.,${opening.swing === 'left' ? '.SINGLE_SWING_LEFT.' : '.SINGLE_SWING_RIGHT.'},$)`,
         )
       : writer.add(`IFCWINDOW(${common},.WINDOW.,.SINGLE_PANEL.,$)`);
-  writer.add(`IFCRELFILLSELEMENT('${ifcGuid(`${opening.id}:fills`)}',$,$,$,${voidRef},${ref})`);
+  writer.add(
+    `IFCRELFILLSELEMENT('${context.guid(`${opening.id}:fills`)}',$,$,$,${voidRef},${ref})`,
+  );
   storeyElements.push(ref);
   return { ref, material: opening.material };
 }
@@ -234,7 +241,7 @@ function exportOther(
   storeyPlacement: string,
 ): Exported & { isSpace: boolean } {
   const { mm, writer } = context;
-  const guid = ifcGuid(element.id);
+  const guid = context.guid(element.id);
   switch (element.category) {
     case 'slab': {
       const local = placement(
@@ -257,10 +264,10 @@ function exportOther(
           opening.map(([x, y]): Vec2 => [mm(x), mm(y)]),
         );
         const voidRef = writer.add(
-          `IFCOPENINGELEMENT('${ifcGuid(`${element.id}:void-${index}`)}',$,${ifcString(`${element.mark} opening ${index + 1}`)},$,$,${placement(context, local, 0, 0, 0)},${shape(context, [extrusion(context, voidProfile, mm(element.thickness) + 20, 0, 0, -10)])},$,.OPENING.)`,
+          `IFCOPENINGELEMENT('${context.guid(`${element.id}:void-${index}`)}',$,${ifcString(`${element.mark} opening ${index + 1}`)},$,$,${placement(context, local, 0, 0, 0)},${shape(context, [extrusion(context, voidProfile, mm(element.thickness) + 20, 0, 0, -10)])},$,.OPENING.)`,
         );
         writer.add(
-          `IFCRELVOIDSELEMENT('${ifcGuid(`${element.id}:voids-${index}`)}',$,$,$,${ref},${voidRef})`,
+          `IFCRELVOIDSELEMENT('${context.guid(`${element.id}:voids-${index}`)}',$,$,$,${ref},${voidRef})`,
         );
       });
       return { ref, material: element.material, isSpace: false };
@@ -369,7 +376,15 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
   const body = writer.add(
     `IFCGEOMETRICREPRESENTATIONSUBCONTEXT('Body','Model',*,*,*,*,${modelContext},$,.MODEL_VIEW.,$)`,
   );
-  const context: Context = { writer, mm: (value) => value * factor, body, zAxis, xAxis };
+  const salt = building.uid ?? 'llull';
+  const context: Context = {
+    writer,
+    guid: (seed) => ifcGuid(`${salt}:${seed}`),
+    mm: (value) => value * factor,
+    body,
+    zAxis,
+    xAxis,
+  };
   const units = [
     writer.add('IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.)'),
     writer.add('IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.)'),
@@ -379,18 +394,22 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
   const unitAssignment = writer.add(`IFCUNITASSIGNMENT((${units.join(',')}))`);
   const { project } = building;
   const projectRef = writer.add(
-    `IFCPROJECT('${ifcGuid('project')}',$,${ifcString(project.name)},${ifcString(project.client)},$,$,$,(${modelContext}),${unitAssignment})`,
+    `IFCPROJECT('${context.guid('project')}',$,${ifcString(project.name)},${ifcString(project.client)},$,$,$,(${modelContext}),${unitAssignment})`,
   );
   const sitePlacement = writer.add(`IFCLOCALPLACEMENT($,${worldAxes})`);
   const site = writer.add(
-    `IFCSITE('${ifcGuid('site')}',$,'Site',${ifcString(project.address)},$,${sitePlacement},$,$,.ELEMENT.,$,$,$,$,$)`,
+    `IFCSITE('${context.guid('site')}',$,'Site',${ifcString(project.address)},$,${sitePlacement},$,$,.ELEMENT.,$,$,$,$,$)`,
   );
   const buildingPlacement = placement(context, sitePlacement, 0, 0, 0);
   const buildingRef = writer.add(
-    `IFCBUILDING('${ifcGuid('building')}',$,${ifcString(project.name)},$,$,${buildingPlacement},$,$,.ELEMENT.,$,$,$)`,
+    `IFCBUILDING('${context.guid('building')}',$,${ifcString(project.name)},$,$,${buildingPlacement},$,$,.ELEMENT.,$,$,$)`,
   );
-  writer.add(`IFCRELAGGREGATES('${ifcGuid('rel:project-site')}',$,$,$,${projectRef},(${site}))`);
-  writer.add(`IFCRELAGGREGATES('${ifcGuid('rel:site-building')}',$,$,$,${site},(${buildingRef}))`);
+  writer.add(
+    `IFCRELAGGREGATES('${context.guid('rel:project-site')}',$,$,$,${projectRef},(${site}))`,
+  );
+  writer.add(
+    `IFCRELAGGREGATES('${context.guid('rel:site-building')}',$,$,$,${site},(${buildingRef}))`,
+  );
   const storeys: string[] = [];
   const byMaterial = new Map<string, string[]>();
   let productCount = 0;
@@ -405,7 +424,7 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
       context.mm(level.elevation),
     );
     const storey = writer.add(
-      `IFCBUILDINGSTOREY('${ifcGuid(level.id)}',$,${ifcString(level.name)},$,$,${storeyPlacement},$,$,.ELEMENT.,${ifcReal(context.mm(level.elevation))})`,
+      `IFCBUILDINGSTOREY('${context.guid(level.id)}',$,${ifcString(level.name)},$,$,${storeyPlacement},$,$,.ELEMENT.,${ifcReal(context.mm(level.elevation))})`,
     );
     storeys.push(storey);
     const contained: string[] = [];
@@ -422,7 +441,7 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
       const element = building.elements[id];
       if (!element || !('levelId' in element) || element.levelId !== level.id) continue;
       if (element.category === 'wall') {
-        const wall = exportWall(context, element, storeyPlacement);
+        const wall = exportWall(context, element, wallExtent(building, element), storeyPlacement);
         contained.push(wall.ref);
         record(wall);
         for (const openingId of building.elementOrder) {
@@ -442,31 +461,31 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
     }
     if (contained.length > 0) {
       writer.add(
-        `IFCRELCONTAINEDINSPATIALSTRUCTURE('${ifcGuid(`rel:contains:${level.id}`)}',$,$,$,(${contained.join(',')}),${storey})`,
+        `IFCRELCONTAINEDINSPATIALSTRUCTURE('${context.guid(`rel:contains:${level.id}`)}',$,$,$,(${contained.join(',')}),${storey})`,
       );
     }
     if (spaces.length > 0) {
       writer.add(
-        `IFCRELAGGREGATES('${ifcGuid(`rel:spaces:${level.id}`)}',$,$,$,${storey},(${spaces.join(',')}))`,
+        `IFCRELAGGREGATES('${context.guid(`rel:spaces:${level.id}`)}',$,$,$,${storey},(${spaces.join(',')}))`,
       );
     }
   }
   if (storeys.length > 0) {
     writer.add(
-      `IFCRELAGGREGATES('${ifcGuid('rel:building-storeys')}',$,$,$,${buildingRef},(${storeys.join(',')}))`,
+      `IFCRELAGGREGATES('${context.guid('rel:building-storeys')}',$,$,$,${buildingRef},(${storeys.join(',')}))`,
     );
   }
   for (const [material, refs] of byMaterial) {
     const materialRef = writer.add(`IFCMATERIAL(${ifcString(material)},$,$)`);
     writer.add(
-      `IFCRELASSOCIATESMATERIAL('${ifcGuid(`rel:material:${material}`)}',$,$,$,(${refs.join(',')}),${materialRef})`,
+      `IFCRELASSOCIATESMATERIAL('${context.guid(`rel:material:${material}`)}',$,$,$,(${refs.join(',')}),${materialRef})`,
     );
   }
   const name = fileSlug(project.name, 'project');
   const ifc = [
     'ISO-10303-21;',
     'HEADER;',
-    "FILE_DESCRIPTION(('ViewDefinition [ReferenceView_V1.2]'),'2;1');",
+    "FILE_DESCRIPTION(('ViewDefinition [DesignTransferView_V1.0]'),'2;1');",
     `FILE_NAME(${ifcString(`${name}.ifc`)},${ifcString(timestamp)},(${ifcString(project.author)}),(''),'llull','llull',${ifcString(project.drawingNumber)});`,
     "FILE_SCHEMA(('IFC4'));",
     'ENDSEC;',

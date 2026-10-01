@@ -13,7 +13,7 @@ The plan and status of this work: [`CONSTRUCTION_PLAN.md`](CONSTRUCTION_PLAN.md)
 | Concept | What it is |
 | --- | --- |
 | **Building model** | `CadDocument.building` — the *constructive* definition (levels + elements + project info + cost rates). It is the source of truth. |
-| **Evaluated entities** | Each element regenerates ordinary entities (boxes, extrusions, lines, text…) with ids `<elementId>:<part>`, names like "Wall W3", tags `bim`, `<category>`, `element:<id>`. Edit the element, never these entities. |
+| **Evaluated entities** | Each element regenerates ordinary entities (boxes, extrusions, lines, text…) with ids `<elementId>:<part>`, names like "Wall W3", tags `bim`, `<category>`, `element:<id>`. Edit the element, never these entities — generic commands that would change them (move, delete, layer delete…) are refused; Delete on a selected wall deletes the wall element. |
 | **Layers** | AIA / US National CAD Standard: `A-WALL`, `A-DOOR`, `A-GLAZ`, `S-SLAB`, `S-COLS`, `S-BEAM`, `A-FLOR-STRS`, `A-AREA`, `S-GRID`, plus `A-ANNO-DIMS` in drawings. |
 | **Units** | Model lengths use the document unit (default mm; `set_units` for m, cm, in, ft). Quantities are always metric (m, m², m³, ea); drawing dimensions are in mm. |
 | **Levels** | Storeys with an elevation (finished floor) and floor-to-floor height. The *active level* receives new elements. A "Level 0" is created automatically if you start drawing without one. |
@@ -32,12 +32,12 @@ The plan and status of this work: [`CONSTRUCTION_PLAN.md`](CONSTRUCTION_PLAN.md)
 | Stair | `add_stair` | Equal risers from the level height; reports the Blondel rule 2R + G (600–650 mm). |
 | Room | `add_room` | Name + number, from a boundary or the inner faces of walls; area tag. |
 | Typical floors | `copy_level_elements` | Repeat a level onto others (walls keep their openings). |
-| Edits | `move_building_element`, `delete_building_element`, `update_level`, `delete_level` | Moving a level moves everything on it. |
+| Edits | `move_building_element`, `delete_building_element`, `update_level`, `delete_level` | Moving a level moves everything on it; full-height walls / columns and stairs follow a new level height. Element ids are never reused, and building commands report the element id first in `affected` (so `build_project` aliases and history replay keep hosts linked). |
 | Starter | `add_building_template` | `house` or `office`, created in one undoable step. |
 
 ## Quantities, schedules and costs
 
-- `quantity_takeoff` — bill of quantities by category × material × unit (centerline method for walls,
+- `quantity_takeoff` — bill of quantities by category × material × unit (walls measured on their built body — joints applied, no double counting at corners —
   openings deducted). Each line has a key such as `wall.masonry.m3`, `slab-roof.concrete.m2`, `door.timber.ea`.
 - `building_schedule` — wall, door, window, room, slab, column, beam or stair schedule (CSV).
 - `set_cost_rates` + `estimate_cost` — unit rates by key or wildcard (`wall.*.m2`, `*.concrete.m3`);
