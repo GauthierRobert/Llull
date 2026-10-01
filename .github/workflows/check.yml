@@ -20,6 +20,9 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
@@ -35,10 +38,20 @@ jobs:
       - name: Run coverage (90/85/90/90 gate)
         run: npm run test:coverage
 
-      # Server typecheck
+      # Server: typecheck + tests + production bundle (what `npm --prefix server start` runs)
       - name: Server typecheck
         run: npm --prefix server run typecheck
 
+      - name: Server tests
+        run: npm --prefix server test
+
+      - name: Server build
+        run: npm --prefix server run build
+
+      # Production web build (tsc -b + vite build)
+      - name: App build
+        run: npm run build
+
       # Registry 1:1 guard: listCommands() must match toToolSchemas() exactly
       - name: Registry schema 1:1 guard
-        run: npx tsx scripts/check-registry-schema.ts
+        run: server/node_modules/.bin/tsx scripts/check-registry-schema.ts

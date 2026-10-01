@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { frameEntityIds } from './sseTestHelpers';
 import request from 'supertest';
 import { app } from '../src/index';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
@@ -78,8 +79,7 @@ describe('POST /command — mutation', () => {
     // Mutation broadcast received.
     expect(fakeRes.written.length).toBeGreaterThan(writesBefore);
     const lastMsg = fakeRes.written[fakeRes.written.length - 1] ?? '';
-    const parsed = JSON.parse(lastMsg.slice('data: '.length)) as Record<string, unknown>;
-    expect(Object.keys(parsed['entities'] as Record<string, unknown>)).toHaveLength(1);
+    expect(frameEntityIds(lastMsg)).toHaveLength(1);
 
     unsub();
   });
