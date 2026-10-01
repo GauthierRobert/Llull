@@ -30,7 +30,17 @@ describe('industrial tools', () => {
       length: '24000',
       craneRailHeight: '5000',
     });
-    for (const id of ['member', 'footing', 'panel', 'craneRunway', 'equipment', 'pipe', 'tray']) {
+    doc = apply(doc, 'hall', { basePlates: 'false', x: '40000', span: '12000', length: '12000' });
+    for (const id of [
+      'member',
+      'footing',
+      'panel',
+      'craneRunway',
+      'equipment',
+      'pipe',
+      'tray',
+      'basePlates',
+    ]) {
       doc = apply(doc, id, id === 'footing' ? { underColumns: 'false' } : {});
     }
     const categories = new Set(

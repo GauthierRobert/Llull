@@ -72,6 +72,7 @@ const SCHEDULE_KINDS: ReadonlyArray<ScheduleKind> = [
   'equipment',
   'pipe',
   'tray',
+  'plate',
 ];
 
 interface BuildingScheduleParams {

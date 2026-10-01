@@ -19,6 +19,7 @@ import { openingsOf, wallExtent } from './evaluate';
 import { findProfile } from './steel/profiles';
 import { polygonNormal } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
+import { plateMass } from './industrial/plates';
 
 export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
@@ -294,6 +295,23 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       scale.length(trayLength(tray)),
     );
   }
+  for (const plate of elementsOf(building, 'plate')) {
+    takeoff.add(
+      'plate',
+      plate.material,
+      'kg',
+      `Base plates ${plate.material} — mass`,
+      plateMass(doc, plate),
+    );
+    takeoff.add('plate', plate.material, 'ea', `Base plates ${plate.material} — count`, 1);
+    takeoff.add(
+      'plate',
+      `anchor M${plate.boltDiameter}`,
+      'ea',
+      `Anchor bolts M${plate.boltDiameter} — count`,
+      plate.boltCount,
+    );
+  }
   return takeoff.result();
 }
 
@@ -345,7 +363,8 @@ export type ScheduleKind =
   | 'panel'
   | 'equipment'
   | 'pipe'
-  | 'tray';
+  | 'tray'
+  | 'plate';
 
 export interface Schedule {
   readonly kind: ScheduleKind;
@@ -658,6 +677,30 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           round(scale.length(trayLength(tray)), 2),
           Math.max(0, tray.points.length - 2),
           levelName(building, tray.levelId),
+        ]),
+      };
+    case 'plate':
+      return {
+        kind,
+        columns: [
+          'Mark',
+          'Column',
+          `Size (${unit})`,
+          `Thickness (${unit})`,
+          'Anchor bolts',
+          'Mass (kg)',
+          'Grade',
+          'Level',
+        ],
+        rows: elementsOf(building, 'plate').map((plate) => [
+          plate.mark,
+          building.elements[plate.memberId]?.mark ?? plate.memberId,
+          `${round(plate.length, 1)}×${round(plate.width, 1)}`,
+          plate.thickness,
+          `${plate.boltCount}×M${plate.boltDiameter}`,
+          round(plateMass(doc, plate), 1),
+          plate.material,
+          levelName(building, plate.levelId),
         ]),
       };
   }

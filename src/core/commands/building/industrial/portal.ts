@@ -31,6 +31,7 @@ import {
   withoutFootings,
 } from './members';
 import { panelFrame } from './evaluate';
+import { appendBasePlates, columnsWithoutPlates } from './plates';
 import { addGrid, gridLabels, nextFreeLabel } from '../grid';
 
 type MemberSpecs = Parameters<typeof appendMembers>[2];
@@ -239,6 +240,7 @@ interface PortalHallParams {
   purlinSpacing?: number;
   railSpacing?: number;
   footings?: boolean;
+  basePlates?: boolean;
   cladding?: boolean;
   floorSlab?: boolean;
   crane?: { capacity?: number; railHeight: number; profile?: string };
@@ -303,6 +305,10 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       purlinSpacing: { type: 'number', description: 'Along the slope. Default 1800 mm.' },
       railSpacing: { type: 'number', description: 'Vertical. Default 1800 mm.' },
       footings: { type: 'boolean', description: 'Pad footings under columns. Default true.' },
+      basePlates: {
+        type: 'boolean',
+        description: 'Base plates with 4 M24 anchor bolts under every column. Default true.',
+      },
       cladding: { type: 'boolean', description: 'Roof, side and gable cladding. Default true.' },
       floorSlab: { type: 'boolean', description: 'Ground-bearing slab. Default true.' },
       crane: {
@@ -575,6 +581,16 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       return noChange(doc, `add_portal_frame_building failed: ${membersAdded.reason}.`);
     building = membersAdded.building;
     ids.push(...membersAdded.ids);
+    if (params.basePlates !== false) {
+      const plates = appendBasePlates(
+        doc,
+        building,
+        columnsWithoutPlates(building, null, new Set(membersAdded.ids)),
+        {},
+      );
+      building = plates.building;
+      ids.push(...plates.ids);
+    }
     // Crane runway on both sides, inboard of the columns.
     if (params.crane) {
       const craneProfile = findProfile(params.crane.profile ?? 'HEB300');

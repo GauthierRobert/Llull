@@ -51,6 +51,7 @@ import {
   evaluatePanel,
   evaluatePipe,
   evaluateTray,
+  evaluatePlate,
 } from './industrial/evaluate';
 
 import {
@@ -551,6 +552,12 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluatePipe(leveled, level);
     case 'tray':
       return evaluateTray(context.doc, leveled, level);
+    case 'plate': {
+      const member = building.elements[leveled.memberId];
+      return member?.category === 'member'
+        ? evaluatePlate(context.doc, leveled, member, level)
+        : [];
+    }
   }
 }
 

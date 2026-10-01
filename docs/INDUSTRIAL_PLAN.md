@@ -48,7 +48,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
       side with internal columns on shared column lines, valley gutters between the roofs.
 - [x] **I13 — Cable trays.** `add_cable_tray` (3D route, width, height, system), clash detection,
       takeoff (m by system), plan symbol, IFC `IfcCableCarrierSegment`.
-- [ ] **I14 — Steel connections.** `add_base_plates`: base plates with anchor bolts under every steel
+- [x] **I14 — Steel connections.** `add_base_plates`: base plates with anchor bolts under every steel
       column foot; plate steel mass and bolt counts in the takeoff; IFC `IfcPlate` /
       `IfcMechanicalFastener`.
 - [ ] **I15 — DXF hatches.** Cut walls, concrete columns and steel sections in `export_dxf` plans

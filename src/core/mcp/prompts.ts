@@ -454,7 +454,7 @@ const designFactory: PromptTemplate = {
           `rafterProfile, crane: { railHeight, capacity } } — grids, frames, gable posts, purlins, rails, bracing, ` +
           `footings, slab and cladding in one undoable step.\n` +
           `4. Adjust: \`update_steel_member\` { memberId, profile } to upsize, \`add_steel_member\` for mezzanines / ` +
-          `platforms, \`add_crane_runway\`, \`add_footing\` { underColumns: true }, \`add_panel\` for extra cladding.\n` +
+          `platforms, \`add_crane_runway\`, \`add_footing\` { underColumns: true }, \`add_base_plates\`, \`add_panel\` for extra cladding.\n` +
           `5. Process: \`add_equipment\` { name, location, size, clearance, weight } for each machine, ` +
           `\`add_pipe_run\` { points, diameter, service } for utilities, \`add_cable_tray\` { points, width, system } for cabling.\n` +
           `6. Coordinate: \`check_clashes\` — fix every hard clash and clearance violation with ` +

@@ -25,6 +25,7 @@ export const CATEGORY_LAYER: Readonly<Record<BimCategory, { name: string; color:
   equipment: { name: 'Q-EQPM', color: '#c27c2c' },
   pipe: { name: 'P-PIPE', color: '#2f9c8f' },
   tray: { name: 'E-TRAY', color: '#a07c2c' },
+  plate: { name: 'S-CONN', color: '#5d6f80' },
 };
 
 /** Layer per steel member role (AIA structural sub-layers). */

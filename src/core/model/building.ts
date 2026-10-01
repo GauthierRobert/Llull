@@ -25,7 +25,8 @@ export type BimCategory =
   | 'panel'
   | 'equipment'
   | 'pipe'
-  | 'tray';
+  | 'tray'
+  | 'plate';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -229,6 +230,23 @@ export interface CableTrayElement extends ElementBase {
   system: string;
 }
 
+/** A steel base plate with anchor bolts under the foot of a steel column (follows the column). */
+export interface BasePlateElement extends ElementBase {
+  readonly category: 'plate';
+  levelId: string;
+  /** The steel column (member) it carries. */
+  memberId: string;
+  /** Plate size along the column depth. */
+  length: number;
+  /** Plate size along the column width. */
+  width: number;
+  thickness: number;
+  /** Anchor bolts: an even number, in two rows along the length. */
+  boltCount: number;
+  boltDiameter: number;
+  material: string;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -243,7 +261,8 @@ export type BuildingElement =
   | PanelElement
   | EquipmentElement
   | PipeElement
-  | CableTrayElement;
+  | CableTrayElement
+  | BasePlateElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */

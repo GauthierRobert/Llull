@@ -58,6 +58,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('craneCapacity', 'Crane capacity (t)', '10'),
       { key: 'cladding', label: 'Roof & wall cladding', kind: 'checkbox', defaultValue: 'true' },
       { key: 'footings', label: 'Pad footings', kind: 'checkbox', defaultValue: 'true' },
+      { key: 'basePlates', label: 'Base plates + anchors', kind: 'checkbox', defaultValue: 'true' },
       { key: 'floorSlab', label: 'Ground slab', kind: 'checkbox', defaultValue: 'true' },
     ],
     build: (values, context) => {
@@ -80,6 +81,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
             : { railHeight, capacity: reader.number('craneCapacity') },
         cladding: reader.flag('cladding'),
         footings: reader.flag('footings'),
+        basePlates: reader.flag('basePlates'),
         floorSlab: reader.flag('floorSlab'),
         ...onLevel(context),
       });
@@ -283,6 +285,27 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         width: reader.number('width'),
         height: reader.number('height'),
         system: reader.text('system') || undefined,
+        ...onLevel(context),
+      });
+    },
+  },
+  {
+    id: 'basePlates',
+    label: 'Base plates',
+    group: GROUP,
+    fields: [
+      num('thickness', 'Thickness', '', true),
+      num('margin', 'Overhang', '100'),
+      num('boltCount', 'Anchor bolts', '4'),
+      num('boltDiameter', 'Bolt Ø', '24'),
+    ],
+    build: (values, context) => {
+      const reader = new FieldReader(values);
+      return result(reader, 'add_base_plates', {
+        thickness: reader.optionalNumber('thickness'),
+        margin: reader.number('margin'),
+        boltCount: reader.number('boltCount'),
+        boltDiameter: reader.number('boltDiameter'),
         ...onLevel(context),
       });
     },

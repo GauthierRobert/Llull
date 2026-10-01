@@ -14,6 +14,7 @@ import type { CommandDefinition, CommandResult } from '../types';
 import { isValidPolygon, offsetPolygon, polygonArea } from '../../../lib/polygon';
 import {
   getBuilding,
+  hostOf,
   isVec2,
   isVec2List,
   nextElementId,
@@ -126,16 +127,12 @@ export const addRoom: CommandDefinition<AddRoomParams> = {
   },
 };
 
-/** Element ids plus the openings hosted by any wall among them. */
+/** Element ids plus the elements hosted by any of them (wall openings, column base plates). */
 function withHostedOpenings(building: BuildingModel, ids: ReadonlyArray<string>): Set<string> {
   const result = new Set(ids);
   for (const element of Object.values(building.elements)) {
-    if (
-      (element.category === 'door' || element.category === 'window') &&
-      result.has(element.hostId)
-    ) {
-      result.add(element.id);
-    }
+    const host = hostOf(element);
+    if (host !== null && result.has(host)) result.add(element.id);
   }
   return result;
 }
@@ -232,6 +229,7 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
       return { ...element, points: element.points.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
     case 'door':
     case 'window':
+    case 'plate':
       return element;
   }
 }
@@ -276,15 +274,13 @@ export const moveBuildingElement: CommandDefinition<MoveBuildingElementParams> =
     }
     const strayOpenings = known.filter((id) => {
       const element = building.elements[id];
-      return (
-        (element?.category === 'door' || element?.category === 'window') &&
-        !known.includes(element.hostId)
-      );
+      const host = element ? hostOf(element) : null;
+      return host !== null && !known.includes(host);
     });
     if (strayOpenings.length > 0) {
       return noChange(
         doc,
-        `move_building_element refused: ${strayOpenings.join(', ')} are hosted by walls — slide them with update_opening (offset) or move their wall.`,
+        `move_building_element refused: ${strayOpenings.join(', ')} are hosted (by a wall or a steel column) — slide openings with update_opening (offset) or move their host.`,
       );
     }
     let next = building;
@@ -430,19 +426,24 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
           ),
         );
         created.push(id);
-        if (element.category !== 'wall') continue;
-        for (const openingId of building.elementOrder) {
-          const opening = building.elements[openingId];
-          if (!opening || (opening.category !== 'door' && opening.category !== 'window')) continue;
-          if (opening.hostId !== element.id) continue;
-          const copyId = nextElementId(next, opening.category);
-          next = withElement(next, {
-            ...opening,
-            id: copyId,
-            mark: nextMark(next, opening.category),
-            hostId: id,
-            entityIds: [],
-          });
+        for (const hostedId of building.elementOrder) {
+          const hosted = building.elements[hostedId];
+          if (
+            !hosted ||
+            hostOf(hosted) !== element.id ||
+            (hosted.category !== 'plate' &&
+              hosted.category !== 'door' &&
+              hosted.category !== 'window')
+          )
+            continue;
+          const copyId = nextElementId(next, hosted.category);
+          const mark = nextMark(next, hosted.category);
+          next = withElement(
+            next,
+            hosted.category === 'plate'
+              ? { ...hosted, id: copyId, mark, memberId: id, levelId: targetLevelId, entityIds: [] }
+              : { ...hosted, id: copyId, mark, hostId: id, entityIds: [] },
+          );
           created.push(copyId);
         }
       }

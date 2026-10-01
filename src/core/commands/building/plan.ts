@@ -21,6 +21,7 @@ import { CATEGORY_LAYER, openingsOf, pointAlong, wallExtent, wallFrame } from '.
 import { MEMBER_LAYER } from './entities';
 import { sweepFrame } from './mesh';
 import { findProfile, profileOutline } from './steel/profiles';
+import { plateLayout } from './industrial/evaluate';
 
 export type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
 
@@ -373,7 +374,7 @@ function industrialPrimitives(
   doc: PlanSource,
   element: Extract<
     BuildingElement,
-    { category: 'member' | 'footing' | 'panel' | 'equipment' | 'pipe' | 'tray' }
+    { category: 'member' | 'footing' | 'panel' | 'equipment' | 'pipe' | 'tray' | 'plate' }
   >,
   cutHeight: number,
 ): PlanPrimitive[] {
@@ -504,6 +505,38 @@ function industrialPrimitives(
         },
       ];
     }
+    case 'plate': {
+      const building = getBuilding(doc);
+      const member = building.elements[element.memberId];
+      const level = building.levels[element.levelId];
+      const layout =
+        member?.category === 'member' && level ? plateLayout(doc, element, member, level) : null;
+      if (!layout) return [];
+      const [cos, sin] = [Math.cos(layout.angle), Math.sin(layout.angle)];
+      const [hx, hy] = [element.length / 2, element.width / 2];
+      const corner = (x: number, y: number): Vec2 => [
+        layout.center[0] + x * cos - y * sin,
+        layout.center[1] + x * sin + y * cos,
+      ];
+      const layer = layerName('plate');
+      return [
+        {
+          type: 'polygon',
+          layer,
+          style: 'thin',
+          points: [corner(-hx, -hy), corner(hx, -hy), corner(hx, hy), corner(-hx, hy)],
+        },
+        ...layout.bolts.map(
+          (center): PlanPrimitive => ({
+            type: 'circle',
+            layer,
+            style: 'thin',
+            center,
+            radius: element.boltDiameter / 2,
+          }),
+        ),
+      ];
+    }
     case 'tray': {
       const points = element.points.map(flat);
       const layer = layerName('tray');
@@ -620,6 +653,7 @@ export function buildPlanDrawing(
       case 'equipment':
       case 'pipe':
       case 'tray':
+      case 'plate':
         primitives.push(...industrialPrimitives(doc, element, cutHeight));
         break;
       case 'room': {

@@ -1,12 +1,20 @@
 /**
  * Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes,
- * cable trays.
+ * cable trays, base plates.
  * @layer core/commands/building/industrial
  * @pure
  */
 
-import type { CadDocument, Entity, SphereEntity, Vec2, Vec3 } from '../../../model/types';
 import type {
+  CadDocument,
+  CylinderEntity,
+  Entity,
+  SphereEntity,
+  Vec2,
+  Vec3,
+} from '../../../model/types';
+import type {
+  BasePlateElement,
   BuildingLevel,
   CableTrayElement,
   EquipmentElement,
@@ -18,7 +26,7 @@ import type {
 } from '../../../model/building';
 import { fromMm } from '../model';
 import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../entities';
-import { prismMesh, sweepMesh } from '../mesh';
+import { prismMesh, sweepFrame, sweepMesh } from '../mesh';
 import { findProfile, profileOutline } from '../steel/profiles';
 
 export const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
@@ -238,4 +246,89 @@ export function evaluateTray(
     );
   }
   return entities;
+}
+
+/** World placement of a base plate and its anchor bolts (null when the column is missing). */
+export interface PlateLayout {
+  /** Plate centre (world). */
+  readonly center: Vec3;
+  /** Plan angle of the plate length axis (the column depth direction). */
+  readonly angle: number;
+  /** World plan positions of the bolts. */
+  readonly bolts: Vec2[];
+  /** Bolt projection above the plate top and embedment below its underside. */
+  readonly boltAbove: number;
+  readonly boltBelow: number;
+}
+
+export function plateLayout(
+  doc: Pick<CadDocument, 'units'>,
+  plate: BasePlateElement,
+  member: SteelMemberElement,
+  level: BuildingLevel,
+): PlateLayout | null {
+  const [start, end] = [atLevel(level, member.start), atLevel(level, member.end)];
+  const foot = start[2] <= end[2] ? start : end;
+  const frame = sweepFrame(start, end, member.roll);
+  if (!frame) return null;
+  const angle = Math.atan2(frame.v[1], frame.v[0]);
+  const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
+  const edge = Math.max(2 * plate.boltDiameter, fromMm(doc, 40));
+  const columns = Math.max(1, plate.boltCount / 2);
+  const bolts: Vec2[] = [];
+  for (const side of [-1, 1]) {
+    for (let index = 0; index < columns; index++) {
+      const along =
+        columns === 1
+          ? 0
+          : -plate.length / 2 + edge + ((plate.length - 2 * edge) * index) / (columns - 1);
+      const across = side * (plate.width / 2 - edge);
+      bolts.push([foot[0] + along * cos - across * sin, foot[1] + along * sin + across * cos]);
+    }
+  }
+  return {
+    center: [foot[0], foot[1], foot[2] - plate.thickness / 2],
+    angle,
+    bolts,
+    boltAbove: 3 * plate.boltDiameter,
+    boltBelow: 12 * plate.boltDiameter,
+  };
+}
+
+export function evaluatePlate(
+  doc: Pick<CadDocument, 'units'>,
+  plate: BasePlateElement,
+  member: SteelMemberElement,
+  level: BuildingLevel,
+): Entity[] {
+  const layout = plateLayout(doc, plate, member, level);
+  if (!layout) return [];
+  const color = colorForMaterial(plate.material, '#5d6f80');
+  const top = layout.center[2] + plate.thickness / 2;
+  const bottom = layout.center[2] - plate.thickness / 2;
+  const boltHeight = layout.boltAbove + plate.thickness + layout.boltBelow;
+  return [
+    orientedBox(
+      plate,
+      { part: 'body', label: `Base plate ${plate.mark}` },
+      layout.center,
+      layout.angle,
+      [plate.length, plate.width, plate.thickness],
+      color,
+    ),
+    ...layout.bolts.map(
+      (bolt, index): CylinderEntity => ({
+        ...base(
+          plate,
+          { part: `bolt-${index}`, label: `Anchor bolt ${plate.mark} M${plate.boltDiameter}` },
+          [bolt[0], bolt[1], (top + layout.boltAbove + bottom - layout.boltBelow) / 2],
+          [0, 0, 0],
+          '#3d4650',
+        ),
+        kind: 'cylinder',
+        radius: plate.boltDiameter / 2,
+        height: boltHeight,
+      }),
+    ),
+  ];
 }

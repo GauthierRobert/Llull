@@ -926,3 +926,124 @@ describe('add_cable_tray', () => {
     });
   });
 });
+
+describe('add_base_plates', () => {
+  function column(doc: CadDocument, x: number, profile = 'HEA300'): CadDocument {
+    return run(doc, 'add_steel_member', {
+      profile,
+      role: 'column',
+      start: [x, 0, 0],
+      end: [x, 0, 6000],
+    });
+  }
+
+  it('adds a plate with anchor bolts under every unplated column', () => {
+    let doc = column(column(createEmptyDocument(), 0), 6000, 'HEB200');
+    const before = JSON.stringify(doc);
+    const result = execute(doc, 'add_base_plates', {});
+    expect(JSON.stringify(doc)).toBe(before);
+    expect(result.summary).toMatch(
+      /Added 2 base plate\(s\) with 8 anchor bolt\(s\) M24: \d+\.\d kg/,
+    );
+    doc = result.document;
+    expect(element(doc, 'plate-1')).toMatchObject({
+      memberId: 'member-1',
+      length: 490,
+      width: 500,
+      thickness: 20,
+      boltCount: 4,
+      mark: 'BP1',
+    });
+    expect(element(doc, 'plate-1').entityIds).toEqual([
+      'plate-1:body',
+      'plate-1:bolt-0',
+      'plate-1:bolt-1',
+      'plate-1:bolt-2',
+      'plate-1:bolt-3',
+    ]);
+    // Plate top under the column foot; HEA300 depth along +X.
+    expect(doc.entities['plate-1:body']).toMatchObject({ kind: 'box', position: [0, 0, -10] });
+    expect(execute(doc, 'add_base_plates', {}).summary).toMatch(/no steel column without/);
+  });
+
+  it('takes sizes and explicit columns, and validates them', () => {
+    const doc = column(column(createEmptyDocument(), 0), 6000);
+    const result = execute(doc, 'add_base_plates', {
+      memberIds: ['member-2'],
+      thickness: 30,
+      boltCount: 6,
+      boltDiameter: 30,
+      margin: 150,
+    });
+    expect(element(result.document, 'plate-1')).toMatchObject({
+      memberId: 'member-2',
+      thickness: 30,
+      boltCount: 6,
+      boltDiameter: 30,
+      length: 590,
+    });
+    for (const params of [
+      { boltCount: 3 },
+      { boltCount: 14 },
+      { thickness: 0 },
+      { levelId: 'nope' },
+      { memberIds: ['member-9'] },
+    ]) {
+      expect(execute(doc, 'add_base_plates', params).affected, JSON.stringify(params)).toEqual([]);
+    }
+  });
+
+  it('follows, copies and deletes with its column; cannot move alone', () => {
+    let doc = run(column(createEmptyDocument(), 0), 'add_base_plates', {});
+    doc = run(doc, 'move_building_element', { elementIds: ['member-1'], delta: [1000, 0] });
+    expect(doc.entities['plate-1:body']?.position).toEqual([1000, 0, -10]);
+    expect(
+      execute(doc, 'move_building_element', { elementIds: ['plate-1'], delta: [1, 0] }).summary,
+    ).toMatch(/refused: plate-1 are hosted/);
+    doc = run(doc, 'add_level', { name: 'Upper' });
+    doc = run(doc, 'copy_level_elements', {
+      sourceLevelId: 'level-1',
+      targetLevelIds: ['level-2'],
+    });
+    expect(element(doc, 'plate-2')).toMatchObject({ memberId: 'member-2', levelId: 'level-2' });
+    doc = run(doc, 'delete_building_element', { elementIds: ['member-1'] });
+    expect(doc.building?.elements['plate-1']).toBeUndefined();
+    expect(doc.entities['plate-1:body']).toBeUndefined();
+  });
+
+  it('feeds takeoff, schedule, plan, IFC and the hall generator', () => {
+    const hall = execute(createEmptyDocument(), 'add_portal_frame_building', SMALL_HALL).document;
+    const plates = elementsOf(hall, 'plate');
+    expect(plates).toHaveLength(16);
+    const lines = (execute(hall, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
+    expect(lines.find((line) => line.key === 'plate.anchor M24.ea')?.quantity).toBe(64);
+    expect(lines.find((line) => line.key === 'plate.S355.kg')?.quantity).toBeGreaterThan(400);
+    const schedule = execute(hall, 'building_schedule', { kind: 'plate' }).data as {
+      rows: unknown[][];
+    };
+    expect(schedule.rows[0]?.slice(0, 5)).toEqual(['BP1', 'SC1', '590×500', 25, '4×M24']);
+    const plan = buildPlanDrawing(hall, undefined)!;
+    expect(plan.primitives.filter((p) => p.type === 'circle' && p.layer === 'S-CONN')).toHaveLength(
+      64,
+    );
+    const ifc = (execute(hall, 'export_ifc', {}).data as IfcExport).ifc;
+    expect(ifc).toContain("'BASE_PLATE'");
+    expect(ifc).toContain('.ANCHORBOLT.');
+    expect(execute(hall, 'check_clashes', {}).summary).toBe('No clashes found.');
+    expect(buildingErrors(hall.building)).toEqual([]);
+    const broken = JSON.parse(JSON.stringify(hall.building)) as {
+      elements: Record<string, Record<string, unknown>>;
+    };
+    broken.elements['plate-1']!['memberId'] = 'slab-1';
+    broken.elements['plate-1']!['boltCount'] = 3;
+    expect(buildingErrors(broken)).toEqual([
+      expect.stringMatching(/is not a steel member/),
+      expect.stringMatching(/boltCount must be an even integer/),
+    ]);
+    const bare = execute(createEmptyDocument(), 'add_portal_frame_building', {
+      ...SMALL_HALL,
+      basePlates: false,
+    }).document;
+    expect(elementsOf(bare, 'plate')).toHaveLength(0);
+  });
+});

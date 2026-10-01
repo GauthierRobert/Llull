@@ -23,6 +23,7 @@ const CATEGORIES: ReadonlySet<string> = new Set([
   'equipment',
   'pipe',
   'tray',
+  'plate',
 ]);
 
 /** Numeric fields each category must carry (finite numbers). */
@@ -42,6 +43,7 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   equipment: ['angle', 'clearance', 'weight'],
   pipe: ['diameter'],
   tray: ['width', 'height'],
+  plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
 };
 
 /** Fields that must be strictly positive. */
@@ -57,6 +59,7 @@ const POSITIVE: Readonly<Record<string, ReadonlyArray<string>>> = {
   panel: ['thickness'],
   pipe: ['diameter'],
   tray: ['width', 'height'],
+  plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
 };
 
 /** Plan-point fields each category must carry. */
@@ -76,6 +79,7 @@ const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
   equipment: ['location'],
   pipe: [],
   tray: [],
+  plate: [],
 };
 
 const isPoint = (value: unknown): boolean =>
@@ -175,6 +179,7 @@ function elementErrors(
     equipment: ['name'],
     pipe: ['service', 'material'],
     tray: ['system'],
+    plate: ['material'],
   };
   for (const field of textFields[category] ?? []) {
     if (typeof element[field] !== 'string') {
@@ -197,6 +202,17 @@ function elementErrors(
     const levelId = element['levelId'];
     if (typeof levelId !== 'string' || !(levelId in levels)) {
       errors.push(`building element ${key}: levelId '${String(levelId)}' is not a known level`);
+    }
+  }
+  if (category === 'plate') {
+    const memberId = element['memberId'];
+    const host = typeof memberId === 'string' ? elements[memberId] : undefined;
+    if (!isRecord(host) || host['category'] !== 'member') {
+      errors.push(`building element ${key}: memberId '${String(memberId)}' is not a steel member`);
+    }
+    const bolts = element['boltCount'];
+    if (!(typeof bolts === 'number' && Number.isInteger(bolts) && bolts % 2 === 0)) {
+      errors.push(`building element ${key}: boltCount must be an even integer`);
     }
   }
   if (category === 'door' || category === 'window') {

@@ -75,6 +75,7 @@ const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string
   equipment: 'EQ',
   pipe: 'PL',
   tray: 'CT',
+  plate: 'BP',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */
@@ -229,4 +230,10 @@ export function followLevelHeight(
     return { ...element, riserHeight: newHeight / element.riserCount };
   }
   return element;
+}
+
+/** Host of a hosted element: a door / window's wall, a base plate's column (else null). */
+export function hostOf(element: BuildingElement): string | null {
+  if (element.category === 'door' || element.category === 'window') return element.hostId;
+  return element.category === 'plate' ? element.memberId : null;
 }

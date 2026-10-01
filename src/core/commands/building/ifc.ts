@@ -14,6 +14,7 @@ import type {
   PanelElement,
   PipeElement,
   CableTrayElement,
+  BasePlateElement,
   SteelMemberElement,
   BuildingLevel,
   OpeningElement,
@@ -25,7 +26,7 @@ import { toCounterClockwise } from '../../../lib/polygon';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
 import { wallExtent, wallFrame, type WallExtent } from './evaluate';
 import { sweepFrame } from './mesh';
-import { panelFrame, trayOutline } from './industrial/evaluate';
+import { panelFrame, plateLayout, trayOutline } from './industrial/evaluate';
 import { findProfile, type SteelProfile } from './steel/profiles';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
@@ -431,6 +432,47 @@ function exportIndustrial(
   }
 }
 
+/** A base plate (IfcPlate) and its anchor bolts (IfcMechanicalFastener). */
+function exportPlate(
+  context: Context,
+  units: Pick<CadDocument, 'units'>,
+  plate: BasePlateElement,
+  member: SteelMemberElement,
+  level: BuildingLevel,
+  storeyPlacement: string,
+): Exported[] {
+  const { mm, writer } = context;
+  const layout = plateLayout(units, plate, member, level);
+  if (!layout) return [];
+  const [cx, cy, cz] = layout.center;
+  const bottom = cz - level.elevation - plate.thickness / 2;
+  const local = placement(context, storeyPlacement, mm(cx), mm(cy), mm(bottom), layout.angle);
+  const body = extrusion(
+    context,
+    rectangleProfile(context, [0, 0], mm(plate.length), mm(plate.width)),
+    mm(plate.thickness),
+  );
+  const plateRef = writer.add(
+    `IFCPLATE('${context.guid(plate.id)}',$,${ifcString(plate.mark)},$,'BASE_PLATE',${local},${shape(context, [body])},${ifcString(plate.id)},.USERDEFINED.)`,
+  );
+  const origin = writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
+  const circle = writer.add(
+    `IFCCIRCLEPROFILEDEF(.AREA.,$,${origin},${ifcReal(mm(plate.boltDiameter) / 2)})`,
+  );
+  const boltLength = layout.boltBelow + plate.thickness + layout.boltAbove;
+  const boltBottom = bottom - layout.boltBelow;
+  const bolts = layout.bolts.map(([x, y]) =>
+    extrusion(context, circle, mm(boltLength), mm(x), mm(y), mm(boltBottom)),
+  );
+  const fastenerRef = writer.add(
+    `IFCMECHANICALFASTENER('${context.guid(`${plate.id}:bolts`)}',$,${ifcString(`${plate.mark} anchors`)},$,$,${placement(context, storeyPlacement, 0, 0, 0)},${shape(context, bolts)},$,${ifcReal(mm(plate.boltDiameter))},${ifcReal(mm(boltLength))},.ANCHORBOLT.)`,
+  );
+  return [
+    { ref: plateRef, material: plate.material },
+    { ref: fastenerRef, material: plate.material },
+  ];
+}
+
 const SLAB_TYPE: Readonly<Record<SlabElement['role'], string>> = {
   floor: '.FLOOR.',
   roof: '.ROOF.',
@@ -670,6 +712,15 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
         if (industrial) {
           contained.push(industrial.ref);
           record(industrial);
+        }
+        continue;
+      }
+      if (element.category === 'plate') {
+        const member = building.elements[element.memberId];
+        if (member?.category !== 'member') continue;
+        for (const exported of exportPlate(context, doc, element, member, level, storeyPlacement)) {
+          contained.push(exported.ref);
+          record(exported);
         }
         continue;
       }
