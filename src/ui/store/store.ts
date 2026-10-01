@@ -101,7 +101,7 @@ export interface CadStoreState {
    *
    * Fire-and-forget from the caller's perspective — returns void.
    * On success: updates lastSummary, lastMeasure (if data present), canUndo/canRedo.
-   * On failure: sets liveStatus to 'disconnected' and lastSummary to an error message.
+   * On network failure: sets liveStatus to 'disconnected'; HTTP errors leave liveStatus alone. Always sets lastSummary to an error message.
    * The document is NEVER mutated here; it arrives via the /live SSE stream.
    *
    * This is the ONLY way the UI changes the document (PRIME DIRECTIVE).
@@ -195,6 +195,15 @@ export interface CadStoreState {
 // Store implementation
 // ---------------------------------------------------------------------------
 
+/** Only network failures flip liveStatus; HTTP errors (4xx/429/5xx) just surface the message. */
+function failureState(
+  err: unknown,
+  message: string,
+): { lastSummary: string; liveStatus?: 'disconnected' } {
+  const isHttpError = err instanceof ServerCommandError && err.kind === 'http';
+  return isHttpError ? { lastSummary: message } : { lastSummary: message, liveStatus: 'disconnected' };
+}
+
 export const useStore = create<CadStoreState>()((set, get) => ({
   document: createEmptyDocument(),
   lastSummary: null,
@@ -222,7 +231,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
       const message = err instanceof ServerCommandError
         ? err.message
         : `Command '${name}' failed: ${String(err)}`;
-      set({ liveStatus: 'disconnected', lastSummary: message });
+      set(failureState(err, message));
     });
   },
 
@@ -241,7 +250,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
       const message = err instanceof ServerCommandError
         ? err.message
         : `Undo failed: ${String(err)}`;
-      set({ liveStatus: 'disconnected', lastSummary: message });
+      set(failureState(err, message));
     });
   },
 
@@ -256,7 +265,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
       const message = err instanceof ServerCommandError
         ? err.message
         : `Redo failed: ${String(err)}`;
-      set({ liveStatus: 'disconnected', lastSummary: message });
+      set(failureState(err, message));
     });
   },
 

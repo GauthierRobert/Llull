@@ -2,7 +2,7 @@
  * @layer ui/hooks
  *
  * Global shortcuts: Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo,
- * Delete/Backspace delete selection, Escape clear selection.
+ * Delete/Backspace delete selection (one delete_entities call), Escape clear selection.
  * Ignored while typing in form fields. All mutations go through the store.
  */
 
@@ -18,7 +18,10 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
-      if (isTypingTarget(e.target)) return;
+      if (e.repeat || e.defaultPrevented) return;
+      const origin = e.composedPath()[0] ?? e.target;
+      if (isTypingTarget(origin)) return;
+      if (origin instanceof Element && origin.closest('[role="dialog"]')) return;
       const state = useStore.getState();
       const modifier = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
@@ -34,7 +37,7 @@ export function useKeyboardShortcuts(): void {
         const selection = state.document.selection;
         if (selection.length === 0) return;
         e.preventDefault();
-        for (const id of selection) state.dispatch('delete_entity', { id });
+        state.dispatch('delete_entities', { ids: [...selection] });
       } else if (!modifier && e.key === 'Escape') {
         state.clearSelection();
       }

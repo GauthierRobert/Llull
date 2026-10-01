@@ -38,8 +38,14 @@ export interface ServerCommandResponse {
 // ---------------------------------------------------------------------------
 
 export class ServerCommandError extends Error {
-  constructor(message: string) {
+  /** 'network' = fetch failed (server unreachable); 'http' = server answered non-2xx. */
+  readonly kind: 'network' | 'http';
+  readonly status: number | undefined;
+
+  constructor(message: string, kind: 'network' | 'http' = 'network', status?: number) {
     super(message);
+    this.kind = kind;
+    this.status = status;
     this.name = 'ServerCommandError';
   }
 }
@@ -61,7 +67,7 @@ async function postJson(path: string, body: unknown): Promise<ServerCommandRespo
   }
 
   if (!response.ok) {
-    throw new ServerCommandError(`Server responded with HTTP ${response.status} for ${path}`);
+    throw new ServerCommandError(`Server responded with HTTP ${response.status} for ${path}`, 'http', response.status);
   }
 
   return response.json() as Promise<ServerCommandResponse>;

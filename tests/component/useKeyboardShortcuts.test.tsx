@@ -40,11 +40,34 @@ describe('useKeyboardShortcuts', () => {
     expect(redo).toHaveBeenCalledTimes(2);
   });
 
-  it('Delete dispatches delete_entity for each selected id', () => {
+  it('Delete dispatches one delete_entities call with all selected ids', () => {
     render(<Harness />);
     fireEvent.keyDown(window, { key: 'Delete' });
-    expect(dispatch).toHaveBeenCalledWith('delete_entity', { id: 'a' });
-    expect(dispatch).toHaveBeenCalledWith('delete_entity', { id: 'b' });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith('delete_entities', { ids: ['a', 'b'] });
+  });
+
+  it('ignores auto-repeat and already-handled key events', () => {
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'Delete', repeat: true });
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true, repeat: true });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(undo).not.toHaveBeenCalled();
+  });
+
+  it('ignores shortcuts originating inside an open dialog', () => {
+    const { getByTestId } = render(
+      <>
+        <Harness />
+        <div role="dialog">
+          <button data-testid="in-dialog" type="button" />
+        </div>
+      </>,
+    );
+    fireEvent.keyDown(getByTestId('in-dialog'), { key: 'Delete' });
+    fireEvent.keyDown(getByTestId('in-dialog'), { key: 'z', ctrlKey: true });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(undo).not.toHaveBeenCalled();
   });
 
   it('Escape clears selection', () => {

@@ -160,6 +160,17 @@ describe('CadStore — networked dispatch', () => {
     expect(getState().lastSummary).toContain('Network');
   });
 
+  it('dispatch keeps liveStatus on HTTP 429 and surfaces the error in lastSummary', async () => {
+    useStore.setState({ liveStatus: 'connected' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429, json: () => Promise.resolve({}) }));
+
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    await flushPromises();
+
+    expect(getState().liveStatus).toBe('connected');
+    expect(getState().lastSummary).toContain('429');
+  });
+
   it('dispatch does NOT update document — only hydrateLiveDocument does', async () => {
     mockFetch(DEFAULT_RESPONSE);
 
