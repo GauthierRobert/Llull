@@ -167,10 +167,11 @@ const CONCRETE_CATEGORIES: ReadonlySet<string> = new Set([
   'beam',
   'stair',
   'footing',
+  'curvedWall',
 ]);
 
 function cutMaterial(category: string | null): CutMaterial {
-  if (category === 'member') return 'steel';
+  if (category === 'member' || category === 'plate') return 'steel';
   return category !== null && CONCRETE_CATEGORIES.has(category) ? 'concrete' : 'other';
 }
 

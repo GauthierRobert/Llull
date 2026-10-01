@@ -20,6 +20,7 @@ import { findProfile } from './steel/profiles';
 import { polygonNormal } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
 import { plateMass } from './industrial/plates';
+import { boltSize } from './industrial/evaluate';
 import { curvedWallLength } from './curvedWallGeometry';
 
 export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
@@ -331,9 +332,9 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
     takeoff.add('plate', plate.material, 'ea', `Base plates ${plate.material} — count`, 1);
     takeoff.add(
       'plate',
-      `anchor M${plate.boltDiameter}`,
+      `anchor ${boltSize(doc, plate.boltDiameter)}`,
       'ea',
-      `Anchor bolts M${plate.boltDiameter} — count`,
+      `Anchor bolts ${boltSize(doc, plate.boltDiameter)} — count`,
       plate.boltCount,
     );
   }
@@ -738,7 +739,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           building.elements[plate.memberId]?.mark ?? plate.memberId,
           `${round(plate.length, 1)}×${round(plate.width, 1)}`,
           plate.thickness,
-          `${plate.boltCount}×M${plate.boltDiameter}`,
+          `${plate.boltCount}×${boltSize(doc, plate.boltDiameter)}`,
           round(plateMass(doc, plate), 1),
           plate.material,
           levelName(building, plate.levelId),

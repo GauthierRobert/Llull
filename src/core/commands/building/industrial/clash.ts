@@ -10,7 +10,7 @@ import { fromMm, getBuilding, isFiniteNumber, noChange, toMetres } from '../mode
 import { sweepFrame } from '../mesh';
 import { findProfile } from '../steel/profiles';
 import { atLevel } from './evaluate';
-import { arcPoints, curvedWallArc } from '../curvedWallGeometry';
+import { arcPoints, curvedWallArc, curvedWallBand } from '../curvedWallGeometry';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
 export interface OrientedBox {
@@ -127,7 +127,7 @@ export function elementBoxes(
     }
     case 'curvedWall': {
       const arc = curvedWallArc(element);
-      if (!level || !arc) return [];
+      if (!level || !arc || !curvedWallBand(element)) return [];
       const points = arcPoints(arc, arc.radius);
       const z = level.elevation + element.baseOffset + element.height / 2;
       return points.slice(1).map((point, index): OrientedBox => {

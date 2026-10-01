@@ -144,3 +144,24 @@ describe('add_curved_wall', () => {
     expect(buildingErrors(broken)).toEqual([expect.stringMatching(/through/)]);
   });
 });
+
+describe('curved wall review regressions', () => {
+  it('is hatched as concrete when cut in a section', async () => {
+    const { buildElevationDrawing } = await import('@core/commands/building/elevation');
+    const doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    const drawing = buildElevationDrawing(doc, { direction: 'south', cutAt: 4000 })!;
+    expect(drawing.cutRegions.map((region) => region.material)).toEqual(['concrete']);
+  });
+
+  it('rejects collinear curved walls on load and gives no clash boxes without a band', async () => {
+    const { elementBoxes } = await import('@core/commands/building/industrial/clash');
+    const doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    const broken = JSON.parse(JSON.stringify(doc.building)) as {
+      elements: Record<string, Record<string, unknown>>;
+    };
+    broken.elements['curvedWall-1']!['through'] = [0, 0];
+    expect(buildingErrors(broken)).toEqual([expect.stringMatching(/collinear/)]);
+    const thick = { ...wallOf(doc), thickness: 20000 };
+    expect(elementBoxes(doc, doc.building!, thick)).toEqual([]);
+  });
+});

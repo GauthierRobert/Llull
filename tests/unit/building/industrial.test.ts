@@ -1037,7 +1037,7 @@ describe('add_base_plates', () => {
     broken.elements['plate-1']!['memberId'] = 'slab-1';
     broken.elements['plate-1']!['boltCount'] = 3;
     expect(buildingErrors(broken)).toEqual([
-      expect.stringMatching(/is not a steel member/),
+      expect.stringMatching(/is not a steel column/),
       expect.stringMatching(/boltCount must be an even integer/),
     ]);
     const bare = execute(createEmptyDocument(), 'add_portal_frame_building', {
@@ -1045,5 +1045,104 @@ describe('add_base_plates', () => {
       basePlates: false,
     }).document;
     expect(elementsOf(bare, 'plate')).toHaveLength(0);
+  });
+});
+
+describe('phase 2 review regressions', () => {
+  function plated(profile = 'HEA300'): CadDocument {
+    const doc = run(createEmptyDocument(), 'add_steel_member', {
+      profile,
+      role: 'column',
+      start: [0, 0, 0],
+      end: [0, 0, 6000],
+    });
+    return run(doc, 'add_base_plates', {});
+  }
+
+  it('fails gracefully on non-array spans', () => {
+    for (const spans of [18000, {}]) {
+      expect(
+        execute(createEmptyDocument(), 'add_portal_frame_building', { spans }).summary,
+      ).toMatch(/spans must be 1–10 widths/);
+    }
+  });
+
+  it('never copies a base plate without its column', () => {
+    const doc = run(plated(), 'add_level', { name: 'Upper' });
+    const result = execute(doc, 'copy_level_elements', {
+      sourceLevelId: 'level-1',
+      targetLevelIds: ['level-2'],
+      categories: ['plate'],
+    });
+    expect(result.affected).toEqual([]);
+    expect(elementsOf(result.document, 'plate')).toHaveLength(1);
+  });
+
+  it('re-sizes plates with their column and removes them when it stops being one', () => {
+    let doc = plated();
+    const result = execute(doc, 'update_steel_member', { memberId: 'member-1', profile: 'HEB500' });
+    expect(result.summary).toMatch(/Base plate\(s\) plate-1 re-sized/);
+    doc = result.document;
+    expect(element(doc, 'plate-1')).toMatchObject({ length: 700, width: 500 });
+    const rafter = execute(doc, 'update_steel_member', { memberId: 'member-1', role: 'rafter' });
+    expect(rafter.summary).toMatch(/plate-1 removed \(no longer a column\)/);
+    expect(rafter.document.building?.elements['plate-1']).toBeUndefined();
+    expect(rafter.document.entities['plate-1:body']).toBeUndefined();
+    // Unrelated edits leave the plate alone.
+    const noted = execute(doc, 'update_steel_member', { memberId: 'member-1', note: 'x' });
+    expect(noted.summary).not.toMatch(/plate/i);
+  });
+
+  it('names bolts in mm in a metre document', () => {
+    let doc = execute(createEmptyDocument(), 'set_units', { units: 'm' }).document;
+    doc = run(doc, 'add_steel_member', {
+      profile: 'HEA300',
+      role: 'column',
+      start: [0, 0, 0],
+      end: [0, 0, 6],
+    });
+    const result = execute(doc, 'add_base_plates', {});
+    expect(result.summary).toMatch(/anchor bolt\(s\) M24/);
+    const lines = (
+      execute(result.document, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }
+    ).lines;
+    expect(lines.some((line) => line.key === 'plate.anchor M24.ea')).toBe(true);
+  });
+
+  it('draws a tray starting with a vertical riser as a full-width band', () => {
+    const doc = run(createEmptyDocument(), 'add_cable_tray', {
+      points: [
+        [0, 0, 3000],
+        [0, 0, 5000],
+        [10000, 0, 5000],
+      ],
+    });
+    const edges = buildPlanDrawing(doc, undefined)!.primitives.filter(
+      (p) => p.type === 'polyline' && p.layer === 'E-TRAY',
+    );
+    expect(edges.map((edge) => edge.type === 'polyline' && edge.points[0])).toEqual([
+      [0, 150],
+      [0, -150],
+    ]);
+    const riser = run(createEmptyDocument(), 'add_cable_tray', {
+      points: [
+        [0, 0, 3000],
+        [0, 0, 5000],
+      ],
+    });
+    const symbol = buildPlanDrawing(riser, undefined)!.primitives.find((p) => p.layer === 'E-TRAY');
+    expect(symbol?.type).toBe('polygon');
+  });
+
+  it('fills cut plates as steel in sections and rejects plates on non-columns', () => {
+    const doc = plated();
+    const drawing = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 })
+      .data as { svg: string };
+    expect(drawing.svg).toContain('class="poche-steel"');
+    const broken = JSON.parse(JSON.stringify(doc.building)) as {
+      elements: Record<string, Record<string, unknown>>;
+    };
+    broken.elements['member-1']!['role'] = 'beam';
+    expect(buildingErrors(broken)).toEqual([expect.stringMatching(/is not a steel column/)]);
   });
 });

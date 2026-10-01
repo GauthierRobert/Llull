@@ -554,8 +554,35 @@ function industrialPrimitives(
       ];
     }
     case 'tray': {
-      const points = element.points.map(flat);
+      // Vertical risers collapse to one plan point: keep distinct consecutive points only.
+      const points = element.points
+        .map(flat)
+        .filter(
+          (point, index, all) =>
+            index === 0 ||
+            Math.hypot(
+              point[0] - (all[index - 1] as Vec2)[0],
+              point[1] - (all[index - 1] as Vec2)[1],
+            ) > 1e-9,
+        );
       const layer = layerName('tray');
+      if (points.length < 2) {
+        const [x, y] = points[0] as Vec2;
+        const half = element.width / 2;
+        return [
+          {
+            type: 'polygon',
+            layer,
+            style: 'thin',
+            points: [
+              [x - half, y - half],
+              [x + half, y - half],
+              [x + half, y + half],
+              [x - half, y + half],
+            ],
+          },
+        ];
+      }
       const [a, b] = [points[0] as Vec2, points[1] as Vec2];
       return [
         ...offsetPolyline(points, element.width / 2).map(

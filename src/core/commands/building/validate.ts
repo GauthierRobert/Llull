@@ -6,6 +6,8 @@
 
 import { isRecord } from '../../../lib/isRecord';
 import { MEMBER_LAYER } from './entities';
+import { arcThrough } from './curvedWallGeometry';
+import { isVec2 } from './model';
 
 const CATEGORIES: ReadonlySet<string> = new Set([
   'grid',
@@ -209,11 +211,20 @@ function elementErrors(
       errors.push(`building element ${key}: levelId '${String(levelId)}' is not a known level`);
     }
   }
+  if (
+    category === 'curvedWall' &&
+    isVec2(element['start']) &&
+    isVec2(element['through']) &&
+    isVec2(element['end']) &&
+    !arcThrough(element['start'], element['through'], element['end'])
+  ) {
+    errors.push(`building element ${key}: start, through and end are collinear`);
+  }
   if (category === 'plate') {
     const memberId = element['memberId'];
     const host = typeof memberId === 'string' ? elements[memberId] : undefined;
-    if (!isRecord(host) || host['category'] !== 'member') {
-      errors.push(`building element ${key}: memberId '${String(memberId)}' is not a steel member`);
+    if (!isRecord(host) || host['category'] !== 'member' || host['role'] !== 'column') {
+      errors.push(`building element ${key}: memberId '${String(memberId)}' is not a steel column`);
     }
     const bolts = element['boltCount'];
     if (!(typeof bolts === 'number' && Number.isInteger(bolts) && bolts % 2 === 0)) {

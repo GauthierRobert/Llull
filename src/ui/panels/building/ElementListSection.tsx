@@ -8,6 +8,8 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingElement } from '@core/model/building';
+import type { DocumentUnit } from '@core/model/types';
+import { boltSize } from '@core/commands/building/industrial/evaluate';
 import { Icon } from '@ui/components/Icon';
 import { PanelSection } from '@ui/panels/PanelParts';
 
@@ -31,7 +33,7 @@ const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string>> = {
   curvedWall: 'Curved wall',
 };
 
-function describe(element: BuildingElement): string {
+function describe(element: BuildingElement, units: DocumentUnit): string {
   switch (element.category) {
     case 'wall':
       return `${element.material} · ${element.thickness}`;
@@ -65,7 +67,7 @@ function describe(element: BuildingElement): string {
     case 'curvedWall':
       return `${element.material} · ${element.thickness}`;
     case 'plate':
-      return `${element.length}×${element.width}×${element.thickness} · ${element.boltCount}×M${element.boltDiameter}`;
+      return `${element.length}×${element.width}×${element.thickness} · ${element.boltCount}×${boltSize({ units }, element.boltDiameter)}`;
   }
 }
 
@@ -77,6 +79,7 @@ interface ElementRowProps {
 function ElementRow({ element, selected }: ElementRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const select = useStore((s) => s.select);
+  const units = useStore((s) => s.document.units);
   return (
     <li
       className={`panel__row${selected ? ' panel__row--selected' : ''}`}
@@ -90,7 +93,7 @@ function ElementRow({ element, selected }: ElementRowProps): React.ReactElement 
       >
         <span className="chip">{CATEGORY_LABEL[element.category]}</span>
         <span className="panel__row-main">{element.mark}</span>
-        <span className="panel__row-meta">{describe(element)}</span>
+        <span className="panel__row-meta">{describe(element, units)}</span>
       </button>
       <span className="panel__row-actions">
         <button

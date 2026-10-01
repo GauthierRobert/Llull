@@ -397,7 +397,13 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
         `copy_level_elements failed: unknown or missing level(s) ${missing.join(', ') || '(no targets)'}.`,
       );
     }
-    const allowed = new Set<string>(categories && categories.length > 0 ? categories : COPYABLE);
+    const requested = Array.isArray(categories)
+      ? categories.filter((category) => (COPYABLE as ReadonlyArray<string>).includes(category))
+      : [];
+    // Hosted elements (doors, windows, base plates) are copied with their host only.
+    const allowed = new Set<string>(
+      Array.isArray(categories) && categories.length > 0 ? requested : COPYABLE,
+    );
     const sourceElements = building.elementOrder
       .map((id) => building.elements[id])
       .filter(

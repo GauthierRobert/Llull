@@ -248,6 +248,11 @@ export function evaluateTray(
   return entities;
 }
 
+/** Anchor bolt size label, e.g. "M24" (diameter in document units). */
+export function boltSize(doc: Pick<CadDocument, 'units'>, diameter: number): string {
+  return `M${Math.round(diameter / fromMm(doc, 1))}`;
+}
+
 /** World placement of a base plate and its anchor bolts (null when the column is missing). */
 export interface PlateLayout {
   /** Plate centre (world). */
@@ -320,7 +325,10 @@ export function evaluatePlate(
       (bolt, index): CylinderEntity => ({
         ...base(
           plate,
-          { part: `bolt-${index}`, label: `Anchor bolt ${plate.mark} M${plate.boltDiameter}` },
+          {
+            part: `bolt-${index}`,
+            label: `Anchor bolt ${plate.mark} ${boltSize(doc, plate.boltDiameter)}`,
+          },
           [bolt[0], bolt[1], (top + layout.boltAbove + bottom - layout.boltBelow) / 2],
           [0, 0, 0],
           '#3d4650',

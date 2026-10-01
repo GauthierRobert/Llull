@@ -18,6 +18,7 @@ import {
 } from '../model';
 import { regenerateBuilding } from '../evaluate';
 import { findProfile } from '../steel/profiles';
+import { boltSize } from './evaluate';
 
 const STEEL_DENSITY_KG_PER_M3 = 7850;
 
@@ -70,6 +71,49 @@ export function appendBasePlates(
     ids.push(plate.id);
   }
   return { building: next, ids };
+}
+
+/**
+ * Keeps the base plates of `member` consistent after an edit: re-sized (same overhang) when its
+ * profile changed from `previousProfile`, removed when it is no longer a column.
+ */
+export function refitPlates(
+  doc: Pick<CadDocument, 'units'>,
+  building: BuildingModel,
+  member: SteelMemberElement,
+  previousProfile: string,
+): { building: BuildingModel; resized: string[]; removed: string[] } {
+  const plates = Object.values(building.elements).filter(
+    (element): element is BasePlateElement =>
+      element.category === 'plate' && element.memberId === member.id,
+  );
+  if (member.role !== 'column') {
+    const removed = new Set(plates.map((plate) => plate.id));
+    const elements = { ...building.elements };
+    for (const id of removed) delete elements[id];
+    return {
+      building: {
+        ...building,
+        elements,
+        elementOrder: building.elementOrder.filter((id) => !removed.has(id)),
+      },
+      resized: [],
+      removed: [...removed],
+    };
+  }
+  const [before, after] = [findProfile(previousProfile), findProfile(member.profile)];
+  if (!before || !after || before.name === after.name) {
+    return { building, resized: [], removed: [] };
+  }
+  let next = building;
+  for (const plate of plates) {
+    next = withElement(next, {
+      ...plate,
+      length: plate.length + fromMm(doc, after.h - before.h),
+      width: plate.width + fromMm(doc, after.b - before.b),
+    });
+  }
+  return { building: next, resized: plates.map((plate) => plate.id), removed: [] };
 }
 
 /** Steel columns of `levelId` (or `memberIds`) that do not yet carry a base plate. */
@@ -170,7 +214,7 @@ export const addBasePlates: CommandDefinition<AddBasePlatesParams> = {
     const kilograms = plates.reduce((sum, plate) => sum + plateMass(doc, plate), 0);
     return {
       document,
-      summary: `Added ${plates.length} base plate(s) with ${plates.length * boltCount} anchor bolt(s) M${plates[0]?.boltDiameter ?? ''}: ${kilograms.toFixed(1)} kg of plate.`,
+      summary: `Added ${plates.length} base plate(s) with ${plates.length * boltCount} anchor bolt(s) ${boltSize(doc, plates[0]?.boltDiameter ?? 0)}: ${kilograms.toFixed(1)} kg of plate.`,
       affected: elementAffected(document, added.ids),
       data: { elementIds: added.ids },
     };
