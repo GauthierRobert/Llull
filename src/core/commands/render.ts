@@ -645,19 +645,21 @@ function tessellateExtrusion(e: {
   return polys;
 }
 
-/** Mesh solid: world-space triangle soup. Groups every 3 vertices as one triangle. */
+/** Mesh solid: world-space triangles — indexed (kernel output) or a soup when indices is empty. */
 function tessellateMesh(e: {
   position: Vec3;
-  mesh: { positions: readonly number[] };
+  mesh: { positions: readonly number[]; indices: readonly number[] };
   color: string;
 }): PreDepthPolygon[] {
   const p = e.mesh.positions;
+  const vertex = (i: number): Vec3 => [p[i * 3] ?? 0, p[i * 3 + 1] ?? 0, p[i * 3 + 2] ?? 0];
+  const corners =
+    e.mesh.indices.length > 0 ? e.mesh.indices : p.map((_, i) => i).slice(0, p.length / 3);
   const polys: PreDepthPolygon[] = [];
-  for (let i = 0; i + 8 < p.length; i += 9) {
-    const v0: Vec3 = [p[i] as number, p[i + 1] as number, p[i + 2] as number];
-    const v1: Vec3 = [p[i + 3] as number, p[i + 4] as number, p[i + 5] as number];
-    const v2: Vec3 = [p[i + 6] as number, p[i + 7] as number, p[i + 8] as number];
-    polys.push(makePolygon([v0, v1, v2], e.color));
+  for (let i = 0; i + 2 < corners.length; i += 3) {
+    polys.push(
+      makePolygon([vertex(corners[i]!), vertex(corners[i + 1]!), vertex(corners[i + 2]!)], e.color),
+    );
   }
   return polys;
 }

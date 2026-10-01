@@ -158,7 +158,7 @@ wildly unexpected orientation. Always use radians.
 | \`render_view\`     | Render to image (use showAxes+showGrid for context) |
 | \`check_model\`     | Lint the document for errors                       |
 | \`add_box\`         | Create a rectangular box solid                     |
-| \`add_cylinder\`    | Create a cylinder (base-center anchor)             |
+| \`add_cylinder\`    | Create a cylinder (center anchor)                  |
 | \`add_sphere\`      | Create a sphere (center anchor)                    |
 | \`add_cone\`        | Create a cone (base-center anchor)                 |
 | \`add_torus\`       | Create a torus/donut (center anchor)               |
@@ -167,6 +167,14 @@ wildly unexpected orientation. Always use radians.
 | \`move_entity\`     | Translate an entity by a delta vector              |
 | \`delete_entity\`   | Remove an entity by id                             |
 | \`set_entity_name\` | Assign a human-readable name to an entity          |
+| \`export_code\`     | Model as CadQuery/build123d/OpenSCAD/FreeCAD source |
+| \`import_code\`     | Rebuild the model from edited CadQuery/build123d   |
+| \`export_step\`     | Exact B-rep STEP file (server Python bridge)       |
+| \`import_step\`     | STEP solids → named, coloured mesh entities        |
+
+To read or rework a whole model at once, call \`export_code\` (language "cadquery"):
+the code lists every parameter, dimension and feature in build order. Edit it and
+send it back with \`import_code\` to regenerate an editable feature history.
 `;
 
 /** The URI for the conventions resource. */

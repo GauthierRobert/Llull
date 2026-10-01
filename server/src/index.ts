@@ -24,6 +24,7 @@ import './loadEnv';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { buildMcpRouter, exchangeOptionsFromEnv } from './mcp';
+import { installGeometryKernel } from './geometryKernel';
 import { applyExchangeToolCall } from '@core/mcp';
 import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
@@ -352,6 +353,7 @@ export function startServer(port: number = PORT, host: string = HOST): Server {
       '[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).',
     );
   }
+  void installGeometryKernel();
   const server = app.listen(port, host, () => {
     console.warn(`[llull-server] listening on http://${host}:${port}`);
   });

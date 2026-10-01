@@ -9,16 +9,16 @@
  *
  * Tessellation per entity kind:
  *   box       → Manifold.cube(size, center=true) — matches THREE.BoxGeometry centering
- *   cylinder  → Manifold.cylinder(height, radius, center=true) rotated −90° around X
- *               to align with three.js CylinderGeometry (Y-axis, centered)
+ *   cylinder  → Manifold.cylinder(height, radius, center=true) — llull cylinders run along +Z
  *   sphere    → Manifold.sphere(radius) — both three.js and Manifold center at origin
  *   extrusion → CrossSection(profile).extrude(depth) — both three.js ExtrudeGeometry and
  *               Manifold extrude along Z from z=0
- *   mesh      → Manifold mesh from MeshData (already world-space; position=[0,0,0])
+ *   mesh      → Manifold mesh from MeshData (indexed or triangle soup), vertices welded
+ *   cone, torus, wedge, pyramid, revolution → llull's own world-space tessellation
+ *               (`entityToTriangles`, what the viewport and STL export use), welded
  *
  * Entity transform (position + Euler rotation in RADIANS) is applied AFTER
- * primitive construction: rotate first (converting rad→deg), then translate.
- * This matches how three.js applies rotation then position.
+ * primitive construction: rotate about Z, then Y, then X (llull M = Rx·Ry·Rz), then translate.
  *
  * WASM boundary: `manifold-3d` types are loose; a minimal local interface
  * narrows the parts we use. The single `as ManifoldType` cast at init is the
@@ -27,6 +27,8 @@
 
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
 import type { Entity } from '@core/model/types';
+import { createEmptyDocument } from '@core/model/types';
+import { entityToTriangles } from '@core/commands/export';
 
 // ---------------------------------------------------------------------------
 // Minimal local interface for the Manifold WASM module (avoids `any`).
@@ -58,6 +60,7 @@ interface CrossSectionShape {
 }
 
 interface ManifoldStatic {
+  ofMesh(mesh: unknown): ManifoldShape;
   cube(size: [number, number, number], center?: boolean): ManifoldShape;
   cylinder(
     height: number,
@@ -72,6 +75,11 @@ interface ManifoldStatic {
 interface ManifoldModule {
   Manifold: ManifoldStatic;
   CrossSection: new (polygons: Array<Array<[number, number]>>) => CrossSectionShape;
+  Mesh: new (options: {
+    numProp: number;
+    vertProperties: Float32Array;
+    triVerts: Uint32Array;
+  }) => unknown;
   setup(): void;
 }
 
@@ -94,8 +102,6 @@ async function getManifoldModule(): Promise<ManifoldModule> {
 
 // ---------------------------------------------------------------------------
 // Euler rotation (radians) → ManifoldShape.rotate (degrees) helper.
-// Applies ZYX Euler sequence to match three.js default ('XYZ' in three's enum
-// maps to extrinsic XYZ, which is our representation: [rx, ry, rz] radians).
 // ---------------------------------------------------------------------------
 
 const RAD_TO_DEG = 180 / Math.PI;
@@ -108,12 +114,15 @@ function applyTransform(
   const [rx, ry, rz] = rotation;
   const [px, py, pz] = position;
 
-  // Apply rotation in XYZ order (degrees).
-  const rotated = solid.rotate([rx * RAD_TO_DEG, ry * RAD_TO_DEG, rz * RAD_TO_DEG]);
-  // Then translate.
-  const translated = rotated.translate([px, py, pz]);
-  // rotated is an intermediate — free it.
-  rotated.delete();
+  // llull rotation is M = Rx·Ry·Rz (Rz applied first); Manifold's rotate([x,y,z]) applies X
+  // first, so compose the three axes explicitly: Z, then Y, then X (degrees).
+  const aboutZ = solid.rotate([0, 0, rz * RAD_TO_DEG]);
+  const aboutY = aboutZ.rotate([0, ry * RAD_TO_DEG, 0]);
+  const aboutX = aboutY.rotate([rx * RAD_TO_DEG, 0, 0]);
+  const translated = aboutX.translate([px, py, pz]);
+  aboutZ.delete();
+  aboutY.delete();
+  aboutX.delete();
   return translated;
 }
 
@@ -121,6 +130,77 @@ function applyTransform(
 // Entity → Manifold solid tessellation.
 // Returns null for unsupported / degenerate input.
 // ---------------------------------------------------------------------------
+
+/**
+ * Build a Manifold from triangles, merging coincident corners so the result is an oriented
+ * 2-manifold. `indices` undefined → `positions` is a triangle soup (9 numbers per triangle).
+ * Returns null when the triangles do not close into a valid solid.
+ */
+function weldedManifold(
+  m: ManifoldModule,
+  positions: ReadonlyArray<number>,
+  indices: ReadonlyArray<number> | undefined,
+  entity: Entity,
+): ManifoldShape | null {
+  const corners = indices ?? Array.from({ length: positions.length / 3 }, (_, i) => i);
+  const vertexOf = new Map<string, number>();
+  const vertProperties: number[] = [];
+  const triVerts: number[] = [];
+  for (const corner of corners) {
+    const x = positions[corner * 3] ?? 0;
+    const y = positions[corner * 3 + 1] ?? 0;
+    const z = positions[corner * 3 + 2] ?? 0;
+    const key = `${Math.round(x * WELD_SCALE)},${Math.round(y * WELD_SCALE)},${Math.round(z * WELD_SCALE)}`;
+    let vertex = vertexOf.get(key);
+    if (vertex === undefined) {
+      vertex = vertProperties.length / 3;
+      vertexOf.set(key, vertex);
+      vertProperties.push(x, y, z);
+    }
+    triVerts.push(vertex);
+  }
+  if (signedVolume(vertProperties, triVerts) < 0) {
+    // Inside-out input (consistent but inward winding): flip every triangle.
+    for (let i = 0; i + 2 < triVerts.length; i += 3) {
+      const second = triVerts[i + 1]!;
+      triVerts[i + 1] = triVerts[i + 2]!;
+      triVerts[i + 2] = second;
+    }
+  }
+  try {
+    const mesh = new m.Mesh({
+      numProp: 3,
+      vertProperties: new Float32Array(vertProperties),
+      triVerts: new Uint32Array(triVerts),
+    });
+    const prim = m.Manifold.ofMesh(mesh);
+    // Tessellated primitives are already world-space; a mesh entity still honours its transform.
+    if (entity.kind !== 'mesh') return prim;
+    return applyTransform(prim, entity.position, entity.rotation);
+  } catch {
+    return null;
+  }
+}
+
+function signedVolume(vertices: readonly number[], triangles: readonly number[]): number {
+  let sum = 0;
+  for (let i = 0; i + 2 < triangles.length; i += 3) {
+    const a = triangles[i]! * 3;
+    const b = triangles[i + 1]! * 3;
+    const c = triangles[i + 2]! * 3;
+    const [ax, ay, az] = [vertices[a]!, vertices[a + 1]!, vertices[a + 2]!];
+    const [bx, by, bz] = [vertices[b]!, vertices[b + 1]!, vertices[b + 2]!];
+    const [cx, cy, cz] = [vertices[c]!, vertices[c + 1]!, vertices[c + 2]!];
+    sum += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
+  }
+  return sum / 6;
+}
+
+/** Corners closer than 1/WELD_SCALE document units are merged into one vertex. */
+const WELD_SCALE = 1e6;
+
+/** Primitive tessellation never reads components; instances are not boolean operands. */
+const NO_COMPONENTS = createEmptyDocument();
 
 function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | null {
   switch (entity.kind) {
@@ -135,13 +215,9 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
     case 'cylinder': {
       const { radius, height } = entity;
       if (radius <= 0 || height <= 0) return null;
-      // Manifold cylinder is along Z; THREE.CylinderGeometry is along Y, centered.
-      // Produce a Z-axis centered cylinder, then rotate −90° around X → Y-axis.
+      // llull cylinders run along +Z, centred on position — Manifold's native frame.
       const prim = m.Manifold.cylinder(height, radius, -1, 0, true);
-      const aligned = prim.rotate([-90, 0, 0]);
-      prim.delete();
-      // Now apply entity transform on top of the Y-axis alignment.
-      return applyTransform(aligned, entity.position, entity.rotation);
+      return applyTransform(prim, entity.position, entity.rotation);
     }
 
     case 'sphere': {
@@ -163,29 +239,22 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
       return applyTransform(prim, entity.position, entity.rotation);
     }
 
-    case 'mesh': {
-      // MeshSolidEntity holds world-space geometry; position is always [0,0,0].
-      // Re-use the flat arrays directly via the Manifold mesh constructor approach.
-      // Manifold's setup() exposes ManifoldTri constructor only via the C++ binding;
-      // the JS API wraps it. We build from raw arrays using the `meshGL` property.
-      // The public API accepts a MeshGL object with vertProperties + triVerts.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const manifoldAny = m.Manifold as any;
-      if (typeof manifoldAny.ofMesh !== 'function') {
-        // Fallback: no direct mesh constructor found — return null gracefully.
-        return null;
+    case 'mesh':
+      // World-space geometry (position is [0,0,0]); indexed or triangle soup.
+      return weldedManifold(m, entity.mesh.positions, entity.mesh.indices, entity);
+
+    case 'cone':
+    case 'torus':
+    case 'wedge':
+    case 'pyramid':
+    case 'revolution': {
+      // No dedicated primitive: use llull's own world-space tessellation (the geometry the
+      // viewport renders and STL exports), so the kernel never disagrees with the model.
+      const positions: number[] = [];
+      for (const triangle of entityToTriangles(entity, NO_COMPONENTS)) {
+        for (const [x, y, z] of triangle) positions.push(x, y, z);
       }
-      const meshInput = {
-        numProp: 3,
-        vertProperties: new Float32Array(entity.mesh.positions),
-        triVerts: new Uint32Array(entity.mesh.indices),
-      };
-      try {
-        const prim = manifoldAny.ofMesh(meshInput) as ManifoldShape;
-        return applyTransform(prim, entity.position, entity.rotation);
-      } catch {
-        return null;
-      }
+      return weldedManifold(m, positions, undefined, entity);
     }
 
     default:

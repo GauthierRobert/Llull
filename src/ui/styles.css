@@ -2154,6 +2154,17 @@ body,
   cursor: pointer;
 }
 
+.project-io__select {
+  height: 22px;
+  padding: 0 4px;
+  background: transparent;
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 10px;
+}
+
 .project-io__btn:hover {
   background: var(--bg-input);
   color: var(--text-primary);

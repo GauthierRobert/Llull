@@ -190,7 +190,7 @@ def op_run(request):
             bodies.extend(_bodies_from(obj, tolerance, name or "shape_%d" % (index + 1)))
         if not bodies:
             raise ValueError("the script's result contains no solid geometry")
-        trace = {"version": 1, "parameters": [], "features": [{"command": "import_mesh", "params": {"bodies": bodies}}]}
+        trace = {"version": 1, "parameters": [], "features": [{"command": "import_mesh", "ref": "f1", "params": {"bodies": bodies}}]}
         model = targets[0][0] if len(targets) == 1 else [t[0] for t in targets]
 
     response = {"ok": True, "trace": trace, "traced": traced}
