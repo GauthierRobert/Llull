@@ -225,7 +225,7 @@ function footingNetPressure(
   doc: CadDocument,
   reaction: BaseReaction,
   footing: FootingElement,
-): { pressure: number; breadth: number; length: number } {
+): { pressure: number; breadth: number; length: number; foundingDepth: number } {
   const [widthX, lengthY, thickness] = [footing.width, footing.length, footing.thickness].map(
     (value) => toMetres(doc, value),
   ) as [number, number, number];
@@ -238,6 +238,7 @@ function footingNetPressure(
     pressure: Math.max(0, gross - BACKFILL_UNIT_WEIGHT * (thickness + backfill)),
     breadth: Math.min(widthX, lengthY),
     length: Math.max(widthX, lengthY),
+    foundingDepth: thickness + backfill,
   };
 }
 
@@ -277,7 +278,7 @@ export function clayLayerError(layer: unknown): string | null {
 
 /**
  * Primary consolidation settlement (mm) of a clay layer in 5 sublayers: groundwater at the founding level,
- * γ' = unitWeight − 9.81, σ'0 = γ' z, Δσ = q B L / ((B + z)(L + z)) at the sublayer centre (2:1 spreading),
+ * γ' = unitWeight − 9.81, σ'0 = 18 D + γ' z (D = founding depth, z below the founding level), Δσ = q B L / ((B + z)(L + z)) at the sublayer centre (2:1 spreading),
  * s = Σ Cc h/(1+e0) log10((σ'0+Δσ)/σ'0); with σ'p, Cr up to σ'p and Cc beyond.
  * @pure
  */
@@ -286,6 +287,7 @@ export function consolidationSettlement(
   breadth: number,
   length: number,
   layer: ClayLayer,
+  foundingDepth: number = 0,
 ): number {
   const effectiveWeight = (layer.unitWeight ?? DEFAULT_CLAY_UNIT_WEIGHT) - WATER_UNIT_WEIGHT;
   const recompression = layer.recompressionIndex ?? layer.compressionIndex / 5;
@@ -293,7 +295,7 @@ export function consolidationSettlement(
   let total = 0;
   for (let index = 0; index < CONSOLIDATION_SUBLAYERS; index++) {
     const z = layer.topDepth + (index + 0.5) * sublayer;
-    const initial = effectiveWeight * z;
+    const initial = BACKFILL_UNIT_WEIGHT * foundingDepth + effectiveWeight * z;
     const increase = (netPressure * breadth * length) / ((breadth + z) * (length + z));
     const final = initial + increase;
     const preconsolidation = layer.preconsolidationPressure;
@@ -339,9 +341,9 @@ export function footingSettlementParts(
   clayLayer?: ClayLayer,
 ): { elastic: number; consolidation: number; total: number } {
   const elastic = footingSettlement(doc, reaction, footing, soilModulus);
-  const { pressure, breadth, length } = footingNetPressure(doc, reaction, footing);
+  const { pressure, breadth, length, foundingDepth } = footingNetPressure(doc, reaction, footing);
   const consolidation = clayLayer
-    ? consolidationSettlement(pressure, breadth, length, clayLayer)
+    ? consolidationSettlement(pressure, breadth, length, clayLayer, foundingDepth)
     : 0;
   return { elastic, consolidation, total: elastic + consolidation };
 }
@@ -751,7 +753,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
     'in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), always grade 8.8. Simplifications: pinned ' +
     'bases (no moment), horizontal force taken at the plate level, bending in the smaller footing ' +
     'side, no biaxial effects, no backfill reduction for the column, no friction in the anchor ' +
-    'shear check, no footing reinforcement or punching (see design_footings). (5) Elastic settlement of each pad under SLS G+S, s = q B (1 − ν²) Is / Es (net pressure q − 18 kN/m³ × founding depth, i.e. footing + backfill weight replaces excavated soil; Is 0.88 rigid square, ν 0.3, Es = `soilModulus`, default 20 MPa) vs 25 mm, plus the worst differential settlement between adjacent columns of a frame vs L/500. With the optional `clayLayer` the primary consolidation of a clay layer below the footing (5 sublayers, groundwater at the founding level, γ′ = unitWeight − 9.81, Δσ by 2:1 spreading, s = Σ Cc h/(1+e0) log10((σ′0+Δσ)/σ′0), Cr up to preconsolidationPressure and Cc beyond) is added to the elastic settlement (same 25 mm limit, row text gives both parts) and feeds the differential row. Returns one row per check ' +
+    'shear check, no footing reinforcement or punching (see design_footings). (5) Elastic settlement of each pad under SLS G+S, s = q B (1 − ν²) Is / Es (net pressure q − 18 kN/m³ × founding depth, i.e. footing + backfill weight replaces excavated soil; Is 0.88 rigid square, ν 0.3, Es = `soilModulus`, default 20 MPa) vs 25 mm, plus the worst differential settlement between adjacent columns of a frame vs L/500. With the optional `clayLayer` the primary consolidation of a clay layer below the footing (5 sublayers, groundwater at the founding level, γ′ = unitWeight − 9.81, σ′0 = 18 kN/m³ × founding depth + γ′ z, Δσ by 2:1 spreading, s = Σ Cc h/(1+e0) log10((σ′0+Δσ)/σ′0), Cr up to preconsolidationPressure and Cc beyond) is added to the elastic settlement (same 25 mm limit, row text gives both parts) and feeds the differential row. Returns one row per check ' +
     'and column (worst combination); utilisation > 1 fails. Not a substitute for a geotechnical ' +
     'or structural engineer.',
   paramsSchema: {
@@ -781,7 +783,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
           'Optional compressible clay layer under the pads, adds primary consolidation settlement to the settlement rows. ' +
           'topDepth: depth of the layer top below the founding level, m (>= 0). thickness: m (> 0). compressionIndex: Cc (> 0). ' +
           'recompressionIndex: Cr (> 0, <= Cc; default Cc/5, used only with preconsolidationPressure). voidRatio: e0 (> 0). ' +
-          'unitWeight: bulk kN/m³ (> 9.81, default 19; groundwater assumed at the founding level, γ′ = unitWeight − 9.81). ' +
+          'unitWeight: bulk kN/m³ (> 9.81, default 19; groundwater assumed at the founding level; σ′0 = 18 kN/m³ × founding depth + γ′·z). ' +
           'preconsolidationPressure: σ′p in kPa (> 0; omit for normally consolidated clay). Required: topDepth, thickness, compressionIndex, voidRatio.',
         properties: {
           topDepth: { type: 'number', description: 'Layer top below founding level, m (>= 0).' },

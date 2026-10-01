@@ -288,31 +288,49 @@ describe('consolidation settlement (clayLayer)', () => {
   it('matches a hand computation of the 5 sublayers', () => {
     const q = 100;
     const layer: ClayLayer = { topDepth: 1, thickness: 5, compressionIndex: 0.3, voidRatio: 1 };
-    // h = 1 m, centres z = 1.5 … 5.5, gamma' = 19 − 9.81 = 9.19, B = L = 2.
-    const first = ((0.3 * 1) / 2) * Math.log10((9.19 * 1.5 + (q * 4) / (3.5 * 3.5)) / (9.19 * 1.5));
-    expect(first * 1000).toBeCloseTo(79.1, 0);
+    // h = 1 m, centres z = 1.5 … 5.5, gamma' = 19 − 9.81 = 9.19, B = L = 2, D = 1.2 m (18 D = 21.6 kPa).
+    const sigma0 = 21.6 + 9.19 * 1.5;
+    expect(sigma0).toBeCloseTo(35.385, 3);
+    const first = ((0.3 * 1) / 2) * Math.log10((sigma0 + (q * 4) / (3.5 * 3.5)) / sigma0);
+    expect(first * 1000).toBeCloseTo(0.15 * Math.log10(68.038 / 35.385) * 1000, 1);
     let total = 0;
     for (let index = 0; index < 5; index++) {
       const z = 1.5 + index;
-      const initial = 9.19 * z;
+      const initial = 21.6 + 9.19 * z;
       total += (0.3 / 2) * Math.log10((initial + (q * 4) / ((2 + z) * (2 + z))) / initial);
     }
-    expect(consolidationSettlement(q, 2, 2, layer)).toBeCloseTo(total * 1000, 6);
+    expect(consolidationSettlement(q, 2, 2, layer, 1.2)).toBeCloseTo(total * 1000, 6);
     // Preconsolidated above the final stress: Cr = Cc/5 only.
-    const recompressed = consolidationSettlement(q, 2, 2, {
-      ...layer,
-      preconsolidationPressure: 1e6,
-    });
+    const recompressed = consolidationSettlement(
+      q,
+      2,
+      2,
+      { ...layer, preconsolidationPressure: 1e6 },
+      1.2,
+    );
     expect(recompressed).toBeCloseTo((total * 1000) / 5, 6);
-    // Straddling σ'p of the first sublayer (13.785 < 30 < 46.4): Cr then Cc.
-    const straddle = consolidationSettlement(q, 2, 2, {
+    // First sublayer straddles σ'p = 50 (35.385 < 50 < 68.04): Cr up to σ'p then Cc beyond.
+    const straddleLayer: ClayLayer = {
       ...layer,
       thickness: 0.5,
       topDepth: 1.25,
-      preconsolidationPressure: 30,
+      preconsolidationPressure: 50,
       recompressionIndex: 0.05,
-    });
-    expect(straddle).toBeGreaterThan(0);
+    };
+    let expected = 0;
+    for (let index = 0; index < 5; index++) {
+      const z = 1.3 + 0.1 * index;
+      const initial = 21.6 + 9.19 * z;
+      const final = initial + (q * 4) / ((2 + z) * (2 + z));
+      const strain =
+        final <= 50
+          ? 0.05 * Math.log10(final / initial)
+          : initial >= 50
+            ? 0.3 * Math.log10(final / initial)
+            : 0.05 * Math.log10(50 / initial) + 0.3 * Math.log10(final / 50);
+      expected += (0.1 * strain) / 2;
+    }
+    expect(consolidationSettlement(q, 2, 2, straddleLayer, 1.2)).toBeCloseTo(expected * 1000, 6);
   });
 
   it('is a no-op for bad clayLayer values', () => {
