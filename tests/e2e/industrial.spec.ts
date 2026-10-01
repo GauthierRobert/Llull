@@ -254,4 +254,28 @@ test.describe('industrial workflow', () => {
     await page.getByTestId('frame-check-row').first().click();
     await expect(page.getByTestId('frame-check-row').first()).toContainText('CB');
   });
+
+  test('I28–I31 — footing design, anchor bolt plan and DSTV NC files', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', { span: '24000', length: '30000', cladding: 'false' });
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('footing-design').click();
+    await expect(status(page)).toContainText('Designed 12 of 12 footing(s)');
+    await page.getByLabel('Schedule').selectOption('footing');
+    const schedule = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Schedule CSV' }).click(),
+    );
+    expect(schedule.text).toMatch(/H\d+ @ \d+ B1\/B2/);
+    const plan = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Anchor plan' }).click(),
+    );
+    expect(plan.name).toMatch(/anchor-plan/);
+    expect(plan.text).toContain('A+6000/1');
+    const nc = await downloadText(page, () =>
+      page.getByRole('button', { name: 'NC files (DSTV)' }).click(),
+    );
+    expect(nc.name).toMatch(/\.nc1$/);
+    expect(nc.text).toMatch(/^ST/m);
+    await expect(page.getByTestId('building-export-status')).toContainText('DSTV NC1:');
+  });
 });

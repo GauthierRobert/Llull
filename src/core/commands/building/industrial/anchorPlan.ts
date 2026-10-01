@@ -577,7 +577,10 @@ export const exportAnchorPlan: CommandDefinition<AnchorPlanParams> = {
       canvas.dimension(
         [minX, dim.from],
         [minX, dim.to],
-        canvas.map([minX, dim.from])[0] - leftEdge + (horizontal.length > 2 ? 16 : 8) + band * BAND_STEP,
+        canvas.map([minX, dim.from])[0] -
+          leftEdge +
+          (horizontal.length > 2 ? 16 : 8) +
+          band * BAND_STEP,
         dim.label,
       );
     });

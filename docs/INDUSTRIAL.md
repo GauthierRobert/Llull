@@ -82,8 +82,22 @@ Companion checks, all read-only and driven by the same loads:
   the surge), shear, lateral-torsional buckling, L/600 deflections (EN 1993-6) and fatigue with the
   damage-equivalent factor of the crane class (S2–S4, detail category 71).
 
-Not covered: local wind zones / internal pressure cases, settlement and reinforcement design,
-connection fatigue details. This is a preliminary design aid, not a substitute for
+`design_footings` designs the pad footings (EN 1992-1-1, C25/30, B500): bottom mat both ways from
+bending at the base plate face (minimum steel, bar H12–H25 at 100–250 mm), one-way shear and
+punching at 2d; footings that fail shear or punching are reported "increase thickness". The bars
+go to the footing schedule and the rebar mass to the takeoff. `check_foundations` adds elastic
+settlement (`soilModulus`, 25 mm) and differential settlement between frame columns (L/500).
+
+## Site and fabrication deliverables
+
+- `export_anchor_plan` — anchor bolt setting-out plan (SVG): grids, footings, base plates and every
+  anchor bolt dimensioned from the grid lines, with a bolt schedule (grid reference with offset,
+  bolts, embedment, projection, top of concrete / grout).
+- `export_nc_files` — DSTV NC1 files for CNC saw-drill and plate lines: one file per distinct part
+  (profile, length, pitched cuts, bolt holes; base and end plates with their contour and holes),
+  with quantities.
+
+Not covered: local roof zones (F/G/H/I), consolidation settlement, connection fatigue details. This is a preliminary design aid, not a substitute for
 the engineer of record.
 
 ## Quantities and fabrication lists

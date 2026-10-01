@@ -137,6 +137,20 @@ function elementErrors(
     if (typeof value === 'number' && value < 0)
       errors.push(`building element ${key}: ${field} must be >= 0`);
   }
+  const reinforcement = element['reinforcement'];
+  if (category === 'footing' && reinforcement !== undefined) {
+    const valid =
+      isRecord(reinforcement) &&
+      ['barDiameter', 'spacing', 'cover'].every((field) => {
+        const value = reinforcement[field];
+        return typeof value === 'number' && Number.isFinite(value) && value > 0;
+      });
+    if (!valid) {
+      errors.push(
+        `building element ${key}: reinforcement must have barDiameter, spacing and cover > 0`,
+      );
+    }
+  }
   if (category === 'stair') {
     const risers = element['riserCount'];
     if (!(typeof risers === 'number' && Number.isInteger(risers) && risers >= 1)) {

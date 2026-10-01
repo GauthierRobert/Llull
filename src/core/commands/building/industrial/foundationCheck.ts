@@ -21,7 +21,13 @@ import {
   resolveFrameLoads,
   type FrameLoadParams,
 } from './frameCheck';
-import { baseReactions, type BaseReaction, type FrameLoads, type LoadCase } from './frameModel';
+import {
+  baseReactions,
+  WIND_CASES,
+  type BaseReaction,
+  type FrameLoads,
+  type LoadCase,
+} from './frameModel';
 import { anchorBoltResistance } from './steelDesign';
 
 export interface FoundationRow {
@@ -43,10 +49,11 @@ export interface FoundationCheckParams extends FrameLoadParams {
   soilBearing?: number;
   thrustTie?: boolean;
   tieCapacity?: number;
+  soilModulus?: number;
 }
 
-type Factors = Partial<Record<LoadCase, number>>;
-interface Combination {
+export type Factors = Partial<Record<LoadCase, number>>;
+export interface Combination {
   readonly name: string;
   readonly factors: Factors;
 }
@@ -64,8 +71,14 @@ const MIN_EFFECTIVE_RATIO = 0.01;
 const TOLERANCE_METRES = 0.1;
 /** 2 × H16 B500 bars: 2 × 201 mm² × 435 N/mm², kN. */
 const DEFAULT_TIE_CAPACITY = 175;
+const DEFAULT_SOIL_MODULUS = 20; // MPa
+const POISSON_RATIO = 0.3;
+/** Influence factor of a rigid square footing (elastic half-space). */
+const SETTLEMENT_INFLUENCE = 1.12;
+const SETTLEMENT_LIMIT_MM = 25;
+const DIFFERENTIAL_RATIO = 500;
 
-function combine(reaction: BaseReaction, factors: Factors): { v: number; h: number } {
+export function combine(reaction: BaseReaction, factors: Factors): { v: number; h: number } {
   let v = 0;
   let h = 0;
   for (const [loadCase, factor] of Object.entries(factors) as [LoadCase, number][]) {
@@ -77,7 +90,7 @@ function combine(reaction: BaseReaction, factors: Factors): { v: number; h: numb
   return { v, h };
 }
 
-function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
+export function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
   const forces = reaction.cases[loadCase];
   return forces !== undefined && (forces.vertical !== 0 || forces.horizontal !== 0);
 }
@@ -86,12 +99,12 @@ function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
 function serviceCombinations(wind: boolean, crane: boolean): Combination[] {
   const list: Combination[] = [{ name: 'G+S', factors: { G: 1, S: 1 } }];
   if (wind) {
-    list.push(
-      { name: 'G+S+0.6W→', factors: { G: 1, S: 1, WL: 0.6 } },
-      { name: 'G+S+0.6W←', factors: { G: 1, S: 1, WR: 0.6 } },
-      { name: 'G+W→', factors: { G: 1, WL: 1 } },
-      { name: 'G+W←', factors: { G: 1, WR: 1 } },
-    );
+    for (const { loadCase, label } of WIND_CASES) {
+      list.push(
+        { name: `G+S+0.6${label}`, factors: { G: 1, S: 1, [loadCase]: 0.6 } },
+        { name: `G+${label}`, factors: { G: 1, [loadCase]: 1 } },
+      );
+    }
   }
   if (crane) {
     list.push(
@@ -103,16 +116,19 @@ function serviceCombinations(wind: boolean, crane: boolean): Combination[] {
 }
 
 /** ULS combinations; `favourable` uses 1.0G (uplift / sliding), otherwise 1.35G (compression). */
-function ultimateCombinations(wind: boolean, crane: boolean, favourable: boolean): Combination[] {
+export function ultimateCombinations(
+  wind: boolean,
+  crane: boolean,
+  favourable: boolean,
+): Combination[] {
   const g = favourable ? 1 : 1.35;
   const list: Combination[] = [];
   if (favourable) {
     list.push({ name: '1.0G+1.5S', factors: { G: g, S: 1.5 } });
     if (wind) {
-      list.push(
-        { name: '1.0G+1.5W→', factors: { G: g, WL: 1.5 } },
-        { name: '1.0G+1.5W←', factors: { G: g, WR: 1.5 } },
-      );
+      for (const { loadCase, label } of WIND_CASES) {
+        list.push({ name: `1.0G+1.5${label}`, factors: { G: g, [loadCase]: 1.5 } });
+      }
     }
     if (crane) {
       list.push(
@@ -124,10 +140,9 @@ function ultimateCombinations(wind: boolean, crane: boolean, favourable: boolean
   }
   list.push({ name: '1.35G+1.5S', factors: { G: g, S: 1.5 } });
   if (wind) {
-    list.push(
-      { name: '1.35G+1.5W→+0.75S', factors: { G: g, WL: 1.5, S: 0.75 } },
-      { name: '1.35G+1.5W←+0.75S', factors: { G: g, WR: 1.5, S: 0.75 } },
-    );
+    for (const { loadCase, label } of WIND_CASES) {
+      list.push({ name: `1.35G+1.5${label}+0.75S`, factors: { G: g, [loadCase]: 1.5, S: 0.75 } });
+    }
   }
   if (crane) {
     list.push(
@@ -143,7 +158,7 @@ function columnBaseLocation(column: SteelMemberElement): { x: number; y: number 
   return { x: base[0], y: base[1] };
 }
 
-function findFooting(
+export function findFooting(
   doc: CadDocument,
   building: BuildingModel,
   levelId: string,
@@ -164,7 +179,7 @@ function findFooting(
   return null;
 }
 
-function findPlate(building: BuildingModel, columnId: string): BasePlateElement | null {
+export function findPlate(building: BuildingModel, columnId: string): BasePlateElement | null {
   for (const element of Object.values(building.elements)) {
     if (element.category === 'plate' && element.memberId === columnId) return element;
   }
@@ -185,6 +200,33 @@ function worst(candidates: Candidate[]): Candidate | null {
   );
 }
 
+/**
+ * Elastic settlement (mm) of a pad under SLS G+S: s = q B (1 − ν²) Is / Es, q = (V + footing + backfill) / area.
+ * @pure
+ */
+export function footingSettlement(
+  doc: CadDocument,
+  reaction: BaseReaction,
+  footing: FootingElement,
+  soilModulus: number,
+): number {
+  const [widthX, lengthY, thickness] = [footing.width, footing.length, footing.thickness].map(
+    (value) => toMetres(doc, value),
+  ) as [number, number, number];
+  const backfill = Math.max(0, -toMetres(doc, footing.topOffset));
+  const area = widthX * lengthY;
+  const { v } = combine(reaction, { G: 1, S: 1 });
+  const pressure = Math.max(
+    0,
+    (v + (CONCRETE_UNIT_WEIGHT * thickness + BACKFILL_UNIT_WEIGHT * backfill) * area) / area,
+  );
+  return (
+    ((pressure * Math.min(widthX, lengthY) * (1 - POISSON_RATIO ** 2) * SETTLEMENT_INFLUENCE) /
+      (soilModulus * 1000)) *
+    1000
+  );
+}
+
 function footingRows(
   doc: CadDocument,
   reaction: BaseReaction,
@@ -194,6 +236,7 @@ function footingRows(
   wind: boolean,
   slidingHorizontal: (factors: Factors) => number,
   slabShare: number,
+  soilModulus: number,
 ): FoundationRow[] {
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
   const [widthX, lengthY, thickness] = [footing.width, footing.length, footing.thickness].map(
@@ -241,10 +284,10 @@ function footingRows(
   if (wind) {
     const uplift: Candidate[] = [];
     const resisting = 0.9 * weights;
-    const equCombinations: Combination[] = [
-      { name: '0.9G+1.5W→', factors: { G: 0.9, WL: 1.5 } },
-      { name: '0.9G+1.5W←', factors: { G: 0.9, WR: 1.5 } },
-    ];
+    const equCombinations: Combination[] = WIND_CASES.map(({ loadCase, label }) => ({
+      name: `0.9G+1.5${label}`,
+      factors: { G: 0.9, [loadCase]: 1.5 },
+    }));
     for (const combination of equCombinations) {
       const net = Math.max(0, -combine(reaction, combination.factors).v);
       uplift.push({
@@ -279,6 +322,20 @@ function footingRows(
   const slidingWorst = worst(sliding);
   if (slidingWorst)
     rows.push(row(`sliding (mu ${FRICTION}, gammaR,h ${GAMMA_R_H})`, slidingWorst, 'kN'));
+
+  const settlement = footingSettlement(doc, reaction, footing, soilModulus);
+  rows.push(
+    row(
+      `settlement (elastic, Es ${soilModulus} MPa, rigid square Is ${SETTLEMENT_INFLUENCE}, nu ${POISSON_RATIO})`,
+      {
+        value: settlement,
+        limit: SETTLEMENT_LIMIT_MM,
+        combination: 'G+S',
+        utilisation: Math.min(settlement / SETTLEMENT_LIMIT_MM, MAX_UTILISATION),
+      },
+      'mm',
+    ),
+  );
   return rows;
 }
 
@@ -373,6 +430,47 @@ function plateRows(
   return rows;
 }
 
+function differentialRows(
+  doc: CadDocument,
+  settlements: ReadonlyArray<{
+    frame: string;
+    x: number;
+    column: string;
+    footing: FootingElement;
+    settlement: number;
+  }>,
+): FoundationRow[] {
+  let best: FoundationRow | null = null;
+  for (const frame of new Set(settlements.map((item) => item.frame))) {
+    const ordered = settlements.filter((item) => item.frame === frame).sort((a, b) => a.x - b.x);
+    for (let index = 1; index < ordered.length; index++) {
+      const [a, b] = [ordered[index - 1], ordered[index]] as [
+        (typeof ordered)[number],
+        (typeof ordered)[number],
+      ];
+      const spanMm = toMetres(doc, b.x - a.x) * 1000;
+      if (spanMm <= 0) continue;
+      const limit = spanMm / DIFFERENTIAL_RATIO;
+      const value = Math.abs(a.settlement - b.settlement);
+      const utilisation = Math.min(value / limit, MAX_UTILISATION);
+      if (best === null || utilisation > best.utilisation) {
+        best = {
+          column: `${a.column}–${b.column}`,
+          footing: `${a.footing.mark}/${b.footing.mark}`,
+          elementId: a.footing.id,
+          check: `differential settlement (L/${DIFFERENTIAL_RATIO}, ${round(spanMm / 1000, 1)} m)`,
+          value,
+          limit,
+          unit: 'mm',
+          utilisation,
+          combination: 'G+S',
+        };
+      }
+    }
+  }
+  return best ? [best] : [];
+}
+
 /**
  * Checks footings and base plates of the columns of a level.
  * @pure
@@ -384,6 +482,7 @@ export function checkFoundations(
   soilBearing: number,
   thrustTie: boolean,
   tieCapacity: number,
+  soilModulus: number = DEFAULT_SOIL_MODULUS,
 ): { rows: FoundationRow[]; footings: number; plates: number; unchecked: number } {
   const building = getBuilding(doc);
   const wind = loads.windPressure > 0;
@@ -411,6 +510,13 @@ export function checkFoundations(
         0,
       )
     : 0;
+  const settlements: Array<{
+    frame: string;
+    x: number;
+    column: string;
+    footing: FootingElement;
+    settlement: number;
+  }> = [];
   const slabShare = reactions.length > 0 ? slabWeight / reactions.length : 0;
   for (const reaction of reactions) {
     const column = building.elements[reaction.columnId];
@@ -463,14 +569,23 @@ export function checkFoundations(
           wind,
           slidingHorizontal,
           slabShare,
+          soilModulus,
         ),
       );
+      settlements.push({
+        frame: reaction.frame,
+        x: footing.location[0],
+        column: column.mark,
+        footing,
+        settlement: footingSettlement(doc, reaction, footing, soilModulus),
+      });
     }
     if (plate) {
       plates += 1;
       rows.push(...plateRows(doc, reaction, column.mark, footing?.mark ?? '—', plate, wind));
     }
   }
+  rows.push(...differentialRows(doc, settlements));
   const unchecked = Object.values(building.elements).filter(
     (element) =>
       element.category === 'footing' &&
@@ -511,7 +626,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
     'in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), always grade 8.8. Simplifications: pinned ' +
     'bases (no moment), horizontal force taken at the plate level, bending in the smaller footing ' +
     'side, no biaxial effects, no backfill reduction for the column, no friction in the anchor ' +
-    'shear check, no footing reinforcement or punching, no settlement. Returns one row per check ' +
+    'shear check, no footing reinforcement or punching (see design_footings). (5) Elastic settlement of each pad under SLS G+S, s = q B (1 − ν²) Is / Es (Is 1.12 rigid square, ν 0.3, Es = `soilModulus`, default 20 MPa) vs 25 mm, plus the worst differential settlement between adjacent columns of a frame vs L/500. Returns one row per check ' +
     'and column (worst combination); utilisation > 1 fails. Not a substitute for a geotechnical ' +
     'or structural engineer.',
   paramsSchema: {
@@ -530,6 +645,11 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
           'check and one tie-force row per frame is added. false = every pad resists its own ' +
           'horizontal reaction by friction. Default true when the level has a slab element, else false.',
       },
+      soilModulus: {
+        type: 'number',
+        description:
+          'Soil elastic (Young) modulus Es in MPa for the settlement rows. Default 20. Must be > 0.',
+      },
       tieCapacity: {
         type: 'number',
         description:
@@ -543,6 +663,10 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
     const soilBearing = params.soilBearing ?? 150;
     if (!isFiniteNumber(soilBearing) || soilBearing <= 0) {
       return noChange(doc, 'check_foundations failed: soilBearing must be a number > 0 (kPa).');
+    }
+    const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
+    if (!isFiniteNumber(soilModulus) || soilModulus <= 0) {
+      return noChange(doc, 'check_foundations failed: soilModulus must be a number > 0 (MPa).');
     }
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noChange(doc, `check_foundations failed: ${resolved.reason}.`);
@@ -570,6 +694,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
       soilBearing,
       thrustTie,
       tieCapacity,
+      soilModulus,
     );
     if (rows.length === 0) {
       return noChange(
@@ -608,13 +733,13 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
       document: doc,
       summary:
         `Checked ${footings} footing(s) and ${plates} base plate(s) on level '${levelId}' ` +
-        `(${describeLoads(loads)}, soil ${soilBearing} kPa, ${thrustTie ? `thrust taken by a tie / slab (capacity ${tieCapacity} kN)` : 'thrust resisted by pad friction'}): ${rows.length} check(s), ` +
+        `(${describeLoads(loads)}, soil ${soilBearing} kPa, Es ${soilModulus} MPa, ${thrustTie ? `thrust taken by a tie / slab (capacity ${tieCapacity} kN)` : 'thrust resisted by pad friction'}): ${rows.length} check(s), ` +
         (unchecked > 0
           ? `${unchecked} footing(s) not checked (no analysed frame column, e.g. gable posts); `
           : '') +
         `max utilisation ${round(worstRow.utilisation)} (${worstRow.column} ${worstRow.check}, ${worstRow.combination}); ` +
         (failures.length === 0
-          ? 'all OK (pinned bases, no settlement / reinforcement checks).'
+          ? 'all OK (pinned bases, no reinforcement check).'
           : `${failures.length} failure(s): ${failures
               .slice(0, 8)
               .map((row) => `${row.column} ${row.check} ${round(row.utilisation)}`)

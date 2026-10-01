@@ -100,6 +100,30 @@ function elementsOf<C extends BimCategory>(
     );
 }
 
+const REBAR_KG_PER_M3 = 7850;
+const REBAR_LAP_FACTOR = 1.1;
+
+/** Mass (kg) of a footing's two-way bottom mat incl. 10% laps; 0 when unreinforced. */
+function footingRebarMass(
+  footing: Extract<BuildingElement, { category: 'footing' }>,
+  scale: Scale,
+): number {
+  const { reinforcement } = footing;
+  if (!reinforcement) return 0;
+  const [diameter, spacing, cover, width, length] = [
+    reinforcement.barDiameter,
+    reinforcement.spacing,
+    reinforcement.cover,
+    footing.width,
+    footing.length,
+  ].map(scale.length) as [number, number, number, number, number];
+  const barLength = (extent: number): number => Math.max(0, extent - 2 * cover);
+  const total =
+    (Math.floor((length - 2 * cover) / spacing) + 1) * barLength(width) +
+    (Math.floor((width - 2 * cover) / spacing) + 1) * barLength(length);
+  return total * ((Math.PI * diameter ** 2) / 4) * REBAR_KG_PER_M3 * REBAR_LAP_FACTOR;
+}
+
 class TakeoffAccumulator {
   private readonly lines = new Map<string, TakeoffLine>();
 
@@ -310,6 +334,16 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       `Pad footings, ${footing.material} — volume`,
       scale.volume(footing.width * footing.length * footing.thickness),
     );
+    const rebar = footingRebarMass(footing, scale);
+    if (rebar > 0) {
+      takeoff.add(
+        'footing',
+        'rebar',
+        'kg',
+        'Pad footing reinforcement B500 — mass (both ways, 10% laps)',
+        rebar,
+      );
+    }
   }
   for (const panel of elementsOf(building, 'panel')) {
     takeoff.add(
@@ -689,7 +723,16 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
     case 'footing':
       return {
         kind,
-        columns: ['Mark', 'Level', 'X', 'Y', `Size (${unit})`, `Top (${unit})`, 'Volume (m³)'],
+        columns: [
+          'Mark',
+          'Level',
+          'X',
+          'Y',
+          `Size (${unit})`,
+          `Top (${unit})`,
+          'Volume (m³)',
+          'Reinforcement',
+        ],
         rows: elementsOf(building, 'footing').map((footing) => [
           footing.mark,
           levelName(building, footing.levelId),
@@ -698,6 +741,9 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           `${footing.width}×${footing.length}×${footing.thickness}`,
           footing.topOffset,
           round(scale.volume(footing.width * footing.length * footing.thickness)),
+          footing.reinforcement
+            ? `H${round(scale.length(footing.reinforcement.barDiameter * 1000), 0)} @ ${round(scale.length(footing.reinforcement.spacing * 1000), 0)} B1/B2`
+            : '',
         ]),
       };
     case 'panel':

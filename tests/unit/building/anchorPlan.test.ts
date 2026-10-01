@@ -121,6 +121,40 @@ describe('export_anchor_plan', () => {
     );
   });
 
+  it('signs the grid offset of off-grid plates in the schedule and labels', () => {
+    const data = anchorPlan.run(hall(), {}).data as AnchorData;
+    const all = texts(data.svg);
+    const offGrid = all.filter((text) => /^[A-Z]+[+-]\d+\/\d+$/.test(text));
+    expect(offGrid.length).toBeGreaterThan(0);
+    expect(offGrid.some((text) => /^[A-Z][+-]6000\//.test(text))).toBe(true);
+    expect(all.some((text) => /^BP\d+ [A-Z]+[+-]\d+\/\d+$/.test(text))).toBe(true);
+    expect(all).toContain('A/1');
+  });
+
+  it('places grid dimensions outside the plate labels', () => {
+    const data = anchorPlan.run(hall(), {}).data as AnchorData;
+    const group = (id: string): string =>
+      new RegExp(`<g id="${id}">([\\s\\S]*?)</g>`).exec(data.svg)?.[1] ?? '';
+    const labelYs = [...group('plate-labels').matchAll(/<text [^>]*y="([\d.-]+)"/g)].map((m) =>
+      Number(m[1]),
+    );
+    const dimYs = [
+      ...group('grid-dimensions').matchAll(
+        /<line [^>]*y1="([\d.-]+)"[^>]*y2="([\d.-]+)" class="dim"/g,
+      ),
+    ].flatMap((m) => [Number(m[1]), Number(m[2])]);
+    expect(labelYs.length).toBeGreaterThan(0);
+    expect(dimYs.length).toBeGreaterThan(0);
+    const horizontalRuns = [
+      ...group('grid-dimensions').matchAll(
+        /<line [^>]*y1="([\d.-]+)"[^>]*y2="([\d.-]+)" class="dim"/g,
+      ),
+    ].filter((m) => m[1] === m[2]);
+    expect(horizontalRuns.length).toBeGreaterThan(0);
+    const top = Math.min(...labelYs) - 2;
+    expect(Math.min(...horizontalRuns.map((run) => Number(run[1])))).toBeLessThanOrEqual(top - 8);
+  });
+
   it('is a graceful no-op without plates', () => {
     const doc = createEmptyDocument();
     const result = anchorPlan.run(doc, {});

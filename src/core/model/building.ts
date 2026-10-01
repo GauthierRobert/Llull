@@ -194,6 +194,8 @@ export interface FootingElement extends ElementBase {
   thickness: number;
   topOffset: number;
   material: string;
+  /** Bottom mat (same bars both ways), set by design_footings; document units. */
+  reinforcement?: { barDiameter: number; spacing: number; cover: number };
 }
 
 /** A planar cladding / roofing / sandwich panel through 3D `corners` (z relative to the level). */

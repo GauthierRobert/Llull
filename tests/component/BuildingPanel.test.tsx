@@ -224,6 +224,12 @@ describe('BuildingPanel', () => {
     fireEvent.click(rows[0]!);
     expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
     fireEvent.click(screen.getByTestId('frame-design'));
+    fireEvent.click(screen.getByTestId('footing-design'));
+    expect(dispatch).toHaveBeenCalledWith('design_footings', {
+      deadLoad: 0.5,
+      snowLoad: 1,
+      windPressure: 0.6,
+    });
     expect(dispatch).toHaveBeenCalledWith('design_portal_frames', {
       deadLoad: 0.5,
       snowLoad: 1,

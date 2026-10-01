@@ -129,6 +129,14 @@ export function StructuralSection(): React.ReactElement {
         >
           Design frames
         </button>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => dispatch('design_footings', loads)}
+          data-testid="footing-design"
+        >
+          Design footings
+        </button>
       </div>
       {report !== null && (
         <>
