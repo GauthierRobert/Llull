@@ -17,6 +17,7 @@ import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { MAX_CURVE_SAMPLES } from './limits';
 import { sampleInvolute } from './gears';
 
 /** Clone the document shallowly with a new entity added. Keeps commands pure. */
@@ -789,10 +790,10 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
       };
     }
     const samplesInt = Math.round(samples);
-    if (samplesInt < 2) {
+    if (samplesInt < 2 || samplesInt > MAX_CURVE_SAMPLES) {
       return {
         document: doc,
-        summary: `draw_involute: samples must be >= 2, got ${samples}.`,
+        summary: `draw_involute: samples must be in [2, ${MAX_CURVE_SAMPLES}], got ${samples}.`,
         affected: [],
       };
     }
@@ -1024,10 +1025,10 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
     }
 
     // --- Validate arcSamples ---
-    if (!Number.isFinite(arcSamples) || arcSamples < 2) {
+    if (!Number.isFinite(arcSamples) || arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
       return {
         document: doc,
-        summary: `draw_belt_around: arcSamples must be a finite number >= 2 (got ${String(arcSamples)}).`,
+        summary: `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
         affected: [],
       };
     }

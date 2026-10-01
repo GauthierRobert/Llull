@@ -17,6 +17,7 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { MAX_COPIES_PER_COMMAND } from './limits';
 import { DEFAULT_LAYER_ID } from '../model/types';
 
 // ---------------------------------------------------------------------------
@@ -154,8 +155,8 @@ export const arrayAlongPath: CommandDefinition<ArrayAlongPathParams> = {
         affected: [],
       };
     }
-    if (!Number.isFinite(count) || count < 1) {
-      return { document: doc, summary: `array_along_path: count must be >= 1 (got ${count}).`, affected: [] };
+    if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
+      return { document: doc, summary: `array_along_path: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`, affected: [] };
     }
 
     // Validate path points are Vec3.
@@ -278,8 +279,8 @@ export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
     if (!Number.isFinite(radius) || radius <= 0) {
       return { document: doc, summary: `distribute_on_arc: radius must be > 0 (got ${radius}).`, affected: [] };
     }
-    if (!Number.isFinite(count) || count < 1) {
-      return { document: doc, summary: `distribute_on_arc: count must be >= 1 (got ${count}).`, affected: [] };
+    if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
+      return { document: doc, summary: `distribute_on_arc: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`, affected: [] };
     }
     if (!Array.isArray(center) || center.length < 3) {
       return { document: doc, summary: 'distribute_on_arc: center must be a [x,y,z] triple.', affected: [] };

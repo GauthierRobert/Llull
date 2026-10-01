@@ -30,6 +30,7 @@ import type { CadDocument, InstanceEntity, Vec2, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../../lib/id';
+import { MAX_COPIES_PER_COMMAND } from './limits';
 
 // ---------------------------------------------------------------------------
 // Path math helpers (Vec2 only — all 2D, world-space via entity transform)
@@ -329,10 +330,10 @@ export const distributeAlongPath: CommandDefinition<DistributeAlongPathParams> =
     }
 
     // --- Validate count ---
-    if (!Number.isFinite(count) || count < 1 || !Number.isInteger(count)) {
+    if (!Number.isFinite(count) || count < 1 || !Number.isInteger(count) || count > MAX_COPIES_PER_COMMAND) {
       return {
         document: doc,
-        summary: `distribute_along_path: count must be a positive integer >= 1 (got ${count}).`,
+        summary: `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
         affected: [],
       };
     }

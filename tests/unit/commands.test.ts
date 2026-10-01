@@ -2077,9 +2077,9 @@ describe('render_view', () => {
     expect(result.summary).toContain('position');
   });
 
-  it('add_text — failure: short position array is a no-op', () => {
+  it('add_text — failure: 1-element position array is a no-op', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: 'Hi', position: [0, 0], height: 1 });
+    const result = execute(doc, 'add_text', { content: 'Hi', position: [0], height: 1 });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });

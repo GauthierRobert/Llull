@@ -465,6 +465,22 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
     }
   }
 
+  // Order must reference existing entities (renderers index entities[id] directly)
+  for (const orderedId of v['order'] as string[]) {
+    if (!Object.prototype.hasOwnProperty.call(entities, orderedId)) {
+      errors.push(`order: '${orderedId}' does not reference a known entity`);
+    }
+  }
+
+  // Feature history steps are replayed by name/params — each must be a well-formed record
+  if (Array.isArray(v['featureHistory'])) {
+    v['featureHistory'].forEach((step: unknown, index: number) => {
+      if (!isRecord(step) || typeof step['id'] !== 'string' || typeof step['name'] !== 'string') {
+        errors.push(`featureHistory[${index}] is malformed (needs string id and name)`);
+      }
+    });
+  }
+
   // Layers
   const layers = v['layers'] as Record<string, unknown>;
   for (const layer of Object.values(layers)) {

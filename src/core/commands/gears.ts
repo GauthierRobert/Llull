@@ -11,6 +11,7 @@ import type { CadDocument, Entity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './scene';
 
 // ---------------------------------------------------------------------------
@@ -385,10 +386,10 @@ export const addSpurGear: CommandDefinition<AddSpurGearParams> = {
 
     // --- Validate teeth ---
     const teethInt = Math.round(teeth);
-    if (!Number.isFinite(teeth) || teethInt < 3) {
+    if (!Number.isFinite(teeth) || teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
       return {
         document: doc,
-        summary: `add_spur_gear failed: teeth must be a finite integer >= 3, got ${String(teeth)}.`,
+        summary: `add_spur_gear failed: teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
         affected: [],
       };
     }

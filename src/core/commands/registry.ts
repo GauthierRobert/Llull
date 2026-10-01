@@ -11,9 +11,31 @@
 import type { CadDocument, FeatureStep } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
-import { addBox, addCylinder, addSphere, addCone, addTorus, addWedge, addPyramid, extrude, move, deleteEntity } from './geometry';
+import {
+  addBox,
+  addCylinder,
+  addSphere,
+  addCone,
+  addTorus,
+  addWedge,
+  addPyramid,
+  extrude,
+  move,
+  deleteEntity,
+} from './geometry';
 import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
-import { drawLine, drawPolyline, drawArc, drawCircle, drawRectangle, drawPoint, drawEllipse, drawSpline, drawInvolute, drawBeltAround } from './draw2d';
+import {
+  drawLine,
+  drawPolyline,
+  drawArc,
+  drawCircle,
+  drawRectangle,
+  drawPoint,
+  drawEllipse,
+  drawSpline,
+  drawInvolute,
+  drawBeltAround,
+} from './draw2d';
 import { loadDocument } from './persistence';
 import { extrudeSketch, revolveProfile } from './profile';
 import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit';
@@ -34,14 +56,7 @@ import { historyCommands, setRegistryRef } from './history';
 import { createConfiguration, activateConfiguration, setConfigRegistryRef } from './configurations';
 import { createMaterial, assignMaterial } from './materials';
 import { saveRecipe, instantiateRecipe, setRecipeRegistryRef } from './recipes';
-import {
-  explodePolyline,
-  offset2D,
-  trim,
-  extend,
-  fillet2D,
-  chamfer2D,
-} from './modify2d';
+import { explodePolyline, offset2D, trim, extend, fillet2D, chamfer2D } from './modify2d';
 import {
   addLayer,
   renameLayer,
@@ -68,13 +83,103 @@ import { align, distribute, stackOn } from './place';
 import { arrayAlongPath, distributeOnArc } from './array_along_path';
 import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } from './constraints';
 import { addMate, billOfMaterials } from './mates';
-import { addJoint, deleteJoint, setJointValue, addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './joints';
+import {
+  addJoint,
+  deleteJoint,
+  setJointValue,
+  addDriveRelation,
+  deleteDriveRelation,
+  evaluateMotion,
+  bakeMotion,
+} from './joints';
 import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
 
+function containsNonFinite(value: unknown, depth = 0): boolean {
+  if (typeof value === 'number') return !Number.isFinite(value);
+  if (typeof value !== 'object' || value === null || depth > 8) return false;
+  if (Array.isArray(value) && value.some((v) => v === undefined || v === null)) return true;
+  return Object.values(value).some((v) => containsNonFinite(v, depth + 1));
+}
+
+/** A top-level 2-number `position` is a planar shorthand: pad z=0 (never mutates `params`). */
+function padPlanarPosition(params: object): object {
+  const position = (params as { position?: unknown }).position;
+  const isPlanar =
+    Array.isArray(position) &&
+    position.length === 2 &&
+    position.every((n) => typeof n === 'number');
+  return isPlanar ? { ...params, position: [...position, 0] } : params;
+}
+
+/** Every entity carries a Vec3 `position`; a short/odd vector would poison downstream math. */
+function hasMalformedPosition(entity: unknown): boolean {
+  if (typeof entity !== 'object' || entity === null) return false;
+  const position = (entity as { position?: unknown }).position;
+  return position !== undefined && (!Array.isArray(position) || position.length !== 3);
+}
+
+/** True when any string in `value` is an Object.prototype key (`constructor`, `__proto__`, ...). */
+function containsPrototypeKey(value: unknown, depth = 0): boolean {
+  if (typeof value === 'string') return value in Object.prototype;
+  if (typeof value !== 'object' || value === null || depth > 6) return false;
+  return Object.values(value).some((v) => containsPrototypeKey(v, depth + 1));
+}
+
+/**
+ * @pure
+ * @failure run throws, params contain an Object.prototype key string (would alias entity-bag lookups),
+ * or affected entities contain NaN/Infinity/undefined vector components or a non-Vec3 position -> no-op, affected:[]
+ * @invariant non-object params are coerced to {} so field destructuring cannot throw;
+ * a 2-number `position` is padded to [x, y, 0]
+ */
+function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknown> {
+  return {
+    ...def,
+    run: (doc, params): CommandResult => {
+      const safeParams = padPlanarPosition(
+        typeof params === 'object' && params !== null ? params : {},
+      );
+      if (containsPrototypeKey(safeParams)) {
+        return {
+          document: doc,
+          summary: `${def.name} rejected: params contain a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id/name.`,
+          affected: [],
+        };
+      }
+      let result: CommandResult;
+      try {
+        result = def.run(doc, safeParams);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        return {
+          document: doc,
+          summary: `${def.name} rejected invalid input: ${reason}`,
+          affected: [],
+        };
+      }
+      if (result.document !== doc) {
+        const corrupted = result.affected.find(
+          (id) =>
+            containsNonFinite(result.document.entities[id]) ||
+            hasMalformedPosition(result.document.entities[id]),
+        );
+        if (corrupted !== undefined) {
+          return {
+            document: doc,
+            summary: `${def.name} rejected: result for ${corrupted} contains non-finite numbers (NaN/Infinity). Document unchanged.`,
+            affected: [],
+          };
+        }
+      }
+      return result;
+    },
+  };
+}
+
 // Using `unknown` for params here; each definition narrows its own type internally.
-const definitions = [
+const rawDefinitions = [
   addBox,
   addCylinder,
   addSphere,
@@ -186,9 +291,9 @@ const definitions = [
   distributeAlongPath,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
-const byName = new Map<string, CommandDefinition<unknown>>(
-  definitions.map((d) => [d.name, d]),
-);
+const definitions: ReadonlyArray<CommandDefinition<unknown>> = rawDefinitions.map(guardCommand);
+
+const byName = new Map<string, CommandDefinition<unknown>>(definitions.map((d) => [d.name, d]));
 
 // Wire up the late-bound references so history.ts, configurations.ts, and recipes.ts
 // can call getCommand without a circular import at module load time.
@@ -222,11 +327,7 @@ export function getCommand(name: string): CommandDefinition<unknown> | undefined
  *   (i.e. the command actually mutated the document), a FeatureStep is
  *   appended to the new document's featureHistory.
  */
-export function execute(
-  doc: CadDocument,
-  commandName: string,
-  params: unknown,
-): CommandResult {
+export function execute(doc: CadDocument, commandName: string, params: unknown): CommandResult {
   const def = byName.get(commandName);
   if (!def) {
     return { document: doc, summary: `Unknown command: ${commandName}`, affected: [] };
@@ -290,7 +391,8 @@ export function toToolSchemas(): Array<{
       input_schema: d.paramsSchema,
     };
     if (d.annotations) {
-      const ann: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean } = {};
+      const ann: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean } =
+        {};
       if (d.annotations.readOnly === true) ann.readOnlyHint = true;
       if (d.annotations.destructive === true) ann.destructiveHint = true;
       if (d.annotations.idempotent === true) ann.idempotentHint = true;

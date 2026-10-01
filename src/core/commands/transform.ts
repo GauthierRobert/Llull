@@ -8,6 +8,7 @@
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { MAX_COPIES_PER_COMMAND } from './limits';
 
 // ---------------------------------------------------------------------------
 // rotate_entity
@@ -430,10 +431,10 @@ export const arrayLinear: CommandDefinition<ArrayLinearParams> = {
     if (!target) {
       return { document: doc, summary: `array_linear: No entity ${id}.`, affected: [] };
     }
-    if (!Number.isInteger(count) || count < 2) {
+    if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return {
         document: doc,
-        summary: `array_linear: count must be an integer >= 2 (got ${count}); entity ${id} unchanged.`,
+        summary: `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
         affected: [],
       };
     }
@@ -527,10 +528,10 @@ export const arrayPolar: CommandDefinition<ArrayPolarParams> = {
     if (!target) {
       return { document: doc, summary: `array_polar: No entity ${id}.`, affected: [] };
     }
-    if (!Number.isInteger(count) || count < 2) {
+    if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return {
         document: doc,
-        summary: `array_polar: count must be an integer >= 2 (got ${count}); entity ${id} unchanged.`,
+        summary: `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
         affected: [],
       };
     }
