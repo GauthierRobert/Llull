@@ -85,9 +85,9 @@ describe('entityBounds — per kind', () => {
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [-1, -2, -3], max: [3, 4, 5] });
   });
 
-  it('cylinder: radius in X/Z, height in Y (three.js axis)', () => {
+  it('cylinder: radius in X/Y, height in Z (Z-up axis)', () => {
     const doc = execute(createEmptyDocument(), 'add_cylinder', { radius: 2, height: 10, position: [0, 0, 0] }).document;
-    expect(entityBounds(lastEntity(doc))).toEqual({ min: [-2, -5, -2], max: [2, 5, 2] });
+    expect(entityBounds(lastEntity(doc))).toEqual({ min: [-2, -2, -5], max: [2, 2, 5] });
   });
 
   it('sphere: position ± radius on all axes', () => {
@@ -280,10 +280,10 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
     expect(snap.entities[0]!.bounds.oriented).toBeUndefined();
   });
 
-  it('cylinder rotated [π/2,0,0]: Z-axis cylinder becomes X-axis cylinder, extents swap', () => {
-    // Unrotated cylinder (Y-axis in three.js): extent ±radius in X/Z, ±height/2 in Y.
-    // After Rx(π/2): Y-axis maps to -Z, Z-axis maps to +Y.
-    // So the tall Y extent (height/2=5) maps to Z, and the flat Z extent (radius=2) maps to Y.
+  it('cylinder rotated [π/2,0,0]: Z-axis cylinder becomes Y-axis cylinder, extents swap', () => {
+    // Unrotated cylinder (Z-up): extent ±radius in X/Y, ±height/2 in Z.
+    // After Rx(π/2): Y-axis maps to +Z, Z-axis maps to -Y.
+    // The tall Z extent (height/2=5) maps to Y; the radius (2) now spans Z.
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_cylinder', { radius: 2, height: 10, position: [0, 0, 0] }).document;
     const id = doc.order[0]!;
@@ -295,10 +295,10 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
     // X extents still ±2 (X axis unaffected by Rx).
     expect(approxEq(b.min[0], -2)).toBe(true);
     expect(approxEq(b.max[0],  2)).toBe(true);
-    // Y extent: was ±5, now maps to ±5 in Z; Y gets ±2 from old Z corners.
+    // Y extent: was ±2, now ±5 (height axis); Z extent ±2.
     const yExtent = b.max[1] - b.min[1];
     const zExtent = b.max[2] - b.min[2];
-    expect(yExtent).toBeLessThan(zExtent); // Y (radius) < Z (height) after rotation
+    expect(zExtent).toBeLessThan(yExtent); // Z (radius) < Y (height) after rotation
   });
 
   it('rotated mesh with non-zero position stays consistent with the raw (unrotated) path', () => {

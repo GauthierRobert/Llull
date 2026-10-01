@@ -46,7 +46,7 @@ export function ClippingPlane(): null {
 
   // Keep a stable Plane instance — update it imperatively instead of recreating
   // each render to avoid unnecessary material re-compilation (r3f R9).
-  const planeRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const planeRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0));
 
   useEffect(() => {
     if (!enabled) {

@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { SphereEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
-import { radialSegmentsForDiag, sphereDiag } from '../lodSegments';
+import { buildSphereGeometry } from './primitiveGeometry';
 
 interface SphereMeshProps {
   entity: SphereEntity;
@@ -24,13 +24,7 @@ interface SphereMeshProps {
 export function SphereMesh({ entity, selected, onSelect, pbrMaterial }: SphereMeshProps): React.ReactElement {
   const { radius, position, rotation, color } = entity;
 
-  const geometry = useMemo(() => {
-    const segments = radialSegmentsForDiag(sphereDiag(radius));
-    // heightSegments = half of radialSegments, clamped to [4, 32] for correct normals.
-    const heightSeg = Math.max(4, Math.min(32, Math.floor(segments / 2)));
-    const geo = new THREE.SphereGeometry(radius, segments, heightSeg);
-    return geo;
-  }, [radius]);
+  const geometry = useMemo(() => buildSphereGeometry(radius), [radius]);
 
   const meshRef = useRef<THREE.Mesh>(null);
 

@@ -39,7 +39,7 @@ import { evaluateAnimationScalar } from './animationMath';
 function normalise(v: Vec3): THREE.Vector3 {
   const vec = new THREE.Vector3(v[0], v[1], v[2]);
   const len = vec.length();
-  if (len < 1e-9) return new THREE.Vector3(0, 1, 0); // safe fallback: Y axis
+  if (len < 1e-9) return new THREE.Vector3(0, 0, 1); // safe fallback: Z axis (Z-up)
   return vec.divideScalar(len);
 }
 

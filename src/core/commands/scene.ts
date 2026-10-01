@@ -97,10 +97,10 @@ export function entityBounds(e: Entity): Bounds {
       return { min: offset(e.position, -w / 2, -h / 2, -d / 2), max: offset(e.position, w / 2, h / 2, d / 2) };
     }
     case 'cylinder':
-      // three.js CylinderGeometry: axis is Y, centered at origin.
+      // Z-up: axis along Z, centered at position (matches render.ts / export.ts).
       return {
-        min: offset(e.position, -e.radius, -e.height / 2, -e.radius),
-        max: offset(e.position, e.radius, e.height / 2, e.radius),
+        min: offset(e.position, -e.radius, -e.radius, -e.height / 2),
+        max: offset(e.position, e.radius, e.radius, e.height / 2),
       };
     case 'sphere':
       return { min: offset(e.position, -e.radius, -e.radius, -e.radius), max: offset(e.position, e.radius, e.radius, e.radius) };
@@ -340,11 +340,11 @@ function localEntityCorners(e: Entity): Vec3[] {
       ];
     }
     case 'cylinder': {
-      // AABB of cylinder: radius in X/Z, height along Y (three.js CylinderGeometry).
+      // Z-up AABB of cylinder: radius in X/Y, height along Z, centered at position.
       const r = e.radius, hh = e.height / 2;
       return [
-        [-r, -hh, -r], [r, -hh, -r], [r, -hh, r], [-r, -hh, r],
-        [-r,  hh, -r], [r,  hh, -r], [r,  hh, r], [-r,  hh, r],
+        [-r, -r, -hh], [r, -r, -hh], [r, r, -hh], [-r, r, -hh],
+        [-r, -r,  hh], [r, -r,  hh], [r, r,  hh], [-r, r,  hh],
       ];
     }
     case 'sphere': {

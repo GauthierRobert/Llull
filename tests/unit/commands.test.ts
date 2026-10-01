@@ -6223,7 +6223,7 @@ describe('W4B — unified placement anchor', () => {
     });
     const b = entityBounds(e);
     expectVec(b.min, [0, 0, 0]);
-    expectVec(b.max, [2, 4, 2]);
+    expectVec(b.max, [2, 2, 4]);
   });
 
   it('add_sphere anchor "min" puts the AABB min corner at position', () => {

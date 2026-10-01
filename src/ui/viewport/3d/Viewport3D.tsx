@@ -158,6 +158,9 @@ function ViewportStoreInvalidator(): null {
 // Camera initializer
 // ---------------------------------------------------------------------------
 
+/** drei Grid/ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
+const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
+
 /**
  * Convert spherical CameraState → a cartesian THREE.Vector3 eye position.
  *
@@ -166,9 +169,6 @@ function ViewportStoreInvalidator(): null {
  *   polar=π/2 → camera in the XY plane (at target elevation)
  *   azimuth   → angle in the XY plane from +Y axis toward +X
  */
-/** drei Grid/ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
-const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
-
 function sphericalToCartesian(
   target: [number, number, number],
   azimuth: number,

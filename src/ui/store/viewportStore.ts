@@ -48,7 +48,7 @@ export type ClipAxis = 'x' | 'y' | 'z';
 export interface ClipPlaneState {
   /** Whether the clipping plane is active. */
   enabled: boolean;
-  /** Axis the plane is normal to. Default: 'y' (horizontal cut). */
+  /** Axis the plane is normal to. Default: 'z' (horizontal cut, Z-up). */
   axis: ClipAxis;
   /**
    * Signed offset along the axis in world units.
@@ -201,7 +201,7 @@ export interface ViewportStoreState {
 
 const DEFAULT_CLIP_PLANE: ClipPlaneState = {
   enabled: false,
-  axis: 'y',
+  axis: 'z',
   offset: 0,
   flipped: false,
 };

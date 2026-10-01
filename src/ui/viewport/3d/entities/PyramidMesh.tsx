@@ -2,8 +2,8 @@
  * @layer ui/viewport/3d
  *
  * Render branch for `kind:'pyramid'` entities.
- * Rectangular base centered at position (±baseWidth/2 in X, ±baseDepth/2 in Z),
- * apex at +Y*height (Y-up, consistent with the rest of the 3D viewport).
+ * Rectangular base centered at position (±baseWidth/2 in X, ±baseDepth/2 in Y),
+ * apex at +Z*height (Z-up, matches core tessellation).
  *
  * Custom BufferGeometry: 4 triangular side faces + 2 base triangles.
  * Normals computed via computeVertexNormals() for correct lighting.
@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { PyramidEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
+import { buildPyramidGeometry } from './primitiveGeometry';
 
 interface PyramidMeshProps {
   entity: PyramidEntity;
@@ -22,45 +23,6 @@ interface PyramidMeshProps {
   onSelect: (id: string, additive: boolean) => void;
   /** Optional PBR material override from an assigned document material (VNF4). */
   pbrMaterial?: { color: string; metalness: number; roughness: number };
-}
-
-/**
- * Build a rectangular pyramid BufferGeometry centered at the local origin.
- *
- * Base corners (y=0):
- *   v0 = (-hw, 0, -hd)   v1 = ( hw, 0, -hd)
- *   v2 = ( hw, 0,  hd)   v3 = (-hw, 0,  hd)
- * Apex: v4 = (0, height, 0)
- *
- * 6 triangles total: 2 for the base, 4 for the side faces.
- */
-function buildPyramidGeometry(baseWidth: number, baseDepth: number, height: number): THREE.BufferGeometry {
-  const hw = baseWidth / 2;
-  const hd = baseDepth / 2;
-
-  // prettier-ignore
-  const vertices = new Float32Array([
-    // Base — two triangles (wound clockwise from below = CCW from above)
-    -hw, 0, -hd,   hw, 0,  hd,  -hw, 0,  hd,   // tri 0 (v0,v2,v3)
-    -hw, 0, -hd,   hw, 0, -hd,   hw, 0,  hd,   // tri 1 (v0,v1,v2)
-
-    // Front side (z = -hd): v0,v1,apex
-     hw, 0, -hd,  -hw, 0, -hd,   0, height, 0,
-
-    // Right side (x = +hw): v1,v2,apex
-     hw, 0,  hd,   hw, 0, -hd,   0, height, 0,
-
-    // Back side (z = +hd): v2,v3,apex
-    -hw, 0,  hd,   hw, 0,  hd,   0, height, 0,
-
-    // Left side (x = -hw): v3,v0,apex
-    -hw, 0, -hd,  -hw, 0,  hd,   0, height, 0,
-  ]);
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-  geo.computeVertexNormals();
-  return geo;
 }
 
 export function PyramidMesh({ entity, selected, onSelect, pbrMaterial }: PyramidMeshProps): React.ReactElement {

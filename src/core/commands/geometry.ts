@@ -436,7 +436,7 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
     // Default anchor for cylinder is 'center': stored position is the geometric center.
     // AABB half-extents from center: [radius, height/2, radius].
     // (entityBounds uses Y axis for height per three.js CylinderGeometry convention.)
-    const storedPosition = resolvePosition([radius, height / 2, radius], 'center', anchor, position);
+    const storedPosition = resolvePosition([radius, radius, height / 2], 'center', anchor, position);
     const id = nextId('cyl');
     const entity: Entity = {
       id,

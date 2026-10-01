@@ -112,7 +112,7 @@ function ConstraintLine({ constraint, entities }: ConstraintLineProps): React.Re
       <lineSegments geometry={geometry} material={material} renderOrder={998} />
       <Text
         font={TEXT_FONT_URL}
-        position={[midpoint.x, midpoint.y + 0.25, midpoint.z]}
+        position={[midpoint.x, midpoint.y, midpoint.z + 0.25]}
         fontSize={0.35}
         color={CONSTRAINT_COLOR}
         anchorX="center"
