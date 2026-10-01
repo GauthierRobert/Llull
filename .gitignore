@@ -10,3 +10,4 @@ coverage
 .claude/worktrees
 .playwright-mcp
 server/.autosave.json
+*.tsbuildinfo
