@@ -25,12 +25,13 @@
  *   (f) tools/call with unknown tool name → isError:true, explanatory content block.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/index';
 import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { listCommands } from '@core/commands/registry';
+import * as registry from '@core/commands/registry';
 import { buildBridgeToolDefinitions } from '@core/mcp';
 
 // ---------------------------------------------------------------------------
@@ -466,5 +467,19 @@ describe('MCP tools/call — unknown tool name', () => {
     expect(result.content.length).toBeGreaterThanOrEqual(1);
     expect(result.content[0]!.type).toBe('text');
     expect(result.content[0]!.text).toMatch(/unknown command/i);
+  });
+});
+
+describe('MCP tools/call — throwing command', () => {
+  it('is returned as an isError result, not a JSON-RPC error', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+    vi.spyOn(registry, 'execute').mockImplementation(() => {
+      throw new Error('kernel exploded');
+    });
+    const result = await mcpCallTool(sessionId, 'add_box', { size: [1, 1, 1] });
+    vi.restoreAllMocks();
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain('kernel exploded');
   });
 });

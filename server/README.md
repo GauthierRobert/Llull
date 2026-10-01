@@ -10,11 +10,18 @@ Optional Express backend. Provides:
 # From the repo root:
 npm --prefix server install
 
-# Start the MCP host:
+# Start the MCP host (dev, auto-reload):
 MCP_AUTH_TOKEN=changeme npm --prefix server run dev
+
+# Production: bundle once, then run the bundle
+npm --prefix server run build
+MCP_AUTH_TOKEN=changeme npm --prefix server start
 ```
 
-The server starts on `http://localhost:3001` by default. Override with `PORT=<n>`.
+Variables are also read from `<repo>/.env` and `server/.env` (see `.env.example`); real
+environment variables take precedence.
+
+The server binds to `127.0.0.1:3001` by default (local tool; not reachable from the network). Override with `PORT=<n>` and `HOST=<addr>` (`HOST=0.0.0.0` to expose it; set `MCP_AUTH_TOKEN` when you do). SIGTERM/SIGINT shut down gracefully (SSE/MCP streams closed, autosave flushed).
 
 ## Routes
 
@@ -192,3 +199,24 @@ Done. Client closed cleanly.
 | `MCP_AUTH_TOKEN`           | recommended | —             | Bearer token guarding `/mcp`. Unset = unprotected (warn) |
 | `MCP_RATE_LIMIT_MAX`       | no       | `60`              | Max requests per window per IP on `/mcp`                 |
 | `MCP_RATE_LIMIT_WINDOW_MS` | no       | `60000`           | Rate limit window in milliseconds (default: 1 minute)    |
+| `HOST`                     | no       | `127.0.0.1`       | Bind address. Use `0.0.0.0` only with `MCP_AUTH_TOKEN` set |
+| `LLULL_ALLOWED_ORIGINS`    | no       | `http://localhost:5173,http://localhost:5174,http://localhost:3000` | Comma-separated browser origins for CORS and the REST mutation guard. Disallowed origins get no CORS headers |
+| `LLULL_REQUIRE_TOKEN_FOR_REST` | no   | unset             | `true` + `MCP_AUTH_TOKEN`: `/command`, `/undo`, `/redo` always need the bearer token (UI must send it) |
+| `LLULL_REST_RATE_LIMIT_MAX` | no      | `600`             | Max requests per window per IP on `/command`, `/undo`, `/redo`, `/export/stl` |
+| `LLULL_REST_RATE_LIMIT_WINDOW_MS` | no | `60000`          | REST rate limit window |
+| `LLULL_BODY_LIMIT`         | no       | `2mb`             | JSON body size limit (413 beyond it) |
+| `LLULL_AUTOSAVE_PATH`      | no       | `server/.autosave.json` | Autosave file (written atomically via temp file + rename) |
+| `LLULL_AUTOSAVE_DEBOUNCE_MS` | no     | `300`             | Autosave write coalescing delay; flushed on shutdown |
+| `LLULL_AUTOSAVE_DISABLED`  | no       | unset             | `true` disables autosave |
+| `MCP_SESSION_TTL_MS` / `MCP_SESSION_SWEEP_MS` | no | `1800000` / `60000` | Idle MCP session eviction |
+
+### REST mutation policy (`/command`, `/undo`, `/redo`)
+
+The browser UI cannot attach a token to these, so they are guarded by origin instead of being open:
+
+1. Valid `Authorization: Bearer <MCP_AUTH_TOKEN>` -> allowed.
+2. `Origin` header present and not in `LLULL_ALLOWED_ORIGINS` -> `403` (blocks cross-site requests).
+3. `MCP_AUTH_TOKEN` set and no `Origin` and no bearer (curl, scripts) -> `401`.
+4. Allowed browser origin, or no token configured -> allowed.
+
+`Origin` is spoofable by non-browser clients, so for a network-exposed deployment set `LLULL_REQUIRE_TOKEN_FOR_REST=true` (UI must then send the bearer). Malformed JSON returns `400`, oversize bodies `413`, throwing commands return `isError` results.

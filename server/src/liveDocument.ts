@@ -17,6 +17,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createAutosaver } from './autosave';
 import type { Response } from 'express';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
@@ -53,14 +54,32 @@ function loadAutosave(): CadDocument {
   }
 }
 
+const autosaver = createAutosaver({
+  filePath: AUTOSAVE_PATH,
+  debounceMs: Number.parseInt(process.env['LLULL_AUTOSAVE_DEBOUNCE_MS'] ?? '', 10) || 300,
+  serialize: serializeDocument,
+});
+
 function writeAutosave(doc: CadDocument): void {
   if (!AUTOSAVE_ENABLED) return;
-  try {
-    fs.mkdirSync(path.dirname(AUTOSAVE_PATH), { recursive: true });
-    fs.writeFileSync(AUTOSAVE_PATH, serializeDocument(doc), 'utf8');
-  } catch (err) {
-    console.warn(`[liveDocument] autosave write failed: ${(err as Error).message}`);
+  autosaver.schedule(doc);
+}
+
+/** Write any debounced autosave immediately (shutdown path). */
+export function flushAutosave(): void {
+  if (AUTOSAVE_ENABLED) autosaver.flush();
+}
+
+/** End every open SSE stream and forget the subscribers (shutdown path). */
+export function closeAllSubscribers(): void {
+  for (const res of _subscribers) {
+    try {
+      res.end();
+    } catch {
+      // already closed
+    }
   }
+  _subscribers.clear();
 }
 
 // ---------------------------------------------------------------------------

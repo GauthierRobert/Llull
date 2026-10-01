@@ -40,6 +40,7 @@ import {
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
+  type CallToolRequest,
   type CallToolResult,
   type GetPromptResult,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -148,6 +149,18 @@ function startSessionSweep(): void {
 // ---------------------------------------------------------------------------
 // Auth middleware
 // ---------------------------------------------------------------------------
+
+/** Close and forget every MCP session (shutdown path). */
+export async function closeAllSessions(): Promise<void> {
+  const entries = [...sessions.values()];
+  sessions.clear();
+  await Promise.all(entries.map((entry) => entry.transport.close().catch(() => {})));
+}
+
+/** Number of live sessions (test helper). @internal */
+export function _sessionCount(): number {
+  return sessions.size;
+}
 
 /**
  * Bearer-token auth guard.
@@ -600,7 +613,7 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
   // tools/call — route through commandBus so MCP edits share history + broadcast,
   // then shape the result into MCP content blocks via the single implementation
   // in core/mcp (shapeToolCallContent).  execute() runs exactly once (in the bus).
-  server.setRequestHandler(CallToolRequestSchema, async (req): Promise<CallToolResult> => {
+  const handleToolCall = async (req: CallToolRequest): Promise<CallToolResult> => {
     const { name, arguments: args } = req.params;
 
     // -----------------------------------------------------------------------
@@ -679,6 +692,16 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
     }
 
     return shaped;
+  };
+
+  // Tool failures are returned as MCP isError results, never thrown as JSON-RPC errors.
+  server.setRequestHandler(CallToolRequestSchema, async (req): Promise<CallToolResult> => {
+    try {
+      return await handleToolCall(req);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return makeErrorResult(`Tool ${req.params.name} failed: ${message}`);
+    }
   });
 
   // resources/list — enumerate the three read-only CAD resources
