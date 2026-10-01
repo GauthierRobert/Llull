@@ -116,4 +116,44 @@ test.describe('industrial workflow', () => {
     expect(section.text).toContain('class="section"');
     await expect(page.getByTestId('building-export-status')).toContainText('visible face');
   });
+
+  test('I11–I16 — multi-span hall, base plates, cable tray, curved wall, hatched DXF', async ({
+    page,
+  }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', { spans: '18000, 18000', length: '24000' });
+    await expect(status(page)).toContainText('(2 spans)');
+    await expect(elementRows(page, 'plate')).toHaveCount(15 + 8);
+
+    await applyTool(page, 'tray', { points: '2000,6000,5000; 30000,6000,5000', system: 'data' });
+    await expect(status(page)).toContainText('Added data cable tray CT1');
+    await page.getByLabel('Schedule').selectOption('tray');
+    const trays = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Schedule CSV' }).click(),
+    );
+    expect(trays.text).toContain('CT1,data,300,60,28');
+
+    await applyTool(page, 'curvedWall', { x1: '40000', xm: '43000', ym: '3000', x2: '46000' });
+    await expect(status(page)).toContainText('Added curved wall');
+
+    const dxf = await downloadText(page, () =>
+      page.getByRole('button', { name: 'DXF (AutoCAD)' }).click(),
+    );
+    expect(dxf.text).toContain('A-WALL-PATT');
+    expect(dxf.text).toContain('S-COLS-PATT');
+
+    await page.getByLabel('Elevation direction').selectOption('south');
+    await page.getByLabel('Section cut position').fill('12000');
+    const section = await downloadText(page, () =>
+      page.getByRole('button', { name: 'Section sheet' }).click(),
+    );
+    expect(section.text).toContain('class="poche-steel"');
+
+    const ifc = await downloadText(page, () =>
+      page.getByRole('button', { name: 'IFC (BIM)' }).click(),
+    );
+    for (const entity of ['IFCCABLECARRIERSEGMENT(', 'IFCPLATE(', 'IFCMECHANICALFASTENER(']) {
+      expect(ifc.text).toContain(entity);
+    }
+  });
 });
