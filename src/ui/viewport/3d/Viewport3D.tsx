@@ -59,6 +59,7 @@ import {
   GizmoViewport,
   PerspectiveCamera,
   Environment,
+  Lightformer,
   ContactShadows,
   SoftShadows,
 } from '@react-three/drei';
@@ -364,7 +365,16 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       {/* ---- IBL environment: studio preset for reflections/ambient; no background.
            Kept on across all quality tiers — it is a single texture sample (cheap)
            and significantly improves material quality. ---- */}
-      {quality.environmentEnabled && <Environment preset="studio" background={false} />}
+      {quality.environmentEnabled && (
+        // Procedural studio IBL — no network fetch (preset="studio" pulls an HDR from a CDN
+        // and crashes the viewport offline).
+        <Environment background={false} resolution={256}>
+          <Lightformer form="rect" intensity={2} position={[0, 5, -5]} scale={[10, 6, 1]} />
+          <Lightformer form="rect" intensity={1} position={[-6, 2, 2]} scale={[6, 4, 1]} />
+          <Lightformer form="rect" intensity={1} position={[6, 2, 2]} scale={[6, 4, 1]} />
+          <Lightformer form="ring" intensity={0.6} position={[0, -4, 0]} scale={8} />
+        </Environment>
+      )}
 
       {/* ---- Soft shadow patch: PCSS-style softening on the shadow map.
            Disabled in Low tier (softShadowSamples === 0) to save per-fragment cost.

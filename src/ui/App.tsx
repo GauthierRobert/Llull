@@ -39,6 +39,7 @@ import { MeasurementHUD } from '@ui/components/MeasurementHUD';
 import { EmptyState } from '@ui/components/EmptyState';
 import { TopBar } from '@ui/components/TopBar';
 import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
+import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 
 type ViewMode = '3d' | '2d';
 
@@ -48,6 +49,7 @@ export function App(): React.ReactElement {
 
   // Mirror the server-authoritative CadDocument into the store via SSE.
   useMcpLiveDocument();
+  useKeyboardShortcuts();
 
   // Apply the theme as a data attribute on <html> so the CSS variables
   // cascade to the entire document (including portals).

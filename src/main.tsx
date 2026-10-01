@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '@ui/App';
+import { AppErrorBoundary } from '@ui/components/AppErrorBoundary';
 import '@ui/styles.css';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@ui/geometry/manifoldKernel';
@@ -43,6 +44,8 @@ if (!rootEl) throw new Error('Root element #root not found.');
 
 createRoot(rootEl).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 );
