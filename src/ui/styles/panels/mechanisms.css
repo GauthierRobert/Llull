@@ -1,0 +1,49 @@
+/* Mechanisms panel — constraints, joints, drive relations */
+
+.mechanisms-row {
+  cursor: pointer;
+  min-height: 34px;
+}
+
+.mechanisms-row-info {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.mechanisms-row-info strong {
+  font-weight: var(--weight-medium);
+  color: var(--fg);
+}
+
+.mechanisms-ratio {
+  color: var(--accent-text);
+}
+
+.mechanisms-row .chip {
+  min-width: 0;
+}
+
+.mechanisms-joint-input {
+  width: 56px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mechanisms-row .panel__row-actions {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  margin: 0;
+  padding: 0 2px;
+  transform: translateY(-50%);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.mechanisms-row.panel__row--selected .panel__row-actions {
+  background: var(--surface-1);
+}

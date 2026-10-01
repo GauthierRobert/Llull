@@ -1,7 +1,7 @@
 /**
  * @layer ui/panels
  *
- * PropertiesPanel — a left-docked read-only entity inspector.
+ * PropertiesPanel — the right-docked read-only entity inspector.
  *
  * Shows the properties of the currently selected entity (kind, id, position,
  * color, and kind-specific dimensions). For 0 or multiple selections, shows a
@@ -18,14 +18,71 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
+import { is2D } from '@core/model/types';
 import type { Entity } from '@core/model/types';
+import { Icon } from '@ui/components/Icon';
+import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Field primitives
 // ---------------------------------------------------------------------------
 
-function formatVec(v: readonly number[]): string {
-  return v.map((n) => n.toFixed(3)).join(', ');
+const AXES = ['x', 'y', 'z'] as const;
+
+function formatNumber(n: number): string {
+  return n.toFixed(3);
+}
+
+function PropRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="props-row">
+      <span className="props-key">{label}</span>
+      <div className="props-value">{children}</div>
+    </div>
+  );
+}
+
+function AxisFields({ values }: { values: readonly number[] }): React.ReactElement {
+  return (
+    <div className="axis-fields">
+      {values.slice(0, 3).map((n, i) => {
+        const axis = AXES[i] ?? 'z';
+        return (
+          <span key={axis} className="axis-field">
+            <span className={`axis-field__letter axis-field__letter--${axis}`} aria-hidden="true">
+              {axis.toUpperCase()}
+            </span>
+            <span className="axis-field__value">{formatNumber(n)}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScalarRow({
+  label,
+  value,
+  unit,
+}: {
+  label: string;
+  value: number;
+  unit?: string;
+}): React.ReactElement {
+  return (
+    <PropRow label={label}>
+      <span className="props-number">
+        {formatNumber(value)}
+        {unit !== undefined && <span className="props-unit">{unit}</span>}
+      </span>
+    </PropRow>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -36,16 +93,18 @@ function EntityVisibilityToggle({ entityId }: { entityId: string }): React.React
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
   const toggleVisibility = useViewportStore((s) => s.toggleEntityVisibility);
   const isHidden = hiddenEntityIds.has(entityId);
+  const label = isHidden ? 'Show entity in viewport' : 'Hide entity in viewport';
 
   return (
     <button
       type="button"
-      className={`props-visibility-btn${isHidden ? ' props-visibility-btn--hidden' : ''}`}
+      className={`icon-btn props-visibility-btn${isHidden ? ' props-visibility-btn--hidden' : ''}`}
       aria-pressed={isHidden}
-      title={isHidden ? 'Show entity in viewport' : 'Hide entity in viewport'}
+      aria-label={label}
+      title={label}
       onClick={() => toggleVisibility(entityId)}
     >
-      {isHidden ? 'Show' : 'Hide'}
+      <Icon name={isHidden ? 'eyeOff' : 'eye'} size={15} />
     </button>
   );
 }
@@ -58,182 +117,110 @@ function EntityDimensions({ entity }: { entity: Entity }): React.ReactElement | 
   switch (entity.kind) {
     case 'box':
       return (
-        <div className="props-row">
-          <dt className="props-key">Size</dt>
-          <dd className="props-value">{formatVec(entity.size)}</dd>
-        </div>
+        <PropRow label="Size">
+          <AxisFields values={entity.size} />
+        </PropRow>
       );
     case 'cylinder':
       return (
         <>
-          <div className="props-row">
-            <dt className="props-key">Radius</dt>
-            <dd className="props-value">{entity.radius.toFixed(3)}</dd>
-          </div>
-          <div className="props-row">
-            <dt className="props-key">Height</dt>
-            <dd className="props-value">{entity.height.toFixed(3)}</dd>
-          </div>
+          <ScalarRow label="Radius" value={entity.radius} />
+          <ScalarRow label="Height" value={entity.height} />
         </>
       );
     case 'sphere':
-      return (
-        <div className="props-row">
-          <dt className="props-key">Radius</dt>
-          <dd className="props-value">{entity.radius.toFixed(3)}</dd>
-        </div>
-      );
-    case 'extrusion':
-      return (
-        <div className="props-row">
-          <dt className="props-key">Depth</dt>
-          <dd className="props-value">{entity.depth.toFixed(3)}</dd>
-        </div>
-      );
     case 'circle':
-      return (
-        <div className="props-row">
-          <dt className="props-key">Radius</dt>
-          <dd className="props-value">{entity.radius.toFixed(3)}</dd>
-        </div>
-      );
+      return <ScalarRow label="Radius" value={entity.radius} />;
+    case 'extrusion':
+      return <ScalarRow label="Depth" value={entity.depth} />;
     case 'arc':
       return (
         <>
-          <div className="props-row">
-            <dt className="props-key">Radius</dt>
-            <dd className="props-value">{entity.radius.toFixed(3)}</dd>
-          </div>
-          <div className="props-row">
-            <dt className="props-key">Start Angle</dt>
-            <dd className="props-value">{entity.startAngle.toFixed(3)} rad</dd>
-          </div>
-          <div className="props-row">
-            <dt className="props-key">End Angle</dt>
-            <dd className="props-value">{entity.endAngle.toFixed(3)} rad</dd>
-          </div>
+          <ScalarRow label="Radius" value={entity.radius} />
+          <ScalarRow label="Start Angle" value={entity.startAngle} unit="rad" />
+          <ScalarRow label="End Angle" value={entity.endAngle} unit="rad" />
         </>
       );
     case 'rectangle':
       return (
         <>
-          <div className="props-row">
-            <dt className="props-key">Width</dt>
-            <dd className="props-value">{entity.width.toFixed(3)}</dd>
-          </div>
-          <div className="props-row">
-            <dt className="props-key">Height</dt>
-            <dd className="props-value">{entity.height.toFixed(3)}</dd>
-          </div>
+          <ScalarRow label="Width" value={entity.width} />
+          <ScalarRow label="Height" value={entity.height} />
         </>
       );
     case 'line':
       return (
         <>
-          <div className="props-row">
-            <dt className="props-key">Start</dt>
-            <dd className="props-value">{formatVec(entity.start)}</dd>
-          </div>
-          <div className="props-row">
-            <dt className="props-key">End</dt>
-            <dd className="props-value">{formatVec(entity.end)}</dd>
-          </div>
+          <PropRow label="Start">
+            <AxisFields values={entity.start} />
+          </PropRow>
+          <PropRow label="End">
+            <AxisFields values={entity.end} />
+          </PropRow>
         </>
       );
     case 'polyline':
       return (
-        <div className="props-row">
-          <dt className="props-key">Points</dt>
-          <dd className="props-value">{entity.points.length} pts</dd>
-        </div>
+        <PropRow label="Points">
+          <span className="props-number">
+            {entity.points.length}
+            <span className="props-unit">pts</span>
+          </span>
+        </PropRow>
       );
-    case 'point':
-      return null;
     default:
       return null;
   }
 }
 
 // ---------------------------------------------------------------------------
-// SelectionSection
+// Selected-entity detail
 // ---------------------------------------------------------------------------
 
-interface SelectionSectionProps {
-  selection: readonly string[];
-  entities: Record<string, Entity>;
-}
-
-function SelectionSection({ selection, entities }: SelectionSectionProps): React.ReactElement {
-  if (selection.length === 0) {
-    return (
-      <section className="props-section" aria-label="Selection">
-        <h2 className="props-section-title">Selection</h2>
-        <p className="props-empty">No entity selected.</p>
-      </section>
-    );
-  }
-
-  if (selection.length > 1) {
-    return (
-      <section className="props-section" aria-label="Selection">
-        <h2 className="props-section-title">Selection</h2>
-        <p className="props-empty">{selection.length} entities selected.</p>
-      </section>
-    );
-  }
-
-  const id = selection[0];
-  if (!id) {
-    return (
-      <section className="props-section" aria-label="Selection">
-        <h2 className="props-section-title">Selection</h2>
-        <p className="props-empty">No entity selected.</p>
-      </section>
-    );
-  }
-
-  const entity = entities[id];
-  if (!entity) {
-    return (
-      <section className="props-section" aria-label="Selection">
-        <h2 className="props-section-title">Selection</h2>
-        <p className="props-empty">Entity not found.</p>
-      </section>
-    );
-  }
-
+function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
+  const hasDimensions = EntityDimensions({ entity }) !== null;
   return (
-    <section className="props-section" aria-label="Selection">
-      <div className="props-section-header">
-        <h2 className="props-section-title">Selection</h2>
+    <section className="props-detail" aria-label="Selection">
+      <div className="props-summary">
+        <span className="props-summary__icon" aria-hidden="true">
+          <Icon name={is2D(entity) ? 'square' : 'cube'} size={18} />
+        </span>
+        <div className="props-summary__text">
+          <span className="props-summary__name" title={entity.name ?? entity.id}>
+            {entity.name ?? entity.id}
+          </span>
+          <div className="props-summary__meta">
+            <span className="chip chip--accent">{entity.kind}</span>
+            {entity.name !== undefined && <span className="props-id">{entity.id}</span>}
+          </div>
+        </div>
         <EntityVisibilityToggle entityId={entity.id} />
       </div>
-      <dl className="props-list">
-        <div className="props-row">
-          <dt className="props-key">Kind</dt>
-          <dd className="props-value">{entity.kind}</dd>
-        </div>
-        <div className="props-row">
-          <dt className="props-key">ID</dt>
-          <dd className="props-value props-id">{entity.id}</dd>
-        </div>
-        <div className="props-row">
-          <dt className="props-key">Position</dt>
-          <dd className="props-value">{formatVec(entity.position)}</dd>
-        </div>
-        <div className="props-row">
-          <dt className="props-key">Color</dt>
-          <dd className="props-value">
+
+      <PanelSection title="Transform">
+        <PropRow label="Position">
+          <AxisFields values={entity.position} />
+        </PropRow>
+      </PanelSection>
+
+      {hasDimensions && (
+        <PanelSection title="Geometry">
+          <EntityDimensions entity={entity} />
+        </PanelSection>
+      )}
+
+      <PanelSection title="Appearance">
+        <PropRow label="Color">
+          <span className="props-color">
             <span
               className="props-color-swatch"
               style={{ background: entity.color }}
               aria-label={entity.color}
             />
-            {entity.color}
-          </dd>
-        </div>
-        <EntityDimensions entity={entity} />
-      </dl>
+            <span className="props-number">{entity.color}</span>
+          </span>
+        </PropRow>
+      </PanelSection>
     </section>
   );
 }
@@ -250,12 +237,40 @@ export function PropertiesPanel({ className }: PropertiesPanelProps): React.Reac
   const selection = useStore((s) => s.document.selection);
   const entities = useStore((s) => s.document.entities);
 
+  const [selectedId] = selection;
+  const entity =
+    selection.length === 1 && selectedId !== undefined ? entities[selectedId] : undefined;
+
+  let body: React.ReactElement;
+  if (selection.length === 0) {
+    body = (
+      <PanelEmpty
+        icon="cursor"
+        message="No entity selected"
+        hint="Select an entity to inspect it."
+      />
+    );
+  } else if (selection.length > 1) {
+    body = (
+      <PanelEmpty
+        icon="layers"
+        message={`${selection.length} entities selected`}
+        hint="Select a single entity to see its properties."
+      />
+    );
+  } else if (entity === undefined) {
+    body = <PanelEmpty icon="info" message="Entity not found." />;
+  } else {
+    body = <EntityDetail entity={entity} />;
+  }
+
   return (
     <aside
-      className={['app-properties', className].filter(Boolean).join(' ')}
+      className={['panel properties-panel', className].filter(Boolean).join(' ')}
       aria-label="Properties"
     >
-      <SelectionSection selection={selection} entities={entities} />
+      <PanelHeader title="Properties" />
+      {body}
     </aside>
   );
 }

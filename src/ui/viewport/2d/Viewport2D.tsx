@@ -498,18 +498,18 @@ export function Viewport2D(): React.ReactElement {
       {/* HTML overlay: scale bar (bottom-right) */}
       <ScaleBar zoom={cameraZoom} document={document} />
 
-      {/* HTML tool palette overlaid on top of the canvas */}
-      <DrawTools activeTool={activeTool} onSelectTool={handleSelectDrawTool} />
-
-      {/* HTML modify tool palette overlaid on the canvas (right of draw tools) */}
-      <ModifyTools
-        activeTool={activeModifyTool}
-        phase={modifyPhase}
-        pendingValue={pendingValue}
-        onSelectTool={handleSelectModifyTool}
-        onSetValue={setPendingValue}
-        onCommitValue={commitValue}
-      />
+      {/* Left-edge dock: draw palette above modify palette, stacked by flex layout */}
+      <div className="vp-tool-dock">
+        <DrawTools activeTool={activeTool} onSelectTool={handleSelectDrawTool} />
+        <ModifyTools
+          activeTool={activeModifyTool}
+          phase={modifyPhase}
+          pendingValue={pendingValue}
+          onSelectTool={handleSelectModifyTool}
+          onSetValue={setPendingValue}
+          onCommitValue={commitValue}
+        />
+      </div>
     </div>
   );
 }

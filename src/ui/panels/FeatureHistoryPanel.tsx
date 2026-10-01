@@ -19,6 +19,8 @@
 import React, { useCallback } from 'react';
 import { useStore } from '@ui/store';
 import type { FeatureStep } from '@core/model/types';
+import { Icon } from '@ui/components/Icon';
+import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 
 // ---------------------------------------------------------------------------
 // FeatureStepRow — one row in the timeline
@@ -56,141 +58,63 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
 
   return (
     <li
-      className={`history-step${isSuppressed ? ' history-step--suppressed' : ''}`}
+      className={`panel__row history-step${isSuppressed ? ' history-step--suppressed' : ''}`}
       data-testid={`history-step-${step.id}`}
       aria-label={`Step ${index + 1}: ${displayLabel}${isSuppressed ? ' (suppressed)' : ''}`}
     >
-      {/* Step index badge */}
       <span className="history-step-index" aria-hidden="true">
         {index + 1}
       </span>
 
-      {/* Suppress toggle */}
-      <button
-        type="button"
-        className={`history-suppress-btn${isSuppressed ? ' history-suppress-btn--suppressed' : ''}`}
-        onClick={handleToggleSuppress}
-        aria-pressed={isSuppressed}
-        aria-label={isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`}
-        title={isSuppressed ? 'Restore (un-suppress)' : 'Suppress (skip during replay)'}
-      >
-        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-          {isSuppressed ? (
-            /* Eye with a line through it */
-            <>
-              <ellipse
-                cx="6"
-                cy="6"
-                rx="4.5"
-                ry="3"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-                opacity="0.45"
-              />
-              <line
-                x1="2"
-                y1="2"
-                x2="10"
-                y2="10"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-              />
-            </>
-          ) : (
-            /* Eye open */
-            <>
-              <ellipse
-                cx="6"
-                cy="6"
-                rx="4.5"
-                ry="3"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-              />
-              <circle cx="6" cy="6" r="1.5" fill="currentColor" />
-            </>
-          )}
-        </svg>
-      </button>
-
-      {/* Command name + optional label */}
       <span className="history-step-name" title={step.name}>
         <span className="history-step-cmd">{step.name}</span>
         {step.label != null && <span className="history-step-label">{step.label}</span>}
       </span>
 
-      {/* Reorder buttons */}
-      <div className="history-step-actions">
+      {isSuppressed && <span className="chip chip--warning">off</span>}
+
+      <div className="panel__row-actions">
         <button
           type="button"
-          className="history-action-btn"
+          className="icon-btn"
           onClick={handleMoveUp}
           disabled={index === 0}
           aria-label={`Move step ${displayLabel} up`}
           title="Move up"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-            <polyline
-              points="2,7 5,3 8,7"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Icon name="arrowUp" size={13} />
         </button>
         <button
           type="button"
-          className="history-action-btn"
+          className="icon-btn"
           onClick={handleMoveDown}
           disabled={index >= totalCount - 1}
           aria-label={`Move step ${displayLabel} down`}
           title="Move down"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-            <polyline
-              points="2,3 5,7 8,3"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Icon name="arrowDown" size={13} />
         </button>
         <button
           type="button"
-          className="history-action-btn history-action-btn--delete"
+          className="icon-btn icon-btn--danger"
           onClick={handleDelete}
           aria-label={`Delete step ${displayLabel}`}
           title="Delete step"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-            <line
-              x1="1"
-              y1="1"
-              x2="9"
-              y2="9"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-            <line
-              x1="9"
-              y1="1"
-              x2="1"
-              y2="9"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+          <Icon name="trash" size={13} />
         </button>
       </div>
+
+      <button
+        type="button"
+        className={`icon-btn history-suppress-btn${isSuppressed ? ' history-suppress-btn--suppressed' : ''}`}
+        onClick={handleToggleSuppress}
+        aria-pressed={isSuppressed}
+        aria-label={isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`}
+        title={isSuppressed ? 'Restore (un-suppress)' : 'Suppress (skip during replay)'}
+      >
+        <Icon name={isSuppressed ? 'eyeOff' : 'eye'} size={14} />
+      </button>
     </li>
   );
 }
@@ -216,40 +140,36 @@ export function FeatureHistoryPanel({ className }: FeatureHistoryPanelProps): Re
 
   return (
     <aside
-      className={['history-panel', className].filter(Boolean).join(' ')}
+      className={['panel history-panel', className].filter(Boolean).join(' ')}
       aria-label="Feature history"
     >
-      <div className="history-panel-header">
-        <h2 className="history-panel-title">History</h2>
-        <div className="history-panel-header-actions">
-          <span className="history-panel-count" aria-label={`${stepCount} steps`}>
-            {stepCount}
-            {suppressedCount > 0 && (
-              <span
-                className="history-panel-suppressed-badge"
-                title={`${suppressedCount} suppressed`}
-              >
-                {` (${suppressedCount} off)`}
-              </span>
-            )}
+      <PanelHeader title="History" count={stepCount} countLabel={`${stepCount} steps`}>
+        {suppressedCount > 0 && (
+          <span className="chip chip--warning" title={`${suppressedCount} suppressed`}>
+            {suppressedCount} off
           </span>
-          <button
-            type="button"
-            className="history-replay-btn"
-            onClick={handleReplay}
-            disabled={stepCount === 0}
-            aria-label="Replay feature history"
-            title="Regenerate document from history"
-          >
-            Replay
-          </button>
-        </div>
-      </div>
+        )}
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={handleReplay}
+          disabled={stepCount === 0}
+          aria-label="Replay feature history"
+          title="Regenerate document from history"
+        >
+          <Icon name="reset" size={12} />
+          Replay
+        </button>
+      </PanelHeader>
 
       {stepCount === 0 ? (
-        <p className="history-empty">No history steps yet.</p>
+        <PanelEmpty
+          icon="history"
+          message="No history steps yet."
+          hint="Every command you run is recorded here as an editable step."
+        />
       ) : (
-        <ol className="history-step-list" aria-label="Feature history steps">
+        <ol className="panel__list" aria-label="Feature history steps">
           {featureHistory.map((step, index) => (
             <FeatureStepRow key={step.id} step={step} index={index} totalCount={stepCount} />
           ))}

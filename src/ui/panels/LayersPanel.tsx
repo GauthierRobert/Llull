@@ -21,6 +21,8 @@
 import React, { useCallback } from 'react';
 import { useStore, useViewportStore } from '@ui/store';
 import type { Layer } from '@core/model/types';
+import { Icon } from '@ui/components/Icon';
+import { PanelHeader } from '@ui/panels/PanelParts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,14 +63,13 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
 
   return (
     <li
-      className="layer-row"
+      className={`panel__row layer-row${effectivelyVisible ? '' : ' layer-row--hidden'}`}
       data-testid={`layer-row-${layer.id}`}
       aria-label={`Layer: ${layer.name}`}
     >
-      {/* Local viewport visibility toggle (does NOT dispatch a command) */}
       <button
         type="button"
-        className={`layer-btn layer-visibility-btn${effectivelyVisible ? '' : ' layer-visibility-btn--hidden'}`}
+        className={`icon-btn layer-visibility-btn${effectivelyVisible ? '' : ' layer-visibility-btn--hidden'}`}
         onClick={handleLocalVisibilityToggle}
         aria-pressed={effectivelyVisible}
         aria-label={
@@ -80,85 +81,19 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
           effectivelyVisible ? 'Hide layer in viewport (local)' : 'Show layer in viewport (local)'
         }
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-          {effectivelyVisible ? (
-            <>
-              <ellipse
-                cx="7"
-                cy="7"
-                rx="5"
-                ry="3"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-              />
-              <circle cx="7" cy="7" r="1.5" fill="currentColor" />
-            </>
-          ) : (
-            <>
-              <ellipse
-                cx="7"
-                cy="7"
-                rx="5"
-                ry="3"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-                opacity="0.4"
-              />
-              <line
-                x1="3"
-                y1="3"
-                x2="11"
-                y2="11"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-              />
-            </>
-          )}
-        </svg>
+        <Icon name={effectivelyVisible ? 'eye' : 'eyeOff'} size={14} />
       </button>
 
-      {/* Lock state — read-only indicator (controlled by MCP agent) */}
       <span
-        className={`layer-btn layer-lock-indicator${layer.locked ? ' layer-lock-btn--locked' : ''}`}
+        className={`layer-lock${layer.locked ? ' layer-lock--locked' : ''}`}
         aria-label={
           layer.locked ? `Layer ${layer.name} is locked` : `Layer ${layer.name} is unlocked`
         }
         title={layer.locked ? 'Locked (set by MCP agent)' : 'Unlocked'}
       >
-        <svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true" focusable="false">
-          <rect
-            x="1"
-            y="6"
-            width="10"
-            height="7"
-            rx="1.5"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            fill="none"
-          />
-          {layer.locked ? (
-            <path
-              d="M3 6 V4 A3 3 0 0 1 9 4 V6"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              fill="none"
-            />
-          ) : (
-            <path
-              d="M3 6 V4 A3 3 0 0 1 9 4"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              fill="none"
-              opacity="0.4"
-            />
-          )}
-        </svg>
+        <Icon name={layer.locked ? 'lock' : 'unlock'} size={12} />
       </span>
 
-      {/* Color swatch (read-only) */}
       {layer.color != null ? (
         <span
           className="layer-color-swatch"
@@ -170,16 +105,12 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
         <span className="layer-color-swatch layer-color-swatch--none" aria-hidden="true" />
       )}
 
-      {/* Layer name (read-only) */}
-      <span className="layer-name-cell">
-        <span className="layer-name-label" aria-label={`Layer name: ${layer.name}`}>
-          {layer.name}
-        </span>
+      <span className="panel__row-main layer-name" aria-label={`Layer name: ${layer.name}`}>
+        {layer.name}
       </span>
 
-      {/* Entity count badge */}
       <span
-        className="layer-entity-count"
+        className="panel__row-meta"
         title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'} on this layer`}
         aria-label={`${entityCount} entities`}
       >
@@ -203,12 +134,17 @@ export function LayersPanel({ className }: LayersPanelProps): React.ReactElement
   const entityCounts = useLayerEntityCounts();
 
   return (
-    <aside className={['layers-panel', className].filter(Boolean).join(' ')} aria-label="Layers">
-      <div className="layers-panel-header">
-        <h2 className="layers-panel-title">Layers</h2>
-      </div>
+    <aside
+      className={['panel layers-panel', className].filter(Boolean).join(' ')}
+      aria-label="Layers"
+    >
+      <PanelHeader
+        title="Layers"
+        count={layerOrder.length}
+        countLabel={`${layerOrder.length} layers`}
+      />
 
-      <ul className="layer-list" aria-label="Layer list" role="list">
+      <ul className="panel__list" aria-label="Layer list" role="list">
         {layerOrder.map((id) => {
           const layer = layers[id];
           if (!layer) return null;

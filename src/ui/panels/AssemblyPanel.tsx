@@ -20,6 +20,8 @@
 import React, { useCallback } from 'react';
 import { useStore } from '@ui/store';
 import type { Component, InstanceEntity } from '@core/model/types';
+import { Icon } from '@ui/components/Icon';
+import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 
 // ---------------------------------------------------------------------------
 // Section A: Component row
@@ -40,21 +42,18 @@ function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
 
   return (
     <li
-      className="assembly-component-row"
+      className="panel__row assembly-component-row"
       data-testid={`assembly-component-${component.id}`}
       aria-label={`Component: ${component.name}`}
     >
-      <span className="assembly-component-icon" aria-hidden="true">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.2" />
-          <path d="M4 6h4M6 4v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-        </svg>
+      <span className="panel__row-icon" aria-hidden="true">
+        <Icon name="cube" size={14} />
       </span>
-      <span className="assembly-component-name" title={component.name}>
+      <span className="panel__row-main" title={component.name}>
         {component.name}
       </span>
       <span
-        className="assembly-component-count"
+        className="panel__row-meta"
         title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}`}
         aria-label={`${entityCount} entities`}
       >
@@ -62,11 +61,12 @@ function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
       </span>
       <button
         type="button"
-        className="assembly-insert-btn"
+        className="btn btn--ghost btn--sm"
         onClick={handleInsert}
         aria-label={`Insert instance of ${component.name}`}
         title="Insert instance at origin"
       >
+        <Icon name="plus" size={12} />
         Insert
       </button>
     </li>
@@ -104,18 +104,15 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
 
   return (
     <li
-      className={`assembly-instance-row${selected ? ' assembly-instance-row--selected' : ''}`}
+      className={`panel__row assembly-instance-row${selected ? ' panel__row--selected assembly-instance-row--selected' : ''}`}
       data-testid={`assembly-instance-${instance.id}`}
       aria-label={`Instance of ${componentName}`}
       aria-selected={selected}
       onClick={handleClick}
       role="option"
     >
-      <span className="assembly-instance-icon" aria-hidden="true">
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.2" />
-          <circle cx="5.5" cy="5.5" r="1.5" fill="currentColor" />
-        </svg>
+      <span className="panel__row-icon" aria-hidden="true">
+        <Icon name="assembly" size={14} />
       </span>
       <span className="assembly-instance-info">
         <span className="assembly-instance-name" title={componentName}>
@@ -127,11 +124,12 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
       </span>
       <button
         type="button"
-        className="assembly-explode-btn"
+        className="btn btn--ghost btn--sm btn--danger"
         onClick={handleExplode}
         aria-label={`Explode instance ${instance.id}`}
         title="Explode instance into individual entities"
       >
+        <Icon name="explode" size={12} />
         Explode
       </button>
     </li>
@@ -162,42 +160,35 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
 
   return (
     <aside
-      className={['assembly-panel', className].filter(Boolean).join(' ')}
+      className={['panel assembly-panel', className].filter(Boolean).join(' ')}
       aria-label="Assembly"
     >
-      {/* ---- Section A: Component Library ---- */}
-      <div className="assembly-panel-section">
-        <div className="assembly-panel-header">
-          <h2 className="assembly-panel-title">Components</h2>
-          <span className="assembly-panel-count" aria-label={`${componentList.length} components`}>
-            {componentList.length}
-          </span>
-        </div>
-
+      <PanelHeader title="Assembly" />
+      <PanelSection
+        title="Components"
+        count={componentList.length}
+        countLabel={`${componentList.length} components`}
+      >
         {componentList.length === 0 ? (
-          <p className="assembly-empty-hint">No components defined.</p>
+          <PanelEmpty compact icon="assembly" message="No components defined." />
         ) : (
-          <ul className="assembly-component-list" aria-label="Component list" role="list">
+          <ul className="panel__list" aria-label="Component list" role="list">
             {componentList.map((comp) => (
               <ComponentRow key={comp.id} component={comp} />
             ))}
           </ul>
         )}
-      </div>
+      </PanelSection>
 
-      {/* ---- Section B: Instances ---- */}
-      <div className="assembly-panel-section">
-        <div className="assembly-panel-header">
-          <h2 className="assembly-panel-title">Instances</h2>
-          <span className="assembly-panel-count" aria-label={`${instanceList.length} instances`}>
-            {instanceList.length}
-          </span>
-        </div>
-
+      <PanelSection
+        title="Instances"
+        count={instanceList.length}
+        countLabel={`${instanceList.length} instances`}
+      >
         {instanceList.length === 0 ? (
-          <p className="assembly-empty-hint">No instances in the scene.</p>
+          <PanelEmpty compact icon="assembly" message="No instances in the scene." />
         ) : (
-          <ul className="assembly-instance-list" aria-label="Instance list" role="listbox">
+          <ul className="panel__list" aria-label="Instance list" role="listbox">
             {instanceList.map((inst) => {
               const comp = components[inst.componentId];
               const compName = comp ? comp.name : inst.componentId;
@@ -212,7 +203,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
             })}
           </ul>
         )}
-      </div>
+      </PanelSection>
     </aside>
   );
 }
