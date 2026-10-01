@@ -46,6 +46,17 @@ export function setRegistryRef(
 // Internal replay helper
 // ---------------------------------------------------------------------------
 
+/** One successfully replayed step, reported to `replayHistory`'s optional `onStep` observer. */
+export interface ReplayStepEvent {
+  readonly step: FeatureStep;
+  /** Recorded params with ids remapped but `=expr` strings kept. */
+  readonly rawParams: unknown;
+  /** Params actually passed to the command (`=expr` resolved, ids remapped). */
+  readonly params: unknown;
+  readonly before: CadDocument;
+  readonly after: CadDocument;
+}
+
 /**
  * Replay all non-suppressed steps in `history` from a fresh document,
  * preserving document-level state from `base` (classification in history_carry.ts).
@@ -66,6 +77,7 @@ export function replayHistory(
   history: FeatureStep[],
   getCommandFn: (name: string) => CommandDefinition<unknown> | undefined,
   resolveWarnings?: string[],
+  onStep?: (event: ReplayStepEvent) => void,
 ): CadDocument {
   // Start from empty geometry but preserve document-level settings.
   let doc: CadDocument = {
@@ -109,8 +121,16 @@ export function replayHistory(
       // 2. Rewrite stale entity-id references using the accumulated idMap.
       const remapped = remapIds(resolved, idMap);
       const result = cmd.run(doc, remapped);
+      const before = doc;
       // Accept the new geometry but keep OUR featureHistory intact.
       doc = { ...result.document, featureHistory: history };
+      onStep?.({
+        step,
+        rawParams: remapIds(step.params, idMap),
+        params: remapped,
+        before,
+        after: doc,
+      });
 
       // 3. Extend idMap: zip step.affected (old ids) with result.affected (new ids)
       // positionally. Commands produce entities in the same order given the same

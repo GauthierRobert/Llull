@@ -1,0 +1,68 @@
+/**
+ * Source-text formatting shared by every code emitter.
+ *
+ * @layer core/codegen
+ * @pure
+ */
+
+import type { Feature, FeatureProgram, Term } from './featureProgram';
+
+/** Shortest faithful decimal for a coordinate (12 significant digits, no `-0`). */
+export function formatNumber(value: number): string {
+  if (!Number.isFinite(value) || Math.abs(value) < 1e-12) return '0';
+  return String(Number(value.toPrecision(12)));
+}
+
+/** A term's source: its parameter expression when bound, otherwise the literal number. */
+export function formatTerm(term: Term): string {
+  return term.expression ?? formatNumber(term.value);
+}
+
+/** Radians → degrees, keeping a parameter expression symbolic via `piName` (e.g. `math.pi`). */
+export function formatDegrees(term: Term, piName: string): string {
+  if (term.expression !== undefined) return `(${term.expression}) * 180 / ${piName}`;
+  const degrees = (term.value * 180) / Math.PI;
+  return Math.abs(degrees) < 1e-12 ? '0' : String(Number(degrees.toPrecision(15)));
+}
+
+export function isZero(terms: readonly Term[]): boolean {
+  return terms.every((t) => t.expression === undefined && t.value === 0);
+}
+
+/** A string literal valid in Python and OpenSCAD (JSON escapes are a subset of both). */
+export function quote(text: string): string {
+  return JSON.stringify(text);
+}
+
+/** `# step 3 · add_box` style heading, emitted once per contiguous run of features from a step. */
+export function stepHeading(feature: Feature, previous: Feature | undefined): string | null {
+  if (feature.step === null) return feature.command;
+  if (previous !== undefined && previous.step === feature.step) return null;
+  return `step ${feature.step} · ${feature.command}`;
+}
+
+/** Numbers packed `perLine` per line, for long mesh arrays. */
+export function numberRows(values: readonly number[], perLine: number): string[] {
+  const rows: string[] = [];
+  for (let i = 0; i < values.length; i += perLine) {
+    rows.push(
+      values
+        .slice(i, i + perLine)
+        .map(formatNumber)
+        .join(', '),
+    );
+  }
+  return rows;
+}
+
+/** One-paragraph provenance shared by every emitter's header. */
+export function provenance(program: FeatureProgram): string[] {
+  const lines = [
+    `Units: ${program.units}. Right-handed frame, +Z up.`,
+    program.source === 'history'
+      ? 'Features follow the llull feature history in order; parameter-driven dimensions are expressions.'
+      : 'The document had no reproducible feature history; this is its current geometry.',
+  ];
+  for (const note of program.notes) lines.push(`Note: ${note}`);
+  return lines;
+}

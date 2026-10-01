@@ -23,10 +23,17 @@
 import './loadEnv';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
-import { buildMcpRouter } from './mcp';
+import { buildMcpRouter, exchangeOptionsFromEnv } from './mcp';
+import { applyExchangeToolCall } from '@core/mcp';
 import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
-import { subscribeLive, flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
+import {
+  subscribeLive,
+  flushAutosave,
+  stopAutosave,
+  closeAllSubscribers,
+  getLiveDoc,
+} from './liveDocument';
 import { closeAllSessions } from './mcp';
 import {
   getAllowedOrigins,
@@ -238,13 +245,67 @@ app.get('/export/stl', restLimiter, (req: Request, res: Response) => {
   }
 });
 
+/** Python bridge for STEP / parametric code (shared by /export/step and the MCP exchange tools). */
+const exchange = exchangeOptionsFromEnv();
+
+function exportLanguage(raw: unknown): 'cadquery' | 'build123d' | 'openscad' | 'freecad' {
+  return raw === 'build123d' || raw === 'openscad' || raw === 'freecad' ? raw : 'cadquery';
+}
+
+/**
+ * GET /export/code — download the model as parametric source code (export_code).
+ * Query: language = cadquery (default) | build123d | openscad | freecad; name = file base name.
+ */
+app.get('/export/code', restLimiter, (req: Request, res: Response) => {
+  const name = sanitizeFilename(req.query['name'], 'model');
+  const result = applyCommand('export_code', {
+    language: exportLanguage(req.query['language']),
+    name,
+  });
+  const data = result.data as { text?: string; fileName?: string } | undefined;
+  if (data?.text === undefined || data.fileName === undefined) {
+    res.status(500).json({ error: result.summary });
+    return;
+  }
+  res.setHeader('Content-Disposition', `attachment; filename="${data.fileName}"`);
+  res.type('text/plain; charset=utf-8').status(200).send(data.text);
+});
+
+/**
+ * GET /export/step — download the model as an exact B-rep STEP file (needs the Python bridge).
+ * Query: name = file base name; language = cadquery (default) | build123d. 503 when Python is
+ * not configured, 500 with { error } when the bridge fails.
+ */
+app.get('/export/step', restLimiter, (req: Request, res: Response) => {
+  void (async () => {
+    const name = sanitizeFilename(req.query['name'], 'model');
+    const language = req.query['language'] === 'build123d' ? 'build123d' : 'cadquery';
+    const result = await applyExchangeToolCall(
+      'export_step',
+      { name, language, save: false },
+      { ...exchange, getDoc: getLiveDoc, applyCommand },
+    );
+    const stepBase64 = result?.structuredContent?.['stepBase64'];
+    if (typeof stepBase64 !== 'string') {
+      const message = result?.content[0]?.text ?? 'export_step failed.';
+      res.status(exchange.port === null ? 503 : 500).json({ error: message });
+      return;
+    }
+    const body = Buffer.from(stepBase64, 'base64');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}.step"`);
+    res.setHeader('Content-Type', 'model/step');
+    res.setHeader('Content-Length', body.length);
+    res.status(200).end(body);
+  })();
+});
+
 // UI↔MCP live-sync bridge routes — guarded by the same bearer auth as /mcp.
 // See server/src/uiBridgeRouter.ts for the implementation.
 app.use('/ui-bridge', buildUiBridgeRouter());
 
 // MCP endpoint — Streamable HTTP, guarded by bearer auth + rate limiting.
 // See server/src/mcp.ts for the implementation.
-app.use('/mcp', buildMcpRouter(inMemoryBridge));
+app.use('/mcp', buildMcpRouter(inMemoryBridge, exchange));
 
 app.use(jsonErrorHandler);
 

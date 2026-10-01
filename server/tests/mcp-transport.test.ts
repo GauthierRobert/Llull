@@ -32,7 +32,7 @@ import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { listCommands } from '@core/commands/registry';
 import * as registry from '@core/commands/registry';
-import { buildBridgeToolDefinitions } from '@core/mcp';
+import { buildBridgeToolDefinitions, buildExchangeToolDefinitions } from '@core/mcp';
 
 // ---------------------------------------------------------------------------
 // SSE parsing helpers
@@ -198,25 +198,29 @@ describe('MCP initialize handshake', () => {
 // ---------------------------------------------------------------------------
 
 describe('MCP tools/list', () => {
-  it('returns one tool per registered command plus bridge tools', async () => {
+  it('returns one tool per registered command plus bridge and exchange tools', async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
     const tools = await mcpListTools(sessionId);
-    // The transport appends bridge tools (snapshot_in_from_ui, snapshot_out_to_ui)
-    // on top of the core registry tools.
-    const expectedCount = listCommands().length + buildBridgeToolDefinitions().length;
+    // The transport appends bridge tools (snapshot_in_from_ui, snapshot_out_to_ui) and the
+    // exchange tools (export_step, import_step, import_code) on top of the core registry tools.
+    const expectedCount =
+      listCommands().length +
+      buildBridgeToolDefinitions().length +
+      buildExchangeToolDefinitions().length;
     expect(tools.length).toBe(expectedCount);
   });
 
-  it('tool names include all registered command names plus bridge tool names', async () => {
+  it('tool names include all registered command names plus bridge and exchange tool names', async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);
 
     const tools = await mcpListTools(sessionId);
     const registeredNames = listCommands().map((c) => c.name);
     const bridgeNames = buildBridgeToolDefinitions().map((t) => t.name);
-    const expectedNames = [...registeredNames, ...bridgeNames];
+    const exchangeNames = buildExchangeToolDefinitions().map((t) => t.name);
+    const expectedNames = [...registeredNames, ...bridgeNames, ...exchangeNames];
     const toolNames = tools.map((t) => t.name);
     expect(toolNames).toEqual(expectedNames);
   });

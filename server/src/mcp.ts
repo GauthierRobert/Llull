@@ -53,11 +53,33 @@ import {
   getMcpPrompt,
   buildBridgeToolDefinitions,
   applyBridgeToolCall,
+  buildExchangeToolDefinitions,
+  applyExchangeToolCall,
 } from '@core/mcp';
-import type { UiBridge } from '@core/mcp';
+import type { CadExchangePort, UiBridge } from '@core/mcp';
 import type { CadDocument } from '@core/model/types';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
+import {
+  codeExecutionAllowed,
+  createPythonExchangePort,
+  pythonExchangeConfigFromEnv,
+} from './pythonExchange';
+
+/** STEP / parametric-code exchange wiring (Python bridge), injected into each MCP server. */
+export interface ExchangeOptions {
+  readonly port: CadExchangePort | null;
+  readonly allowCodeExecution: boolean;
+}
+
+/** Exchange options from the environment (LLULL_PYTHON, LLULL_ALLOW_CODE_EXECUTION, ...). */
+export function exchangeOptionsFromEnv(): ExchangeOptions {
+  const config = pythonExchangeConfigFromEnv();
+  return {
+    port: config === null ? null : createPythonExchangePort(config),
+    allowCodeExecution: codeExecutionAllowed(),
+  };
+}
 import { hasValidBearer } from './security';
 import { buildImageBlock, stripSvgFromData, rasterizeSvg } from './renderImage';
 import {
@@ -544,7 +566,11 @@ function r2Public(n: number): number {
  * @param getDoc - returns the current shared document (used for resources/read)
  * @param bridge - the injected UiBridge for UI↔session sync tools
  */
-function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
+function buildMcpServer(
+  getDoc: () => CadDocument,
+  bridge: UiBridge,
+  exchange: ExchangeOptions,
+): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
@@ -672,7 +698,13 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
       annotations: t.annotations,
     }));
 
-    return { tools: [...tools, ...bridgeTools] };
+    const exchangeTools = buildExchangeToolDefinitions().map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+      ...(t.annotations ? { annotations: t.annotations } : {}),
+    }));
+    return { tools: [...tools, ...bridgeTools, ...exchangeTools] };
   });
 
   // tools/call — route through commandBus so MCP edits share history + broadcast,
@@ -698,6 +730,22 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
       // Double cast: BridgeToolResult lacks the SDK's index signature — same
       // pattern as shapeToolCallContent casts throughout this file.
       return bridgeResult as unknown as CallToolResult;
+    }
+
+    // -----------------------------------------------------------------------
+    // Exchange tool intercept — export_step / import_step / import_code
+    // -----------------------------------------------------------------------
+    // Python-kernel I/O lives behind the injected port; document changes still
+    // route through registry commands on the shared command bus.
+    const exchangeResult = await applyExchangeToolCall(name, args, {
+      port: exchange.port,
+      getDoc,
+      applyCommand,
+      allowCodeExecution: exchange.allowCodeExecution,
+    });
+    if (exchangeResult !== null) {
+      sessionDoc = getLiveDoc();
+      return exchangeResult as unknown as CallToolResult;
     }
 
     // -----------------------------------------------------------------------
@@ -833,7 +881,10 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
  *   (client `close()`, dropped socket, crash) → also removes from `sessions`,
  *   preventing unbounded Map growth from clients that never send DELETE.
  */
-function allocateSession(bridge: UiBridge): {
+function allocateSession(
+  bridge: UiBridge,
+  exchange: ExchangeOptions,
+): {
   transport: StreamableHTTPServerTransport;
   server: Server;
 } {
@@ -860,7 +911,7 @@ function allocateSession(bridge: UiBridge): {
 
   // Wire the shared live document read accessor and the UI bridge.
   // Mutations route through commandBus.applyCommand (not setLiveDoc directly).
-  const server = buildMcpServer(getLiveDoc, bridge);
+  const server = buildMcpServer(getLiveDoc, bridge, exchange);
 
   return { transport, server };
 }
@@ -888,8 +939,12 @@ function allocateSession(bridge: UiBridge): {
  *   5. Any request with an unknown session id → 404.
  *
  * @param bridge - the UI↔MCP bridge injected at server startup.
+ * @param exchange - STEP/code exchange port (defaults to the environment-configured Python bridge).
  */
-export function buildMcpRouter(bridge: UiBridge): Router {
+export function buildMcpRouter(
+  bridge: UiBridge,
+  exchange: ExchangeOptions = exchangeOptionsFromEnv(),
+): Router {
   // Start the background idle-TTL sweep (no-op if already running).
   startSessionSweep();
 
@@ -943,7 +998,7 @@ export function buildMcpRouter(bridge: UiBridge): Router {
       if (handled) return;
 
       // No session id → this is an `initialize` request; allocate a new session.
-      const { transport, server } = allocateSession(bridge);
+      const { transport, server } = allocateSession(bridge, exchange);
 
       try {
         await server.connect(transport as Transport);

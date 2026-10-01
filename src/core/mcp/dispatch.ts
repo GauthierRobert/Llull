@@ -68,6 +68,13 @@ export interface McpToolCallResult extends McpShapedResult {
   data?: unknown;
 }
 
+/** The `text` of a `{ format: 'code', text }` data record, else null. */
+function codeText(data: unknown): string | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const record = data as Record<string, unknown>;
+  return record.format === 'code' && typeof record.text === 'string' ? record.text : null;
+}
+
 // ---------------------------------------------------------------------------
 // Single shaping implementation
 // ---------------------------------------------------------------------------
@@ -82,7 +89,8 @@ export interface McpToolCallResult extends McpShapedResult {
  * Content block rules:
  *   1. Always: `{ type:'text', text: summary }`.
  *   2. When affected is non-empty: `{ type:'text', text:'Affected entity ids: ...' }`.
- *   3. When data is defined: `{ type:'text', text:'```json\n...\n```' }`.
+ *   3. When data is defined: `{ type:'text', text:'```json\n...\n```' }`; a `format:'code'`
+ *      record's `text` is moved out of the JSON into its own verbatim text block.
  *   4. When data is a non-null, non-array object: also set `structuredContent`.
  *
  * @pure — no execute, no document, no side effects.
@@ -107,10 +115,13 @@ export function shapeToolCallContent(result: {
   }
 
   if (result.data !== undefined) {
+    // Source code (export_code) is shown verbatim so agents read it as code, not as a JSON string.
+    const code = codeText(result.data);
     content.push({
       type: 'text',
-      text: `\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``,
+      text: `\`\`\`json\n${JSON.stringify(code === null ? result.data : { ...(result.data as object), text: '(source code in the next block)' }, null, 2)}\n\`\`\``,
     });
+    if (code !== null) content.push({ type: 'text', text: code });
     const isRecord =
       typeof result.data === 'object' && result.data !== null && !Array.isArray(result.data);
     if (isRecord) {
