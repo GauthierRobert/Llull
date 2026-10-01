@@ -22,6 +22,8 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
+import { Icon } from '@ui/components/Icon';
+import { NamedViewsOverlay } from './NamedViews';
 import { PRESET_DIRECTIONS, type PresetDirection, type PresetName } from './viewPresetDirections';
 
 // ---------------------------------------------------------------------------
@@ -236,39 +238,47 @@ export function ViewPresetsOverlay(): React.ReactElement {
   }, []);
 
   return (
-    <div className="view-presets" aria-label="View presets" role="group">
-      {PRESETS.map((preset) => (
-        <button
-          key={preset.name}
-          type="button"
-          className="view-preset-btn"
-          onClick={() => handlePreset(preset.direction)}
-          title={`${preset.label} view`}
-          aria-label={`${preset.label} view`}
-        >
-          {preset.label}
-        </button>
-      ))}
-      <span className="view-preset-divider" aria-hidden="true" />
-      <button
-        type="button"
-        className="view-preset-btn"
-        onClick={() => handleFit(allIds)}
-        title="Fit all entities into view"
-        aria-label="Fit all into view"
-      >
-        Fit All
-      </button>
-      <button
-        type="button"
-        className="view-preset-btn"
-        onClick={() => handleFit(selection)}
-        title="Fit selected entities into view"
-        aria-label="Fit selection into view"
-        disabled={selection.length === 0}
-      >
-        Fit Sel
-      </button>
+    <div className="vp-overlay vp-overlay--top-right">
+      <div className="vp-toolbar" aria-label="View presets" role="group">
+        <div className="vp-group">
+          {PRESETS.map((preset) => (
+            <button
+              key={preset.name}
+              type="button"
+              className="vp-btn"
+              onClick={() => handlePreset(preset.direction)}
+              title={`${preset.label} view`}
+              aria-label={`${preset.label} view`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <span className="vp-divider" aria-hidden="true" />
+        <div className="vp-group">
+          <button
+            type="button"
+            className="vp-btn vp-btn--icon"
+            onClick={() => handleFit(allIds)}
+            title="Fit all entities into view"
+            aria-label="Fit all into view"
+          >
+            <Icon name="fit" size={14} />
+          </button>
+          <button
+            type="button"
+            className="vp-btn vp-btn--icon"
+            onClick={() => handleFit(selection)}
+            title="Fit selected entities into view"
+            aria-label="Fit selection into view"
+            disabled={selection.length === 0}
+          >
+            <Icon name="cursor" size={14} />
+          </button>
+        </div>
+        <span className="vp-divider" aria-hidden="true" />
+        <NamedViewsOverlay />
+      </div>
     </div>
   );
 }

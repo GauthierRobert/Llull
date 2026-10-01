@@ -394,44 +394,18 @@ const MODES: ReadonlyArray<{
 
 export function GizmoModeToggle({ mode, onMode }: ModeToggleProps): React.ReactElement {
   return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: 12,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        gap: 4,
-        background: 'rgba(18,22,32,0.82)',
-        borderRadius: 8,
-        padding: '4px 6px',
-        backdropFilter: 'blur(4px)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.45)',
-        zIndex: 10,
-        userSelect: 'none',
-      }}
-    >
+    <div className="vp-gizmo-toggle" role="group" aria-label="Transform mode">
       {MODES.map(({ id, label, key }) => (
         <button
           key={id}
+          type="button"
+          className={`vp-btn${mode === id ? ' vp-btn--selected' : ''}`}
           aria-pressed={mode === id}
           aria-label={`${label} (${key})`}
           onClick={() => onMode(id)}
-          style={{
-            padding: '4px 10px',
-            borderRadius: 5,
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: 12,
-            fontFamily: 'inherit',
-            fontWeight: mode === id ? 700 : 400,
-            background: mode === id ? '#3a7bd5' : 'transparent',
-            color: mode === id ? '#fff' : '#8fa0be',
-            transition: 'background 0.12s, color 0.12s',
-          }}
         >
           {label}
-          <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.6 }}>{key}</span>
+          <kbd className="vp-kbd">{key}</kbd>
         </button>
       ))}
     </div>

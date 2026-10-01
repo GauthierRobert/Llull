@@ -41,63 +41,11 @@ export function ScaleBar({ zoom, document }: ScaleBarProps): React.ReactElement 
   const label = useMemo(() => formatLength(document, worldLength), [document, worldLength]);
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: 16,
-        right: 16,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-end',
-        gap: 3,
-        pointerEvents: 'none',
-        userSelect: 'none',
-      }}
-    >
-      {/* Label */}
-      <span
-        style={{
-          fontFamily: 'monospace',
-          fontSize: 11,
-          color: '#8a9bb5',
-          letterSpacing: '0.04em',
-        }}
-      >
-        {label}
-      </span>
-
-      {/* Bar */}
-      <div
-        style={{
-          width: Math.round(pixelLength),
-          height: 3,
-          background: 'linear-gradient(to right, #4a6080, #8aaccc)',
-          borderRadius: 1,
-          position: 'relative',
-        }}
-      >
-        {/* Left tick */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: -3,
-            width: 1,
-            height: 9,
-            background: '#8aaccc',
-          }}
-        />
-        {/* Right tick */}
-        <div
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: -3,
-            width: 1,
-            height: 9,
-            background: '#8aaccc',
-          }}
-        />
+    <div className="vp-scalebar vp-scalebar--2d">
+      <span className="vp-scalebar__label">{label}</span>
+      <div className="vp-scalebar__bar" style={{ width: Math.round(pixelLength) }}>
+        <div className="vp-scalebar__tick vp-scalebar__tick--start" />
+        <div className="vp-scalebar__tick vp-scalebar__tick--end" />
       </div>
     </div>
   );

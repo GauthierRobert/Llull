@@ -72,7 +72,7 @@ import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
 import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
 import type { GizmoMode } from './TransformGizmo';
 import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
-import { NamedViewsInner, NamedViewsOverlay } from './NamedViews';
+import { NamedViewsInner } from './NamedViews';
 import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
 import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
@@ -548,11 +548,8 @@ export function Viewport3D(): React.ReactElement {
       {/* Mode toggle overlay — only visible when a single entity is selected */}
       {showModeToggle && <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />}
 
-      {/* View preset buttons (top-right) */}
+      {/* View presets, fit and named views (top-right) */}
       <ViewPresetsOverlay />
-
-      {/* Named-view bookmarks (below view presets) */}
-      <NamedViewsOverlay />
 
       {/* Display mode + section plane controls (top-left) */}
       <ViewportControls />

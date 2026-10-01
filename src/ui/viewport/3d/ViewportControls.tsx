@@ -1,23 +1,21 @@
 /**
  * @layer ui/viewport/3d
  *
- * ViewportControls — a minimal overlay mounted OUTSIDE the Canvas.
- *
- * Houses two control groups:
- *   1. Display mode — segmented button: Shaded / Wireframe / X-Ray.
- *   2. Section plane — toggle + axis selector + offset slider + flip checkbox.
- *
- * All state lives in the viewport store (render-only, no document mutation).
- * Positioned absolute in the top-left of the viewport wrapper.
- *
- * Styling uses existing CSS variables from the design system (V3).
- * Accessible: real <button>/<input>/<label> elements; aria attributes on
- * toggles (R10).
+ * ViewportControls — floating glass toolbar (top-left) mounted OUTSIDE the Canvas.
+ * Groups: display mode, section plane, 3D snap, render quality, animation transport.
+ * Section options open as a popover under the toolbar. Render-only state (viewport store);
+ * never mutates the document.
  */
 
 import React, { useCallback, useId } from 'react';
 import { useViewportStore, useStore } from '@ui/store';
 import type { DisplayMode, ClipAxis, QualityOverride } from '@ui/store';
+import { Icon } from '@ui/components/Icon';
+import type { IconName } from '@ui/components/Icon';
+
+function Divider(): React.ReactElement {
+  return <span className="vp-divider" aria-hidden="true" />;
+}
 
 // ---------------------------------------------------------------------------
 // 3D snap toggle
@@ -27,15 +25,16 @@ function Snap3DToggle(): React.ReactElement {
   const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
   const toggleSnap3d = useViewportStore((s) => s.toggleSnap3d);
   return (
-    <div className="vp-control-group" role="group" aria-label="3D snap">
+    <div className="vp-group" role="group" aria-label="3D snap">
       <button
         type="button"
-        className={`vp-mode-btn${snap3dEnabled ? ' vp-mode-btn--active' : ''}`}
+        className={`vp-btn${snap3dEnabled ? ' vp-btn--toggled' : ''}`}
         aria-pressed={snap3dEnabled}
         title={snap3dEnabled ? 'Disable 3D snap (vertex/edge/face-center/grid)' : 'Enable 3D snap'}
         onClick={toggleSnap3d}
       >
-        Snap
+        <Icon name="magnet" size={14} />
+        <span className="vp-btn__text">Snap</span>
       </button>
     </div>
   );
@@ -45,10 +44,15 @@ function Snap3DToggle(): React.ReactElement {
 // Display mode segmented button
 // ---------------------------------------------------------------------------
 
-const DISPLAY_MODES: { value: DisplayMode; label: string; title: string }[] = [
-  { value: 'shaded', label: 'Shaded', title: 'Shaded — standard PBR rendering' },
-  { value: 'wireframe', label: 'Wire', title: 'Wireframe — show mesh edges only' },
-  { value: 'xray', label: 'X-Ray', title: 'X-Ray — transparent surfaces' },
+const DISPLAY_MODES: { value: DisplayMode; label: string; title: string; icon: IconName }[] = [
+  { value: 'shaded', label: 'Shaded', title: 'Shaded — standard PBR rendering', icon: 'shaded' },
+  {
+    value: 'wireframe',
+    label: 'Wire',
+    title: 'Wireframe — show mesh edges only',
+    icon: 'wireframe',
+  },
+  { value: 'xray', label: 'X-Ray', title: 'X-Ray — transparent surfaces', icon: 'xray' },
 ];
 
 function DisplayModeControl(): React.ReactElement {
@@ -56,17 +60,19 @@ function DisplayModeControl(): React.ReactElement {
   const setDisplayMode = useViewportStore((s) => s.setDisplayMode);
 
   return (
-    <div className="vp-control-group" role="group" aria-label="Display mode">
-      {DISPLAY_MODES.map(({ value, label, title }) => (
+    <div className="vp-group vp-segmented" role="group" aria-label="Display mode">
+      {DISPLAY_MODES.map(({ value, label, title, icon }) => (
         <button
           key={value}
           type="button"
-          className={`vp-mode-btn${displayMode === value ? ' vp-mode-btn--active' : ''}`}
+          className={`vp-btn${displayMode === value ? ' vp-btn--selected' : ''}`}
           aria-pressed={displayMode === value}
+          aria-label={label}
           title={title}
           onClick={() => setDisplayMode(value)}
         >
-          {label}
+          <Icon name={icon} size={14} />
+          <span className="vp-btn__text">{label}</span>
         </button>
       ))}
     </div>
@@ -74,7 +80,7 @@ function DisplayModeControl(): React.ReactElement {
 }
 
 // ---------------------------------------------------------------------------
-// Section / clipping plane controls
+// Section / clipping plane — toggle (in toolbar) + options popover (under it)
 // ---------------------------------------------------------------------------
 
 const CLIP_AXES: { value: ClipAxis; label: string }[] = [
@@ -83,9 +89,28 @@ const CLIP_AXES: { value: ClipAxis; label: string }[] = [
   { value: 'z', label: 'Z' },
 ];
 
-function ClipPlaneControl(): React.ReactElement {
-  const clipPlane = useViewportStore((s) => s.clipPlane);
+function SectionToggle(): React.ReactElement {
+  const enabled = useViewportStore((s) => s.clipPlane.enabled);
   const toggleClip = useViewportStore((s) => s.toggleClipPlane);
+  return (
+    <div className="vp-group" role="group" aria-label="Section plane">
+      <button
+        type="button"
+        className={`vp-btn${enabled ? ' vp-btn--toggled' : ''}`}
+        aria-pressed={enabled}
+        aria-label="Section"
+        title={enabled ? 'Disable section plane' : 'Enable section plane'}
+        onClick={toggleClip}
+      >
+        <Icon name="section" size={14} />
+        <span className="vp-btn__text">Section</span>
+      </button>
+    </div>
+  );
+}
+
+function SectionPopover(): React.ReactElement | null {
+  const clipPlane = useViewportStore((s) => s.clipPlane);
   const setClipPlane = useViewportStore((s) => s.setClipPlane);
   const baseId = useId();
 
@@ -110,73 +135,57 @@ function ClipPlaneControl(): React.ReactElement {
     [setClipPlane],
   );
 
+  if (!clipPlane.enabled) return null;
+
   return (
-    <div className="vp-control-group vp-clip-group" aria-label="Section plane">
-      <button
-        type="button"
-        className={`vp-clip-toggle${clipPlane.enabled ? ' vp-clip-toggle--active' : ''}`}
-        aria-pressed={clipPlane.enabled}
-        title={clipPlane.enabled ? 'Disable section plane' : 'Enable section plane'}
-        onClick={toggleClip}
+    <div className="vp-popover vp-section-options">
+      <label htmlFor={`${baseId}-axis`} className="vp-field-label">
+        Axis
+      </label>
+      <select
+        id={`${baseId}-axis`}
+        className="vp-select"
+        value={clipPlane.axis}
+        onChange={handleAxisChange}
+        aria-label="Section plane axis"
       >
-        <span className="vp-clip-icon" aria-hidden="true">
-          ✂
-        </span>
-        Section
-      </button>
+        {CLIP_AXES.map(({ value, label }) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
 
-      {clipPlane.enabled && (
-        <div className="vp-clip-options">
-          {/* Axis selector */}
-          <label htmlFor={`${baseId}-axis`} className="vp-clip-label">
-            Axis
-          </label>
-          <select
-            id={`${baseId}-axis`}
-            className="vp-clip-select"
-            value={clipPlane.axis}
-            onChange={handleAxisChange}
-            aria-label="Section plane axis"
-          >
-            {CLIP_AXES.map(({ value, label }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+      <label htmlFor={`${baseId}-offset`} className="vp-field-label">
+        Offset
+      </label>
+      <div className="vp-slider-row">
+        <input
+          id={`${baseId}-offset`}
+          type="range"
+          className="vp-slider"
+          min={-50}
+          max={50}
+          step={0.5}
+          value={clipPlane.offset}
+          onChange={handleOffsetChange}
+          aria-label="Section plane offset"
+          aria-valuemin={-50}
+          aria-valuemax={50}
+          aria-valuenow={clipPlane.offset}
+        />
+        <span className="vp-value">{clipPlane.offset.toFixed(1)}</span>
+      </div>
 
-          {/* Offset slider */}
-          <label htmlFor={`${baseId}-offset`} className="vp-clip-label">
-            Offset&nbsp;<span className="vp-clip-value">{clipPlane.offset.toFixed(1)}</span>
-          </label>
-          <input
-            id={`${baseId}-offset`}
-            type="range"
-            className="vp-clip-slider"
-            min={-50}
-            max={50}
-            step={0.5}
-            value={clipPlane.offset}
-            onChange={handleOffsetChange}
-            aria-label="Section plane offset"
-            aria-valuemin={-50}
-            aria-valuemax={50}
-            aria-valuenow={clipPlane.offset}
-          />
-
-          {/* Flip toggle */}
-          <label className="vp-clip-label vp-clip-flip-label">
-            <input
-              type="checkbox"
-              className="vp-clip-flip"
-              checked={clipPlane.flipped}
-              onChange={handleFlipChange}
-              aria-label="Flip section plane direction"
-            />
-            Flip
-          </label>
-        </div>
-      )}
+      <label className="vp-field-label vp-flip">
+        <input
+          type="checkbox"
+          checked={clipPlane.flipped}
+          onChange={handleFlipChange}
+          aria-label="Flip section plane direction"
+        />
+        Flip direction
+      </label>
     </div>
   );
 }
@@ -195,27 +204,30 @@ function AnimationTransportControls(): React.ReactElement | null {
   if (Object.keys(animations).length === 0) return null;
 
   return (
-    <div className="vp-control-group" role="group" aria-label="Animation transport">
-      <button
-        type="button"
-        className={`vp-mode-btn${animationPlaying ? ' vp-mode-btn--active' : ''}`}
-        aria-label={animationPlaying ? 'Pause animations' : 'Play animations'}
-        aria-pressed={animationPlaying}
-        title={animationPlaying ? 'Pause animations' : 'Play animations'}
-        onClick={toggleAnimationPlaying}
-      >
-        {animationPlaying ? '⏸' : '▶'}
-      </button>
-      <button
-        type="button"
-        className="vp-mode-btn"
-        aria-label="Reset animations"
-        title="Reset animations to initial pose"
-        onClick={resetAnimations}
-      >
-        ⟲
-      </button>
-    </div>
+    <>
+      <Divider />
+      <div className="vp-group" role="group" aria-label="Animation transport">
+        <button
+          type="button"
+          className={`vp-btn vp-btn--icon${animationPlaying ? ' vp-btn--toggled' : ''}`}
+          aria-label={animationPlaying ? 'Pause animations' : 'Play animations'}
+          aria-pressed={animationPlaying}
+          title={animationPlaying ? 'Pause animations' : 'Play animations'}
+          onClick={toggleAnimationPlaying}
+        >
+          <Icon name={animationPlaying ? 'pause' : 'play'} size={14} />
+        </button>
+        <button
+          type="button"
+          className="vp-btn vp-btn--icon"
+          aria-label="Reset animations"
+          title="Reset animations to initial pose"
+          onClick={resetAnimations}
+        >
+          <Icon name="reset" size={14} />
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -251,13 +263,13 @@ function QualityControl(): React.ReactElement {
   );
 
   return (
-    <div className="vp-control-group" role="group" aria-label="Render quality settings">
-      <label htmlFor={`${baseId}-quality`} className="vp-clip-label">
+    <div className="vp-group vp-quality" role="group" aria-label="Render quality settings">
+      <label htmlFor={`${baseId}-quality`} className="vp-field-label vp-quality__label">
         Quality
       </label>
       <select
         id={`${baseId}-quality`}
-        className="vp-clip-select"
+        className="vp-select vp-select--ghost"
         value={qualityOverride}
         onChange={handleChange}
         aria-label="Render quality"
@@ -279,12 +291,17 @@ function QualityControl(): React.ReactElement {
 
 export function ViewportControls(): React.ReactElement {
   return (
-    <div className="vp-controls-overlay" aria-label="Viewport controls">
-      <DisplayModeControl />
-      <ClipPlaneControl />
-      <Snap3DToggle />
-      <QualityControl />
-      <AnimationTransportControls />
+    <div className="vp-overlay vp-overlay--top-left" aria-label="Viewport controls">
+      <div className="vp-toolbar">
+        <DisplayModeControl />
+        <Divider />
+        <SectionToggle />
+        <Snap3DToggle />
+        <Divider />
+        <QualityControl />
+        <AnimationTransportControls />
+      </div>
+      <SectionPopover />
     </div>
   );
 }

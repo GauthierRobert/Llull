@@ -15,6 +15,7 @@
 
 import React from 'react';
 import { useStore } from '@ui/store';
+import { Icon } from './Icon';
 
 // ---------------------------------------------------------------------------
 // Typed data shapes (local — mirror the command data interfaces for narrowing)
@@ -216,7 +217,10 @@ export function MeasurementHUD(): React.ReactElement | null {
   return (
     <div className="mhud" role="region" aria-label={`Measurement result: ${title}`}>
       <div className="mhud-header">
-        <span className="mhud-title">{title}</span>
+        <span className="mhud-title">
+          <Icon name="ruler" size={14} />
+          {title}
+        </span>
         <button
           type="button"
           className="mhud-dismiss"
@@ -224,7 +228,7 @@ export function MeasurementHUD(): React.ReactElement | null {
           aria-label="Dismiss measurement"
           title="Dismiss"
         >
-          ×
+          <Icon name="close" size={12} />
         </button>
       </div>
 

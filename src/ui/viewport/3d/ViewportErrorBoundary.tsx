@@ -7,6 +7,7 @@
  */
 
 import { Component } from 'react';
+import { Icon } from '@ui/components/Icon';
 import type { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
@@ -36,21 +37,17 @@ export class ViewportErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#0f1117',
-            color: '#e05252',
-            fontFamily: 'monospace',
-            fontSize: 13,
-            padding: 24,
-          }}
-        >
-          Viewport error: {this.state.message}
+        <div className="vp-error" role="alert">
+          <div className="vp-error__card">
+            <span className="vp-error__icon">
+              <Icon name="info" size={18} />
+            </span>
+            <h2 className="vp-error__title">The viewport hit a problem</h2>
+            <p className="vp-error__message">{this.state.message}</p>
+            <p className="vp-error__hint">
+              Your document is safe. Reload the page to restore the view.
+            </p>
+          </div>
         </div>
       );
     }

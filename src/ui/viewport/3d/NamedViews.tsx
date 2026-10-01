@@ -25,6 +25,7 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useNamedViewStore } from '@ui/store';
+import { Icon } from '@ui/components/Icon';
 import type { NamedViewCamera } from '@ui/store';
 
 // ---------------------------------------------------------------------------
@@ -169,29 +170,28 @@ export function NamedViewsOverlay(): React.ReactElement {
 
   return (
     <div className="named-views" aria-label="Named camera views" role="group">
-      {/* Collapsed trigger button showing view count */}
       <button
         type="button"
-        className={`named-views-toggle view-preset-btn${isExpanded ? ' named-views-toggle--active' : ''}`}
+        className={`vp-btn${namedViews.length > 0 ? '' : ' vp-btn--icon'}${isExpanded ? ' vp-btn--toggled' : ''}`}
         onClick={handleToggle}
         aria-expanded={isExpanded}
         aria-controls="named-views-panel"
+        aria-label={`Views${namedViews.length > 0 ? ` (${namedViews.length})` : ''}`}
         title="Named views"
       >
-        Views{namedViews.length > 0 ? ` (${namedViews.length})` : ''}
+        <Icon name="bookmark" size={14} />
+        {namedViews.length > 0 && <span className="vp-count">{namedViews.length}</span>}
       </button>
 
-      {/* Expanded panel */}
       {isExpanded && (
         <div
           id="named-views-panel"
-          className="named-views-panel"
+          className="vp-popover named-views-panel"
           role="region"
           aria-label="Named views panel"
         >
-          {/* Save-current row */}
           <div className="named-views-save-row">
-            <label className="named-views-label" htmlFor="named-view-name-input">
+            <label className="visually-hidden" htmlFor="named-view-name-input">
               Name
             </label>
             <input
@@ -199,7 +199,7 @@ export function NamedViewsOverlay(): React.ReactElement {
               ref={inputRef}
               type="text"
               className="named-views-input"
-              placeholder="View name…"
+              placeholder="Name this view…"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -208,7 +208,7 @@ export function NamedViewsOverlay(): React.ReactElement {
             />
             <button
               type="button"
-              className="named-views-save-btn"
+              className="vp-primary-btn"
               onClick={handleSave}
               aria-label="Save current camera as named view"
               title="Save current camera"
@@ -217,7 +217,6 @@ export function NamedViewsOverlay(): React.ReactElement {
             </button>
           </div>
 
-          {/* Saved views list */}
           {namedViews.length > 0 ? (
             <ul className="named-views-list" role="list" aria-label="Saved views">
               {namedViews.map((view) => (
@@ -238,7 +237,7 @@ export function NamedViewsOverlay(): React.ReactElement {
                     title={`Delete view: ${view.name}`}
                     aria-label={`Delete view ${view.name}`}
                   >
-                    ×
+                    <Icon name="close" size={12} />
                   </button>
                 </li>
               ))}

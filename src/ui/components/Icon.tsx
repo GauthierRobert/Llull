@@ -56,11 +56,28 @@ const ICON_PATHS = {
   xray: 'M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5Z M12 11.5v10M3.5 7 12 11.5 20.5 7',
   shaded: 'M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5ZM3.5 7 12 11.5 20.5 7M12 11.5v10',
   plus: 'M12 5v14M5 12h14',
-  trash: 'M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6M10 11v6M14 11v6',
+  trash:
+    'M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6M10 11v6M14 11v6',
   arrowUp: 'M12 19V5M5 12l7-7 7 7',
   arrowDown: 'M12 5v14M19 12l-7 7-7-7',
   zap: 'M13 2 4 14h7l-1 8 9-12h-7l1-8Z',
-  explode: 'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8',
+  explode:
+    'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8',
+  drawLine: 'M5 19 19 5M3 19h3v3H3zM18 2h3v3h-3z',
+  drawPolyline: 'M3 18 8 8l6 6 7-9',
+  drawCircle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
+  drawRectangle: 'M3 6h18v12H3z',
+  drawEllipse: 'M12 18c5 0 9-2.7 9-6s-4-6-9-6-9 2.7-9 6 4 6 9 6Z',
+  drawSpline: 'M3 17C7 17 7 7 12 7s5 10 9 10',
+  drawPoint: 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM12 3v4M12 17v4M3 12h4M17 12h4',
+  modifyOffset: 'M3 21V10a7 7 0 0 1 7-7h11M9 21v-8a4 4 0 0 1 4-4h8',
+  modifyFillet: 'M4 20V12a8 8 0 0 1 8-8h8',
+  modifyChamfer: 'M4 20V10l6-6h10',
+  modifyTrim:
+    'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12',
+  modifyExtend: 'M3 12h13M12 8l4 4-4 4M21 4v16',
+  modifyExplode:
+    'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;
