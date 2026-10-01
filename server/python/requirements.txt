@@ -1,0 +1,4 @@
+# llull Python bridge (STEP export/import, import_code). Python >= 3.10.
+# build123d pins a different OCP version: install it in its own virtualenv and
+# point LLULL_PYTHON_BUILD123D at that interpreter.
+cadquery>=2.4

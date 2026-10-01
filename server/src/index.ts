@@ -24,9 +24,18 @@ import './loadEnv';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { buildMcpRouter } from './mcp';
+import { exchangeOptionsFromEnv } from './pythonExchange';
+import { installGeometryKernel } from './geometryKernel';
+import { exportStepFile } from '@core/mcp';
 import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
-import { subscribeLive, flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
+import {
+  subscribeLive,
+  flushAutosave,
+  stopAutosave,
+  closeAllSubscribers,
+  getLiveDoc,
+} from './liveDocument';
 import { closeAllSessions } from './mcp';
 import {
   getAllowedOrigins,
@@ -238,13 +247,70 @@ app.get('/export/stl', restLimiter, (req: Request, res: Response) => {
   }
 });
 
+/** Python bridge for STEP / parametric code (shared by /export/step and the MCP exchange tools). */
+const exchange = exchangeOptionsFromEnv();
+
+function exportLanguage(raw: unknown): 'cadquery' | 'build123d' | 'openscad' | 'freecad' {
+  return raw === 'build123d' || raw === 'openscad' || raw === 'freecad' ? raw : 'cadquery';
+}
+
+/**
+ * GET /export/code — download the model as parametric source code (export_code).
+ * Query: language = cadquery (default) | build123d | openscad | freecad; name = file base name.
+ */
+app.get('/export/code', restLimiter, (req: Request, res: Response) => {
+  const name = sanitizeFilename(req.query['name'], 'model');
+  const result = applyCommand('export_code', {
+    language: exportLanguage(req.query['language']),
+    name,
+  });
+  const data = result.data as { text?: string; fileName?: string } | undefined;
+  if (data?.text === undefined || data.fileName === undefined) {
+    res.status(500).json({ error: result.summary });
+    return;
+  }
+  res.setHeader('Content-Disposition', `attachment; filename="${data.fileName}"`);
+  res.type('text/plain; charset=utf-8').status(200).send(data.text);
+});
+
+/**
+ * GET /export/step — download the model as an exact B-rep STEP file (needs the Python bridge).
+ * Query: name = file base name; language = cadquery (default) | build123d. 503 when Python is
+ * not configured, 500 with { error } when the bridge fails.
+ */
+app.get('/export/step', restLimiter, (req: Request, res: Response) => {
+  const port = exchange.port;
+  if (port === null) {
+    res.status(503).json({ error: 'STEP export needs the Python bridge (LLULL_PYTHON is off).' });
+    return;
+  }
+  const name = sanitizeFilename(req.query['name'], 'model');
+  exportStepFile(getLiveDoc, port, { name, language: req.query['language'], save: false })
+    .then((file) => {
+      if ('error' in file) {
+        res.status(500).json({ error: file.error });
+        return;
+      }
+      const body = Buffer.from(file.stepBase64, 'base64');
+      res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+      res.setHeader('Content-Type', 'model/step');
+      res.setHeader('Content-Length', body.length);
+      res.status(200).end(body);
+    })
+    .catch((error: unknown) => {
+      res.status(500).json({
+        error: `export_step failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    });
+});
+
 // UI↔MCP live-sync bridge routes — guarded by the same bearer auth as /mcp.
 // See server/src/uiBridgeRouter.ts for the implementation.
 app.use('/ui-bridge', buildUiBridgeRouter());
 
 // MCP endpoint — Streamable HTTP, guarded by bearer auth + rate limiting.
 // See server/src/mcp.ts for the implementation.
-app.use('/mcp', buildMcpRouter(inMemoryBridge));
+app.use('/mcp', buildMcpRouter(inMemoryBridge, exchange));
 
 app.use(jsonErrorHandler);
 
@@ -291,6 +357,7 @@ export function startServer(port: number = PORT, host: string = HOST): Server {
       '[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).',
     );
   }
+  void installGeometryKernel();
   const server = app.listen(port, host, () => {
     console.warn(`[llull-server] listening on http://${host}:${port}`);
   });

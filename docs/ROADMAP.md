@@ -54,7 +54,9 @@ AI control — there is no in-app AI bridge).**
 ## v0.8 — Interop & persistence
 - [ ] Native save/load + document versioning
 - [ ] 2D: DXF / DWG import + export
-- [ ] 3D exchange: STEP / IGES (kernel-dependent)
+- [x] 3D exchange: STEP export (exact B-rep, via CadQuery/OpenCascade) + STEP import (as meshes) — docs/CAD_EXCHANGE.md
+- [x] Parametric code exchange: CadQuery / build123d (round-trip), OpenSCAD + FreeCAD macro (export)
+- [ ] IGES; STEP feature recognition (import as editable primitives)
 - [ ] Mesh/print: STL / 3MF / OBJ / glTF; PDF export of drawings
 
 ## v0.9 — Assemblies

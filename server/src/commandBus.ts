@@ -11,7 +11,7 @@
  * Architecture notes:
  * - This is transport/state GLUE (L6). No entity construction or geometry here.
  * - History logic mirrors src/ui/store/store.ts dispatch/undo/redo.
- * - Query commands (result.data !== undefined) are detected the same way as the
+ * - Query commands (data present, document unchanged) are detected the same way as the
  *   UI store: return data, skip history push, skip broadcast.
  * - Purity is preserved: `execute` is called once per `applyCommand`; the result
  *   is inspected here and either stored (mutation) or returned as-is (query/no-op).
@@ -64,9 +64,10 @@ export interface CommandBusResult {
  *
  * Behaviour:
  * - Unknown command → isError true, document unchanged, no history push.
- * - Query command (result.data !== undefined) → return data; no history, no broadcast.
+ * - Query command (data present, document unchanged) → return data; no history, no broadcast.
  * - Mutating command (result.document !== prior) → push prior to undoStack (capped),
- *   clear redoStack, call setLiveDoc (broadcasts). Return summary/affected.
+ *   clear redoStack, call setLiveDoc (broadcasts). Return summary/affected (+ data, e.g.
+ *   build_project's per-step report).
  * - No-op (result.document === prior, no data) → no history, no broadcast.
  *
  * @param name   - snake_case command name (== MCP tool name).
@@ -89,7 +90,7 @@ export function applyCommand(name: string, params: unknown): CommandBusResult {
     };
   }
 
-  if (result.data !== undefined) {
+  if (result.data !== undefined && result.document === prior) {
     // Query command — return data, leave document + history untouched.
     return {
       summary: result.summary,
@@ -113,6 +114,7 @@ export function applyCommand(name: string, params: unknown): CommandBusResult {
     summary: result.summary,
     affected: result.affected,
     isError,
+    ...(result.data !== undefined ? { data: result.data } : {}),
     canUndo: canUndo(),
     canRedo: canRedo(),
   };

@@ -72,6 +72,16 @@ MCP_AUTH_TOKEN=<secret> npm --prefix server start
 - Web app build vars: `VITE_LLULL_SERVER_URL` (server base URL), `VITE_LLULL_API_TOKEN` (bearer for REST when the server requires it).
 - Full env reference: [`server/README.md`](server/README.md).
 
+## STEP and parametric code
+
+`export_code` writes the model as **CadQuery, build123d, OpenSCAD or a FreeCAD macro**.
+Parameters become variables, parameter-driven dimensions stay expressions, and features keep
+their history order. Edited CadQuery/build123d code comes back through the MCP tool
+`import_code` as an editable feature history. With the optional Python bridge
+(`pip install -r server/python/requirements.txt`), the MCP server also offers
+`export_step` (exact B-rep through OpenCascade) and `import_step`. See
+[docs/CAD_EXCHANGE.md](docs/CAD_EXCHANGE.md).
+
 ## Project layout
 
 ```

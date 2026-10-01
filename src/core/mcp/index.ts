@@ -37,3 +37,17 @@ export { buildBridgeToolDefinitions, applyBridgeToolCall } from './bridgeTools';
 
 export type { EntityDelta, DocPatch } from './docPatch';
 export { computeDocPatch, applyDocPatch } from './docPatch';
+
+export type {
+  CadExchangePort,
+  ExchangeDeps,
+  ExchangeCommandResult,
+  ProgramRun,
+  PythonLanguage,
+  StepFile,
+} from './exchangeTools';
+export {
+  buildExchangeToolDefinitions,
+  applyExchangeToolCall,
+  exportStepFile,
+} from './exchangeTools';
