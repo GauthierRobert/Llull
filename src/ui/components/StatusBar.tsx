@@ -1,21 +1,19 @@
 /**
  * @layer ui/components
  *
- * StatusBar — a bottom bar that surfaces live document state at a glance.
+ * StatusBar — slim bottom bar that surfaces live document state at a glance.
  *
  * Reads (all via narrow Zustand selectors — react R3):
  *   - liveStatus + syncState + hasUnsyncedLocalEdits → live / syncing / sync-failed indicator
  *   - document.units + document.displayPrecision → formatted unit label
- *   - document.selection.length               → selection count
+ *   - document.order.length / document.selection.length → entity + selection counts
  *   - lastSummary                             → most recent command feedback
  *
  * Presentation ONLY. No document mutations (PRIME DIRECTIVE).
  */
 
 import React from 'react';
-import { useStore, useThemeStore } from '@ui/store';
-import { McpConnectButton } from '@ui/components/McpConnect';
-import { ProjectIO } from '@ui/components/ProjectIO';
+import { useStore } from '@ui/store';
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -40,13 +38,8 @@ function StatusItem({
   );
 }
 
-// ---------------------------------------------------------------------------
-// LiveIndicator
-// ---------------------------------------------------------------------------
-
 function LiveIndicator(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
-
   const syncState = useStore((s) => s.syncState);
   const hasUnsynced = useStore((s) => s.hasUnsyncedLocalEdits);
 
@@ -74,37 +67,18 @@ function LiveIndicator(): React.ReactElement {
 }
 
 // ---------------------------------------------------------------------------
-// ThemeToggle
-// ---------------------------------------------------------------------------
-
-function ThemeToggle(): React.ReactElement {
-  const theme = useThemeStore((s) => s.theme);
-  const toggleTheme = useThemeStore((s) => s.toggleTheme);
-
-  return (
-    <button
-      type="button"
-      className="status-theme-toggle"
-      onClick={toggleTheme}
-      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-    >
-      {theme === 'dark' ? '☀' : '☾'}
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // StatusBar
 // ---------------------------------------------------------------------------
 
 export function StatusBar(): React.ReactElement {
   const units = useStore((s) => s.document.units);
   const displayPrecision = useStore((s) => s.document.displayPrecision);
+  const entityCount = useStore((s) => s.document.order.length);
   const selectionCount = useStore((s) => s.document.selection.length);
   const lastSummary = useStore((s) => s.lastSummary);
 
   const unitLabel = `${units} (${displayPrecision}dp)`;
+  const entityLabel = `${entityCount}`;
   const selectionLabel =
     selectionCount === 0
       ? 'None'
@@ -116,33 +90,27 @@ export function StatusBar(): React.ReactElement {
     <footer className="status-bar-bottom" aria-label="Document status">
       <div className="status-bar-bottom__items">
         <LiveIndicator />
-        <span className="status-divider" aria-hidden="true" />
-        <StatusItem label="Units" value={unitLabel} aria-label={`Units: ${unitLabel}`} />
+        {lastSummary !== null && (
+          <span
+            className="status-summary"
+            aria-live="polite"
+            aria-label={`Last command: ${lastSummary}`}
+            title={lastSummary}
+          >
+            {lastSummary}
+          </span>
+        )}
+      </div>
+      <div className="status-bar-bottom__right">
+        <StatusItem label="Entities" value={entityLabel} aria-label={`Entities: ${entityLabel}`} />
         <span className="status-divider" aria-hidden="true" />
         <StatusItem
           label="Selection"
           value={selectionLabel}
           aria-label={`Selection: ${selectionLabel}`}
         />
-        {lastSummary !== null && (
-          <>
-            <span className="status-divider" aria-hidden="true" />
-            <span
-              className="status-summary"
-              aria-live="polite"
-              aria-label={`Last command: ${lastSummary}`}
-            >
-              {lastSummary}
-            </span>
-          </>
-        )}
-      </div>
-      <div className="status-bar-bottom__right">
-        <ProjectIO />
         <span className="status-divider" aria-hidden="true" />
-        <McpConnectButton />
-        <span className="status-divider" aria-hidden="true" />
-        <ThemeToggle />
+        <StatusItem label="Units" value={unitLabel} aria-label={`Units: ${unitLabel}`} />
       </div>
     </footer>
   );

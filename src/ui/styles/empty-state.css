@@ -1,0 +1,129 @@
+/* ==========================================================================
+   Viewport empty state — non-blocking glass card, centered over the canvas
+   ========================================================================== */
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  pointer-events: none; /* viewport stays orbitable around the card */
+}
+
+.empty-state__card {
+  position: relative;
+  width: min(420px, 100%);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: var(--surface-float);
+  backdrop-filter: var(--backdrop);
+  border: 1px solid var(--border-float);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+  animation: empty-state-in var(--dur) var(--ease) both;
+}
+
+.empty-state__dismiss {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+}
+
+.empty-state__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+.empty-state__heading {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+
+.empty-state__subheading {
+  margin-top: var(--space-1);
+  font-size: var(--text-base);
+  color: var(--fg-muted);
+}
+
+.empty-state__tips {
+  width: 100%;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--divider);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.empty-state__tip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+
+.empty-state__tip-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--fg-subtle);
+  flex-shrink: 0;
+}
+
+.empty-state__tip-text {
+  flex: 1;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.empty-state__tip-text strong {
+  font-weight: var(--weight-medium);
+  color: var(--fg);
+}
+
+.empty-state__hint {
+  margin-top: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.empty-state__hint kbd {
+  padding: 1px 5px;
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+}
+
+@keyframes empty-state-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

@@ -7,14 +7,17 @@
  *     "connecting…" when connecting, "offline" when disconnected.
  *   - "Design" tab is present and marked active.
  *   - "Render" tab is present but aria-disabled.
+ *   - Theme toggle flips the theme store.
+ *   - Dock toggles flip the layout store.
+ *   - Project Open/Save and Connect agent actions are present.
  *
  * Does NOT test CSS variables or visual appearance.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { __resetIdCounter } from '@lib/id';
-import { useStore } from '@ui/store';
+import { useLayoutStore, useStore, useThemeStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { TopBar } from '@ui/components/TopBar';
 
@@ -110,5 +113,65 @@ describe('TopBar — tabs', () => {
     const renderTab = screen.getByRole('button', { name: /render/i });
     expect(renderTab).toBeDefined();
     expect(renderTab.getAttribute('aria-disabled')).toBe('true');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TopBar — theme toggle
+// ---------------------------------------------------------------------------
+
+describe('TopBar — theme toggle', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    resetStore();
+  });
+
+  it('flips the theme from dark to light', () => {
+    useThemeStore.setState({ theme: 'dark' });
+    render(<TopBar />);
+    fireEvent.click(screen.getByRole('button', { name: /switch to light theme/i }));
+    expect(useThemeStore.getState().theme).toBe('light');
+  });
+
+  it('flips the theme from light to dark', () => {
+    useThemeStore.setState({ theme: 'light' });
+    render(<TopBar />);
+    fireEvent.click(screen.getByRole('button', { name: /switch to dark theme/i }));
+    expect(useThemeStore.getState().theme).toBe('dark');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TopBar — dock toggles + actions
+// ---------------------------------------------------------------------------
+
+describe('TopBar — dock toggles and actions', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    resetStore();
+    useLayoutStore.setState({ sidebarOpen: true, inspectorOpen: true });
+  });
+
+  it('hides and shows the browser panel', () => {
+    render(<TopBar />);
+    fireEvent.click(screen.getByRole('button', { name: 'Hide browser panel' }));
+    expect(useLayoutStore.getState().sidebarOpen).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Show browser panel' }));
+    expect(useLayoutStore.getState().sidebarOpen).toBe(true);
+  });
+
+  it('hides and shows the properties panel', () => {
+    render(<TopBar />);
+    fireEvent.click(screen.getByRole('button', { name: 'Hide properties panel' }));
+    expect(useLayoutStore.getState().inspectorOpen).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Show properties panel' }));
+    expect(useLayoutStore.getState().inspectorOpen).toBe(true);
+  });
+
+  it('exposes Open, Save and Connect agent actions', () => {
+    render(<TopBar />);
+    expect(screen.getByRole('button', { name: /open project/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /save project/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /connect an mcp agent/i })).toBeDefined();
   });
 });

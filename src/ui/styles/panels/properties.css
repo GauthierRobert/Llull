@@ -1,0 +1,146 @@
+/* ==========================================================================
+   Properties panel (E2)
+   ========================================================================== */
+
+.app-properties {
+  flex: 0 0 240px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.props-section {
+  padding: 12px 14px;
+}
+
+.props-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
+.props-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.props-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* Selection property list */
+.props-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.props-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.props-key {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex: 0 0 60px;
+  white-space: nowrap;
+}
+
+.props-value {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.props-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.props-color-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border-medium);
+  vertical-align: middle;
+  margin-right: 5px;
+}
+
+/* ==========================================================================
+   Properties panel — EN8 additions
+   (visibility toggle, section header flex)
+   ========================================================================== */
+
+.props-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+/* Re-locate the title margin when inside the flex header. */
+.props-section-header .props-section-title {
+  margin-bottom: 0;
+}
+
+.props-visibility-btn {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+}
+
+.props-visibility-btn:hover {
+  background: var(--bg-input);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.props-visibility-btn--hidden {
+  border-color: var(--border-accent);
+  color: var(--accent-text);
+}
+
+.props-visibility-btn--hidden:hover {
+  background: var(--accent-bg);
+  color: var(--accent-text-hover);
+}
+
+.props-visibility-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+

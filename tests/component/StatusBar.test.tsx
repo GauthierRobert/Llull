@@ -6,17 +6,16 @@
  *   - Units and displayPrecision from the document are shown.
  *   - Selection count is reflected correctly for 0, 1, and N selections.
  *   - Last command summary is shown when present; absent when null.
- *   - Theme toggle button exists and switches the theme in the store.
+ *   - Entity count is shown.
  *
  * Does NOT test CSS variables or visual appearance — that is left for
  * Playwright / screenshot verification.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
-import { useThemeStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { StatusBar } from '@ui/components/StatusBar';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -31,7 +30,6 @@ function resetStore(): void {
     lastSummary: null,
     liveStatus: 'connecting',
   });
-  useThemeStore.setState({ theme: 'dark' });
 }
 
 /** Create a box entity via localDispatch (bypasses network), return its id. */
@@ -177,46 +175,24 @@ describe('StatusBar — last command summary', () => {
 });
 
 // ---------------------------------------------------------------------------
-// StatusBar — theme toggle
+// StatusBar — entity count
 // ---------------------------------------------------------------------------
 
-describe('StatusBar — theme toggle', () => {
+describe('StatusBar — entity count', () => {
   beforeEach(() => {
     __resetIdCounter();
     resetStore();
   });
 
-  it('renders a theme toggle button', () => {
+  it('shows 0 entities for an empty document', () => {
     render(<StatusBar />);
-    const btn = screen.getByRole('button', { name: /switch to light theme/i });
-    expect(btn).toBeDefined();
+    expect(screen.getByLabelText('Entities: 0')).toBeDefined();
   });
 
-  it('clicking the toggle flips the theme from dark to light', () => {
-    useThemeStore.setState({ theme: 'dark' });
+  it('counts entities in the document', () => {
+    createBox();
+    createBox();
     render(<StatusBar />);
-
-    const btn = screen.getByRole('button', { name: /switch to light theme/i });
-    fireEvent.click(btn);
-
-    expect(useThemeStore.getState().theme).toBe('light');
-  });
-
-  it('clicking the toggle again flips back to dark', () => {
-    useThemeStore.setState({ theme: 'light' });
-    render(<StatusBar />);
-
-    const btn = screen.getByRole('button', { name: /switch to dark theme/i });
-    fireEvent.click(btn);
-
-    expect(useThemeStore.getState().theme).toBe('dark');
-  });
-
-  it('the toggle aria-label changes to reflect the new target theme', () => {
-    useThemeStore.setState({ theme: 'dark' });
-    render(<StatusBar />);
-
-    // When dark → button says "switch to light"
-    expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeDefined();
+    expect(screen.getByLabelText('Entities: 2')).toBeDefined();
   });
 });

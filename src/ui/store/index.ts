@@ -24,3 +24,6 @@ export type {
 
 export { useNamedViewStore } from './namedViewStore';
 export type { NamedViewStoreState, NamedView, NamedViewCamera } from './namedViewStore';
+
+export { useLayoutStore } from './layoutStore';
+export type { LayoutStoreState, SidebarTab } from './layoutStore';
