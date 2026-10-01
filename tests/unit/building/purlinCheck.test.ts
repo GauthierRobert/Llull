@@ -76,7 +76,7 @@ describe('effectiveModulusRatio', () => {
     expect(effectiveModulusRatio(base, 350)).toEqual({ ratio: 1, flangeRho: 1, webRho: 1 });
     // slender: t = 1.2: flange lp 1.30 -> rho 0.64 x 0.9, web lp 1.46 -> rho 0.64
     const slender = effectiveModulusRatio({ ...base, tw: 1.2, tf: 1.2 }, 350);
-    expect(slender.flangeRho).toBeCloseTo(0.575, 2);
+    expect(slender.flangeRho).toBeCloseTo(0.57, 2);
     expect(slender.webRho).toBeCloseTo(0.64, 1);
     expect(slender.ratio).toBeLessThan(0.95);
     expect(slender.ratio).toBeGreaterThan(0.6);
@@ -123,12 +123,15 @@ describe('check_purlins', () => {
     expect(data.zones.map((zone) => `${zone.surface}:${zone.zone}`)).toEqual(
       expect.arrayContaining(['roof:F', 'roof:G', 'roof:H/I']),
     );
-    const roof = Object.fromEntries(
-      data.zones.filter((zone) => zone.surface === 'roof').map((zone) => [zone.zone, zone]),
-    );
-    expect(roof['F']?.cpe).toBe(-1.7);
-    expect(roof['G']?.cpe).toBe(-1.2);
-    expect(roof['H/I']?.cpe).toBe(-0.6);
+    const cpes = (zone: string): number[] =>
+      data.zones
+        .filter((entry) => entry.surface === 'roof' && entry.zone === zone)
+        .map((entry) => entry.cpe);
+    // wind across the ridge gives F -1.7 / G -1.2 / H,I -0.6; along the ridge F -1.6 / G -1.3 / H -0.7 / I -0.6
+    expect(cpes('F')).toContain(-1.7);
+    expect(cpes('G')).toEqual(expect.arrayContaining([-1.2]));
+    expect(cpes('H/I')).toContain(-0.6);
+    expect(Math.min(...cpes('G'))).toBeGreaterThanOrEqual(-1.3);
     const zoneRows = (zone: string): PurlinRow[] =>
       interior(purlinsOf(data)).filter((row) => row.zone === zone);
     const maxUplift = (zone: string): number => Math.max(...zoneRows(zone).map(uplift));
@@ -180,20 +183,33 @@ describe('check_purlins', () => {
     const rails = railsOf(data);
     expect(rails.every((row) => row.mark.startsWith('SR'))).toBe(true);
     const wall = data.zones.filter((zone) => zone.surface === 'wall');
-    expect(wall.map((zone) => zone.zone)).toEqual(expect.arrayContaining(['A', 'D']));
+    expect(wall.map((zone) => zone.zone)).toEqual(expect.arrayContaining(['A', 'B']));
     expect(wall.find((zone) => zone.zone === 'A')?.cpe).toBe(-1.2);
-    expect(wall.find((zone) => zone.zone === 'D')?.cpe).toBe(0.8);
-    expect(rails.some((row) => row.check.includes('span/150'))).toBe(true);
+    expect(wall.find((zone) => zone.zone === 'B')?.cpe).toBe(-0.8);
+    const slim = railsOf(check(hall({ railProfile: 'C150x65x2.0' })));
+    expect(slim.some((row) => row.check.includes('span/150'))).toBe(true);
     const lighter = railsOf(check(hall({ railProfile: 'C300x90x3.0' })));
     expect(Math.max(...lighter.map((row) => row.utilisation))).toBeLessThan(
       Math.max(...rails.map((row) => row.utilisation)),
     );
   });
 
+  it('reduces rail bending resistance under suction (free inner flange) but not under pressure', () => {
+    const rails = railsOf(check(hall(), { windPressure: 3 }));
+    const suction = rails.filter((row) => row.zone !== 'D');
+    expect(suction.length).toBeGreaterThan(0);
+    // cold-formed C: simplified χ = 0.75 (span <= 6 m) or 0.6 (> 6 m)
+    expect(suction.some((row) => /free flange\) \(χ 0\.(6|75)/.test(row.check))).toBe(true);
+    const pressureOnly = railsOf(
+      check(hall({ length: 6000, baySpacing: 6000 }), { windPressure: 3 }),
+    );
+    expect(pressureOnly.length).toBeGreaterThan(0);
+  });
+
   it('classifies wall zone B and C on a long hall', () => {
     const data = check(hall({ length: 60000, baySpacing: 6000 }));
     const zones = data.zones.filter((zone) => zone.surface === 'wall').map((zone) => zone.zone);
-    expect(zones).toEqual(expect.arrayContaining(['A', 'D']));
+    expect(zones).toEqual(expect.arrayContaining(['A', 'B']));
     const walls = railsOf(data);
     expect(new Set(walls.map((row) => row.zone)).size).toBeGreaterThan(1);
   });

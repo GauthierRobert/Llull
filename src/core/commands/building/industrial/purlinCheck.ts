@@ -25,6 +25,8 @@ const CPI_SUCTION = 0.2;
 const CPI_PRESSURE = 0.3;
 /** cpe,10 of the roof zones (duopitch, pitch about 5-15 deg; H and I share the value). */
 const CPE_ROOF = { F: -1.7, G: -1.2, 'H/I': -0.6 } as const;
+/** cpe,10 of the roof zones for wind along the ridge (θ = 90°, EN 1991-1-4 Tab. 7.4b, pitch 5-15 deg). */
+const CPE_ROOF_ALONG = { F: -1.6, G: -1.3, H: -0.7, I: -0.6 } as const;
 /** cpe,10 of the wall zones. */
 const CPE_WALL = { A: -1.2, B: -0.8, C: -0.5, D: 0.8 } as const;
 const PURLIN_DEFLECTION_RATIO = 200;
@@ -35,6 +37,7 @@ const TOLERANCE = 1;
 const GRAVITY = 9.81;
 
 type RoofZone = keyof typeof CPE_ROOF;
+type AlongZone = keyof typeof CPE_ROOF_ALONG;
 type WallZone = keyof typeof CPE_WALL;
 
 export interface PurlinRow {
@@ -124,7 +127,7 @@ function sectionModulus(segments: readonly Segment[], top: number): number {
 /**
  * Effective / gross section modulus of a cold-formed C in strong-axis bending (thin-walled model,
  * compression flange on top; symmetric so gravity and uplift share the ratio).
- * Flange: internal element, kσ = 4, bp = b - 2t, ρ·bp split at the flange ends, extra 0.9 when λp > 0.673.
+ * Flange: internal element, kσ = 4, bp = b - t (centreline flat width), ρ·bp split at the flange ends, extra 0.9 when λp > 0.673.
  * Web: ψ = -1, kσ = 23.9, compression zone h/2, ρ·hc split 0.4 / 0.6 (EN 1993-1-5 Tab. 4.1).
  * Lips fully effective (no distortional buckling χd); neutral axis shift not iterated.
  * @returns ratio <= 1 and the flange / web reduction factors
@@ -138,7 +141,7 @@ export function effectiveModulusRatio(
   const web = profile.h - t;
   const flange = profile.b - t;
   const lip = Math.max(0, profile.lip - t / 2);
-  const flangeSlenderness = (profile.b - 2 * t) / t / (28.4 * epsilon * Math.sqrt(4));
+  const flangeSlenderness = flange / t / (28.4 * epsilon * Math.sqrt(4));
   const webSlenderness = web / t / (28.4 * epsilon * Math.sqrt(23.9));
   const flangeRho = plateReduction(flangeSlenderness, 0.22) * (flangeSlenderness > 0.673 ? 0.9 : 1);
   const webRho = plateReduction(webSlenderness, 0.11);
@@ -268,15 +271,17 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
     'ground to eaves at the ends). Roof, per purlin: (1) gravity 1.35 (roofDeadLoad + self-weight) + ' +
     '1.5 snow on plan, components normal to the slope (× cos pitch), bending with the top flange ' +
     'restrained by the sheeting (χLT = 1); (2) wind uplift 1.5 qp (|cpe| + cpi 0.2) - 1.0 dead, with ' +
-    'EN 1991-1-4 duopitch roof zones F -1.7 / G -1.2 / H and I -0.6 (pitch about 5-15°): e = min(b, 2h) ' +
-    'with b the crosswind dimension and h the ridge height, worst of wind across the ridge (F/G within e/10 of ' +
-    'the eaves, F also within e/4 of a gable) and along the ridge (G within e/2 of a gable, F also ' +
-    'within e/4 of the eaves); the worst zone touching the member applies to its whole length. The ' +
+    'EN 1991-1-4 duopitch roof zones (pitch about 5-15°): e = min(b, 2h) with b the crosswind dimension ' +
+    'and h the ridge height; worst of wind across the ridge (θ = 0°: F -1.7 / G -1.2 / H and I -0.6; F/G ' +
+    'within e/10 of the eaves, F also within e/4 of a gable) and along the ridge (θ = 90°, Tab. 7.4b: F ' +
+    '-1.6 / G -1.3 / H -0.7 / I -0.6; F and G within e/10 of a gable, F within e/4 of the eaves, H up to ' +
+    'e/2); the worst zone touching the member applies to its whole length. The ' +
     'bottom flange is in compression: χLT from §6.3.2.3 for I sections with Lcr = span/2, simplified ' +
     'EN 1993-1-3 §10.1 value for cold-formed C sections (0.6 for spans > 6 m, else 0.75), assuming one ' +
     'row of anti-sag bars at mid-span; (3) shear; (4) deflection under characteristic dead + snow ≤ ' +
     'span/200. Rails: horizontal wind on the strong axis, zones A -1.2 (within e/5 of a gable) / B ' +
-    '-0.8 (within e) / C -0.5, with cpi +0.2, and pressure D +0.8 with cpi -0.3; bending, shear, ' +
+    '-0.8 (within e) / C -0.5, with cpi +0.2 (inner flange free and in compression: χLT as for purlin uplift), ' +
+    'and pressure D +0.8 with cpi -0.3 (restrained, χLT = 1); bending, shear, ' +
     'deflection under characteristic wind ≤ span/150. Cold-formed C sections use an effective section ' +
     'modulus (EN 1993-1-3 §5.5 / 1993-1-5 §4.4, simplified: flange kσ 4 with 0.9 when λp > 0.673, web ψ -1, lips fully effective, no distortional buckling); weak-axis, torsion and cladding self-weight on rails are not ' +
     'checked. Returns one row per member with its governing check; values > 1 fail. Preliminary - ' +
@@ -379,7 +384,7 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
       cpe: number,
       utilisation: number,
     ): void => {
-      const key = `${surface}|${zone}`;
+      const key = `${surface}|${zone}|${cpe}`;
       const current = zoneStats.get(key);
       zoneStats.set(key, {
         surface,
@@ -444,13 +449,17 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
                 ? 'F'
                 : 'G'
               : 'H/I';
-          const alongZone: RoofZone = nearGable(eAlong / 2)
-            ? horizontalEaves <= eAlong / 4 + TOLERANCE && nearGable(eAlong / 10)
+          const alongZone: AlongZone = nearGable(eAlong / 10)
+            ? horizontalEaves <= eAlong / 4 + TOLERANCE
               ? 'F'
               : 'G'
-            : 'H/I';
-          const zone = CPE_ROOF[acrossZone] <= CPE_ROOF[alongZone] ? acrossZone : alongZone;
-          const cpe = CPE_ROOF[zone];
+            : nearGable(eAlong / 2)
+              ? 'H'
+              : 'I';
+          const [zone, cpe] =
+            CPE_ROOF[acrossZone] <= CPE_ROOF_ALONG[alongZone]
+              ? ([acrossZone, CPE_ROOF[acrossZone]] as const)
+              : ([alongZone, CPE_ROOF_ALONG[alongZone]] as const);
 
           const wind = windPressure * (Math.abs(cpe) + CPI_SUCTION) * trib;
           const gravityVerdicts = beamVerdicts(purlin.profile, fy, purlin.length, {
@@ -520,19 +529,34 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
             : 'C';
       const suction = Math.abs(CPE_WALL[suctionZone]) + CPI_SUCTION;
       const pressure = CPE_WALL.D + CPI_PRESSURE;
-      const zone: WallZone = pressure > suction ? 'D' : suctionZone;
-      const net = Math.max(pressure, suction);
-      const line = windPressure * net * trib;
-      const [bending, shear, deflection] = beamVerdicts(rail.profile, fy, rail.length, {
-        ultimate: GAMMA_Q * line,
-        ultimateLabel: '1.5W',
-        serviceability: line,
-        serviceabilityLabel: 'SLS W',
-        deflectionRatio: RAIL_DEFLECTION_RATIO,
-        reduction: 1,
-        bendingLabel: `wind bending zone ${zone} cp,net ${net.toFixed(1)}`,
-      }) as [Verdict, Verdict, Verdict];
-      const worst = governing([bending, shear, deflection]);
+      // Suction: inner flange free and in compression (χLT as purlin uplift); pressure: sheeting-restrained.
+      const cases = [
+        {
+          zone: suctionZone,
+          net: suction,
+          reduction: freeFlangeReduction(rail.profile, fy, rail.length),
+        },
+        { zone: 'D' as WallZone, net: pressure, reduction: 1 },
+      ].map((windCase) => ({
+        zone: windCase.zone,
+        net: windCase.net,
+        verdicts: beamVerdicts(rail.profile, fy, rail.length, {
+          ultimate: GAMMA_Q * windPressure * windCase.net * trib,
+          ultimateLabel: '1.5W',
+          serviceability: windPressure * windCase.net * trib,
+          serviceabilityLabel: 'SLS W',
+          deflectionRatio: RAIL_DEFLECTION_RATIO,
+          reduction: windCase.reduction,
+          bendingLabel: `wind bending zone ${windCase.zone} cp,net ${windCase.net.toFixed(1)}${windCase.zone === 'D' ? '' : ' (free flange)'}`,
+        }),
+      }));
+      const governingCase = cases.reduce((best, windCase) =>
+        governing(windCase.verdicts).utilisation > governing(best.verdicts).utilisation
+          ? windCase
+          : best,
+      );
+      const zone = governingCase.zone;
+      const worst = governing(governingCase.verdicts);
       rows.push({
         elementId: rail.member.id,
         mark: rail.member.mark,
