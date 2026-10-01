@@ -70,6 +70,11 @@ export function flushAutosave(): void {
   if (AUTOSAVE_ENABLED) autosaver.flush();
 }
 
+/** Flush, then write every later mutation synchronously (no debounce). Call at shutdown start. */
+export function stopAutosave(): void {
+  if (AUTOSAVE_ENABLED) autosaver.stop();
+}
+
 /** End every open SSE stream and forget the subscribers (shutdown path). */
 export function closeAllSubscribers(): void {
   for (const res of _subscribers) {

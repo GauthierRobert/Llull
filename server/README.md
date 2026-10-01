@@ -21,7 +21,7 @@ MCP_AUTH_TOKEN=changeme npm --prefix server start
 Variables are also read from `<repo>/.env` and `server/.env` (see `.env.example`); real
 environment variables take precedence.
 
-The server binds to `127.0.0.1:3001` by default (local tool; not reachable from the network). Override with `PORT=<n>` and `HOST=<addr>` (`HOST=0.0.0.0` to expose it; set `MCP_AUTH_TOKEN` when you do). SIGTERM/SIGINT shut down gracefully (SSE/MCP streams closed, autosave flushed).
+The server binds to `127.0.0.1:3001` by default (local tool; not reachable from the network). Override with `PORT=<n>` and `HOST=<addr>` (`HOST=0.0.0.0` to expose it; set `MCP_AUTH_TOKEN` when you do). SIGTERM/SIGINT shut down gracefully (autosave switches to synchronous writes, SSE/MCP streams closed with a 3 s time-box, connections drained, autosave flushed again); a second signal forces exit after a sync flush, and `uncaughtException` flushes before exiting. Requires Node >= 20.12.
 
 ## Routes
 
@@ -201,7 +201,9 @@ Done. Client closed cleanly.
 | `MCP_RATE_LIMIT_WINDOW_MS` | no       | `60000`           | Rate limit window in milliseconds (default: 1 minute)    |
 | `HOST`                     | no       | `127.0.0.1`       | Bind address. Use `0.0.0.0` only with `MCP_AUTH_TOKEN` set |
 | `LLULL_ALLOWED_ORIGINS`    | no       | `http://localhost:5173,http://localhost:5174,http://localhost:3000` | Comma-separated browser origins for CORS and the REST mutation guard. Disallowed origins get no CORS headers |
-| `LLULL_REQUIRE_TOKEN_FOR_REST` | no   | unset             | `true` + `MCP_AUTH_TOKEN`: `/command`, `/undo`, `/redo` always need the bearer token (UI must send it) |
+| `LLULL_REQUIRE_TOKEN_FOR_REST` | no   | unset             | `true` + `MCP_AUTH_TOKEN`: `/command`, `/undo`, `/redo`, `/ui-bridge` mutations always need the bearer token. The UI does NOT send a token yet, so enabling this breaks the browser UI |
+| `LLULL_ALLOWED_HOSTS`      | no       | unset             | Comma-separated extra `Host` header values (`name` = any port, `name:port` = exact). `localhost`, `127.0.0.1`, `[::1]` are always allowed (DNS-rebinding defence). If `HOST` is non-loopback and this is unset, any Host is accepted |
+| `LLULL_ALLOW_UNAUTHENTICATED` | no    | unset             | `true` lets the server start on a non-loopback `HOST` without `MCP_AUTH_TOKEN`. Default: it refuses to start |
 | `LLULL_REST_RATE_LIMIT_MAX` | no      | `600`             | Max requests per window per IP on `/command`, `/undo`, `/redo`, `/export/stl` |
 | `LLULL_REST_RATE_LIMIT_WINDOW_MS` | no | `60000`          | REST rate limit window |
 | `LLULL_BODY_LIMIT`         | no       | `2mb`             | JSON body size limit (413 beyond it) |
@@ -219,4 +221,4 @@ The browser UI cannot attach a token to these, so they are guarded by origin ins
 3. `MCP_AUTH_TOKEN` set and no `Origin` and no bearer (curl, scripts) -> `401`.
 4. Allowed browser origin, or no token configured -> allowed.
 
-`Origin` is spoofable by non-browser clients, so for a network-exposed deployment set `LLULL_REQUIRE_TOKEN_FOR_REST=true` (UI must then send the bearer). Malformed JSON returns `400`, oversize bodies `413`, throwing commands return `isError` results.
+The `Origin` allowlist is CSRF protection only: `Origin` is forged trivially by curl. Therefore when `MCP_AUTH_TOKEN` is set, REST mutations from a non-loopback peer socket always require the bearer, regardless of `Origin`. A non-loopback `HOST` without `MCP_AUTH_TOKEN` refuses to start (override: `LLULL_ALLOW_UNAUTHENTICATED=true`). `LLULL_REQUIRE_TOKEN_FOR_REST=true` additionally demands the bearer from loopback clients (the UI must then send it; it currently does not). Bearer comparison is constant-time and the `Bearer` scheme is case-insensitive. Malformed JSON returns `400`, oversize bodies `413`, throwing commands return `isError` results.

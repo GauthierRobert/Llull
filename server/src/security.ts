@@ -25,23 +25,100 @@ export function getAllowedOrigins(): string[] {
     .filter((origin) => origin.length > 0);
 }
 
-function hasValidBearer(req: Request, token: string): boolean {
+const sha256 = (value: string): Buffer => crypto.createHash('sha256').update(value).digest();
+
+/** Constant-time `Authorization: Bearer <token>` check (digest compare: no length leak; scheme case-insensitive). */
+export function hasValidBearer(req: Request, token: string): boolean {
   const header = req.headers['authorization'];
   if (typeof header !== 'string') return false;
-  const expected = Buffer.from(`Bearer ${token}`);
-  const actual = Buffer.from(header);
-  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+  const match = /^bearer +(.+)$/i.exec(header);
+  const presented = match?.[1];
+  if (presented === undefined) return false;
+  return crypto.timingSafeEqual(sha256(presented), sha256(token));
+}
+
+/** True for 127.0.0.0/8, ::1, ::ffff:127.*, and `localhost`. */
+export function isLoopbackAddress(address: string | undefined): boolean {
+  if (address === undefined) return false;
+  const value = address.toLowerCase();
+  return (
+    value === 'localhost' ||
+    value === '::1' ||
+    value.startsWith('127.') ||
+    value.startsWith('::ffff:127.')
+  );
 }
 
 /**
- * Guard for the unauthenticated-by-design browser routes (/command, /undo, /redo).
+ * Startup safety: a non-loopback `HOST` without `MCP_AUTH_TOKEN` exposes an unauthenticated
+ * document-mutating API to the network. Returns an error message to refuse startup, or null.
+ * Opt out with `LLULL_ALLOW_UNAUTHENTICATED=true`.
+ */
+export function checkBindSafety(host: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  if (isLoopbackAddress(host) || env['MCP_AUTH_TOKEN']) return null;
+  if (env['LLULL_ALLOW_UNAUTHENTICATED'] === 'true') return null;
+  return (
+    `Refusing to start: HOST=${host} is not loopback and MCP_AUTH_TOKEN is not set. ` +
+    'Set MCP_AUTH_TOKEN, bind to 127.0.0.1, or set LLULL_ALLOW_UNAUTHENTICATED=true.'
+  );
+}
+
+function hostWithoutPort(hostHeader: string): string {
+  const value = hostHeader.trim().toLowerCase();
+  if (value.startsWith('[')) {
+    const end = value.indexOf(']');
+    return end === -1 ? value : value.slice(0, end + 1);
+  }
+  const colon = value.lastIndexOf(':');
+  return colon === -1 ? value : value.slice(0, colon);
+}
+
+/**
+ * Host-header allowlist (DNS-rebinding defence). Allowed: localhost, 127.0.0.1, [::1] (any port)
+ * plus `LLULL_ALLOWED_HOSTS` (comma-separated; `name` = any port, `name:port` = exact).
+ * When `HOST` is non-loopback and `LLULL_ALLOWED_HOSTS` is unset, any Host is accepted
+ * (public hostnames are unknown; bearer auth is mandatory there, see `checkBindSafety`).
+ */
+export function hostAllowlist(): RequestHandler {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const extra = (process.env['LLULL_ALLOWED_HOSTS'] ?? '')
+      .split(',')
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => entry.length > 0);
+    if (extra.length === 0 && !isLoopbackAddress(process.env['HOST'] ?? '127.0.0.1')) {
+      next();
+      return;
+    }
+    const header = req.headers['host'];
+    if (typeof header === 'string') {
+      const full = header.trim().toLowerCase();
+      const bare = hostWithoutPort(full);
+      const allowed =
+        ['localhost', '127.0.0.1', '[::1]'].includes(bare) ||
+        extra.includes(full) ||
+        extra.includes(bare);
+      if (allowed) {
+        next();
+        return;
+      }
+    }
+    res.status(403).json({ error: 'Host header is not allowed.' });
+  };
+}
+
+/**
+ * Guard for the browser routes (/command, /undo, /redo, /ui-bridge mutations).
+ *
+ * The Origin allowlist is CSRF protection ONLY (it stops other websites driving a browser);
+ * `Origin` is trivially forged by curl, so it is never treated as authentication for remote peers.
  *
  * Policy (evaluated per request):
  *   1. valid `Authorization: Bearer <MCP_AUTH_TOKEN>`              -> allow
  *   2. `LLULL_REQUIRE_TOKEN_FOR_REST=true` and a token is set       -> 401
- *   3. `Origin` header present and not in the allowlist             -> 403 (blocks CSRF from other sites)
- *   4. token set, no `Origin` header (non-browser client, no token) -> 401
- *   5. otherwise (allowed browser origin, or no token configured)   -> allow
+ *   3. token set and peer socket is NOT loopback                    -> 401 (Origin is not trusted)
+ *   4. `Origin` header present and not in the allowlist             -> 403 (blocks CSRF from other sites)
+ *   5. token set, no `Origin` header (non-browser client, no token) -> 401
+ *   6. otherwise (allowed browser origin, or no token configured)   -> allow
  */
 export function guardMutation(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -51,6 +128,10 @@ export function guardMutation(): RequestHandler {
       return;
     }
     if (token && process.env['LLULL_REQUIRE_TOKEN_FOR_REST'] === 'true') {
+      res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
+      return;
+    }
+    if (token && !isLoopbackAddress(req.socket?.remoteAddress)) {
       res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
       return;
     }

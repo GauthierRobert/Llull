@@ -16,6 +16,8 @@ import type { CadDocument } from '@core/model/types';
 export interface Autosaver {
   schedule(doc: CadDocument): void;
   flush(): void;
+  /** Flush, then make every later `schedule` write synchronously (shutdown path). */
+  stop(): void;
 }
 
 export interface AutosaverOptions {
@@ -28,6 +30,7 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
   const { filePath, debounceMs, serialize } = options;
   let pending: CadDocument | null = null;
   let timer: NodeJS.Timeout | null = null;
+  let stopped = false;
 
   const writeAtomic = (doc: CadDocument): void => {
     const tempPath = `${filePath}.tmp-${process.pid}`;
@@ -59,10 +62,18 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
   return {
     schedule(doc: CadDocument): void {
       pending = doc;
+      if (stopped) {
+        flush();
+        return;
+      }
       if (timer !== null) return;
       timer = setTimeout(flush, debounceMs);
       timer.unref();
     },
     flush,
+    stop(): void {
+      stopped = true;
+      flush();
+    },
   };
 }

@@ -58,6 +58,7 @@ import type { UiBridge } from '@core/mcp';
 import type { CadDocument } from '@core/model/types';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
+import { hasValidBearer } from './security';
 import { buildImageBlock, stripSvgFromData, rasterizeSvg } from './renderImage';
 import {
   buildTurntableFrames,
@@ -177,9 +178,8 @@ function buildAuthMiddleware(): (req: Request, res: Response, next: () => void) 
     );
     return (_req, _res, next) => next();
   }
-  const expected = `Bearer ${token}`;
   return (req: Request, res: Response, next: () => void) => {
-    if (req.headers['authorization'] !== expected) {
+    if (!hasValidBearer(req, token)) {
       res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
       return;
     }

@@ -17,7 +17,7 @@
  * /command, /undo, /redo are guarded by `guardMutation` (see security.ts) and rate limited.
  *
  * Env: PORT (3001), HOST (127.0.0.1), LLULL_ALLOWED_ORIGINS, LLULL_BODY_LIMIT (2mb),
- * MCP_AUTH_TOKEN, LLULL_REQUIRE_TOKEN_FOR_REST, LLULL_REST_RATE_LIMIT_*; see server/README.md.
+ * MCP_AUTH_TOKEN, LLULL_REQUIRE_TOKEN_FOR_REST, LLULL_ALLOWED_HOSTS, LLULL_ALLOW_UNAUTHENTICATED, LLULL_REST_RATE_LIMIT_*; see server/README.md.
  */
 
 import './loadEnv';
@@ -26,14 +26,17 @@ import cors from 'cors';
 import { buildMcpRouter } from './mcp';
 import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
-import { subscribeLive, flushAutosave, closeAllSubscribers } from './liveDocument';
+import { subscribeLive, flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
 import { closeAllSessions } from './mcp';
 import {
   getAllowedOrigins,
   guardMutation,
+  hostAllowlist,
+  checkBindSafety,
   buildRestRateLimiter,
   sanitizeFilename,
   jsonErrorHandler,
+  isLoopbackAddress,
 } from './security';
 import type { Server } from 'http';
 import { applyCommand, undo, redo } from './commandBus';
@@ -44,6 +47,8 @@ import type { ExportStlData } from '@core/commands/export';
 // ---------------------------------------------------------------------------
 
 const app = express();
+
+app.use(hostAllowlist());
 
 app.use(express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' }));
 
@@ -256,31 +261,60 @@ const PORT = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 3001;
  */
 const HOST = process.env['HOST'] ?? '127.0.0.1';
 
-/** Stop accepting connections, end SSE/MCP streams, flush autosave. Resolves when closed. */
+const SESSION_CLOSE_TIMEOUT_MS = 3_000;
+const DRAIN_TIMEOUT_MS = 5_000;
+
+const delay = (ms: number): Promise<void> =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
+
+/**
+ * Stop accepting connections, end SSE/MCP streams, drain, flush autosave. Resolves when closed.
+ * Autosave is switched to synchronous-write mode first so an edit finishing mid-drain is persisted.
+ */
 export async function shutdown(server: Server): Promise<void> {
+  stopAutosave();
   const closed = new Promise<void>((resolve) => server.close(() => resolve()));
   closeAllSubscribers();
-  await closeAllSessions();
-  flushAutosave();
+  await Promise.race([closeAllSessions(), delay(SESSION_CLOSE_TIMEOUT_MS)]);
   server.closeIdleConnections();
-  await Promise.race([closed, new Promise<void>((resolve) => setTimeout(resolve, 5_000).unref())]);
+  await Promise.race([closed, delay(DRAIN_TIMEOUT_MS)]);
   server.closeAllConnections();
+  flushAutosave();
 }
 
-/** Listen on HOST:PORT, log startup, install SIGTERM/SIGINT handlers. */
+/** Listen on HOST:PORT, log startup, install SIGTERM/SIGINT/uncaughtException handlers. */
 export function startServer(port: number = PORT, host: string = HOST): Server {
+  const refusal = checkBindSafety(host);
+  if (refusal !== null) throw new Error(refusal);
+  if (!isLoopbackAddress(host) && !process.env['MCP_AUTH_TOKEN']) {
+    console.warn('[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).');
+  }
   const server = app.listen(port, host, () => {
     console.warn(`[llull-server] listening on http://${host}:${port}`);
   });
   let stopping = false;
   const onSignal = (signal: string): void => {
-    if (stopping) return;
+    if (stopping) {
+      console.warn(`[llull-server] second ${signal}, forcing exit`);
+      flushAutosave();
+      process.exit(1);
+    }
     stopping = true;
     console.warn(`[llull-server] ${signal} received, shutting down`);
-    void shutdown(server).then(() => process.exit(0));
+    shutdown(server)
+      .catch((err: unknown) => console.error('[llull-server] shutdown failed:', err))
+      .finally(() => {
+        flushAutosave();
+        process.exit(0);
+      });
   };
   process.on('SIGTERM', () => onSignal('SIGTERM'));
   process.on('SIGINT', () => onSignal('SIGINT'));
+  process.on('uncaughtException', (err: Error) => {
+    console.error('[llull-server] uncaughtException:', err);
+    flushAutosave();
+    process.exit(1);
+  });
   return server;
 }
 
