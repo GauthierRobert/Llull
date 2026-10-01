@@ -12,6 +12,7 @@
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "agent:example": "tsx examples/mcp-agent.ts",
+    "demo:factory": "tsx examples/factory-demo.mts",
     "verify:ui-bridge": "tsx examples/verify-ui-bridge.ts"
   },
   "dependencies": {
