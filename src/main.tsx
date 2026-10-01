@@ -12,7 +12,7 @@ import '@fontsource/geist-mono/latin-500.css';
 import '@fontsource/geist-mono/latin-600.css';
 import '@ui/styles/index.css';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { createManifoldKernel } from '@ui/geometry/manifoldKernel';
+import { createManifoldKernel } from '@core/geometry/manifoldKernel';
 
 // ---------------------------------------------------------------------------
 // Kernel selection: ?kernel=occt swaps in OCC (dev/power-user toggle).

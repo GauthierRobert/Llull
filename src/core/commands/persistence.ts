@@ -28,6 +28,7 @@ import type {
   Recipe,
 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { isRecord } from '../../lib/isRecord';
 
 // ---------------------------------------------------------------------------
 // Envelope types
@@ -68,10 +69,6 @@ export function serializeDocument(doc: CadDocument): string {
 // ---------------------------------------------------------------------------
 // Primitive type-narrowing helpers (no `any`)
 // ---------------------------------------------------------------------------
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
 
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');

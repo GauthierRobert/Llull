@@ -27,10 +27,12 @@
 
 import type { CadDocument } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { execute, getCommand } from './registry';
+import { getCommand } from './registry';
+import { executeRecorded } from './record';
 import { computeSceneSnapshot, type SceneSnapshot } from './scene';
-import { evaluateExpression } from './expression';
+import { evaluateExpression, extractReferences } from './expression';
 import { MAX_PROJECT_ACTIONS, MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
+import { isRecord } from '../../lib/isRecord';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -308,6 +310,32 @@ function resolveExprInParam(
 }
 
 /**
+ * Params to RECORD in featureHistory for an inner step: `$alias` refs stay resolved (ids), but an
+ * `=expr` whose identifiers are all document parameters is kept verbatim so replay re-evaluates it
+ * (architecture L8). Expressions using loop variables (`$i`, `$as`) are recorded as their value.
+ * @pure
+ */
+function recordableParams(
+  raw: unknown,
+  resolved: unknown,
+  parameters: CadDocument['parameters'],
+): unknown {
+  if (typeof raw === 'string' && raw.startsWith('=') && !raw.includes('$')) {
+    const refs = extractReferences(raw.slice(1));
+    return [...refs].every((name) => name in parameters) ? raw : resolved;
+  }
+  if (Array.isArray(raw) && Array.isArray(resolved)) {
+    return raw.map((item, i) => recordableParams(item, resolved[i], parameters));
+  }
+  if (isRecord(raw) && isRecord(resolved)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(resolved)) out[k] = recordableParams(raw[k], v, parameters);
+    return out;
+  }
+  return resolved;
+}
+
+/**
  * Execute a single inner step (for repeat/for_each bodies) against the current doc.
  * Returns { doc, stepReport, aborted } where aborted=true means the caller should stop.
  */
@@ -347,7 +375,12 @@ function runInnerStep(
     return { doc: current, affected: [], aborted: onError === 'abort' };
   }
 
-  const result = execute(current, command, resolved.value);
+  const result = executeRecorded(
+    current,
+    command,
+    resolved.value,
+    recordableParams(params, resolved.value, current.parameters),
+  );
   const ok = result.affected.length > 0 || result.document !== current;
   steps.push({
     index: outerIndex,
@@ -434,6 +467,9 @@ export const buildProject: CommandDefinition<BuildProjectParams> = {
     },
     required: ['actions'],
   },
+  // Each inner step is recorded in featureHistory by `execute`; recording the plan itself too
+  // would replay every step twice.
+  annotations: { metaHistory: true },
   run: (doc, params): CommandResult => {
     if (projectDepth >= MAX_PROJECT_DEPTH) {
       return noop(
@@ -719,7 +755,12 @@ function runProject(
       }
       continue;
     }
-    const result = execute(current, raw.command, resolved.value);
+    const result = executeRecorded(
+      current,
+      raw.command,
+      resolved.value,
+      recordableParams(raw.params ?? {}, resolved.value, current.parameters),
+    );
     // A graceful no-op (no change + nothing affected) is a soft failure for a plan step.
     const ok = result.affected.length > 0 || result.document !== current;
     steps.push({

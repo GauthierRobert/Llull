@@ -21,6 +21,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
+import { isRecord } from '@lib/isRecord';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -68,6 +69,13 @@ export interface McpToolCallResult extends McpShapedResult {
   data?: unknown;
 }
 
+/** The `text` of a `{ format: 'code', text }` data record, else null. */
+function codeText(data: unknown): string | null {
+  return isRecord(data) && data.format === 'code' && typeof data.text === 'string'
+    ? data.text
+    : null;
+}
+
 // ---------------------------------------------------------------------------
 // Single shaping implementation
 // ---------------------------------------------------------------------------
@@ -82,7 +90,8 @@ export interface McpToolCallResult extends McpShapedResult {
  * Content block rules:
  *   1. Always: `{ type:'text', text: summary }`.
  *   2. When affected is non-empty: `{ type:'text', text:'Affected entity ids: ...' }`.
- *   3. When data is defined: `{ type:'text', text:'```json\n...\n```' }`.
+ *   3. When data is defined: `{ type:'text', text:'```json\n...\n```' }`; a `format:'code'`
+ *      record's `text` is moved out of the JSON into its own verbatim text block.
  *   4. When data is a non-null, non-array object: also set `structuredContent`.
  *
  * @pure — no execute, no document, no side effects.
@@ -107,17 +116,22 @@ export function shapeToolCallContent(result: {
   }
 
   if (result.data !== undefined) {
+    // Source code (export_code) is shown verbatim so agents read it as code, not as a JSON string.
+    const code = codeText(result.data);
+    const jsonData =
+      code === null
+        ? result.data
+        : { ...(result.data as object), text: '(source code in the next block)' };
     content.push({
       type: 'text',
-      text: `\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``,
+      text: `\`\`\`json\n${JSON.stringify(jsonData, null, 2)}\n\`\`\``,
     });
-    const isRecord =
-      typeof result.data === 'object' && result.data !== null && !Array.isArray(result.data);
-    if (isRecord) {
+    if (code !== null) content.push({ type: 'text', text: code });
+    if (isRecord(result.data)) {
       return {
         content,
         isError: result.isError,
-        structuredContent: result.data as Record<string, unknown>,
+        structuredContent: result.data,
       };
     }
   }

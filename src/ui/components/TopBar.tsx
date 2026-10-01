@@ -17,6 +17,7 @@ import { useLayoutStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { ThemeToggle } from '@ui/components/ThemeToggle';
 import { ProjectIO } from '@ui/components/ProjectIO';
+import { ModelExport } from '@ui/components/ModelExport';
 import { McpConnectButton } from '@ui/components/McpConnect';
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,7 @@ export function TopBar(): React.ReactElement {
         <AgentPill status={liveStatus} />
         <span className="topbar__sep" aria-hidden="true" />
         <ProjectIO />
+        <ModelExport />
         <McpConnectButton />
         <span className="topbar__sep" aria-hidden="true" />
         <ThemeToggle />

@@ -31,6 +31,9 @@ The server binds to `127.0.0.1:3001` by default (local tool; not reachable from 
 | POST   | /mcp       | MCP Streamable HTTP — initialize + tools/list + tools/call |
 | GET    | /mcp       | MCP SSE stream for server-initiated notifications    |
 | DELETE | /mcp       | MCP session close (stateless v1: no-op, returns 200) |
+| GET    | /export/stl | Download the live model as STL |
+| GET    | /export/code | Download the model as parametric code (`?language=cadquery\|build123d\|openscad\|freecad`) |
+| GET    | /export/step | Download an exact B-rep STEP file (needs the Python bridge; 503 otherwise) |
 
 ---
 
@@ -211,6 +214,11 @@ Done. Client closed cleanly.
 | `LLULL_AUTOSAVE_DEBOUNCE_MS` | no     | `300`             | Autosave write coalescing delay; flushed on shutdown |
 | `LLULL_AUTOSAVE_DISABLED`  | no       | unset             | `true` disables autosave |
 | `MCP_SESSION_TTL_MS` / `MCP_SESSION_SWEEP_MS` | no | `1800000` / `60000` | Idle MCP session eviction |
+| `LLULL_PYTHON`             | no       | `python3`         | Python with CadQuery for `export_step` / `import_step` / `import_code`; `off` disables the bridge. See [docs/CAD_EXCHANGE.md](../docs/CAD_EXCHANGE.md) |
+| `LLULL_PYTHON_BUILD123D`   | no       | `LLULL_PYTHON`    | Python with build123d (keep it in its own virtualenv) |
+| `LLULL_PYTHON_TIMEOUT_MS`  | no       | `120000`          | Per-request Python timeout |
+| `LLULL_EXCHANGE_DIR`       | no       | unset             | Directory for the exchange tools' `path` arguments; `export_step` also saves there |
+| `LLULL_ALLOW_CODE_EXECUTION` | no     | unset             | `1` enables `import_code`, which **runs arbitrary Python** with server privileges |
 
 ### REST mutation policy (`/command`, `/undo`, `/redo`)
 

@@ -21,6 +21,7 @@ import {
   SEG_TORUS_TUBE,
   circlePoints,
   earClipTriangulate,
+  meshTriangles,
 } from './tessellation';
 
 // ---------------------------------------------------------------------------
@@ -101,8 +102,9 @@ function triangulateBox(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Tria
   const z0 = pz - d / 2,
     z1 = pz + d / 2;
 
+  // Counter-clockwise seen from outside (outward normals).
   const quads: Vec3[][] = [
-    // bottom (-Z)  reversed = face down
+    // bottom (-Z)
     [
       [x0, y0, z0],
       [x0, y1, z0],
@@ -112,37 +114,37 @@ function triangulateBox(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Tria
     // top (+Z)
     [
       [x0, y0, z1],
-      [x0, y1, z1],
-      [x1, y1, z1],
       [x1, y0, z1],
+      [x1, y1, z1],
+      [x0, y1, z1],
     ],
     // front (-Y)
     [
       [x0, y0, z0],
-      [x0, y0, z1],
-      [x1, y0, z1],
       [x1, y0, z0],
+      [x1, y0, z1],
+      [x0, y0, z1],
     ],
     // back (+Y)
     [
       [x0, y1, z0],
-      [x1, y1, z0],
-      [x1, y1, z1],
       [x0, y1, z1],
+      [x1, y1, z1],
+      [x1, y1, z0],
     ],
     // left (-X)
     [
       [x0, y0, z0],
-      [x0, y1, z0],
-      [x0, y1, z1],
       [x0, y0, z1],
+      [x0, y1, z1],
+      [x0, y1, z0],
     ],
     // right (+X)
     [
       [x1, y0, z0],
-      [x1, y0, z1],
-      [x1, y1, z1],
       [x1, y1, z0],
+      [x1, y1, z1],
+      [x1, y0, z1],
     ],
   ];
 
@@ -322,20 +324,21 @@ function tessellateWedge(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Tri
   const b00 = p(0, 0, d);
   const b10 = p(w, 0, d);
 
+  // Counter-clockwise seen from outside (outward normals).
   const quads: Vec3[][] = [
-    // front face
-    [f00, f10, f11, f01],
-    // bottom face
-    [f00, b00, b10, f10],
+    // front face (-Z)
+    [f00, f01, f11, f10],
+    // bottom face (-Y)
+    [f00, f10, b10, b00],
     // top slope (ramp)
-    [f01, f11, b10, b00],
+    [f01, b00, b10, f11],
   ];
   const triPairs: Triangle[] = [
     ...quads.flatMap(fanTriangulate),
-    // left triangle
-    [f00, f01, b00],
-    // right triangle
-    [f10, b10, f11],
+    // left triangle (-X)
+    [f00, b00, f01],
+    // right triangle (+X)
+    [f10, f11, b10],
   ];
 
   return applyRotationToTriangles(triPairs, e.position, e.rotation);
@@ -400,17 +403,10 @@ function triangulateExtrusion(e: {
 
 function triangulateMesh(e: {
   position: Vec3;
-  mesh: { positions: readonly number[] };
+  mesh: { positions: readonly number[]; indices: readonly number[] };
   rotation: Vec3;
 }): Triangle[] {
-  const p = e.mesh.positions;
-  const tris: Triangle[] = [];
-  for (let i = 0; i + 8 < p.length; i += 9) {
-    const v0: Vec3 = [p[i] as number, p[i + 1] as number, p[i + 2] as number];
-    const v1: Vec3 = [p[i + 3] as number, p[i + 4] as number, p[i + 5] as number];
-    const v2: Vec3 = [p[i + 6] as number, p[i + 7] as number, p[i + 8] as number];
-    tris.push([v0, v1, v2]);
-  }
+  const tris: Triangle[] = meshTriangles(e.mesh);
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
