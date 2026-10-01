@@ -101,7 +101,7 @@ const WHITE = new THREE.Color(1, 1, 1);
  * `batchMaterial` carries optional PBR overrides from an assigned document material (VNF4).
  * The overrides are applied in shaded mode only — wireframe and x-ray ignore them.
  */
-function makeMaterialArgs(
+export function makeMaterialArgs(
   displayMode: DisplayMode,
   batchMaterial?: { roughness: number; metalness: number } | undefined,
 ): THREE.MeshStandardMaterialParameters {
@@ -120,7 +120,6 @@ function makeMaterialArgs(
         opacity: 1,
         depthWrite: true,
         side: THREE.FrontSide,
-        vertexColors: true,
       };
     case 'xray':
       return {
@@ -132,7 +131,6 @@ function makeMaterialArgs(
         opacity: 0.18,
         depthWrite: false,
         side: THREE.DoubleSide,
-        vertexColors: true,
       };
     case 'shaded':
     default:
@@ -145,7 +143,6 @@ function makeMaterialArgs(
         opacity: 1,
         depthWrite: true,
         side: THREE.FrontSide,
-        vertexColors: true,
       };
   }
 }
@@ -166,7 +163,8 @@ interface InstanceBatchMeshProps {
  *
  * - Geometry: created once via useMemo; disposed on unmount.
  * - Material: created once via useMemo; disposed on unmount.
- *   Uses `vertexColors: true` so per-instance color overrides work via setColorAt.
+ *   Per-instance colors come from `instanceColor` (setColorAt); `vertexColors` stays
+ *   off — primitive geometries carry no color attribute, so enabling it renders black.
  * - Instance matrices + colors: written in a useEffect keyed on entity ids +
  *   selection set. NOT in useFrame.
  * - Click/raycast: InstancedMesh fires onClick with `intersection.instanceId`;

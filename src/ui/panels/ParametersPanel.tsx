@@ -18,6 +18,8 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useStore } from '@ui/store';
 import type { Parameter } from '@core/model/types';
+import { Icon } from '@ui/components/Icon';
+import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 
 // ---------------------------------------------------------------------------
 // ParameterRow — one row per existing parameter
@@ -73,7 +75,7 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
 
   return (
     <li
-      className="param-row"
+      className="panel__row param-row"
       data-testid={`param-row-${param.name}`}
       aria-label={`Parameter: ${param.name}`}
     >
@@ -84,7 +86,7 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
       <input
         ref={inputRef}
         type="text"
-        className={`param-expression-input${hasError ? ' param-expression-input--error' : ''}`}
+        className={`param-expression-input${hasError ? ' input--error' : ''}`}
         value={displayExpression}
         onFocus={handleExpressionFocus}
         onChange={handleExpressionChange}
@@ -102,35 +104,21 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
 
       <button
         type="button"
-        className="param-delete-btn"
+        className="icon-btn icon-btn--danger param-delete-btn"
         onClick={handleDelete}
         aria-label={`Delete parameter ${param.name}`}
         title={`Delete parameter ${param.name}`}
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-          <line
-            x1="1"
-            y1="1"
-            x2="9"
-            y2="9"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <line
-            x1="9"
-            y1="1"
-            x2="1"
-            y2="9"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <Icon name="trash" size={13} />
       </button>
 
       {hasError && (
-        <p id={`param-error-${param.name}`} className="param-error" role="alert" aria-live="polite">
+        <p
+          id={`param-error-${param.name}`}
+          className="param-error panel__error"
+          role="alert"
+          aria-live="polite"
+        >
           {param.error}
         </p>
       )}
@@ -164,38 +152,40 @@ function AddParameterRow(): React.ReactElement {
 
   return (
     <form
-      className="param-add-form"
+      className="panel__form param-add-form"
       onSubmit={handleSubmit}
       aria-label="Add new parameter"
       data-testid="param-add-form"
     >
-      <input
-        type="text"
-        className={`param-add-name-input${!nameValid ? ' param-expression-input--error' : ''}`}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="name"
-        aria-label="New parameter name"
-        autoComplete="off"
-      />
-      <input
-        type="text"
-        className="param-add-expr-input"
-        value={expression}
-        onChange={(e) => setExpression(e.target.value)}
-        placeholder="expression"
-        aria-label="New parameter expression"
-        autoComplete="off"
-      />
-      <button
-        type="submit"
-        className="param-add-btn"
-        disabled={name.trim() === '' || expression.trim() === '' || !nameValid}
-        aria-label="Add parameter"
-        title="Add parameter"
-      >
-        Add
-      </button>
+      <div className="param-add-fields">
+        <input
+          type="text"
+          className={`param-add-name-input${!nameValid ? ' input--error' : ''}`}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="name"
+          aria-label="New parameter name"
+          autoComplete="off"
+        />
+        <input
+          type="text"
+          className="param-add-expr-input"
+          value={expression}
+          onChange={(e) => setExpression(e.target.value)}
+          placeholder="expression"
+          aria-label="New parameter expression"
+          autoComplete="off"
+        />
+        <button
+          type="submit"
+          className="btn btn--primary"
+          disabled={name.trim() === '' || expression.trim() === '' || !nameValid}
+          aria-label="Add parameter"
+          title="Add parameter"
+        >
+          <Icon name="plus" size={14} />
+        </button>
+      </div>
     </form>
   );
 }
@@ -214,35 +204,37 @@ export function ParametersPanel({ className }: ParametersPanelProps): React.Reac
 
   return (
     <aside
-      className={['params-panel', className].filter(Boolean).join(' ')}
+      className={['panel params-panel', className].filter(Boolean).join(' ')}
       aria-label="Parameters"
     >
-      <div className="params-panel-header">
-        <h2 className="params-panel-title">Parameters</h2>
-        <span className="params-panel-count" aria-label={`${paramList.length} parameters`}>
-          {paramList.length}
-        </span>
-      </div>
+      <PanelHeader
+        title="Parameters"
+        count={paramList.length}
+        countLabel={`${paramList.length} parameters`}
+      />
 
       {paramList.length === 0 ? (
-        <p className="params-empty">No parameters defined.</p>
+        <PanelEmpty
+          icon="parameters"
+          message="No parameters defined."
+          hint="Name a value, then reference it from expressions."
+        />
       ) : (
-        <ul className="param-list" aria-label="Parameter list" role="list">
-          <li className="param-list-header" aria-hidden="true">
-            <span className="param-col-name">Name</span>
-            <span className="param-col-expr">Expression</span>
-            <span className="param-col-value">Value</span>
-            <span className="param-col-actions" />
-          </li>
-          {paramList.map((param) => (
-            <ParameterRow key={param.name} param={param} />
-          ))}
-        </ul>
+        <>
+          <div className="param-columns" aria-hidden="true">
+            <span>Name</span>
+            <span>Expression</span>
+            <span className="param-columns__value">Value</span>
+          </div>
+          <ul className="panel__list" aria-label="Parameter list" role="list">
+            {paramList.map((param) => (
+              <ParameterRow key={param.name} param={param} />
+            ))}
+          </ul>
+        </>
       )}
 
-      <div className="params-panel-footer">
-        <AddParameterRow />
-      </div>
+      <AddParameterRow />
     </aside>
   );
 }

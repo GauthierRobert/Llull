@@ -15,6 +15,7 @@
 import React, { useRef } from 'react';
 import { useStore } from '@ui/store';
 import { serializeDocument } from '@core/commands/persistence';
+import { Icon } from '@ui/components/Icon';
 
 function timestamp(): string {
   const d = new Date();
@@ -63,7 +64,8 @@ export function ProjectIO(): React.ReactElement {
         aria-label="Open project from a JSON file"
         title="Open project (.json)"
       >
-        Open
+        <Icon name="open" size={14} />
+        <span>Open</span>
       </button>
       <button
         type="button"
@@ -72,7 +74,8 @@ export function ProjectIO(): React.ReactElement {
         aria-label="Save project to a JSON file"
         title="Save project (.json)"
       >
-        Save
+        <Icon name="save" size={14} />
+        <span>Save</span>
       </button>
       <input
         ref={fileInputRef}

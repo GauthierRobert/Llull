@@ -15,6 +15,8 @@
 import React, { useState, useCallback } from 'react';
 import { useStore } from '@ui/store';
 import type { Configuration } from '@core/model/types';
+import { Icon } from '@ui/components/Icon';
+import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 
 // ---------------------------------------------------------------------------
 // ConfigurationRow — one row per existing configuration
@@ -44,11 +46,12 @@ function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement
         </span>
         <button
           type="button"
-          className="config-activate-btn"
+          className="btn btn--ghost btn--sm"
           onClick={handleActivate}
           aria-label={`Activate configuration ${config.name}`}
           title={`Apply "${config.name}" to the document`}
         >
+          <Icon name="play" size={10} />
           Activate
         </button>
       </div>
@@ -126,31 +129,12 @@ function ParameterValueRow({
       {canRemove && (
         <button
           type="button"
-          className="config-pv-remove-btn"
+          className="icon-btn config-pv-remove-btn"
           onClick={() => onRemove(index)}
           aria-label={`Remove parameter row ${index + 1}`}
           title="Remove this parameter row"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-            <line
-              x1="1"
-              y1="1"
-              x2="9"
-              y2="9"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-            <line
-              x1="9"
-              y1="1"
-              x2="1"
-              y2="9"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+          <Icon name="close" size={12} />
         </button>
       )}
     </div>
@@ -223,13 +207,16 @@ function CreateConfigurationForm(): React.ReactElement {
 
   return (
     <form
-      className="config-create-form"
+      className="panel__form config-create-form"
       onSubmit={handleSubmit}
       aria-label="Create new configuration"
       data-testid="config-create-form"
     >
-      <div className="config-create-name-row">
-        <label className="config-create-label" htmlFor="config-create-name">
+      <span className="panel__form-title" aria-hidden="true">
+        New configuration
+      </span>
+      <div className="field">
+        <label className="field__label" htmlFor="config-create-name">
           Name
         </label>
         <input
@@ -245,7 +232,7 @@ function CreateConfigurationForm(): React.ReactElement {
       </div>
 
       <div className="config-create-pv-section">
-        <span className="config-create-pv-heading" aria-hidden="true">
+        <span className="panel__form-title" aria-hidden="true">
           Parameters
         </span>
         {pvRows.map((row, index) => (
@@ -262,18 +249,19 @@ function CreateConfigurationForm(): React.ReactElement {
         ))}
         <button
           type="button"
-          className="config-add-row-btn"
+          className="btn btn--ghost btn--sm config-add-row-btn"
           onClick={handleAddRow}
           aria-label="Add parameter row"
           title="Add another parameter"
         >
-          + param
+          <Icon name="plus" size={12} />
+          Parameter
         </button>
       </div>
 
       <button
         type="submit"
-        className="config-create-btn"
+        className="btn btn--primary btn--block"
         disabled={!isSubmittable()}
         aria-label="Create configuration"
         title="Create configuration"
@@ -298,18 +286,21 @@ export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): Re
 
   return (
     <aside
-      className={['configs-panel', className].filter(Boolean).join(' ')}
+      className={['panel configs-panel', className].filter(Boolean).join(' ')}
       aria-label="Configurations"
     >
-      <div className="configs-panel-header">
-        <h2 className="configs-panel-title">Configurations</h2>
-        <span className="configs-panel-count" aria-label={`${configList.length} configurations`}>
-          {configList.length}
-        </span>
-      </div>
+      <PanelHeader
+        title="Configurations"
+        count={configList.length}
+        countLabel={`${configList.length} configurations`}
+      />
 
       {configList.length === 0 ? (
-        <p className="configs-empty">No configurations defined.</p>
+        <PanelEmpty
+          icon="configurations"
+          message="No configurations defined."
+          hint="A configuration is a named set of parameter values."
+        />
       ) : (
         <ul className="config-list" aria-label="Configuration list" role="list">
           {configList.map((config) => (
@@ -318,9 +309,7 @@ export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): Re
         </ul>
       )}
 
-      <div className="configs-panel-footer">
-        <CreateConfigurationForm />
-      </div>
+      <CreateConfigurationForm />
     </aside>
   );
 }

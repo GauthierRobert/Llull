@@ -72,13 +72,14 @@ import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
 import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
 import type { GizmoMode } from './TransformGizmo';
 import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
-import { NamedViewsInner, NamedViewsOverlay } from './NamedViews';
+import { NamedViewsInner } from './NamedViews';
 import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
 import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { useRenderQuality } from './useRenderQuality';
 import { MechanismOverlay } from './MechanismOverlay';
+import { useViewportPalette } from '@ui/viewport/viewportPalette';
 
 // ---------------------------------------------------------------------------
 // StoreInvalidator — calls r3f invalidate() when the CAD store changes
@@ -298,6 +299,7 @@ function SceneContents({
 
   // R3 narrow selector: quality settings derived from entity count + user override.
   const quality = useRenderQuality();
+  const palette = useViewportPalette();
 
   const initialPosition = useMemo(
     () =>
@@ -331,6 +333,9 @@ function SceneContents({
 
   return (
     <>
+      {/* ---- Theme-aware clear color ---- */}
+      <color attach="background" args={[palette.background]} />
+
       {/* ---- Camera + controls ---- */}
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention). */}
       <PerspectiveCamera
@@ -431,7 +436,7 @@ function SceneContents({
         <ContactShadows
           position={[0, 0, -0.001]}
           rotation={GROUND_PLANE_ROTATION}
-          opacity={0.55}
+          opacity={palette.contactShadowOpacity}
           scale={40}
           blur={2.5}
           far={20}
@@ -445,10 +450,10 @@ function SceneContents({
         args={[40, 40]}
         cellSize={1}
         cellThickness={0.5}
-        cellColor="#2a3040"
+        cellColor={palette.gridCell}
         sectionSize={5}
         sectionThickness={1}
-        sectionColor="#374055"
+        sectionColor={palette.gridSection}
         fadeDistance={80}
         fadeStrength={1.5}
         position={[0, 0, 0]}
@@ -472,7 +477,7 @@ function SceneContents({
 
       {/* ---- Orientation gizmo (bottom-right corner) ---- */}
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
-        <GizmoViewport axisColors={['#e05252', '#52c05a', '#4e8de0']} labelColor="#e8eaed" />
+        <GizmoViewport axisColors={palette.axisColors} labelColor={palette.axisLabel} />
       </GizmoHelper>
     </>
   );
@@ -517,7 +522,7 @@ export function Viewport3D(): React.ReactElement {
   const showModeToggle = selection.length === 1;
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div className="viewport-3d-wrapper">
       <Canvas
         frameloop="demand"
         shadows
@@ -528,7 +533,7 @@ export function Viewport3D(): React.ReactElement {
           toneMappingExposure: 1.1,
         }}
         dpr={[1, 2]}
-        style={{ width: '100%', height: '100%', background: '#141720' }}
+        style={{ width: '100%', height: '100%' }}
         onPointerMissed={handlePointerMissed}
       >
         <Suspense fallback={null}>
@@ -543,11 +548,8 @@ export function Viewport3D(): React.ReactElement {
       {/* Mode toggle overlay — only visible when a single entity is selected */}
       {showModeToggle && <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />}
 
-      {/* View preset buttons (top-right) */}
+      {/* View presets, fit and named views (top-right) */}
       <ViewPresetsOverlay />
-
-      {/* Named-view bookmarks (below view presets) */}
-      <NamedViewsOverlay />
 
       {/* Display mode + section plane controls (top-left) */}
       <ViewportControls />

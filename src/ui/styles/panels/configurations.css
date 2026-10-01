@@ -1,0 +1,103 @@
+/* Configurations panel — variant cards + create form */
+
+.config-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  padding: var(--space-3);
+}
+
+.config-row {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.config-row:hover {
+  border-color: var(--border-strong);
+}
+
+.config-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 28px;
+}
+
+.config-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-medium);
+}
+
+.config-param-list {
+  list-style: none;
+  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--divider);
+}
+
+.config-param-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.config-param-name {
+  color: var(--accent-text);
+}
+
+.config-param-equals {
+  color: var(--fg-faint);
+}
+
+.config-param-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+
+.config-create-pv-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.config-create-pv-section .panel__form-title {
+  margin-top: var(--space-1);
+}
+
+.config-pv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 10px minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.config-pv-row input {
+  font-family: var(--font-mono);
+}
+
+.config-pv-equals {
+  text-align: center;
+  color: var(--fg-faint);
+}
+
+.config-pv-remove-btn {
+  width: 24px;
+  height: 24px;
+}
+
+.config-add-row-btn {
+  align-self: flex-start;
+}

@@ -1,0 +1,376 @@
+/* ==========================================================================
+   Panel anatomy — shared by every sidebar browser panel and the inspector
+   header → sections → rows → sticky footer form
+   ========================================================================== */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  font-size: var(--text-base);
+  color: var(--fg);
+}
+
+/* ---- Header ------------------------------------------------------------- */
+
+.panel__header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  flex-shrink: 0;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--divider);
+}
+
+.panel__title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.005em;
+  color: var(--fg);
+}
+
+.panel__count {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-subtle);
+}
+
+.panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* ---- Sections ----------------------------------------------------------- */
+
+.panel__section + .panel__section {
+  border-top: 1px solid var(--divider);
+}
+
+.panel__section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--fg-subtle);
+  text-align: left;
+}
+
+.panel__section-header--button {
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.panel__section-header--button:hover {
+  color: var(--fg);
+}
+
+.panel__section-header .panel__count {
+  letter-spacing: 0;
+}
+
+.panel__section-body {
+  padding-bottom: var(--space-2);
+}
+
+/* ---- Lists and rows ----------------------------------------------------- */
+
+.panel__list {
+  list-style: none;
+  padding: var(--space-1) 0;
+}
+
+.panel__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.panel__row:hover {
+  background: var(--surface-2);
+}
+
+.panel__row--selected,
+.panel__row--selected:hover {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.panel__row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel__row-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-subtle);
+  white-space: nowrap;
+}
+
+.panel__row-icon {
+  display: inline-flex;
+  color: var(--fg-subtle);
+}
+
+.panel__row--selected .panel__row-icon {
+  color: var(--accent-text);
+}
+
+/* Actions that appear on hover / focus within the row */
+.panel__row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.panel__row:hover .panel__row-actions,
+.panel__row:focus-within .panel__row-actions {
+  opacity: 1;
+}
+
+.panel__row .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+
+.panel__row .icon-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.panel__row .icon-btn--danger:hover,
+.icon-btn--danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ---- Chips -------------------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--fg-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chip--accent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.chip--success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.chip--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.chip--danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.chip--agent {
+  background: var(--agent-soft);
+  color: var(--agent);
+}
+
+/* ---- Empty state -------------------------------------------------------- */
+
+.panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+  color: var(--fg-faint);
+}
+
+.panel__empty--compact {
+  padding: var(--space-4) var(--space-3);
+}
+
+.panel__empty-text {
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+.panel__empty-hint {
+  max-width: 220px;
+  font-size: var(--text-xs);
+  color: var(--fg-faint);
+}
+
+/* ---- Buttons ------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btn--primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn--ghost {
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+}
+
+.btn--ghost:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+
+.btn--danger:hover {
+  background: var(--danger-soft);
+  border-color: transparent;
+  color: var(--danger);
+}
+
+.btn--sm {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* ---- Forms -------------------------------------------------------------- */
+
+/* Sticky footer form, pinned to the bottom of the scrolling panel; capped so a
+   tall form never hides the list above it on short windows. */
+.panel__form {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  max-height: 45%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding: var(--space-3);
+  background: var(--surface-1);
+  border-top: 1px solid var(--divider);
+}
+
+.panel__form-title {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--fg-subtle);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.field__label {
+  flex: 0 0 68px;
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+.field input[type='text'],
+.field input[type='number'] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.field input[type='range'] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.field__value {
+  flex: 0 0 34px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-subtle);
+}
+
+.input--error,
+.input--error:hover {
+  border-color: var(--danger);
+}
+
+.panel__error {
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--danger);
+}

@@ -16,6 +16,7 @@
 import React, { useState, useCallback } from 'react';
 import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
+import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 
 // ---------------------------------------------------------------------------
 // MaterialRow — one row per existing material
@@ -47,7 +48,7 @@ function MaterialRow({
 
   return (
     <li
-      className={`material-row${isSelected ? ' material-row--selected' : ''}`}
+      className={`panel__row material-row${isSelected ? ' panel__row--selected material-row--selected' : ''}`}
       data-testid={`material-row-${material.name}`}
       aria-label={`Material: ${material.name}`}
       aria-selected={isSelected}
@@ -59,7 +60,6 @@ function MaterialRow({
         aria-label={`Select material ${material.name}`}
         title={material.name}
       >
-        {/* Color swatch — inline background is data, not theme (task constraint) */}
         <span
           className="material-swatch"
           style={{ background: material.color }}
@@ -144,13 +144,16 @@ function CreateMaterialForm(): React.ReactElement {
 
   return (
     <form
-      className="material-create-form"
+      className="panel__form material-create-form"
       onSubmit={handleSubmit}
       aria-label="Create new material"
       data-testid="material-create-form"
     >
-      <div className="material-create-row">
-        <label className="material-create-label" htmlFor="material-create-name">
+      <span className="panel__form-title" aria-hidden="true">
+        New material
+      </span>
+      <div className="field">
+        <label className="field__label" htmlFor="material-create-name">
           Name
         </label>
         <input
@@ -165,8 +168,8 @@ function CreateMaterialForm(): React.ReactElement {
         />
       </div>
 
-      <div className="material-create-row">
-        <label className="material-create-label" htmlFor="material-create-density">
+      <div className="field">
+        <label className="field__label" htmlFor="material-create-density">
           Density
         </label>
         <input
@@ -183,8 +186,8 @@ function CreateMaterialForm(): React.ReactElement {
         />
       </div>
 
-      <div className="material-create-row material-create-row--color">
-        <label className="material-create-label" htmlFor="material-create-color">
+      <div className="field material-create-row--color">
+        <label className="field__label" htmlFor="material-create-color">
           Color
         </label>
         <input
@@ -200,8 +203,8 @@ function CreateMaterialForm(): React.ReactElement {
         </span>
       </div>
 
-      <div className="material-create-row">
-        <label className="material-create-label" htmlFor="material-create-metalness">
+      <div className="field">
+        <label className="field__label" htmlFor="material-create-metalness">
           Metalness
         </label>
         <input
@@ -217,11 +220,11 @@ function CreateMaterialForm(): React.ReactElement {
           aria-valuemin={0}
           aria-valuemax={1}
         />
-        <span className="material-create-range-value">{parseFloat(metalness).toFixed(2)}</span>
+        <span className="field__value">{parseFloat(metalness).toFixed(2)}</span>
       </div>
 
-      <div className="material-create-row">
-        <label className="material-create-label" htmlFor="material-create-roughness">
+      <div className="field">
+        <label className="field__label" htmlFor="material-create-roughness">
           Roughness
         </label>
         <input
@@ -237,12 +240,12 @@ function CreateMaterialForm(): React.ReactElement {
           aria-valuemin={0}
           aria-valuemax={1}
         />
-        <span className="material-create-range-value">{parseFloat(roughness).toFixed(2)}</span>
+        <span className="field__value">{parseFloat(roughness).toFixed(2)}</span>
       </div>
 
       <button
         type="submit"
-        className="material-create-btn"
+        className="btn btn--primary btn--block"
         disabled={!isValid}
         aria-label="Create material"
         title="Create material"
@@ -276,23 +279,23 @@ export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactE
 
   return (
     <aside
-      className={['materials-panel', className].filter(Boolean).join(' ')}
+      className={['panel materials-panel', className].filter(Boolean).join(' ')}
       aria-label="Materials"
     >
-      <div className="materials-panel-header">
-        <h2 className="materials-panel-title">Materials</h2>
-        <span
-          className="materials-panel-count"
-          aria-label={`${materialList.length} material${materialList.length !== 1 ? 's' : ''}`}
-        >
-          {materialList.length}
-        </span>
-      </div>
+      <PanelHeader
+        title="Materials"
+        count={materialList.length}
+        countLabel={`${materialList.length} material${materialList.length !== 1 ? 's' : ''}`}
+      />
 
       {materialList.length === 0 ? (
-        <p className="materials-empty">No materials defined.</p>
+        <PanelEmpty
+          icon="materials"
+          message="No materials defined."
+          hint="Create one below, then assign it to the selection."
+        />
       ) : (
-        <ul className="material-list" aria-label="Material list" role="list">
+        <ul className="panel__list" aria-label="Material list" role="list">
           {materialList.map((material) => (
             <MaterialRow
               key={material.name}
@@ -305,9 +308,7 @@ export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactE
         </ul>
       )}
 
-      <div className="materials-panel-footer">
-        <CreateMaterialForm />
-      </div>
+      <CreateMaterialForm />
     </aside>
   );
 }

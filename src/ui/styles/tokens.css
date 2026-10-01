@@ -1,0 +1,158 @@
+/* ==========================================================================
+   llull design tokens
+   --------------------------------------------------------------------------
+   Single source of truth for color, type, spacing, radius, elevation, motion.
+   Dark is the default; [data-theme="light"] overrides color tokens only.
+   Components reference ONLY these variables — never raw color values.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- Surfaces (low → high elevation) ---- */
+  --surface-app: oklch(0.165 0.005 260); /* window chrome behind everything */
+  --surface-1: oklch(0.195 0.005 260); /* docked panels, bars */
+  --surface-2: oklch(0.225 0.006 260); /* inputs, cards, rows on hover */
+  --surface-3: oklch(0.26 0.007 260); /* pressed / active rows */
+  --surface-float: oklch(0.215 0.006 260 / 0.82); /* floating viewport chrome (glass) */
+  --surface-popover: oklch(0.225 0.006 260); /* menus, dialogs */
+  --surface-scrim: oklch(0.1 0.004 260 / 0.62);
+
+  /* ---- Lines ---- */
+  --border: oklch(1 0 0 / 0.075);
+  --border-strong: oklch(1 0 0 / 0.13);
+  --border-float: oklch(1 0 0 / 0.1);
+  --divider: oklch(1 0 0 / 0.055);
+
+  /* ---- Text ---- */
+  --fg: oklch(0.955 0.004 260);
+  --fg-muted: oklch(0.78 0.006 260);
+  --fg-subtle: oklch(0.63 0.008 260);
+  --fg-faint: oklch(0.5 0.008 260);
+
+  /* ---- Accent (selection / primary action) ---- */
+  --accent: oklch(0.68 0.165 258);
+  --accent-hover: oklch(0.73 0.15 258);
+  --accent-fg: oklch(0.99 0 0); /* text on a solid accent fill */
+  --accent-soft: oklch(0.68 0.165 258 / 0.16);
+  --accent-softer: oklch(0.68 0.165 258 / 0.09);
+  --accent-text: oklch(0.8 0.115 258);
+  --accent-border: oklch(0.68 0.165 258 / 0.5);
+
+  /* ---- Status ---- */
+  --success: oklch(0.76 0.15 155);
+  --success-soft: oklch(0.76 0.15 155 / 0.14);
+  --warning: oklch(0.8 0.145 75);
+  --warning-soft: oklch(0.8 0.145 75 / 0.14);
+  --danger: oklch(0.68 0.19 25);
+  --danger-soft: oklch(0.68 0.19 25 / 0.14);
+  --agent: oklch(0.74 0.13 50); /* Claude / MCP agent activity (warm) */
+  --agent-soft: oklch(0.74 0.13 50 / 0.14);
+
+  /* ---- Axis colors (X / Y / Z) ---- */
+  --axis-x: oklch(0.66 0.19 25);
+  --axis-y: oklch(0.74 0.17 145);
+  --axis-z: oklch(0.66 0.16 255);
+
+  /* ---- Typography ---- */
+  --font-sans:
+    'Geist Sans', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --tracking-caps: 0.06em;
+
+  /* ---- Spacing (4px grid) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ---- Sizing ---- */
+  --control-h: 28px;
+  --control-h-sm: 24px;
+  --topbar-h: 48px;
+  --statusbar-h: 28px;
+  --rail-w: 48px;
+  --sidebar-w: 288px;
+  --inspector-w: 296px;
+
+  /* ---- Radius ---- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* ---- Elevation ---- */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-float:
+    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px -6px oklch(0 0 0 / 0.5),
+    0 2px 6px oklch(0 0 0 / 0.25);
+  --shadow-popover: 0 24px 64px -12px oklch(0 0 0 / 0.65), 0 4px 16px oklch(0 0 0 / 0.3);
+  --backdrop: blur(14px) saturate(1.4);
+
+  /* ---- Focus ---- */
+  --focus-ring: 0 0 0 2px var(--surface-app), 0 0 0 4px var(--accent-border);
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-app: oklch(0.955 0.003 260);
+  --surface-1: oklch(0.995 0.001 260);
+  --surface-2: oklch(0.965 0.003 260);
+  --surface-3: oklch(0.93 0.005 260);
+  --surface-float: oklch(1 0 0 / 0.86);
+  --surface-popover: oklch(1 0 0);
+  --surface-scrim: oklch(0.25 0.01 260 / 0.35);
+
+  --border: oklch(0.2 0.01 260 / 0.1);
+  --border-strong: oklch(0.2 0.01 260 / 0.17);
+  --border-float: oklch(0.2 0.01 260 / 0.1);
+  --divider: oklch(0.2 0.01 260 / 0.07);
+
+  --fg: oklch(0.2 0.01 260);
+  --fg-muted: oklch(0.38 0.01 260);
+  --fg-subtle: oklch(0.52 0.01 260);
+  --fg-faint: oklch(0.64 0.008 260);
+
+  --accent: oklch(0.56 0.19 258);
+  --accent-hover: oklch(0.5 0.19 258);
+  --accent-fg: oklch(1 0 0);
+  --accent-soft: oklch(0.56 0.19 258 / 0.12);
+  --accent-softer: oklch(0.56 0.19 258 / 0.06);
+  --accent-text: oklch(0.47 0.18 258);
+  --accent-border: oklch(0.56 0.19 258 / 0.45);
+
+  --success: oklch(0.56 0.15 155);
+  --success-soft: oklch(0.56 0.15 155 / 0.12);
+  --warning: oklch(0.62 0.15 70);
+  --warning-soft: oklch(0.62 0.15 70 / 0.12);
+  --danger: oklch(0.56 0.2 25);
+  --danger-soft: oklch(0.56 0.2 25 / 0.1);
+  --agent: oklch(0.6 0.15 45);
+  --agent-soft: oklch(0.6 0.15 45 / 0.12);
+
+  --shadow-sm: 0 1px 2px oklch(0.2 0.01 260 / 0.08);
+  --shadow-float:
+    0 0 0 0.5px oklch(0.2 0.01 260 / 0.04), 0 6px 20px -6px oklch(0.2 0.01 260 / 0.18),
+    0 1px 3px oklch(0.2 0.01 260 / 0.08);
+  --shadow-popover:
+    0 24px 64px -12px oklch(0.2 0.01 260 / 0.3), 0 4px 12px oklch(0.2 0.01 260 / 0.08);
+}

@@ -1,0 +1,161 @@
+/* Properties inspector */
+
+.props-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.props-summary__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.props-summary__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.props-summary__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+.props-summary__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.props-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.props-visibility-btn--hidden {
+  color: var(--warning);
+}
+
+/* ---- Rows --------------------------------------------------------------- */
+
+.props-detail .panel__section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.props-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.props-key {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.props-value {
+  min-width: 0;
+}
+
+.props-number {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.props-unit {
+  margin-left: 4px;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+/* ---- X / Y / Z fields --------------------------------------------------- */
+
+.axis-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.axis-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.axis-field__letter {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.axis-field__letter--x {
+  color: var(--axis-x);
+}
+
+.axis-field__letter--y {
+  color: var(--axis-y);
+}
+
+.axis-field__letter--z {
+  color: var(--axis-z);
+}
+
+.axis-field__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* ---- Color -------------------------------------------------------------- */
+
+.props-color {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.props-color-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-xs);
+  box-shadow:
+    inset 0 0 0 1px oklch(0 0 0 / 0.18),
+    0 0 0 1px var(--border);
+}

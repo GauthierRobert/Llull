@@ -1,0 +1,86 @@
+/* Parameters panel — name / expression / value table */
+
+.param-columns,
+.param-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 56px 24px;
+  align-items: center;
+  column-gap: var(--space-2);
+}
+
+.param-columns {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--fg-faint);
+}
+
+.param-columns__value {
+  grid-column: 3;
+  text-align: right;
+}
+
+.param-row {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.param-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--accent-text);
+}
+
+.param-expression-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  background: transparent;
+  border-color: transparent;
+}
+
+.param-row:hover .param-expression-input {
+  background: var(--surface-2);
+}
+
+.param-value {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-muted);
+}
+
+.param-delete-btn {
+  opacity: 0;
+}
+
+.param-row:hover .param-delete-btn,
+.param-row:focus-within .param-delete-btn {
+  opacity: 1;
+}
+
+.param-error {
+  grid-column: 1 / -1;
+  padding: 0 0 2px;
+}
+
+.param-add-fields {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) var(--control-h);
+  gap: var(--space-2);
+}
+
+.param-add-fields input {
+  font-family: var(--font-mono);
+}
+
+.param-add-fields .btn {
+  padding: 0;
+}

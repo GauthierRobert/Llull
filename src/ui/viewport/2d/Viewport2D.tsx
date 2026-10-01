@@ -51,6 +51,7 @@ import {
   snapOrigin2D,
 } from './gridHelpers';
 import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
+import { useViewportPalette } from '@ui/viewport/viewportPalette';
 
 // ---------------------------------------------------------------------------
 // StoreInvalidator2D — calls r3f invalidate() when the store changes
@@ -150,7 +151,15 @@ function RenderOriginSyncer2D(): null {
  * The grid position follows the camera XY so it always covers the view at world
  * Z=0 regardless of any floating-origin offset applied to the entities group.
  */
-function AdaptiveGrid2D(): React.ReactElement | null {
+interface AdaptiveGrid2DProps {
+  minorColor: number;
+  majorColor: number;
+}
+
+function AdaptiveGrid2D({
+  minorColor,
+  majorColor,
+}: AdaptiveGrid2DProps): React.ReactElement | null {
   const minorRef = useRef<THREE.GridHelper | null>(null);
   const majorRef = useRef<THREE.GridHelper | null>(null);
   // Track the last-built grid params; rebuild geometry only when they change.
@@ -160,18 +169,18 @@ function AdaptiveGrid2D(): React.ReactElement | null {
 
   // Build initial helpers with placeholder geometry — replaced in useFrame.
   const minorHelper = useMemo(() => {
-    const h = new THREE.GridHelper(100, 10, 0x1e2535, 0x1e2535);
+    const h = new THREE.GridHelper(100, 10, minorColor, minorColor);
     h.rotation.x = Math.PI / 2; // lay flat on XY plane
     h.renderOrder = -1;
     return h;
-  }, []);
+  }, [minorColor]);
 
   const majorHelper = useMemo(() => {
-    const h = new THREE.GridHelper(100, 10, 0x2a3350, 0x2a3350);
+    const h = new THREE.GridHelper(100, 10, majorColor, majorColor);
     h.rotation.x = Math.PI / 2;
     h.renderOrder = -1;
     return h;
-  }, []);
+  }, [majorColor]);
 
   useEffect(() => {
     return () => {
@@ -215,8 +224,8 @@ function AdaptiveGrid2D(): React.ReactElement | null {
       const scratchMinor = new THREE.GridHelper(
         minorPatch.extent,
         minorPatch.divisions,
-        0x1e2535,
-        0x1e2535,
+        minorColor,
+        minorColor,
       );
       scratchMinor.rotation.x = Math.PI / 2;
       if (minorRef.current) {
@@ -229,8 +238,8 @@ function AdaptiveGrid2D(): React.ReactElement | null {
       const scratchMajor = new THREE.GridHelper(
         majorPatch.extent,
         majorPatch.divisions,
-        0x2a3350,
-        0x2a3350,
+        majorColor,
+        majorColor,
       );
       scratchMajor.rotation.x = Math.PI / 2;
       if (majorRef.current) {
@@ -325,6 +334,7 @@ function SceneContents2D({
   const renderOrigin = useStore((s) => s.renderOrigin);
   const isDrawing = activeTool !== 'none';
   const isModifying = activeModifyTool !== 'none';
+  const palette = useViewportPalette();
 
   // Offset entity group by -renderOrigin (XY only; Z stays 0 for top-down).
   // Entity world positions are document coords; subtracting renderOrigin keeps
@@ -365,7 +375,12 @@ function SceneContents2D({
       <ambientLight intensity={1.0} />
 
       {/* ---- Adaptive 2D grid on the XY plane ---- */}
-      <AdaptiveGrid2D />
+      <color attach="background" args={[palette.background]} />
+      <AdaptiveGrid2D
+        key={`${palette.grid2dMinor}-${palette.grid2dMajor}`}
+        minorColor={palette.grid2dMinor}
+        majorColor={palette.grid2dMajor}
+      />
 
       {/* ---- Entities, snap indicator, and draw interaction are all inside
            the same offset group so pointer e.point resolves in document
@@ -457,16 +472,13 @@ export function Viewport2D(): React.ReactElement {
   }, []);
 
   return (
-    <div
-      className="viewport-2d-wrapper"
-      style={{ position: 'relative', width: '100%', height: '100%' }}
-    >
+    <div className="viewport-2d-wrapper">
       <Canvas
         frameloop="demand"
         gl={{ antialias: true, alpha: false }}
         dpr={[1, 2]}
         orthographic
-        style={{ width: '100%', height: '100%', background: '#0e1220' }}
+        style={{ width: '100%', height: '100%' }}
       >
         <Suspense fallback={null}>
           <SceneContents2D
@@ -486,18 +498,18 @@ export function Viewport2D(): React.ReactElement {
       {/* HTML overlay: scale bar (bottom-right) */}
       <ScaleBar zoom={cameraZoom} document={document} />
 
-      {/* HTML tool palette overlaid on top of the canvas */}
-      <DrawTools activeTool={activeTool} onSelectTool={handleSelectDrawTool} />
-
-      {/* HTML modify tool palette overlaid on the canvas (right of draw tools) */}
-      <ModifyTools
-        activeTool={activeModifyTool}
-        phase={modifyPhase}
-        pendingValue={pendingValue}
-        onSelectTool={handleSelectModifyTool}
-        onSetValue={setPendingValue}
-        onCommitValue={commitValue}
-      />
+      {/* Left-edge dock: draw palette above modify palette, stacked by flex layout */}
+      <div className="vp-tool-dock">
+        <DrawTools activeTool={activeTool} onSelectTool={handleSelectDrawTool} />
+        <ModifyTools
+          activeTool={activeModifyTool}
+          phase={modifyPhase}
+          pendingValue={pendingValue}
+          onSelectTool={handleSelectModifyTool}
+          onSetValue={setPendingValue}
+          onCommitValue={commitValue}
+        />
+      </div>
     </div>
   );
 }

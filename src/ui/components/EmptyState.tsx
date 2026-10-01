@@ -19,6 +19,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
+import { Icon } from '@ui/components/Icon';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -41,34 +42,16 @@ export function EmptyState(): React.ReactElement | null {
       <div className="empty-state__card">
         <button
           type="button"
-          className="empty-state__dismiss"
+          className="icon-btn empty-state__dismiss"
           onClick={() => setDismissed(true)}
           aria-label="Dismiss hint"
           title="Dismiss"
         >
-          &times;
+          <Icon name="close" size={14} />
         </button>
 
-        <div className="empty-state__icon" aria-hidden="true">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect
-              x="8"
-              y="8"
-              width="24"
-              height="24"
-              rx="3"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeDasharray="4 2"
-            />
-            <circle cx="20" cy="20" r="3" stroke="currentColor" strokeWidth="1.5" />
-            <path
-              d="M20 10v4M20 26v4M10 20h4M26 20h4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+        <div className="empty-state__mark" aria-hidden="true">
+          <Icon name="sparkle" size={22} />
         </div>
 
         <h2 className="empty-state__heading">Waiting for your MCP agent</h2>
@@ -79,22 +62,28 @@ export function EmptyState(): React.ReactElement | null {
         <ul className="empty-state__tips" aria-label="Viewer tips">
           <li className="empty-state__tip">
             <span className="empty-state__tip-icon" aria-hidden="true">
-              &#x2192;
+              <Icon name="plug" size={14} />
             </span>
-            Claude drives this canvas over MCP — describe a model and watch it render.
+            <span className="empty-state__tip-text">
+              Claude drives this canvas over MCP — describe a model and watch it render.
+            </span>
           </li>
           <li className="empty-state__tip">
             <span className="empty-state__tip-icon" aria-hidden="true">
-              &#x25CB;
+              <Icon name="cursor" size={14} />
             </span>
-            Click any entity to inspect its properties in the left panel.
+            <span className="empty-state__tip-text">
+              Click any entity to inspect its properties in the panel on the right.
+            </span>
           </li>
           <li className="empty-state__tip">
             <span className="empty-state__tip-icon" aria-hidden="true">
-              &#x2715;
+              <Icon name="cube" size={14} />
             </span>
-            Switch between <strong>2D</strong> and <strong>3D</strong> with the toggle above the
-            viewport.
+            <span className="empty-state__tip-text">
+              Switch between <strong>2D</strong> and <strong>3D</strong> with the toggle at the top
+              of the viewport.
+            </span>
           </li>
         </ul>
       </div>
