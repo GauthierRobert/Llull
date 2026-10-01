@@ -166,7 +166,7 @@ export function computeDocPatch(prev: CadDocument, next: CadDocument): DocPatch 
     entities: { added, changed, removed },
   };
 
-  if (!jsonEqual(prev.order, next.order))         patch.order = next.order;
+  if (!jsonEqual(prev.order, next.order)) patch.order = next.order;
   if (!jsonEqual(prev.selection, next.selection)) patch.selection = next.selection;
 
   // featureHistory — incremental: emit only the newly-appended steps so the patch
@@ -190,24 +190,30 @@ export function computeDocPatch(prev: CadDocument, next: CadDocument): DocPatch 
     }
   }
 
-  if (!jsonEqual(prev.layers, next.layers))                 patch.layers = next.layers;
-  if (!jsonEqual(prev.layerOrder, next.layerOrder))         patch.layerOrder = next.layerOrder;
-  if (!jsonEqual(prev.groups, next.groups))                 patch.groups = next.groups;
-  if (!jsonEqual(prev.parameters, next.parameters))         patch.parameters = next.parameters;
-  if (!jsonEqual(prev.animations, next.animations))         patch.animations = next.animations;
-  if (!jsonEqual(prev.configurations, next.configurations)) patch.configurations = next.configurations;
-  if (!jsonEqual(prev.materials, next.materials))           patch.materials = next.materials;
-  if (!jsonEqual(prev.recipes, next.recipes))               patch.recipes = next.recipes;
-  if (!jsonEqual(prev.components, next.components))         patch.components = next.components;
-  if (!jsonEqual(prev.camera, next.camera))                 patch.camera = next.camera;
-  if (prev.units !== next.units)                            patch.units = next.units;
-  if (prev.displayPrecision !== next.displayPrecision)      patch.displayPrecision = next.displayPrecision;
-  if (!jsonEqual(prev.constraints, next.constraints))       patch.constraints = next.constraints as Record<string, unknown>;
-  if (!jsonEqual(prev.constraintOrder, next.constraintOrder)) patch.constraintOrder = next.constraintOrder;
-  if (!jsonEqual(prev.joints, next.joints))                 patch.joints = next.joints;
-  if (!jsonEqual(prev.jointOrder, next.jointOrder))         patch.jointOrder = next.jointOrder;
-  if (!jsonEqual(prev.driveRelations, next.driveRelations)) patch.driveRelations = next.driveRelations;
-  if (!jsonEqual(prev.driveRelationOrder, next.driveRelationOrder)) patch.driveRelationOrder = next.driveRelationOrder;
+  if (!jsonEqual(prev.layers, next.layers)) patch.layers = next.layers;
+  if (!jsonEqual(prev.layerOrder, next.layerOrder)) patch.layerOrder = next.layerOrder;
+  if (!jsonEqual(prev.groups, next.groups)) patch.groups = next.groups;
+  if (!jsonEqual(prev.parameters, next.parameters)) patch.parameters = next.parameters;
+  if (!jsonEqual(prev.animations, next.animations)) patch.animations = next.animations;
+  if (!jsonEqual(prev.configurations, next.configurations))
+    patch.configurations = next.configurations;
+  if (!jsonEqual(prev.materials, next.materials)) patch.materials = next.materials;
+  if (!jsonEqual(prev.recipes, next.recipes)) patch.recipes = next.recipes;
+  if (!jsonEqual(prev.components, next.components)) patch.components = next.components;
+  if (!jsonEqual(prev.camera, next.camera)) patch.camera = next.camera;
+  if (prev.units !== next.units) patch.units = next.units;
+  if (prev.displayPrecision !== next.displayPrecision)
+    patch.displayPrecision = next.displayPrecision;
+  if (!jsonEqual(prev.constraints, next.constraints))
+    patch.constraints = next.constraints as Record<string, unknown>;
+  if (!jsonEqual(prev.constraintOrder, next.constraintOrder))
+    patch.constraintOrder = next.constraintOrder;
+  if (!jsonEqual(prev.joints, next.joints)) patch.joints = next.joints;
+  if (!jsonEqual(prev.jointOrder, next.jointOrder)) patch.jointOrder = next.jointOrder;
+  if (!jsonEqual(prev.driveRelations, next.driveRelations))
+    patch.driveRelations = next.driveRelations;
+  if (!jsonEqual(prev.driveRelationOrder, next.driveRelationOrder))
+    patch.driveRelationOrder = next.driveRelationOrder;
 
   return patch;
 }
@@ -232,16 +238,14 @@ export function applyDocPatch(doc: CadDocument, patch: DocPatch): CadDocument {
   const { added, changed, removed } = patch.entities;
 
   const hasEntityChange =
-    Object.keys(added).length > 0 ||
-    Object.keys(changed).length > 0 ||
-    removed.length > 0;
+    Object.keys(added).length > 0 || Object.keys(changed).length > 0 || removed.length > 0;
 
   let entities = doc.entities;
   if (hasEntityChange) {
     entities = { ...doc.entities };
-    for (const [id, entity] of Object.entries(added))   entities[id] = entity;
+    for (const [id, entity] of Object.entries(added)) entities[id] = entity;
     for (const [id, entity] of Object.entries(changed)) entities[id] = entity;
-    for (const id of removed)                           delete entities[id];
+    for (const id of removed) delete entities[id];
   }
 
   // featureHistory: append new steps or full-replace depending on the patch flag.
@@ -254,26 +258,26 @@ export function applyDocPatch(doc: CadDocument, patch: DocPatch): CadDocument {
 
   return {
     entities,
-    order:            patch.order            ?? doc.order,
-    selection:        patch.selection        ?? doc.selection,
+    order: patch.order ?? doc.order,
+    selection: patch.selection ?? doc.selection,
     featureHistory,
-    layers:           patch.layers           ?? doc.layers,
-    layerOrder:       patch.layerOrder       ?? doc.layerOrder,
-    groups:           patch.groups           ?? doc.groups,
-    parameters:       patch.parameters       ?? doc.parameters,
-    animations:       patch.animations       ?? doc.animations,
-    configurations:   patch.configurations   ?? doc.configurations,
-    materials:        patch.materials        ?? doc.materials,
-    recipes:          patch.recipes          ?? doc.recipes,
-    components:       patch.components       ?? doc.components,
-    camera:           patch.camera           ?? doc.camera,
-    units:            patch.units            ?? doc.units,
+    layers: patch.layers ?? doc.layers,
+    layerOrder: patch.layerOrder ?? doc.layerOrder,
+    groups: patch.groups ?? doc.groups,
+    parameters: patch.parameters ?? doc.parameters,
+    animations: patch.animations ?? doc.animations,
+    configurations: patch.configurations ?? doc.configurations,
+    materials: patch.materials ?? doc.materials,
+    recipes: patch.recipes ?? doc.recipes,
+    components: patch.components ?? doc.components,
+    camera: patch.camera ?? doc.camera,
+    units: patch.units ?? doc.units,
     displayPrecision: patch.displayPrecision ?? doc.displayPrecision,
-    constraints:        (patch.constraints as typeof doc.constraints | undefined) ?? doc.constraints,
-    constraintOrder:    patch.constraintOrder  ?? doc.constraintOrder,
-    joints:             patch.joints           ?? doc.joints,
-    jointOrder:         patch.jointOrder       ?? doc.jointOrder,
-    driveRelations:     patch.driveRelations   ?? doc.driveRelations,
+    constraints: (patch.constraints as typeof doc.constraints | undefined) ?? doc.constraints,
+    constraintOrder: patch.constraintOrder ?? doc.constraintOrder,
+    joints: patch.joints ?? doc.joints,
+    jointOrder: patch.jointOrder ?? doc.jointOrder,
+    driveRelations: patch.driveRelations ?? doc.driveRelations,
     driveRelationOrder: patch.driveRelationOrder ?? doc.driveRelationOrder,
   };
 }

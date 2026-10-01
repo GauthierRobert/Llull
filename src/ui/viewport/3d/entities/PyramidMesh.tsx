@@ -25,7 +25,12 @@ interface PyramidMeshProps {
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function PyramidMesh({ entity, selected, onSelect, pbrMaterial }: PyramidMeshProps): React.ReactElement {
+export function PyramidMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: PyramidMeshProps): React.ReactElement {
   const { baseWidth, baseDepth, height, position, rotation, color } = entity;
 
   const geometry = useMemo(
@@ -44,7 +49,14 @@ export function PyramidMesh({ entity, selected, onSelect, pbrMaterial }: Pyramid
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.45,
+    metalness: 0.08,
+    envMapIntensity: 0.8,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

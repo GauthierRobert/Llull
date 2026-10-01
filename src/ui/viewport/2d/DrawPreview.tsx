@@ -13,7 +13,11 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
 import type { DrawToolKind } from './useDrawTool';
-import { rectParamsFromCorners, circleRadiusFromPoints, ellipseParamsFromCenterCorner } from './drawHelpers';
+import {
+  rectParamsFromCorners,
+  circleRadiusFromPoints,
+  ellipseParamsFromCenterCorner,
+} from './drawHelpers';
 
 // ---------------------------------------------------------------------------
 // Shared preview material (not disposed — singleton)
@@ -57,7 +61,30 @@ function buildRectGeo(a: Vec2, b: Vec2): THREE.BufferGeometry {
   const y0 = Math.min(a[1], b[1]);
   const y1 = Math.max(a[1], b[1]);
   const verts = new Float32Array([
-    x0, y0, 0, x1, y0, 0, x1, y0, 0, x1, y1, 0, x1, y1, 0, x0, y1, 0, x0, y1, 0, x0, y0, 0,
+    x0,
+    y0,
+    0,
+    x1,
+    y0,
+    0,
+    x1,
+    y0,
+    0,
+    x1,
+    y1,
+    0,
+    x1,
+    y1,
+    0,
+    x0,
+    y1,
+    0,
+    x0,
+    y1,
+    0,
+    x0,
+    y0,
+    0,
   ]);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));

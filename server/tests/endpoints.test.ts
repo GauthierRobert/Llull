@@ -91,18 +91,14 @@ describe('POST /command — mutation', () => {
 
 describe('POST /command — validation', () => {
   it('returns 400 when body has no "name" field', async () => {
-    const res = await request(app)
-      .post('/command')
-      .send({ params: {} });
+    const res = await request(app).post('/command').send({ params: {} });
 
     expect(res.status).toBe(400);
     expect(typeof res.body.error).toBe('string');
   });
 
   it('returns 400 when "name" is not a string', async () => {
-    const res = await request(app)
-      .post('/command')
-      .send({ name: 42 });
+    const res = await request(app).post('/command').send({ name: 42 });
 
     expect(res.status).toBe(400);
     expect(typeof res.body.error).toBe('string');
@@ -172,9 +168,7 @@ describe('POST /undo + POST /redo', () => {
 
 describe('POST /command — unknown command', () => {
   it('returns 200 with isError: true', async () => {
-    const res = await request(app)
-      .post('/command')
-      .send({ name: 'totally_unknown_command' });
+    const res = await request(app).post('/command').send({ name: 'totally_unknown_command' });
 
     expect(res.status).toBe(200);
     expect(res.body.isError).toBe(true);

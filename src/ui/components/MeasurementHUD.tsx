@@ -20,24 +20,52 @@ import { useStore } from '@ui/store';
 // Typed data shapes (local — mirror the command data interfaces for narrowing)
 // ---------------------------------------------------------------------------
 
-interface DistanceData { distance: number; unit: string; }
-interface AngleData { degrees: number; radians: number; }
-interface AreaData { area: number; unit: string; }
-interface PerimeterData { perimeter: number; unit: string; }
+interface DistanceData {
+  distance: number;
+  unit: string;
+}
+interface AngleData {
+  degrees: number;
+  radians: number;
+}
+interface AreaData {
+  area: number;
+  unit: string;
+}
+interface PerimeterData {
+  perimeter: number;
+  unit: string;
+}
 interface BoundingBoxData {
   min: readonly [number, number, number];
   max: readonly [number, number, number];
   size: readonly [number, number, number];
 }
-interface VolumeData { volume: number; unit: string; }
-interface MassPropertiesData { volume: number; density: number; mass: number; unit: string; }
+interface VolumeData {
+  volume: number;
+  unit: string;
+}
+interface MassPropertiesData {
+  volume: number;
+  density: number;
+  mass: number;
+  unit: string;
+}
 
 // ---------------------------------------------------------------------------
 // Type-guard helpers (narrow `unknown` data without unsafe casts)
 // ---------------------------------------------------------------------------
 
 function isDistanceData(d: unknown): d is DistanceData {
-  return typeof d === 'object' && d !== null && 'distance' in d && 'unit' in d && !('area' in d) && !('perimeter' in d) && !('volume' in d);
+  return (
+    typeof d === 'object' &&
+    d !== null &&
+    'distance' in d &&
+    'unit' in d &&
+    !('area' in d) &&
+    !('perimeter' in d) &&
+    !('volume' in d)
+  );
 }
 
 function isAngleData(d: unknown): d is AngleData {
@@ -61,7 +89,14 @@ function isVolumeData(d: unknown): d is VolumeData {
 }
 
 function isMassPropertiesData(d: unknown): d is MassPropertiesData {
-  return typeof d === 'object' && d !== null && 'volume' in d && 'density' in d && 'mass' in d && 'unit' in d;
+  return (
+    typeof d === 'object' &&
+    d !== null &&
+    'volume' in d &&
+    'density' in d &&
+    'mass' in d &&
+    'unit' in d
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +115,11 @@ function fmtVec3(v: readonly [number, number, number], precision = 3): string {
 // Per-command result renderers
 // ---------------------------------------------------------------------------
 
-interface RowProps { label: string; value: string; unit?: string; }
+interface RowProps {
+  label: string;
+  value: string;
+  unit?: string;
+}
 
 function Row({ label, value, unit }: RowProps): React.ReactElement {
   return (
@@ -95,9 +134,7 @@ function Row({ label, value, unit }: RowProps): React.ReactElement {
 }
 
 function DistanceResult({ data }: { data: DistanceData }): React.ReactElement {
-  return (
-    <Row label="Distance" value={fmt(data.distance)} unit={data.unit} />
-  );
+  return <Row label="Distance" value={fmt(data.distance)} unit={data.unit} />;
 }
 
 function AngleResult({ data }: { data: AngleData }): React.ReactElement {
@@ -110,15 +147,11 @@ function AngleResult({ data }: { data: AngleData }): React.ReactElement {
 }
 
 function AreaResult({ data }: { data: AreaData }): React.ReactElement {
-  return (
-    <Row label="Area" value={fmt(data.area)} unit={data.unit} />
-  );
+  return <Row label="Area" value={fmt(data.area)} unit={data.unit} />;
 }
 
 function PerimeterResult({ data }: { data: PerimeterData }): React.ReactElement {
-  return (
-    <Row label="Perimeter" value={fmt(data.perimeter)} unit={data.unit} />
-  );
+  return <Row label="Perimeter" value={fmt(data.perimeter)} unit={data.unit} />;
 }
 
 function BoundingBoxResult({ data }: { data: BoundingBoxData }): React.ReactElement {
@@ -132,16 +165,22 @@ function BoundingBoxResult({ data }: { data: BoundingBoxData }): React.ReactElem
 }
 
 function VolumeResult({ data }: { data: VolumeData }): React.ReactElement {
-  return (
-    <Row label="Volume" value={fmt(data.volume)} unit={data.unit} />
-  );
+  return <Row label="Volume" value={fmt(data.volume)} unit={data.unit} />;
 }
 
 function MassPropertiesResult({ data }: { data: MassPropertiesData }): React.ReactElement {
   return (
     <>
-      <Row label="Volume" value={fmt(data.volume)} unit={`${data.unit.replace('g', '')}³`.trim() || 'mm³'} />
-      <Row label="Density" value={fmt(data.density, 5)} unit={`g/${data.unit.replace('g', '') || 'mm'}³`} />
+      <Row
+        label="Volume"
+        value={fmt(data.volume)}
+        unit={`${data.unit.replace('g', '')}³`.trim() || 'mm³'}
+      />
+      <Row
+        label="Density"
+        value={fmt(data.density, 5)}
+        unit={`g/${data.unit.replace('g', '') || 'mm'}³`}
+      />
       <Row label="Mass" value={fmt(data.mass)} unit={data.unit} />
     </>
   );

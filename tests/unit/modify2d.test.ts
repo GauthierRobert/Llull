@@ -113,7 +113,7 @@ describe('geometry helpers', () => {
       const hit = segIntersect([0, 0], [2, 0], [1, 1], [1, 2]);
       expect(hit).not.toBeNull();
       expect(hit!.t).toBeCloseTo(0.5); // x=1 is halfway along [0,2]
-      expect(hit!.u).toBeCloseTo(-1);  // extension beyond segment start
+      expect(hit!.u).toBeCloseTo(-1); // extension beyond segment start
     });
 
     it('handles 45° crossing', () => {
@@ -337,7 +337,13 @@ describe('2D modify commands', () => {
       // We rely on type-safe doc construction — we can't easily inject a bad entity via commands.
       // Instead, verify via a 2-point polyline (which succeeds) just to ensure the >=2 path works.
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_polyline', { points: [[0, 0], [1, 0]], closed: false });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+        closed: false,
+      });
       doc = r.document;
       const id = r.affected[0]!;
       const result = execute(doc, 'explode_polyline', { id });
@@ -348,7 +354,11 @@ describe('2D modify commands', () => {
     it('inherits color and layerId from the source polyline', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [1, 0], [2, 0]],
+        points: [
+          [0, 0],
+          [1, 0],
+          [2, 0],
+        ],
         closed: false,
         color: '#ff0000',
       });
@@ -400,7 +410,11 @@ describe('2D modify commands', () => {
       let doc = createEmptyDocument();
       // L-shape: right angle at [4,0]
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 4]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -564,7 +578,11 @@ describe('2D modify commands', () => {
     it('failure: entity is not a line', () => {
       let doc = createEmptyDocument();
       const rPoly = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [5, 0], [5, 5]],
+        points: [
+          [0, 0],
+          [5, 0],
+          [5, 5],
+        ],
         closed: false,
       });
       doc = rPoly.document;
@@ -730,7 +748,11 @@ describe('2D modify commands', () => {
       let doc = createEmptyDocument();
       // Right-angle L at vertex [4,0]: (0,0)→(4,0)→(4,8)
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 8]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 8],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -771,7 +793,12 @@ describe('2D modify commands', () => {
       let doc = createEmptyDocument();
       // Square: 4 vertices, closed
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 4], [0, 4]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+          [0, 4],
+        ],
         closed: true,
       });
       doc = r.document;
@@ -815,7 +842,11 @@ describe('2D modify commands', () => {
     it('failure: radius <= 0', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 4]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -831,7 +862,11 @@ describe('2D modify commands', () => {
     it('failure: vertexIndex out of range for open polyline', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 4]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -850,7 +885,11 @@ describe('2D modify commands', () => {
       let doc = createEmptyDocument();
       // Short segments: (0,0)→(1,0)→(1,1), length=1 each
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [1, 0], [1, 1]],
+        points: [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -869,7 +908,10 @@ describe('2D modify commands', () => {
     it('failure: polyline has fewer than 3 points', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0]],
+        points: [
+          [0, 0],
+          [4, 0],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -892,7 +934,11 @@ describe('2D modify commands', () => {
       // Tangent points: tangentPrev=(3,8), tangentNext=(4,7)
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 8], [4, 8], [4, 0]],
+        points: [
+          [0, 8],
+          [4, 8],
+          [4, 0],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -937,7 +983,11 @@ describe('2D modify commands', () => {
     it('arc center is equidistant from both tangent points', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 8]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 8],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -970,7 +1020,11 @@ describe('2D modify commands', () => {
       let doc = createEmptyDocument();
       // Right-angle L: (0,0)→(4,0)→(4,8)
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 8]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 8],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -1009,7 +1063,12 @@ describe('2D modify commands', () => {
     it('happy path: chamfers a vertex in a closed polyline', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 4], [0, 4]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+          [0, 4],
+        ],
         closed: true,
       });
       doc = r.document;
@@ -1053,7 +1112,11 @@ describe('2D modify commands', () => {
     it('failure: distance <= 0', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 4]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -1069,7 +1132,11 @@ describe('2D modify commands', () => {
     it('failure: vertexIndex out of range', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 4]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -1086,7 +1153,11 @@ describe('2D modify commands', () => {
     it('failure: distance too large for segment lengths', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [1, 0], [1, 1]],
+        points: [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -1103,7 +1174,10 @@ describe('2D modify commands', () => {
     it('failure: polyline has fewer than 3 points', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0]],
+        points: [
+          [0, 0],
+          [4, 0],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -1119,7 +1193,11 @@ describe('2D modify commands', () => {
     it('inherits color and layerId from source polyline', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [4, 0], [4, 4]],
+        points: [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+        ],
         closed: false,
         color: '#abcdef',
       });

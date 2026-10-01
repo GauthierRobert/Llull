@@ -22,9 +22,12 @@ export function EllipseRenderer({ entity, selected }: EllipseRendererProps): Rea
 
   const lineObject = useMemo(() => {
     const curve = new THREE.EllipseCurve(
-      center[0], center[1],
-      radiusX, radiusY,
-      0, Math.PI * 2,
+      center[0],
+      center[1],
+      radiusX,
+      radiusY,
+      0,
+      Math.PI * 2,
       false,
       0,
     );
@@ -33,7 +36,7 @@ export function EllipseRenderer({ entity, selected }: EllipseRendererProps): Rea
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({ color: selected ? '#5b8dee' : color });
     return new THREE.Line(geo, mat);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center[0], center[1], radiusX, radiusY, color, selected]);
 
   useEffect(() => {

@@ -126,7 +126,18 @@ describe('check_model — degenerate_size', () => {
   });
 
   it('flags an extrusion with depth ≤ 0', () => {
-    const bad: Entity = { ...BASE, id: 'e1', kind: 'extrusion', profile: [[0,0],[1,0],[1,1],[0,1]], depth: 0 };
+    const bad: Entity = {
+      ...BASE,
+      id: 'e1',
+      kind: 'extrusion',
+      profile: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
+      depth: 0,
+    };
     const doc = injectEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'e1');
@@ -144,7 +155,15 @@ describe('check_model — degenerate_size', () => {
   });
 
   it('flags an arc with radius ≤ 0', () => {
-    const bad: Entity = { ...BASE, id: 'a1', kind: 'arc', center: [0, 0], radius: 0, startAngle: 0, endAngle: 1 };
+    const bad: Entity = {
+      ...BASE,
+      id: 'a1',
+      kind: 'arc',
+      center: [0, 0],
+      radius: 0,
+      startAngle: 0,
+      endAngle: 1,
+    };
     const doc = injectEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'a1');
@@ -153,7 +172,14 @@ describe('check_model — degenerate_size', () => {
   });
 
   it('flags an ellipse with radiusX ≤ 0', () => {
-    const bad: Entity = { ...BASE, id: 'el1', kind: 'ellipse', center: [0, 0], radiusX: 0, radiusY: 1 };
+    const bad: Entity = {
+      ...BASE,
+      id: 'el1',
+      kind: 'ellipse',
+      center: [0, 0],
+      radiusX: 0,
+      radiusY: 1,
+    };
     const doc = injectEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'el1');
@@ -162,7 +188,14 @@ describe('check_model — degenerate_size', () => {
   });
 
   it('flags an ellipse with radiusY ≤ 0', () => {
-    const bad: Entity = { ...BASE, id: 'el2', kind: 'ellipse', center: [0, 0], radiusX: 1, radiusY: -1 };
+    const bad: Entity = {
+      ...BASE,
+      id: 'el2',
+      kind: 'ellipse',
+      center: [0, 0],
+      radiusX: 1,
+      radiusY: -1,
+    };
     const doc = injectEntity(createEmptyDocument(), bad);
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'el2');
@@ -187,7 +220,14 @@ describe('check_model — open_profile', () => {
 
   it('flags an open polyline with a warning', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', { points: [[0,0],[1,0],[1,1]], closed: false }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
+      closed: false,
+    }).document;
     const { issues } = runModelChecks(doc, 1e6);
     const hit = issues.find((i) => i.code === 'open_profile');
     expect(hit).toBeDefined();
@@ -196,7 +236,14 @@ describe('check_model — open_profile', () => {
 
   it('does NOT flag a closed polyline', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', { points: [[0,0],[1,0],[1,1]], closed: true }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
+      closed: true,
+    }).document;
     const { issues } = runModelChecks(doc, 1e6);
     expect(issues.filter((i) => i.code === 'open_profile')).toHaveLength(0);
   });
@@ -238,7 +285,12 @@ describe('check_model — insufficient_points', () => {
 
   it('does NOT flag a polyline with 2 or more points', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', { points: [[0,0],[1,0]] }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+      ],
+    }).document;
     const { issues } = runModelChecks(doc, 1e6);
     expect(issues.filter((i) => i.code === 'insufficient_points')).toHaveLength(0);
   });
@@ -318,7 +370,7 @@ describe('check_model — orphaned_group_member', () => {
     const doc: CadDocument = {
       ...createEmptyDocument(),
       groups: {
-        'g1': { id: 'g1', name: 'Broken Group', memberIds: ['ghost-id'] },
+        g1: { id: 'g1', name: 'Broken Group', memberIds: ['ghost-id'] },
       },
     };
     const { issues } = runModelChecks(doc, 1e6);
@@ -335,7 +387,10 @@ describe('check_model — orphaned_group_member', () => {
     doc = a.document;
     const b = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = b.document;
-    doc = execute(doc, 'group_entities', { ids: [a.affected[0]!, b.affected[0]!], name: 'Good' }).document;
+    doc = execute(doc, 'group_entities', {
+      ids: [a.affected[0]!, b.affected[0]!],
+      name: 'Good',
+    }).document;
     const { issues } = runModelChecks(doc, 1e6);
     expect(issues.filter((i) => i.code === 'orphaned_group_member')).toHaveLength(0);
   });
@@ -352,7 +407,12 @@ describe('check_model — parameter_error', () => {
     const doc: CadDocument = {
       ...createEmptyDocument(),
       parameters: {
-        broken: { name: 'broken', expression: 'unknown_ref * 2', value: 0, error: 'unknown parameter: unknown_ref' },
+        broken: {
+          name: 'broken',
+          expression: 'unknown_ref * 2',
+          value: 0,
+          error: 'unknown parameter: unknown_ref',
+        },
       },
     };
     const { issues } = runModelChecks(doc, 1e6);
@@ -388,7 +448,14 @@ describe('check_model — ok flag', () => {
   it('ok is true when there are only warnings/info but no errors', () => {
     let doc = createEmptyDocument();
     // open polyline → warning; empty layer-default has entity now so no empty-layer info
-    doc = execute(doc, 'draw_polyline', { points: [[0,0],[1,0],[1,1]], closed: false }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
+      closed: false,
+    }).document;
     const data = runModelChecks(doc, 1e6);
     // no error issues
     expect(data.issues.filter((i) => i.severity === 'error')).toHaveLength(0);

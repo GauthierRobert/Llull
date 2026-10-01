@@ -61,9 +61,18 @@ function BBoxLines({ min, max }: BBoxLinesProps): React.ReactElement | null {
     // 12 edges (each is a pair of corner indices) — typed as readonly tuples to
     // satisfy noUncheckedIndexedAccess (destructuring from a typed tuple is safe).
     const edges: readonly [number, number][] = [
-      [0, 1], [1, 2], [2, 3], [3, 0], // front face
-      [4, 5], [5, 6], [6, 7], [7, 4], // back face
-      [0, 4], [1, 5], [2, 6], [3, 7], // connecting edges
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 0], // front face
+      [4, 5],
+      [5, 6],
+      [6, 7],
+      [7, 4], // back face
+      [0, 4],
+      [1, 5],
+      [2, 6],
+      [3, 7], // connecting edges
     ];
 
     const positions: number[] = [];
@@ -82,7 +91,7 @@ function BBoxLines({ min, max }: BBoxLinesProps): React.ReactElement | null {
     () =>
       new THREE.LineBasicMaterial({
         color: '#60a5fa', // accent blue matching --accent
-        linewidth: 1,     // wider not supported on all platforms
+        linewidth: 1, // wider not supported on all platforms
         depthTest: false, // always visible through geometry
         transparent: true,
         opacity: 0.85,

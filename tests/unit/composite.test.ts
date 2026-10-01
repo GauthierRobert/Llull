@@ -27,22 +27,28 @@ function applyEulerXYZ(v: Vec3, origin: Vec3, euler: Vec3): Vec3 {
   let z = v[2] - origin[2];
 
   // Rx
-  const cxr = Math.cos(rx), sxr = Math.sin(rx);
+  const cxr = Math.cos(rx),
+    sxr = Math.sin(rx);
   const y1 = cxr * y - sxr * z;
   const z1 = sxr * y + cxr * z;
-  y = y1; z = z1;
+  y = y1;
+  z = z1;
 
   // Ry
-  const cyr = Math.cos(ry), syr = Math.sin(ry);
+  const cyr = Math.cos(ry),
+    syr = Math.sin(ry);
   const x2 = cyr * x + syr * z;
   const z2 = -syr * x + cyr * z;
-  x = x2; z = z2;
+  x = x2;
+  z = z2;
 
   // Rz
-  const czr = Math.cos(rz), szr = Math.sin(rz);
+  const czr = Math.cos(rz),
+    szr = Math.sin(rz);
   const x3 = czr * x - szr * y;
   const y3 = szr * x + czr * y;
-  x = x3; y = y3;
+  x = x3;
+  y = y3;
 
   return [x + origin[0], y + origin[1], z + origin[2]];
 }
@@ -60,18 +66,10 @@ function cylinderEndpoint(
   const halfH = height / 2;
   // Local +Z tip → p2
   const p2End = applyEulerXYZ([0, 0, halfH], [0, 0, 0], rotation);
-  const p2World: Vec3 = [
-    position[0] + p2End[0],
-    position[1] + p2End[1],
-    position[2] + p2End[2],
-  ];
+  const p2World: Vec3 = [position[0] + p2End[0], position[1] + p2End[1], position[2] + p2End[2]];
   // Local -Z tip → p1
   const p1End = applyEulerXYZ([0, 0, -halfH], [0, 0, 0], rotation);
-  const p1World: Vec3 = [
-    position[0] + p1End[0],
-    position[1] + p1End[1],
-    position[2] + p1End[2],
-  ];
+  const p1World: Vec3 = [position[0] + p1End[0], position[1] + p1End[1], position[2] + p1End[2]];
   return { p1End: p1World, p2End: p2World };
 }
 

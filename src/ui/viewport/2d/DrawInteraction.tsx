@@ -131,7 +131,11 @@ export function DrawInteraction({
         onDoubleClick={handleDoubleClick}
       />
 
-      <DrawPreview activeTool={activeTool} collectedPoints={collectedPoints} cursor={snappedCursor} />
+      <DrawPreview
+        activeTool={activeTool}
+        collectedPoints={collectedPoints}
+        cursor={snappedCursor}
+      />
 
       <CollectedPointMarkers points={collectedPoints} />
     </>

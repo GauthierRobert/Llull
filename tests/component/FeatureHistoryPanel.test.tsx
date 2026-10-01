@@ -190,7 +190,9 @@ describe('FeatureHistoryPanel — reorder', () => {
     render(<FeatureHistoryPanel />);
 
     const row = screen.getByTestId('history-step-s0');
-    const upBtn = within(row).getByRole('button', { name: /move step add_box up/i }) as HTMLButtonElement;
+    const upBtn = within(row).getByRole('button', {
+      name: /move step add_box up/i,
+    }) as HTMLButtonElement;
     expect(upBtn.disabled).toBe(true);
   });
 
@@ -199,7 +201,9 @@ describe('FeatureHistoryPanel — reorder', () => {
     render(<FeatureHistoryPanel />);
 
     const row = screen.getByTestId('history-step-s1');
-    const downBtn = within(row).getByRole('button', { name: /move step add_sphere down/i }) as HTMLButtonElement;
+    const downBtn = within(row).getByRole('button', {
+      name: /move step add_sphere down/i,
+    }) as HTMLButtonElement;
     expect(downBtn.disabled).toBe(true);
   });
 });
@@ -244,14 +248,18 @@ describe('FeatureHistoryPanel — replay', () => {
 
   it('Replay button is disabled when history is empty', () => {
     render(<FeatureHistoryPanel />);
-    const replayBtn = screen.getByRole('button', { name: /replay feature history/i }) as HTMLButtonElement;
+    const replayBtn = screen.getByRole('button', {
+      name: /replay feature history/i,
+    }) as HTMLButtonElement;
     expect(replayBtn.disabled).toBe(true);
   });
 
   it('Replay button is enabled when history has at least one step', () => {
     setHistory([makeStep('s1', 'add_box')]);
     render(<FeatureHistoryPanel />);
-    const replayBtn = screen.getByRole('button', { name: /replay feature history/i }) as HTMLButtonElement;
+    const replayBtn = screen.getByRole('button', {
+      name: /replay feature history/i,
+    }) as HTMLButtonElement;
     expect(replayBtn.disabled).toBe(false);
   });
 });

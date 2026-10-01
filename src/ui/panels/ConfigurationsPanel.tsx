@@ -54,13 +54,18 @@ function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement
       </div>
 
       {paramEntries.length > 0 && (
-        <ul className="config-param-list" aria-label={`Parameters for configuration ${config.name}`}>
+        <ul
+          className="config-param-list"
+          aria-label={`Parameters for configuration ${config.name}`}
+        >
           {paramEntries.map(([paramName, expression]) => (
             <li key={paramName} className="config-param-entry">
               <span className="config-param-name" title={paramName}>
                 {paramName}
               </span>
-              <span className="config-param-equals" aria-hidden="true">=</span>
+              <span className="config-param-equals" aria-hidden="true">
+                =
+              </span>
               <span className="config-param-value" title={expression}>
                 {expression}
               </span>
@@ -106,7 +111,9 @@ function ParameterValueRow({
         aria-label={`Parameter name for row ${index + 1}`}
         autoComplete="off"
       />
-      <span className="config-pv-equals" aria-hidden="true">=</span>
+      <span className="config-pv-equals" aria-hidden="true">
+        =
+      </span>
       <input
         type="text"
         className="config-pv-expr-input"
@@ -125,8 +132,24 @@ function ParameterValueRow({
           title="Remove this parameter row"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <line
+              x1="1"
+              y1="1"
+              x2="9"
+              y2="9"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <line
+              x1="9"
+              y1="1"
+              x2="1"
+              y2="9"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
       )}
@@ -153,9 +176,7 @@ function CreateConfigurationForm(): React.ReactElement {
   }, []);
 
   const handleExpressionChange = useCallback((index: number, value: string) => {
-    setPvRows((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, expression: value } : row)),
-    );
+    setPvRows((prev) => prev.map((row, i) => (i === index ? { ...row, expression: value } : row)));
   }, []);
 
   const handleAddRow = useCallback(() => {
@@ -273,9 +294,7 @@ export interface ConfigurationsPanelProps {
 
 export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): React.ReactElement {
   const configurations = useStore((s) => s.document.configurations);
-  const configList = Object.values(configurations).filter(
-    (c): c is Configuration => c != null,
-  );
+  const configList = Object.values(configurations).filter((c): c is Configuration => c != null);
 
   return (
     <aside

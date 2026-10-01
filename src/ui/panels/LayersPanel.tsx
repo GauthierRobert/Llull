@@ -72,20 +72,49 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
         onClick={handleLocalVisibilityToggle}
         aria-pressed={effectivelyVisible}
         aria-label={
-          effectivelyVisible ? `Hide layer ${layer.name} in viewport` : `Show layer ${layer.name} in viewport`
+          effectivelyVisible
+            ? `Hide layer ${layer.name} in viewport`
+            : `Show layer ${layer.name} in viewport`
         }
-        title={effectivelyVisible ? 'Hide layer in viewport (local)' : 'Show layer in viewport (local)'}
+        title={
+          effectivelyVisible ? 'Hide layer in viewport (local)' : 'Show layer in viewport (local)'
+        }
       >
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
           {effectivelyVisible ? (
             <>
-              <ellipse cx="7" cy="7" rx="5" ry="3" stroke="currentColor" strokeWidth="1.2" fill="none" />
+              <ellipse
+                cx="7"
+                cy="7"
+                rx="5"
+                ry="3"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                fill="none"
+              />
               <circle cx="7" cy="7" r="1.5" fill="currentColor" />
             </>
           ) : (
             <>
-              <ellipse cx="7" cy="7" rx="5" ry="3" stroke="currentColor" strokeWidth="1.2" fill="none" opacity="0.4" />
-              <line x1="3" y1="3" x2="11" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              <ellipse
+                cx="7"
+                cy="7"
+                rx="5"
+                ry="3"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                fill="none"
+                opacity="0.4"
+              />
+              <line
+                x1="3"
+                y1="3"
+                x2="11"
+                y2="11"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
             </>
           )}
         </svg>
@@ -94,15 +123,37 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
       {/* Lock state — read-only indicator (controlled by MCP agent) */}
       <span
         className={`layer-btn layer-lock-indicator${layer.locked ? ' layer-lock-btn--locked' : ''}`}
-        aria-label={layer.locked ? `Layer ${layer.name} is locked` : `Layer ${layer.name} is unlocked`}
+        aria-label={
+          layer.locked ? `Layer ${layer.name} is locked` : `Layer ${layer.name} is unlocked`
+        }
         title={layer.locked ? 'Locked (set by MCP agent)' : 'Unlocked'}
       >
         <svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true" focusable="false">
-          <rect x="1" y="6" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
+          <rect
+            x="1"
+            y="6"
+            width="10"
+            height="7"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            fill="none"
+          />
           {layer.locked ? (
-            <path d="M3 6 V4 A3 3 0 0 1 9 4 V6" stroke="currentColor" strokeWidth="1.2" fill="none" />
+            <path
+              d="M3 6 V4 A3 3 0 0 1 9 4 V6"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              fill="none"
+            />
           ) : (
-            <path d="M3 6 V4 A3 3 0 0 1 9 4" stroke="currentColor" strokeWidth="1.2" fill="none" opacity="0.4" />
+            <path
+              d="M3 6 V4 A3 3 0 0 1 9 4"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              fill="none"
+              opacity="0.4"
+            />
           )}
         </svg>
       </span>
@@ -152,10 +203,7 @@ export function LayersPanel({ className }: LayersPanelProps): React.ReactElement
   const entityCounts = useLayerEntityCounts();
 
   return (
-    <aside
-      className={['layers-panel', className].filter(Boolean).join(' ')}
-      aria-label="Layers"
-    >
+    <aside className={['layers-panel', className].filter(Boolean).join(' ')} aria-label="Layers">
       <div className="layers-panel-header">
         <h2 className="layers-panel-title">Layers</h2>
       </div>
@@ -164,13 +212,7 @@ export function LayersPanel({ className }: LayersPanelProps): React.ReactElement
         {layerOrder.map((id) => {
           const layer = layers[id];
           if (!layer) return null;
-          return (
-            <LayerRow
-              key={id}
-              layer={layer}
-              entityCount={entityCounts[id] ?? 0}
-            />
-          );
+          return <LayerRow key={id} layer={layer} entityCount={entityCounts[id] ?? 0} />;
         })}
       </ul>
     </aside>

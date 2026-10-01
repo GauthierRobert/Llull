@@ -42,13 +42,13 @@ const HALF_FOV_RAD = (DEFAULT_FOV_DEG / 2) * (Math.PI / 180);
  * Follows +Z-up spherical convention matching Viewport3D.tsx.
  */
 const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
-  front:   { azimuth: Math.PI,         polar: Math.PI / 2 },
-  back:    { azimuth: 0,               polar: Math.PI / 2 },
-  right:   { azimuth: Math.PI / 2,     polar: Math.PI / 2 },
-  left:    { azimuth: -Math.PI / 2,    polar: Math.PI / 2 },
-  top:     { azimuth: Math.PI,         polar: 0.01 },
-  bottom:  { azimuth: Math.PI,         polar: Math.PI - 0.01 },
-  iso:     { azimuth: (3 * Math.PI) / 4, polar: Math.PI / 4 },
+  front: { azimuth: Math.PI, polar: Math.PI / 2 },
+  back: { azimuth: 0, polar: Math.PI / 2 },
+  right: { azimuth: Math.PI / 2, polar: Math.PI / 2 },
+  left: { azimuth: -Math.PI / 2, polar: Math.PI / 2 },
+  top: { azimuth: Math.PI, polar: 0.01 },
+  bottom: { azimuth: Math.PI, polar: Math.PI - 0.01 },
+  iso: { azimuth: (3 * Math.PI) / 4, polar: Math.PI / 4 },
 };
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,8 @@ export const setCamera: CommandDefinition<SetCameraParams> = {
       },
       distance: {
         type: 'number',
-        description: 'Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.',
+        description:
+          'Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.',
       },
     },
     required: [],
@@ -124,14 +125,14 @@ export const setCamera: CommandDefinition<SetCameraParams> = {
     const next: CameraState = {
       target: p.target !== undefined ? (p.target as Vec3) : prev.target,
       azimuth: p.azimuth !== undefined ? p.azimuth : prev.azimuth,
-      polar:   p.polar   !== undefined ? p.polar   : prev.polar,
+      polar: p.polar !== undefined ? p.polar : prev.polar,
       distance: p.distance !== undefined ? p.distance : prev.distance,
     };
 
     const changed = ([] as string[]).concat(
-      p.target   !== undefined ? ['target']   : [],
-      p.azimuth  !== undefined ? ['azimuth']  : [],
-      p.polar    !== undefined ? ['polar']    : [],
+      p.target !== undefined ? ['target'] : [],
+      p.azimuth !== undefined ? ['azimuth'] : [],
+      p.polar !== undefined ? ['polar'] : [],
       p.distance !== undefined ? ['distance'] : [],
     );
 
@@ -218,9 +219,9 @@ export const lookAt: CommandDefinition<LookAtParams> = {
 
     const prev: CameraState = doc.camera;
     const next: CameraState = {
-      target:   p.target as Vec3,
-      azimuth:  p.azimuth !== undefined ? p.azimuth : prev.azimuth,
-      polar:    p.polar   !== undefined ? p.polar   : prev.polar,
+      target: p.target as Vec3,
+      azimuth: p.azimuth !== undefined ? p.azimuth : prev.azimuth,
+      polar: p.polar !== undefined ? p.polar : prev.polar,
       distance: prev.distance,
     };
 
@@ -287,7 +288,9 @@ export const fitView: CommandDefinition<FitViewParams> = {
     const direction: FitDirection = p.direction ?? 'iso';
     const padding: number = p.padding ?? 1.2;
 
-    if (!['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current'].includes(direction)) {
+    if (
+      !['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current'].includes(direction)
+    ) {
       return {
         document: doc,
         summary: `fit_view: unknown direction "${direction}". Valid values: front, back, left, right, top, bottom, iso, current. Camera unchanged.`,
@@ -316,7 +319,7 @@ export const fitView: CommandDefinition<FitViewParams> = {
       distance = 10;
       const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
       const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
-      const polar   = preset ? preset.polar   : doc.camera.polar;
+      const polar = preset ? preset.polar : doc.camera.polar;
       const next: CameraState = { target, azimuth, polar, distance };
       return {
         document: { ...doc, camera: next },
@@ -341,7 +344,7 @@ export const fitView: CommandDefinition<FitViewParams> = {
 
     const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
     const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
-    const polar   = preset ? preset.polar   : doc.camera.polar;
+    const polar = preset ? preset.polar : doc.camera.polar;
 
     const next: CameraState = { target, azimuth, polar, distance };
     return {

@@ -65,9 +65,9 @@ describe('draw_involute', () => {
     const mod = 2;
     const teeth = 42;
     const pressureAngle = Math.PI / 9;
-    const pitchRadius = (mod * teeth) / 2;          // 42
+    const pitchRadius = (mod * teeth) / 2; // 42
     const baseR = pitchRadius * Math.cos(pressureAngle);
-    const outerRadius = pitchRadius + mod;           // 44
+    const outerRadius = pitchRadius + mod; // 44
 
     // The involute's tMax parameter where it reaches outerRadius:
     //   baseR * sqrt(1 + tMax²) = outerRadius  →  tMax = sqrt((outerRadius/baseR)² − 1)
@@ -178,10 +178,10 @@ describe('draw_involute', () => {
     });
     const id = result.affected[0]!;
     expect(result.summary).toContain(id);
-    expect(result.summary).toContain('4');       // baseRadius
-    expect(result.summary).toContain('0.5');     // startAngle
-    expect(result.summary).toContain('2.5');     // endAngle
-    expect(result.summary).toContain('12');      // samples
+    expect(result.summary).toContain('4'); // baseRadius
+    expect(result.summary).toContain('0.5'); // startAngle
+    expect(result.summary).toContain('2.5'); // endAngle
+    expect(result.summary).toContain('12'); // samples
   });
 
   // ---------------------------------------------------------------------------

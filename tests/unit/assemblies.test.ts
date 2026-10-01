@@ -88,7 +88,10 @@ describe('assemblies', () => {
     const boxId = r1.affected[0]!;
     const sphereId = r2.affected[0]!;
 
-    const result = execute(doc, 'create_component', { name: 'MyComp', entityIds: [boxId, sphereId] });
+    const result = execute(doc, 'create_component', {
+      name: 'MyComp',
+      entityIds: [boxId, sphereId],
+    });
     doc = result.document;
 
     // One instance replaces the two source entities.

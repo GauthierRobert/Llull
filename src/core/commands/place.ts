@@ -42,9 +42,15 @@ function withEntities(doc: CadDocument, updates: Entity[]): CadDocument {
 // ---------------------------------------------------------------------------
 
 type AlignEdge =
-  | 'min-x' | 'min-y' | 'min-z'
-  | 'max-x' | 'max-y' | 'max-z'
-  | 'center-x' | 'center-y' | 'center-z';
+  | 'min-x'
+  | 'min-y'
+  | 'min-z'
+  | 'max-x'
+  | 'max-y'
+  | 'max-z'
+  | 'center-x'
+  | 'center-y'
+  | 'center-z';
 
 interface AlignParams {
   targetIds: string[];
@@ -64,7 +70,7 @@ export const align: CommandDefinition<AlignParams> = {
   name: 'align',
   description:
     'Move every entity in targetIds so that its bounding-box edge (or center) along the ' +
-    'specified axis matches the reference entity\'s. ' +
+    "specified axis matches the reference entity's. " +
     'edge values: "min-x", "min-y", "min-z", "max-x", "max-y", "max-z", ' +
     '"center-x", "center-y", "center-z". ' +
     'The reference entity is not moved. Returns affected: targetIds.',
@@ -91,22 +97,46 @@ export const align: CommandDefinition<AlignParams> = {
   },
   run: (doc, { targetIds, edge, referenceId }): CommandResult => {
     if (!Array.isArray(targetIds) || targetIds.length === 0) {
-      return { document: doc, summary: 'align: targetIds must be a non-empty array.', affected: [] };
+      return {
+        document: doc,
+        summary: 'align: targetIds must be a non-empty array.',
+        affected: [],
+      };
     }
     const refEntity = doc.entities[referenceId];
     if (!refEntity) {
-      return { document: doc, summary: `align: reference entity "${referenceId}" not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `align: reference entity "${referenceId}" not found.`,
+        affected: [],
+      };
     }
     const missingTarget = targetIds.find((id) => !doc.entities[id]);
     if (missingTarget) {
-      return { document: doc, summary: `align: target entity "${missingTarget}" not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `align: target entity "${missingTarget}" not found.`,
+        affected: [],
+      };
     }
 
     const VALID_EDGES: ReadonlySet<string> = new Set<AlignEdge>([
-      'min-x', 'min-y', 'min-z', 'max-x', 'max-y', 'max-z', 'center-x', 'center-y', 'center-z',
+      'min-x',
+      'min-y',
+      'min-z',
+      'max-x',
+      'max-y',
+      'max-z',
+      'center-x',
+      'center-y',
+      'center-z',
     ]);
     if (!VALID_EDGES.has(edge)) {
-      return { document: doc, summary: `align: invalid edge "${edge}". Must be one of min-x, min-y, min-z, max-x, max-y, max-z, center-x, center-y, center-z.`, affected: [] };
+      return {
+        document: doc,
+        summary: `align: invalid edge "${edge}". Must be one of min-x, min-y, min-z, max-x, max-y, max-z, center-x, center-y, center-z.`,
+        affected: [],
+      };
     }
 
     const refBounds = entityBounds(refEntity);
@@ -115,24 +145,52 @@ export const align: CommandDefinition<AlignParams> = {
     let axis: 0 | 1 | 2;
     let edgeType: 'min' | 'max' | 'center';
 
-    if (edge === 'min-x')      { axis = 0; edgeType = 'min'; refValue = refBounds.min[0]; }
-    else if (edge === 'max-x') { axis = 0; edgeType = 'max'; refValue = refBounds.max[0]; }
-    else if (edge === 'center-x') { axis = 0; edgeType = 'center'; refValue = (refBounds.min[0] + refBounds.max[0]) / 2; }
-    else if (edge === 'min-y') { axis = 1; edgeType = 'min'; refValue = refBounds.min[1]; }
-    else if (edge === 'max-y') { axis = 1; edgeType = 'max'; refValue = refBounds.max[1]; }
-    else if (edge === 'center-y') { axis = 1; edgeType = 'center'; refValue = (refBounds.min[1] + refBounds.max[1]) / 2; }
-    else if (edge === 'min-z') { axis = 2; edgeType = 'min'; refValue = refBounds.min[2]; }
-    else if (edge === 'max-z') { axis = 2; edgeType = 'max'; refValue = refBounds.max[2]; }
-    else { /* center-z */ axis = 2; edgeType = 'center'; refValue = (refBounds.min[2] + refBounds.max[2]) / 2; }
+    if (edge === 'min-x') {
+      axis = 0;
+      edgeType = 'min';
+      refValue = refBounds.min[0];
+    } else if (edge === 'max-x') {
+      axis = 0;
+      edgeType = 'max';
+      refValue = refBounds.max[0];
+    } else if (edge === 'center-x') {
+      axis = 0;
+      edgeType = 'center';
+      refValue = (refBounds.min[0] + refBounds.max[0]) / 2;
+    } else if (edge === 'min-y') {
+      axis = 1;
+      edgeType = 'min';
+      refValue = refBounds.min[1];
+    } else if (edge === 'max-y') {
+      axis = 1;
+      edgeType = 'max';
+      refValue = refBounds.max[1];
+    } else if (edge === 'center-y') {
+      axis = 1;
+      edgeType = 'center';
+      refValue = (refBounds.min[1] + refBounds.max[1]) / 2;
+    } else if (edge === 'min-z') {
+      axis = 2;
+      edgeType = 'min';
+      refValue = refBounds.min[2];
+    } else if (edge === 'max-z') {
+      axis = 2;
+      edgeType = 'max';
+      refValue = refBounds.max[2];
+    } else {
+      /* center-z */ axis = 2;
+      edgeType = 'center';
+      refValue = (refBounds.min[2] + refBounds.max[2]) / 2;
+    }
 
     const moved: Entity[] = [];
     for (const id of targetIds) {
       const e = doc.entities[id]!;
       const bounds = entityBounds(e);
       let currentValue: number;
-      if (edgeType === 'min')         currentValue = bounds.min[axis];
-      else if (edgeType === 'max')    currentValue = bounds.max[axis];
-      else /* center */               currentValue = (bounds.min[axis] + bounds.max[axis]) / 2;
+      if (edgeType === 'min') currentValue = bounds.min[axis];
+      else if (edgeType === 'max') currentValue = bounds.max[axis];
+      else /* center */ currentValue = (bounds.min[axis] + bounds.max[axis]) / 2;
 
       const delta = refValue - currentValue;
       if (Math.abs(delta) < 1e-10) continue; // Already aligned; no-op for this entity.
@@ -146,7 +204,11 @@ export const align: CommandDefinition<AlignParams> = {
     }
 
     if (moved.length === 0) {
-      return { document: doc, summary: `align: all ${targetIds.length} entit${targetIds.length === 1 ? 'y' : 'ies'} already aligned to ${edge} of "${referenceId}".`, affected: [] };
+      return {
+        document: doc,
+        summary: `align: all ${targetIds.length} entit${targetIds.length === 1 ? 'y' : 'ies'} already aligned to ${edge} of "${referenceId}".`,
+        affected: [],
+      };
     }
 
     const newDoc = withEntities(doc, moved);
@@ -212,17 +274,33 @@ export const distribute: CommandDefinition<DistributeParams> = {
   },
   run: (doc, { targetIds, axis, mode = 'equal-spacing' }): CommandResult => {
     if (!Array.isArray(targetIds) || targetIds.length < 2) {
-      return { document: doc, summary: 'distribute: targetIds must contain at least 2 entity ids.', affected: [] };
+      return {
+        document: doc,
+        summary: 'distribute: targetIds must contain at least 2 entity ids.',
+        affected: [],
+      };
     }
     const missingId = targetIds.find((id) => !doc.entities[id]);
     if (missingId) {
-      return { document: doc, summary: `distribute: entity "${missingId}" not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `distribute: entity "${missingId}" not found.`,
+        affected: [],
+      };
     }
     if (axis !== 'x' && axis !== 'y' && axis !== 'z') {
-      return { document: doc, summary: `distribute: invalid axis "${axis}". Must be "x", "y", or "z".`, affected: [] };
+      return {
+        document: doc,
+        summary: `distribute: invalid axis "${axis}". Must be "x", "y", or "z".`,
+        affected: [],
+      };
     }
     if (mode !== 'equal-spacing' && mode !== 'equal-gap') {
-      return { document: doc, summary: `distribute: invalid mode "${mode}". Must be "equal-spacing" or "equal-gap".`, affected: [] };
+      return {
+        document: doc,
+        summary: `distribute: invalid mode "${mode}". Must be "equal-spacing" or "equal-gap".`,
+        affected: [],
+      };
     }
 
     const axisIndex: 0 | 1 | 2 = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
@@ -269,7 +347,8 @@ export const distribute: CommandDefinition<DistributeParams> = {
       // Total span = lastMax - firstMin; subtract all entity widths; divide remaining gap.
       const firstItem = entities[0]!;
       const lastItem = entities[n - 1]!;
-      const totalSpan = (lastItem.center + lastItem.halfExtent) - (firstItem.center - firstItem.halfExtent);
+      const totalSpan =
+        lastItem.center + lastItem.halfExtent - (firstItem.center - firstItem.halfExtent);
       const totalEntityWidths = entities.reduce((sum, item) => sum + item.halfExtent * 2, 0);
       const remaining = totalSpan - totalEntityWidths;
       const gap = remaining / (n - 1);
@@ -359,14 +438,26 @@ export const stackOn: CommandDefinition<StackOnParams> = {
   run: (doc, { movingId, baseId, axis = 'z' }): CommandResult => {
     const movingEntity = doc.entities[movingId];
     if (!movingEntity) {
-      return { document: doc, summary: `stack_on: moving entity "${movingId}" not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `stack_on: moving entity "${movingId}" not found.`,
+        affected: [],
+      };
     }
     const baseEntity = doc.entities[baseId];
     if (!baseEntity) {
-      return { document: doc, summary: `stack_on: base entity "${baseId}" not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `stack_on: base entity "${baseId}" not found.`,
+        affected: [],
+      };
     }
     if (axis !== 'x' && axis !== 'y' && axis !== 'z') {
-      return { document: doc, summary: `stack_on: invalid axis "${axis}". Must be "x", "y", or "z".`, affected: [] };
+      return {
+        document: doc,
+        summary: `stack_on: invalid axis "${axis}". Must be "x", "y", or "z".`,
+        affected: [],
+      };
     }
 
     const axisIndex: 0 | 1 | 2 = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;

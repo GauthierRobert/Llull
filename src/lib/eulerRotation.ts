@@ -30,22 +30,28 @@ export function applyEulerXYZ(v: Vec3, origin: Vec3, euler: Vec3): [number, numb
   let z = v[2] - origin[2];
 
   // Rz first
-  const czr = Math.cos(rz), szr = Math.sin(rz);
+  const czr = Math.cos(rz),
+    szr = Math.sin(rz);
   const x1 = czr * x - szr * y;
   const y1 = szr * x + czr * y;
-  x = x1; y = y1;
+  x = x1;
+  y = y1;
 
   // Ry second
-  const cyr = Math.cos(ry), syr = Math.sin(ry);
+  const cyr = Math.cos(ry),
+    syr = Math.sin(ry);
   const x2 = cyr * x + syr * z;
   const z2 = -syr * x + cyr * z;
-  x = x2; z = z2;
+  x = x2;
+  z = z2;
 
   // Rx last
-  const cxr = Math.cos(rx), sxr = Math.sin(rx);
+  const cxr = Math.cos(rx),
+    sxr = Math.sin(rx);
   const y3 = cxr * y - sxr * z;
   const z3 = sxr * y + cxr * z;
-  y = y3; z = z3;
+  y = y3;
+  z = z3;
 
   return [x + origin[0], y + origin[1], z + origin[2]];
 }

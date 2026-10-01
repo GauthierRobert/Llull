@@ -16,17 +16,30 @@ interface RectangleRendererProps {
   selected: boolean;
 }
 
-export function RectangleRenderer({ entity, selected }: RectangleRendererProps): React.ReactElement {
+export function RectangleRenderer({
+  entity,
+  selected,
+}: RectangleRendererProps): React.ReactElement {
   const { width, height, position, color } = entity;
 
   const lineObject = useMemo(() => {
     // Lower-left origin; 5 points to close the loop.
     const vertices = new Float32Array([
-      0,     0,      0,
-      width, 0,      0,
-      width, height, 0,
-      0,     height, 0,
-      0,     0,      0,
+      0,
+      0,
+      0,
+      width,
+      0,
+      0,
+      width,
+      height,
+      0,
+      0,
+      height,
+      0,
+      0,
+      0,
+      0,
     ]);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));

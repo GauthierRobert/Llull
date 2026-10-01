@@ -30,11 +30,7 @@ function vec3Distance(a: Vec3, b: Vec3): number {
 /** Entity centroid: midpoint of its world-space AABB. */
 function centroid(e: Entity): Vec3 {
   const b = entityBounds(e);
-  return [
-    (b.min[0] + b.max[0]) / 2,
-    (b.min[1] + b.max[1]) / 2,
-    (b.min[2] + b.max[2]) / 2,
-  ];
+  return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
 }
 
 function mergeBoundsLocal(a: Bounds, b: Bounds): Bounds {
@@ -116,7 +112,11 @@ export const measureDistance: CommandDefinition<MeasureDistanceParams> = {
     } else if (entityId1) {
       const e = doc.entities[entityId1];
       if (!e) {
-        return { document: doc, summary: `measure_distance: entity '${entityId1}' not found.`, affected: [] };
+        return {
+          document: doc,
+          summary: `measure_distance: entity '${entityId1}' not found.`,
+          affected: [],
+        };
       }
       locA = centroid(e);
     }
@@ -128,7 +128,11 @@ export const measureDistance: CommandDefinition<MeasureDistanceParams> = {
     } else if (entityId2) {
       const e = doc.entities[entityId2];
       if (!e) {
-        return { document: doc, summary: `measure_distance: entity '${entityId2}' not found.`, affected: [] };
+        return {
+          document: doc,
+          summary: `measure_distance: entity '${entityId2}' not found.`,
+          affected: [],
+        };
       }
       locB = centroid(e);
     }
@@ -235,10 +239,18 @@ export const measureAngle: CommandDefinition<MeasureAngleParams> = {
       const e1 = doc.entities[lineId1];
       const e2 = doc.entities[lineId2];
       if (!e1) {
-        return { document: doc, summary: `measure_angle: entity '${lineId1}' not found.`, affected: [] };
+        return {
+          document: doc,
+          summary: `measure_angle: entity '${lineId1}' not found.`,
+          affected: [],
+        };
       }
       if (!e2) {
-        return { document: doc, summary: `measure_angle: entity '${lineId2}' not found.`, affected: [] };
+        return {
+          document: doc,
+          summary: `measure_angle: entity '${lineId2}' not found.`,
+          affected: [],
+        };
       }
       if (e1.kind !== 'line') {
         return {
@@ -332,7 +344,7 @@ export const measureArea: CommandDefinition<MeasureAreaParams> = {
   annotations: { readOnly: true },
   description:
     'Compute the area of a closed 2D shape. Provide either: (a) an entityId for a closed ' +
-    "polyline, rectangle, or circle entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). " +
+    'polyline, rectangle, or circle entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). ' +
     'Returns data: { area, unit } where unit is the squared document unit (e.g. "mm²"). ' +
     'Open polylines are rejected with an explanatory message. Does not modify the document.',
   paramsSchema: {
@@ -384,7 +396,11 @@ export const measureArea: CommandDefinition<MeasureAreaParams> = {
 
     const e = doc.entities[entityId];
     if (!e) {
-      return { document: doc, summary: `measure_area: entity '${entityId}' not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `measure_area: entity '${entityId}' not found.`,
+        affected: [],
+      };
     }
 
     let area: number;
@@ -475,7 +491,11 @@ export const measurePerimeter: CommandDefinition<MeasurePerimeterParams> = {
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) {
-      return { document: doc, summary: `measure_perimeter: entity '${entityId}' not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `measure_perimeter: entity '${entityId}' not found.`,
+        affected: [],
+      };
     }
 
     let perimeter: number;
@@ -610,8 +630,7 @@ export const measureBoundingBox: CommandDefinition<MeasureBoundingBoxParams> = {
       }
       bounds = entityBounds(e);
     } else {
-      const ids =
-        useSelection && doc.selection.length > 0 ? doc.selection : doc.order;
+      const ids = useSelection && doc.selection.length > 0 ? doc.selection : doc.order;
 
       for (const id of ids) {
         const e = doc.entities[id];
@@ -676,14 +695,20 @@ interface MeasureVolumeData {
 function meshVolume(positions: ReadonlyArray<number>, indices: ReadonlyArray<number>): number {
   let sum = 0;
   for (let t = 0; t + 2 < indices.length; t += 3) {
-    const ia = indices[t]! * 3, ib = indices[t + 1]! * 3, ic = indices[t + 2]! * 3;
-    const ax = positions[ia]!,     ay = positions[ia + 1]!, az = positions[ia + 2]!;
-    const bx = positions[ib]!,     by = positions[ib + 1]!, bz = positions[ib + 2]!;
-    const cx = positions[ic]!,     cy = positions[ic + 1]!, cz = positions[ic + 2]!;
+    const ia = indices[t]! * 3,
+      ib = indices[t + 1]! * 3,
+      ic = indices[t + 2]! * 3;
+    const ax = positions[ia]!,
+      ay = positions[ia + 1]!,
+      az = positions[ia + 2]!;
+    const bx = positions[ib]!,
+      by = positions[ib + 1]!,
+      bz = positions[ib + 2]!;
+    const cx = positions[ic]!,
+      cy = positions[ic + 1]!,
+      cz = positions[ic + 2]!;
     // Scalar triple product A · (B × C)
-    sum += ax * (by * cz - bz * cy)
-         - ay * (bx * cz - bz * cx)
-         + az * (bx * cy - by * cx);
+    sum += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
   }
   return Math.abs(sum / 6);
 }
@@ -707,7 +732,7 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
     "'wedge' (w×h×d / 2 — half the enclosing box), " +
     "'pyramid' (baseWidth × baseDepth × height / 3), " +
     "'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; " +
-    "falls back to bounding-box approximation if the profile crosses the revolution axis). " +
+    'falls back to bounding-box approximation if the profile crosses the revolution axis). ' +
     'Returns data: { volume, unit } where unit is the cubed document unit (e.g. "mm³"). ' +
     '2D shape entities are rejected. Does not modify the document.',
   paramsSchema: {
@@ -725,7 +750,11 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) {
-      return { document: doc, summary: `measure_volume: entity '${entityId}' not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `measure_volume: entity '${entityId}' not found.`,
+        affected: [],
+      };
     }
 
     const volumeUnit = `${doc.units}³`;
@@ -810,7 +839,7 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
           volume = 0;
           break;
         }
-        const sweepAngle = e.angle ?? (2 * Math.PI);
+        const sweepAngle = e.angle ?? 2 * Math.PI;
         // centroid x = (1/(6·A)) · Σ (xi+xj)(xi·yj − xj·yi)  — but we need |x_c|
         const xCentroid = Math.abs(cx / (6 * profileArea));
         // V = sweepAngle · x_centroid · A_profile
@@ -878,15 +907,15 @@ export const massProperties: CommandDefinition<MassPropertiesParams> = {
   name: 'mass_properties',
   annotations: { readOnly: true },
   description:
-    "Compute the mass of a 3D solid from its volume and density. " +
+    'Compute the mass of a 3D solid from its volume and density. ' +
     "Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', " +
     "'cone', 'torus', 'wedge', 'pyramid'. " +
-    "Density resolution: if the entity has a material assigned (via assign_material) and that " +
+    'Density resolution: if the entity has a material assigned (via assign_material) and that ' +
     "material exists in doc.materials, the material's density is used automatically — the density " +
-    "param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). " +
-    "The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. " +
-    "Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). " +
-    "Does not modify the document.",
+    'param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). ' +
+    'The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. ' +
+    'Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). ' +
+    'Does not modify the document.',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -919,7 +948,11 @@ export const massProperties: CommandDefinition<MassPropertiesParams> = {
 
     const e = doc.entities[entityId];
     if (!e) {
-      return { document: doc, summary: `mass_properties: entity '${entityId}' not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `mass_properties: entity '${entityId}' not found.`,
+        affected: [],
+      };
     }
 
     // Resolve the effective density: prefer assigned material over the param.

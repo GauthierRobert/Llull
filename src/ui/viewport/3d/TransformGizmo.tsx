@@ -106,10 +106,7 @@ export function computeTranslateDelta(
 }
 
 /** Compute the rotation delta between two Euler angles (radians). */
-export function computeRotateDelta(
-  prev: THREE.Euler,
-  next: THREE.Euler,
-): [number, number, number] {
+export function computeRotateDelta(prev: THREE.Euler, next: THREE.Euler): [number, number, number] {
   return [next.x - prev.x, next.y - prev.y, next.z - prev.z];
 }
 
@@ -132,7 +129,10 @@ interface TransformGizmoProps {
   onDraggingChanged: (dragging: boolean) => void;
 }
 
-export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps): React.ReactElement | null {
+export function TransformGizmo({
+  mode,
+  onDraggingChanged,
+}: TransformGizmoProps): React.ReactElement | null {
   // Narrow selectors (R3).
   const selection = useStore((s) => s.document.selection);
   const entities = useStore((s) => s.document.entities);
@@ -232,14 +232,18 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
     const worldZ = t.position.z + renderOrigin[2];
 
     const result = snap3d(
-      worldX, worldY, worldZ,
+      worldX,
+      worldY,
+      worldZ,
       snapCandidatesRef.current,
       SNAP3D_TOLERANCE,
       SNAP3D_GRID_STEP,
     );
 
     // Store for drag-end consumption.
-    activeSnapRef.current = result.snapped ? { x: result.x, y: result.y, z: result.z, type: result.type } : null;
+    activeSnapRef.current = result.snapped
+      ? { x: result.x, y: result.y, z: result.z, type: result.type }
+      : null;
 
     // Update indicator — only call setState when the value actually changed to
     // avoid triggering unnecessary React re-renders on every frame.
@@ -308,16 +312,15 @@ export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps)
         const mag = Math.sqrt(delta[0] ** 2 + delta[1] ** 2 + delta[2] ** 2);
         if (mag < 1e-6) return;
         dispatch('move_entity', { id: selectedId, delta });
-
       } else if (mode === 'rotate') {
         const delta = computeRotateDelta(preDragRot.current, t.rotation);
         const mag = Math.sqrt(delta[0] ** 2 + delta[1] ** 2 + delta[2] ** 2);
         if (mag < 1e-6) return;
         dispatch('rotate_entity', { id: selectedId, delta });
-
       } else {
         // scale — derive uniform factor relative to the pre-drag scale baseline.
-        const prevAvg = (preDragScale.current.x + preDragScale.current.y + preDragScale.current.z) / 3;
+        const prevAvg =
+          (preDragScale.current.x + preDragScale.current.y + preDragScale.current.z) / 3;
         const nextFactor = computeScaleFactor(t.scale);
         const factor = prevAvg > 0 ? nextFactor / prevAvg : nextFactor;
         if (Math.abs(factor - 1) < 1e-6 || factor <= 0) return;
@@ -379,7 +382,11 @@ interface ModeToggleProps {
   onMode: (m: GizmoMode) => void;
 }
 
-const MODES: ReadonlyArray<{ readonly id: GizmoMode; readonly label: string; readonly key: string }> = [
+const MODES: ReadonlyArray<{
+  readonly id: GizmoMode;
+  readonly label: string;
+  readonly key: string;
+}> = [
   { id: 'translate', label: 'Move', key: 'G' },
   { id: 'rotate', label: 'Rotate', key: 'R' },
   { id: 'scale', label: 'Scale', key: 'S' },

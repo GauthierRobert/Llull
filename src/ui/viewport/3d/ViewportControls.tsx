@@ -25,7 +25,7 @@ import type { DisplayMode, ClipAxis, QualityOverride } from '@ui/store';
 
 function Snap3DToggle(): React.ReactElement {
   const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
-  const toggleSnap3d  = useViewportStore((s) => s.toggleSnap3d);
+  const toggleSnap3d = useViewportStore((s) => s.toggleSnap3d);
   return (
     <div className="vp-control-group" role="group" aria-label="3D snap">
       <button
@@ -46,13 +46,13 @@ function Snap3DToggle(): React.ReactElement {
 // ---------------------------------------------------------------------------
 
 const DISPLAY_MODES: { value: DisplayMode; label: string; title: string }[] = [
-  { value: 'shaded',    label: 'Shaded',    title: 'Shaded — standard PBR rendering' },
-  { value: 'wireframe', label: 'Wire',      title: 'Wireframe — show mesh edges only' },
-  { value: 'xray',      label: 'X-Ray',     title: 'X-Ray — transparent surfaces' },
+  { value: 'shaded', label: 'Shaded', title: 'Shaded — standard PBR rendering' },
+  { value: 'wireframe', label: 'Wire', title: 'Wireframe — show mesh edges only' },
+  { value: 'xray', label: 'X-Ray', title: 'X-Ray — transparent surfaces' },
 ];
 
 function DisplayModeControl(): React.ReactElement {
-  const displayMode    = useViewportStore((s) => s.displayMode);
+  const displayMode = useViewportStore((s) => s.displayMode);
   const setDisplayMode = useViewportStore((s) => s.setDisplayMode);
 
   return (
@@ -84,10 +84,10 @@ const CLIP_AXES: { value: ClipAxis; label: string }[] = [
 ];
 
 function ClipPlaneControl(): React.ReactElement {
-  const clipPlane      = useViewportStore((s) => s.clipPlane);
-  const toggleClip     = useViewportStore((s) => s.toggleClipPlane);
-  const setClipPlane   = useViewportStore((s) => s.setClipPlane);
-  const baseId         = useId();
+  const clipPlane = useViewportStore((s) => s.clipPlane);
+  const toggleClip = useViewportStore((s) => s.toggleClipPlane);
+  const setClipPlane = useViewportStore((s) => s.setClipPlane);
+  const baseId = useId();
 
   const handleAxisChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -119,7 +119,9 @@ function ClipPlaneControl(): React.ReactElement {
         title={clipPlane.enabled ? 'Disable section plane' : 'Enable section plane'}
         onClick={toggleClip}
       >
-        <span className="vp-clip-icon" aria-hidden="true">✂</span>
+        <span className="vp-clip-icon" aria-hidden="true">
+          ✂
+        </span>
         Section
       </button>
 
@@ -137,7 +139,9 @@ function ClipPlaneControl(): React.ReactElement {
             aria-label="Section plane axis"
           >
             {CLIP_AXES.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
 
@@ -184,9 +188,9 @@ function ClipPlaneControl(): React.ReactElement {
 
 function AnimationTransportControls(): React.ReactElement | null {
   const animations = useStore((s) => s.document.animations);
-  const animationPlaying    = useViewportStore((s) => s.animationPlaying);
+  const animationPlaying = useViewportStore((s) => s.animationPlaying);
   const toggleAnimationPlaying = useViewportStore((s) => s.toggleAnimationPlaying);
-  const resetAnimations     = useViewportStore((s) => s.resetAnimations);
+  const resetAnimations = useViewportStore((s) => s.resetAnimations);
 
   if (Object.keys(animations).length === 0) return null;
 
@@ -220,16 +224,24 @@ function AnimationTransportControls(): React.ReactElement | null {
 // ---------------------------------------------------------------------------
 
 const QUALITY_OPTIONS: { value: QualityOverride; label: string; title: string }[] = [
-  { value: 'auto',   label: 'Auto',   title: 'Auto — tier scales with scene size (recommended)' },
-  { value: 'high',   label: 'High',   title: 'High — PCSS 16 samples, 2048² shadows (≤ 50 entities ideal)' },
+  { value: 'auto', label: 'Auto', title: 'Auto — tier scales with scene size (recommended)' },
+  {
+    value: 'high',
+    label: 'High',
+    title: 'High — PCSS 16 samples, 2048² shadows (≤ 50 entities ideal)',
+  },
   { value: 'medium', label: 'Medium', title: 'Medium — PCSS 8 samples, 1024² shadows' },
-  { value: 'low',    label: 'Low',    title: 'Low — flat shadows, no contact shadows (best for 200+ entities)' },
+  {
+    value: 'low',
+    label: 'Low',
+    title: 'Low — flat shadows, no contact shadows (best for 200+ entities)',
+  },
 ];
 
 function QualityControl(): React.ReactElement {
-  const qualityOverride    = useViewportStore((s) => s.qualityOverride);
+  const qualityOverride = useViewportStore((s) => s.qualityOverride);
   const setQualityOverride = useViewportStore((s) => s.setQualityOverride);
-  const baseId             = useId();
+  const baseId = useId();
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {

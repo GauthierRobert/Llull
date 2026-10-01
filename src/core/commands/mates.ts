@@ -56,10 +56,7 @@ const LOCAL_AXES: Record<'axis-x' | 'axis-y' | 'axis-z', Vec3> = {
  *
  * @pure
  */
-function resolveFrame(
-  ref: MateRef,
-  doc: CadDocument,
-): [number, number] | null {
+function resolveFrame(ref: MateRef, doc: CadDocument): [number, number] | null {
   const entity = doc.entities[ref.instanceId];
   if (!entity || entity.kind !== 'instance') return null;
   const instance = entity as InstanceEntity;
@@ -85,7 +82,9 @@ function resolveFrame(
 type MateKind = 'coincident' | 'parallel' | 'distance';
 
 const VALID_MATE_KINDS: ReadonlySet<string> = new Set<MateKind>([
-  'coincident', 'parallel', 'distance',
+  'coincident',
+  'parallel',
+  'distance',
 ]);
 
 interface AddMateParams {
@@ -190,14 +189,24 @@ export const addMate: CommandDefinition<AddMateParams> = {
     }
 
     // Validate ref shapes
-    if (typeof a !== 'object' || a === null || typeof a.instanceId !== 'string' || a.instanceId.length === 0) {
+    if (
+      typeof a !== 'object' ||
+      a === null ||
+      typeof a.instanceId !== 'string' ||
+      a.instanceId.length === 0
+    ) {
       return {
         document: doc,
         summary: `add_mate: a must be an object with a non-empty instanceId string.`,
         affected: [],
       };
     }
-    if (typeof b !== 'object' || b === null || typeof b.instanceId !== 'string' || b.instanceId.length === 0) {
+    if (
+      typeof b !== 'object' ||
+      b === null ||
+      typeof b.instanceId !== 'string' ||
+      b.instanceId.length === 0
+    ) {
       return {
         document: doc,
         summary: `add_mate: b must be an object with a non-empty instanceId string.`,
@@ -258,7 +267,7 @@ export const addMate: CommandDefinition<AddMateParams> = {
       }
     }
 
-    const constraintId = (typeof id === 'string' && id.length > 0) ? id : nextId('mate');
+    const constraintId = typeof id === 'string' && id.length > 0 ? id : nextId('mate');
 
     if (constraintId in doc.constraints) {
       return {
@@ -282,7 +291,13 @@ export const addMate: CommandDefinition<AddMateParams> = {
     type NewConstraint =
       | { id: string; kind: 'coincident'; a: { entityId: string }; b: { entityId: string } }
       | { id: string; kind: 'parallel'; a: { entityId: string }; b: { entityId: string } }
-      | { id: string; kind: 'distance'; a: { entityId: string }; b: { entityId: string }; value: number | string };
+      | {
+          id: string;
+          kind: 'distance';
+          a: { entityId: string };
+          b: { entityId: string };
+          value: number | string;
+        };
 
     let newConstraint: NewConstraint;
     if (kind === 'distance' && value !== undefined) {

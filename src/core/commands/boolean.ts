@@ -58,12 +58,7 @@ function consumeOperandsAndAdd(
 
 type NoOp = { document: CadDocument; summary: string; affected: [] };
 
-function validateOperands(
-  doc: CadDocument,
-  opName: string,
-  a: string,
-  b: string,
-): NoOp | null {
+function validateOperands(doc: CadDocument, opName: string, a: string, b: string): NoOp | null {
   if (a === b) {
     return {
       document: doc,

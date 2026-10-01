@@ -77,8 +77,10 @@ describe('draw_belt_around', () => {
   it('2 different-radius pulleys: first polyline point is the outgoing TP on pulley 0', () => {
     const r1 = 5;
     const r2 = 3;
-    const cx1 = 0, cy1 = 0;
-    const cx2 = 20, cy2 = 0;
+    const cx1 = 0,
+      cy1 = 0;
+    const cx2 = 20,
+      cy2 = 0;
     const d = 20;
     const alpha = Math.asin((r1 - r2) / d);
     const theta = 0; // atan2(0, 20) = 0
@@ -232,12 +234,18 @@ describe('draw_belt_around', () => {
     const doc = createEmptyDocument();
     __resetIdCounter();
     const r1 = execute(doc, 'draw_belt_around', {
-      pulleys: [{ center: [0, 0], radius: 4 }, { center: [10, 0], radius: 4 }],
+      pulleys: [
+        { center: [0, 0], radius: 4 },
+        { center: [10, 0], radius: 4 },
+      ],
       position: [0, 0, 0],
     });
     __resetIdCounter();
     const r2 = execute(doc, 'draw_belt_around', {
-      pulleys: [{ center: [0, 0], radius: 4 }, { center: [10, 0], radius: 4 }],
+      pulleys: [
+        { center: [0, 0], radius: 4 },
+        { center: [10, 0], radius: 4 },
+      ],
       position: [100, 0, 0],
     });
     expect(r2.document.entities[r2.affected[0]!]!.position[0]).toBe(100);

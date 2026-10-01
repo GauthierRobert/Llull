@@ -310,7 +310,9 @@ describe('MeasurementHUD — store lastMeasure integration', () => {
   });
 
   it('clearLastMeasure sets lastMeasure to null', () => {
-    useStore.setState({ lastMeasure: { command: 'measure_distance', data: { distance: 5, unit: 'mm' } } });
+    useStore.setState({
+      lastMeasure: { command: 'measure_distance', data: { distance: 5, unit: 'mm' } },
+    });
     useStore.getState().clearLastMeasure();
     expect(useStore.getState().lastMeasure).toBeNull();
   });

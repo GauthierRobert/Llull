@@ -292,9 +292,7 @@ describe('MCP tools/call — query (measure_volume)', () => {
     });
 
     // Extract entity id from the "Affected entity ids: ..." block.
-    const affectedBlock = addResult.content.find((c) =>
-      c.text?.startsWith('Affected entity ids:'),
-    );
+    const affectedBlock = addResult.content.find((c) => c.text?.startsWith('Affected entity ids:'));
     expect(affectedBlock).toBeDefined();
     const entityId = affectedBlock!.text!.replace('Affected entity ids:', '').trim();
     expect(entityId.length).toBeGreaterThan(0);

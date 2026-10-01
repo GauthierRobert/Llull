@@ -46,7 +46,10 @@ function resolveAxis(axis: Joint['axis']): THREE.Vector3 {
 }
 
 /** Get the world position of an entity by id, or [0,0,0] if not found. */
-function entityPosition(entityId: string, entities: Record<string, { position: Vec3 }>): THREE.Vector3 {
+function entityPosition(
+  entityId: string,
+  entities: Record<string, { position: Vec3 }>,
+): THREE.Vector3 {
   const e = entities[entityId];
   if (!e) return new THREE.Vector3(0, 0, 0);
   return new THREE.Vector3(e.position[0], e.position[1], e.position[2]);
@@ -66,10 +69,7 @@ function ConstraintLine({ constraint, entities }: ConstraintLineProps): React.Re
   const posB = entityPosition(constraint.b.entityId, entities);
 
   const geometry = useMemo(() => {
-    const positions = new Float32Array([
-      posA.x, posA.y, posA.z,
-      posB.x, posB.y, posB.z,
-    ]);
+    const positions = new Float32Array([posA.x, posA.y, posA.z, posB.x, posB.y, posB.z]);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     return geo;
@@ -100,10 +100,11 @@ function ConstraintLine({ constraint, entities }: ConstraintLineProps): React.Re
     };
   }, [geometry, material]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const midpoint = useMemo(() => new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5), [
-    posA.x, posA.y, posA.z, posB.x, posB.y, posB.z,
-  ]);
+  const midpoint = useMemo(
+    () => new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [posA.x, posA.y, posA.z, posB.x, posB.y, posB.z],
+  );
 
   if (posA.distanceTo(posB) < 1e-6) return null;
 

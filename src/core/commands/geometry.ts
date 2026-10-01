@@ -45,7 +45,11 @@ function resolveRotation(rotation: unknown): Vec3 {
  */
 export type PlacementAnchor = 'center' | 'min' | 'base-center';
 
-const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>(['center', 'min', 'base-center']);
+const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>([
+  'center',
+  'min',
+  'base-center',
+]);
 
 /**
  * Compute the stored `position` so that the requested anchor lands at `inputPosition`.
@@ -85,9 +89,12 @@ function resolvePosition(
 
   function anchorOffsetFromCenter(a: PlacementAnchor): Vec3 {
     switch (a) {
-      case 'center':      return [0, 0, 0];
-      case 'min':         return [-hx, -hy, -hz];
-      case 'base-center': return [0, 0, -hz];
+      case 'center':
+        return [0, 0, 0];
+      case 'min':
+        return [-hx, -hy, -hz];
+      case 'base-center':
+        return [0, 0, -hz];
     }
   }
 
@@ -114,9 +121,7 @@ function resolvePosition(
 /** Format an AABB for inclusion in a command summary. */
 function boundsText(b: { min: Vec3; max: Vec3 }): string {
   const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
-  return (
-    `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`
-  );
+  return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
 }
 
 /** Helper: clone the document shallowly with new entity maps. Keeps commands pure. */
@@ -159,8 +164,7 @@ export const addBox: CommandDefinition<AddBoxParams> = {
     properties: {
       size: {
         type: 'array',
-        description:
-          '[width, height, depth] in document units. All three components must be > 0.',
+        description: '[width, height, depth] in document units. All three components must be > 0.',
         items: { type: 'number' },
       },
       position: {
@@ -189,13 +193,26 @@ export const addBox: CommandDefinition<AddBoxParams> = {
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
         items: { type: 'number' },
       },
-      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
+      },
     },
     required: ['size'],
   },
-  run: (doc, { size, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { size, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+  ): CommandResult => {
     const [w, h, d] = size;
-    if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(d) || w <= 0 || h <= 0 || d <= 0) {
+    if (
+      !Number.isFinite(w) ||
+      !Number.isFinite(h) ||
+      !Number.isFinite(d) ||
+      w <= 0 ||
+      h <= 0 ||
+      d <= 0
+    ) {
       return {
         document: doc,
         summary: `add_box failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
@@ -275,11 +292,17 @@ export const extrude: CommandDefinition<ExtrudeParams> = {
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
         items: { type: 'number' },
       },
-      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#c8553d".' },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#c8553d".',
+      },
     },
     required: ['profile', 'depth'],
   },
-  run: (doc, { profile, depth, position = [0, 0, 0], rotation, color = '#c8553d' }): CommandResult => {
+  run: (
+    doc,
+    { profile, depth, position = [0, 0, 0], rotation, color = '#c8553d' },
+  ): CommandResult => {
     if (!Array.isArray(profile) || profile.length < 3) {
       return {
         document: doc,
@@ -393,8 +416,7 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
       },
       height: {
         type: 'number',
-        description:
-          'Total height of the cylinder in document units. Must be > 0.',
+        description: 'Total height of the cylinder in document units. Must be > 0.',
       },
       position: {
         type: 'array',
@@ -422,20 +444,39 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
         items: { type: 'number' },
       },
-      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
+      },
     },
     required: ['radius', 'height'],
   },
-  run: (doc, { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+  ): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
-      return { document: doc, summary: `add_cylinder failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
+      return {
+        document: doc,
+        summary: `add_cylinder failed: radius must be finite and > 0, got ${radius}.`,
+        affected: [],
+      };
     }
     if (!Number.isFinite(height) || height <= 0) {
-      return { document: doc, summary: `add_cylinder failed: height must be finite and > 0, got ${height}.`, affected: [] };
+      return {
+        document: doc,
+        summary: `add_cylinder failed: height must be finite and > 0, got ${height}.`,
+        affected: [],
+      };
     }
     // Default anchor for cylinder is 'center': stored position is the geometric center.
     // AABB half-extents from center: [radius, radius, height/2] (axis along +Z).
-    const storedPosition = resolvePosition([radius, radius, height / 2], 'center', anchor, position);
+    const storedPosition = resolvePosition(
+      [radius, radius, height / 2],
+      'center',
+      anchor,
+      position,
+    );
     const id = nextId('cyl');
     const entity: Entity = {
       id,
@@ -517,13 +558,23 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
         items: { type: 'number' },
       },
-      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
+      },
     },
     required: ['radius'],
   },
-  run: (doc, { radius, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { radius, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+  ): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
-      return { document: doc, summary: `add_sphere failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
+      return {
+        document: doc,
+        summary: `add_sphere failed: radius must be finite and > 0, got ${radius}.`,
+        affected: [],
+      };
     }
     // Default anchor for sphere is 'center': stored position is the geometric center.
     // Half-extents from center: [radius, radius, radius].
@@ -618,16 +669,30 @@ export const addCone: CommandDefinition<AddConeParams> = {
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
         items: { type: 'number' },
       },
-      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
+      },
     },
     required: ['radius', 'height'],
   },
-  run: (doc, { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+  ): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
-      return { document: doc, summary: `add_cone failed: radius must be finite and > 0, got ${radius}.`, affected: [] };
+      return {
+        document: doc,
+        summary: `add_cone failed: radius must be finite and > 0, got ${radius}.`,
+        affected: [],
+      };
     }
     if (!Number.isFinite(height) || height <= 0) {
-      return { document: doc, summary: `add_cone failed: height must be finite and > 0, got ${height}.`, affected: [] };
+      return {
+        document: doc,
+        summary: `add_cone failed: height must be finite and > 0, got ${height}.`,
+        affected: [],
+      };
     }
     // Default anchor for cone is 'base-center': stored position IS the base center.
     // AABB from base-center origin: spans [−radius..+radius, −radius..+radius, 0..height].
@@ -635,7 +700,12 @@ export const addCone: CommandDefinition<AddConeParams> = {
     // relative to the AABB center: AABB center is at [0, 0, height/2] from base-center.
     // We pass half-extents as seen from the AABB center: [radius, radius, height/2].
     // defaultAnchor='base-center' tells resolvePosition the stored origin is the base-center.
-    const storedPosition = resolvePosition([radius, radius, height / 2], 'base-center', anchor, position);
+    const storedPosition = resolvePosition(
+      [radius, radius, height / 2],
+      'base-center',
+      anchor,
+      position,
+    );
     const id = nextId('cone');
     const entity: Entity = {
       id,
@@ -730,11 +800,17 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
         items: { type: 'number' },
       },
-      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
+      },
     },
     required: ['ringRadius', 'tubeRadius'],
   },
-  run: (doc, { ringRadius, tubeRadius, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { ringRadius, tubeRadius, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+  ): CommandResult => {
     if (!Number.isFinite(ringRadius) || ringRadius <= 0) {
       return {
         document: doc,
@@ -752,7 +828,12 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
     // Default anchor for torus is 'center': stored position is the geometric center.
     // AABB half-extents from center: [ringRadius+tubeRadius, ringRadius+tubeRadius, tubeRadius].
     const outerRadius = ringRadius + tubeRadius;
-    const storedPosition = resolvePosition([outerRadius, outerRadius, tubeRadius], 'center', anchor, position);
+    const storedPosition = resolvePosition(
+      [outerRadius, outerRadius, tubeRadius],
+      'center',
+      anchor,
+      position,
+    );
     const id = nextId('tor');
     const entity: Entity = {
       id,
@@ -843,13 +924,26 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
         items: { type: 'number' },
       },
-      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
+      },
     },
     required: ['size'],
   },
-  run: (doc, { size, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { size, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+  ): CommandResult => {
     const [w, h, d] = size;
-    if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(d) || w <= 0 || h <= 0 || d <= 0) {
+    if (
+      !Number.isFinite(w) ||
+      !Number.isFinite(h) ||
+      !Number.isFinite(d) ||
+      w <= 0 ||
+      h <= 0 ||
+      d <= 0
+    ) {
       return {
         document: doc,
         summary: `add_wedge failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
@@ -955,11 +1049,17 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
         items: { type: 'number' },
       },
-      color: { type: 'string', description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".' },
+      color: {
+        type: 'string',
+        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
+      },
     },
     required: ['baseWidth', 'baseDepth', 'height'],
   },
-  run: (doc, { baseWidth, baseDepth, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { baseWidth, baseDepth, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+  ): CommandResult => {
     if (!Number.isFinite(baseWidth) || baseWidth <= 0) {
       return {
         document: doc,
@@ -985,7 +1085,12 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
     // AABB from base-center origin: spans [−bw/2..+bw/2, −bd/2..+bd/2, 0..height].
     // Half-extents for resolvePosition (which works from AABB center internally):
     // pass half-extents as seen from base-center: [baseWidth/2, baseDepth/2, height/2].
-    const storedPosition = resolvePosition([baseWidth / 2, baseDepth / 2, height / 2], 'base-center', anchor, position);
+    const storedPosition = resolvePosition(
+      [baseWidth / 2, baseDepth / 2, height / 2],
+      'base-center',
+      anchor,
+      position,
+    );
     const id = nextId('pyr');
     const entity: Entity = {
       id,

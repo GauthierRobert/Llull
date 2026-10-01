@@ -52,13 +52,21 @@ export function EmptyState(): React.ReactElement | null {
         <div className="empty-state__icon" aria-hidden="true">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
             <rect
-              x="8" y="8" width="24" height="24" rx="3"
-              stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2"
+              x="8"
+              y="8"
+              width="24"
+              height="24"
+              rx="3"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeDasharray="4 2"
             />
             <circle cx="20" cy="20" r="3" stroke="currentColor" strokeWidth="1.5" />
             <path
               d="M20 10v4M20 26v4M10 20h4M26 20h4"
-              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
             />
           </svg>
         </div>
@@ -70,17 +78,23 @@ export function EmptyState(): React.ReactElement | null {
 
         <ul className="empty-state__tips" aria-label="Viewer tips">
           <li className="empty-state__tip">
-            <span className="empty-state__tip-icon" aria-hidden="true">&#x2192;</span>
+            <span className="empty-state__tip-icon" aria-hidden="true">
+              &#x2192;
+            </span>
             Claude drives this canvas over MCP — describe a model and watch it render.
           </li>
           <li className="empty-state__tip">
-            <span className="empty-state__tip-icon" aria-hidden="true">&#x25CB;</span>
+            <span className="empty-state__tip-icon" aria-hidden="true">
+              &#x25CB;
+            </span>
             Click any entity to inspect its properties in the left panel.
           </li>
           <li className="empty-state__tip">
-            <span className="empty-state__tip-icon" aria-hidden="true">&#x2715;</span>
-            Switch between <strong>2D</strong> and <strong>3D</strong> with the
-            toggle above the viewport.
+            <span className="empty-state__tip-icon" aria-hidden="true">
+              &#x2715;
+            </span>
+            Switch between <strong>2D</strong> and <strong>3D</strong> with the toggle above the
+            viewport.
           </li>
         </ul>
       </div>

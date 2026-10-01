@@ -25,7 +25,12 @@ interface WedgeMeshProps {
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function WedgeMesh({ entity, selected, onSelect, pbrMaterial }: WedgeMeshProps): React.ReactElement {
+export function WedgeMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: WedgeMeshProps): React.ReactElement {
   const { size, position, rotation, color } = entity;
   const [w, h, d] = size;
 
@@ -42,7 +47,14 @@ export function WedgeMesh({ entity, selected, onSelect, pbrMaterial }: WedgeMesh
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.5, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.5,
+    metalness: 0.08,
+    envMapIntensity: 0.8,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

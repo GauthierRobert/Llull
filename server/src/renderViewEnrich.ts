@@ -78,7 +78,12 @@ export interface RenderViewEnrichParams {
 // ---------------------------------------------------------------------------
 
 /** Extract RenderViewData from an execute() result, or null on failure. */
-function extractRenderData(doc: CadDocument, view: string, width: number, height: number): RenderViewData | null {
+function extractRenderData(
+  doc: CadDocument,
+  view: string,
+  width: number,
+  height: number,
+): RenderViewData | null {
   const result = execute(doc, 'render_view', { view, width, height });
   if (!result.data || typeof result.data !== 'object') return null;
   const d = result.data as Record<string, unknown>;
@@ -96,7 +101,12 @@ function extractRenderData(doc: CadDocument, view: string, width: number, height
  *
  * @pure — returns a new CadDocument, never mutates the input.
  */
-function rotateDocumentAroundZ(doc: CadDocument, cx: number, cy: number, angleRad: number): CadDocument {
+function rotateDocumentAroundZ(
+  doc: CadDocument,
+  cx: number,
+  cy: number,
+  angleRad: number,
+): CadDocument {
   const cos = Math.cos(angleRad);
   const sin = Math.sin(angleRad);
 
@@ -136,7 +146,9 @@ export function buildTurntableFrames(
 
   // Compute scene center from bounds
   const baseResult = execute(doc, 'describe_scene', {});
-  const snapshot = baseResult.data as { bounds: { min: [number, number, number]; max: [number, number, number] } | null } | undefined;
+  const snapshot = baseResult.data as
+    | { bounds: { min: [number, number, number]; max: [number, number, number] } | null }
+    | undefined;
   const bounds = snapshot?.bounds;
   const cx = bounds ? (bounds.min[0] + bounds.max[0]) / 2 : 0;
   const cy = bounds ? (bounds.min[1] + bounds.max[1]) / 2 : 0;
@@ -208,7 +220,9 @@ export function buildIsolateSvg(
 
   // Build composed SVG
   const lines: string[] = [];
-  lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`);
+  lines.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+  );
   // Background (from dim render)
   lines.push(`  <rect width="${width}" height="${height}" fill="#1a1a2e"/>`);
   // Dimmed layer (non-highlighted entities at low opacity)
@@ -394,7 +408,9 @@ export function appendAxesAndGrid(
     const iMin = Math.floor(-ext / gridStep);
     const iMax = Math.ceil(ext / gridStep);
 
-    lines.push(`  <g id="ground-grid" opacity="0.18" stroke="#88aacc" stroke-width="0.8" stroke-linecap="round">`);
+    lines.push(
+      `  <g id="ground-grid" opacity="0.18" stroke="#88aacc" stroke-width="0.8" stroke-linecap="round">`,
+    );
 
     // Lines parallel to Y axis (varying X, fixed Z=0)
     for (let i = iMin; i <= iMax; i++) {
@@ -469,7 +485,9 @@ export function appendAxesAndGrid(
       lines.push(`    <circle cx="${r2(zTip[0])}" cy="${r2(zTip[1])}" r="3" fill="#4488ff"/>`);
 
       // Origin dot
-      lines.push(`    <circle cx="${r2(origin[0])}" cy="${r2(origin[1])}" r="3" fill="#ffffff" opacity="0.7"/>`);
+      lines.push(
+        `    <circle cx="${r2(origin[0])}" cy="${r2(origin[1])}" r="3" fill="#ffffff" opacity="0.7"/>`,
+      );
 
       // Axis labels at tips (with outline for legibility over any background)
       const labelStyle = `font-family="monospace" font-size="12" font-weight="bold" stroke="#1a1a2e" stroke-width="3" paint-order="stroke"`;
@@ -488,9 +506,7 @@ export function appendAxesAndGrid(
 
     // Scale label — shows pixel-per-unit ratio for the agent
     // Compute screen distance for the axis length in world units
-    const scalePx = Math.sqrt(
-      Math.pow(xTip[0] - origin[0], 2) + Math.pow(xTip[1] - origin[1], 2),
-    );
+    const scalePx = Math.sqrt(Math.pow(xTip[0] - origin[0], 2) + Math.pow(xTip[1] - origin[1], 2));
     const scaleLabel = `${r2(axisLen)} ${units} = ${r2(scalePx)} px`;
     lines.push(
       `  <text x="8" y="${height - 8}" font-family="monospace" font-size="10" ` +
@@ -565,7 +581,9 @@ export function buildSectionSvg(
   const negInner = negData ? extractSvgInner(negData.svg) : '';
 
   const lines: string[] = [];
-  lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`);
+  lines.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+  );
   lines.push(`  <rect width="${width}" height="${height}" fill="#1a1a2e"/>`);
   // Negative side (dimmed / transparent)
   if (negInner) {
@@ -600,11 +618,13 @@ function buildSectionPlaneOverlay(
   const up = normalize3(cross3(right, fwd));
 
   const bounds = data.bounds;
-  const ext = bounds ? Math.max(
-    bounds.max[0] - bounds.min[0],
-    bounds.max[1] - bounds.min[1],
-    bounds.max[2] - bounds.min[2],
-  ) * 1.5 : 10;
+  const ext = bounds
+    ? Math.max(
+        bounds.max[0] - bounds.min[0],
+        bounds.max[1] - bounds.min[1],
+        bounds.max[2] - bounds.min[2],
+      ) * 1.5
+    : 10;
 
   const cx = bounds ? (bounds.min[0] + bounds.max[0]) / 2 : 0;
   const cy = bounds ? (bounds.min[1] + bounds.max[1]) / 2 : 0;
@@ -662,25 +682,29 @@ type EntityCategory = 'point' | 'curve2d' | 'solid3d' | 'annotation';
 
 /** CSS colours per category (must stay in sync with the legend). */
 const CATEGORY_COLORS: Record<EntityCategory, string> = {
-  point:      '#ff9944',  // orange
-  curve2d:    '#44ddff',  // cyan
-  solid3d:    '#bb88ff',  // purple
-  annotation: '#ffdd44',  // yellow
+  point: '#ff9944', // orange
+  curve2d: '#44ddff', // cyan
+  solid3d: '#bb88ff', // purple
+  annotation: '#ffdd44', // yellow
 };
 
 function entityCategory(e: Entity): EntityCategory {
   switch (e.kind) {
-    case 'point':      return 'point';
+    case 'point':
+      return 'point';
     case 'line':
     case 'polyline':
     case 'arc':
     case 'circle':
     case 'rectangle':
     case 'ellipse':
-    case 'spline':     return 'curve2d';
+    case 'spline':
+      return 'curve2d';
     case 'text':
-    case 'dimension':  return 'annotation';
-    default:           return 'solid3d';
+    case 'dimension':
+      return 'annotation';
+    default:
+      return 'solid3d';
   }
 }
 
@@ -759,12 +783,7 @@ function entityKeyPoints(e: Entity): Array<[number, number, number]> {
 
     case 'rectangle':
       // 4 corners: lower-left, lower-right, upper-right, upper-left.
-      return [
-        lift(0, 0),
-        lift(e.width, 0),
-        lift(e.width, e.height),
-        lift(0, e.height),
-      ];
+      return [lift(0, 0), lift(e.width, 0), lift(e.width, e.height), lift(0, e.height)];
 
     case 'text':
     case 'dimension':
@@ -800,7 +819,8 @@ function labelAnchor(
   project: (p: [number, number, number]) => [number, number],
 ): [number, number] {
   if (keyPoints.length === 0) return [0, 0];
-  let sumX = 0, sumY = 0;
+  let sumX = 0,
+    sumY = 0;
   for (const pt of keyPoints) {
     const [sx, sy] = project(pt);
     sumX += sx;
@@ -867,7 +887,9 @@ export function appendEntityLabels(
       const [sx, sy] = project(pt);
       // Only draw if reasonably within the viewport (with generous margin).
       if (sx < -20 || sx > width + 20 || sy < -20 || sy > height + 20) continue;
-      lines.push(`    <circle cx="${r2(sx)}" cy="${r2(sy)}" r="3" fill="${color}" opacity="0.85" stroke="#0d0d1a" stroke-width="0.8"/>`);
+      lines.push(
+        `    <circle cx="${r2(sx)}" cy="${r2(sy)}" r="3" fill="${color}" opacity="0.85" stroke="#0d0d1a" stroke-width="0.8"/>`,
+      );
     }
 
     // Label at centroid of key points (always drawn even if markers clip)
@@ -885,9 +907,9 @@ export function appendEntityLabels(
   // Legend — top-right corner
   // -------------------------------------------------------------------------
   const legendEntries: Array<{ cat: EntityCategory; label: string }> = [
-    { cat: 'solid3d',    label: '3D solid' },
-    { cat: 'curve2d',    label: '2D curve' },
-    { cat: 'point',      label: 'point' },
+    { cat: 'solid3d', label: '3D solid' },
+    { cat: 'curve2d', label: '2D curve' },
+    { cat: 'point', label: 'point' },
     { cat: 'annotation', label: 'annotation' },
   ];
   const legendX = width - 4;
@@ -941,7 +963,10 @@ function escapeXml(s: string): string {
 
 type Vec3Mutable = [number, number, number];
 
-function sub3(a: readonly [number, number, number], b: readonly [number, number, number]): Vec3Mutable {
+function sub3(
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+): Vec3Mutable {
   return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
 
@@ -949,7 +974,10 @@ function dot3(a: readonly [number, number, number], b: readonly [number, number,
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-function cross3(a: readonly [number, number, number], b: readonly [number, number, number]): Vec3Mutable {
+function cross3(
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+): Vec3Mutable {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
@@ -974,8 +1002,8 @@ function toScreenCoords(
   height: number,
 ): [number, number] {
   const margin = 0.9;
-  const scaleX = (width / 2) * margin / orthoHalf;
-  const scaleY = (height / 2) * margin / orthoHalf;
+  const scaleX = ((width / 2) * margin) / orthoHalf;
+  const scaleY = ((height / 2) * margin) / orthoHalf;
   const scale = Math.min(scaleX, scaleY);
   const sx = width / 2 + u * scale;
   const sy = height / 2 - v * scale;

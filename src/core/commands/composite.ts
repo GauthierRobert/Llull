@@ -21,11 +21,7 @@ function dot3(a: Vec3, b: Vec3): number {
 
 /** Cross product of two 3-vectors. */
 function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 /** Euclidean length of a 3-vector. */
@@ -204,14 +200,22 @@ export const makeTubeBetween: CommandDefinition<MakeTubeBetweenParams> = {
   },
   run: (doc, { p1, p2, radius, color = '#6b8f9c' }): CommandResult => {
     // --- Validate inputs ---
-    if (!Array.isArray(p1) || p1.length < 3 || p1.some((v) => typeof v !== 'number' || !isFinite(v))) {
+    if (
+      !Array.isArray(p1) ||
+      p1.length < 3 ||
+      p1.some((v) => typeof v !== 'number' || !isFinite(v))
+    ) {
       return {
         document: doc,
         summary: 'make_tube_between failed: p1 must be a numeric [x, y, z] array.',
         affected: [],
       };
     }
-    if (!Array.isArray(p2) || p2.length < 3 || p2.some((v) => typeof v !== 'number' || !isFinite(v))) {
+    if (
+      !Array.isArray(p2) ||
+      p2.length < 3 ||
+      p2.some((v) => typeof v !== 'number' || !isFinite(v))
+    ) {
       return {
         document: doc,
         summary: 'make_tube_between failed: p2 must be a numeric [x, y, z] array.',

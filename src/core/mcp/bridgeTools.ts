@@ -41,7 +41,7 @@ export function buildBridgeToolDefinitions(): McpToolDefinition[] {
     {
       name: 'snapshot_in_from_ui',
       description:
-        'Replace this MCP session\'s working document with the current live UI document. ' +
+        "Replace this MCP session's working document with the current live UI document. " +
         'The UI must have pushed its document via POST /ui-bridge/push first. ' +
         'No-op (with explanation) if no UI document is available. ' +
         'Read-only with respect to the UI — the UI document is not modified.',

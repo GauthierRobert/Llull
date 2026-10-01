@@ -10,7 +10,13 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import type { Entity, LineEntity, PolylineEntity, CircleEntity, RectangleEntity } from '@core/model/types';
+import type {
+  Entity,
+  LineEntity,
+  PolylineEntity,
+  CircleEntity,
+  RectangleEntity,
+} from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Nearest-vertex picking for polylines (fillet / chamfer)
@@ -33,10 +39,7 @@ export interface NearestVertexResult {
  * @pure
  * @failure returns null when points is empty
  */
-export function nearestVertex(
-  points: ReadonlyArray<Vec2>,
-  pick: Vec2,
-): NearestVertexResult | null {
+export function nearestVertex(points: ReadonlyArray<Vec2>, pick: Vec2): NearestVertexResult | null {
   if (points.length === 0) return null;
 
   let bestIdx = 0;
@@ -149,11 +152,7 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
         if (d < best) best = d;
       }
       if (poly.closed && poly.points.length > 1) {
-        const d = pointToSegDistSq(
-          pick,
-          poly.points[poly.points.length - 1]!,
-          poly.points[0]!,
-        );
+        const d = pointToSegDistSq(pick, poly.points[poly.points.length - 1]!, poly.points[0]!);
         if (d < best) best = d;
       }
       return best;

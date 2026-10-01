@@ -24,8 +24,18 @@ export function PointRenderer({ entity, selected }: PointRendererProps): React.R
     // A small cross: horizontal + vertical arm drawn as two line segments.
     const s = CROSS_SIZE;
     const vertices = new Float32Array([
-      -s,  0, 0,   s,  0, 0,   // horizontal arm
-       0, -s, 0,   0,  s, 0,   // vertical arm
+      -s,
+      0,
+      0,
+      s,
+      0,
+      0, // horizontal arm
+      0,
+      -s,
+      0,
+      0,
+      s,
+      0, // vertical arm
     ]);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));

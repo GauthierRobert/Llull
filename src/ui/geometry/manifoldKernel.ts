@@ -260,9 +260,21 @@ export async function createManifoldKernel(): Promise<GeometryKernel> {
         return null;
       } finally {
         // Free WASM objects to prevent memory leaks.
-        try { solidA?.delete(); } catch { /* ignore */ }
-        try { solidB?.delete(); } catch { /* ignore */ }
-        try { result?.delete(); } catch { /* ignore */ }
+        try {
+          solidA?.delete();
+        } catch {
+          /* ignore */
+        }
+        try {
+          solidB?.delete();
+        } catch {
+          /* ignore */
+        }
+        try {
+          result?.delete();
+        } catch {
+          /* ignore */
+        }
       }
     },
 
@@ -290,7 +302,11 @@ export async function createManifoldKernel(): Promise<GeometryKernel> {
       } catch {
         return null;
       } finally {
-        try { solid?.delete(); } catch { /* ignore */ }
+        try {
+          solid?.delete();
+        } catch {
+          /* ignore */
+        }
       }
     },
   };

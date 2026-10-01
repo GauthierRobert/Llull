@@ -72,7 +72,9 @@ export function circlePoints(cx: number, cy: number, cz: number, r: number, segs
  *              Must have >= 3 distinct points. No duplicate consecutive vertices.
  * @returns Array of triangle index triplets.
  */
-export function earClipTriangulate(pts: ReadonlyArray<readonly [number, number]>): Array<[number, number, number]> {
+export function earClipTriangulate(
+  pts: ReadonlyArray<readonly [number, number]>,
+): Array<[number, number, number]> {
   const n = pts.length;
   if (n < 3) return [];
   if (n === 3) return [[0, 1, 2]];
@@ -88,10 +90,14 @@ export function earClipTriangulate(pts: ReadonlyArray<readonly [number, number]>
 
   /** Is point P strictly inside triangle (A, B, C)? */
   function pointInTriangle(
-    px: number, py: number,
-    ax: number, ay: number,
-    bx: number, by: number,
-    cx: number, cy: number,
+    px: number,
+    py: number,
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    cx: number,
+    cy: number,
   ): boolean {
     const d1 = cross2(ax, ay, bx, by, px, py);
     const d2 = cross2(bx, by, cx, cy, px, py);

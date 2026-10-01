@@ -465,10 +465,15 @@ describe('appendAxesAndGrid', () => {
 
 describe('appendEntityLabels', () => {
   // Helper: render and return data + entity list for a given doc
-  function renderAndEntities(doc: CadDocument): { data: RenderViewData; entities: import('@core/model/types').Entity[] } {
+  function renderAndEntities(doc: CadDocument): {
+    data: RenderViewData;
+    entities: import('@core/model/types').Entity[];
+  } {
     const renderResult = execute(doc, 'render_view', { view: 'iso', width: 300, height: 200 });
     const data = renderResult.data as RenderViewData;
-    const entities = Object.values(doc.entities).filter((e): e is NonNullable<typeof e> => e !== undefined);
+    const entities = Object.values(doc.entities).filter(
+      (e): e is NonNullable<typeof e> => e !== undefined,
+    );
     return { data, entities };
   }
 
@@ -538,7 +543,9 @@ describe('appendEntityLabels', () => {
 
     expect(enriched).toContain(circleId);
     // Circle produces 2 markers: center + radius handle
-    const entityGroup = enriched.match(new RegExp(`data-entity-id="${circleId}"[\\s\\S]*?</g>`))?.[0];
+    const entityGroup = enriched.match(
+      new RegExp(`data-entity-id="${circleId}"[\\s\\S]*?</g>`),
+    )?.[0];
     expect(entityGroup).toBeDefined();
     const circleMarkers = entityGroup!.match(/<circle[^>]+r="3"/g);
     expect(circleMarkers).not.toBeNull();
@@ -554,7 +561,9 @@ describe('appendEntityLabels', () => {
     const enriched = appendEntityLabels(data.svg, data, entities);
 
     expect(enriched).toContain(ellipseId);
-    const entityGroup = enriched.match(new RegExp(`data-entity-id="${ellipseId}"[\\s\\S]*?</g>`))?.[0];
+    const entityGroup = enriched.match(
+      new RegExp(`data-entity-id="${ellipseId}"[\\s\\S]*?</g>`),
+    )?.[0];
     expect(entityGroup).toBeDefined();
     const markers = entityGroup!.match(/<circle[^>]+r="3"/g);
     expect(markers).not.toBeNull();

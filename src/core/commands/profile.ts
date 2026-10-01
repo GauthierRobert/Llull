@@ -364,13 +364,18 @@ export const revolveProfile: CommandDefinition<RevolveProfileParams> = {
     }
 
     // --- segments: clamp to minimum 3 ---
-    const segments = Math.max(3, Math.round(typeof rawSegments === 'number' && Number.isFinite(rawSegments) ? rawSegments : 32));
+    const segments = Math.max(
+      3,
+      Math.round(
+        typeof rawSegments === 'number' && Number.isFinite(rawSegments) ? rawSegments : 32,
+      ),
+    );
 
     // --- resolve layer ---
     const resolvedLayerId =
       typeof layerId === 'string' && doc.layers[layerId] !== undefined
         ? layerId
-        : Object.keys(doc.layers)[0] ?? 'layer-default';
+        : (Object.keys(doc.layers)[0] ?? 'layer-default');
 
     // --- build entity ---
     const id = typeof explicitId === 'string' && explicitId.length > 0 ? explicitId : nextId('rev');
@@ -391,9 +396,10 @@ export const revolveProfile: CommandDefinition<RevolveProfileParams> = {
     const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
     const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
     const boundsStr = `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
-    const axisLabel = rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z'
-      ? rawAxis
-      : `[${axis.map((v) => parseFloat(v.toFixed(3))).join(', ')}]`;
+    const axisLabel =
+      rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z'
+        ? rawAxis
+        : `[${axis.map((v) => parseFloat(v.toFixed(3))).join(', ')}]`;
     return {
       document: newDoc,
       summary: `revolve_profile: created revolution "${id}" — ${profile.length}-point profile, axis=${axisLabel}, angle=${parseFloat(angle.toFixed(4))} rad, segments=${segments}; ${boundsStr}.`,

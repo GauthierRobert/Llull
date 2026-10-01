@@ -247,11 +247,7 @@ export function ModifyTools({
             onKeyDown={handleInputKeyDown}
             aria-label={`${valueLabel(activeTool)} value`}
           />
-          <button
-            className="modify-tool-commit-btn"
-            onClick={onCommitValue}
-            aria-label="Apply"
-          >
+          <button className="modify-tool-commit-btn" onClick={onCommitValue} aria-label="Apply">
             Apply
           </button>
         </div>

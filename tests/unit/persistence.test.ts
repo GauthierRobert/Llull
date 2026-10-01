@@ -50,7 +50,11 @@ function makeEnvelope(
  * All base fields (id, kind, position, rotation, layerId, color) are pre-filled
  * with valid defaults so tests only need to supply the fields they want to break.
  */
-function validEntityBase(id: string, kind: string, extras: Record<string, unknown> = {}): Record<string, unknown> {
+function validEntityBase(
+  id: string,
+  kind: string,
+  extras: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     id,
     kind,
@@ -315,7 +319,9 @@ describe('deserializeDocument — entity kind-specific validation', () => {
     const entity = validEntityBase('rect1', 'rectangle', { width: 10, height: 5 });
     const json = makeEnvelope({ entities: { rect1: entity }, order: ['rect1'] });
     const restored = deserializeDocument(json);
-    expect((restored.entities['rect1'] as unknown as Record<string, unknown>)['kind']).toBe('rectangle');
+    expect((restored.entities['rect1'] as unknown as Record<string, unknown>)['kind']).toBe(
+      'rectangle',
+    );
   });
 
   // ── ellipse — valid passes (covers break line 225-226) ────────────────────
@@ -324,7 +330,9 @@ describe('deserializeDocument — entity kind-specific validation', () => {
     const entity = validEntityBase('el1', 'ellipse', { center: [0, 0], radiusX: 3, radiusY: 2 });
     const json = makeEnvelope({ entities: { el1: entity }, order: ['el1'] });
     const restored = deserializeDocument(json);
-    expect((restored.entities['el1'] as unknown as Record<string, unknown>)['kind']).toBe('ellipse');
+    expect((restored.entities['el1'] as unknown as Record<string, unknown>)['kind']).toBe(
+      'ellipse',
+    );
   });
 
   // ── default case — line, polyline, point, spline, dimension, mesh ─────────
@@ -340,10 +348,17 @@ describe('deserializeDocument — entity kind-specific validation', () => {
   });
 
   it('accepts a polyline entity — covers default break', () => {
-    const entity = validEntityBase('p1', 'polyline', { points: [[0, 0], [1, 1]] });
+    const entity = validEntityBase('p1', 'polyline', {
+      points: [
+        [0, 0],
+        [1, 1],
+      ],
+    });
     const json = makeEnvelope({ entities: { p1: entity }, order: ['p1'] });
     const restored = deserializeDocument(json);
-    expect((restored.entities['p1'] as unknown as Record<string, unknown>)['kind']).toBe('polyline');
+    expect((restored.entities['p1'] as unknown as Record<string, unknown>)['kind']).toBe(
+      'polyline',
+    );
   });
 
   it('accepts a point entity — covers default break', () => {
@@ -368,7 +383,9 @@ describe('deserializeDocument — entity kind-specific validation', () => {
     });
     const json = makeEnvelope({ entities: { d1: entity }, order: ['d1'] });
     const restored = deserializeDocument(json);
-    expect((restored.entities['d1'] as unknown as Record<string, unknown>)['kind']).toBe('dimension');
+    expect((restored.entities['d1'] as unknown as Record<string, unknown>)['kind']).toBe(
+      'dimension',
+    );
   });
 
   // ── unknown kind ──────────────────────────────────────────────────────────
@@ -493,7 +510,9 @@ describe('deserializeDocument — entity kind-specific validation', () => {
     const entity = validEntityBase('cy3', 'cylinder', { radius: 3, height: 10 });
     const json = makeEnvelope({ entities: { cy3: entity }, order: ['cy3'] });
     const restored = deserializeDocument(json);
-    expect((restored.entities['cy3'] as unknown as Record<string, unknown>)['kind']).toBe('cylinder');
+    expect((restored.entities['cy3'] as unknown as Record<string, unknown>)['kind']).toBe(
+      'cylinder',
+    );
   });
 
   // ── pyramid validation ────────────────────────────────────────────────────
@@ -520,24 +539,37 @@ describe('deserializeDocument — entity kind-specific validation', () => {
     const entity = validEntityBase('py4', 'pyramid', { baseWidth: 4, baseDepth: 3, height: 5 });
     const json = makeEnvelope({ entities: { py4: entity }, order: ['py4'] });
     const restored = deserializeDocument(json);
-    expect((restored.entities['py4'] as unknown as Record<string, unknown>)['kind']).toBe('pyramid');
+    expect((restored.entities['py4'] as unknown as Record<string, unknown>)['kind']).toBe(
+      'pyramid',
+    );
   });
 
   // ── extrusion — valid passes + invalid depth ──────────────────────────────
 
   it('accepts a valid extrusion entity — covers break in extrusion case', () => {
     const entity = validEntityBase('ex1', 'extrusion', {
-      profile: [[0, 0], [1, 0], [1, 1], [0, 1]],
+      profile: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
       depth: 3,
     });
     const json = makeEnvelope({ entities: { ex1: entity }, order: ['ex1'] });
     const restored = deserializeDocument(json);
-    expect((restored.entities['ex1'] as unknown as Record<string, unknown>)['kind']).toBe('extrusion');
+    expect((restored.entities['ex1'] as unknown as Record<string, unknown>)['kind']).toBe(
+      'extrusion',
+    );
   });
 
   it('throws on extrusion entity with NaN depth', () => {
     const entity = validEntityBase('ex2', 'extrusion', {
-      profile: [[0, 0], [1, 0], [1, 1]],
+      profile: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
       depth: NaN,
     });
     const json = makeEnvelope({ entities: { ex2: entity }, order: ['ex2'] });
@@ -546,7 +578,11 @@ describe('deserializeDocument — entity kind-specific validation', () => {
 
   it('throws on extrusion entity with Infinity depth', () => {
     const entity = validEntityBase('ex3', 'extrusion', {
-      profile: [[0, 0], [1, 0], [1, 1]],
+      profile: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
       depth: Infinity,
     });
     const json = makeEnvelope({ entities: { ex3: entity }, order: ['ex3'] });
@@ -634,7 +670,10 @@ describe('deserializeDocument — material validation', () => {
       },
     });
     const restored = deserializeDocument(json);
-    const mats = (restored as unknown as Record<string, unknown>)['materials'] as Record<string, unknown>;
+    const mats = (restored as unknown as Record<string, unknown>)['materials'] as Record<
+      string,
+      unknown
+    >;
     expect(mats['steel']).toBeDefined();
   });
 
@@ -762,7 +801,10 @@ describe('deserializeDocument — parameter validation', () => {
       },
     });
     const restored = deserializeDocument(json);
-    const params = (restored as unknown as Record<string, unknown>)['parameters'] as Record<string, unknown>;
+    const params = (restored as unknown as Record<string, unknown>)['parameters'] as Record<
+      string,
+      unknown
+    >;
     expect(params['width']).toBeDefined();
   });
 });
@@ -775,7 +817,7 @@ describe('deserializeDocument — migration / back-compat defaults', () => {
   beforeEach(() => __resetIdCounter());
 
   it('fills parameters: {} when the field is absent', () => {
-    const json = makeEnvelope();  // makeEnvelope does not include parameters
+    const json = makeEnvelope(); // makeEnvelope does not include parameters
     const restored = deserializeDocument(json);
     expect((restored as unknown as Record<string, unknown>)['parameters']).toEqual({});
   });

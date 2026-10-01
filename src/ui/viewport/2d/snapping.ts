@@ -132,12 +132,7 @@ function entityToSegments(entity: Entity): Array<[number, number, number, number
 
   switch (entity.kind) {
     case 'line': {
-      return [[
-        entity.start[0] + ox,
-        entity.start[1] + oy,
-        entity.end[0] + ox,
-        entity.end[1] + oy,
-      ]];
+      return [[entity.start[0] + ox, entity.start[1] + oy, entity.end[0] + ox, entity.end[1] + oy]];
     }
     case 'polyline': {
       const segs: Array<[number, number, number, number]> = [];
@@ -497,8 +492,7 @@ export function collectSnapCandidates(
           // crosses the 0/2π wrap still lands on the arc itself rather than the
           // opposite side. sweep is normalized to [0, 2π).
           const sweep =
-            (((entity.endAngle - entity.startAngle) % (2 * Math.PI)) + 2 * Math.PI) %
-            (2 * Math.PI);
+            (((entity.endAngle - entity.startAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
           const midAngle = entity.startAngle + sweep / 2;
           candidates.push({
             x: cx + r * Math.cos(midAngle),
@@ -512,8 +506,14 @@ export function collectSnapCandidates(
         }
         if (doNearest && cursor !== null) {
           const [nx, ny] = nearestOnArc(
-            cursor[0], cursor[1], cx, cy, r,
-            entity.startAngle, entity.endAngle, false,
+            cursor[0],
+            cursor[1],
+            cx,
+            cy,
+            r,
+            entity.startAngle,
+            entity.endAngle,
+            false,
           );
           candidates.push({ x: nx, y: ny, type: 'nearest' });
         }
@@ -726,11 +726,9 @@ export function applyOrthoPolar(origin: Vec2, cursor: Vec2, opts: OrthoPolarOpts
 
   // Polar tracking. Treat a missing OR non-positive increment as the 15° default
   // (a 0 increment from an uninitialized UI field would otherwise yield NaN).
-  const increment = opts.polarIncrement && opts.polarIncrement > 0 ? opts.polarIncrement : Math.PI / 12;
+  const increment =
+    opts.polarIncrement && opts.polarIncrement > 0 ? opts.polarIncrement : Math.PI / 12;
   const rawAngle = Math.atan2(dy, dx);
   const snappedAngle = Math.round(rawAngle / increment) * increment;
-  return [
-    origin[0] + length * Math.cos(snappedAngle),
-    origin[1] + length * Math.sin(snappedAngle),
-  ];
+  return [origin[0] + length * Math.cos(snappedAngle), origin[1] + length * Math.sin(snappedAngle)];
 }

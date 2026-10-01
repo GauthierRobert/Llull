@@ -81,7 +81,13 @@ describe('MaterialsPanel — rendering', () => {
 
   it('shows material name in each row', () => {
     setMaterials({
-      aluminium: { name: 'aluminium', density: 0.0027, color: '#d4d8e0', metalness: 0.85, roughness: 0.3 },
+      aluminium: {
+        name: 'aluminium',
+        density: 0.0027,
+        color: '#d4d8e0',
+        metalness: 0.85,
+        roughness: 0.3,
+      },
     });
     render(<MaterialsPanel />);
     expect(screen.getByText('aluminium')).toBeDefined();
@@ -109,7 +115,13 @@ describe('MaterialsPanel — rendering', () => {
 
   it('shows the density value in each row', () => {
     setMaterials({
-      titanium: { name: 'titanium', density: 0.00445, color: '#c0c4cc', metalness: 0.7, roughness: 0.35 },
+      titanium: {
+        name: 'titanium',
+        density: 0.00445,
+        color: '#c0c4cc',
+        metalness: 0.7,
+        roughness: 0.35,
+      },
     });
     render(<MaterialsPanel />);
     // toPrecision(3) of 0.00445 = "0.00445"
@@ -140,7 +152,9 @@ describe('MaterialsPanel — assign', () => {
       steel: { name: 'steel', density: 0.00785, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
     });
     render(<MaterialsPanel />);
-    const assignBtn = screen.getByRole('button', { name: /assign material steel/i }) as HTMLButtonElement;
+    const assignBtn = screen.getByRole('button', {
+      name: /assign material steel/i,
+    }) as HTMLButtonElement;
     expect(assignBtn.disabled).toBe(true);
   });
 
@@ -150,7 +164,9 @@ describe('MaterialsPanel — assign', () => {
     });
     setSelection(['entity-1']);
     render(<MaterialsPanel />);
-    const assignBtn = screen.getByRole('button', { name: /assign material steel/i }) as HTMLButtonElement;
+    const assignBtn = screen.getByRole('button', {
+      name: /assign material steel/i,
+    }) as HTMLButtonElement;
     expect(assignBtn.disabled).toBe(false);
   });
 

@@ -23,7 +23,11 @@ import { TopBar } from '@ui/components/TopBar';
 // ---------------------------------------------------------------------------
 
 function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null, liveStatus: 'connecting' });
+  useStore.setState({
+    document: createEmptyDocument(),
+    lastSummary: null,
+    liveStatus: 'connecting',
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -127,7 +127,10 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
       doc = b.doc;
 
       const result = execute(doc, 'find_entities', {
-        insideBBox: [[-5, -5, -5], [5, 5, 5]],
+        insideBBox: [
+          [-5, -5, -5],
+          [5, 5, 5],
+        ],
       });
       const data = result.data as { matches: Array<{ id: string }>; count: number };
 
@@ -143,7 +146,10 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
       doc = a.doc;
 
       const result = execute(doc, 'find_entities', {
-        insideBBox: [[-5, -5, -5], [5, 5, 5]],
+        insideBBox: [
+          [-5, -5, -5],
+          [5, 5, 5],
+        ],
       });
       const data = result.data as { count: number };
       expect(data.count).toBe(0);
@@ -152,7 +158,10 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
     it('returns no-op when insideBBox min > max on an axis', () => {
       const doc = createEmptyDocument();
       const result = execute(doc, 'find_entities', {
-        insideBBox: [[5, 0, 0], [0, 10, 10]],
+        insideBBox: [
+          [5, 0, 0],
+          [0, 10, 10],
+        ],
       });
       expect(result.document).toBe(doc);
       expect(result.affected).toHaveLength(0);
@@ -184,7 +193,10 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
       doc = b.doc;
 
       const result = execute(doc, 'find_entities', {
-        overlapsBBox: [[-2, -2, -2], [2, 2, 2]],
+        overlapsBBox: [
+          [-2, -2, -2],
+          [2, 2, 2],
+        ],
       });
       const data = result.data as { matches: Array<{ id: string }>; count: number };
 
@@ -200,7 +212,10 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
       doc = a.doc;
 
       const result = execute(doc, 'find_entities', {
-        overlapsBBox: [[-1, -1, -1], [3, 1, 1]],
+        overlapsBBox: [
+          [-1, -1, -1],
+          [3, 1, 1],
+        ],
       });
       const data = result.data as { count: number };
       expect(data.count).toBe(1);
@@ -209,7 +224,10 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
     it('returns no-op when overlapsBBox min > max on an axis', () => {
       const doc = createEmptyDocument();
       const result = execute(doc, 'find_entities', {
-        overlapsBBox: [[0, 5, 0], [10, 0, 10]],
+        overlapsBBox: [
+          [0, 5, 0],
+          [10, 0, 10],
+        ],
       });
       expect(result.document).toBe(doc);
       expect(result.affected).toHaveLength(0);
@@ -387,9 +405,17 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
       doc = b.doc;
 
       // Entity A: name contains "wall", tag contains "struct"
-      doc = execute(doc, 'set_entity_name', { id: a.id, name: 'Left Wall', tags: ['structural'] }).document;
+      doc = execute(doc, 'set_entity_name', {
+        id: a.id,
+        name: 'Left Wall',
+        tags: ['structural'],
+      }).document;
       // Entity B: name contains "wall" but tag does NOT contain "struct"
-      doc = execute(doc, 'set_entity_name', { id: b.id, name: 'Right Wall', tags: ['decorative'] }).document;
+      doc = execute(doc, 'set_entity_name', {
+        id: b.id,
+        name: 'Right Wall',
+        tags: ['decorative'],
+      }).document;
 
       const result = execute(doc, 'find_entities', {
         nameFuzzy: 'wall',
@@ -414,8 +440,14 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
 
     execute(doc, 'find_entities', {
       nearPoint: { point: [0, 0, 0], radius: 5 },
-      insideBBox: [[-10, -10, -10], [10, 10, 10]],
-      overlapsBBox: [[-5, -5, -5], [5, 5, 5]],
+      insideBBox: [
+        [-10, -10, -10],
+        [10, 10, 10],
+      ],
+      overlapsBBox: [
+        [-5, -5, -5],
+        [5, 5, 5],
+      ],
       nameFuzzy: 'test',
       tagFuzzy: 'tag',
     });

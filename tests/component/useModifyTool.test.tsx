@@ -142,9 +142,7 @@ describe('useModifyTool', () => {
     input.focus();
 
     act(() => {
-      input.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'o', bubbles: true }),
-      );
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'o', bubbles: true }));
     });
     // Tool should NOT have changed because the event target is an input
     expect(result.current.activeTool).toBe('none');
@@ -163,22 +161,30 @@ describe('useModifyTool', () => {
     });
     // First pick: pick the polyline entity
     act(() => {
-      result.current.handleEntityPick('poly-1', [0, 0], [
+      result.current.handleEntityPick(
+        'poly-1',
         [0, 0],
-        [10, 0],
-        [10, 10],
-      ]);
+        [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+        ],
+      );
     });
     expect(result.current.phase).toBe('pick-vertex');
     expect(result.current.pickedEntityId).toBe('poly-1');
 
     // Second pick: pick near a vertex
     act(() => {
-      result.current.handleEntityPick('poly-1', [9.5, 0.5], [
-        [0, 0],
-        [10, 0],
-        [10, 10],
-      ]);
+      result.current.handleEntityPick(
+        'poly-1',
+        [9.5, 0.5],
+        [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+        ],
+      );
     });
     expect(result.current.phase).toBe('enter-value');
     expect(result.current.pickedVertexIndex).toBe(1); // [10,0] is nearest to [9.5,0.5]

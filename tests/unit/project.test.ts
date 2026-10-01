@@ -48,7 +48,7 @@ describe('build_project — happy path', () => {
     expect(result.summary).toContain('2/2');
   });
 
-  it('resolves a $alias reference to an earlier step\'s created id', () => {
+  it("resolves a $alias reference to an earlier step's created id", () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', {
       actions: [
@@ -95,7 +95,9 @@ describe('build_project — happy path', () => {
   it('is pure — the input document is never mutated', () => {
     const doc = createEmptyDocument();
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'build_project', { actions: [{ command: 'add_box', params: { size: [1, 1, 1] } }] });
+    execute(doc, 'build_project', {
+      actions: [{ command: 'add_box', params: { size: [1, 1, 1] } }],
+    });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });

@@ -23,10 +23,18 @@ interface TorusMeshProps {
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function TorusMesh({ entity, selected, onSelect, pbrMaterial }: TorusMeshProps): React.ReactElement {
+export function TorusMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: TorusMeshProps): React.ReactElement {
   const { ringRadius, tubeRadius, position, rotation, color } = entity;
 
-  const geometry = useMemo(() => buildTorusGeometry(ringRadius, tubeRadius), [ringRadius, tubeRadius]);
+  const geometry = useMemo(
+    () => buildTorusGeometry(ringRadius, tubeRadius),
+    [ringRadius, tubeRadius],
+  );
 
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -39,7 +47,14 @@ export function TorusMesh({ entity, selected, onSelect, pbrMaterial }: TorusMesh
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.4, metalness: 0.1, envMapIntensity: 0.9, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.4,
+    metalness: 0.1,
+    envMapIntensity: 0.9,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

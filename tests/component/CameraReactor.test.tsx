@@ -115,9 +115,7 @@ describe('CameraReactor — sphericalToCartesian eye position', () => {
     const polar = 1.1;
     const distance = 8;
     const [ex, ey, ez] = sphericalToCartesian(target, azimuth, polar, distance);
-    const dist = Math.sqrt(
-      (ex - target[0]) ** 2 + (ey - target[1]) ** 2 + (ez - target[2]) ** 2,
-    );
+    const dist = Math.sqrt((ex - target[0]) ** 2 + (ey - target[1]) ** 2 + (ez - target[2]) ** 2);
     expect(dist).toBeCloseTo(distance, 4);
   });
 });

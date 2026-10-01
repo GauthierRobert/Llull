@@ -130,21 +130,21 @@ function ViewportStoreInvalidator(): null {
   const invalidate = useThree((s) => s.invalidate);
 
   useEffect(() => {
-    let prevMode    = useViewportStore.getState().displayMode;
-    let prevClip    = useViewportStore.getState().clipPlane;
-    let prevHidden  = useViewportStore.getState().hiddenEntityIds;
+    let prevMode = useViewportStore.getState().displayMode;
+    let prevClip = useViewportStore.getState().clipPlane;
+    let prevHidden = useViewportStore.getState().hiddenEntityIds;
     let prevQuality = useViewportStore.getState().qualityOverride;
 
     return useViewportStore.subscribe((state) => {
       if (
-        state.displayMode     !== prevMode    ||
-        state.clipPlane       !== prevClip    ||
-        state.hiddenEntityIds !== prevHidden  ||
+        state.displayMode !== prevMode ||
+        state.clipPlane !== prevClip ||
+        state.hiddenEntityIds !== prevHidden ||
         state.qualityOverride !== prevQuality
       ) {
-        prevMode    = state.displayMode;
-        prevClip    = state.clipPlane;
-        prevHidden  = state.hiddenEntityIds;
+        prevMode = state.displayMode;
+        prevClip = state.clipPlane;
+        prevHidden = state.hiddenEntityIds;
         prevQuality = state.qualityOverride;
         invalidate();
       }
@@ -285,7 +285,11 @@ interface SceneContentsProps {
   onDraggingChanged: (dragging: boolean) => void;
 }
 
-function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
+function SceneContents({
+  orbitEnabled,
+  gizmoMode,
+  onDraggingChanged,
+}: SceneContentsProps): React.ReactElement {
   const document = useStore((s) => s.document);
   const renderOrigin = useStore((s) => s.renderOrigin);
   const selection = useStore((s) => s.document.selection);
@@ -296,7 +300,13 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   const quality = useRenderQuality();
 
   const initialPosition = useMemo(
-    () => sphericalToCartesian(cam.target as [number, number, number], cam.azimuth, cam.polar, cam.distance),
+    () =>
+      sphericalToCartesian(
+        cam.target as [number, number, number],
+        cam.azimuth,
+        cam.polar,
+        cam.distance,
+      ),
     // Only used for initial mount — intentionally not reactive to later cam changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -315,8 +325,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   // Raycasting is automatically correct: three.js resolves click events in
   // world space using the mesh's matrixWorld, which accounts for the group offset.
   const groupOffset = useMemo(
-    () =>
-      new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]),
+    () => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]),
     [renderOrigin],
   );
 
@@ -324,7 +333,14 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
     <>
       {/* ---- Camera + controls ---- */}
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention). */}
-      <PerspectiveCamera makeDefault fov={45} near={0.01} far={1e8} position={initialPosition} up={[0, 0, 1]} />
+      <PerspectiveCamera
+        makeDefault
+        fov={45}
+        near={0.01}
+        far={1e8}
+        position={initialPosition}
+        up={[0, 0, 1]}
+      />
       <OrbitControls
         makeDefault
         target={targetVec}
@@ -351,7 +367,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* ---- View preset camera driver — reads store via props to avoid Canvas re-render ---- */}
       <ViewPresetsInner
-        entities={document.entities as Record<string, { position: readonly [number, number, number] }>}
+        entities={
+          document.entities as Record<string, { position: readonly [number, number, number] }>
+        }
         selection={selection}
         allEntityIds={allEntityIds}
       />
@@ -454,10 +472,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* ---- Orientation gizmo (bottom-right corner) ---- */}
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
-        <GizmoViewport
-          axisColors={['#e05252', '#52c05a', '#4e8de0']}
-          labelColor="#e8eaed"
-        />
+        <GizmoViewport axisColors={['#e05252', '#52c05a', '#4e8de0']} labelColor="#e8eaed" />
       </GizmoHelper>
     </>
   );
@@ -526,9 +541,7 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       {/* Mode toggle overlay — only visible when a single entity is selected */}
-      {showModeToggle && (
-        <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />
-      )}
+      {showModeToggle && <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />}
 
       {/* View preset buttons (top-right) */}
       <ViewPresetsOverlay />

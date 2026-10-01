@@ -226,7 +226,16 @@ describe('readOnly commands — document reference unchanged', () => {
     ['check_model', {}],
     ['find_entities', {}],
     ['measure_distance', { point1: [0, 0, 0], point2: [1, 0, 0] }],
-    ['measure_angle', { points: [[0, 0, 0], [1, 0, 0], [0, 1, 0]] }],
+    [
+      'measure_angle',
+      {
+        points: [
+          [0, 0, 0],
+          [1, 0, 0],
+          [0, 1, 0],
+        ],
+      },
+    ],
     ['measure_bounding_box', {}],
   ];
 

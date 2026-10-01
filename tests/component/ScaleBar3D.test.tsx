@@ -19,7 +19,10 @@ import { ScaleBar3D } from '@ui/viewport/3d/ScaleBar3D';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeDoc(units: 'mm' | 'cm' | 'm' | 'in' | 'ft', displayPrecision = 3): ReturnType<typeof createEmptyDocument> {
+function makeDoc(
+  units: 'mm' | 'cm' | 'm' | 'in' | 'ft',
+  displayPrecision = 3,
+): ReturnType<typeof createEmptyDocument> {
   return { ...createEmptyDocument(), units, displayPrecision };
 }
 
@@ -34,9 +37,7 @@ describe('ScaleBar3D', () => {
 
   it('renders without crashing', () => {
     const doc = makeDoc('mm');
-    const { container } = render(
-      <ScaleBar3D distance={10} viewportWidthPx={800} document={doc} />,
-    );
+    const { container } = render(<ScaleBar3D distance={10} viewportWidthPx={800} document={doc} />);
     expect(container.firstChild).not.toBeNull();
   });
 
@@ -87,9 +88,7 @@ describe('ScaleBar3D', () => {
 
   it('renders a bar element (visual indicator div)', () => {
     const doc = makeDoc('mm');
-    const { container } = render(
-      <ScaleBar3D distance={10} viewportWidthPx={800} document={doc} />,
-    );
+    const { container } = render(<ScaleBar3D distance={10} viewportWidthPx={800} document={doc} />);
     // The bar is a <div> with a gradient background; container has nested divs.
     const divs = container.querySelectorAll('div');
     // Outer wrapper + bar + left tick + right tick = at least 4 elements.

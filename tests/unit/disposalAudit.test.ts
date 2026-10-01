@@ -27,7 +27,10 @@ function withDisposeSpy<T extends THREE.BufferGeometry | THREE.Material>(
   const obj = make();
   let called = false;
   const original = obj.dispose.bind(obj);
-  obj.dispose = () => { called = true; original(); };
+  obj.dispose = () => {
+    called = true;
+    original();
+  };
   use(obj);
   obj.dispose();
   return { disposeCalled: called };
@@ -41,7 +44,9 @@ describe('Disposal audit — BoxGeometry', () => {
   it('dispose() is called on the geometry created by BoxMesh pattern', () => {
     const result = withDisposeSpy(
       () => new THREE.BoxGeometry(1, 2, 3),
-      () => { /* geometry used by mesh */ },
+      () => {
+        /* geometry used by mesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -55,7 +60,9 @@ describe('Disposal audit — SphereGeometry', () => {
   it('dispose() is called on the geometry created by SphereMesh pattern', () => {
     const result = withDisposeSpy(
       () => new THREE.SphereGeometry(5, 16, 8),
-      () => { /* geometry used by mesh */ },
+      () => {
+        /* geometry used by mesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -69,7 +76,9 @@ describe('Disposal audit — CylinderGeometry', () => {
   it('dispose() is called on the geometry created by CylinderMesh pattern', () => {
     const result = withDisposeSpy(
       () => new THREE.CylinderGeometry(2, 2, 10, 16),
-      () => { /* geometry used by mesh */ },
+      () => {
+        /* geometry used by mesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -83,7 +92,9 @@ describe('Disposal audit — ConeGeometry', () => {
   it('dispose() is called on the geometry created by ConeMesh pattern', () => {
     const result = withDisposeSpy(
       () => new THREE.ConeGeometry(3, 8, 16),
-      () => { /* geometry used by mesh */ },
+      () => {
+        /* geometry used by mesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -97,7 +108,9 @@ describe('Disposal audit — TorusGeometry', () => {
   it('dispose() is called on the geometry created by TorusMesh pattern', () => {
     const result = withDisposeSpy(
       () => new THREE.TorusGeometry(4, 0.8, 8, 16),
-      () => { /* geometry used by mesh */ },
+      () => {
+        /* geometry used by mesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -117,7 +130,9 @@ describe('Disposal audit — ExtrudeGeometry', () => {
 
     const result = withDisposeSpy(
       () => new THREE.ExtrudeGeometry(shape, { depth: 2, bevelEnabled: false }),
-      () => { /* geometry used by mesh */ },
+      () => {
+        /* geometry used by mesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -139,7 +154,9 @@ describe('Disposal audit — custom BufferGeometry', () => {
         geo.computeVertexNormals();
         return geo;
       },
-      () => { /* geometry used by mesh */ },
+      () => {
+        /* geometry used by mesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -154,12 +171,18 @@ describe('Disposal audit — SnapIndicator3D geometry', () => {
     const geo = new THREE.OctahedronGeometry(0.18, 0);
     let geoCalled = false;
     const geoOriginal = geo.dispose.bind(geo);
-    geo.dispose = () => { geoCalled = true; geoOriginal(); };
+    geo.dispose = () => {
+      geoCalled = true;
+      geoOriginal();
+    };
 
     const mat = new THREE.MeshBasicMaterial({ color: '#f5c842', wireframe: true });
     let matCalled = false;
     const matOriginal = mat.dispose.bind(mat);
-    mat.dispose = () => { matCalled = true; matOriginal(); };
+    mat.dispose = () => {
+      matCalled = true;
+      matOriginal();
+    };
 
     // Simulate: colour changes → material recreated → OLD material dispose called.
     mat.dispose();
@@ -181,7 +204,9 @@ describe('Disposal audit — MeasureBBoxWireframe material', () => {
   it('LineBasicMaterial.dispose() is called on unmount', () => {
     const result = withDisposeSpy(
       () => new THREE.LineBasicMaterial({ color: '#60a5fa' }),
-      () => { /* material used by lineSegments */ },
+      () => {
+        /* material used by lineSegments */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -195,7 +220,9 @@ describe('Disposal audit — InstancedRenderer MeshStandardMaterial', () => {
   it('MeshStandardMaterial.dispose() is called when batch unmounts', () => {
     const result = withDisposeSpy(
       () => new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.08 }),
-      () => { /* material used by InstancedMesh */ },
+      () => {
+        /* material used by InstancedMesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });
@@ -203,7 +230,9 @@ describe('Disposal audit — InstancedRenderer MeshStandardMaterial', () => {
   it('geometry.dispose() is called when batch unmounts', () => {
     const result = withDisposeSpy(
       () => new THREE.BoxGeometry(10, 20, 30),
-      () => { /* geometry used by InstancedMesh */ },
+      () => {
+        /* geometry used by InstancedMesh */
+      },
     );
     expect(result.disposeCalled).toBe(true);
   });

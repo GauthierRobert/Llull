@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type { CircleEntity, RectangleEntity, PolylineEntity, LineEntity, ExtrusionEntity, RevolutionEntity } from '@core/model/types';
+import type {
+  CircleEntity,
+  RectangleEntity,
+  PolylineEntity,
+  LineEntity,
+  ExtrusionEntity,
+  RevolutionEntity,
+} from '@core/model/types';
 import { DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { __resetIdCounter } from '@lib/id';
@@ -54,7 +61,11 @@ function docWithClosedPolyline(): { doc: ReturnType<typeof createEmptyDocument>;
   const entity: PolylineEntity = {
     id,
     kind: 'polyline',
-    points: [[0, 0], [10, 0], [5, 8]],
+    points: [
+      [0, 0],
+      [10, 0],
+      [5, 8],
+    ],
     closed: true,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -73,7 +84,11 @@ function docWithOpenPolyline(): { doc: ReturnType<typeof createEmptyDocument>; i
   const entity: PolylineEntity = {
     id,
     kind: 'polyline',
-    points: [[0, 0], [10, 0], [5, 8]],
+    points: [
+      [0, 0],
+      [10, 0],
+      [5, 8],
+    ],
     closed: false,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -241,7 +256,10 @@ describe('extrude_sketch', () => {
     const entity: PolylineEntity = {
       id,
       kind: 'polyline',
-      points: [[0, 0], [5, 0]],
+      points: [
+        [0, 0],
+        [5, 0],
+      ],
       closed: true,
       position: [0, 0, 0],
       rotation: [0, 0, 0],
@@ -261,7 +279,11 @@ describe('extrude_sketch', () => {
 // ---------------------------------------------------------------------------
 
 /** Triangle profile for revolution tests: 3 points in the +X half-plane */
-const TRI_PROFILE: ReadonlyArray<readonly [number, number]> = [[1, 0], [3, 0], [2, 2]];
+const TRI_PROFILE: ReadonlyArray<readonly [number, number]> = [
+  [1, 0],
+  [3, 0],
+  [2, 2],
+];
 
 describe('revolve_profile', () => {
   beforeEach(() => __resetIdCounter());
@@ -296,7 +318,11 @@ describe('revolve_profile', () => {
 
   it('summary contains id, axis, angle, and segments', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 'z', segments: 16 });
+    const result = execute(doc, 'revolve_profile', {
+      profile: TRI_PROFILE,
+      axis: 'z',
+      segments: 16,
+    });
     const id = result.affected[0]!;
     expect(result.summary).toContain(id);
     expect(result.summary).toContain('z');
@@ -397,7 +423,12 @@ describe('revolve_profile', () => {
 
   it('profile with < 3 points → graceful no-op', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'revolve_profile', { profile: [[1, 0], [2, 1]] });
+    const result = execute(doc, 'revolve_profile', {
+      profile: [
+        [1, 0],
+        [2, 1],
+      ],
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('at least 3');
@@ -442,8 +473,10 @@ describe('revolve_profile', () => {
 
   it('invalid axis string → graceful no-op', () => {
     const doc = createEmptyDocument();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: 'diagonal' as any });
+    const result = execute(doc, 'revolve_profile', {
+      profile: TRI_PROFILE,
+      axis: 'diagonal',
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('axis');
@@ -451,8 +484,10 @@ describe('revolve_profile', () => {
 
   it('zero-length Vec3 axis → graceful no-op', () => {
     const doc = createEmptyDocument();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = execute(doc, 'revolve_profile', { profile: TRI_PROFILE, axis: [0, 0, 0] as any });
+    const result = execute(doc, 'revolve_profile', {
+      profile: TRI_PROFILE,
+      axis: [0, 0, 0],
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });

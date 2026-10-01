@@ -14,14 +14,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
-import {
-  applyCommand,
-  undo,
-  redo,
-  canUndo,
-  canRedo,
-  _resetHistory,
-} from '../src/commandBus';
+import { applyCommand, undo, redo, canUndo, canRedo, _resetHistory } from '../src/commandBus';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
 
 // ---------------------------------------------------------------------------
@@ -238,12 +231,12 @@ describe('undo / redo', () => {
 
     // Undo once.
     const u1 = undo();
-    expect(u1.canUndo).toBe(true);   // still 1 step left
+    expect(u1.canUndo).toBe(true); // still 1 step left
     expect(u1.canRedo).toBe(true);
 
     // Undo again.
     const u2 = undo();
-    expect(u2.canUndo).toBe(false);  // stack empty
+    expect(u2.canUndo).toBe(false); // stack empty
     expect(u2.canRedo).toBe(true);
 
     // Redo once.

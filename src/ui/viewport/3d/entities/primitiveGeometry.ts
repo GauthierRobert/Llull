@@ -12,14 +12,23 @@ import { radialSegmentsForDiag, cylinderDiag, sphereDiag, torusDiag } from '../l
 
 /** Cylinder: axis along +Z, centered at the origin. */
 export function buildCylinderGeometry(radius: number, height: number): THREE.BufferGeometry {
-  const geo = new THREE.CylinderGeometry(radius, radius, height, radialSegmentsForDiag(cylinderDiag(radius, height)));
+  const geo = new THREE.CylinderGeometry(
+    radius,
+    radius,
+    height,
+    radialSegmentsForDiag(cylinderDiag(radius, height)),
+  );
   geo.rotateX(Math.PI / 2);
   return geo;
 }
 
 /** Cone: base circle in XY at the origin, apex at (0, 0, height). */
 export function buildConeGeometry(radius: number, height: number): THREE.BufferGeometry {
-  const geo = new THREE.ConeGeometry(radius, height, radialSegmentsForDiag(cylinderDiag(radius, height)));
+  const geo = new THREE.ConeGeometry(
+    radius,
+    height,
+    radialSegmentsForDiag(cylinderDiag(radius, height)),
+  );
   geo.rotateX(Math.PI / 2);
   geo.translate(0, 0, height / 2);
   return geo;
@@ -52,7 +61,11 @@ export function buildTorusGeometry(ringRadius: number, tubeRadius: number): THRE
  *
  * 6 triangles total: 2 for the base, 4 for the side faces.
  */
-export function buildPyramidGeometry(baseWidth: number, baseDepth: number, height: number): THREE.BufferGeometry {
+export function buildPyramidGeometry(
+  baseWidth: number,
+  baseDepth: number,
+  height: number,
+): THREE.BufferGeometry {
   const hw = baseWidth / 2;
   const hd = baseDepth / 2;
 

@@ -15,7 +15,15 @@
  * geometry. Zero-rotation entities produce the same output as before (back-compat).
  */
 
-import type { AnimationChannel, AnimationMode, CadDocument, Entity, EntityKind, InstanceEntity, Vec3 } from '../model/types';
+import type {
+  AnimationChannel,
+  AnimationMode,
+  CadDocument,
+  Entity,
+  EntityKind,
+  InstanceEntity,
+  Vec3,
+} from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
 
@@ -94,7 +102,10 @@ export function entityBounds(e: Entity): Bounds {
   switch (e.kind) {
     case 'box': {
       const [w, h, d] = e.size;
-      return { min: offset(e.position, -w / 2, -h / 2, -d / 2), max: offset(e.position, w / 2, h / 2, d / 2) };
+      return {
+        min: offset(e.position, -w / 2, -h / 2, -d / 2),
+        max: offset(e.position, w / 2, h / 2, d / 2),
+      };
     }
     case 'cylinder':
       // Z-up: axis along Z, centered at position (matches render.ts / export.ts).
@@ -103,7 +114,10 @@ export function entityBounds(e: Entity): Bounds {
         max: offset(e.position, e.radius, e.radius, e.height / 2),
       };
     case 'sphere':
-      return { min: offset(e.position, -e.radius, -e.radius, -e.radius), max: offset(e.position, e.radius, e.radius, e.radius) };
+      return {
+        min: offset(e.position, -e.radius, -e.radius, -e.radius),
+        max: offset(e.position, e.radius, e.radius, e.radius),
+      };
     case 'extrusion': {
       const xs = e.profile.map((pt) => pt[0]);
       const ys = e.profile.map((pt) => pt[1]);
@@ -112,15 +126,24 @@ export function entityBounds(e: Entity): Bounds {
       const minY = ys.length ? Math.min(...ys) : 0;
       const maxY = ys.length ? Math.max(...ys) : 0;
       // ExtrudeGeometry extrudes along +Z from the profile plane.
-      return { min: offset(e.position, minX, minY, 0), max: offset(e.position, maxX, maxY, e.depth) };
+      return {
+        min: offset(e.position, minX, minY, 0),
+        max: offset(e.position, maxX, maxY, e.depth),
+      };
     }
     case 'mesh': {
       const p = e.mesh.positions;
       if (p.length < 3) return { min: e.position, max: e.position };
-      let minX = Infinity, minY = Infinity, minZ = Infinity;
-      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        minZ = Infinity;
+      let maxX = -Infinity,
+        maxY = -Infinity,
+        maxZ = -Infinity;
       for (let i = 0; i + 2 < p.length; i += 3) {
-        const x = p[i] as number, y = p[i + 1] as number, z = p[i + 2] as number;
+        const x = p[i] as number,
+          y = p[i + 1] as number,
+          z = p[i + 2] as number;
         if (x < minX) minX = x;
         if (y < minY) minY = y;
         if (z < minZ) minZ = z;
@@ -139,8 +162,18 @@ export function entityBounds(e: Entity): Bounds {
     case 'torus':
       // Torus ring in XY plane: outer extent is ringRadius+tubeRadius; tube extends ±tubeRadius in Z.
       return {
-        min: offset(e.position, -(e.ringRadius + e.tubeRadius), -(e.ringRadius + e.tubeRadius), -e.tubeRadius),
-        max: offset(e.position, e.ringRadius + e.tubeRadius, e.ringRadius + e.tubeRadius, e.tubeRadius),
+        min: offset(
+          e.position,
+          -(e.ringRadius + e.tubeRadius),
+          -(e.ringRadius + e.tubeRadius),
+          -e.tubeRadius,
+        ),
+        max: offset(
+          e.position,
+          e.ringRadius + e.tubeRadius,
+          e.ringRadius + e.tubeRadius,
+          e.tubeRadius,
+        ),
       };
     case 'wedge': {
       // Wedge lower-front-left corner is at position; bounding box is the full size.
@@ -166,7 +199,9 @@ export function entityBounds(e: Entity): Bounds {
       const maxAxial = Math.max(...axialValues);
       const [ax, ay, az] = e.axis;
       // Determine which world axis the revolution axis aligns with (largest component).
-      const abx = Math.abs(ax), aby = Math.abs(ay), abz = Math.abs(az);
+      const abx = Math.abs(ax),
+        aby = Math.abs(ay),
+        abz = Math.abs(az);
       if (abz >= abx && abz >= aby) {
         // Z-axis revolution: radial in XY, axial in Z
         return {
@@ -196,7 +231,10 @@ export function entityBounds(e: Entity): Bounds {
     }
     case 'polyline': {
       if (e.points.length === 0) return { min: e.position, max: e.position };
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
       for (const [x, y] of e.points) {
         if (x < minX) minX = x;
         if (y < minY) minY = y;
@@ -224,7 +262,10 @@ export function entityBounds(e: Entity): Bounds {
       };
     case 'spline': {
       if (e.points.length === 0) return { min: e.position, max: e.position };
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
       for (const [x, y] of e.points) {
         if (x < minX) minX = x;
         if (y < minY) minY = y;
@@ -309,8 +350,16 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
         combined = { min: [world[0], world[1], world[2]], max: [world[0], world[1], world[2]] };
       } else {
         combined = {
-          min: [Math.min(combined.min[0], world[0]), Math.min(combined.min[1], world[1]), Math.min(combined.min[2], world[2])],
-          max: [Math.max(combined.max[0], world[0]), Math.max(combined.max[1], world[1]), Math.max(combined.max[2], world[2])],
+          min: [
+            Math.min(combined.min[0], world[0]),
+            Math.min(combined.min[1], world[1]),
+            Math.min(combined.min[2], world[2]),
+          ],
+          max: [
+            Math.max(combined.max[0], world[0]),
+            Math.max(combined.max[1], world[1]),
+            Math.max(combined.max[2], world[2]),
+          ],
         };
       }
     }
@@ -333,25 +382,46 @@ function localEntityCorners(e: Entity): Vec3[] {
   switch (e.kind) {
     case 'box': {
       const [w, h, d] = e.size;
-      const hw = w / 2, hh = h / 2, hd = d / 2;
+      const hw = w / 2,
+        hh = h / 2,
+        hd = d / 2;
       return [
-        [-hw, -hh, -hd], [hw, -hh, -hd], [hw, hh, -hd], [-hw, hh, -hd],
-        [-hw, -hh,  hd], [hw, -hh,  hd], [hw, hh,  hd], [-hw, hh,  hd],
+        [-hw, -hh, -hd],
+        [hw, -hh, -hd],
+        [hw, hh, -hd],
+        [-hw, hh, -hd],
+        [-hw, -hh, hd],
+        [hw, -hh, hd],
+        [hw, hh, hd],
+        [-hw, hh, hd],
       ];
     }
     case 'cylinder': {
       // Z-up AABB of cylinder: radius in X/Y, height along Z, centered at position.
-      const r = e.radius, hh = e.height / 2;
+      const r = e.radius,
+        hh = e.height / 2;
       return [
-        [-r, -r, -hh], [r, -r, -hh], [r, r, -hh], [-r, r, -hh],
-        [-r, -r,  hh], [r, -r,  hh], [r, r,  hh], [-r, r,  hh],
+        [-r, -r, -hh],
+        [r, -r, -hh],
+        [r, r, -hh],
+        [-r, r, -hh],
+        [-r, -r, hh],
+        [r, -r, hh],
+        [r, r, hh],
+        [-r, r, hh],
       ];
     }
     case 'sphere': {
       const r = e.radius;
       return [
-        [-r, -r, -r], [r, -r, -r], [r, r, -r], [-r, r, -r],
-        [-r, -r,  r], [r, -r,  r], [r, r,  r], [-r, r,  r],
+        [-r, -r, -r],
+        [r, -r, -r],
+        [r, r, -r],
+        [-r, r, -r],
+        [-r, -r, r],
+        [r, -r, r],
+        [r, r, r],
+        [-r, r, r],
       ];
     }
     case 'extrusion': {
@@ -362,60 +432,102 @@ function localEntityCorners(e: Entity): Vec3[] {
       const minY = ys.length ? Math.min(...ys) : 0;
       const maxY = ys.length ? Math.max(...ys) : 0;
       return [
-        [minX, minY, 0], [maxX, minY, 0], [maxX, maxY, 0], [minX, maxY, 0],
-        [minX, minY, e.depth], [maxX, minY, e.depth], [maxX, maxY, e.depth], [minX, maxY, e.depth],
+        [minX, minY, 0],
+        [maxX, minY, 0],
+        [maxX, maxY, 0],
+        [minX, maxY, 0],
+        [minX, minY, e.depth],
+        [maxX, minY, e.depth],
+        [maxX, maxY, e.depth],
+        [minX, maxY, e.depth],
       ];
     }
     case 'mesh': {
       const p = e.mesh.positions;
       // @invariant positions is a flat Float32-style array of xyz triples; one triangle = 9 floats minimum.
       if (p.length < 9 || p.length % 3 !== 0) return [[0, 0, 0]];
-      let minX = Infinity, minY = Infinity, minZ = Infinity;
-      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        minZ = Infinity;
+      let maxX = -Infinity,
+        maxY = -Infinity,
+        maxZ = -Infinity;
       for (let i = 0; i + 2 < p.length; i += 3) {
-        const x = p[i] as number, y = p[i + 1] as number, z = p[i + 2] as number;
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
-        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        const x = p[i] as number,
+          y = p[i + 1] as number,
+          z = p[i + 2] as number;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z;
+        if (z > maxZ) maxZ = z;
       }
       // @invariant positions are world-space; subtract position so rotatedEntityBounds
       // round-trips correctly (it adds position back for every corner).
-      const px = e.position[0], py = e.position[1], pz = e.position[2];
+      const px = e.position[0],
+        py = e.position[1],
+        pz = e.position[2];
       return [
-        [minX - px, minY - py, minZ - pz], [maxX - px, minY - py, minZ - pz],
-        [maxX - px, maxY - py, minZ - pz], [minX - px, maxY - py, minZ - pz],
-        [minX - px, minY - py, maxZ - pz], [maxX - px, minY - py, maxZ - pz],
-        [maxX - px, maxY - py, maxZ - pz], [minX - px, maxY - py, maxZ - pz],
+        [minX - px, minY - py, minZ - pz],
+        [maxX - px, minY - py, minZ - pz],
+        [maxX - px, maxY - py, minZ - pz],
+        [minX - px, maxY - py, minZ - pz],
+        [minX - px, minY - py, maxZ - pz],
+        [maxX - px, minY - py, maxZ - pz],
+        [maxX - px, maxY - py, maxZ - pz],
+        [minX - px, maxY - py, maxZ - pz],
       ];
     }
     case 'cone': {
       // Base circle in XY at z=0; apex at z=height. OBB: radius in X/Y, height in Z.
-      const r = e.radius, h = e.height;
+      const r = e.radius,
+        h = e.height;
       return [
-        [-r, -r, 0], [r, -r, 0], [r, r, 0], [-r, r, 0],
-        [0,   0, h],
+        [-r, -r, 0],
+        [r, -r, 0],
+        [r, r, 0],
+        [-r, r, 0],
+        [0, 0, h],
       ];
     }
     case 'torus': {
-      const outer = e.ringRadius + e.tubeRadius, t = e.tubeRadius;
+      const outer = e.ringRadius + e.tubeRadius,
+        t = e.tubeRadius;
       return [
-        [-outer, -outer, -t], [outer, -outer, -t], [outer, outer, -t], [-outer, outer, -t],
-        [-outer, -outer,  t], [outer, -outer,  t], [outer, outer,  t], [-outer, outer,  t],
+        [-outer, -outer, -t],
+        [outer, -outer, -t],
+        [outer, outer, -t],
+        [-outer, outer, -t],
+        [-outer, -outer, t],
+        [outer, -outer, t],
+        [outer, outer, t],
+        [-outer, outer, t],
       ];
     }
     case 'wedge': {
       const [ww, wh, wd] = e.size;
       // Lower-front-left corner is at local (0,0,0); extends +X/+Y/+Z.
       return [
-        [0, 0, 0], [ww, 0, 0], [ww, wh, 0], [0, wh, 0],
-        [0, 0, wd], [ww, 0, wd], [ww, wh, wd], [0, wh, wd],
+        [0, 0, 0],
+        [ww, 0, 0],
+        [ww, wh, 0],
+        [0, wh, 0],
+        [0, 0, wd],
+        [ww, 0, wd],
+        [ww, wh, wd],
+        [0, wh, wd],
       ];
     }
     case 'pyramid': {
-      const hw = e.baseWidth / 2, hd = e.baseDepth / 2;
+      const hw = e.baseWidth / 2,
+        hd = e.baseDepth / 2;
       return [
-        [-hw, -hd, 0], [hw, -hd, 0], [hw, hd, 0], [-hw, hd, 0],
-        [0,   0, e.height],
+        [-hw, -hd, 0],
+        [hw, -hd, 0],
+        [hw, hd, 0],
+        [-hw, hd, 0],
+        [0, 0, e.height],
       ];
     }
     case 'revolution': {
@@ -425,24 +537,44 @@ function localEntityCorners(e: Entity): Vec3[] {
       const minA = Math.min(...axialValues);
       const maxA = Math.max(...axialValues);
       const [ax, ay, az] = e.axis;
-      const abx = Math.abs(ax), aby = Math.abs(ay), abz = Math.abs(az);
+      const abx = Math.abs(ax),
+        aby = Math.abs(ay),
+        abz = Math.abs(az);
       if (abz >= abx && abz >= aby) {
         // Z-axis: radial in XY, axial in Z
         return [
-          [-maxR, -maxR, minA], [maxR, -maxR, minA], [maxR, maxR, minA], [-maxR, maxR, minA],
-          [-maxR, -maxR, maxA], [maxR, -maxR, maxA], [maxR, maxR, maxA], [-maxR, maxR, maxA],
+          [-maxR, -maxR, minA],
+          [maxR, -maxR, minA],
+          [maxR, maxR, minA],
+          [-maxR, maxR, minA],
+          [-maxR, -maxR, maxA],
+          [maxR, -maxR, maxA],
+          [maxR, maxR, maxA],
+          [-maxR, maxR, maxA],
         ];
       } else if (aby >= abx) {
         // Y-axis: radial in XZ, axial in Y
         return [
-          [-maxR, minA, -maxR], [maxR, minA, -maxR], [maxR, minA, maxR], [-maxR, minA, maxR],
-          [-maxR, maxA, -maxR], [maxR, maxA, -maxR], [maxR, maxA, maxR], [-maxR, maxA, maxR],
+          [-maxR, minA, -maxR],
+          [maxR, minA, -maxR],
+          [maxR, minA, maxR],
+          [-maxR, minA, maxR],
+          [-maxR, maxA, -maxR],
+          [maxR, maxA, -maxR],
+          [maxR, maxA, maxR],
+          [-maxR, maxA, maxR],
         ];
       } else {
         // X-axis: radial in YZ, axial in X
         return [
-          [minA, -maxR, -maxR], [maxA, -maxR, -maxR], [maxA, maxR, -maxR], [minA, maxR, -maxR],
-          [minA, -maxR, maxR], [maxA, -maxR, maxR], [maxA, maxR, maxR], [minA, maxR, maxR],
+          [minA, -maxR, -maxR],
+          [maxA, -maxR, -maxR],
+          [maxA, maxR, -maxR],
+          [minA, maxR, -maxR],
+          [minA, -maxR, maxR],
+          [maxA, -maxR, maxR],
+          [maxA, maxR, maxR],
+          [minA, maxR, maxR],
         ];
       }
     }
@@ -452,45 +584,81 @@ function localEntityCorners(e: Entity): Vec3[] {
       const maxX = Math.max(e.start[0], e.end[0]);
       const minY = Math.min(e.start[1], e.end[1]);
       const maxY = Math.max(e.start[1], e.end[1]);
-      return [[minX, minY, 0], [maxX, minY, 0], [maxX, maxY, 0], [minX, maxY, 0]];
+      return [
+        [minX, minY, 0],
+        [maxX, minY, 0],
+        [maxX, maxY, 0],
+        [minX, maxY, 0],
+      ];
     }
     case 'polyline':
     case 'spline': {
       if (e.points.length === 0) return [[0, 0, 0]];
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
       for (const [x, y] of e.points) {
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
       }
-      return [[minX, minY, 0], [maxX, minY, 0], [maxX, maxY, 0], [minX, maxY, 0]];
+      return [
+        [minX, minY, 0],
+        [maxX, minY, 0],
+        [maxX, maxY, 0],
+        [minX, maxY, 0],
+      ];
     }
     case 'arc':
     case 'circle': {
       const r = e.radius;
-      const cx = e.center[0], cy = e.center[1];
+      const cx = e.center[0],
+        cy = e.center[1];
       return [
-        [cx - r, cy - r, 0], [cx + r, cy - r, 0],
-        [cx + r, cy + r, 0], [cx - r, cy + r, 0],
+        [cx - r, cy - r, 0],
+        [cx + r, cy - r, 0],
+        [cx + r, cy + r, 0],
+        [cx - r, cy + r, 0],
       ];
     }
     case 'ellipse': {
-      const cx = e.center[0], cy = e.center[1];
+      const cx = e.center[0],
+        cy = e.center[1];
       return [
-        [cx - e.radiusX, cy - e.radiusY, 0], [cx + e.radiusX, cy - e.radiusY, 0],
-        [cx + e.radiusX, cy + e.radiusY, 0], [cx - e.radiusX, cy + e.radiusY, 0],
+        [cx - e.radiusX, cy - e.radiusY, 0],
+        [cx + e.radiusX, cy - e.radiusY, 0],
+        [cx + e.radiusX, cy + e.radiusY, 0],
+        [cx - e.radiusX, cy + e.radiusY, 0],
       ];
     }
     case 'rectangle':
-      return [[0, 0, 0], [e.width, 0, 0], [e.width, e.height, 0], [0, e.height, 0]];
+      return [
+        [0, 0, 0],
+        [e.width, 0, 0],
+        [e.width, e.height, 0],
+        [0, e.height, 0],
+      ];
     case 'point':
       return [[0, 0, 0]];
     case 'text': {
       const estimatedWidth = e.content.length * e.height * 0.6;
-      return [[0, 0, 0], [estimatedWidth, 0, 0], [estimatedWidth, e.height, 0], [0, e.height, 0]];
+      return [
+        [0, 0, 0],
+        [estimatedWidth, 0, 0],
+        [estimatedWidth, e.height, 0],
+        [0, e.height, 0],
+      ];
     }
     case 'dimension': {
       const ext = e.offset ?? 5;
-      return [[-ext, -ext, 0], [ext, -ext, 0], [ext, ext, 0], [-ext, ext, 0]];
+      return [
+        [-ext, -ext, 0],
+        [ext, -ext, 0],
+        [ext, ext, 0],
+        [-ext, ext, 0],
+      ];
     }
     case 'instance': {
       // Instance has no own geometry in local space — collapse to a single point.
@@ -529,8 +697,12 @@ export function rotatedEntityBounds(e: Entity): Bounds {
   }
 
   const corners = localEntityCorners(e);
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity;
+  let maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity;
   for (const local of corners) {
     // local corner is relative to position=0; rotate it about the entity origin
     const world = applyEulerXYZ(
@@ -538,9 +710,12 @@ export function rotatedEntityBounds(e: Entity): Bounds {
       e.position,
       e.rotation,
     );
-    if (world[0] < minX) minX = world[0]; if (world[0] > maxX) maxX = world[0];
-    if (world[1] < minY) minY = world[1]; if (world[1] > maxY) maxY = world[1];
-    if (world[2] < minZ) minZ = world[2]; if (world[2] > maxZ) maxZ = world[2];
+    if (world[0] < minX) minX = world[0];
+    if (world[0] > maxX) maxX = world[0];
+    if (world[1] < minY) minY = world[1];
+    if (world[1] > maxY) maxY = world[1];
+    if (world[2] < minZ) minZ = world[2];
+    if (world[2] > maxZ) maxZ = world[2];
   }
   return {
     min: [minX, minY, minZ],
@@ -585,7 +760,13 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
   const layers: LayerSummary[] = doc.layerOrder
     .map((lid) => doc.layers[lid])
     .filter((l): l is NonNullable<typeof l> => l !== undefined)
-    .map((l) => ({ id: l.id, name: l.name, visible: l.visible, locked: l.locked, entityCount: layerCounts[l.id] ?? 0 }));
+    .map((l) => ({
+      id: l.id,
+      name: l.name,
+      visible: l.visible,
+      locked: l.locked,
+      entityCount: layerCounts[l.id] ?? 0,
+    }));
 
   const groups: GroupSummary[] = Object.values(doc.groups ?? {}).map((g) => ({
     id: g.id,

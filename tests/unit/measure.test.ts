@@ -210,7 +210,13 @@ describe('measure commands', () => {
     it('purity: input doc not mutated', () => {
       const doc = createEmptyDocument();
       const snapshot = JSON.stringify(doc);
-      execute(doc, 'measure_angle', { points: [[0,0,0],[1,0,0],[0,1,0]] });
+      execute(doc, 'measure_angle', {
+        points: [
+          [0, 0, 0],
+          [1, 0, 0],
+          [0, 1, 0],
+        ],
+      });
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });
@@ -248,7 +254,12 @@ describe('measure commands', () => {
     it('happy: closed polyline area (unit square)', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [1, 0], [1, 1], [0, 1]],
+        points: [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ],
         closed: true,
       });
       doc = r.document;
@@ -263,7 +274,11 @@ describe('measure commands', () => {
       const doc = createEmptyDocument();
       // right triangle with legs 3, 4 → area = 6
       const result = execute(doc, 'measure_area', {
-        points: [[0, 0], [3, 0], [0, 4]],
+        points: [
+          [0, 0],
+          [3, 0],
+          [0, 4],
+        ],
       });
       const d = result.data as { area: number; unit: string };
       expect(d.area).toBeCloseTo(6, 10);
@@ -271,7 +286,14 @@ describe('measure commands', () => {
 
     it('failure: open polyline', () => {
       let doc = createEmptyDocument();
-      const r = execute(doc, 'draw_polyline', { points: [[0, 0], [1, 0], [1, 1]], closed: false });
+      const r = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+        ],
+        closed: false,
+      });
       doc = r.document;
       const id = r.affected[0]!;
 
@@ -312,7 +334,12 @@ describe('measure commands', () => {
 
     it('failure: fewer than 3 explicit points', () => {
       const doc = createEmptyDocument();
-      const result = execute(doc, 'measure_area', { points: [[0, 0], [1, 0]] });
+      const result = execute(doc, 'measure_area', {
+        points: [
+          [0, 0],
+          [1, 0],
+        ],
+      });
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(doc);
       expect(result.data).toBeUndefined();
@@ -321,7 +348,13 @@ describe('measure commands', () => {
     it('purity: input doc not mutated', () => {
       const doc = createEmptyDocument();
       const snapshot = JSON.stringify(doc);
-      execute(doc, 'measure_area', { points: [[0,0],[1,0],[0,1]] });
+      execute(doc, 'measure_area', {
+        points: [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+        ],
+      });
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });
@@ -371,7 +404,11 @@ describe('measure commands', () => {
       let doc = createEmptyDocument();
       // 3-4-5 right triangle open: two legs = 3 + 4 = 7
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [3, 0], [3, 4]],
+        points: [
+          [0, 0],
+          [3, 0],
+          [3, 4],
+        ],
         closed: false,
       });
       doc = r.document;
@@ -386,7 +423,12 @@ describe('measure commands', () => {
       let doc = createEmptyDocument();
       // unit square: perimeter 4
       const r = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [1, 0], [1, 1], [0, 1]],
+        points: [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ],
         closed: true,
       });
       doc = r.document;
@@ -572,7 +614,12 @@ describe('measure commands', () => {
     it('happy: extrusion volume (unit square × depth)', () => {
       let doc = createEmptyDocument();
       const r = execute(doc, 'extrude_profile', {
-        profile: [[0, 0], [1, 0], [1, 1], [0, 1]],
+        profile: [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ],
         depth: 3,
       });
       doc = r.document;
@@ -630,28 +677,44 @@ describe('measure commands', () => {
       // and return a meaningless value; the fixed formula must return ≈ 1.
       const positions: number[] = [
         // v0..v7 — corners of unit cube [0,1]³
-        0, 0, 0,  // 0
-        1, 0, 0,  // 1
-        1, 1, 0,  // 2
-        0, 1, 0,  // 3
-        0, 0, 1,  // 4
-        1, 0, 1,  // 5
-        1, 1, 1,  // 6
-        0, 1, 1,  // 7
+        0,
+        0,
+        0, // 0
+        1,
+        0,
+        0, // 1
+        1,
+        1,
+        0, // 2
+        0,
+        1,
+        0, // 3
+        0,
+        0,
+        1, // 4
+        1,
+        0,
+        1, // 5
+        1,
+        1,
+        1, // 6
+        0,
+        1,
+        1, // 7
       ];
       const indices: number[] = [
         // -Z face (z=0, normal -Z, CCW when viewed from -Z)
-        0, 2, 1,  0, 3, 2,
+        0, 2, 1, 0, 3, 2,
         // +Z face (z=1, normal +Z, CCW when viewed from +Z)
-        4, 5, 6,  4, 6, 7,
+        4, 5, 6, 4, 6, 7,
         // -Y face (y=0, normal -Y)
-        0, 1, 5,  0, 5, 4,
+        0, 1, 5, 0, 5, 4,
         // +Y face (y=1, normal +Y)
-        3, 6, 2,  3, 7, 6,
+        3, 6, 2, 3, 7, 6,
         // -X face (x=0, normal -X)
-        0, 4, 7,  0, 7, 3,
+        0, 4, 7, 0, 7, 3,
         // +X face (x=1, normal +X)
-        1, 2, 6,  1, 6, 5,
+        1, 2, 6, 1, 6, 5,
       ];
 
       // Inject a mesh entity directly (no command creates a standalone mesh;
@@ -724,7 +787,12 @@ describe('measure commands', () => {
       // Profile: [(2,0),(4,0),(4,2),(2,2)] — a 2×2 square at x∈[2,4]
       // A = 4, x_centroid = 3 (midpoint of [2,4])
       // V = 2π · 3 · 4 = 24π ≈ 75.398
-      const profile: ReadonlyArray<readonly [number, number]> = [[2, 0], [4, 0], [4, 2], [2, 2]];
+      const profile: ReadonlyArray<readonly [number, number]> = [
+        [2, 0],
+        [4, 0],
+        [4, 2],
+        [2, 2],
+      ];
       const doc = makeRevolution(profile, 2 * Math.PI);
       const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
       expect(result.affected).toEqual([]);
@@ -740,7 +808,11 @@ describe('measure commands', () => {
       // A = (1/2)·2·2 = 2
       // x_centroid = (1+3+1)/3 = 5/3
       // V = 2π · (5/3) · 2 = 20π/3 ≈ 20.944
-      const profile: ReadonlyArray<readonly [number, number]> = [[1, 0], [3, 0], [1, 2]];
+      const profile: ReadonlyArray<readonly [number, number]> = [
+        [1, 0],
+        [3, 0],
+        [1, 2],
+      ];
       const doc = makeRevolution(profile, 2 * Math.PI);
       const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
       const d = result.data as { volume: number; unit: string };
@@ -748,17 +820,31 @@ describe('measure commands', () => {
     });
 
     it('A3 happy: partial revolution (sweepAngle = π) gives half the full-revolution volume', () => {
-      const profile: ReadonlyArray<readonly [number, number]> = [[2, 0], [4, 0], [4, 2], [2, 2]];
+      const profile: ReadonlyArray<readonly [number, number]> = [
+        [2, 0],
+        [4, 0],
+        [4, 2],
+        [2, 2],
+      ];
       const docFull = makeRevolution(profile, 2 * Math.PI);
       const docHalf = makeRevolution(profile, Math.PI);
-      const full = (execute(docFull, 'measure_volume', { entityId: 'rev-test' }).data as { volume: number }).volume;
-      const half = (execute(docHalf, 'measure_volume', { entityId: 'rev-test' }).data as { volume: number }).volume;
+      const full = (
+        execute(docFull, 'measure_volume', { entityId: 'rev-test' }).data as { volume: number }
+      ).volume;
+      const half = (
+        execute(docHalf, 'measure_volume', { entityId: 'rev-test' }).data as { volume: number }
+      ).volume;
       expect(half).toBeCloseTo(full / 2, 6);
     });
 
     it('A4 happy: missing sweepAngle (undefined entity angle) treated as 2π', () => {
       // Use the square profile and assert the result equals the 2π case.
-      const profile: ReadonlyArray<readonly [number, number]> = [[2, 0], [4, 0], [4, 2], [2, 2]];
+      const profile: ReadonlyArray<readonly [number, number]> = [
+        [2, 0],
+        [4, 0],
+        [4, 2],
+        [2, 2],
+      ];
       const doc = createEmptyDocument();
       // Build entity without the `angle` field to simulate an absent value — cast is intentional.
       const entity = {
@@ -786,7 +872,12 @@ describe('measure commands', () => {
 
     it('A5 failure: profile crossing axis (x < 0) falls back to bbox approx with caveat summary', () => {
       // A profile with one point at negative x crosses the revolution axis.
-      const profile: ReadonlyArray<readonly [number, number]> = [[-1, 0], [2, 0], [2, 2], [-1, 2]];
+      const profile: ReadonlyArray<readonly [number, number]> = [
+        [-1, 0],
+        [2, 0],
+        [2, 2],
+        [-1, 2],
+      ];
       const doc = makeRevolution(profile, 2 * Math.PI);
       const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
       expect(result.affected).toEqual([]);
@@ -806,7 +897,11 @@ describe('measure commands', () => {
       // Profile: triangle with one vertex on the axis. Vertices: (0,0)(2,0)(2,2).
       // Area = 2; centroid_x = (0+2+2)/3 = 4/3.
       // V (full revolution) = 2π · (4/3) · 2 = 16π/3 ≈ 16.755.
-      const profile: ReadonlyArray<readonly [number, number]> = [[0, 0], [2, 0], [2, 2]];
+      const profile: ReadonlyArray<readonly [number, number]> = [
+        [0, 0],
+        [2, 0],
+        [2, 2],
+      ];
       const doc = makeRevolution(profile, 2 * Math.PI);
       const result = execute(doc, 'measure_volume', { entityId: 'rev-test' });
       const d = result.data as { volume: number; unit: string };
@@ -815,7 +910,12 @@ describe('measure commands', () => {
     });
 
     it('A6 purity: revolution entity — input doc not mutated', () => {
-      const profile: ReadonlyArray<readonly [number, number]> = [[2, 0], [4, 0], [4, 2], [2, 2]];
+      const profile: ReadonlyArray<readonly [number, number]> = [
+        [2, 0],
+        [4, 0],
+        [4, 2],
+        [2, 2],
+      ];
       const doc = makeRevolution(profile, 2 * Math.PI);
       const snapshot = JSON.stringify(doc);
       execute(doc, 'measure_volume', { entityId: 'rev-test' });
@@ -863,16 +963,11 @@ describe('measure commands', () => {
     it('happy: indexed unit-cube mesh mass = volume × density', () => {
       // Same unit-cube mesh as in measure_volume. volume ≈ 1 mm³.
       const positions: number[] = [
-        0, 0, 0,  1, 0, 0,  1, 1, 0,  0, 1, 0,
-        0, 0, 1,  1, 0, 1,  1, 1, 1,  0, 1, 1,
+        0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
       ];
       const indices: number[] = [
-        0, 2, 1,  0, 3, 2,
-        4, 5, 6,  4, 6, 7,
-        0, 1, 5,  0, 5, 4,
-        3, 6, 2,  3, 7, 6,
-        0, 4, 7,  0, 7, 3,
-        1, 2, 6,  1, 6, 5,
+        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 6, 2, 3, 7, 6, 0, 4, 7, 0, 7, 3, 1,
+        2, 6, 1, 6, 5,
       ];
       const meshEntity = {
         id: 'mesh-mass-1',

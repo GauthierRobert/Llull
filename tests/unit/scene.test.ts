@@ -8,7 +8,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { computeSceneSnapshot, entityBounds, rotatedEntityBounds, instanceBoundsFromDoc } from '@core/commands/scene';
+import {
+  computeSceneSnapshot,
+  entityBounds,
+  rotatedEntityBounds,
+  instanceBoundsFromDoc,
+} from '@core/commands/scene';
 import { __resetIdCounter } from '@lib/id';
 
 describe('describe_scene command', () => {
@@ -44,7 +49,10 @@ describe('describe_scene command', () => {
     doc = a.document;
     const b = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = b.document;
-    doc = execute(doc, 'group_entities', { ids: [a.affected[0], b.affected[0]], name: 'Pair' }).document;
+    doc = execute(doc, 'group_entities', {
+      ids: [a.affected[0], b.affected[0]],
+      name: 'Pair',
+    }).document;
     doc = { ...doc, selection: [a.affected[0]!] };
 
     const snap = computeSceneSnapshot(doc);
@@ -81,23 +89,38 @@ describe('entityBounds — per kind', () => {
   }
 
   it('box: position ± size/2', () => {
-    const doc = execute(createEmptyDocument(), 'add_box', { size: [4, 6, 8], position: [1, 1, 1] }).document;
+    const doc = execute(createEmptyDocument(), 'add_box', {
+      size: [4, 6, 8],
+      position: [1, 1, 1],
+    }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [-1, -2, -3], max: [3, 4, 5] });
   });
 
   it('cylinder: radius in X/Y, height in Z (Z-up axis)', () => {
-    const doc = execute(createEmptyDocument(), 'add_cylinder', { radius: 2, height: 10, position: [0, 0, 0] }).document;
+    const doc = execute(createEmptyDocument(), 'add_cylinder', {
+      radius: 2,
+      height: 10,
+      position: [0, 0, 0],
+    }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [-2, -2, -5], max: [2, 2, 5] });
   });
 
   it('sphere: position ± radius on all axes', () => {
-    const doc = execute(createEmptyDocument(), 'add_sphere', { radius: 3, position: [1, 0, 0] }).document;
+    const doc = execute(createEmptyDocument(), 'add_sphere', {
+      radius: 3,
+      position: [1, 0, 0],
+    }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [-2, -3, -3], max: [4, 3, 3] });
   });
 
   it('extrusion: profile XY bbox, +Z over depth', () => {
     const doc = execute(createEmptyDocument(), 'extrude_profile', {
-      profile: [[0, 0], [4, 0], [4, 2], [0, 2]],
+      profile: [
+        [0, 0],
+        [4, 0],
+        [4, 2],
+        [0, 2],
+      ],
       depth: 5,
     }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [0, 0, 0], max: [4, 2, 5] });
@@ -105,61 +128,102 @@ describe('entityBounds — per kind', () => {
 
   it('extrusion with empty profile collapses to its position plane', () => {
     const e: Entity = {
-      id: 'ext-x', kind: 'extrusion', profile: [], depth: 3,
-      position: [2, 2, 0], rotation: [0, 0, 0], layerId: 'layer-default', color: '#fff',
+      id: 'ext-x',
+      kind: 'extrusion',
+      profile: [],
+      depth: 3,
+      position: [2, 2, 0],
+      rotation: [0, 0, 0],
+      layerId: 'layer-default',
+      color: '#fff',
     };
     expect(entityBounds(e)).toEqual({ min: [2, 2, 0], max: [2, 2, 3] });
   });
 
   it('mesh: bounds over world-space vertex positions', () => {
     const e: Entity = {
-      id: 'm1', kind: 'mesh',
+      id: 'm1',
+      kind: 'mesh',
       mesh: { positions: [0, 0, 0, 2, 3, 4, -1, -1, -1], indices: [0, 1, 2] },
-      position: [0, 0, 0], rotation: [0, 0, 0], layerId: 'layer-default', color: '#fff',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      layerId: 'layer-default',
+      color: '#fff',
     };
     expect(entityBounds(e)).toEqual({ min: [-1, -1, -1], max: [2, 3, 4] });
   });
 
   it('mesh with too few positions collapses to its position', () => {
     const e: Entity = {
-      id: 'm2', kind: 'mesh', mesh: { positions: [], indices: [] },
-      position: [5, 5, 5], rotation: [0, 0, 0], layerId: 'layer-default', color: '#fff',
+      id: 'm2',
+      kind: 'mesh',
+      mesh: { positions: [], indices: [] },
+      position: [5, 5, 5],
+      rotation: [0, 0, 0],
+      layerId: 'layer-default',
+      color: '#fff',
     };
     expect(entityBounds(e)).toEqual({ min: [5, 5, 5], max: [5, 5, 5] });
   });
 
   it('line: bbox of endpoints offset by position', () => {
-    const doc = execute(createEmptyDocument(), 'draw_line', { start: [1, 1], end: [4, 5], position: [1, 0, 0] }).document;
+    const doc = execute(createEmptyDocument(), 'draw_line', {
+      start: [1, 1],
+      end: [4, 5],
+      position: [1, 0, 0],
+    }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [2, 1, 0], max: [5, 5, 0] });
   });
 
   it('polyline: bbox over all points', () => {
-    const doc = execute(createEmptyDocument(), 'draw_polyline', { points: [[0, 0], [3, 1], [1, 4]] }).document;
+    const doc = execute(createEmptyDocument(), 'draw_polyline', {
+      points: [
+        [0, 0],
+        [3, 1],
+        [1, 4],
+      ],
+    }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [0, 0, 0], max: [3, 4, 0] });
   });
 
   it('polyline with no points collapses to its position', () => {
     const e: Entity = {
-      id: 'pl', kind: 'polyline', points: [], closed: false,
-      position: [7, 8, 9], rotation: [0, 0, 0], layerId: 'layer-default', color: '#fff',
+      id: 'pl',
+      kind: 'polyline',
+      points: [],
+      closed: false,
+      position: [7, 8, 9],
+      rotation: [0, 0, 0],
+      layerId: 'layer-default',
+      color: '#fff',
     };
     expect(entityBounds(e)).toEqual({ min: [7, 8, 9], max: [7, 8, 9] });
   });
 
   it('circle: center ± radius', () => {
-    const doc = execute(createEmptyDocument(), 'draw_circle', { center: [2, 2], radius: 3 }).document;
+    const doc = execute(createEmptyDocument(), 'draw_circle', {
+      center: [2, 2],
+      radius: 3,
+    }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [-1, -1, 0], max: [5, 5, 0] });
   });
 
   it('arc: conservative center ± radius box', () => {
     const doc = execute(createEmptyDocument(), 'draw_arc', {
-      center: [0, 0], radius: 2, startAngle: 0, endAngle: Math.PI / 2,
+      center: [0, 0],
+      radius: 2,
+      startAngle: 0,
+      endAngle: Math.PI / 2,
     }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [-2, -2, 0], max: [2, 2, 0] });
   });
 
   it('rectangle: lower-left at position, extends +X/+Y', () => {
-    const doc = execute(createEmptyDocument(), 'draw_rectangle', { width: 4, height: 2, position: [1, 1, 0] }).document;
+    const doc = execute(createEmptyDocument(), 'draw_rectangle', {
+      width: 4,
+      height: 2,
+      position: [1, 1, 0],
+    }).document;
     expect(entityBounds(lastEntity(doc))).toEqual({ min: [1, 1, 0], max: [5, 3, 0] });
   });
 
@@ -177,7 +241,10 @@ describe('rotatedEntityBounds — zero rotation is byte-for-byte identical to en
   beforeEach(() => __resetIdCounter());
 
   it('box with zero rotation: no oriented flag, same values as entityBounds', () => {
-    const doc = execute(createEmptyDocument(), 'add_box', { size: [4, 6, 8], position: [1, 1, 1] }).document;
+    const doc = execute(createEmptyDocument(), 'add_box', {
+      size: [4, 6, 8],
+      position: [1, 1, 1],
+    }).document;
     const e = doc.entities[doc.order[0]!]!;
     const plain = entityBounds(e);
     const obb = rotatedEntityBounds(e);
@@ -186,7 +253,11 @@ describe('rotatedEntityBounds — zero rotation is byte-for-byte identical to en
   });
 
   it('cylinder with zero rotation: no oriented flag, same values as entityBounds', () => {
-    const doc = execute(createEmptyDocument(), 'add_cylinder', { radius: 2, height: 10, position: [0, 0, 0] }).document;
+    const doc = execute(createEmptyDocument(), 'add_cylinder', {
+      radius: 2,
+      height: 10,
+      position: [0, 0, 0],
+    }).document;
     const e = doc.entities[doc.order[0]!]!;
     expect(rotatedEntityBounds(e)).toEqual(entityBounds(e));
     expect(rotatedEntityBounds(e).oriented).toBeUndefined();
@@ -197,7 +268,9 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
   beforeEach(() => __resetIdCounter());
 
   const EPS = 1e-9;
-  function approxEq(a: number, b: number): boolean { return Math.abs(a - b) < EPS; }
+  function approxEq(a: number, b: number): boolean {
+    return Math.abs(a - b) < EPS;
+  }
 
   it('box [2,2,10] rotated [π/2,0,0]: tall Z-axis box becomes tall Y-axis box', () => {
     // Unrotated: extends ±1 in X/Y, ±5 in Z.
@@ -212,10 +285,10 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
     expect(b.oriented).toBe(true);
     // X extents: ±1
     expect(approxEq(b.min[0], -1)).toBe(true);
-    expect(approxEq(b.max[0],  1)).toBe(true);
+    expect(approxEq(b.max[0], 1)).toBe(true);
     // After Rx(π/2): old ±5 Z → ±5 Y
     expect(approxEq(b.min[1], -5)).toBe(true);
-    expect(approxEq(b.max[1],  5)).toBe(true);
+    expect(approxEq(b.max[1], 5)).toBe(true);
     // After Rx(π/2): old ±1 Y → ∓1 Z (sign depends on rotation direction) → extent still 2
     expect(Math.abs(b.max[2] - b.min[2])).toBeGreaterThan(1.9);
     expect(Math.abs(b.max[2] - b.min[2])).toBeLessThan(2.1);
@@ -294,7 +367,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
     expect(b.oriented).toBe(true);
     // X extents still ±2 (X axis unaffected by Rx).
     expect(approxEq(b.min[0], -2)).toBe(true);
-    expect(approxEq(b.max[0],  2)).toBe(true);
+    expect(approxEq(b.max[0], 2)).toBe(true);
     // Y extent: was ±2, now ±5 (height axis); Z extent ±2.
     const yExtent = b.max[1] - b.min[1];
     const zExtent = b.max[2] - b.min[2];
@@ -307,15 +380,16 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
     // own origin, maps onto itself → bounds must equal the raw AABB. Before the localEntityCorners
     // mesh fix (which double-added position) the bounds would be shifted by R·position and wrong.
     const e: Entity = {
-      id: 'mrot', kind: 'mesh',
+      id: 'mrot',
+      kind: 'mesh',
       mesh: {
-        positions: [
-          3, -1, -1, 5, -1, -1, 5, 1, -1, 3, 1, -1,
-          3, -1, 1, 5, -1, 1, 5, 1, 1, 3, 1, 1,
-        ],
+        positions: [3, -1, -1, 5, -1, -1, 5, 1, -1, 3, 1, -1, 3, -1, 1, 5, -1, 1, 5, 1, 1, 3, 1, 1],
         indices: [0, 1, 2],
       },
-      position: [4, 0, 0], rotation: [0, 0, Math.PI], layerId: 'layer-default', color: '#fff',
+      position: [4, 0, 0],
+      rotation: [0, 0, Math.PI],
+      layerId: 'layer-default',
+      color: '#fff',
     };
     const b = rotatedEntityBounds(e);
     expect(b.oriented).toBe(true);
@@ -349,7 +423,10 @@ describe('instanceBoundsFromDoc — instance world AABB', () => {
     expect(instance.kind).toBe('instance');
 
     // instanceBoundsFromDoc must return the expanded box AABB, NOT a point
-    const bounds = instanceBoundsFromDoc(instance as Parameters<typeof instanceBoundsFromDoc>[0], doc);
+    const bounds = instanceBoundsFromDoc(
+      instance as Parameters<typeof instanceBoundsFromDoc>[0],
+      doc,
+    );
     // A 2×2×2 box centered at [0,0,0] → min [-1,-1,-1] max [1,1,1]
     expect(bounds.min[0]).toBeCloseTo(-1, 5);
     expect(bounds.min[1]).toBeCloseTo(-1, 5);

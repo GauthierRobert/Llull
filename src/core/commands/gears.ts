@@ -194,14 +194,20 @@ export function buildSpurGearProfile(
     );
 
     // --- Tip arc: from right-flank tip to left-flank tip ---
-    const rightTipAngle = Math.atan2(rightFlank[rightFlank.length - 1]![1], rightFlank[rightFlank.length - 1]![0]);
+    const rightTipAngle = Math.atan2(
+      rightFlank[rightFlank.length - 1]![1],
+      rightFlank[rightFlank.length - 1]![0],
+    );
     const leftFlankRaw = sampleInvolute(baseRadius, tStart, tMax, flankSamples);
     // Left flank = mirror of right flank about tooth center line, then rotate to tooth position.
     const leftFlankRotation = -halfToothPitchAngle + involuteAngleAtPitch;
     const leftFlank = leftFlankRaw.map((pt) =>
       rotate2D(mirrorY(pt), leftFlankRotation + toothCenter),
     );
-    const leftTipAngle = Math.atan2(leftFlank[leftFlank.length - 1]![1], leftFlank[leftFlank.length - 1]![0]);
+    const leftTipAngle = Math.atan2(
+      leftFlank[leftFlank.length - 1]![1],
+      leftFlank[leftFlank.length - 1]![0],
+    );
 
     // Tip arc CCW from right-flank tip to left-flank tip.
     // The arc sweeps CCW so we need the shorter path across the tooth top.
@@ -441,8 +447,7 @@ export const addSpurGear: CommandDefinition<AddSpurGearParams> = {
     const outerDiameter = pitchDiameter + 2 * mod;
 
     // --- Bore note ---
-    const boreNote =
-      bore > 0 ? ` bore=${bore} ignored — kernel hole not yet wired.` : '';
+    const boreNote = bore > 0 ? ` bore=${bore} ignored — kernel hole not yet wired.` : '';
 
     // --- Create extrusion entity ---
     const id = nextId('gear');

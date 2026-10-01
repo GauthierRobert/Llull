@@ -12,7 +12,13 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
-import { getLiveDoc, setLiveDoc, subscribeLive, _resetLiveDoc, _subscriberCount } from '../src/liveDocument';
+import {
+  getLiveDoc,
+  setLiveDoc,
+  subscribeLive,
+  _resetLiveDoc,
+  _subscriberCount,
+} from '../src/liveDocument';
 import { applyMcpToolCall } from '@core/mcp/dispatch';
 import { createEmptyDocument } from '@core/model/types';
 

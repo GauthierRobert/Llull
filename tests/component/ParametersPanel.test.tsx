@@ -245,7 +245,10 @@ describe('ParametersPanel — add parameter form', () => {
     fireEvent.change(exprInput, { target: { value: '15' } });
     fireEvent.submit(form);
 
-    expect(dispatchSpy).toHaveBeenCalledWith('set_parameter', { name: 'newParam', expression: '15' });
+    expect(dispatchSpy).toHaveBeenCalledWith('set_parameter', {
+      name: 'newParam',
+      expression: '15',
+    });
   });
 
   it('clears the form fields after successful submit', () => {
@@ -255,8 +258,12 @@ describe('ParametersPanel — add parameter form', () => {
     render(<ParametersPanel />);
 
     const form = screen.getByTestId('param-add-form');
-    const nameInput = within(form).getByRole('textbox', { name: /new parameter name/i }) as HTMLInputElement;
-    const exprInput = within(form).getByRole('textbox', { name: /new parameter expression/i }) as HTMLInputElement;
+    const nameInput = within(form).getByRole('textbox', {
+      name: /new parameter name/i,
+    }) as HTMLInputElement;
+    const exprInput = within(form).getByRole('textbox', {
+      name: /new parameter expression/i,
+    }) as HTMLInputElement;
 
     fireEvent.change(nameInput, { target: { value: 'p' } });
     fireEvent.change(exprInput, { target: { value: '1' } });

@@ -240,10 +240,7 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
 
   // --- Split: batchable kinds (box/cylinder/sphere) go to InstancedRenderer ---
-  const batchableEntities = useMemo(
-    () => visibleEntities.filter(isBatchable),
-    [visibleEntities],
-  );
+  const batchableEntities = useMemo(() => visibleEntities.filter(isBatchable), [visibleEntities]);
 
   // --- Non-batchable kinds continue as per-entity meshes ---
   const nonBatchableEntities = useMemo(
@@ -261,17 +258,17 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
   return (
     <group name="entities">
       {/* Instanced rendering: box / cylinder / sphere — one draw call per batch */}
-      <InstancedRenderer
-        batches={batches}
-        selectionSet={selectionSet}
-        onSelect={handleSelect}
-      />
+      <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
 
       {/* Per-entity rendering: non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid, instance) */}
       {nonBatchableEntities.map((entity) => {
-        const mat: Material | undefined = entity.materialId ? materials[entity.materialId] : undefined;
+        const mat: Material | undefined = entity.materialId
+          ? materials[entity.materialId]
+          : undefined;
         const pbrProp = mat
-          ? { pbrMaterial: { color: mat.color, metalness: mat.metalness, roughness: mat.roughness } }
+          ? {
+              pbrMaterial: { color: mat.color, metalness: mat.metalness, roughness: mat.roughness },
+            }
           : {};
         return (
           <EntityRenderer

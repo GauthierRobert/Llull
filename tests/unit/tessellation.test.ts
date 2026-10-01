@@ -47,12 +47,21 @@ describe('tessellation — circlePoints', () => {
 
 describe('tessellation — earClipTriangulate', () => {
   it('triangulates a CCW triangle to itself', () => {
-    const tris = earClipTriangulate([[0, 0], [1, 0], [0, 1]]);
+    const tris = earClipTriangulate([
+      [0, 0],
+      [1, 0],
+      [0, 1],
+    ]);
     expect(tris).toEqual([[0, 1, 2]]);
   });
 
   it('triangulates a convex square into 2 triangles covering 4 vertices', () => {
-    const tris = earClipTriangulate([[0, 0], [1, 0], [1, 1], [0, 1]]);
+    const tris = earClipTriangulate([
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ]);
     expect(tris).toHaveLength(2);
     const used = new Set(tris.flat());
     expect(used).toEqual(new Set([0, 1, 2, 3]));
@@ -95,7 +104,10 @@ describe('tessellation — earClipTriangulate', () => {
         const theta = ((t * samplesPerTooth + s) / (teeth * samplesPerTooth)) * 2 * Math.PI;
         // Alternate between rOuter (tip) and rRoot (root) across each tooth.
         const phase = s / samplesPerTooth;
-        const r = phase < 0.5 ? rOuter - (rOuter - rRoot) * (phase * 2) : rRoot + (rOuter - rRoot) * ((phase - 0.5) * 2);
+        const r =
+          phase < 0.5
+            ? rOuter - (rOuter - rRoot) * (phase * 2)
+            : rRoot + (rOuter - rRoot) * ((phase - 0.5) * 2);
         pts.push([r * Math.cos(theta), r * Math.sin(theta)]);
       }
     }
@@ -127,12 +139,21 @@ describe('tessellation — earClipTriangulate', () => {
   it('returns empty for < 3 points', () => {
     expect(earClipTriangulate([])).toEqual([]);
     expect(earClipTriangulate([[0, 0]])).toEqual([]);
-    expect(earClipTriangulate([[0, 0], [1, 0]])).toEqual([]);
+    expect(
+      earClipTriangulate([
+        [0, 0],
+        [1, 0],
+      ]),
+    ).toEqual([]);
   });
 
   it('handles CW input by reversing to CCW (winding-tolerant)', () => {
     // CW triangle — should still produce 1 triangle.
-    const tris = earClipTriangulate([[0, 0], [0, 1], [1, 0]]);
+    const tris = earClipTriangulate([
+      [0, 0],
+      [0, 1],
+      [1, 0],
+    ]);
     expect(tris).toHaveLength(1);
   });
 });

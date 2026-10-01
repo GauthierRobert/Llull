@@ -36,15 +36,9 @@ interface ScaleBarProps {
  * Must be placed OUTSIDE the r3f <Canvas> (HTML overlay).
  */
 export function ScaleBar({ zoom, document }: ScaleBarProps): React.ReactElement {
-  const { worldLength, pixelLength } = useMemo(
-    () => scaleBarLength(zoom),
-    [zoom],
-  );
+  const { worldLength, pixelLength } = useMemo(() => scaleBarLength(zoom), [zoom]);
 
-  const label = useMemo(
-    () => formatLength(document, worldLength),
-    [document, worldLength],
-  );
+  const label = useMemo(() => formatLength(document, worldLength), [document, worldLength]);
 
   return (
     <div

@@ -83,7 +83,9 @@ describe('getMcpPrompt() — unknown name', () => {
 
 describe('getMcpPrompt("model_bracket")', () => {
   it('returns a non-null result', () => {
-    expect(getMcpPrompt('model_bracket', { width: '80', height: '40', thickness: '6' })).not.toBeNull();
+    expect(
+      getMcpPrompt('model_bracket', { width: '80', height: '40', thickness: '6' }),
+    ).not.toBeNull();
   });
 
   it('result has a non-empty description', () => {
@@ -304,7 +306,8 @@ describe('getMcpPrompt() — content type invariants', () => {
 /** Extract the first ```json ... ``` block from a string and parse it. */
 function extractJsonBlock(text: string): unknown {
   const match = /```json\s*([\s\S]*?)```/.exec(text);
-  if (!match || match[1] === undefined) throw new Error('No ```json block found in assistant message');
+  if (!match || match[1] === undefined)
+    throw new Error('No ```json block found in assistant message');
   // Strip JS-style line comments (// ...) before parsing — templates may include them.
   const stripped = match[1].replace(/\/\/[^\n]*/g, '');
   return JSON.parse(stripped) as unknown;
@@ -316,7 +319,12 @@ describe('build_project validate regression — model_bracket (default 2 holes)'
   });
 
   it('emitted plan passes build_project validate:true', () => {
-    const result = getMcpPrompt('model_bracket', { width: '80', height: '40', thickness: '6', hole_count: '2' });
+    const result = getMcpPrompt('model_bracket', {
+      width: '80',
+      height: '40',
+      thickness: '6',
+      hole_count: '2',
+    });
     expect(result).not.toBeNull();
 
     const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
@@ -336,7 +344,12 @@ describe('build_project validate regression — model_bracket (default 2 holes)'
   });
 
   it('emitted plan passes validate for hole_count=1', () => {
-    const result = getMcpPrompt('model_bracket', { width: '60', height: '30', thickness: '5', hole_count: '1' });
+    const result = getMcpPrompt('model_bracket', {
+      width: '60',
+      height: '30',
+      thickness: '5',
+      hole_count: '1',
+    });
     expect(result).not.toBeNull();
 
     const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
@@ -354,7 +367,12 @@ describe('build_project validate regression — model_bracket (default 2 holes)'
   });
 
   it('emitted plan passes validate for hole_count=4', () => {
-    const result = getMcpPrompt('model_bracket', { width: '120', height: '50', thickness: '8', hole_count: '4' });
+    const result = getMcpPrompt('model_bracket', {
+      width: '120',
+      height: '50',
+      thickness: '8',
+      hole_count: '4',
+    });
     expect(result).not.toBeNull();
 
     const assistantText = result!.messages.find((m) => m.role === 'assistant')!.content.text;
@@ -409,7 +427,9 @@ describe('build_project validate regression — parametric_part', () => {
     const data = cmdResult.data as { ok: boolean; issues?: string[] } | undefined;
     expect(data).toBeDefined();
     if (data && !data.ok) {
-      throw new Error(`parametric_part (flange_plate) plan validation failed: ${JSON.stringify(data.issues)}`);
+      throw new Error(
+        `parametric_part (flange_plate) plan validation failed: ${JSON.stringify(data.issues)}`,
+      );
     }
     expect(data!.ok).toBe(true);
   });

@@ -21,7 +21,12 @@ interface CylinderMeshProps {
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function CylinderMesh({ entity, selected, onSelect, pbrMaterial }: CylinderMeshProps): React.ReactElement {
+export function CylinderMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: CylinderMeshProps): React.ReactElement {
   const { radius, height, position, rotation, color } = entity;
 
   const geometry = useMemo(() => buildCylinderGeometry(radius, height), [radius, height]);
@@ -37,7 +42,14 @@ export function CylinderMesh({ entity, selected, onSelect, pbrMaterial }: Cylind
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.45,
+    metalness: 0.08,
+    envMapIntensity: 0.8,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

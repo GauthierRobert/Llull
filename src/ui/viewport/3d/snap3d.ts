@@ -67,10 +67,7 @@ const SNAP3D_PRIORITY: Record<Snap3DType, number> = {
 // ---------------------------------------------------------------------------
 
 /** Euclidean distance between two 3D points. */
-function dist3(
-  ax: number, ay: number, az: number,
-  bx: number, by: number, bz: number,
-): number {
+function dist3(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
   const dx = bx - ax;
   const dy = by - ay;
   const dz = bz - az;
@@ -86,9 +83,12 @@ function dist3(
  * All in world space.
  */
 interface AABB {
-  minX: number; maxX: number;
-  minY: number; maxY: number;
-  minZ: number; maxZ: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
 }
 
 /**
@@ -106,32 +106,43 @@ function entityAABB(entity: Entity): AABB | null {
       const [w, h, d] = entity.size;
       // Box is centred at position.
       return {
-        minX: px - w / 2, maxX: px + w / 2,
-        minY: py - h / 2, maxY: py + h / 2,
-        minZ: pz - d / 2, maxZ: pz + d / 2,
+        minX: px - w / 2,
+        maxX: px + w / 2,
+        minY: py - h / 2,
+        maxY: py + h / 2,
+        minZ: pz - d / 2,
+        maxZ: pz + d / 2,
       };
     }
     case 'cylinder': {
       const { radius, height } = entity;
       return {
-        minX: px - radius, maxX: px + radius,
-        minY: py,          maxY: py + height,
-        minZ: pz - radius, maxZ: pz + radius,
+        minX: px - radius,
+        maxX: px + radius,
+        minY: py,
+        maxY: py + height,
+        minZ: pz - radius,
+        maxZ: pz + radius,
       };
     }
     case 'sphere': {
       const { radius } = entity;
       return {
-        minX: px - radius, maxX: px + radius,
-        minY: py - radius, maxY: py + radius,
-        minZ: pz - radius, maxZ: pz + radius,
+        minX: px - radius,
+        maxX: px + radius,
+        minY: py - radius,
+        maxY: py + radius,
+        minZ: pz - radius,
+        maxZ: pz + radius,
       };
     }
     case 'extrusion': {
       const { profile, depth } = entity;
       if (profile.length === 0) return null;
-      let minX = Infinity, maxX = -Infinity;
-      let minZ = Infinity, maxZ = -Infinity;
+      let minX = Infinity,
+        maxX = -Infinity;
+      let minZ = Infinity,
+        maxZ = -Infinity;
       for (const [lx, lz] of profile) {
         if (lx < minX) minX = lx;
         if (lx > maxX) maxX = lx;
@@ -139,25 +150,34 @@ function entityAABB(entity: Entity): AABB | null {
         if (lz > maxZ) maxZ = lz;
       }
       return {
-        minX: px + minX, maxX: px + maxX,
-        minY: py,        maxY: py + depth,
-        minZ: pz + minZ, maxZ: pz + maxZ,
+        minX: px + minX,
+        maxX: px + maxX,
+        minY: py,
+        maxY: py + depth,
+        minZ: pz + minZ,
+        maxZ: pz + maxZ,
       };
     }
     case 'mesh': {
       // Derive AABB from mesh vertices.
       const { positions } = entity.mesh;
       if (positions.length < 3) return null;
-      let minX = Infinity, maxX = -Infinity;
-      let minY = Infinity, maxY = -Infinity;
-      let minZ = Infinity, maxZ = -Infinity;
+      let minX = Infinity,
+        maxX = -Infinity;
+      let minY = Infinity,
+        maxY = -Infinity;
+      let minZ = Infinity,
+        maxZ = -Infinity;
       for (let i = 0; i < positions.length; i += 3) {
-        const vx = positions[i]   ?? 0;
-        const vy = positions[i+1] ?? 0;
-        const vz = positions[i+2] ?? 0;
-        if (vx < minX) minX = vx; if (vx > maxX) maxX = vx;
-        if (vy < minY) minY = vy; if (vy > maxY) maxY = vy;
-        if (vz < minZ) minZ = vz; if (vz > maxZ) maxZ = vz;
+        const vx = positions[i] ?? 0;
+        const vy = positions[i + 1] ?? 0;
+        const vz = positions[i + 2] ?? 0;
+        if (vx < minX) minX = vx;
+        if (vx > maxX) maxX = vx;
+        if (vy < minY) minY = vy;
+        if (vy > maxY) maxY = vy;
+        if (vz < minZ) minZ = vz;
+        if (vz > maxZ) maxZ = vz;
       }
       return { minX, maxX, minY, maxY, minZ, maxZ };
     }
@@ -174,10 +194,14 @@ function entityAABB(entity: Entity): AABB | null {
 function aabbCorners(bb: AABB): Array<[number, number, number]> {
   const { minX, maxX, minY, maxY, minZ, maxZ } = bb;
   return [
-    [minX, minY, minZ], [maxX, minY, minZ],
-    [minX, maxY, minZ], [maxX, maxY, minZ],
-    [minX, minY, maxZ], [maxX, minY, maxZ],
-    [minX, maxY, maxZ], [maxX, maxY, maxZ],
+    [minX, minY, minZ],
+    [maxX, minY, minZ],
+    [minX, maxY, minZ],
+    [maxX, maxY, minZ],
+    [minX, minY, maxZ],
+    [maxX, minY, maxZ],
+    [minX, maxY, maxZ],
+    [maxX, maxY, maxZ],
   ];
 }
 
@@ -191,9 +215,12 @@ function aabbFaceCenters(bb: AABB): Array<[number, number, number]> {
   const cy = (bb.minY + bb.maxY) / 2;
   const cz = (bb.minZ + bb.maxZ) / 2;
   return [
-    [bb.minX, cy, cz], [bb.maxX, cy, cz], // -X / +X face
-    [cx, bb.minY, cz], [cx, bb.maxY, cz], // -Y / +Y face
-    [cx, cy, bb.minZ], [cx, cy, bb.maxZ], // -Z / +Z face
+    [bb.minX, cy, cz],
+    [bb.maxX, cy, cz], // -X / +X face
+    [cx, bb.minY, cz],
+    [cx, bb.maxY, cz], // -Y / +Y face
+    [cx, cy, bb.minZ],
+    [cx, cy, bb.maxZ], // -Z / +Z face
   ];
 }
 
@@ -210,14 +237,20 @@ function aabbEdgeMidpoints(bb: AABB): Array<[number, number, number]> {
   const cz = (minZ + maxZ) / 2;
   return [
     // Edges along X axis (constant Y, Z)
-    [cx, minY, minZ], [cx, maxY, minZ],
-    [cx, minY, maxZ], [cx, maxY, maxZ],
+    [cx, minY, minZ],
+    [cx, maxY, minZ],
+    [cx, minY, maxZ],
+    [cx, maxY, maxZ],
     // Edges along Y axis (constant X, Z)
-    [minX, cy, minZ], [maxX, cy, minZ],
-    [minX, cy, maxZ], [maxX, cy, maxZ],
+    [minX, cy, minZ],
+    [maxX, cy, minZ],
+    [minX, cy, maxZ],
+    [maxX, cy, maxZ],
     // Edges along Z axis (constant X, Y)
-    [minX, minY, cz], [maxX, minY, cz],
-    [minX, maxY, cz], [maxX, maxY, cz],
+    [minX, minY, cz],
+    [maxX, minY, cz],
+    [minX, maxY, cz],
+    [maxX, maxY, cz],
   ];
 }
 
@@ -237,7 +270,7 @@ function cylinderSnapPoints(entity: Entity & { kind: 'cylinder' }): SnapPoint3D[
   const pts: SnapPoint3D[] = [];
 
   // Disc centres.
-  pts.push({ x: px, y: py,          z: pz, type: 'vertex' });
+  pts.push({ x: px, y: py, z: pz, type: 'vertex' });
   pts.push({ x: px, y: py + height, z: pz, type: 'vertex' });
 
   // 8 rim points per disc (every 45°).
@@ -245,7 +278,7 @@ function cylinderSnapPoints(entity: Entity & { kind: 'cylinder' }): SnapPoint3D[
     const angle = (i / 8) * 2 * Math.PI;
     const rx = Math.cos(angle) * radius;
     const rz = Math.sin(angle) * radius;
-    pts.push({ x: px + rx, y: py,          z: pz + rz, type: 'vertex' });
+    pts.push({ x: px + rx, y: py, z: pz + rz, type: 'vertex' });
     pts.push({ x: px + rx, y: py + height, z: pz + rz, type: 'vertex' });
   }
 
@@ -261,13 +294,13 @@ function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
   const [px, py, pz] = entity.position;
   const { radius } = entity;
   return [
-    { x: px,          y: py,          z: pz,          type: 'vertex' }, // centre
-    { x: px + radius, y: py,          z: pz,          type: 'vertex' }, // +X
-    { x: px - radius, y: py,          z: pz,          type: 'vertex' }, // -X
-    { x: px,          y: py + radius, z: pz,          type: 'vertex' }, // +Y
-    { x: px,          y: py - radius, z: pz,          type: 'vertex' }, // -Y
-    { x: px,          y: py,          z: pz + radius, type: 'vertex' }, // +Z
-    { x: px,          y: py,          z: pz - radius, type: 'vertex' }, // -Z
+    { x: px, y: py, z: pz, type: 'vertex' }, // centre
+    { x: px + radius, y: py, z: pz, type: 'vertex' }, // +X
+    { x: px - radius, y: py, z: pz, type: 'vertex' }, // -X
+    { x: px, y: py + radius, z: pz, type: 'vertex' }, // +Y
+    { x: px, y: py - radius, z: pz, type: 'vertex' }, // -Y
+    { x: px, y: py, z: pz + radius, type: 'vertex' }, // +Z
+    { x: px, y: py, z: pz - radius, type: 'vertex' }, // -Z
   ];
 }
 
@@ -355,9 +388,7 @@ export function snap3d(
       const beatsByDist = d < bestDist - 1e-10;
       const sameDist = Math.abs(d - bestDist) <= 1e-10;
       const beatsByPriority =
-        sameDist &&
-        best !== null &&
-        SNAP3D_PRIORITY[pt.type] < SNAP3D_PRIORITY[best.type];
+        sameDist && best !== null && SNAP3D_PRIORITY[pt.type] < SNAP3D_PRIORITY[best.type];
 
       if (beatsByDist || beatsByPriority) {
         bestDist = d;

@@ -182,9 +182,7 @@ describe('add_spur_gear', () => {
     });
     const id1 = r1.affected[0]!;
     const id2 = r2.affected[0]!;
-    expect(r2.document.entities[id2]!.position[0]).not.toBe(
-      r1.document.entities[id1]!.position[0],
-    );
+    expect(r2.document.entities[id2]!.position[0]).not.toBe(r1.document.entities[id1]!.position[0]);
   });
 
   it('rotation is stored on the entity', () => {

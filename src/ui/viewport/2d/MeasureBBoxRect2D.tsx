@@ -47,12 +47,7 @@ function RectLines2D({ min, max }: RectLines2DProps): React.ReactElement | null 
 
   const geometry = useMemo(() => {
     // 4 corners of the XY rectangle, slightly above the entities (z=0.1)
-    const pts = [
-      x0, y0, 0.1,
-      x1, y0, 0.1,
-      x1, y1, 0.1,
-      x0, y1, 0.1,
-    ];
+    const pts = [x0, y0, 0.1, x1, y0, 0.1, x1, y1, 0.1, x0, y1, 0.1];
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     return geo;

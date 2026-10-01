@@ -93,7 +93,11 @@ function parsePosInt(value: string | undefined, fallback: number): number {
 // Client factory
 // ---------------------------------------------------------------------------
 
-function buildClient(name: string, mcpUrl: string, authToken?: string): {
+function buildClient(
+  name: string,
+  mcpUrl: string,
+  authToken?: string,
+): {
   client: Client;
   transport: StreamableHTTPClientTransport;
 } {
@@ -198,10 +202,7 @@ async function main(): Promise<void> {
   console.log(`  Session B entityCount after add_box: ${countB1}`);
 
   assert(countA1 === 1, `session A entityCount is 1 after add_box (got ${countA1})`);
-  assert(
-    countB1 === 0,
-    `session B entityCount is still 0 (isolation preserved, got ${countB1})`,
-  );
+  assert(countB1 === 0, `session B entityCount is still 0 (isolation preserved, got ${countB1})`);
 
   // ---------------------------------------------------------------------------
   // Test 3: session B is independently mutable (add its own entity)

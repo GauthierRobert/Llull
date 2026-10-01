@@ -104,8 +104,8 @@ const sessions = new Map<string, SessionEntry>();
  * without sending DELETE and without triggering a transport close event.
  * Active sessions are never evicted — every routed request touches `lastSeenMs`.
  */
-const DEFAULT_TTL_MS = 30 * 60_000;   // 30 min
-const DEFAULT_SWEEP_MS = 60_000;       // 60 s
+const DEFAULT_TTL_MS = 30 * 60_000; // 30 min
+const DEFAULT_SWEEP_MS = 60_000; // 60 s
 
 function parsePosInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -127,9 +127,7 @@ function startSessionSweep(): void {
   const ttlMs = parsePosInt(process.env['MCP_SESSION_TTL_MS'], DEFAULT_TTL_MS);
   const sweepMs = parsePosInt(process.env['MCP_SESSION_SWEEP_MS'], DEFAULT_SWEEP_MS);
 
-  console.warn(
-    `[mcp] session sweep started — TTL ${ttlMs} ms, sweep every ${sweepMs} ms`,
-  );
+  console.warn(`[mcp] session sweep started — TTL ${ttlMs} ms, sweep every ${sweepMs} ms`);
 
   const timer = setInterval(() => {
     const now = Date.now();
@@ -216,7 +214,15 @@ function buildRateLimiter(): ReturnType<typeof rateLimit> {
 // ---------------------------------------------------------------------------
 
 /** The set of param keys that are handled server-side (not forwarded to core). */
-const ENRICH_PARAM_KEYS = new Set(['turntable', 'isolate', 'showDimensions', 'section', 'showAxes', 'showGrid', 'showLabels']);
+const ENRICH_PARAM_KEYS = new Set([
+  'turntable',
+  'isolate',
+  'showDimensions',
+  'section',
+  'showAxes',
+  'showGrid',
+  'showLabels',
+]);
 
 /**
  * Strip enrichment-only params from a render_view args object so the core
@@ -273,8 +279,12 @@ function applyRenderViewEnrichments(
 
   // Base render params forwarded to core
   const baseView = typeof params.view === 'string' ? params.view : 'iso';
-  const baseWidth = typeof params.width === 'number' ? Math.max(64, Math.min(2000, Math.round(params.width))) : 800;
-  const baseHeight = typeof params.height === 'number' ? Math.max(64, Math.min(2000, Math.round(params.height))) : 600;
+  const baseWidth =
+    typeof params.width === 'number' ? Math.max(64, Math.min(2000, Math.round(params.width))) : 800;
+  const baseHeight =
+    typeof params.height === 'number'
+      ? Math.max(64, Math.min(2000, Math.round(params.height)))
+      : 600;
 
   const doc = getDoc();
   const docUnits: string = doc.units ?? 'mm';
@@ -293,7 +303,9 @@ function applyRenderViewEnrichments(
     // We compose the SVGs side-by-side in a wrapper SVG, then rasterize once.
     const totalWidth = baseWidth * svgs.length;
     const stripLines: string[] = [];
-    stripLines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${baseHeight}" viewBox="0 0 ${totalWidth} ${baseHeight}">`);
+    stripLines.push(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${baseHeight}" viewBox="0 0 ${totalWidth} ${baseHeight}">`,
+    );
     stripLines.push(`  <rect width="${totalWidth}" height="${baseHeight}" fill="#1a1a2e"/>`);
     for (let i = 0; i < svgs.length; i++) {
       const inner = extractSvgInnerPublic(svgs[i] as string);
@@ -315,7 +327,11 @@ function applyRenderViewEnrichments(
     }
 
     const summary = `Rendered turntable strip: ${frames} frame(s), ${totalWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({ summary, affected: [], isError: false }) as CallToolResult;
+    const shaped = shapeToolCallContent({
+      summary,
+      affected: [],
+      isError: false,
+    }) as CallToolResult;
     (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
     return shaped;
   }
@@ -337,9 +353,16 @@ function applyRenderViewEnrichments(
     }
 
     // Compose overlay enrichments on top
-    const baseResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+    const baseResult = applyCommand('render_view', {
+      view: baseView,
+      width: baseWidth,
+      height: baseHeight,
+    });
     if (params.showDimensions === true && baseResult.data) {
-      svg = appendDimensionLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData);
+      svg = appendDimensionLabels(
+        svg,
+        baseResult.data as import('@core/commands/render').RenderViewData,
+      );
     }
     if ((wantAxes || wantGrid) && baseResult.data) {
       svg = appendAxesAndGrid(
@@ -351,8 +374,14 @@ function applyRenderViewEnrichments(
       );
     }
     if (wantLabels && baseResult.data) {
-      const allEntities = Object.values(doc.entities).filter((e): e is NonNullable<typeof e> => e !== undefined);
-      svg = appendEntityLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData, allEntities);
+      const allEntities = Object.values(doc.entities).filter(
+        (e): e is NonNullable<typeof e> => e !== undefined,
+      );
+      svg = appendEntityLabels(
+        svg,
+        baseResult.data as import('@core/commands/render').RenderViewData,
+        allEntities,
+      );
     }
 
     const base64 = rasterizeSvg(svg, baseWidth);
@@ -361,7 +390,11 @@ function applyRenderViewEnrichments(
     }
 
     const summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${baseWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({ summary, affected: [], isError: false }) as CallToolResult;
+    const shaped = shapeToolCallContent({
+      summary,
+      affected: [],
+      isError: false,
+    }) as CallToolResult;
     (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
     return shaped;
   }
@@ -372,7 +405,9 @@ function applyRenderViewEnrichments(
   if (params.section !== undefined) {
     const { axis, offset } = params.section;
     if (axis !== 'x' && axis !== 'y' && axis !== 'z') {
-      return makeErrorResult(`render_view section: invalid axis "${String(axis)}". Must be "x", "y", or "z".`);
+      return makeErrorResult(
+        `render_view section: invalid axis "${String(axis)}". Must be "x", "y", or "z".`,
+      );
     }
 
     let svg = buildSectionSvg(doc, { axis, offset }, baseView, baseWidth, baseHeight);
@@ -381,9 +416,16 @@ function applyRenderViewEnrichments(
     }
 
     // Compose overlay enrichments on top
-    const baseResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+    const baseResult = applyCommand('render_view', {
+      view: baseView,
+      width: baseWidth,
+      height: baseHeight,
+    });
     if (params.showDimensions === true && baseResult.data) {
-      svg = appendDimensionLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData);
+      svg = appendDimensionLabels(
+        svg,
+        baseResult.data as import('@core/commands/render').RenderViewData,
+      );
     }
     if ((wantAxes || wantGrid) && baseResult.data) {
       svg = appendAxesAndGrid(
@@ -395,8 +437,14 @@ function applyRenderViewEnrichments(
       );
     }
     if (wantLabels && baseResult.data) {
-      const allEntities = Object.values(doc.entities).filter((e): e is NonNullable<typeof e> => e !== undefined);
-      svg = appendEntityLabels(svg, baseResult.data as import('@core/commands/render').RenderViewData, allEntities);
+      const allEntities = Object.values(doc.entities).filter(
+        (e): e is NonNullable<typeof e> => e !== undefined,
+      );
+      svg = appendEntityLabels(
+        svg,
+        baseResult.data as import('@core/commands/render').RenderViewData,
+        allEntities,
+      );
     }
 
     const base64 = rasterizeSvg(svg, baseWidth);
@@ -405,7 +453,11 @@ function applyRenderViewEnrichments(
     }
 
     const summary = `Rendered section view: cut at ${axis}=${offset}, ${baseWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({ summary, affected: [], isError: false }) as CallToolResult;
+    const shaped = shapeToolCallContent({
+      summary,
+      affected: [],
+      isError: false,
+    }) as CallToolResult;
     (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
     return shaped;
   }
@@ -413,7 +465,11 @@ function applyRenderViewEnrichments(
   // ------------------------------------------------------------------
   // showDimensions / showAxes / showGrid (no other enrichment): base render + post-process
   // ------------------------------------------------------------------
-  const busResult = applyCommand('render_view', { view: baseView, width: baseWidth, height: baseHeight });
+  const busResult = applyCommand('render_view', {
+    view: baseView,
+    width: baseWidth,
+    height: baseHeight,
+  });
   if (!busResult.data) {
     return makeErrorResult('render_view enrichment: base render returned no data.');
   }
@@ -428,7 +484,9 @@ function applyRenderViewEnrichments(
     enrichedSvg = appendAxesAndGrid(enrichedSvg, baseData, docUnits, wantAxes, wantGrid);
   }
   if (wantLabels) {
-    const allEntities = Object.values(doc.entities).filter((e): e is NonNullable<typeof e> => e !== undefined);
+    const allEntities = Object.values(doc.entities).filter(
+      (e): e is NonNullable<typeof e> => e !== undefined,
+    );
     enrichedSvg = appendEntityLabels(enrichedSvg, baseData, allEntities);
   }
 
@@ -517,7 +575,8 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
               properties: {
                 frames: {
                   type: 'number',
-                  description: 'Number of frames (1..12). Each frame is a separate rotated view stitched into one wide PNG strip.',
+                  description:
+                    'Number of frames (1..12). Each frame is a separate rotated view stitched into one wide PNG strip.',
                 },
               },
               required: ['frames'],
@@ -541,8 +600,14 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
                 'Render a section-plane view: entities on the negative side of the cut plane are dimmed; ' +
                 'a colored dashed line marks the cut. axis: "x"|"y"|"z"; offset: world-space position of the plane.',
               properties: {
-                axis: { type: 'string', description: 'Axis normal to the cut plane: "x", "y", or "z".' },
-                offset: { type: 'number', description: 'World-space position of the cut plane along the axis.' },
+                axis: {
+                  type: 'string',
+                  description: 'Axis normal to the cut plane: "x", "y", or "z".',
+                },
+                offset: {
+                  type: 'number',
+                  description: 'World-space position of the cut plane along the axis.',
+                },
               },
               required: ['axis', 'offset'],
             },
@@ -768,7 +833,10 @@ function buildMcpServer(getDoc: () => CadDocument, bridge: UiBridge): Server {
  *   (client `close()`, dropped socket, crash) → also removes from `sessions`,
  *   preventing unbounded Map growth from clients that never send DELETE.
  */
-function allocateSession(bridge: UiBridge): { transport: StreamableHTTPServerTransport; server: Server } {
+function allocateSession(bridge: UiBridge): {
+  transport: StreamableHTTPServerTransport;
+  server: Server;
+} {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
 
@@ -838,10 +906,7 @@ export function buildMcpRouter(bridge: UiBridge): Router {
    * Returns `true` if the session id header was present (response may be an error).
    * Returns `false` if no session id header — caller handles as a new-session request.
    */
-  const routeToExistingSession = async (
-    req: Request,
-    res: Response,
-  ): Promise<boolean> => {
+  const routeToExistingSession = async (req: Request, res: Response): Promise<boolean> => {
     const sessionId = req.headers['mcp-session-id'];
     if (typeof sessionId !== 'string') return false;
 

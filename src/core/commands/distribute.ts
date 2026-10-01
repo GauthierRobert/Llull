@@ -119,19 +119,13 @@ interface PathSample {
   tangent: Vec2; // unit vector
 }
 
-function samplePath(
-  points: ReadonlyArray<Vec2>,
-  closed: boolean,
-  s: number,
-): PathSample {
+function samplePath(points: ReadonlyArray<Vec2>, closed: boolean, s: number): PathSample {
   if (points.length < 2) {
     return { point: points[0] ?? [0, 0], tangent: [1, 0] };
   }
 
   // Build the effective point list (add wrap-back start for closed paths)
-  const effectivePoints: ReadonlyArray<Vec2> = closed
-    ? [...points, points[0]!]
-    : points;
+  const effectivePoints: ReadonlyArray<Vec2> = closed ? [...points, points[0]!] : points;
 
   const cumul = cumulativeLengths(points, closed);
   const total = cumul[cumul.length - 1] ?? 0;
@@ -241,11 +235,13 @@ export const distributeAlongPath: CommandDefinition<DistributeAlongPathParams> =
     properties: {
       pathId: {
         type: 'string',
-        description: 'Id of an existing polyline or spline entity to distribute instances along. Must have >= 2 points.',
+        description:
+          'Id of an existing polyline or spline entity to distribute instances along. Must have >= 2 points.',
       },
       componentId: {
         type: 'string',
-        description: 'Id of an existing Component in doc.components. Obtain one via create_component.',
+        description:
+          'Id of an existing Component in doc.components. Obtain one via create_component.',
       },
       count: {
         type: 'number',
@@ -281,15 +277,7 @@ export const distributeAlongPath: CommandDefinition<DistributeAlongPathParams> =
   },
   run: (
     doc,
-    {
-      pathId,
-      componentId,
-      count,
-      tangentAlign = true,
-      startOffset = 0,
-      endOffset = 0,
-      name,
-    },
+    { pathId, componentId, count, tangentAlign = true, startOffset = 0, endOffset = 0, name },
   ): CommandResult => {
     // --- Validate path entity ---
     const pathEntity = doc.entities[pathId];
@@ -330,7 +318,12 @@ export const distributeAlongPath: CommandDefinition<DistributeAlongPathParams> =
     }
 
     // --- Validate count ---
-    if (!Number.isFinite(count) || count < 1 || !Number.isInteger(count) || count > MAX_COPIES_PER_COMMAND) {
+    if (
+      !Number.isFinite(count) ||
+      count < 1 ||
+      !Number.isInteger(count) ||
+      count > MAX_COPIES_PER_COMMAND
+    ) {
       return {
         document: doc,
         summary: `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,

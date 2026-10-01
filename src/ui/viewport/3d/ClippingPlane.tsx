@@ -29,10 +29,13 @@ import type { ClipAxis } from '@ui/store';
 function buildNormal(axis: ClipAxis, flipped: boolean): THREE.Vector3 {
   const sign = flipped ? -1 : 1;
   switch (axis) {
-    case 'x': return new THREE.Vector3(sign, 0, 0);
-    case 'z': return new THREE.Vector3(0, 0, sign);
+    case 'x':
+      return new THREE.Vector3(sign, 0, 0);
+    case 'z':
+      return new THREE.Vector3(0, 0, sign);
     case 'y':
-    default:  return new THREE.Vector3(0, sign, 0);
+    default:
+      return new THREE.Vector3(0, sign, 0);
   }
 }
 
@@ -40,8 +43,8 @@ export function ClippingPlane(): null {
   const { gl } = useThree();
 
   const enabled = useViewportStore((s) => s.clipPlane.enabled);
-  const axis    = useViewportStore((s) => s.clipPlane.axis);
-  const offset  = useViewportStore((s) => s.clipPlane.offset);
+  const axis = useViewportStore((s) => s.clipPlane.axis);
+  const offset = useViewportStore((s) => s.clipPlane.offset);
   const flipped = useViewportStore((s) => s.clipPlane.flipped);
 
   // Keep a stable Plane instance — update it imperatively instead of recreating

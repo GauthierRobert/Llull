@@ -11,9 +11,19 @@ import os from 'os';
 import path from 'path';
 import express from 'express';
 import { app } from '../src/index';
-import { _resetLiveDoc, subscribeLive, _subscriberCount, closeAllSubscribers } from '../src/liveDocument';
+import {
+  _resetLiveDoc,
+  subscribeLive,
+  _subscriberCount,
+  closeAllSubscribers,
+} from '../src/liveDocument';
 import { _resetHistory, applyCommand } from '../src/commandBus';
-import { sanitizeFilename, guardMutation, buildRestRateLimiter, getAllowedOrigins } from '../src/security';
+import {
+  sanitizeFilename,
+  guardMutation,
+  buildRestRateLimiter,
+  getAllowedOrigins,
+} from '../src/security';
 import { createAutosaver } from '../src/autosave';
 import { closeAllSessions, _sessionCount } from '../src/mcp';
 import { createEmptyDocument } from '@core/model/types';
@@ -101,23 +111,38 @@ describe('mutation guard (/command, /undo, /redo)', () => {
   });
 
   it('allows an allowed Origin and no-Origin when no token is configured', async () => {
-    expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(200);
+    expect(
+      (await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body))
+        .status,
+    ).toBe(200);
     expect((await request(app).post('/command').send(body)).status).toBe(200);
   });
 
   it('with a token: allowed Origin passes, bare client gets 401, bearer passes', async () => {
     process.env['MCP_AUTH_TOKEN'] = 's3cret';
-    expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(200);
+    expect(
+      (await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body))
+        .status,
+    ).toBe(200);
     expect((await request(app).post('/command').send(body)).status).toBe(401);
-    expect((await request(app).post('/command').set('Authorization', 'Bearer wrong').send(body)).status).toBe(401);
-    expect((await request(app).post('/command').set('Authorization', 'Bearer s3cret').send(body)).status).toBe(200);
+    expect(
+      (await request(app).post('/command').set('Authorization', 'Bearer wrong').send(body)).status,
+    ).toBe(401);
+    expect(
+      (await request(app).post('/command').set('Authorization', 'Bearer s3cret').send(body)).status,
+    ).toBe(200);
   });
 
   it('strict mode requires the bearer even from an allowed Origin; foreign Origin + bearer passes', async () => {
     process.env['MCP_AUTH_TOKEN'] = 's3cret';
     process.env['LLULL_REQUIRE_TOKEN_FOR_REST'] = 'true';
-    expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(401);
-    expect((await request(app).post('/undo').set('Authorization', 'Bearer s3cret')).status).toBe(200);
+    expect(
+      (await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body))
+        .status,
+    ).toBe(401);
+    expect((await request(app).post('/undo').set('Authorization', 'Bearer s3cret')).status).toBe(
+      200,
+    );
   });
 
   it('does not guard read routes', async () => {
@@ -126,7 +151,9 @@ describe('mutation guard (/command, /undo, /redo)', () => {
   });
 
   it('guardMutation is usable standalone', async () => {
-    const mini = express().use(guardMutation()).post('/x', (_req, res) => res.json({ ok: true }));
+    const mini = express()
+      .use(guardMutation())
+      .post('/x', (_req, res) => res.json({ ok: true }));
     expect((await request(mini).post('/x')).status).toBe(200);
   });
 });
@@ -134,7 +161,9 @@ describe('mutation guard (/command, /undo, /redo)', () => {
 describe('REST rate limiting', () => {
   it('returns 429 after the configured max', async () => {
     process.env['LLULL_REST_RATE_LIMIT_MAX'] = '2';
-    const mini = express().use(buildRestRateLimiter()).post('/x', (_req, res) => res.json({ ok: true }));
+    const mini = express()
+      .use(buildRestRateLimiter())
+      .post('/x', (_req, res) => res.json({ ok: true }));
     expect((await request(mini).post('/x')).status).toBe(200);
     expect((await request(mini).post('/x')).status).toBe(200);
     expect((await request(mini).post('/x')).status).toBe(429);
@@ -179,7 +208,11 @@ describe('createAutosaver', () => {
 
   it('flush writes pending doc immediately; flush with nothing pending is a no-op', () => {
     const file = path.join(dir, 'b.json');
-    const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"x":1}' });
+    const saver = createAutosaver({
+      filePath: file,
+      debounceMs: 60_000,
+      serialize: () => '{"x":1}',
+    });
     saver.flush();
     expect(fs.existsSync(file)).toBe(false);
     saver.schedule(createEmptyDocument());

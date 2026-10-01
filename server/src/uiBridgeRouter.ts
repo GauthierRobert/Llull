@@ -72,12 +72,7 @@ export function buildUiBridgeRouter(): Router {
     const body = req.body as unknown;
 
     // Basic structural validation — must be an object with entities + order.
-    if (
-      typeof body !== 'object' ||
-      body === null ||
-      !('entities' in body) ||
-      !('order' in body)
-    ) {
+    if (typeof body !== 'object' || body === null || !('entities' in body) || !('order' in body)) {
       res.status(400).json({
         error:
           'Request body must be a serialised CadDocument ' +

@@ -103,11 +103,20 @@ const modelBracket: PromptTemplate = {
       'action-list you can pass directly to build_project.',
     arguments: [
       { name: 'width', description: 'Bracket width in model units (e.g. 80)', required: true },
-      { name: 'height', description: 'Bracket height (depth) in model units (e.g. 40)', required: true },
-      { name: 'thickness', description: 'Bracket wall thickness in model units (e.g. 6)', required: true },
+      {
+        name: 'height',
+        description: 'Bracket height (depth) in model units (e.g. 40)',
+        required: true,
+      },
+      {
+        name: 'thickness',
+        description: 'Bracket wall thickness in model units (e.g. 6)',
+        required: true,
+      },
       {
         name: 'hole_count',
-        description: 'Number of mounting holes (1–4). Holes are evenly spaced along the bracket width.',
+        description:
+          'Number of mounting holes (1–4). Holes are evenly spaced along the bracket width.',
         required: false,
       },
     ],
@@ -133,9 +142,15 @@ const modelBracket: PromptTemplate = {
       // The current body operand: first iteration uses "body", subsequent use the prior result.
       const bodyIn = i === 0 ? 'body' : `body_${i - 1}`;
       const bodyOut = `body_${i}`;
-      holeActions.push(`    { "command": "draw_circle",    "params": { "center": [${cx}, ${cy}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`);
-      holeActions.push(`    { "command": "extrude_sketch",  "params": { "id": "$${holeSketchAlias}", "depth": ${holeDepth} }, "as": "${holeSolidAlias}" },`);
-      holeActions.push(`    { "command": "boolean_subtract","params": { "a": "$${bodyIn}", "b": "$${holeSolidAlias}" }, "as": "${bodyOut}" },`);
+      holeActions.push(
+        `    { "command": "draw_circle",    "params": { "center": [${cx}, ${cy}], "radius": ${holeRadius} }, "as": "${holeSketchAlias}" },`,
+      );
+      holeActions.push(
+        `    { "command": "extrude_sketch",  "params": { "id": "$${holeSketchAlias}", "depth": ${holeDepth} }, "as": "${holeSolidAlias}" },`,
+      );
+      holeActions.push(
+        `    { "command": "boolean_subtract","params": { "a": "$${bodyIn}", "b": "$${holeSolidAlias}" }, "as": "${bodyOut}" },`,
+      );
     }
 
     // The final mesh is the last body alias produced by the subtract chain.

@@ -238,9 +238,5 @@ export function snapOrigin2D(
   cameraY: number,
   gridSize = 1e4,
 ): [number, number, number] {
-  return [
-    Math.round(cameraX / gridSize) * gridSize,
-    Math.round(cameraY / gridSize) * gridSize,
-    0,
-  ];
+  return [Math.round(cameraX / gridSize) * gridSize, Math.round(cameraY / gridSize) * gridSize, 0];
 }

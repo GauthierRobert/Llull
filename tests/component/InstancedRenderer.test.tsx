@@ -91,8 +91,16 @@ describe('InstancedRenderer integration — unique-color boxes → separate batc
 
   it('10 boxes with unique colors → 10 batches with 1 instance each', () => {
     const colors = [
-      '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff',
-      '#00ffff', '#ffffff', '#aaaaaa', '#555555', '#123456',
+      '#ff0000',
+      '#00ff00',
+      '#0000ff',
+      '#ffff00',
+      '#ff00ff',
+      '#00ffff',
+      '#ffffff',
+      '#aaaaaa',
+      '#555555',
+      '#123456',
     ];
     for (const color of colors) {
       localDispatch('add_box', { size: [5, 5, 5], color });

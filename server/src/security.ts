@@ -197,7 +197,8 @@ export function jsonErrorHandler(
     res.status(413).json({ error: 'Request body too large.' });
     return;
   }
-  const status = typeof httpError.status === 'number' && httpError.status >= 400 ? httpError.status : 500;
+  const status =
+    typeof httpError.status === 'number' && httpError.status >= 400 ? httpError.status : 500;
   if (status >= 500) console.error('[server] unhandled error:', httpError.message);
   res.status(status).json({ error: status >= 500 ? 'Internal server error.' : httpError.message });
 }

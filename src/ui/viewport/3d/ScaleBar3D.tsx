@@ -54,10 +54,7 @@ export function ScaleBar3D({
     [distance, viewportWidthPx, fovDeg],
   );
 
-  const label = useMemo(
-    () => formatLength(document, worldLength),
-    [document, worldLength],
-  );
+  const label = useMemo(() => formatLength(document, worldLength), [document, worldLength]);
 
   return (
     <div

@@ -287,7 +287,9 @@ export function startServer(port: number = PORT, host: string = HOST): Server {
   const refusal = checkBindSafety(host);
   if (refusal !== null) throw new Error(refusal);
   if (!isLoopbackAddress(host) && !process.env['MCP_AUTH_TOKEN']) {
-    console.warn('[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).');
+    console.warn(
+      '[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).',
+    );
   }
   const server = app.listen(port, host, () => {
     console.warn(`[llull-server] listening on http://${host}:${port}`);

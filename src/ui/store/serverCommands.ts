@@ -64,11 +64,17 @@ async function postJson(path: string, body: unknown): Promise<ServerCommandRespo
       body: JSON.stringify(body),
     });
   } catch (cause) {
-    throw new ServerCommandError(`Network error: ${cause instanceof Error ? cause.message : String(cause)}`);
+    throw new ServerCommandError(
+      `Network error: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
   }
 
   if (!response.ok) {
-    throw new ServerCommandError(`Server responded with HTTP ${response.status} for ${path}`, 'http', response.status);
+    throw new ServerCommandError(
+      `Server responded with HTTP ${response.status} for ${path}`,
+      'http',
+      response.status,
+    );
   }
 
   return response.json() as Promise<ServerCommandResponse>;

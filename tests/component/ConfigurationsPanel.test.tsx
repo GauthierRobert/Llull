@@ -171,7 +171,9 @@ describe('ConfigurationsPanel — create form', () => {
 
   it('Create button is disabled when name is empty', () => {
     render(<ConfigurationsPanel />);
-    const createBtn = screen.getByRole('button', { name: /create configuration/i }) as HTMLButtonElement;
+    const createBtn = screen.getByRole('button', {
+      name: /create configuration/i,
+    }) as HTMLButtonElement;
     expect(createBtn.disabled).toBe(true);
   });
 
@@ -180,7 +182,9 @@ describe('ConfigurationsPanel — create form', () => {
     const nameInput = screen.getByRole('textbox', { name: /new configuration name/i });
     fireEvent.change(nameInput, { target: { value: 'myconfig' } });
 
-    const createBtn = screen.getByRole('button', { name: /create configuration/i }) as HTMLButtonElement;
+    const createBtn = screen.getByRole('button', {
+      name: /create configuration/i,
+    }) as HTMLButtonElement;
     expect(createBtn.disabled).toBe(true);
   });
 
@@ -195,7 +199,9 @@ describe('ConfigurationsPanel — create form', () => {
     fireEvent.change(paramNameInput, { target: { value: 'w' } });
     fireEvent.change(exprInput, { target: { value: '20' } });
 
-    const createBtn = screen.getByRole('button', { name: /create configuration/i }) as HTMLButtonElement;
+    const createBtn = screen.getByRole('button', {
+      name: /create configuration/i,
+    }) as HTMLButtonElement;
     expect(createBtn.disabled).toBe(false);
   });
 

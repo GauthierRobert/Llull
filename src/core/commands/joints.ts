@@ -288,14 +288,13 @@ function evaluateMotionInternal(doc: CadDocument): EvaluatedMotion {
       // Accumulate rotation on b by adding angle to the axis component
       // Simple: add angle to Euler component matching axis shorthand
       const deltaRot: Vec3 =
-        joint.axis === 'x' ? [value, 0, 0] :
-        joint.axis === 'y' ? [0, value, 0] :
-        joint.axis === 'z' ? [0, 0, value] :
-        [
-          axisVec[0] * value,
-          axisVec[1] * value,
-          axisVec[2] * value,
-        ];
+        joint.axis === 'x'
+          ? [value, 0, 0]
+          : joint.axis === 'y'
+            ? [0, value, 0]
+            : joint.axis === 'z'
+              ? [0, 0, value]
+              : [axisVec[0] * value, axisVec[1] * value, axisVec[2] * value];
       instanceRotations[joint.b.instanceId] = [
         bRot[0] + deltaRot[0],
         bRot[1] + deltaRot[1],
@@ -434,8 +433,7 @@ export const addJoint: CommandDefinition<AddJointParams> = {
     if (!isValidAxis(axis)) {
       return {
         document: doc,
-        summary:
-          `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`,
+        summary: `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`,
         affected: [],
       };
     }
@@ -478,8 +476,22 @@ export const addJoint: CommandDefinition<AddJointParams> = {
 
     const newJoint: Joint =
       kind === 'revolute'
-        ? { id: jointId, kind: 'revolute', a: mateRefA, b: mateRefB, axis: axis as 'x' | 'y' | 'z' | Vec3, angle: 0 }
-        : { id: jointId, kind: 'prismatic', a: mateRefA, b: mateRefB, axis: axis as 'x' | 'y' | 'z' | Vec3, displacement: 0 };
+        ? {
+            id: jointId,
+            kind: 'revolute',
+            a: mateRefA,
+            b: mateRefB,
+            axis: axis as 'x' | 'y' | 'z' | Vec3,
+            angle: 0,
+          }
+        : {
+            id: jointId,
+            kind: 'prismatic',
+            a: mateRefA,
+            b: mateRefB,
+            axis: axis as 'x' | 'y' | 'z' | Vec3,
+            displacement: 0,
+          };
 
     const newDoc: CadDocument = {
       ...doc,
@@ -566,7 +578,9 @@ export const deleteJoint: CommandDefinition<DeleteJointParams> = {
     };
 
     const cascadeSummary =
-      removedDrIds.length > 0 ? ` Also removed ${removedDrIds.length} drive relation(s): ${removedDrIds.join(', ')}.` : '';
+      removedDrIds.length > 0
+        ? ` Also removed ${removedDrIds.length} drive relation(s): ${removedDrIds.join(', ')}.`
+        : '';
 
     return {
       document: newDoc,
@@ -641,14 +655,20 @@ export const setJointValue: CommandDefinition<SetJointValueParams> = {
 
     if (existing.kind === 'revolute') {
       const resolved = resolveJointValue(value, doc);
-      updatedJoint = { ...existing, angle: typeof resolved === 'number' ? resolved : existing.angle };
+      updatedJoint = {
+        ...existing,
+        angle: typeof resolved === 'number' ? resolved : existing.angle,
+      };
       // Store expression if it's a string (for round-trip); the numeric field stores the last resolved value.
       if (typeof value === 'string') {
         updatedJoint = { ...updatedJoint, angle: resolved ?? existing.angle };
       }
     } else {
       const resolved = resolveJointValue(value, doc);
-      updatedJoint = { ...existing, displacement: typeof resolved === 'number' ? resolved : existing.displacement };
+      updatedJoint = {
+        ...existing,
+        displacement: typeof resolved === 'number' ? resolved : existing.displacement,
+      };
       if (typeof value === 'string') {
         updatedJoint = { ...updatedJoint, displacement: resolved ?? existing.displacement };
       }
@@ -660,9 +680,10 @@ export const setJointValue: CommandDefinition<SetJointValueParams> = {
     };
 
     const fieldName = existing.kind === 'revolute' ? 'angle' : 'displacement';
-    const storedValue = existing.kind === 'revolute'
-      ? (updatedJoint as typeof existing).angle
-      : (updatedJoint as Extract<Joint, { kind: 'prismatic' }>).displacement;
+    const storedValue =
+      existing.kind === 'revolute'
+        ? (updatedJoint as typeof existing).angle
+        : (updatedJoint as Extract<Joint, { kind: 'prismatic' }>).displacement;
 
     return {
       document: newDoc,
@@ -891,8 +912,8 @@ export const evaluateMotion: CommandDefinition<Record<string, never>> = {
   description:
     'Compute the result of applying all kinematic joints and drive relations without mutating the document. ' +
     'Drive relations are walked in topological order: driven_value = driver_value * ratio + offset. ' +
-    'Then each joint is applied: revolute rotates instance b around instance a\'s origin along the axis; ' +
-    'prismatic translates instance b along the axis from instance a\'s origin. ' +
+    "Then each joint is applied: revolute rotates instance b around instance a's origin along the axis; " +
+    "prismatic translates instance b along the axis from instance a's origin. " +
     'Returns the document unchanged with affected:[] and data: ' +
     '{ resolvedJoints: Record<jointId, number>, ' +
     '  instancePositions: Record<instanceId, Vec3>, ' +
@@ -920,8 +941,7 @@ export const evaluateMotion: CommandDefinition<Record<string, never>> = {
 
     return {
       document: doc,
-      summary:
-        `evaluate_motion: evaluated ${jointCount} joint(s), ${movedCount} instance(s) would move.`,
+      summary: `evaluate_motion: evaluated ${jointCount} joint(s), ${movedCount} instance(s) would move.`,
       affected: [],
       data: { resolvedJoints, instancePositions, instanceRotations },
     };
@@ -947,8 +967,8 @@ export const bakeMotion: CommandDefinition<Record<string, never>> = {
     'the position and rotation of affected InstanceEntity objects. ' +
     'This runs the same calculation as evaluate_motion but WRITES the results into the document. ' +
     'Drive relations are walked in topological order; each joint is then applied to instance b. ' +
-    'Revolute joint: rotates instance b around instance a\'s origin along the axis by the joint angle. ' +
-    'Prismatic joint: translates instance b along the axis from instance a\'s origin by the displacement. ' +
+    "Revolute joint: rotates instance b around instance a's origin along the axis by the joint angle. " +
+    "Prismatic joint: translates instance b along the axis from instance a's origin by the displacement. " +
     'Returns the updated document with affected[] listing all modified instance ids.',
   paramsSchema: {
     type: 'object',
@@ -970,7 +990,8 @@ export const bakeMotion: CommandDefinition<Record<string, never>> = {
     if (movedIds.length === 0) {
       return {
         document: doc,
-        summary: 'bake_motion: joints exist but no instance positions changed (all instanceIds may be missing).',
+        summary:
+          'bake_motion: joints exist but no instance positions changed (all instanceIds may be missing).',
         affected: [],
       };
     }
@@ -996,8 +1017,7 @@ export const bakeMotion: CommandDefinition<Record<string, never>> = {
 
     return {
       document: newDoc,
-      summary:
-        `bake_motion: applied ${jointCount} joint(s); updated position/rotation of ${movedIds.length} instance(s): ${movedIds.join(', ')}.`,
+      summary: `bake_motion: applied ${jointCount} joint(s); updated position/rotation of ${movedIds.length} instance(s): ${movedIds.join(', ')}.`,
       affected: movedIds,
     };
   },

@@ -18,7 +18,10 @@ interface SplineRendererProps {
 
 const SPLINE_SEGMENTS_PER_POINT = 16;
 
-export function SplineRenderer({ entity, selected }: SplineRendererProps): React.ReactElement | null {
+export function SplineRenderer({
+  entity,
+  selected,
+}: SplineRendererProps): React.ReactElement | null {
   const { points, closed, position, color } = entity;
 
   const lineObject = useMemo(() => {

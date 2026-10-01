@@ -307,14 +307,25 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
     const i1 = indices[t * 3 + 1] ?? 0;
     const i2 = indices[t * 3 + 2] ?? 0;
 
-    const x0 = positions[i0 * 3] ?? 0, y0 = positions[i0 * 3 + 1] ?? 0, z0 = positions[i0 * 3 + 2] ?? 0;
-    const x1 = positions[i1 * 3] ?? 0, y1 = positions[i1 * 3 + 1] ?? 0, z1 = positions[i1 * 3 + 2] ?? 0;
-    const x2 = positions[i2 * 3] ?? 0, y2 = positions[i2 * 3 + 1] ?? 0, z2 = positions[i2 * 3 + 2] ?? 0;
+    const x0 = positions[i0 * 3] ?? 0,
+      y0 = positions[i0 * 3 + 1] ?? 0,
+      z0 = positions[i0 * 3 + 2] ?? 0;
+    const x1 = positions[i1 * 3] ?? 0,
+      y1 = positions[i1 * 3 + 1] ?? 0,
+      z1 = positions[i1 * 3 + 2] ?? 0;
+    const x2 = positions[i2 * 3] ?? 0,
+      y2 = positions[i2 * 3 + 1] ?? 0,
+      z2 = positions[i2 * 3 + 2] ?? 0;
 
     // Skip degenerate (zero-area) triangles to avoid sewing failures.
-    const abx = x1 - x0, aby = y1 - y0, abz = z1 - z0;
-    const acx = x2 - x0, acy = y2 - y0, acz = z2 - z0;
-    const crossSq = (aby * acz - abz * acy) ** 2 + (abz * acx - abx * acz) ** 2 + (abx * acy - aby * acx) ** 2;
+    const abx = x1 - x0,
+      aby = y1 - y0,
+      abz = z1 - z0;
+    const acx = x2 - x0,
+      acy = y2 - y0,
+      acz = z2 - z0;
+    const crossSq =
+      (aby * acz - abz * acy) ** 2 + (abz * acx - abx * acz) ** 2 + (abx * acy - aby * acx) ** 2;
     if (crossSq < 1e-24) continue; // degenerate — skip
 
     const gp0: OccGpPnt = new api.gp_Pnt_3(x0, y0, z0);
@@ -487,10 +498,26 @@ export async function createOcctKernel(wasmBinary?: Uint8Array): Promise<Geometr
         return null;
       } finally {
         // Free all WASM heap objects to prevent memory leaks (nit fixed: KI4 review).
-        try { shapeA?.delete(); } catch { /* ignore */ }
-        try { shapeB?.delete(); } catch { /* ignore */ }
-        try { resultShape?.delete(); } catch { /* ignore */ }
-        try { fuseOp?.delete(); } catch { /* ignore */ }
+        try {
+          shapeA?.delete();
+        } catch {
+          /* ignore */
+        }
+        try {
+          shapeB?.delete();
+        } catch {
+          /* ignore */
+        }
+        try {
+          resultShape?.delete();
+        } catch {
+          /* ignore */
+        }
+        try {
+          fuseOp?.delete();
+        } catch {
+          /* ignore */
+        }
       }
     },
 
@@ -562,8 +589,16 @@ export async function createOcctKernel(wasmBinary?: Uint8Array): Promise<Geometr
       } catch {
         return null;
       } finally {
-        try { occShape?.delete(); } catch { /* ignore */ }
-        try { filletMaker?.delete(); } catch { /* ignore */ }
+        try {
+          occShape?.delete();
+        } catch {
+          /* ignore */
+        }
+        try {
+          filletMaker?.delete();
+        } catch {
+          /* ignore */
+        }
       }
     },
 
@@ -589,7 +624,11 @@ export async function createOcctKernel(wasmBinary?: Uint8Array): Promise<Geometr
       } catch {
         return null;
       } finally {
-        try { shape?.delete(); } catch { /* ignore */ }
+        try {
+          shape?.delete();
+        } catch {
+          /* ignore */
+        }
       }
     },
   };

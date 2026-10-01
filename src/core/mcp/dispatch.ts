@@ -112,9 +112,7 @@ export function shapeToolCallContent(result: {
       text: `\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``,
     });
     const isRecord =
-      typeof result.data === 'object' &&
-      result.data !== null &&
-      !Array.isArray(result.data);
+      typeof result.data === 'object' && result.data !== null && !Array.isArray(result.data);
     if (isRecord) {
       return {
         content,

@@ -34,8 +34,8 @@ import type { DocPatch } from './docPatch';
  * server bundle. Autosave is disabled inside tests (vitest sets `VITEST`, our
  * own harness sets `TEST`) to avoid clobbering a user's saved project.
  */
-const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH']
-  ?? path.resolve(__dirname, '..', '.autosave.json');
+const AUTOSAVE_PATH =
+  process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
 
 const AUTOSAVE_ENABLED =
   process.env['VITEST'] === undefined &&
@@ -49,7 +49,9 @@ function loadAutosave(): CadDocument {
     const json = fs.readFileSync(AUTOSAVE_PATH, 'utf8');
     return deserializeDocument(json);
   } catch (err) {
-    console.warn(`[liveDocument] autosave load failed (${(err as Error).message}); starting empty.`);
+    console.warn(
+      `[liveDocument] autosave load failed (${(err as Error).message}); starting empty.`,
+    );
     return createEmptyDocument();
   }
 }

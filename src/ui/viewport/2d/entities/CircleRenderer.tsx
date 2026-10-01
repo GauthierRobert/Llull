@@ -22,9 +22,12 @@ export function CircleRenderer({ entity, selected }: CircleRendererProps): React
 
   const lineObject = useMemo(() => {
     const curve = new THREE.EllipseCurve(
-      center[0], center[1],
-      radius, radius,
-      0, Math.PI * 2,
+      center[0],
+      center[1],
+      radius,
+      radius,
+      0,
+      Math.PI * 2,
       false,
       0,
     );
@@ -32,7 +35,7 @@ export function CircleRenderer({ entity, selected }: CircleRendererProps): React
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({ color: selected ? '#5b8dee' : color });
     return new THREE.Line(geo, mat);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center[0], center[1], radius, color, selected]);
 
   useEffect(() => {

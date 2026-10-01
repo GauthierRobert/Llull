@@ -32,11 +32,11 @@ import type { Snap3DType } from './snap3d';
 // ---------------------------------------------------------------------------
 
 const SNAP_COLOUR: Record<Snap3DType, string> = {
-  vertex:        '#f5c842',
-  edge:          '#42d4f5',
+  vertex: '#f5c842',
+  edge: '#42d4f5',
   'face-center': '#42f5a7',
-  grid:          '#8090a0',
-  none:          '#ffffff',
+  grid: '#8090a0',
+  none: '#ffffff',
 };
 
 const INDICATOR_SIZE = 0.18;
@@ -56,7 +56,10 @@ interface SnapIndicator3DProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function SnapIndicator3D({ position, snapType }: SnapIndicator3DProps): React.ReactElement | null {
+export function SnapIndicator3D({
+  position,
+  snapType,
+}: SnapIndicator3DProps): React.ReactElement | null {
   const { invalidate } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
 

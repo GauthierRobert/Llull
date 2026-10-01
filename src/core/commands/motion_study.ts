@@ -143,10 +143,13 @@ function evaluateAtValues(
         pivot[2] + rotatedOffset[2],
       ];
       const deltaRot: Vec3 =
-        joint.axis === 'x' ? [value, 0, 0] :
-        joint.axis === 'y' ? [0, value, 0] :
-        joint.axis === 'z' ? [0, 0, value] :
-        [axisVec[0] * value, axisVec[1] * value, axisVec[2] * value];
+        joint.axis === 'x'
+          ? [value, 0, 0]
+          : joint.axis === 'y'
+            ? [0, value, 0]
+            : joint.axis === 'z'
+              ? [0, 0, value]
+              : [axisVec[0] * value, axisVec[1] * value, axisVec[2] * value];
       instanceRotations[joint.b.instanceId] = [
         bRot[0] + deltaRot[0],
         bRot[1] + deltaRot[1],
@@ -209,9 +212,12 @@ export interface MotionStudyData {
 /** Returns true when two world-space AABBs overlap. */
 function aabbOverlap(a: Bounds, b: Bounds): boolean {
   return (
-    a.min[0] <= b.max[0] && a.max[0] >= b.min[0] &&
-    a.min[1] <= b.max[1] && a.max[1] >= b.min[1] &&
-    a.min[2] <= b.max[2] && a.max[2] >= b.min[2]
+    a.min[0] <= b.max[0] &&
+    a.max[0] >= b.min[0] &&
+    a.min[1] <= b.max[1] &&
+    a.max[1] >= b.min[1] &&
+    a.min[2] <= b.max[2] &&
+    a.max[2] >= b.min[2]
   );
 }
 
@@ -319,13 +325,13 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
         type: 'number',
         description:
           'Start value of the sweep range (inclusive). ' +
-          'For revolute joints: radians. For prismatic joints: document units. For parameters: the parameter\'s unit.',
+          "For revolute joints: radians. For prismatic joints: document units. For parameters: the parameter's unit.",
       },
       end: {
         type: 'number',
         description:
           'End value of the sweep range (inclusive). ' +
-          'For revolute joints: radians. For prismatic joints: document units. For parameters: the parameter\'s unit.',
+          "For revolute joints: radians. For prismatic joints: document units. For parameters: the parameter's unit.",
       },
       steps: {
         type: 'number',
@@ -383,7 +389,11 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
         document: doc,
         summary: `motion_study: start === end (${start}). Sweep has zero length — no steps to evaluate.`,
         affected: [],
-        data: { steps: [], interferences: [], summary: { totalSteps: 0, framesWithInterference: 0 } } satisfies MotionStudyData,
+        data: {
+          steps: [],
+          interferences: [],
+          summary: { totalSteps: 0, framesWithInterference: 0 },
+        } satisfies MotionStudyData,
       };
     }
 
@@ -394,7 +404,11 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
         document: doc,
         summary: `motion_study: steps must be at least 2 (got ${String(steps)}). No sweep performed.`,
         affected: [],
-        data: { steps: [], interferences: [], summary: { totalSteps: 0, framesWithInterference: 0 } } satisfies MotionStudyData,
+        data: {
+          steps: [],
+          interferences: [],
+          summary: { totalSteps: 0, framesWithInterference: 0 },
+        } satisfies MotionStudyData,
       };
     }
     const clampedSteps = Math.min(360, Math.max(2, rawSteps));
@@ -433,7 +447,7 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
     const stepsWithInterference = new Set<number>();
 
     for (let k = 0; k < clampedSteps; k++) {
-      const sweepValue = start + (end - start) * k / (clampedSteps - 1);
+      const sweepValue = start + ((end - start) * k) / (clampedSteps - 1);
 
       let baseValues: Record<string, number>;
 
@@ -446,7 +460,11 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
         // collect all joint values as they would be resolved against that parameter.
         // We patch the doc's parameter value for evaluation purposes (no mutation of
         // input doc — we derive the effective joint values inline).
-        const updatedParam = { ...doc.parameters[target]!, value: sweepValue, expression: String(sweepValue) };
+        const updatedParam = {
+          ...doc.parameters[target]!,
+          value: sweepValue,
+          expression: String(sweepValue),
+        };
         const virtualParameters = { ...doc.parameters, [target]: updatedParam };
 
         // Compute overrides for all joints that use a parameter expression.
@@ -491,9 +509,18 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
         // current numeric value — we scale it to the new sweep position.
       }
 
-      const { instancePositions, instanceRotations, resolvedJoints } = evaluateAtValues(doc, baseValues);
+      const { instancePositions, instanceRotations, resolvedJoints } = evaluateAtValues(
+        doc,
+        baseValues,
+      );
 
-      motionSteps.push({ stepIndex: k, sweepValue, instancePositions, instanceRotations, resolvedJoints });
+      motionSteps.push({
+        stepIndex: k,
+        sweepValue,
+        instancePositions,
+        instanceRotations,
+        resolvedJoints,
+      });
 
       // Interference check (optional, O(n²) AABB pairs)
       if (interferenceCheck === true) {

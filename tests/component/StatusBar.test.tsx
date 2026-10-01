@@ -26,7 +26,11 @@ import { localDispatch } from '../helpers/storeTestHelpers';
 // ---------------------------------------------------------------------------
 
 function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null, liveStatus: 'connecting' });
+  useStore.setState({
+    document: createEmptyDocument(),
+    lastSummary: null,
+    liveStatus: 'connecting',
+  });
   useThemeStore.setState({ theme: 'dark' });
 }
 

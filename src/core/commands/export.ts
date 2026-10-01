@@ -14,7 +14,14 @@ import type { CommandDefinition, CommandResult } from './types';
 import { applyEulerXYZ } from './render';
 import { expandInstance } from './assemblies';
 import { revolutionTriangles } from '../geometry/revolution';
-import { SEG_CIRCLE, SEG_SPHERE_LAT, SEG_SPHERE_LON, SEG_TORUS_TUBE, circlePoints, earClipTriangulate } from './tessellation';
+import {
+  SEG_CIRCLE,
+  SEG_SPHERE_LAT,
+  SEG_SPHERE_LON,
+  SEG_TORUS_TUBE,
+  circlePoints,
+  earClipTriangulate,
+} from './tessellation';
 
 // ---------------------------------------------------------------------------
 // Internal math helpers (pure)
@@ -25,11 +32,7 @@ function sub3(a: Vec3, b: Vec3): Vec3 {
 }
 
 function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function len3(a: Vec3): number {
@@ -91,30 +94,68 @@ function earClipTriangulateVerts(verts: Vec3[]): Triangle[] {
 function triangulateBox(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Triangle[] {
   const [px, py, pz] = e.position;
   const [w, h, d] = e.size;
-  const x0 = px - w / 2, x1 = px + w / 2;
-  const y0 = py - h / 2, y1 = py + h / 2;
-  const z0 = pz - d / 2, z1 = pz + d / 2;
+  const x0 = px - w / 2,
+    x1 = px + w / 2;
+  const y0 = py - h / 2,
+    y1 = py + h / 2;
+  const z0 = pz - d / 2,
+    z1 = pz + d / 2;
 
   const quads: Vec3[][] = [
     // bottom (-Z)  reversed = face down
-    [[x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0]],
+    [
+      [x0, y0, z0],
+      [x0, y1, z0],
+      [x1, y1, z0],
+      [x1, y0, z0],
+    ],
     // top (+Z)
-    [[x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [x1, y0, z1]],
+    [
+      [x0, y0, z1],
+      [x0, y1, z1],
+      [x1, y1, z1],
+      [x1, y0, z1],
+    ],
     // front (-Y)
-    [[x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0]],
+    [
+      [x0, y0, z0],
+      [x0, y0, z1],
+      [x1, y0, z1],
+      [x1, y0, z0],
+    ],
     // back (+Y)
-    [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]],
+    [
+      [x0, y1, z0],
+      [x1, y1, z0],
+      [x1, y1, z1],
+      [x0, y1, z1],
+    ],
     // left (-X)
-    [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]],
+    [
+      [x0, y0, z0],
+      [x0, y1, z0],
+      [x0, y1, z1],
+      [x0, y0, z1],
+    ],
     // right (+X)
-    [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]],
+    [
+      [x1, y0, z0],
+      [x1, y0, z1],
+      [x1, y1, z1],
+      [x1, y1, z0],
+    ],
   ];
 
   const tris = quads.flatMap(fanTriangulate);
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-function triangulateCylinder(e: { position: Vec3; radius: number; height: number; rotation: Vec3 }): Triangle[] {
+function triangulateCylinder(e: {
+  position: Vec3;
+  radius: number;
+  height: number;
+  rotation: Vec3;
+}): Triangle[] {
   const [px, py, pz] = e.position;
   const { radius, height } = e;
   const zb = pz - height / 2;
@@ -159,10 +200,26 @@ function triangulateSphere(e: { position: Vec3; radius: number; rotation: Vec3 }
     for (let lon = 0; lon < SEG_SPHERE_LON; lon++) {
       const b0 = (2 * Math.PI * lon) / SEG_SPHERE_LON;
       const b1 = (2 * Math.PI * (lon + 1)) / SEG_SPHERE_LON;
-      const v00: Vec3 = [px + radius * Math.cos(a0) * Math.cos(b0), py + radius * Math.cos(a0) * Math.sin(b0), pz + radius * Math.sin(a0)];
-      const v01: Vec3 = [px + radius * Math.cos(a0) * Math.cos(b1), py + radius * Math.cos(a0) * Math.sin(b1), pz + radius * Math.sin(a0)];
-      const v10: Vec3 = [px + radius * Math.cos(a1) * Math.cos(b0), py + radius * Math.cos(a1) * Math.sin(b0), pz + radius * Math.sin(a1)];
-      const v11: Vec3 = [px + radius * Math.cos(a1) * Math.cos(b1), py + radius * Math.cos(a1) * Math.sin(b1), pz + radius * Math.sin(a1)];
+      const v00: Vec3 = [
+        px + radius * Math.cos(a0) * Math.cos(b0),
+        py + radius * Math.cos(a0) * Math.sin(b0),
+        pz + radius * Math.sin(a0),
+      ];
+      const v01: Vec3 = [
+        px + radius * Math.cos(a0) * Math.cos(b1),
+        py + radius * Math.cos(a0) * Math.sin(b1),
+        pz + radius * Math.sin(a0),
+      ];
+      const v10: Vec3 = [
+        px + radius * Math.cos(a1) * Math.cos(b0),
+        py + radius * Math.cos(a1) * Math.sin(b0),
+        pz + radius * Math.sin(a1),
+      ];
+      const v11: Vec3 = [
+        px + radius * Math.cos(a1) * Math.cos(b1),
+        py + radius * Math.cos(a1) * Math.sin(b1),
+        pz + radius * Math.sin(a1),
+      ];
       tris.push([v00, v01, v11]);
       tris.push([v00, v11, v10]);
     }
@@ -171,7 +228,12 @@ function triangulateSphere(e: { position: Vec3; radius: number; rotation: Vec3 }
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-function triangulateCone(e: { position: Vec3; radius: number; height: number; rotation: Vec3 }): Triangle[] {
+function triangulateCone(e: {
+  position: Vec3;
+  radius: number;
+  height: number;
+  rotation: Vec3;
+}): Triangle[] {
   const [px, py, pz] = e.position;
   const { radius, height } = e;
   const base = circlePoints(px, py, pz, radius, SEG_CIRCLE);
@@ -195,7 +257,12 @@ function triangulateCone(e: { position: Vec3; radius: number; height: number; ro
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-function triangulateTorus(e: { position: Vec3; ringRadius: number; tubeRadius: number; rotation: Vec3 }): Triangle[] {
+function triangulateTorus(e: {
+  position: Vec3;
+  ringRadius: number;
+  tubeRadius: number;
+  rotation: Vec3;
+}): Triangle[] {
   const [px, py, pz] = e.position;
   const { ringRadius, tubeRadius } = e;
   const RING_SEGS = SEG_CIRCLE;
@@ -205,17 +272,37 @@ function triangulateTorus(e: { position: Vec3; ringRadius: number; tubeRadius: n
   for (let i = 0; i < RING_SEGS; i++) {
     const a0 = (2 * Math.PI * i) / RING_SEGS;
     const a1 = (2 * Math.PI * (i + 1)) / RING_SEGS;
-    const ca0 = Math.cos(a0), sa0 = Math.sin(a0);
-    const ca1 = Math.cos(a1), sa1 = Math.sin(a1);
+    const ca0 = Math.cos(a0),
+      sa0 = Math.sin(a0);
+    const ca1 = Math.cos(a1),
+      sa1 = Math.sin(a1);
     for (let j = 0; j < TUBE_SEGS; j++) {
       const b0 = (2 * Math.PI * j) / TUBE_SEGS;
       const b1 = (2 * Math.PI * (j + 1)) / TUBE_SEGS;
-      const cb0 = Math.cos(b0), sb0 = Math.sin(b0);
-      const cb1 = Math.cos(b1), sb1 = Math.sin(b1);
-      const v00: Vec3 = [px + (ringRadius + tubeRadius * cb0) * ca0, py + (ringRadius + tubeRadius * cb0) * sa0, pz + tubeRadius * sb0];
-      const v01: Vec3 = [px + (ringRadius + tubeRadius * cb1) * ca0, py + (ringRadius + tubeRadius * cb1) * sa0, pz + tubeRadius * sb1];
-      const v10: Vec3 = [px + (ringRadius + tubeRadius * cb0) * ca1, py + (ringRadius + tubeRadius * cb0) * sa1, pz + tubeRadius * sb0];
-      const v11: Vec3 = [px + (ringRadius + tubeRadius * cb1) * ca1, py + (ringRadius + tubeRadius * cb1) * sa1, pz + tubeRadius * sb1];
+      const cb0 = Math.cos(b0),
+        sb0 = Math.sin(b0);
+      const cb1 = Math.cos(b1),
+        sb1 = Math.sin(b1);
+      const v00: Vec3 = [
+        px + (ringRadius + tubeRadius * cb0) * ca0,
+        py + (ringRadius + tubeRadius * cb0) * sa0,
+        pz + tubeRadius * sb0,
+      ];
+      const v01: Vec3 = [
+        px + (ringRadius + tubeRadius * cb1) * ca0,
+        py + (ringRadius + tubeRadius * cb1) * sa0,
+        pz + tubeRadius * sb1,
+      ];
+      const v10: Vec3 = [
+        px + (ringRadius + tubeRadius * cb0) * ca1,
+        py + (ringRadius + tubeRadius * cb0) * sa1,
+        pz + tubeRadius * sb0,
+      ];
+      const v11: Vec3 = [
+        px + (ringRadius + tubeRadius * cb1) * ca1,
+        py + (ringRadius + tubeRadius * cb1) * sa1,
+        pz + tubeRadius * sb1,
+      ];
       tris.push([v00, v10, v11]);
       tris.push([v00, v11, v01]);
     }
@@ -254,9 +341,16 @@ function tessellateWedge(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Tri
   return applyRotationToTriangles(triPairs, e.position, e.rotation);
 }
 
-function triangulatePyramid(e: { position: Vec3; baseWidth: number; baseDepth: number; height: number; rotation: Vec3 }): Triangle[] {
+function triangulatePyramid(e: {
+  position: Vec3;
+  baseWidth: number;
+  baseDepth: number;
+  height: number;
+  rotation: Vec3;
+}): Triangle[] {
   const [px, py, pz] = e.position;
-  const hw = e.baseWidth / 2, hd = e.baseDepth / 2;
+  const hw = e.baseWidth / 2,
+    hd = e.baseDepth / 2;
   const b00: Vec3 = [px - hw, py - hd, pz];
   const b10: Vec3 = [px + hw, py - hd, pz];
   const b11: Vec3 = [px + hw, py + hd, pz];
@@ -276,7 +370,12 @@ function triangulatePyramid(e: { position: Vec3; baseWidth: number; baseDepth: n
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-function triangulateExtrusion(e: { position: Vec3; profile: ReadonlyArray<readonly [number, number]>; depth: number; rotation: Vec3 }): Triangle[] {
+function triangulateExtrusion(e: {
+  position: Vec3;
+  profile: ReadonlyArray<readonly [number, number]>;
+  depth: number;
+  rotation: Vec3;
+}): Triangle[] {
   if (e.profile.length < 3) return [];
   const [px, py, pz] = e.position;
   const n = e.profile.length;
@@ -299,7 +398,11 @@ function triangulateExtrusion(e: { position: Vec3; profile: ReadonlyArray<readon
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-function triangulateMesh(e: { position: Vec3; mesh: { positions: readonly number[] }; rotation: Vec3 }): Triangle[] {
+function triangulateMesh(e: {
+  position: Vec3;
+  mesh: { positions: readonly number[] };
+  rotation: Vec3;
+}): Triangle[] {
   const p = e.mesh.positions;
   const tris: Triangle[] = [];
   for (let i = 0; i + 8 < p.length; i += 9) {
@@ -351,16 +454,26 @@ function triangulateRevolution(e: {
  */
 export function entityToTriangles(e: Entity, doc: CadDocument): Triangle[] {
   switch (e.kind) {
-    case 'box':        return triangulateBox(e);
-    case 'cylinder':   return triangulateCylinder(e);
-    case 'sphere':     return triangulateSphere(e);
-    case 'cone':       return triangulateCone(e);
-    case 'torus':      return triangulateTorus(e);
-    case 'wedge':      return tessellateWedge(e);
-    case 'pyramid':    return triangulatePyramid(e);
-    case 'extrusion':  return triangulateExtrusion(e);
-    case 'mesh':       return triangulateMesh(e);
-    case 'revolution': return triangulateRevolution(e);
+    case 'box':
+      return triangulateBox(e);
+    case 'cylinder':
+      return triangulateCylinder(e);
+    case 'sphere':
+      return triangulateSphere(e);
+    case 'cone':
+      return triangulateCone(e);
+    case 'torus':
+      return triangulateTorus(e);
+    case 'wedge':
+      return tessellateWedge(e);
+    case 'pyramid':
+      return triangulatePyramid(e);
+    case 'extrusion':
+      return triangulateExtrusion(e);
+    case 'mesh':
+      return triangulateMesh(e);
+    case 'revolution':
+      return triangulateRevolution(e);
     case 'instance': {
       const inst = e as InstanceEntity;
       const component = doc.components[inst.componentId];
@@ -373,7 +486,8 @@ export function entityToTriangles(e: Entity, doc: CadDocument): Triangle[] {
       }
       return result;
     }
-    default:           return [];   // 2D shapes → nothing
+    default:
+      return []; // 2D shapes → nothing
   }
 }
 
@@ -445,23 +559,36 @@ function buildBinaryStl(tris: Triangle[], headerText: string): Uint8Array {
   for (const [v0, v1, v2] of tris) {
     const n = facetNormal(v0, v1, v2);
     // normal (3 × float32)
-    view.setFloat32(offset, n[0], true);   offset += 4;
-    view.setFloat32(offset, n[1], true);   offset += 4;
-    view.setFloat32(offset, n[2], true);   offset += 4;
+    view.setFloat32(offset, n[0], true);
+    offset += 4;
+    view.setFloat32(offset, n[1], true);
+    offset += 4;
+    view.setFloat32(offset, n[2], true);
+    offset += 4;
     // v0 (3 × float32)
-    view.setFloat32(offset, v0[0], true);  offset += 4;
-    view.setFloat32(offset, v0[1], true);  offset += 4;
-    view.setFloat32(offset, v0[2], true);  offset += 4;
+    view.setFloat32(offset, v0[0], true);
+    offset += 4;
+    view.setFloat32(offset, v0[1], true);
+    offset += 4;
+    view.setFloat32(offset, v0[2], true);
+    offset += 4;
     // v1 (3 × float32)
-    view.setFloat32(offset, v1[0], true);  offset += 4;
-    view.setFloat32(offset, v1[1], true);  offset += 4;
-    view.setFloat32(offset, v1[2], true);  offset += 4;
+    view.setFloat32(offset, v1[0], true);
+    offset += 4;
+    view.setFloat32(offset, v1[1], true);
+    offset += 4;
+    view.setFloat32(offset, v1[2], true);
+    offset += 4;
     // v2 (3 × float32)
-    view.setFloat32(offset, v2[0], true);  offset += 4;
-    view.setFloat32(offset, v2[1], true);  offset += 4;
-    view.setFloat32(offset, v2[2], true);  offset += 4;
+    view.setFloat32(offset, v2[0], true);
+    offset += 4;
+    view.setFloat32(offset, v2[1], true);
+    offset += 4;
+    view.setFloat32(offset, v2[2], true);
+    offset += 4;
     // attribute byte count (2 bytes, always 0)
-    view.setUint16(offset, 0, true);       offset += 2;
+    view.setUint16(offset, 0, true);
+    offset += 2;
   }
 
   return buf;
@@ -606,7 +733,9 @@ export const exportStl: CommandDefinition<ExportStlParams> = {
     const triangleCount = allTris.length;
 
     // Build summary
-    const parts: string[] = [`export_stl: ${triangleCount} triangle${triangleCount !== 1 ? 's' : ''} exported (format=${fmt}).`];
+    const parts: string[] = [
+      `export_stl: ${triangleCount} triangle${triangleCount !== 1 ? 's' : ''} exported (format=${fmt}).`,
+    ];
     if (skipped2D > 0) parts.push(`${skipped2D} 2D entit${skipped2D !== 1 ? 'ies' : 'y'} skipped.`);
     if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
     const summary = parts.join(' ');

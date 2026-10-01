@@ -11,21 +11,11 @@ import os from 'os';
 import path from 'path';
 import type { Request, Response } from 'express';
 import { app } from '../src/index';
-import {
-  guardMutation,
-  hasValidBearer,
-  isLoopbackAddress,
-  checkBindSafety,
-} from '../src/security';
+import { guardMutation, hasValidBearer, isLoopbackAddress, checkBindSafety } from '../src/security';
 import { createAutosaver } from '../src/autosave';
 import { createEmptyDocument } from '@core/model/types';
 
-const ENV_KEYS = [
-  'MCP_AUTH_TOKEN',
-  'HOST',
-  'LLULL_ALLOWED_HOSTS',
-  'LLULL_REQUIRE_TOKEN_FOR_REST',
-];
+const ENV_KEYS = ['MCP_AUTH_TOKEN', 'HOST', 'LLULL_ALLOWED_HOSTS', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
 });
@@ -125,16 +115,18 @@ describe('/ui-bridge guard', () => {
       .set('Origin', 'http://evil.example')
       .send({ entities: {}, order: [] });
     expect(push.status).toBe(403);
-    expect((await request(app).post('/ui-bridge/pull').set('Origin', 'http://evil.example')).status).toBe(403);
+    expect(
+      (await request(app).post('/ui-bridge/pull').set('Origin', 'http://evil.example')).status,
+    ).toBe(403);
   });
 
   it('uses the shared bearer verifier (case-insensitive scheme)', async () => {
     process.env['MCP_AUTH_TOKEN'] = 'secret';
-    const res = await request(app)
-      .post('/ui-bridge/pull')
-      .set('Authorization', 'bearer secret');
+    const res = await request(app).post('/ui-bridge/pull').set('Authorization', 'bearer secret');
     expect(res.status).toBe(200);
-    expect((await request(app).post('/ui-bridge/pull').set('Authorization', 'Bearer nope')).status).toBe(401);
+    expect(
+      (await request(app).post('/ui-bridge/pull').set('Authorization', 'Bearer nope')).status,
+    ).toBe(401);
   });
 });
 
@@ -143,7 +135,11 @@ describe('autosaver stop mode', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-stop-'));
     try {
       const file = path.join(dir, 's.json');
-      const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"late":1}' });
+      const saver = createAutosaver({
+        filePath: file,
+        debounceMs: 60_000,
+        serialize: () => '{"late":1}',
+      });
       saver.stop();
       expect(fs.existsSync(file)).toBe(false);
       saver.schedule(createEmptyDocument());
@@ -157,7 +153,11 @@ describe('autosaver stop mode', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-stop-'));
     try {
       const file = path.join(dir, 't.json');
-      const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"p":1}' });
+      const saver = createAutosaver({
+        filePath: file,
+        debounceMs: 60_000,
+        serialize: () => '{"p":1}',
+      });
       saver.schedule(createEmptyDocument());
       saver.stop();
       expect(fs.readFileSync(file, 'utf8')).toBe('{"p":1}');

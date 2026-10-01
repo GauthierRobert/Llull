@@ -54,10 +54,7 @@ export function deriveQualityTier(entityCount: number): QualityTier {
  * @pure
  * @layer ui/viewport/3d
  */
-export function resolveQualityTier(
-  override: QualityOverride,
-  entityCount: number,
-): QualityTier {
+export function resolveQualityTier(override: QualityOverride, entityCount: number): QualityTier {
   if (override !== 'auto') return override;
   return deriveQualityTier(entityCount);
 }
@@ -97,10 +94,10 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
   },
   low: {
     tier: 'low',
-    softShadowSamples: 0,  // 0 → SoftShadows component not rendered
+    softShadowSamples: 0, // 0 → SoftShadows component not rendered
     shadowMapSize: 1024,
     contactShadowsEnabled: false,
-    environmentEnabled: true,  // keep IBL on in low — it's a texture sample, not PCSS
+    environmentEnabled: true, // keep IBL on in low — it's a texture sample, not PCSS
   },
 };
 

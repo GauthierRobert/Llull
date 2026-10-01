@@ -71,22 +71,45 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
         className={`history-suppress-btn${isSuppressed ? ' history-suppress-btn--suppressed' : ''}`}
         onClick={handleToggleSuppress}
         aria-pressed={isSuppressed}
-        aria-label={
-          isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`
-        }
+        aria-label={isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`}
         title={isSuppressed ? 'Restore (un-suppress)' : 'Suppress (skip during replay)'}
       >
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
           {isSuppressed ? (
             /* Eye with a line through it */
             <>
-              <ellipse cx="6" cy="6" rx="4.5" ry="3" stroke="currentColor" strokeWidth="1.2" fill="none" opacity="0.45" />
-              <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              <ellipse
+                cx="6"
+                cy="6"
+                rx="4.5"
+                ry="3"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                fill="none"
+                opacity="0.45"
+              />
+              <line
+                x1="2"
+                y1="2"
+                x2="10"
+                y2="10"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
             </>
           ) : (
             /* Eye open */
             <>
-              <ellipse cx="6" cy="6" rx="4.5" ry="3" stroke="currentColor" strokeWidth="1.2" fill="none" />
+              <ellipse
+                cx="6"
+                cy="6"
+                rx="4.5"
+                ry="3"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                fill="none"
+              />
               <circle cx="6" cy="6" r="1.5" fill="currentColor" />
             </>
           )}
@@ -96,9 +119,7 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
       {/* Command name + optional label */}
       <span className="history-step-name" title={step.name}>
         <span className="history-step-cmd">{step.name}</span>
-        {step.label != null && (
-          <span className="history-step-label">{step.label}</span>
-        )}
+        {step.label != null && <span className="history-step-label">{step.label}</span>}
       </span>
 
       {/* Reorder buttons */}
@@ -112,7 +133,14 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
           title="Move up"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-            <polyline points="2,7 5,3 8,7" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline
+              points="2,7 5,3 8,7"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <button
@@ -124,7 +152,14 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
           title="Move down"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-            <polyline points="2,3 5,7 8,3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline
+              points="2,3 5,7 8,3"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <button
@@ -135,8 +170,24 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
           title="Delete step"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <line
+              x1="1"
+              y1="1"
+              x2="9"
+              y2="9"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <line
+              x1="9"
+              y1="1"
+              x2="1"
+              y2="9"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
       </div>
@@ -174,7 +225,10 @@ export function FeatureHistoryPanel({ className }: FeatureHistoryPanelProps): Re
           <span className="history-panel-count" aria-label={`${stepCount} steps`}>
             {stepCount}
             {suppressedCount > 0 && (
-              <span className="history-panel-suppressed-badge" title={`${suppressedCount} suppressed`}>
+              <span
+                className="history-panel-suppressed-badge"
+                title={`${suppressedCount} suppressed`}
+              >
                 {` (${suppressedCount} off)`}
               </span>
             )}
@@ -197,12 +251,7 @@ export function FeatureHistoryPanel({ className }: FeatureHistoryPanelProps): Re
       ) : (
         <ol className="history-step-list" aria-label="Feature history steps">
           {featureHistory.map((step, index) => (
-            <FeatureStepRow
-              key={step.id}
-              step={step}
-              index={index}
-              totalCount={stepCount}
-            />
+            <FeatureStepRow key={step.id} step={step} index={index} totalCount={stepCount} />
           ))}
         </ol>
       )}

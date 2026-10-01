@@ -78,7 +78,20 @@ function arrowheadPoints(
   tipY: number,
   dx: number,
   dy: number,
-): [number, number, number, number, number, number, number, number, number, number, number, number] {
+): [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+] {
   const len = Math.sqrt(dx * dx + dy * dy);
   if (len < 1e-9) {
     return [tipX, tipY, 0, tipX, tipY, 0, tipX, tipY, 0, tipX, tipY, 0];
@@ -91,10 +104,18 @@ function arrowheadPoints(
   const s = ARROWHEAD_SIZE;
   // Two lines from tip: one to each wing of the arrowhead.
   return [
-    tipX, tipY, 0,
-    tipX - nx * s + px * s * 0.5, tipY - ny * s + py * s * 0.5, 0,
-    tipX, tipY, 0,
-    tipX - nx * s - px * s * 0.5, tipY - ny * s - py * s * 0.5, 0,
+    tipX,
+    tipY,
+    0,
+    tipX - nx * s + px * s * 0.5,
+    tipY - ny * s + py * s * 0.5,
+    0,
+    tipX,
+    tipY,
+    0,
+    tipX - nx * s - px * s * 0.5,
+    tipY - ny * s - py * s * 0.5,
+    0,
   ];
 }
 
@@ -109,8 +130,10 @@ function formatValue(value: number, precision: number): string {
 
 /** Build the geometry for a linear or aligned dimension. */
 function buildLinearGeometry(
-  ax: number, ay: number,
-  bx: number, by: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
   offset: number,
   aligned: boolean,
   color: string,
@@ -147,10 +170,7 @@ function buildLinearGeometry(
   const mat = new THREE.LineBasicMaterial({ color });
 
   // Extension lines: from each reference point to the dimension line.
-  const extVerts = new Float32Array([
-    ax, ay, 0, dimAx, dimAy, 0,
-    bx, by, 0, dimBx, dimBy, 0,
-  ]);
+  const extVerts = new Float32Array([ax, ay, 0, dimAx, dimAy, 0, bx, by, 0, dimBx, dimBy, 0]);
   const extGeo = new THREE.BufferGeometry();
   extGeo.setAttribute('position', new THREE.BufferAttribute(extVerts, 3));
   group.add(new THREE.LineSegments(extGeo, mat));
@@ -176,7 +196,8 @@ function buildLinearGeometry(
 
 /** Build the geometry for a radial dimension. */
 function buildRadialGeometry(
-  cx: number, cy: number,
+  cx: number,
+  cy: number,
   radius: number,
   offset: number,
   color: string,
@@ -208,9 +229,12 @@ function buildRadialGeometry(
 
 /** Build the geometry for an angular dimension arc. */
 function buildAngularGeometry(
-  vx: number, vy: number,
-  ax: number, ay: number,
-  bx: number, by: number,
+  vx: number,
+  vy: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
   offset: number,
   color: string,
 ): THREE.Group | null {
@@ -230,7 +254,16 @@ function buildAngularGeometry(
   }
 
   const arcRadius = offset > 0 ? offset : DEFAULT_OFFSET;
-  const curve = new THREE.EllipseCurve(vx, vy, arcRadius, arcRadius, startAngle, endAngle, false, 0);
+  const curve = new THREE.EllipseCurve(
+    vx,
+    vy,
+    arcRadius,
+    arcRadius,
+    startAngle,
+    endAngle,
+    false,
+    0,
+  );
   const pts = curve.getPoints(ANGULAR_ARC_SEGMENTS);
 
   const group = new THREE.Group();
@@ -241,10 +274,18 @@ function buildAngularGeometry(
 
   // Extension lines from vertex to arms at arcRadius distance.
   const extVerts = new Float32Array([
-    vx, vy, 0,
-    vx + Math.cos(startAngle) * arcRadius, vy + Math.sin(startAngle) * arcRadius, 0,
-    vx, vy, 0,
-    vx + Math.cos(endAngle) * arcRadius, vy + Math.sin(endAngle) * arcRadius, 0,
+    vx,
+    vy,
+    0,
+    vx + Math.cos(startAngle) * arcRadius,
+    vy + Math.sin(startAngle) * arcRadius,
+    0,
+    vx,
+    vy,
+    0,
+    vx + Math.cos(endAngle) * arcRadius,
+    vy + Math.sin(endAngle) * arcRadius,
+    0,
   ]);
   const extGeo = new THREE.BufferGeometry();
   extGeo.setAttribute('position', new THREE.BufferAttribute(extVerts, 3));
@@ -279,7 +320,7 @@ export function DimensionRenderer2D({
 }: DimensionRenderer2DProps): React.ReactElement | null {
   const { dimensionKind, entityIds, offset: rawOffset, precision, label, color, position } = entity;
   const offset = rawOffset ?? DEFAULT_OFFSET;
-  const dimColor = selected ? SELECTION_COLOR : (color || DIM_LINE_COLOR);
+  const dimColor = selected ? SELECTION_COLOR : color || DIM_LINE_COLOR;
   const effectivePrecision = precision ?? doc.displayPrecision;
 
   // ---------------------------------------------------------------------------
@@ -308,11 +349,18 @@ export function DimensionRenderer2D({
     const [ax, ay] = ca;
     const [bx, by] = cb;
 
-    const value = dimensionKind === 'aligned'
-      ? Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2)
-      : Math.abs(bx - ax);
+    const value =
+      dimensionKind === 'aligned' ? Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2) : Math.abs(bx - ax);
 
-    const group = buildLinearGeometry(ax, ay, bx, by, offset, dimensionKind === 'aligned', dimColor);
+    const group = buildLinearGeometry(
+      ax,
+      ay,
+      bx,
+      by,
+      offset,
+      dimensionKind === 'aligned',
+      dimColor,
+    );
 
     // Midpoint of dimension line for text placement.
     let textX: number, textY: number;
@@ -444,8 +492,8 @@ export function DimensionRenderer2D({
   const displayText = label
     ? label
     : dimensionKind === 'angular'
-    ? `${formatValue(data.value, 1)}°`
-    : formatValue(data.value, effectivePrecision);
+      ? `${formatValue(data.value, 1)}°`
+      : formatValue(data.value, effectivePrecision);
 
   const [posX, posY, posZ] = position;
 

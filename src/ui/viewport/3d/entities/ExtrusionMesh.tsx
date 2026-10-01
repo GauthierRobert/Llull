@@ -26,7 +26,12 @@ function profileKey(profile: ExtrusionEntity['profile']): string {
   return profile.map(([x, y]) => `${x},${y}`).join(';');
 }
 
-export function ExtrusionMesh({ entity, selected, onSelect, pbrMaterial }: ExtrusionMeshProps): React.ReactElement {
+export function ExtrusionMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: ExtrusionMeshProps): React.ReactElement {
   const { profile, depth, position, rotation, color } = entity;
 
   // Rebuild geometry only when the profile points or depth change.
@@ -64,7 +69,14 @@ export function ExtrusionMesh({ entity, selected, onSelect, pbrMaterial }: Extru
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.45,
+    metalness: 0.08,
+    envMapIntensity: 0.8,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

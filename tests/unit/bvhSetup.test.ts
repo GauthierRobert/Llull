@@ -19,8 +19,10 @@ beforeEach(() => {
   // starts from a clean baseline (mirrors how StrictMode might re-run effects).
   __resetBvhSetup();
   // Restore original prototypes before each test.
-  delete (THREE.BufferGeometry.prototype as Partial<typeof THREE.BufferGeometry.prototype>).computeBoundsTree;
-  delete (THREE.BufferGeometry.prototype as Partial<typeof THREE.BufferGeometry.prototype>).disposeBoundsTree;
+  delete (THREE.BufferGeometry.prototype as Partial<typeof THREE.BufferGeometry.prototype>)
+    .computeBoundsTree;
+  delete (THREE.BufferGeometry.prototype as Partial<typeof THREE.BufferGeometry.prototype>)
+    .disposeBoundsTree;
   // Reset Mesh.prototype.raycast to the THREE.js default (object from prototype chain).
   // We can't easily restore the original function reference, so we verify against acceleratedRaycast after patching.
 });
