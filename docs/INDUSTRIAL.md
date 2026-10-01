@@ -1,0 +1,55 @@
+# Industrial (factory builder) guide
+
+For companies that design and build **factories, warehouses and process halls**: steel portal
+frames, crane runways, foundations, cladding, machines and utilities — delivered as steel
+tonnage, cut lists, clash reports, elevations / sections, plans, DXF and IFC. It extends the
+building workspace ([`CONSTRUCTION.md`](CONSTRUCTION.md)): same constructive building model, same
+"one command = Building panel tool + MCP tool" rule. Plan and status:
+[`INDUSTRIAL_PLAN.md`](INDUSTRIAL_PLAN.md).
+
+## Elements
+
+| Element                 | Command(s)                                | Notes                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Steel profile catalogue | `list_steel_profiles`                     | IPE, HEA, HEB, UPN, cold-formed C, SHS, RHS, CHS and L sections with depth, width, thicknesses, area, kg/m and paint perimeter. Names are case- and space-insensitive (`hea 400`).                                                                                                                                                                  |
+| Steel member            | `add_steel_member`, `update_steel_member` | Role (column, beam, rafter, brace, purlin, side rail, crane beam), profile, axis start / end in 3D (z above the level), roll about the axis, grade (default S355). Exact section swept along the axis. Marks SC / SB / RF / BR / PU / SR / CB. Layers `S-COLS` (columns), `S-BEAM` (beams, rafters), `S-BRAC`, `S-JOIS` (purlins, rails), `S-CRAN`. |
+| Portal-frame hall       | `add_portal_frame_building`               | One undoable step: grid (letters along the hall, numbers per frame), columns and pitched rafters every bay, gable wind posts, purlins on both slopes, side rails, X-bracing in the end bays, pad footings, ground slab, roof / wall / gable cladding, optional crane runway on brackets. Summary reports the steel tonnage.                         |
+| Crane runway            | `add_crane_runway`                        | Runway beams split at supports, a bracket from each support to the nearest steel column (≤ 2 m). Capacity and rail height are noted on the members.                                                                                                                                                                                                 |
+| Pad footing             | `add_footing`                             | At a location, or `underColumns: true` for every steel / concrete column foot of the level. Default 1500 × 1500 × 600, top 300 below the level.                                                                                                                                                                                                     |
+| Cladding panel          | `add_panel`                               | Planar sandwich / sheeting panel through 3D corners; thickness grows along the right-hand normal. Roof or wall role.                                                                                                                                                                                                                                |
+| Equipment               | `add_equipment`                           | Machine footprint with height, rotation, maintenance clearance (drawn dashed in plan) and operating weight.                                                                                                                                                                                                                                         |
+| Pipe run                | `add_pipe_run`                            | 3D polyline with outside diameter and service (compressed air, cooling water…); bends at every interior point.                                                                                                                                                                                                                                      |
+
+## Coordination
+
+`check_clashes` (read-only, like Navisworks / Plant 3D) reports **hard clashes** between pipes,
+equipment, steel, walls, concrete columns, beams and stairs, and **clearance violations** into
+an equipment's maintenance zone, with element ids and penetration depth. Steel-to-steel joints
+and pipe connections (a pipe end inside equipment or on another pipe) are not clashes. In the
+Building panel, _Check clashes_ lists them; click a row to select both elements.
+
+## Quantities and fabrication lists
+
+`quantity_takeoff` adds steel **mass per profile (kg)**, length per profile, **paint / coating
+surface (m²)**, footing count and concrete volume, cladding area by role, equipment count and
+pipe length by service and diameter — all priceable with `set_cost_rates` (keys like
+`member.HEA400.kg`, `member.paint.m2`, `panel-roof.sandwich-panel.m2`). `building_schedule`
+kinds `member` (cut list: mark, role, profile, length, mass, grade), `footing`, `panel`,
+`equipment` and `pipe`.
+
+## Drawings and exchange
+
+| Deliverable | Command                                       | Notes                                                                                                                                                                                               |
+| ----------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Elevation   | `export_elevation_sheet` { direction }        | North / south / east / west (+Y is north), hidden lines removed, level datums, grid bubbles, scale bar, title block. `exclude: ["panel"]` shows the frame behind the cladding.                      |
+| Section     | `export_elevation_sheet` { direction, cutAt } | The model nearer than the cut plane is removed; cut outlines are heavy.                                                                                                                             |
+| Floor plan  | `export_plan_sheet`, `export_dxf`             | Columns cut at 1.2 m as sections, beams / bracing as hidden axis lines, equipment with clearance zone and name, pipes with service, footings hidden. Roof framing belongs to elevations.            |
+| IFC4        | `export_ifc`                                  | IfcColumn / IfcBeam / IfcMember with IfcIShapeProfileDef / IfcRectangleHollowProfileDef / IfcCircleHollowProfileDef…, IfcFooting, IfcCovering, IfcBuildingElementProxy (equipment), IfcPipeSegment. |
+
+## Building panel
+
+_Steel hall_ (starter) generates a default 24 × 48 m hall. The tool picker's **Industrial / steel**
+group has forms for the hall generator (with optional crane), steel member, pad footing, cladding
+panel, crane runway, machine / equipment and pipe run (route as `x,y,z; x,y,z`). _Clash
+detection_, the takeoff (kg lines), schedules and _Deliverables → Elevation / Section sheet_ sit
+below. MCP agents get the same workflow from the `design_factory` prompt.

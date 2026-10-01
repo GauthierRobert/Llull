@@ -148,4 +148,62 @@ describe('BuildingPanel', () => {
     expect(click).toHaveBeenCalledTimes(3);
     click.mockRestore();
   });
+
+  it('generates a steel hall and picks industrial tools from their group', () => {
+    const dispatch = spyDispatch();
+    render(<BuildingPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Steel hall' }));
+    expect(dispatch).toHaveBeenCalledWith('add_portal_frame_building', {});
+    expect(screen.getByRole('group', { name: 'Industrial / steel' })).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('building-tool-select'), { target: { value: 'pipe' } });
+    fireEvent.change(screen.getByTestId('tool-field-service'), { target: { value: 'steam' } });
+    fireEvent.click(screen.getByTestId('tool-submit'));
+    expect(dispatch).toHaveBeenLastCalledWith('add_pipe_run', {
+      points: [
+        [2000, 3000, 4000],
+        [20000, 3000, 4000],
+      ],
+      diameter: 114.3,
+      service: 'steam',
+    });
+  });
+
+  it('runs the clash check and selects a clashing pair', () => {
+    localDispatch('add_steel_member', {
+      profile: 'HEA300',
+      role: 'column',
+      start: [0, 0, 0],
+      end: [0, 0, 6000],
+    });
+    localDispatch('add_equipment', { name: 'Press', location: [0, 0], size: [2000, 2000, 2000] });
+    render(<BuildingPanel />);
+    fireEvent.click(screen.getByTestId('clash-check'));
+    expect(screen.getByTestId('clash-summary')).toHaveTextContent('1 hard, 0 clearance');
+    expect(screen.getByTestId('clash-row')).toHaveTextContent(/EQ1 × SC1/);
+    fireEvent.click(screen.getByTestId('clash-row'));
+    expect(useStore.getState().document.selection).toEqual(['equipment-1:body', 'member-1:body']);
+  });
+
+  it('reports a clean model and exports an elevation and a section', () => {
+    localDispatch('add_box', { position: [0, 0, 500], size: [2000, 1000, 1000] });
+    const createObjectURL = vi.fn(() => 'blob:x');
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    render(<BuildingPanel />);
+    fireEvent.click(screen.getByTestId('clash-check'));
+    expect(screen.getByTestId('clash-summary')).toHaveTextContent('No clashes found.');
+    fireEvent.change(screen.getByLabelText('Elevation direction'), { target: { value: 'east' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Elevation sheet' }));
+    expect(screen.getByTestId('building-export-status')).toHaveTextContent(
+      /East_elevation.*visible face/,
+    );
+    fireEvent.change(screen.getByLabelText('Section cut position'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Hide cladding' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Section sheet' }));
+    expect(screen.getByTestId('building-export-status')).toHaveTextContent(/Section_at_x_0/);
+    expect(click).toHaveBeenCalledTimes(2);
+    click.mockRestore();
+  });
 });

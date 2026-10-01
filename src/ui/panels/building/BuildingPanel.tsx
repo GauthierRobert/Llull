@@ -2,7 +2,7 @@
  * @layer ui/panels/building
  *
  * BuildingPanel — the construction (AEC/BIM) workspace: starter templates, project info,
- * levels, element tools, the active level's elements, quantities & cost, deliverables.
+ * levels, element tools, the active level's elements, clash check, quantities & cost, deliverables.
  * Every change goes through dispatch (PRIME DIRECTIVE); exports run read-only commands.
  */
 
@@ -15,6 +15,7 @@ import { ElementToolsSection } from './ElementToolsSection';
 import { ElementListSection } from './ElementListSection';
 import { QuantitiesSection } from './QuantitiesSection';
 import { BuildingExportsSection } from './BuildingExportsSection';
+import { ClashSection } from './ClashSection';
 
 function StarterTemplates(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -33,6 +34,13 @@ function StarterTemplates(): React.ReactElement {
         onClick={() => dispatch('add_building_template', { template: 'office' })}
       >
         Starter office
+      </button>
+      <button
+        type="button"
+        className="btn btn--ghost btn--sm"
+        onClick={() => dispatch('add_portal_frame_building', {})}
+      >
+        Steel hall
       </button>
       <button
         type="button"
@@ -71,6 +79,7 @@ export function BuildingPanel({ className }: { className?: string }): React.Reac
       <LevelsSection />
       <ElementToolsSection />
       <ElementListSection />
+      <ClashSection />
       <QuantitiesSection />
       <BuildingExportsSection />
     </div>

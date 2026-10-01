@@ -33,6 +33,8 @@ export type ToolCommand =
 export interface ElementTool {
   readonly id: string;
   readonly label: string;
+  /** Picker group heading. Default "Building". */
+  readonly group?: string;
   readonly fields: ReadonlyArray<ToolField>;
   readonly build: (values: Readonly<Record<string, string>>, context: ToolContext) => ToolCommand;
 }
@@ -47,11 +49,11 @@ const MATERIALS: ReadonlyArray<readonly [string, string]> = [
   ['gypsum', 'Gypsum board'],
 ];
 
-function num(key: string, label: string, defaultValue = '', optional = false): ToolField {
+export function num(key: string, label: string, defaultValue = '', optional = false): ToolField {
   return { key, label, kind: 'number', defaultValue, optional };
 }
 
-class FieldReader {
+export class FieldReader {
   readonly missing: string[] = [];
 
   constructor(private readonly values: Readonly<Record<string, string>>) {}
@@ -86,9 +88,25 @@ class FieldReader {
     if (parts.length === 0 || parts.some((part) => !Number.isFinite(part))) this.missing.push(key);
     return parts;
   }
+
+  /** "x,y,z; x,y,z; …" → [[x, y, z], …] (at least `minimum` points). */
+  pointList(key: string, minimum: number): Array<[number, number, number]> {
+    const points = this.text(key)
+      .split(';')
+      .map((part) => part.trim())
+      .filter((part) => part !== '')
+      .map((part) => part.split(/[,\s]+/).map(Number));
+    if (
+      points.length < minimum ||
+      points.some((point) => point.length !== 3 || point.some((value) => !Number.isFinite(value)))
+    ) {
+      this.missing.push(key);
+    }
+    return points.map((point) => [point[0] ?? 0, point[1] ?? 0, point[2] ?? 0]);
+  }
 }
 
-function result(
+export function result(
   reader: FieldReader,
   command: string,
   params: Record<string, unknown>,
@@ -101,7 +119,7 @@ function result(
   return { ok: true, command, params: cleaned };
 }
 
-function onLevel(context: ToolContext): Record<string, unknown> {
+export function onLevel(context: ToolContext): Record<string, unknown> {
   return context.levelId === null ? {} : { levelId: context.levelId };
 }
 

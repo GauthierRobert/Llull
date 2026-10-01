@@ -418,6 +418,59 @@ const designBuilding: PromptTemplate = {
 };
 
 // ---------------------------------------------------------------------------
+// Template: design_factory
+// ---------------------------------------------------------------------------
+
+/**
+ * @prompt design_factory
+ * Guides an agent through the industrial (factory builder) workflow: steel portal hall → crane →
+ * process equipment & piping → clash check → steel takeoff → elevations / plan / IFC deliverables.
+ */
+const designFactory: PromptTemplate = {
+  descriptor: {
+    name: 'design_factory',
+    description:
+      'Workflow for designing a factory / industrial hall: steel portal frames, crane runway, ' +
+      'footings, cladding, machines with clearances, pipe runs, clash detection, steel tonnage and ' +
+      'fabrication lists, then elevations, plan sheet and IFC deliverables.',
+    arguments: [
+      {
+        name: 'brief',
+        description: 'What to build, e.g. "30 x 60 m machining hall with a 16 t crane".',
+        required: false,
+      },
+    ],
+  },
+  buildMessages({ brief = 'a 24 m x 48 m production hall with a 10 t overhead crane' }) {
+    return [
+      userMsg(
+        `Design ${brief} in llull and produce the fabrication and construction deliverables.`,
+      ),
+      assistantMsg(
+        `**Industrial workflow (all lengths in document units — default mm)**\n\n` +
+          `1. \`set_project_info\` (name, client, drawingNumber) — fills title blocks and IFC.\n` +
+          `2. \`list_steel_profiles\` { family } — IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L with kg/m.\n` +
+          `3. \`add_portal_frame_building\` { span, length, baySpacing, eaveHeight, roofPitch, columnProfile, ` +
+          `rafterProfile, crane: { railHeight, capacity } } — grids, frames, gable posts, purlins, rails, bracing, ` +
+          `footings, slab and cladding in one undoable step.\n` +
+          `4. Adjust: \`update_steel_member\` { memberId, profile } to upsize, \`add_steel_member\` for mezzanines / ` +
+          `platforms, \`add_crane_runway\`, \`add_footing\` { underColumns: true }, \`add_panel\` for extra cladding.\n` +
+          `5. Process: \`add_equipment\` { name, location, size, clearance, weight } for each machine, ` +
+          `\`add_pipe_run\` { points, diameter, service } for utilities.\n` +
+          `6. Coordinate: \`check_clashes\` — fix every hard clash and clearance violation with ` +
+          `\`move_building_element\` or \`update_steel_member\`, then re-check.\n` +
+          `7. Quantities: \`quantity_takeoff\` (steel kg per profile, paint m², concrete m³, cladding m², pipe m), ` +
+          `\`building_schedule\` { kind: "member" } for the cut list, then \`set_cost_rates\` and \`estimate_cost\`.\n` +
+          `8. Drawings: \`export_elevation_sheet\` { direction, exclude: ["panel"] } for frame elevations, ` +
+          `{ cutAt } for sections, \`export_plan_sheet\`, \`export_dxf\`, and \`export_ifc\` for the steel detailer.\n\n` +
+          `Never edit generated entities (ids "<elementId>:<part>"); change the element and it is regenerated. ` +
+          `\`describe_building\` summarises the model before delivery.`,
+      ),
+    ];
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -426,6 +479,7 @@ const TEMPLATES: ReadonlyArray<PromptTemplate> = [
   orthographicSetup,
   parametricPart,
   designBuilding,
+  designFactory,
 ];
 
 const TEMPLATE_MAP = new Map<string, PromptTemplate>(TEMPLATES.map((t) => [t.descriptor.name, t]));

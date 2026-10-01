@@ -21,6 +21,11 @@ hosted doors and windows, slabs, columns, beams, stairs and rooms; quantity take
 cost estimates; and deliverables the industry opens — scaled plan sheets with title block, DXF for
 AutoCAD users and IFC4 for BIM coordination. See [`docs/CONSTRUCTION.md`](docs/CONSTRUCTION.md).
 
+For factory builders: a steel profile catalogue, steel members, a one-step portal-frame hall
+generator (frames, purlins, rails, bracing, footings, cladding, crane runway), process equipment
+and pipe runs, clash detection, steel tonnage / cut lists, and elevation / section sheets. See
+[`docs/INDUSTRIAL.md`](docs/INDUSTRIAL.md).
+
 ## Stack
 
 | Concern        | Choice                                   | Why |

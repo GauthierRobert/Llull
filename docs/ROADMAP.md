@@ -74,7 +74,14 @@ AI control — there is no in-app AI bridge).**
 - [x] DXF (R12) plans, scaled SVG plan sheets with title block, IFC4 export
 - [x] Building panel, 2D Wall tool, per-level floor plan in the 2D view, starter templates
 - [x] Slab openings (stair wells, shafts)
-- [ ] Curved walls, wall build-ups, sections / elevations, DXF hatches
+- [x] Sections / elevations (`export_elevation_sheet`)
+- [ ] Curved walls, wall build-ups, DXF hatches
+
+## Industrial (factory builders) — see docs/INDUSTRIAL_PLAN.md
+- [x] Steel profile catalogue, steel members, portal-frame hall generator, crane runways
+- [x] Pad footings, cladding panels, process equipment, pipe runs
+- [x] Clash detection, steel tonnage / paint / cut lists, IFC steel export
+- [ ] Connections (base plates, end plates, bolts), cable trays, multi-span halls
 
 ## Later
 - [ ] Materials library (physical + visual / rendering)

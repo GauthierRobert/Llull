@@ -1,8 +1,8 @@
 /**
  * @layer ui/panels/building
  *
- * BuildingExportsSection — downloads of the read-only exporters: DXF plan, IFC4 model and the
- * printable SVG plan sheet (paper + scale). Presentation + download only.
+ * BuildingExportsSection — downloads of the read-only exporters: DXF plan, IFC4 model, the
+ * printable SVG plan sheet and elevation / section sheets (paper + scale). Presentation only.
  */
 
 import React, { useState } from 'react';
@@ -13,12 +13,17 @@ import { downloadText } from '@ui/download';
 
 const PAPERS = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
 const SCALES = ['auto', '20', '50', '100', '200', '500'] as const;
+const DIRECTIONS = ['south', 'north', 'east', 'west'] as const;
 
 export function BuildingExportsSection(): React.ReactElement {
   const document = useStore((s) => s.document);
   const [paper, setPaper] = useState<(typeof PAPERS)[number]>('A3');
   const [scale, setScale] = useState<(typeof SCALES)[number]>('auto');
   const [status, setStatus] = useState('');
+  const [direction, setDirection] = useState<(typeof DIRECTIONS)[number]>('south');
+  const [cutAt, setCutAt] = useState('');
+  const [hideCladding, setHideCladding] = useState(false);
+  const scaleParams = scale === 'auto' ? {} : { scale: Number(scale) };
 
   const run = (
     command: string,
@@ -63,15 +68,61 @@ export function BuildingExportsSection(): React.ReactElement {
           type="button"
           className="btn btn--primary btn--sm"
           onClick={() =>
+            run('export_plan_sheet', { paper, ...scaleParams }, 'svg', 'image/svg+xml')
+          }
+        >
+          Plan sheet
+        </button>
+      </div>
+      <div className="building-inline-form">
+        <select
+          value={direction}
+          onChange={(event) => setDirection(event.target.value as (typeof DIRECTIONS)[number])}
+          aria-label="Elevation direction"
+        >
+          {DIRECTIONS.map((value) => (
+            <option key={value} value={value}>
+              {value[0]?.toUpperCase()}
+              {value.slice(1)}
+            </option>
+          ))}
+        </select>
+        <input
+          type="number"
+          value={cutAt}
+          placeholder="Cut at (section)"
+          onChange={(event) => setCutAt(event.target.value)}
+          aria-label="Section cut position"
+        />
+        <label className="field">
+          <input
+            type="checkbox"
+            checked={hideCladding}
+            onChange={(event) => setHideCladding(event.target.checked)}
+          />
+          <span>Hide cladding</span>
+        </label>
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          onClick={() =>
             run(
-              'export_plan_sheet',
-              { paper, ...(scale === 'auto' ? {} : { scale: Number(scale) }) },
+              'export_elevation_sheet',
+              {
+                direction,
+                paper,
+                ...scaleParams,
+                ...(cutAt.trim() !== '' && Number.isFinite(Number(cutAt))
+                  ? { cutAt: Number(cutAt) }
+                  : {}),
+                ...(hideCladding ? { exclude: ['panel'] } : {}),
+              },
               'svg',
               'image/svg+xml',
             )
           }
         >
-          Plan sheet
+          {cutAt.trim() === '' ? 'Elevation sheet' : 'Section sheet'}
         </button>
       </div>
       <div className="building-actions">

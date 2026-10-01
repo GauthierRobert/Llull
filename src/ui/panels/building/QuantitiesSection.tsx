@@ -13,8 +13,28 @@ import type { CostLine } from '@core/commands/building';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { downloadText } from '@ui/download';
 
-const UNIT_LABEL: Readonly<Record<string, string>> = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea' };
-const SCHEDULES = ['wall', 'door', 'window', 'room', 'slab', 'column', 'beam', 'stair'] as const;
+const UNIT_LABEL: Readonly<Record<string, string>> = {
+  m: 'm',
+  m2: 'm²',
+  m3: 'm³',
+  ea: 'ea',
+  kg: 'kg',
+};
+const SCHEDULES = [
+  'wall',
+  'door',
+  'window',
+  'room',
+  'slab',
+  'column',
+  'beam',
+  'stair',
+  'member',
+  'footing',
+  'panel',
+  'equipment',
+  'pipe',
+] as const;
 
 interface EstimateData {
   readonly currency: string;

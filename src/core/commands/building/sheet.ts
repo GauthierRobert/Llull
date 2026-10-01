@@ -24,9 +24,9 @@ export const STANDARD_SCALES: ReadonlyArray<number> = [
   1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000,
 ];
 
-const MARGIN = 10;
-const BINDING_MARGIN = 20;
-const TITLE_HEIGHT = 42;
+export const MARGIN = 10;
+export const BINDING_MARGIN = 20;
+export const TITLE_HEIGHT = 42;
 
 export function escapeXml(text: string): string {
   return text
@@ -38,7 +38,7 @@ export function escapeXml(text: string): string {
 
 const n = (value: number): string => String(Math.round(value * 100) / 100);
 
-interface Viewport {
+export interface Viewport {
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -53,6 +53,16 @@ export function fitScale(widthMm: number, heightMm: number, viewport: Viewport):
   }
   return STANDARD_SCALES[STANDARD_SCALES.length - 1] as number;
 }
+
+/** Shared drawing-sheet stylesheet (line weights in paper millimetres). */
+export const SHEET_STYLE = [
+  `<style>`,
+  `.cut{fill:#4a4a4a;stroke:#000;stroke-width:0.35}.cut-line{fill:none;stroke:#000;stroke-width:0.35}`,
+  `.thin{fill:none;stroke:#000;stroke-width:0.18}.hidden{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:1.5 1}`,
+  `.dim{stroke:#000;stroke-width:0.13}.frame{fill:none;stroke:#000;stroke-width:0.5}.frame-thin{fill:none;stroke:#000;stroke-width:0.25}`,
+  `.solid{fill:#000;stroke:#000;stroke-width:0.25}.label{fill:#555}text{fill:#000}`,
+  `</style>`,
+].join('');
 
 class SheetPainter {
   readonly parts: string[] = [];
@@ -205,7 +215,7 @@ interface SheetOptions {
   readonly title?: string;
 }
 
-function titleBlock(
+export function titleBlock(
   doc: CadDocument,
   sheet: { width: number; height: number; title: string; scale: number; paper: PaperSize },
 ): string {
@@ -249,7 +259,7 @@ function northArrow(x: number, y: number): string {
   );
 }
 
-function scaleBar(x: number, y: number, scale: number): string {
+export function scaleBar(x: number, y: number, scale: number): string {
   const stepsMetres = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
   const step = stepsMetres.find((metres) => (metres * 1000) / scale >= 8) ?? 100;
   const stepMm = (step * 1000) / scale;
@@ -296,12 +306,7 @@ export function buildPlanSheet(doc: CadDocument, options: SheetOptions): PlanShe
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
     `<title>${escapeXml(title)}</title>`,
-    `<style>`,
-    `.cut{fill:#4a4a4a;stroke:#000;stroke-width:0.35}.cut-line{fill:none;stroke:#000;stroke-width:0.35}`,
-    `.thin{fill:none;stroke:#000;stroke-width:0.18}.hidden{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:1.5 1}`,
-    `.dim{stroke:#000;stroke-width:0.13}.frame{fill:none;stroke:#000;stroke-width:0.5}.frame-thin{fill:none;stroke:#000;stroke-width:0.25}`,
-    `.solid{fill:#000;stroke:#000;stroke-width:0.25}.label{fill:#555}text{fill:#000}`,
-    `</style>`,
+    SHEET_STYLE,
     `<rect width="${width}" height="${height}" fill="#fff"/>`,
     `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
     `<g id="plan">${painter.parts.join('')}</g>`,

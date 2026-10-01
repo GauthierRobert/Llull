@@ -16,6 +16,12 @@ import {
   type ElementTool,
   type ToolField,
 } from './elementTools';
+import { INDUSTRIAL_TOOLS } from './industrialTools';
+
+const ALL_TOOLS: ReadonlyArray<ElementTool> = [...ELEMENT_TOOLS, ...INDUSTRIAL_TOOLS];
+const TOOL_GROUPS: ReadonlyArray<string> = [
+  ...new Set(ALL_TOOLS.map((tool) => tool.group ?? 'Building')),
+];
 
 interface ElementOption {
   readonly id: string;
@@ -168,9 +174,9 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
 }
 
 export function ElementToolsSection(): React.ReactElement {
-  const [toolId, setToolId] = useState<string>(ELEMENT_TOOLS[0]?.id ?? '');
+  const [toolId, setToolId] = useState<string>(ALL_TOOLS[0]?.id ?? '');
   const lastSummary = useStore((s) => s.lastSummary);
-  const tool = ELEMENT_TOOLS.find((candidate) => candidate.id === toolId) ?? ELEMENT_TOOLS[0];
+  const tool = ALL_TOOLS.find((candidate) => candidate.id === toolId) ?? ALL_TOOLS[0];
   return (
     <PanelSection title="Add element" testId="building-tools">
       <label className="field building-tool-picker">
@@ -181,10 +187,16 @@ export function ElementToolsSection(): React.ReactElement {
           aria-label="Building tool"
           data-testid="building-tool-select"
         >
-          {ELEMENT_TOOLS.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.label}
-            </option>
+          {TOOL_GROUPS.map((group) => (
+            <optgroup key={group} label={group}>
+              {ALL_TOOLS.filter((candidate) => (candidate.group ?? 'Building') === group).map(
+                (candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.label}
+                  </option>
+                ),
+              )}
+            </optgroup>
           ))}
         </select>
       </label>

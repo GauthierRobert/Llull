@@ -19,6 +19,7 @@ import { addSlab, addColumn, addBeam, addStair } from './structure';
 import { addRoom, deleteBuildingElement, moveBuildingElement, copyLevelElements } from './elements';
 import { exportDxf } from './dxf';
 import { exportPlanSheet } from './sheet';
+import { exportElevationSheet } from './elevation';
 import { exportIfc } from './ifc';
 import { addBuildingTemplate } from './templates';
 import { addSlabOpening, deleteSlabOpening } from './slabOpenings';
@@ -65,6 +66,7 @@ export const buildingCommands = [
   estimateCost,
   exportDxf,
   exportPlanSheet,
+  exportElevationSheet,
   exportIfc,
   addBuildingTemplate,
   listSteelProfiles,

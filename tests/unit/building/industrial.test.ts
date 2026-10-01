@@ -12,6 +12,7 @@ import { buildPlanDrawing } from '@core/commands/building/plan';
 import type { TakeoffLine } from '@core/commands/building/quantities';
 import type { IfcExport } from '@core/commands/building/ifc';
 import { serializeDocument } from '@core/commands/persistence';
+import { buildingErrors } from '@core/commands/building/validate';
 import { polygonArea } from '@lib/polygon';
 import { __resetIdCounter } from '@lib/id';
 
@@ -301,7 +302,7 @@ describe('add_portal_frame_building', () => {
     expect(grids).toEqual(['A', 'B', '1', '2', '3', '4', '5', '6']);
     expect(result.summary).toMatch(/134 steel members \(\d+\.\d t\), 8 grid lines/);
     expect(result.affected[0]).toBe(doc.building?.elementOrder[0]);
-    expect(execute(doc, 'validate_building', {}).summary).not.toMatch(/error/i);
+    expect(buildingErrors(doc.building)).toEqual([]);
   });
 
   it('adds a crane runway on brackets and can skip optional parts', () => {
