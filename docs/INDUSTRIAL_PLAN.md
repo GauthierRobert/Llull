@@ -162,3 +162,14 @@ Each step ships with unit tests and is covered by the Playwright suite.
       (single slope from the low to the high eaves); wind with EN 1991-1-4 Tab. 7.3a monopitch
       coefficients (zones F / G / H for wind on the high and the low eaves) in the frame and purlin
       checks; elevations, IFC and quantities work unchanged.
+
+## Phase 11 — automatic sizing of foundations and secondary steel
+
+- [ ] **I40 — Pad sizing.** `design_footings` sizes the pad plan dimensions and thickness (not only
+      the reinforcement) so bearing (with base moments), overturning, uplift, sliding, shear and
+      punching pass — essential for fixed bases.
+- [ ] **I41 — Purlin / rail design.** `design_purlins`: up-sizes purlin and rail profiles (per zone
+      group, keeping rows uniform) until `check_purlins` passes, and re-seats them on the rafters /
+      columns.
+- [ ] **I42 — Bracing strut on multi-span halls.** Find and fix the eaves-strut force reported on
+      two-span (monopitch) halls.
