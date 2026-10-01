@@ -298,3 +298,44 @@ describe('check_purlins', () => {
     expect(result.document).toBe(doc);
   });
 });
+
+describe('multi-span roof wind (EN 1991-1-4 Fig. 7.10 simplified)', () => {
+  const rowAt = (doc: CadDocument, data: PurlinData, x: number, y: number): PurlinRow => {
+    const elements = doc.building!.elements;
+    const found = data.rows.find((row) => {
+      const element = elements[row.elementId];
+      return (
+        element?.category === 'member' &&
+        Math.abs(element.start[0] - x) < 20 &&
+        Math.abs(element.start[1] - y) < 20
+      );
+    });
+    if (!found) throw new Error(`no purlin at x ${x}, y ${y}`);
+    return found;
+  };
+
+  it('reduces the downwind (internal) span next to a valley to zone I with 0.6 cpe', () => {
+    const doc = hall({ spans: [20000, 20000, 20000] });
+    const data = check(doc, { windPressure: 0.8 });
+    // Same purlin row y; x = 19966 is the eaves-side purlin of the windward span (zone G),
+    // x = 20034 the first purlin of the internal span.
+    const windward = rowAt(doc, data, 19966, 12000);
+    const internal = rowAt(doc, data, 20034, 12000);
+    expect(windward.zone).toBe('G');
+    expect(internal.zone).toBe('I');
+    expect(internal.upliftUtilisation!).toBeLessThan(windward.upliftUtilisation!);
+    expect(data.zones.some((zone) => zone.surface === 'roof' && zone.zone === 'I')).toBe(true);
+  });
+
+  it('leaves end spans, two-span and single-span halls unchanged', () => {
+    const two = hall({ spans: [20000, 20000] });
+    const twoData = check(two, { windPressure: 0.8 });
+    expect(rowAt(two, twoData, 19966, 12000).zone).toBe('G');
+    expect(rowAt(two, twoData, 20034, 12000).zone).toBe('G');
+    const single = hall();
+    const viaSpans = hall({ spans: [24000] });
+    expect(check(viaSpans, { windPressure: 0.8 }).rows.map((row) => row.upliftUtilisation)).toEqual(
+      check(single, { windPressure: 0.8 }).rows.map((row) => row.upliftUtilisation),
+    );
+  });
+});

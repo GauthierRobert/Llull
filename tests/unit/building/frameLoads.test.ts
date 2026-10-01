@@ -12,6 +12,8 @@ import {
 import {
   baseReactions,
   craneActions,
+  framesOf,
+  valleyLines,
   craneCapacityOf,
 } from '@core/commands/building/industrial/frameModel';
 import { findProfile, sectionProperties } from '@core/commands/building/steel/profiles';
@@ -170,8 +172,10 @@ describe('load combinations', () => {
     const doc = hall({ crane: { capacity: 16, railHeight: 6000 } });
     const withCrane = check(doc);
     const without = check(doc, { craneCapacity: 0 });
-    expect(withCrane.combinations).toHaveLength(6);
+    expect(withCrane.combinations).toHaveLength(10);
     expect(withCrane.combinations).toContain('1.35G+1.35C(right)');
+    expect(withCrane.combinations).toContain('1.35G+1.35C5(left)');
+    expect(withCrane.combinations).toContain('1.35G+1.35C5(right)+0.75S');
     expect(withCrane.combinations[2]).toBe('1.35G+1.35C(left)+0.75S');
     expect(without.combinations).toHaveLength(2);
     const rail = withCrane.rows.find((candidate) => candidate.check.startsWith('rail-level'))!;
@@ -186,22 +190,99 @@ describe('load combinations', () => {
       heavier.rows.find((candidate) => candidate.check.startsWith('rail-level'))!.utilisation,
     );
     const both = check(doc, { windPressure: 0.8 });
-    expect(both.combinations).toHaveLength(38);
+    expect(both.combinations).toHaveLength(66);
     expect(both.combinations).toContain('1.35G+1.35C(right)+0.75S+0.9W→');
     expect(both.combinations).toContain('1.35G+1.5W←+0.75S+1.35C(left)');
+    expect(both.combinations).toContain('1.35G+1.35C5(left)+0.9W→');
+    expect(both.combinations).toContain('1.35G+1.5W←+0.75S+1.35C5(right)');
     // Crane reactions enter below the column tops: they lower αcr (storey-wise Horne).
     expect(heavier.alphaCritical!).toBeLessThan(without.alphaCritical!);
   });
 
-  it('reads crane capacities and actions', () => {
+  it('reads crane capacities from the runway note', () => {
     const member = { note: 'Crane 12.5 t, rail top 6000' } as SteelMemberElement;
     expect(craneCapacityOf(member)).toBe(12.5);
     expect(craneCapacityOf({ note: 'crane bracket' } as SteelMemberElement)).toBeNull();
     expect(craneCapacityOf({} as SteelMemberElement)).toBeNull();
-    const actions = craneActions(10);
-    expect(actions.max).toBeGreaterThan(actions.min);
-    expect(actions.max / 1000).toBeCloseTo(1.15 * 0.9 * 98.1 + 1.1 * 0.5 * (49.05 + 20), 1);
-    expect(actions.lateral / 1000).toBeCloseTo((0.1 * (98.1 + 0.2 * 69.05)) / 2, 2);
+  });
+
+  it('derives the EN 1991-3 crane actions by statics (hand check)', () => {
+    const [hoist, span] = [98100, 24000];
+    const actions = craneActions(10, span);
+    const self = 0.5 * hoist + 20000;
+    const [near, far] = [23 / 24, 1 / 24];
+    // φ2 = φ2,min + β2 vh, HC2 at vh = 0.1 m/s.
+    expect(actions.phi2).toBeCloseTo(1.1 + 0.34 * 0.1, 9);
+    expect(actions.selfWeight).toBeCloseTo(self, 6);
+    expect(actions.staticMax).toBeCloseTo(0.4 * self + (0.2 * self + hoist) * near, 3);
+    expect(actions.staticMax + actions.staticMin).toBeCloseTo(self + hoist, 3);
+    expect(actions.group1.max).toBeCloseTo(
+      1.1 * (0.4 * self + 0.2 * self * near) + 1.134 * hoist * near,
+      3,
+    );
+    expect(actions.group1.min).toBeCloseTo(
+      1.1 * (0.4 * self + 0.2 * self * far) + 1.134 * hoist * far,
+      3,
+    );
+    expect(actions.group1.max).toBeGreaterThan(actions.group1.min);
+    // Drive: K = μ Σ driven = 0.2 Rmin, HL = φ5 K / 2, HT = φ5 ξ M / a with M = K (ξ1 − 0.5) l.
+    const drive = 0.2 * actions.staticMin;
+    const xi1 = actions.staticMax / (actions.staticMax + actions.staticMin);
+    const moment = drive * (xi1 - 0.5) * span;
+    expect(actions.group1.longitudinal).toBeCloseTo((1.5 * drive) / 2, 6);
+    expect(actions.group1.transverseMax).toBeCloseTo((1.5 * (1 - xi1) * moment) / 3000, 6);
+    expect(actions.group1.transverseMin).toBeCloseTo((1.5 * xi1 * moment) / 3000, 6);
+    // Group 5: φ4 = 1, f = 0.3 (1 − exp(−250 · 0.015)) = 0.2929, HS = f λS ΣQr.
+    const f = 0.3 * (1 - Math.exp(-3.75));
+    expect(f).toBeCloseTo(0.2929, 4);
+    expect(actions.group5.max).toBeCloseTo(actions.staticMax, 6);
+    expect(actions.group5.skewMax).toBeCloseTo((f * (1 - xi1) * (self + hoist)) / 2, 6);
+    expect(actions.group5.skewMin).toBeCloseTo((f * xi1 * (self + hoist)) / 2, 6);
+  });
+
+  it('honours the hoisting class, self-weight, hook approach and wheel base overrides', () => {
+    const heavy = craneActions(10, 24000, {
+      hoistingClass: 'HC4',
+      hoistingSpeed: 0.5,
+      craneSelfWeight: 100,
+      minHookApproach: 2,
+      wheelBase: 4000,
+    });
+    expect(heavy.phi2).toBeCloseTo(1.2 + 0.68 * 0.5, 9);
+    expect(heavy.selfWeight).toBe(100000);
+    expect(heavy.staticMax + heavy.staticMin).toBeCloseTo(100000 + 98100, 3);
+    expect(heavy.staticMin).toBeCloseTo(0.4 * 100000 + (20000 + 98100) * (2 / 24), 3);
+    expect(heavy.group1.transverseMax).toBeLessThan(
+      craneActions(10, 24000).group1.transverseMax * 2,
+    );
+    // Hook approach beyond the span is clamped: all load on one rail side, no negative reaction.
+    expect(craneActions(10, 24000, { minHookApproach: 99 }).staticMin).toBeGreaterThan(0);
+  });
+
+  it('carries both crane load groups into the frame model and the base reactions', () => {
+    const doc = hall({ crane: { capacity: 10, railHeight: 6000 } });
+    const building = doc.building!;
+    const loads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0 };
+    const reactions = baseReactions(doc, building, building.levelOrder[0]!, loads).filter(
+      (reaction) => reaction.frame === 'frame 3',
+    );
+    const vertical = (key: 'CL' | 'CR' | 'CL5' | 'CR5'): number =>
+      reactions.reduce((sum, reaction) => sum + (reaction.cases[key]?.vertical ?? 0), 0);
+    const horizontal = (key: 'CL' | 'CL5' | 'CR'): number =>
+      reactions.reduce((sum, reaction) => sum + (reaction.cases[key]?.horizontal ?? 0), 0);
+    // Gc = 69.05 kN, Q = 98.1 kN: group 1 φ1 Gc + φ2 Q, group 5 φ4 (Gc + Q).
+    expect(vertical('CL')).toBeCloseTo(1.1 * 69050 + 1.134 * 98100, -1);
+    expect(vertical('CL5')).toBeCloseTo(69050 + 98100, -1);
+    expect(vertical('CR')).toBeCloseTo(vertical('CL'), -1);
+    expect(vertical('CR5')).toBeCloseTo(vertical('CL5'), -1);
+    // Group 1 transverse HT = both rails in +x (CL) / −x (CR); skewing HS (group 5) is a couple.
+    const actions = craneActions(10, 22610);
+    expect(horizontal('CL')).toBeCloseTo(
+      -(actions.group1.transverseMax + actions.group1.transverseMin),
+      -1,
+    );
+    expect(horizontal('CR')).toBeCloseTo(-horizontal('CL'), -1);
+    expect(Math.abs(horizontal('CL5'))).toBeLessThan(Math.abs(horizontal('CL')));
   });
 
   it('flags sway-sensitive frames (αcr < 3) and amplifies their moments', () => {
@@ -246,6 +327,35 @@ describe('load combinations', () => {
     expect(result.summary).toMatch(/no analysable portal frame.*\(unstable\)/);
   });
 
+  it('passes the crane model parameters and rejects invalid ones', () => {
+    const doc = hall({ crane: { capacity: 10, railHeight: 6000 } });
+    const base = check(doc, { windPressure: 0.8 });
+    const tuned = execute(doc, 'check_portal_frames', {
+      windPressure: 0.8,
+      hoistingClass: 'HC4',
+      hoistingSpeed: 0.5,
+      craneSelfWeight: 120,
+      minHookApproach: 0.5,
+      wheelBase: 5000,
+    });
+    expect(tuned.summary).toMatch(/^Checked 6 frame/);
+    const tunedData = tuned.data as CheckData;
+    expect(tunedData.combinations).toEqual(base.combinations);
+    expect(row(tunedData, 'SC5', 'column').axial).not.toBe(row(base, 'SC5', 'column').axial);
+    for (const bad of [
+      { hoistingClass: 'HC9' },
+      { hoistingSpeed: -1 },
+      { minHookApproach: -1 },
+      { craneSelfWeight: 0 },
+      { wheelBase: 0 },
+    ]) {
+      const result = execute(doc, 'check_portal_frames', bad);
+      expect(result.document).toBe(doc);
+      expect(result.data).toBeUndefined();
+      expect(result.summary).toMatch(/^check_portal_frames failed: /);
+    }
+  });
+
   it('rejects negative wind or crane input', () => {
     const doc = hall();
     expect(execute(doc, 'check_portal_frames', { windPressure: -1 }).summary).toMatch(
@@ -261,7 +371,7 @@ describe('design_portal_frames with wind and crane', () => {
   it('designs a crane hall under wind so every check passes', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 6000 } });
     const result = execute(doc, 'design_portal_frames', { windPressure: 0.7 });
-    expect(result.summary).toMatch(/Designed 6 frame\(s\) for 38 ULS combination\(s\)/);
+    expect(result.summary).toMatch(/Designed 6 frame\(s\) for 66 ULS combination\(s\)/);
     const after = check(result.document, { windPressure: 0.7 });
     expect(after.maxUtilisation).toBeLessThanOrEqual(1);
   });
@@ -312,5 +422,77 @@ describe('baseReactions', () => {
     expect(
       frame.every((reaction) => reaction.cases.WL!.vertical < reaction.cases.G!.vertical),
     ).toBe(true);
+  });
+});
+
+describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () => {
+  const loads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 1 };
+  const frameOf = (doc: CadDocument): ReturnType<typeof framesOf>['frames'][number] => {
+    const building = doc.building!;
+    return framesOf(doc, building, building.levelOrder[0]!, loads).frames[0]!;
+  };
+  /** Wind uplift per unit length (N/mm) of each rafter, left to right. */
+  const uplifts = (doc: CadDocument, windCase: 'WL' | 'WR' | 'WLs'): number[] => {
+    const frame = frameOf(doc);
+    return frame.members
+      .filter((member) => member.role === 'rafter')
+      .sort((a, b) => (frame.nodes[a.geometry.a]?.x ?? 0) - (frame.nodes[b.geometry.a]?.x ?? 0))
+      .map((member) => member.loads[windCase]!.qy);
+  };
+
+  it('finds the valleys between roofs from the rafter low ends', () => {
+    expect(
+      valleyLines([
+        { start: [0, 0, 7000], end: [10000, 0, 8000] },
+        { start: [10000, 0, 8000], end: [20000, 0, 7000] },
+        { start: [20000, 0, 7000], end: [30000, 0, 8000] },
+        { start: [30000, 0, 8000], end: [40000, 0, 7000] },
+        { start: [20000, 6000, 7000], end: [30000, 6000, 8000] },
+      ]),
+    ).toEqual([20000]);
+  });
+
+  it('loads the downwind spans with 0.6x the suction of the windward span', () => {
+    const doc = hall({ spans: [20000, 20000, 20000], span: undefined });
+    const frame = frameOf(doc);
+    expect(frame.spans).toHaveLength(3);
+    const wind = uplifts(doc, 'WL');
+    expect(wind).toHaveLength(6);
+    // Windward rafters (span 1): (0.6 + 0.2) qp; downwind (spans 2, 3): (0.6 × 0.6 + 0.2) qp.
+    const [windward, downwind] = [wind[0]!, wind[2]!];
+    expect(downwind).toBeLessThan(windward);
+    expect(downwind / windward).toBeCloseTo((0.36 + 0.2) / 0.8, 3);
+    expect(wind.slice(0, 2)).toEqual([windward, windward]);
+    expect(wind.slice(2)).toEqual(Array(4).fill(downwind));
+    // Wind from the right mirrors it: the last span is windward.
+    const mirrored = uplifts(doc, 'WR');
+    expect(mirrored[5]).toBeCloseTo(windward, 9);
+    expect(mirrored[0]).toBeCloseTo(downwind, 9);
+    // Internal suction cpi = −0.3: (0.6 − 0.3) vs (0.36 − 0.3).
+    const suction = uplifts(doc, 'WLs');
+    expect(suction[2]! / suction[0]!).toBeCloseTo(0.06 / 0.3, 3);
+  });
+
+  it('puts wall pressure on the outer columns only', () => {
+    const frame = frameOf(hall({ spans: [20000, 20000, 20000], span: undefined }));
+    const columns = frame.members.filter((member) => member.role === 'column');
+    const xs = [...new Set(columns.map((member) => frame.nodes[member.geometry.a]?.x))].sort(
+      (a, b) => (a ?? 0) - (b ?? 0),
+    );
+    expect(xs).toHaveLength(4);
+    for (const column of columns) {
+      const x = frame.nodes[column.geometry.a]?.x;
+      const outer = x === xs[0] || x === xs[3];
+      expect(column.loads.WL !== undefined).toBe(outer);
+    }
+  });
+
+  it('leaves a single span unchanged: both roof slopes carry the full coefficient', () => {
+    const doc = hall();
+    const wind = uplifts(doc, 'WL');
+    expect(wind).toHaveLength(2);
+    expect(wind[0]).toBeCloseTo(wind[1]!, 9);
+    expect(uplifts(doc, 'WR')[0]).toBeCloseTo(wind[0]!, 9);
+    expect(uplifts(doc, 'WLs')[0]! / wind[0]!).toBeCloseTo(0.3 / 0.8, 6);
   });
 });

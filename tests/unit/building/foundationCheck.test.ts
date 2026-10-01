@@ -6,6 +6,7 @@ import {
   foundationCheck,
   type ClayLayer,
   type FoundationRow,
+  ultimateCombinations,
 } from '@core/commands/building/industrial/foundationCheck';
 import { baseReactions } from '@core/commands/building/industrial/frameModel';
 import {
@@ -355,5 +356,38 @@ describe('consolidation settlement (clayLayer)', () => {
       expect(result.data).toBeUndefined();
       expect(result.summary).toContain('clayLayer');
     }
+  });
+});
+
+describe('crane load groups in the foundation combinations (EN 1991-3 Tab. 2.2)', () => {
+  it('adds group 5 (C5) next to group 1 for every crane ULS combination', () => {
+    const names = (favourable: boolean): string[] =>
+      ultimateCombinations(false, true, favourable).map((combination) => combination.name);
+    expect(names(false)).toEqual(
+      expect.arrayContaining([
+        '1.35G+1.35C(left)+0.75S',
+        '1.35G+1.35C5(left)+0.75S',
+        '1.35G+1.35C5(right)+0.75S',
+      ]),
+    );
+    expect(names(true)).toEqual(
+      expect.arrayContaining(['1.0G+1.35C(right)', '1.0G+1.35C5(left)', '1.0G+1.35C5(right)']),
+    );
+    expect(ultimateCombinations(false, false, false)).toHaveLength(1);
+    expect(ultimateCombinations(true, true, false)).toHaveLength(1 + 4 + 4);
+  });
+
+  it('checks the default crane hall with the group 5 combinations', () => {
+    const doc = execute(createEmptyDocument(), 'add_portal_frame_building', {
+      span: 24000,
+      length: 30000,
+      crane: { capacity: 10, railHeight: 6000 },
+    }).document;
+    const result = execute(doc, 'check_foundations', { windPressure: 0.8 });
+    const rows = (result.data as { rows: FoundationRow[] }).rows;
+    expect(rows.some((row) => row.combination.includes('C5'))).toBe(true);
+    expect(execute(doc, 'design_footings', { windPressure: 0.8 }).summary).toMatch(
+      /^Designed 12 of 12/,
+    );
   });
 });

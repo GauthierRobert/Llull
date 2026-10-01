@@ -9,7 +9,13 @@ import type { CommandDefinition, CommandResult } from '../../types';
 import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
 import { findProfile, sectionProperties } from '../steel/profiles';
 import { toCsv } from '../quantities';
-import { craneActions, craneCapacityOf } from './frameModel';
+import {
+  craneActions,
+  craneCapacityOf,
+  HOISTING_CLASSES,
+  type CraneModel,
+  type HoistingClass,
+} from './frameModel';
 import {
   E_STEEL,
   lateralTorsionalReduction,
@@ -41,6 +47,11 @@ export interface RunwayCheckParams {
   craneCapacity?: number;
   wheelBase?: number;
   craneClass?: CraneClass;
+  hoistingClass?: HoistingClass;
+  hoistingSpeed?: number;
+  craneSpan?: number;
+  craneSelfWeight?: number;
+  minHookApproach?: number;
   levelId?: string;
 }
 
@@ -59,7 +70,8 @@ export interface RunwayCheckRow {
 }
 
 const GAMMA_ULS = 1.35;
-const DYNAMIC_FACTOR = 1.15; // φ2 already inside craneActions
+/** Bridge span (mm) when no paired runway beam is found and craneSpan is not given. */
+const DEFAULT_CRANE_SPAN = 20000;
 const DEFLECTION_RATIO = 600;
 const FATIGUE_PHI = 1.05;
 const FATIGUE_CATEGORY = 71; // N/mm²
@@ -103,7 +115,8 @@ function checkBeam(
   beam: SteelMemberElement,
   span: number,
   capacity: number,
-  wheelBase: number,
+  craneSpan: number,
+  model: CraneModel,
   craneClass: CraneClass,
   railSize: RailSize,
   girder: GirderType,
@@ -113,9 +126,18 @@ function checkBeam(
   const fy = yieldStrength(beam.material);
   const section = sectionProperties(profile);
   const resistance = sectionResistance(profile, fy);
-  const actions = craneActions(capacity);
-  const wheel = actions.max / 2;
-  const lateralWheel = actions.lateral / 2;
+  const wheelBase = model.wheelBase ?? 3000;
+  const actions = craneActions(capacity, craneSpan, model);
+  const wheel = actions.group1.max / 2;
+  // Lateral rail force: envelope of the transverse drive forces HT (group 1) and skewing HS (group 5).
+  const lateralWheel =
+    Math.max(
+      actions.group1.transverseMax,
+      actions.group1.transverseMin,
+      actions.group5.skewMax,
+      actions.group5.skewMin,
+    ) / 2;
+  const longitudinal = GAMMA_ULS * actions.group1.longitudinal;
   const isI = profile.shape === 'I';
   const row = (
     kind: RunwayCheckRow['kind'],
@@ -148,7 +170,7 @@ function checkBeam(
   // C1 = 1.13 (point loads), 0.85 for the destabilising top-flange load.
   const chi = lateralTorsionalReduction(profile, fy, span, 0.85 * 1.13);
 
-  const characteristic = wheel / DYNAMIC_FACTOR;
+  const characteristic = actions.staticMax / 2;
   const verticalDeflection = wheelDeflection(characteristic, wheelBase, span, section.inertia);
   const lateralDeflection = wheelDeflection(
     lateralWheel,
@@ -179,6 +201,13 @@ function checkBeam(
       '-',
     ),
     row('strength', 'shear V/Vpl', shear, resistance.shear, 'N'),
+    row(
+      'strength',
+      `longitudinal stop force φ5 K/nr (axial N/Npl, HL ${round(actions.group1.longitudinal / 1000, 1)} kN, φ2 ${round(actions.phi2, 3)})`,
+      longitudinal,
+      resistance.axial,
+      'N',
+    ),
     row(
       'ltb',
       isI ? 'My/(χLT Mpl,y) + Mz/Mpl,z(top flange)' : 'not susceptible (non-I section)',
@@ -231,12 +260,14 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     'Preliminary check of the crane runway beams (steel members with role crane, from ' +
     'add_crane_runway / add_portal_frame_building crane) of a level. Each segment between supports ' +
     'is a simply supported beam (conservative vs continuous) loaded by one 2-wheel crane group per ' +
-    'rail: wheel load P = max rail reaction / 2 (EN 1991-3 dynamic factors included), lateral ' +
-    'surge H per rail split on the wheels, ULS factor 1.35, runway + rail self-weight (railSize). ' +
+    'rail: wheel load P = max rail reaction / 2 from the statics of the bridge with the trolley at ' +
+    'the minimum hook approach (EN 1991-3 load group 1: φ1 = 1.1 on Gc, φ2 by hoisting class), lateral ' +
+    'rail force = envelope of the transverse drive force HT (group 1, φ5 = 1.5) and the skewing force HS ' +
+    '(group 5, §2.7.4, α = 0.015) split on the wheels, longitudinal stop force HL = φ5 K/nr as axial force, ULS factor 1.35, runway + rail self-weight (railSize). ' +
     'Checks: (1) strength - biaxial My/Mpl,y + Mz/Mpl,z with lateral bending carried by the top ' +
     'flange only (Wpl,z/2), and shear; (2) ltb - χLT from Mcr (C1 = 1.13, Lcr = span, I-sections ' +
     'only, 0.85 Mcr for the top-flange load application); (3) SLS EN 1993-6 §7.3 - vertical and ' +
-    'lateral deflection <= L/600 under characteristic wheel loads (P / 1.15, two-wheel exact ' +
+    'lateral deflection <= L/600 under characteristic wheel loads (static P, two-wheel exact ' +
     'midspan formula); (4) fatigue EN 1993-1-9 - ΔσE2 = λ φfat Δσ at the bottom flange, λ = 0.315 / ' +
     '0.397 / 0.500 (normal stresses, EN 1991-3 Tab. 2.12) for class S2 / S3 / S4, φfat 1.05, detail category 71, γMf 1.15, γFf 1.0. ' +
     '(5) local - EN 1993-6 §5.7.1: leff = 3.25 (Irf/tw)^(1/3), Irf = 0.75 Ir(rail, wear) + If (rail not rigidly ' +
@@ -257,6 +288,31 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
         type: 'number',
         description:
           'Distance between the two wheels of a rail wheel group, mm (> 0). Default 3000.',
+      },
+      hoistingClass: {
+        type: 'string',
+        enum: ['HC1', 'HC2', 'HC3', 'HC4'],
+        description:
+          'EN 1991-3 hoisting class: φ2 = φ2,min + β2 vh (HC1 1.05 + 0.17 vh, HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.',
+      },
+      hoistingSpeed: {
+        type: 'number',
+        description: 'Hoisting speed vh in m/s (>= 0). Default 0.1.',
+      },
+      craneSpan: {
+        type: 'number',
+        description:
+          'Bridge span between the two runway rails, mm (> 0). Default: x distance to the paired runway beam, else 20000.',
+      },
+      craneSelfWeight: {
+        type: 'number',
+        description:
+          'Crane self-weight Gc in kN (> 0, bridge + trolley, trolley = 0.2 Gc). Default 0.5 Q + 20 kN.',
+      },
+      minHookApproach: {
+        type: 'number',
+        description:
+          'Minimum hook approach to the rail in m (>= 0); positions the trolley for the maximum wheel load. Default 1.0.',
       },
       craneClass: {
         type: 'string',
@@ -284,6 +340,11 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     const {
       craneCapacity,
       wheelBase = 3000,
+      hoistingClass = 'HC2',
+      hoistingSpeed = 0.1,
+      craneSpan,
+      craneSelfWeight,
+      minHookApproach = 1,
       craneClass = 'S3',
       railSize = 'A55',
       girder = 'rolled',
@@ -293,6 +354,32 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     }
     if (!(isFiniteNumber(wheelBase) && wheelBase > 0)) {
       return noChange(doc, 'check_crane_runways failed: wheelBase must be a number > 0 (mm).');
+    }
+    if (!(hoistingClass in HOISTING_CLASSES)) {
+      return noChange(
+        doc,
+        "check_crane_runways failed: hoistingClass must be 'HC1', 'HC2', 'HC3' or 'HC4'.",
+      );
+    }
+    if (!(isFiniteNumber(hoistingSpeed) && hoistingSpeed >= 0)) {
+      return noChange(
+        doc,
+        'check_crane_runways failed: hoistingSpeed must be a number >= 0 (m/s).',
+      );
+    }
+    if (!(isFiniteNumber(minHookApproach) && minHookApproach >= 0)) {
+      return noChange(
+        doc,
+        'check_crane_runways failed: minHookApproach must be a number >= 0 (m).',
+      );
+    }
+    for (const [name, value] of [
+      ['craneSpan', craneSpan],
+      ['craneSelfWeight', craneSelfWeight],
+    ] as const) {
+      if (value !== undefined && !(isFiniteNumber(value) && value > 0)) {
+        return noChange(doc, `check_crane_runways failed: ${name} must be a number > 0.`);
+      }
     }
     if (!(craneClass in CLASSES)) {
       return noChange(doc, "check_crane_runways failed: craneClass must be 'S2', 'S3' or 'S4'.");
@@ -316,6 +403,27 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     }
     const mm = (value: number): number => value / fromMm(doc, 1);
     const rows: RunwayCheckRow[] = [];
+    const runways = Object.values(building.elements).filter(
+      (element): element is SteelMemberElement =>
+        element.category === 'member' && element.role === 'crane' && element.levelId === levelId,
+    );
+    /** Bridge span: x distance to the nearest runway beam facing this one (overlapping y range). */
+    const pairedSpan = (beam: SteelMemberElement): number => {
+      const [yLow, yHigh] = [
+        Math.min(beam.start[1], beam.end[1]),
+        Math.max(beam.start[1], beam.end[1]),
+      ];
+      const distances = runways
+        .filter(
+          (other) =>
+            other !== beam &&
+            Math.min(other.start[1], other.end[1]) < yHigh &&
+            Math.max(other.start[1], other.end[1]) > yLow &&
+            Math.abs(mm(other.start[0] - beam.start[0])) > 1000,
+        )
+        .map((other) => Math.abs(mm(other.start[0] - beam.start[0])));
+      return distances.length > 0 ? Math.min(...distances) : DEFAULT_CRANE_SPAN;
+    };
     const capacities = new Set<number>();
     let beams = 0;
     for (const element of Object.values(building.elements)) {
@@ -328,7 +436,23 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
         mm(element.end[1] - element.start[1]),
         mm(element.end[2] - element.start[2]),
       );
-      const beamRows = checkBeam(element, span, capacity, wheelBase, craneClass, railSize, girder);
+      const model: CraneModel = {
+        hoistingClass,
+        hoistingSpeed,
+        minHookApproach,
+        wheelBase,
+        ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}),
+      };
+      const beamRows = checkBeam(
+        element,
+        span,
+        capacity,
+        craneSpan ?? pairedSpan(element),
+        model,
+        craneClass,
+        railSize,
+        girder,
+      );
       if (beamRows.length === 0) continue;
       beams += 1;
       capacities.add(capacity);

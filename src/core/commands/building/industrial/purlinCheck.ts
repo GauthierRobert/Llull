@@ -11,6 +11,7 @@ import type { CommandDefinition, CommandResult } from '../../types';
 import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
 import { toCsv } from '../quantities';
 import { findProfile, sectionProperties, type SteelProfile } from '../steel/profiles';
+import { DOWNWIND_ROOF_FACTOR, valleyLines } from './frameModel';
 import {
   E_STEEL,
   lateralTorsionalReduction,
@@ -275,7 +276,9 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
     'and h the ridge height; worst of wind across the ridge (θ = 0°: F -1.7 / G -1.2 / H and I -0.6; F/G ' +
     'within e/10 of the eaves, F also within e/4 of a gable) and along the ridge (θ = 90°, Tab. 7.4b: F ' +
     '-1.6 / G -1.3 / H -0.7 / I -0.6; F and G within e/10 of a gable, F within e/4 of the eaves, H up to ' +
-    'e/2); the worst zone touching the member applies to its whole length. The ' +
+    'e/2); multi-span halls (valleys between roofs, EN 1991-1-4 Fig. 7.10 simplified): spans between ' +
+    'two valleys are downwind of the windward span for either wind direction and use zone H/I with ' +
+    'cpe × 0.6 for θ = 0°; the worst zone touching the member applies to its whole length. The ' +
     'bottom flange is in compression: χLT from §6.3.2.3 for I sections with Lcr = span/2, simplified ' +
     'EN 1993-1-3 §10.1 value for cold-formed C sections (0.6 for spans > 6 m, else 0.75), assuming one ' +
     'row of anti-sag bars at mid-span; (3) shear; (4) deflection under characteristic dead + snow ≤ ' +
@@ -370,6 +373,11 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
       .filter(({ member }) => member.role === 'rafter')
       .flatMap(({ start, end }) => [start[2], end[2]]);
     const eaves = rafterZs.length > 0 ? Math.min(...rafterZs) : null;
+    const valleys = valleyLines(
+      members
+        .filter(({ member }) => member.role === 'rafter')
+        .map(({ start, end }) => ({ start, end })),
+    );
     const width = x1 - x0;
     const depth = yEnd - y0;
     const eAcross = Math.min(depth, 2 * height);
@@ -443,8 +451,13 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
           const horizontalEaves = Math.abs(purlin.start[0] - eavesEnd.start[0]);
           const nearGable = (distance: number): boolean =>
             purlin.yMin - y0 < distance - TOLERANCE || yEnd - purlin.yMax < distance - TOLERANCE;
-          const acrossZone: RoofZone =
-            horizontalEaves <= eAcross / 10 + TOLERANCE
+          // Multi-span (EN 1991-1-4 Fig. 7.10, simplified): a span between two valleys is downwind
+          // of the windward span for either wind direction: zone H/I with the 0.6 reduction.
+          const spanIndex = valleys.filter((valley) => valley < purlin.start[0]).length;
+          const downwindSpan = spanIndex > 0 && spanIndex < valleys.length;
+          const acrossZone: RoofZone = downwindSpan
+            ? 'H/I'
+            : horizontalEaves <= eAcross / 10 + TOLERANCE
               ? nearGable(eAcross / 4)
                 ? 'F'
                 : 'G'
@@ -456,9 +469,10 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
             : nearGable(eAlong / 2)
               ? 'H'
               : 'I';
+          const acrossCpe = CPE_ROOF[acrossZone] * (downwindSpan ? DOWNWIND_ROOF_FACTOR : 1);
           const [zone, cpe] =
-            CPE_ROOF[acrossZone] <= CPE_ROOF_ALONG[alongZone]
-              ? ([acrossZone, CPE_ROOF[acrossZone]] as const)
+            acrossCpe <= CPE_ROOF_ALONG[alongZone]
+              ? ([acrossZone, acrossCpe] as const)
               : ([alongZone, CPE_ROOF_ALONG[alongZone]] as const);
 
           const wind = windPressure * (Math.abs(cpe) + CPI_SUCTION) * trib;

@@ -22,7 +22,10 @@ import {
   framesOf,
   solveCombination,
   WIND_CASES,
+  HOISTING_CLASSES,
+  type CraneModel,
   type FrameLoads,
+  type HoistingClass,
   type FrameModel,
   type LoadCase,
 } from './frameModel';
@@ -82,11 +85,13 @@ function ultimateCombinations(wind: boolean, crane: boolean): Combination[] {
     }
   }
   if (crane) {
-    // Crane leading (with and without snow, alone or with either wind), then wind leading with the
-    // crane accompanying (ψ0 = 1.0, EN 1991-3 Tab. A.2).
+    // Crane load groups 1 (C) and 5 (C5) of EN 1991-3 Tab. 2.2 leading (with and without snow, alone
+    // or with either wind), then wind leading with the crane accompanying (ψ0 = 1.0, Tab. A.2).
     const sides = [
       { load: 'CL', label: 'C(left)', sway: 1 },
       { load: 'CR', label: 'C(right)', sway: -1 },
+      { load: 'CL5', label: 'C5(left)', sway: 1 },
+      { load: 'CR5', label: 'C5(right)', sway: -1 },
     ] as const;
     for (const side of sides) {
       for (const snow of [0.75, 0]) {
@@ -446,8 +451,11 @@ export function checkFrames(
     }
     if (frame.craneNodes.length > 0) {
       swayCases.push(
-        { name: 'SLS C(left)', factors: { CL: 1 }, crane: true },
-        { name: 'SLS C(right)', factors: { CR: 1 }, crane: true },
+        // EN 1993-6 §7.3: characteristic crane loads without dynamic factors; envelope of group 1 (HT / φ5) and group 5 (HS).
+        { name: 'SLS C1k(left)', factors: { CLk: 1 }, crane: true },
+        { name: 'SLS C1k(right)', factors: { CRk: 1 }, crane: true },
+        { name: 'SLS C5(left)', factors: { CL5: 1 }, crane: true },
+        { name: 'SLS C5(right)', factors: { CR5: 1 }, crane: true },
       );
     }
     for (const swayCase of swayCases) {
@@ -495,6 +503,11 @@ export interface FrameLoadParams {
   snowLoad?: number;
   windPressure?: number;
   craneCapacity?: number;
+  hoistingClass?: HoistingClass;
+  hoistingSpeed?: number;
+  craneSelfWeight?: number;
+  minHookApproach?: number;
+  wheelBase?: number;
   levelId?: string;
 }
 
@@ -516,6 +529,32 @@ export const FRAME_LOAD_PROPERTIES = {
       'Crane capacity in tonnes for every runway on the level. Default: read from the runways ' +
       '(add_crane_runway capacity); 0 = ignore cranes.',
   },
+  hoistingClass: {
+    type: 'string',
+    enum: ['HC1', 'HC2', 'HC3', 'HC4'],
+    description:
+      'EN 1991-3 hoisting class for the dynamic factor φ2 = φ2,min + β2 vh (HC1 1.05 + 0.17 vh, ' +
+      'HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.',
+  },
+  hoistingSpeed: {
+    type: 'number',
+    description: 'Hoisting speed vh in m/s (>= 0) for φ2. Default 0.1.',
+  },
+  craneSelfWeight: {
+    type: 'number',
+    description:
+      'Crane self-weight Gc in kN (> 0, bridge + trolley; trolley = 0.2 Gc). Default 0.5 Q + 20 kN.',
+  },
+  minHookApproach: {
+    type: 'number',
+    description:
+      'Minimum approach of the hook to a rail in m (>= 0): the trolley position that maximises the wheel load. Default 1.0.',
+  },
+  wheelBase: {
+    type: 'number',
+    description:
+      'Wheel base a of a crane rail wheel group in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.',
+  },
   levelId: { type: 'string', description: 'Level id. Default: the active level.' },
 } as const;
 
@@ -534,17 +573,42 @@ export function resolveFrameLoads(
   ) {
     return { reason: 'deadLoad, snowLoad, windPressure and craneCapacity must be >= 0' };
   }
+  const { hoistingClass, hoistingSpeed, craneSelfWeight, minHookApproach, wheelBase } = params;
+  if (hoistingClass !== undefined && !(hoistingClass in HOISTING_CLASSES)) {
+    return { reason: "hoistingClass must be 'HC1', 'HC2', 'HC3' or 'HC4'" };
+  }
+  if (
+    (hoistingSpeed !== undefined && !nonNegative(hoistingSpeed)) ||
+    (minHookApproach !== undefined && !nonNegative(minHookApproach))
+  ) {
+    return { reason: 'hoistingSpeed and minHookApproach must be >= 0' };
+  }
+  const positive = (value: unknown): boolean => isFiniteNumber(value) && value > 0;
+  if (
+    (craneSelfWeight !== undefined && !positive(craneSelfWeight)) ||
+    (wheelBase !== undefined && !positive(wheelBase))
+  ) {
+    return { reason: 'craneSelfWeight and wheelBase must be > 0' };
+  }
   const building = getBuilding(doc);
   const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
   if (levelId === undefined || !building.levels[levelId]) {
     return { reason: `no level '${params.levelId ?? ''}'` };
   }
+  const craneModel: CraneModel = {
+    ...(hoistingClass !== undefined ? { hoistingClass } : {}),
+    ...(hoistingSpeed !== undefined ? { hoistingSpeed } : {}),
+    ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}),
+    ...(minHookApproach !== undefined ? { minHookApproach } : {}),
+    ...(wheelBase !== undefined ? { wheelBase } : {}),
+  };
   return {
     loads: {
       deadLoad,
       snowLoad,
       windPressure,
       ...(craneCapacity !== undefined ? { craneCapacity } : {}),
+      ...(Object.keys(craneModel).length > 0 ? { craneModel } : {}),
     },
     levelId,
   };
@@ -573,8 +637,9 @@ export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
     'plane + the columns under them, pinned bases) is solved as a 2D frame (direct stiffness, ' +
     'section properties from the profile outline, no root radii) for every EN 1990 combination of ' +
     'dead G (deadLoad + self-weight), snow S, wind W (windPressure, both directions, incl. uplift) ' +
-    'and crane C (from add_crane_runway capacity: vertical wheel reactions with dynamic factors + ' +
-    'lateral surge at the brackets), with sway imperfections and Horne αcr per storey (all moments amplified ' +
+    'and crane C (from add_crane_runway capacity, EN 1991-3 load groups 1 and 5: wheel reactions by statics ' +
+    'at the minimum hook approach with φ1 / φ2 (hoisting class) / φ4, transverse drive forces HT (φ5) and ' +
+    'skewing forces HS at the brackets; combinations C / C5 with the crane at the left or right rail), with sway imperfections and Horne αcr per storey (all moments amplified ' +
     'by 1/(1−1/αcr) when αcr < 10). Checks: member cross-section (EN 1993-1-1 §6.2), flexural buckling with N–M ' +
     'interaction and lateral-torsional buckling (§6.3; columns full height, LTB between side rails, ' +
     'rafters between purlins, compression flanges assumed fly-braced at purlins / rails), frame sway stability ' +

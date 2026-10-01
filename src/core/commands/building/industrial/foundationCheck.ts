@@ -131,6 +131,8 @@ function serviceCombinations(wind: boolean, crane: boolean): Combination[] {
     list.push(
       { name: 'G+C(left)', factors: { G: 1, CL: 1 } },
       { name: 'G+C(right)', factors: { G: 1, CR: 1 } },
+      { name: 'G+C5(left)', factors: { G: 1, CL5: 1 } },
+      { name: 'G+C5(right)', factors: { G: 1, CR5: 1 } },
     );
   }
   return list;
@@ -155,6 +157,8 @@ export function ultimateCombinations(
       list.push(
         { name: '1.0G+1.35C(left)', factors: { G: g, CL: 1.35 } },
         { name: '1.0G+1.35C(right)', factors: { G: g, CR: 1.35 } },
+        { name: '1.0G+1.35C5(left)', factors: { G: g, CL5: 1.35 } },
+        { name: '1.0G+1.35C5(right)', factors: { G: g, CR5: 1.35 } },
       );
     }
     return list;
@@ -169,6 +173,8 @@ export function ultimateCombinations(
     list.push(
       { name: '1.35G+1.35C(left)+0.75S', factors: { G: g, CL: 1.35, S: 0.75 } },
       { name: '1.35G+1.35C(right)+0.75S', factors: { G: g, CR: 1.35, S: 0.75 } },
+      { name: '1.35G+1.35C5(left)+0.75S', factors: { G: g, CL5: 1.35, S: 0.75 } },
+      { name: '1.35G+1.35C5(right)+0.75S', factors: { G: g, CR5: 1.35, S: 0.75 } },
     );
   }
   return list;

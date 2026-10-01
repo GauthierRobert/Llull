@@ -44,13 +44,13 @@ describe('check_crane_runways', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(data.failures).toEqual([]);
-    expect(data.rows.length % 8).toBe(0);
+    expect(data.rows.length % 9).toBe(0);
     for (const kind of ['strength', 'ltb', 'deflection', 'fatigue', 'local']) {
       expect(data.rows.some((row) => row.kind === kind)).toBe(true);
     }
     expect(find(data.rows, 'deflection', 'vertical').unit).toBe('mm');
     expect(find(data.rows, 'deflection', 'lateral').limit).toBeGreaterThan(0);
-    for (const row of data.rows) {
+    for (const row of data.rows.filter((candidate) => !candidate.check.includes('longitudinal'))) {
       expect(row.utilisation).toBeGreaterThan(0.005);
       expect(row.utilisation).toBeLessThan(1);
     }
@@ -115,6 +115,48 @@ describe('check_crane_runways', () => {
     expect(unknown.summary).toMatch(/no crane runway beam/);
   });
 
+  it('applies the EN 1991-3 load groups: hoisting class, hook approach, HT / HS and HL', () => {
+    const doc = hall();
+    const base = rowsOf(doc);
+    const longitudinal = find(base, 'strength', 'longitudinal');
+    // HL = φ5 K / nr (K = 0.2 Rmin), checked as 1.35 HL axial force against Npl.
+    const actions = craneActions(10, 22610);
+    expect(longitudinal.value).toBeCloseTo(1.35 * actions.group1.longitudinal, -1);
+    expect(longitudinal.check).toMatch(/HL \d+(\.\d)? kN, φ2 1\.134/);
+    expect(longitudinal.utilisation).toBeLessThan(0.05);
+    const hc4 = rowsOf(doc, { hoistingClass: 'HC4', hoistingSpeed: 0.5 });
+    expect(find(hc4, 'strength', 'bending').value).toBeGreaterThan(
+      find(base, 'strength', 'bending').value,
+    );
+    expect(find(hc4, 'strength', 'longitudinal').check).toContain('φ2 1.54');
+    const far = rowsOf(doc, { minHookApproach: 5 });
+    expect(find(far, 'strength', 'shear').value).toBeLessThan(
+      find(base, 'strength', 'shear').value,
+    );
+    const spanned = rowsOf(doc, { craneSpan: 12000, craneSelfWeight: 30 });
+    expect(find(spanned, 'strength', 'shear').value).not.toBe(
+      find(base, 'strength', 'shear').value,
+    );
+  });
+
+  it('falls back to a 20 m bridge span for a runway without a paired beam', () => {
+    const doc = hall();
+    const kept = Object.values(doc.building!.elements).filter(
+      (element) =>
+        !(element.category === 'member' && element.role === 'crane' && element.start[0] > 10000),
+    );
+    const single = {
+      ...doc,
+      building: { ...doc.building!, elements: Object.fromEntries(kept.map((e) => [e.id, e])) },
+    };
+    const actions = craneActions(10, 20000);
+    const lonely = rowsOf(single);
+    expect(find(lonely, 'strength', 'longitudinal').value).toBeCloseTo(
+      1.35 * actions.group1.longitudinal,
+      -1,
+    );
+  });
+
   it('is a graceful no-op for bad input', () => {
     const doc = hall();
     for (const params of [
@@ -122,6 +164,11 @@ describe('check_crane_runways', () => {
       { craneCapacity: Number.NaN },
       { wheelBase: 0 },
       { craneClass: 'S9' as 'S2' },
+      { hoistingClass: 'HC9' as 'HC1' },
+      { hoistingSpeed: -1 },
+      { minHookApproach: -1 },
+      { craneSpan: 0 },
+      { craneSelfWeight: 0 },
       { levelId: 'nope' },
     ]) {
       const result = runwayCheck.run(doc, params);
@@ -156,7 +203,8 @@ describe('local wheel stresses (EN 1993-6 §5.7.1)', () => {
     const irf = 0.75 * 1.78e6 + (234 * 19 ** 3) / 12;
     const leff = 3.25 * (irf / 11) ** (1 / 3);
     expect(leff).toBeCloseTo(166.1, 0);
-    const wheel = craneActions(10).max / 2;
+    // Paired runway beams at x = 695 / 23305 mm: bridge span 22610 mm.
+    const wheel = craneActions(10, 22610).group1.max / 2;
     const sigma = (1.35 * wheel) / (leff * 11);
     expect(stress(rows).value).toBeCloseTo(sigma, 1);
     expect(stress(rows).limit).toBe(355);
