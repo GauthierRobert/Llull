@@ -8,13 +8,15 @@ integrations for each — leads to duplicated logic and drift. We avoid that wit
 a single **command layer**. AI control is delivered through MCP, not a bespoke
 in-app integration.
 
-A *command* is a pure function:
+A _command_ is a pure function:
 
 ```ts
-(document, params) => { document, summary, affected }
+(document, params) => {
+  (document, summary, affected);
+};
 ```
 
-It takes the current document and parameters, and returns a *new* document plus
+It takes the current document and parameters, and returns a _new_ document plus
 metadata. It never mutates its input and never touches React, the DOM, or the
 network.
 

@@ -273,7 +273,7 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
         `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ` +
         `Max utilisation now ${worst.toFixed(2)}${failures > 0 ? `, ${failures} element(s) still failing` : ''}` +
         `${limited ? ' (largest available size reached for some elements)' : ''}. ` +
-        `No lateral-torsional buckling, fatigue or bracing checks` +
+        `Frames only (verify bracing, foundations and runways with their checks)` +
         `${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
       affected: elementAffected(document, [...changed]),
       data: { changes, maxUtilisation: worst, failures },

@@ -66,8 +66,23 @@ a frame fails on sway or stability, picks the bolt diameter and row count of eac
 against all combinations, and reports the changes and final utilisations. Connections also carry
 full-strength fillet weld sizes in their schedule and weld length / metal in the takeoff.
 
-Not covered: lateral-torsional buckling, fatigue (crane classes), gable / bracing systems, base
-plate and footing design, local wind zones. This is a preliminary design aid, not a substitute for
+Lateral-torsional buckling uses Mcr from the section (It, Iw) with the compression flange
+restrained at the purlins (rafters) and side rails (columns) — fly braces assumed.
+
+Companion checks, all read-only and driven by the same loads:
+
+- `check_bracing` — longitudinal wind on the gables (and frame stability forces) → roof and wall
+  X-bracing as tension-only diagonals, eaves struts in compression, gable posts in bending.
+- `check_foundations` — characteristic base reactions per load case → pad footing soil bearing
+  (effective width), uplift (EQU), sliding, base plate concrete bearing and anchor bolts. With a
+  ground slab the frame thrust is tied through it (tie-force row, slab friction against sliding);
+  `thrustTie: false` makes each pad resist its own reaction.
+- `check_crane_runways` — runway beams under two moving wheels: biaxial bending (top flange takes
+  the surge), shear, lateral-torsional buckling, L/600 deflections (EN 1993-6) and fatigue with the
+  damage-equivalent factor of the crane class (S2–S4, detail category 71).
+
+Not covered: local wind zones / internal pressure cases, settlement and reinforcement design,
+connection fatigue details. This is a preliminary design aid, not a substitute for
 the engineer of record.
 
 ## Quantities and fabrication lists

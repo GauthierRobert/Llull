@@ -232,4 +232,26 @@ test.describe('industrial workflow', () => {
     await page.getByTestId('frame-check').click();
     await expect(summary).toContainText('all OK');
   });
+
+  test('I24–I27 — bracing, foundations and crane runway checks', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', {
+      span: '24000',
+      length: '30000',
+      cladding: 'false',
+      craneRailHeight: '6000',
+    });
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    const summary = page.getByTestId('frame-check-summary');
+    await page.getByTestId('bracing-check').click();
+    await expect(summary).toContainText('Bracing check (qp 0.7 kN/m²');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('foundation-check').click();
+    await expect(summary).toContainText('Checked 12 footing(s)');
+    await page.getByTestId('runway-check').click();
+    await expect(summary).toContainText('crane runway beam(s)');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('frame-check-row').first().click();
+    await expect(page.getByTestId('frame-check-row').first()).toContainText('CB');
+  });
 });

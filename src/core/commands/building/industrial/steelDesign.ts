@@ -91,24 +91,70 @@ function curves(profile: SteelProfile): { major: number; minor: number } {
   return { major: 0.49, minor: 0.49 };
 }
 
+const G_STEEL = 81000; // N/mm²
+
+/**
+ * Elastic critical moment of a doubly-symmetric I-section (load at the shear centre, k = kw = 1):
+ * Mcr = C1 π² E Iz / L² · √(Iw/Iz + L² G It / (π² E Iz)); It, Iw from the plate dimensions.
+ * @returns N·mm; Infinity for shapes not susceptible to lateral-torsional buckling
+ */
+export function criticalMoment(profile: SteelProfile, length: number, c1 = 1): number {
+  if (profile.shape !== 'I') return Infinity;
+  const minor = sectionProperties(profile).minorInertia;
+  const torsion =
+    (2 * profile.b * profile.tf ** 3 + (profile.h - 2 * profile.tf) * profile.tw ** 3) / 3;
+  const warping = (minor * (profile.h - profile.tf) ** 2) / 4;
+  const euler = (Math.PI ** 2 * E_STEEL * minor) / length ** 2;
+  return c1 * euler * Math.sqrt(warping / minor + (G_STEEL * torsion) / euler);
+}
+
+/**
+ * χLT for rolled I-sections (§6.3.2.3: λ̄LT,0 = 0.4, β = 0.75; curve b for h/b ≤ 2, c above).
+ * `momentFactor` scales Mcr (C1 and load-position effects).
+ */
+export function lateralTorsionalReduction(
+  profile: SteelProfile,
+  fy: number,
+  length: number,
+  momentFactor = 1,
+): number {
+  const mcr = criticalMoment(profile, length, momentFactor);
+  if (!Number.isFinite(mcr)) return 1;
+  const slenderness = Math.sqrt(sectionResistance(profile, fy).moment / mcr);
+  if (slenderness <= 0.4) return 1;
+  const imperfection = profile.h / profile.b <= 2 ? 0.34 : 0.49;
+  const phi = 0.5 * (1 + imperfection * (slenderness - 0.4) + 0.75 * slenderness ** 2);
+  return Math.min(
+    1,
+    1 / slenderness ** 2,
+    1 / (phi + Math.sqrt(phi * phi - 0.75 * slenderness ** 2)),
+  );
+}
+
 export interface BucklingCheck {
   readonly utilisation: number;
   readonly chiMajor: number;
   readonly chiMinor: number;
+  readonly chiLateralTorsional: number;
 }
 
 /**
- * Member stability under compression N (N, ≥ 0) + major-axis bending M (N·mm):
- * N/(χy Npl) + kyy M/Mrd and N/(χz Npl) + 0.6 kyy M/Mrd (method 2), Cm = 0.9 (sway).
- * Lateral-torsional buckling is not checked (restrained compression flange).
- * @invariant lengths in mm
+ * Member stability under compression N (N, ≥ 0) + major-axis bending M (N·mm), EN 1993-1-1
+ * §6.3.3 method 2 (Annex B), Cm = CmLT = 0.9:
+ * N/(χy Npl) + kyy M/(χLT Mrd) and N/(χz Npl) + kzy M/(χLT Mrd); kzy per Tab. B.2 for
+ * torsionally susceptible I-sections (0.6 kyy and χLT = 1 for the other shapes).
+ * @invariant lengths in mm; lateralTorsional = spacing of compression-flange restraints
  */
 export function memberBuckling(
   profile: SteelProfile,
   fy: number,
   compression: number,
   moment: number,
-  lengths: { readonly major: number; readonly minor: number },
+  lengths: {
+    readonly major: number;
+    readonly minor: number;
+    readonly lateralTorsional?: number;
+  },
 ): BucklingCheck {
   const section = sectionProperties(profile);
   const resistance = sectionResistance(profile, fy);
@@ -116,23 +162,39 @@ export function memberBuckling(
     Math.sqrt(resistance.axial / ((Math.PI ** 2 * E_STEEL * inertia) / length ** 2));
   const { major, minor } = curves(profile);
   const lambdaMajor = slenderness(section.inertia, lengths.major);
+  const lambdaMinor = slenderness(section.minorInertia, lengths.minor);
   const chiMajor = bucklingReduction(lambdaMajor, major);
-  const chiMinor = bucklingReduction(slenderness(section.minorInertia, lengths.minor), minor);
+  const chiMinor = bucklingReduction(lambdaMinor, minor);
+  const chiLateralTorsional = lateralTorsionalReduction(
+    profile,
+    fy,
+    lengths.lateralTorsional ?? lengths.minor,
+  );
   const axial = Math.max(0, compression);
   const n = axial / ((chiMajor * resistance.axial) / GAMMA_M1);
+  const nMinor = axial / ((chiMinor * resistance.axial) / GAMMA_M1);
+  const plastic = resistance.sectionClass <= 2;
   // Annex B Tab. B.1 — class 1–2: Cm (1 + (λ̄ − 0.2) n) ≤ Cm (1 + 0.8 n);
   // class 3: Cm (1 + 0.6 λ̄ n) ≤ Cm (1 + 0.6 n).
-  const kyy =
-    resistance.sectionClass <= 2
-      ? 0.9 * (1 + Math.min(Math.max(lambdaMajor - 0.2, 0), 0.8) * n)
-      : 0.9 * (1 + 0.6 * Math.min(lambdaMajor, 1) * n);
-  const bending = Math.abs(moment) / (resistance.moment / GAMMA_M1);
+  const kyy = plastic
+    ? 0.9 * (1 + Math.min(Math.max(lambdaMajor - 0.2, 0), 0.8) * n)
+    : 0.9 * (1 + 0.6 * Math.min(lambdaMajor, 1) * n);
+  // Tab. B.2 (CmLT = 0.9): kzy = 1 − c λ̄z nz / (CmLT − 0.25), λ̄z clamped to 1; c = 0.1 / 0.05.
+  const factor = plastic ? 0.1 : 0.05;
+  const kzy =
+    profile.shape !== 'I'
+      ? 0.6 * kyy
+      : plastic && lambdaMinor < 0.4
+        ? Math.min(0.6 + lambdaMinor, 1 - (factor * lambdaMinor * nMinor) / 0.65)
+        : Math.max(
+            1 - (factor * Math.min(lambdaMinor, 1) * nMinor) / 0.65,
+            1 - (factor * nMinor) / 0.65,
+          );
+  const bending = Math.abs(moment) / ((chiLateralTorsional * resistance.moment) / GAMMA_M1);
   return {
-    utilisation: Math.max(
-      n + kyy * bending,
-      axial / ((chiMinor * resistance.axial) / GAMMA_M1) + 0.6 * kyy * bending,
-    ),
+    utilisation: Math.max(n + kyy * bending, nMinor + kzy * bending),
     chiMajor,
     chiMinor,
+    chiLateralTorsional,
   };
 }

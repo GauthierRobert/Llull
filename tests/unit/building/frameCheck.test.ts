@@ -159,7 +159,7 @@ describe('structural review regressions', () => {
     });
     const result = execute(doc, 'design_portal_frames', {});
     expect(result.summary).toMatch(/gable posts are not analysed/);
-    expect(result.summary).toMatch(/No lateral-torsional buckling/);
+    expect(result.summary).toMatch(/Frames only/);
     const members = (d: CadDocument): SteelMemberElement[] =>
       Object.values(d.building!.elements).flatMap((e) => (e.category === 'member' ? [e] : []));
     const before = new Map(members(doc).map((m) => [m.id, m]));

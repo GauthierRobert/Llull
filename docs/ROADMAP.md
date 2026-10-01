@@ -99,7 +99,7 @@ AI control — there is no in-app AI bridge).**
 - [x] Moment connections (end plates, haunches, bolts)
 - [x] Frame analysis, member and bolt checks, automatic sizing, weld detailing
 - [x] Wind / crane load cases, buckling, sway stability and deflection checks
-- [ ] Lateral-torsional buckling, crane fatigue, bracing and footing design
+- [x] Lateral-torsional buckling, crane runway fatigue, bracing and foundation checks
 
 ## Later
 

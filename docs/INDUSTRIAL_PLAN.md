@@ -97,14 +97,15 @@ Each step ships with unit tests and is covered by the Playwright suite.
 
 ## Phase 6 — stability details, foundations, bracing, crane runways
 
-- [ ] **I24 — Lateral-torsional buckling.** EN 1993-1-1 §6.3.2.2/6.3.2.3 (rolled I-sections), Mcr
+- [x] **I24 — Lateral-torsional buckling.** EN 1993-1-1 §6.3.2.2/6.3.2.3 (rolled I-sections), Mcr
       from It / Iw with C1, restraint spacing from purlins (rafters) and side rails (columns);
       §6.3.3 interaction with χLT and kzy for torsionally susceptible members.
-- [ ] **I25 — Foundations and base plates.** `check_foundations`: characteristic base reactions
+- [x] **I25 — Foundations and base plates.** `check_foundations`: characteristic base reactions
       per load case → pad footing soil bearing (SLS), uplift (EQU), sliding; base plate concrete
-      bearing and anchor bolt tension / shear (EN 1993-1-8 §6.2.5, §6.2.6.12).
-- [ ] **I26 — Wind bracing.** `check_bracing`: longitudinal wind on the gables → roof and wall
+      bearing and anchor bolt tension / shear (EN 1993-1-8 §6.2.5, §6.2.6.12). Frame thrust tied
+      through the ground slab (tie force row, slab friction) or resisted by each pad.
+- [x] **I26 — Wind bracing.** `check_bracing`: longitudinal wind on the gables → roof and wall
       bracing (tension diagonals) forces per braced bay vs. EN 1993-1-1 §6.2.3 / §6.3.1.
-- [ ] **I27 — Crane runway beams.** `check_crane_runways`: runway beam bending + shear under
+- [x] **I27 — Crane runway beams.** `check_crane_runways`: runway beam bending + shear under
       wheel loads (EN 1991-3 dynamic factors), vertical / lateral deflection limits (EN 1993-6
       §7.3: L/600, L/600), fatigue with the damage-equivalent factor λ (EN 1993-1-9, class S3).

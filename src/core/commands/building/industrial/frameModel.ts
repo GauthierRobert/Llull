@@ -32,8 +32,15 @@ export interface AnalysisMember {
   /** True for the first / last analysis piece of the element (connection ends). */
   readonly ends: readonly [boolean, boolean];
   readonly loads: CaseLoads;
-  /** Buckling lengths (mm): in-plane system length and out-of-plane restraint spacing. */
-  readonly lengths: { readonly major: number; readonly minor: number };
+  /**
+   * Buckling lengths (mm): in-plane system length, out-of-plane flexural length and the spacing
+   * of lateral-torsional restraints (purlins / side rails with fly braces to the inner flange).
+   */
+  readonly lengths: {
+    readonly major: number;
+    readonly minor: number;
+    readonly lateralTorsional: number;
+  };
 }
 
 export interface NodeCaseLoad {
@@ -240,6 +247,7 @@ export function framesOf(
         lengths: {
           major: length,
           minor: (purlinGap * length) / Math.max(Math.abs(x1 - x0), 1),
+          lateralTorsional: (purlinGap * length) / Math.max(Math.abs(x1 - x0), 1),
         },
       });
     }
@@ -279,6 +287,23 @@ export function framesOf(
       if (topNode < 0) continue; // gable posts under the rafter span are not analysed
       const section = sectionProperties(profile);
       const height = zTop - zBottom;
+      const railLevels = [
+        zBottom,
+        zTop,
+        ...members
+          .filter(
+            (member) =>
+              member.role === 'rail' &&
+              Math.abs(mm(member.start[0]) - x) < 1000 &&
+              Math.min(mm(member.start[1]), mm(member.end[1])) <= y + tolerance &&
+              Math.max(mm(member.start[1]), mm(member.end[1])) >= y - tolerance,
+          )
+          .map((member) => mm(member.start[2]))
+          .filter((z) => z > zBottom && z < zTop),
+      ].sort((a, b) => a - b);
+      const railGap = Math.max(
+        ...railLevels.slice(1).map((z, index) => z - (railLevels[index] as number)),
+      );
       const splits: number[] = [];
       for (const bracket of brackets) {
         const z = mm(bracket.start[2]);
@@ -342,7 +367,7 @@ export function framesOf(
             ...(windLeft ? { WL: windLeft } : {}),
             ...(windRight ? { WR: windRight } : {}),
           },
-          lengths: { major: height, minor: height },
+          lengths: { major: height, minor: height, lateralTorsional: railGap },
         });
       });
       columnTops.push({ node: topNode, height, elementId: column.id });

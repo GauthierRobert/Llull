@@ -326,7 +326,7 @@ export function checkFrames(
         const shearRatio = shear / resistance.shear;
         const governing =
           buckling.utilisation >= section && buckling.utilisation >= shearRatio
-            ? `buckling χy ${buckling.chiMajor.toFixed(2)} χz ${buckling.chiMinor.toFixed(2)}`
+            ? `buckling χy ${buckling.chiMajor.toFixed(2)} χz ${buckling.chiMinor.toFixed(2)} χLT ${buckling.chiLateralTorsional.toFixed(2)}`
             : shearRatio > section
               ? 'shear V/Vpl'
               : `N/Npl + M/M${resistance.sectionClass <= 2 ? 'pl' : 'el'}`;
@@ -563,12 +563,13 @@ export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
     'and crane C (from add_crane_runway capacity: vertical wheel reactions with dynamic factors + ' +
     'lateral surge at the brackets), with sway imperfections and Horne αcr per storey (all moments amplified ' +
     'by 1/(1−1/αcr) when αcr < 10). Checks: member cross-section (EN 1993-1-1 §6.2), flexural buckling with N–M ' +
-    'interaction (§6.3, columns full height, rafters between purlins), frame sway stability ' +
+    'interaction and lateral-torsional buckling (§6.3; columns full height, LTB between side rails, ' +
+    'rafters between purlins, compression flanges assumed fly-braced at purlins / rails), frame sway stability ' +
     '(αcr ≥ 3), end-plate bolt groups (EN 1993-1-8, grade 8.8) and SLS deflections (rafters ' +
     'span/200 under snow, eaves h/150 under wind, rail level h/400 under crane). Returns the worst ' +
-    'utilisation per element; values > 1 fail. Not covered: lateral-torsional buckling, fatigue, ' +
-    'gable / bracing systems, base / footing design — a preliminary design check, not a ' +
-    'substitute for the engineer of record.',
+    'utilisation per element; values > 1 fail. Bracing, foundations and crane runway beams are ' +
+    'checked by check_bracing, check_foundations and check_crane_runways. A preliminary design ' +
+    'check, not a substitute for the engineer of record.',
   paramsSchema: {
     type: 'object',
     properties: FRAME_LOAD_PROPERTIES,
@@ -631,7 +632,7 @@ export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'} ${worst?.kind ?? ''}, ${worst?.frame ?? '—'}, ${worst?.combination ?? '—'}); ` +
         `min αcr ${Number.isFinite(minAlphaCritical) ? round(minAlphaCritical, 1) : '—'}; ` +
         (failures.length === 0
-          ? 'all OK (no lateral-torsional buckling, fatigue or bracing checks).'
+          ? 'all OK (frames only: see check_bracing, check_foundations, check_crane_runways).'
           : `${failures.length} failure(s): ${failures
               .slice(0, 8)
               .map((row) => `${row.mark} ${row.kind} ${round(row.utilisation)}`)

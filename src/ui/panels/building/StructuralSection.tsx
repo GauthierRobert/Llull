@@ -1,21 +1,56 @@
 /**
  * @layer ui/panels/building
  *
- * StructuralSection — roof / wind loads → read-only check_portal_frames (utilisation list, click selects
- * the element) and design_portal_frames (dispatched; up-sizes sections and bolt groups).
+ * StructuralSection — roof / wind loads → the read-only structural checks (frames, bracing,
+ * foundations, crane runways; utilisation list, click selects the element) and
+ * design_portal_frames (dispatched; up-sizes sections and bolt groups).
  */
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
-import type { CheckRow } from '@core/commands/building/industrial/frameCheck';
 import type { BuildingModel } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
 
+/** The fields every structural check row shares (frames, bracing, foundations, runways). */
+interface ReportRow {
+  readonly key: string;
+  readonly elementId: string;
+  readonly label: string;
+  readonly utilisation: number;
+}
+
 interface Report {
   readonly summary: string;
-  readonly rows: ReadonlyArray<CheckRow>;
+  readonly rows: ReadonlyArray<ReportRow>;
   readonly building: BuildingModel | undefined;
+}
+
+const CHECKS = [
+  { command: 'check_portal_frames', label: 'Check frames', testId: 'frame-check' },
+  { command: 'check_bracing', label: 'Bracing', testId: 'bracing-check' },
+  { command: 'check_foundations', label: 'Foundations', testId: 'foundation-check' },
+  { command: 'check_crane_runways', label: 'Runways', testId: 'runway-check' },
+] as const;
+
+function toReportRows(data: unknown): ReportRow[] {
+  const rows = (data as { rows?: unknown } | undefined)?.rows;
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((row: Record<string, unknown>, index): ReportRow[] => {
+    const text = (key: string): string => (typeof row[key] === 'string' ? row[key] : '');
+    if (typeof row.utilisation !== 'number') return [];
+    const label = [text('mark') || text('column'), text('kind') || text('check'), text('frame')]
+      .filter((part) => part !== '')
+      .join(' · ');
+    return [
+      {
+        key: `${index}:${text('elementId')}`,
+        elementId: text('elementId'),
+        label,
+        utilisation: row.utilisation,
+      },
+    ];
+  });
 }
 
 export function StructuralSection(): React.ReactElement {
@@ -33,12 +68,13 @@ export function StructuralSection(): React.ReactElement {
     windPressure: Number(windPressure),
   };
 
-  const runCheck = (): void => {
-    const result = execute(useStore.getState().document, 'check_portal_frames', loads);
-    const rows = (result.data as { rows: CheckRow[] } | undefined)?.rows ?? [];
+  const runCheck = (command: string): void => {
+    const result = execute(useStore.getState().document, command, loads);
     setReport({
       summary: result.summary,
-      rows: [...rows].sort((a, b) => b.utilisation - a.utilisation).slice(0, 12),
+      rows: toReportRows(result.data)
+        .sort((a, b) => b.utilisation - a.utilisation)
+        .slice(0, 12),
       building,
     });
   };
@@ -67,14 +103,17 @@ export function StructuralSection(): React.ReactElement {
           aria-label="Wind pressure qp (kN/m²)"
           title="Peak velocity pressure qp, kN/m² (0 = no wind)"
         />
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={runCheck}
-          data-testid="frame-check"
-        >
-          Check frames
-        </button>
+        {CHECKS.map((check) => (
+          <button
+            key={check.command}
+            type="button"
+            className={`btn btn--sm ${check.command === 'check_portal_frames' ? 'btn--primary' : 'btn--ghost'}`}
+            onClick={() => runCheck(check.command)}
+            data-testid={check.testId}
+          >
+            {check.label}
+          </button>
+        ))}
         <button
           type="button"
           className="btn btn--ghost btn--sm"
@@ -91,7 +130,7 @@ export function StructuralSection(): React.ReactElement {
           </p>
           <ul className="panel__list" aria-label="Utilisations">
             {report.rows.map((row) => (
-              <li key={`${row.frame}:${row.elementId}:${row.kind}`} className="panel__row">
+              <li key={row.key} className="panel__row">
                 <button
                   type="button"
                   className="building-row-btn"
@@ -99,9 +138,7 @@ export function StructuralSection(): React.ReactElement {
                   data-testid="frame-check-row"
                 >
                   <span className="chip">{row.utilisation > 1 ? 'FAIL' : 'OK'}</span>
-                  <span className="panel__row-main">
-                    {row.mark} {row.kind} · {row.frame}
-                  </span>
+                  <span className="panel__row-main">{row.label}</span>
                   <span className="panel__row-meta">{row.utilisation.toFixed(2)}</span>
                 </button>
               </li>

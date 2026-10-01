@@ -4,6 +4,8 @@ import { execute } from '@core/commands/registry';
 import type { CheckRow } from '@core/commands/building/industrial/frameCheck';
 import {
   bucklingReduction,
+  criticalMoment,
+  lateralTorsionalReduction,
   memberBuckling,
   sectionResistance,
 } from '@core/commands/building/industrial/steelDesign';
@@ -56,8 +58,14 @@ describe('member buckling (EN 1993-1-1 §6.3)', () => {
     expect(stocky.utilisation).toBeCloseTo(0.5 / stocky.chiMinor, 6);
     expect(slender.chiMinor).toBeLessThan(slender.chiMajor);
     expect(slender.utilisation).toBeGreaterThan(1);
-    const bending = memberBuckling(profile, 355, 0, 1e8, { major: 8000, minor: 8000 });
-    expect(bending.utilisation).toBeCloseTo((0.9 * 1e8) / sectionResistance(profile, 355).moment);
+    // Restrained flange (short LTB length): kzy = 1 governs pure bending.
+    const bending = memberBuckling(profile, 355, 0, 1e8, {
+      major: 8000,
+      minor: 8000,
+      lateralTorsional: 100,
+    });
+    expect(bending.chiLateralTorsional).toBe(1);
+    expect(bending.utilisation).toBeCloseTo(1e8 / sectionResistance(profile, 355).moment);
     // Hollow and other shapes use their own curves.
     expect(
       memberBuckling(findProfile('SHS100x5')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor,
@@ -87,6 +95,36 @@ describe('member buckling (EN 1993-1-1 §6.3)', () => {
       resistance.axial / ((Math.PI ** 2 * 210000 * sectionProperties(profile).inertia) / 6000 ** 2),
     );
     expect(result.utilisation).toBeCloseTo(n + 0.9 * (1 + 0.6 * Math.min(lambda, 1) * n) * 0.3, 6);
+  });
+});
+
+describe('lateral-torsional buckling (EN 1993-1-1 §6.3.2)', () => {
+  it('matches the hand Mcr of an IPE300 over 6 m and reduces the bending resistance', () => {
+    const profile = findProfile('IPE300')!;
+    // Catalogue It = 20.1 cm⁴ gives 90.5 kNm; the outline It (no root radii) is ≈ 15.6 cm⁴.
+    const mcr = criticalMoment(profile, 6000) / 1e6;
+    expect(mcr).toBeGreaterThan(0.88 * 90.5);
+    expect(mcr).toBeLessThan(90.5);
+    expect(criticalMoment(profile, 6000, 1.13)).toBeCloseTo(1.13 * criticalMoment(profile, 6000));
+    expect(criticalMoment(findProfile('SHS100x5')!, 6000)).toBe(Infinity);
+    const long = lateralTorsionalReduction(profile, 355, 6000);
+    expect(long).toBeLessThan(0.5);
+    expect(lateralTorsionalReduction(profile, 355, 500)).toBe(1);
+    expect(lateralTorsionalReduction(findProfile('CHS76.1x3.6')!, 355, 6000)).toBe(1);
+    const free = memberBuckling(profile, 355, 0, 5e7, {
+      major: 6000,
+      minor: 6000,
+      lateralTorsional: 6000,
+    });
+    expect(free.utilisation).toBeCloseTo(5e7 / (long * sectionResistance(profile, 355).moment), 6);
+  });
+
+  it('restrains columns at the side rails and rafters at the purlins', () => {
+    const rows = check(hall()).rows;
+    const column = row({ rows } as CheckData, 'SC5', 'column');
+    expect(column.utilisation).toBeLessThan(1);
+    const sparse = check(hall({ railSpacing: 7000 }));
+    expect(row(sparse, 'SC5', 'column').utilisation).toBeGreaterThanOrEqual(column.utilisation);
   });
 });
 

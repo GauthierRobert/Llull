@@ -457,7 +457,7 @@ const designFactory: PromptTemplate = {
           `platforms, \`add_crane_runway\`, \`add_footing\` { underColumns: true }, \`add_base_plates\`, \`add_moment_connections\`, \`add_panel\` for extra cladding.\n` +
           `5. Process: \`add_equipment\` { name, location, size, clearance, weight } for each machine, ` +
           `\`add_pipe_run\` { points, diameter, service } for utilities, \`add_cable_tray\` { points, width, system } for cabling.\n` +
-          `5b. Structure: \`design_portal_frames\` { deadLoad, snowLoad, windPressure (qp, kN/m²) } sizes sections and bolt groups for gravity, wind and crane combinations (cranes read from the runways), \`check_portal_frames\` reports utilisations incl. buckling, sway stability (αcr) and deflections.\n` +
+          `5b. Structure: \`design_portal_frames\` { deadLoad, snowLoad, windPressure (qp, kN/m²) } sizes sections and bolt groups for gravity, wind and crane combinations (cranes read from the runways), \`check_portal_frames\` reports utilisations incl. buckling, sway stability (αcr) and deflections; then \`check_bracing\`, \`check_foundations\` and \`check_crane_runways\` with the same loads.\n` +
           `6. Coordinate: \`check_clashes\` — fix every hard clash and clearance violation with ` +
           `\`move_building_element\` or \`update_steel_member\`, then re-check.\n` +
           `7. Quantities: \`quantity_takeoff\` (steel kg per profile, paint m², concrete m³, cladding m², pipe m), ` +
