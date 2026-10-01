@@ -30,25 +30,18 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   render(): ReactNode {
     if (this.state.message === null) return this.props.children;
     return (
-      <div
-        role="alert"
-        style={{
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 12,
-          font: '14px system-ui, sans-serif',
-          color: '#e8eaed',
-          background: '#14161a',
-        }}
-      >
-        <strong>Something went wrong.</strong>
-        <code style={{ opacity: 0.7, maxWidth: 520 }}>{this.state.message}</code>
-        <button type="button" onClick={() => window.location.reload()}>
-          Reload
-        </button>
+      <div role="alert" className="app-error">
+        <div className="app-error__card">
+          <strong className="app-error__title">Something went wrong</strong>
+          <code className="app-error__message">{this.state.message}</code>
+          <button
+            type="button"
+            className="app-error__reload"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
       </div>
     );
   }

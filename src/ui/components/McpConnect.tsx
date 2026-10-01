@@ -4,7 +4,7 @@
  * McpConnect — modal dialog that shows how to connect an MCP agent to llull.
  *
  * Exports:
- *   McpConnectButton  — trigger button (mounts in StatusBar)
+ *   McpConnectButton  — trigger button (mounts in TopBar)
  *   McpConnect        — modal itself (opened by McpConnectButton)
  *
  * Presentation ONLY. No document mutations (PRIME DIRECTIVE).
@@ -13,6 +13,7 @@
 
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { SERVER_BASE } from '@ui/serverConfig';
+import { Icon } from '@ui/components/Icon';
 
 // ---------------------------------------------------------------------------
 // Static constants (no registry import — pure UI)
@@ -105,12 +106,12 @@ function CopyButton({ text, label }: CopyButtonProps): React.ReactElement {
   return (
     <button
       type="button"
-      className={`mcp-connect__copy-btn${copied ? ' mcp-connect__copy-btn--copied' : ''}`}
+      className={`icon-btn mcp-connect__copy-btn${copied ? ' mcp-connect__copy-btn--copied' : ''}`}
       onClick={handleCopy}
       aria-label={copied ? `${label} copied` : `Copy ${label}`}
       title={copied ? 'Copied!' : `Copy ${label}`}
     >
-      {copied ? 'Copied!' : 'Copy'}
+      <Icon name={copied ? 'check' : 'copy'} size={14} />
     </button>
   );
 }
@@ -122,7 +123,10 @@ function CopyButton({ text, label }: CopyButtonProps): React.ReactElement {
 function McpAgentLoop(): React.ReactElement {
   return (
     <section className="mcp-connect__section" aria-label="Recommended agent loop">
-      <p className="mcp-connect__section-label">3. Recommended agent loop</p>
+      <span className="mcp-connect__step-num" aria-hidden="true">
+        3
+      </span>
+      <p className="mcp-connect__section-label">Recommended agent loop</p>
       <ol className="mcp-connect__loop-list">
         {AGENT_LOOP_STEPS.map((step) => (
           <li key={step.index} className="mcp-connect__loop-item">
@@ -217,17 +221,23 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
       >
         {/* Header */}
         <div className="mcp-connect__header">
-          <h2 id={titleId} className="mcp-connect__title">
-            Connect an MCP agent
-          </h2>
+          <span className="mcp-connect__header-icon" aria-hidden="true">
+            <Icon name="plug" size={16} />
+          </span>
+          <div className="mcp-connect__heading">
+            <h2 id={titleId} className="mcp-connect__title">
+              Connect an MCP agent
+            </h2>
+            <p className="mcp-connect__subtitle">Let Claude or any MCP client drive this canvas.</p>
+          </div>
           <button
             type="button"
-            className="mcp-connect__close"
+            className="icon-btn mcp-connect__close"
             onClick={onClose}
             aria-label="Close dialog"
             title="Close"
           >
-            &times;
+            <Icon name="close" size={14} />
           </button>
         </div>
 
@@ -244,7 +254,10 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
 
           {/* 1. Install + start the server */}
           <section className="mcp-connect__section" aria-label="Install and start server">
-            <p className="mcp-connect__section-label">1. Install &amp; start the MCP server</p>
+            <span className="mcp-connect__step-num" aria-hidden="true">
+              1
+            </span>
+            <p className="mcp-connect__section-label">Install &amp; start the MCP server</p>
             <div className="mcp-connect__code-row">
               <pre className="mcp-connect__code">
                 <code>{SERVER_INSTALL_CMD}</code>
@@ -259,7 +272,10 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
 
           {/* 2. Endpoint URL */}
           <section className="mcp-connect__section" aria-label="Endpoint URL">
-            <p className="mcp-connect__section-label">2. MCP endpoint</p>
+            <span className="mcp-connect__step-num" aria-hidden="true">
+              2
+            </span>
+            <p className="mcp-connect__section-label">MCP endpoint</p>
             <div className="mcp-connect__code-row">
               <pre className="mcp-connect__code">
                 <code>{ENDPOINT_URL}</code>
@@ -282,7 +298,7 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
 }
 
 // ---------------------------------------------------------------------------
-// McpConnectButton — launcher for the StatusBar
+// McpConnectButton — launcher for the TopBar
 // ---------------------------------------------------------------------------
 
 export function McpConnectButton(): React.ReactElement {
@@ -308,7 +324,8 @@ export function McpConnectButton(): React.ReactElement {
         aria-label="Connect an MCP agent"
         title="Connect an MCP agent"
       >
-        Connect agent
+        <Icon name="plug" size={14} />
+        <span>Connect agent</span>
       </button>
 
       {open && <McpConnect onClose={handleClose} />}
