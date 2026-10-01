@@ -27,6 +27,7 @@ import {
   isBatchable,
 } from '../../src/ui/viewport/3d/grouping';
 import type { Entity } from '@core/model/types';
+import { makeMaterialArgs } from '@ui/viewport/3d/InstancedRenderer';
 
 function resetStore(): void {
   useStore.setState({ document: createEmptyDocument(), lastSummary: null });
@@ -274,4 +275,17 @@ describe('InstancedRenderer integration — entityIdFromInstanceId', () => {
       seen.add(id!);
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// Instance materials — per-instance color must not require vertex colors
+// ---------------------------------------------------------------------------
+
+describe('InstancedRenderer — material args', () => {
+  it.each(['shaded', 'wireframe', 'xray'] as const)(
+    '%s mode does not enable vertexColors (geometry has no color attribute → black)',
+    (displayMode) => {
+      expect(makeMaterialArgs(displayMode).vertexColors).not.toBe(true);
+    },
+  );
 });
