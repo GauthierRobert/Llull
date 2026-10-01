@@ -109,3 +109,17 @@ Each step ships with unit tests and is covered by the Playwright suite.
 - [x] **I27 — Crane runway beams.** `check_crane_runways`: runway beam bending + shear under
       wheel loads (EN 1991-3 dynamic factors), vertical / lateral deflection limits (EN 1993-6
       §7.3: L/600, L/600), fatigue with the damage-equivalent factor λ (EN 1993-1-9, class S3).
+
+## Phase 7 — wind refinement, concrete foundations, site and fabrication deliverables
+
+- [ ] **I28 — Internal pressure cases.** Wind with cpi = +0.2 and −0.3 (EN 1991-1-4 §7.2.9) on
+      walls and roof of every frame, both directions; columns take the net (cpe − cpi) pressure.
+- [ ] **I29 — RC pad footing design.** `design_footings` (EN 1992-1-1): bending at the column
+      face → bottom reinforcement both ways (bar diameter / spacing, minimum steel), one-way shear,
+      punching at the 2d control perimeter; reinforcement stored on the footing, rebar mass in
+      the takeoff and footing schedule. Elastic settlement estimate in `check_foundations`.
+- [ ] **I30 — Anchor bolt setting-out plan.** `export_anchor_plan`: SVG sheet with grids,
+      footing outlines, base plates and every anchor bolt dimensioned from the grid lines, plus
+      a bolt schedule — the drawing the groundworks contractor casts to.
+- [ ] **I31 — DSTV NC1 export.** `export_nc_files`: one DSTV NC file per steel member (header,
+      profile, length, cuts, holes of end / base plates) for CNC saw-drill lines.
