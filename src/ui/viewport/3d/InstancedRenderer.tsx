@@ -16,8 +16,7 @@
  *
  * ## Supported geometry kinds (v1)
  * - box:      THREE.BoxGeometry
- * - cylinder: THREE.CylinderGeometry (32 radial segments)
- * - sphere:   THREE.SphereGeometry (32 × 16 segments)
+ * - cylinder/sphere: shared +Z-up builders from entities/primitiveGeometry (same as single meshes)
  *
  * Non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid) are NOT
  * rendered here — they remain in the per-entity mesh path in Entities.tsx.
@@ -43,7 +42,7 @@ import { useViewportStore } from '@ui/store';
 import type { DisplayMode } from '@ui/store';
 import type { InstanceBatch } from './grouping';
 import { entityIdFromInstanceId } from './grouping';
-import { radialSegmentsForDiag, sphereDiag, cylinderDiag } from './lodSegments';
+import { buildCylinderGeometry, buildSphereGeometry } from './entities/primitiveGeometry';
 
 // ---------------------------------------------------------------------------
 // Geometry factory (pure, called inside useMemo)
@@ -56,7 +55,7 @@ import { radialSegmentsForDiag, sphereDiag, cylinderDiag } from './lodSegments';
  *
  * @pure (called inside useMemo — no side effects)
  */
-function makeGeometry(batch: InstanceBatch): THREE.BufferGeometry {
+export function makeGeometry(batch: InstanceBatch): THREE.BufferGeometry {
   const first = batch.entities[0];
   if (!first) return new THREE.BufferGeometry();
 
@@ -68,14 +67,11 @@ function makeGeometry(batch: InstanceBatch): THREE.BufferGeometry {
     }
     case 'cylinder': {
       if (first.kind !== 'cylinder') return new THREE.BufferGeometry();
-      const cylSeg = radialSegmentsForDiag(cylinderDiag(first.radius, first.height));
-      return new THREE.CylinderGeometry(first.radius, first.radius, first.height, cylSeg);
+      return buildCylinderGeometry(first.radius, first.height);
     }
     case 'sphere': {
       if (first.kind !== 'sphere') return new THREE.BufferGeometry();
-      const sphSeg = radialSegmentsForDiag(sphereDiag(first.radius));
-      const sphHSeg = Math.max(4, Math.min(32, Math.floor(sphSeg / 2)));
-      return new THREE.SphereGeometry(first.radius, sphSeg, sphHSeg);
+      return buildSphereGeometry(first.radius);
     }
     default: {
       // Exhaustiveness guard — TypeScript narrows BatchableKind; this is unreachable

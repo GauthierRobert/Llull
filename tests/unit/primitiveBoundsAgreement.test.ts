@@ -20,6 +20,8 @@ import {
   buildWedgeGeometry,
 } from '@ui/viewport/3d/entities/primitiveGeometry';
 import { __resetIdCounter } from '@lib/id';
+import { groupEntitiesForInstancing } from '@ui/viewport/3d/grouping';
+import { makeGeometry } from '@ui/viewport/3d/InstancedRenderer';
 
 const POSITION: Vec3 = [10, -4, 3];
 
@@ -65,12 +67,42 @@ interface Case {
 }
 
 const CASES: Case[] = [
-  { kind: 'cylinder', command: 'add_cylinder', params: { radius: 2, height: 6 }, build: () => buildCylinderGeometry(2, 6) },
-  { kind: 'cone', command: 'add_cone', params: { radius: 2, height: 6 }, build: () => buildConeGeometry(2, 6) },
-  { kind: 'pyramid', command: 'add_pyramid', params: { baseWidth: 4, baseDepth: 2, height: 5 }, build: () => buildPyramidGeometry(4, 2, 5) },
-  { kind: 'wedge', command: 'add_wedge', params: { size: [3, 4, 5] }, build: () => buildWedgeGeometry(3, 4, 5) },
-  { kind: 'sphere', command: 'add_sphere', params: { radius: 3 }, build: () => buildSphereGeometry(3) },
-  { kind: 'torus', command: 'add_torus', params: { ringRadius: 4, tubeRadius: 1 }, build: () => buildTorusGeometry(4, 1) },
+  {
+    kind: 'cylinder',
+    command: 'add_cylinder',
+    params: { radius: 2, height: 6 },
+    build: () => buildCylinderGeometry(2, 6),
+  },
+  {
+    kind: 'cone',
+    command: 'add_cone',
+    params: { radius: 2, height: 6 },
+    build: () => buildConeGeometry(2, 6),
+  },
+  {
+    kind: 'pyramid',
+    command: 'add_pyramid',
+    params: { baseWidth: 4, baseDepth: 2, height: 5 },
+    build: () => buildPyramidGeometry(4, 2, 5),
+  },
+  {
+    kind: 'wedge',
+    command: 'add_wedge',
+    params: { size: [3, 4, 5] },
+    build: () => buildWedgeGeometry(3, 4, 5),
+  },
+  {
+    kind: 'sphere',
+    command: 'add_sphere',
+    params: { radius: 3 },
+    build: () => buildSphereGeometry(3),
+  },
+  {
+    kind: 'torus',
+    command: 'add_torus',
+    params: { ringRadius: 4, tubeRadius: 1 },
+    build: () => buildTorusGeometry(4, 1),
+  },
 ];
 
 describe('primitive bounds agreement (render / core bbox / export tessellation)', () => {
@@ -78,7 +110,10 @@ describe('primitive bounds agreement (render / core bbox / export tessellation)'
 
   for (const testCase of CASES) {
     it(`${testCase.kind}: rendered geometry == entityBounds == rotatedEntityBounds == tessellation`, () => {
-      const result = execute(createEmptyDocument(), testCase.command, { ...testCase.params, position: POSITION });
+      const result = execute(createEmptyDocument(), testCase.command, {
+        ...testCase.params,
+        position: POSITION,
+      });
       const entity = result.document.entities[result.affected[0]!] as Entity;
       expect(entity.kind).toBe(testCase.kind);
 
@@ -102,9 +137,19 @@ describe('primitive bounds agreement (render / core bbox / export tessellation)'
   }
 
   it('cylinder bbox uses the same +Z axis convention as the cone', () => {
-    const cylinder = execute(createEmptyDocument(), 'add_cylinder', { radius: 2, height: 6, position: POSITION });
-    const cone = execute(createEmptyDocument(), 'add_cone', { radius: 2, height: 6, position: POSITION });
-    const cylinderBounds = entityBounds(cylinder.document.entities[cylinder.affected[0]!] as Entity);
+    const cylinder = execute(createEmptyDocument(), 'add_cylinder', {
+      radius: 2,
+      height: 6,
+      position: POSITION,
+    });
+    const cone = execute(createEmptyDocument(), 'add_cone', {
+      radius: 2,
+      height: 6,
+      position: POSITION,
+    });
+    const cylinderBounds = entityBounds(
+      cylinder.document.entities[cylinder.affected[0]!] as Entity,
+    );
     const coneBounds = entityBounds(cone.document.entities[cone.affected[0]!] as Entity);
     expect(cylinderBounds.max[2] - cylinderBounds.min[2]).toBe(6);
     expect(cylinderBounds.max[1] - cylinderBounds.min[1]).toBe(4);
@@ -115,19 +160,40 @@ describe('primitive bounds agreement (render / core bbox / export tessellation)'
     expect(coneBounds.min[2]).toBe(POSITION[2]);
   });
 
-  const PROFILE: ReadonlyArray<readonly [number, number]> = [[1, 0], [3, 0], [3, 2], [1, 2]];
-  const SWEEPS: Array<[string, number]> = [['90deg', Math.PI / 2], ['180deg', Math.PI], ['270deg', 1.5 * Math.PI], ['360deg', 2 * Math.PI]];
+  const PROFILE: ReadonlyArray<readonly [number, number]> = [
+    [1, 0],
+    [3, 0],
+    [3, 2],
+    [1, 2],
+  ];
+  const SWEEPS: Array<[string, number]> = [
+    ['90deg', Math.PI / 2],
+    ['180deg', Math.PI],
+    ['270deg', 1.5 * Math.PI],
+    ['360deg', 2 * Math.PI],
+  ];
 
-  for (const axis of [[0, 0, 1], [0, 1, 0], [1, 0, 0]] as const) {
+  for (const axis of [
+    [0, 0, 1],
+    [0, 1, 0],
+    [1, 0, 0],
+  ] as const) {
     for (const [label, angle] of SWEEPS) {
       it(`revolution axis ${axis.join(',')} sweep ${label}: rendered == export tessellation, within core bounds`, () => {
         const result = execute(createEmptyDocument(), 'revolve_profile', {
-          profile: PROFILE, axis, angle, segments: 24, position: POSITION,
+          profile: PROFILE,
+          axis,
+          angle,
+          segments: 24,
+          position: POSITION,
         });
         const entity = result.document.entities[result.affected[0]!] as Entity;
         expect(entity.kind).toBe('revolution');
 
-        const rendered = renderedBounds(buildRevolutionGeometry(PROFILE, axis, angle, 24), POSITION);
+        const rendered = renderedBounds(
+          buildRevolutionGeometry(PROFILE, axis, angle, 24),
+          POSITION,
+        );
         const tessellated = tessellatedBounds(entity);
         const core = entityBounds(entity);
 
@@ -140,4 +206,31 @@ describe('primitive bounds agreement (render / core bbox / export tessellation)'
       });
     }
   }
+});
+
+describe('instanced batch geometry matches single-mesh geometry (+Z-up)', () => {
+  it.each(['cylinder', 'sphere'] as const)(
+    '%s batch geometry has the single-mesh bounds',
+    (kind) => {
+      const doc =
+        kind === 'cylinder'
+          ? execute(createEmptyDocument(), 'add_cylinder', { radius: 1, height: 4 }).document
+          : execute(createEmptyDocument(), 'add_sphere', { radius: 1.5 }).document;
+      const entities = Object.values(doc.entities);
+      const batch = [...groupEntitiesForInstancing(entities).values()][0];
+      expect(batch).toBeDefined();
+      const batchGeometry = makeGeometry(batch!);
+      const singleGeometry =
+        kind === 'cylinder' ? buildCylinderGeometry(1, 4) : buildSphereGeometry(1.5);
+      batchGeometry.computeBoundingBox();
+      singleGeometry.computeBoundingBox();
+      expect(batchGeometry.boundingBox!.min.toArray()).toEqual(
+        singleGeometry.boundingBox!.min.toArray(),
+      );
+      expect(batchGeometry.boundingBox!.max.toArray()).toEqual(
+        singleGeometry.boundingBox!.max.toArray(),
+      );
+      if (kind === 'cylinder') expect(batchGeometry.boundingBox!.max.z).toBeCloseTo(2, 6);
+    },
+  );
 });

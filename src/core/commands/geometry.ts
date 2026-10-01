@@ -434,8 +434,7 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
       return { document: doc, summary: `add_cylinder failed: height must be finite and > 0, got ${height}.`, affected: [] };
     }
     // Default anchor for cylinder is 'center': stored position is the geometric center.
-    // AABB half-extents from center: [radius, height/2, radius].
-    // (entityBounds uses Y axis for height per three.js CylinderGeometry convention.)
+    // AABB half-extents from center: [radius, radius, height/2] (axis along +Z).
     const storedPosition = resolvePosition([radius, radius, height / 2], 'center', anchor, position);
     const id = nextId('cyl');
     const entity: Entity = {
