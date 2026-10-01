@@ -7,6 +7,7 @@
  */
 
 import type { MeshData } from '../geometry/kernel';
+import type { BuildingModel } from './building';
 export type { MeshData };
 
 export type EntityId = string;
@@ -956,6 +957,8 @@ export interface CadDocument {
    * Initialized as [] in createEmptyDocument.
    */
   driveRelationOrder: string[];
+  /** Constructive building (AEC/BIM) model; absent until the first building command. */
+  building?: BuildingModel;
 }
 
 /**

@@ -73,6 +73,7 @@ export const clearDocument: CommandDefinition<ClearDocumentParams> = {
       isMaterialsEmpty &&
       isRecipesEmpty &&
       isComponentsEmpty &&
+      doc.building === undefined &&
       (keepLayers || isLayersDefault);
 
     if (isAlreadyEmpty) {
@@ -103,6 +104,7 @@ export const clearDocument: CommandDefinition<ClearDocumentParams> = {
             layerOrder: fresh.layerOrder,
           }),
     };
+    delete nextDoc.building;
 
     const layerPart = keepLayers
       ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}`

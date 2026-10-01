@@ -1,0 +1,360 @@
+/**
+ * Rooms, and generic edits on any building element (delete, move, copy to levels).
+ * @layer core/commands/building
+ */
+
+import type { Vec2 } from '../../model/types';
+import type {
+  BuildingElement,
+  BuildingModel,
+  RoomElement,
+  WallElement,
+} from '../../model/building';
+import type { CommandDefinition, CommandResult } from '../types';
+import { isValidPolygon, offsetPolygon, polygonArea } from '../../../lib/polygon';
+import {
+  getBuilding,
+  isVec2,
+  isVec2List,
+  nextElementId,
+  nextMark,
+  noChange,
+  resolveLevel,
+  toMetres,
+  toVec2,
+  withElement,
+} from './model';
+import { regenerateBuilding } from './evaluate';
+import { wallLoop } from './structure';
+
+interface AddRoomParams {
+  name: string;
+  number?: string;
+  boundary?: Vec2[];
+  wallIds?: string[];
+  levelId?: string;
+}
+
+/**
+ * @command add_room
+ * @pure
+ * @affects creates the room outline + name/area tags on layer A-AREA
+ * @failure missing name / invalid boundary / walls not a closed loop -> no-op
+ */
+export const addRoom: CommandDefinition<AddRoomParams> = {
+  name: 'add_room',
+  description:
+    'Define a room (space) with a name and number from a plan boundary polygon, or from wallIds forming ' +
+    'a closed loop (the room then follows the inner wall faces). Draws the outline and an area tag; ' +
+    'rooms feed the room schedule and IFC spaces.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Room name, e.g. "Kitchen".' },
+      number: {
+        type: 'string',
+        description: 'Room number. Default: level index × 100 + n (e.g. "101").',
+      },
+      boundary: {
+        type: 'array',
+        items: { type: 'array', items: { type: 'number' } },
+        description: 'Closed plan polygon [[x, y], …].',
+      },
+      wallIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Alternative to boundary: ids of walls enclosing the room (closed loop).',
+      },
+      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
+    },
+    required: ['name'],
+  },
+  run: (doc, { name, number, boundary, wallIds, levelId }): CommandResult => {
+    if (typeof name !== 'string' || name.trim() === '') {
+      return noChange(doc, 'add_room failed: name is required.');
+    }
+    const building = getBuilding(doc);
+    let outline: Vec2[] | null = null;
+    if (boundary !== undefined) {
+      outline = isVec2List(boundary, 3) ? boundary.map(toVec2) : null;
+    } else if (Array.isArray(wallIds)) {
+      const walls = wallIds.map((id) => building.elements[id]);
+      if (walls.every((wall): wall is WallElement => wall?.category === 'wall')) {
+        const loop = wallLoop(walls);
+        const halfThickness = Math.max(...walls.map((wall) => wall.thickness)) / 2;
+        outline = loop ? offsetPolygon(loop, -halfThickness).map(toVec2) : null;
+      }
+    }
+    if (!outline || !isValidPolygon(outline)) {
+      return noChange(
+        doc,
+        'add_room failed: give a boundary of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.',
+      );
+    }
+    const resolution = resolveLevel(doc, building, levelId);
+    if (!resolution.ok) return noChange(doc, `add_room failed: ${resolution.reason}.`);
+    const levelIndex = resolution.building.levelOrder.indexOf(resolution.level.id);
+    const roomsOnLevel = Object.values(resolution.building.elements).filter(
+      (element) => element.category === 'room' && element.levelId === resolution.level.id,
+    ).length;
+    const room: RoomElement = {
+      id: nextElementId(resolution.building, 'room'),
+      category: 'room',
+      mark: number?.trim() || String(levelIndex * 100 + roomsOnLevel + 1).padStart(3, '0'),
+      entityIds: [],
+      levelId: resolution.level.id,
+      name: name.trim(),
+      boundary: outline,
+    };
+    const document = regenerateBuilding(doc, withElement(resolution.building, room));
+    const squareMetres = polygonArea(outline) * toMetres(doc, 1) ** 2;
+    return {
+      document,
+      summary: `Added room ${room.mark} "${room.name}" (${room.id}) on ${resolution.level.name}: ${squareMetres.toFixed(2)} m².`,
+      affected: document.building?.elements[room.id]?.entityIds ?? [],
+      data: { elementId: room.id, areaSquareMetres: squareMetres },
+    };
+  },
+};
+
+/** Element ids plus the openings hosted by any wall among them. */
+function withHostedOpenings(building: BuildingModel, ids: ReadonlyArray<string>): Set<string> {
+  const result = new Set(ids);
+  for (const element of Object.values(building.elements)) {
+    if (
+      (element.category === 'door' || element.category === 'window') &&
+      result.has(element.hostId)
+    ) {
+      result.add(element.id);
+    }
+  }
+  return result;
+}
+
+interface DeleteBuildingElementParams {
+  elementIds: string[];
+}
+
+/**
+ * @command delete_building_element
+ * @pure
+ * @affects removes the elements' evaluated entities (walls take their doors/windows along)
+ * @failure no known ids -> no-op
+ */
+export const deleteBuildingElement: CommandDefinition<DeleteBuildingElementParams> = {
+  name: 'delete_building_element',
+  annotations: { destructive: true },
+  description:
+    'Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, ' +
+    'grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      elementIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Element ids, e.g. ["wall-2", "door-1"].',
+      },
+    },
+    required: ['elementIds'],
+  },
+  run: (doc, { elementIds }): CommandResult => {
+    const building = getBuilding(doc);
+    const known = Array.isArray(elementIds)
+      ? elementIds.filter((id) => typeof id === 'string' && building.elements[id] !== undefined)
+      : [];
+    if (known.length === 0) {
+      return noChange(doc, 'delete_building_element: none of the given ids is a building element.');
+    }
+    const doomed = withHostedOpenings(building, known);
+    const elements = { ...building.elements };
+    const removedEntityIds: string[] = [];
+    for (const id of doomed) {
+      removedEntityIds.push(...(elements[id]?.entityIds ?? []));
+      delete elements[id];
+    }
+    const next: BuildingModel = {
+      ...building,
+      elements,
+      elementOrder: building.elementOrder.filter((id) => !doomed.has(id)),
+    };
+    return {
+      document: regenerateBuilding(doc, next),
+      summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.`,
+      affected: removedEntityIds,
+    };
+  },
+};
+
+function translated(element: BuildingElement, dx: number, dy: number): BuildingElement {
+  const shift = (point: Vec2): Vec2 => [point[0] + dx, point[1] + dy];
+  switch (element.category) {
+    case 'grid':
+    case 'wall':
+    case 'beam':
+      return { ...element, start: shift(element.start), end: shift(element.end) };
+    case 'slab':
+    case 'room':
+      return { ...element, boundary: element.boundary.map(shift) };
+    case 'column':
+      return { ...element, location: shift(element.location) };
+    case 'stair':
+      return { ...element, start: shift(element.start) };
+    case 'door':
+    case 'window':
+      return element;
+  }
+}
+
+interface MoveBuildingElementParams {
+  elementIds: string[];
+  delta: Vec2;
+}
+
+/**
+ * @command move_building_element
+ * @pure
+ * @affects regenerates the moved elements (hosted openings move with their wall)
+ * @failure no known ids / invalid delta -> no-op
+ */
+export const moveBuildingElement: CommandDefinition<MoveBuildingElementParams> = {
+  name: 'move_building_element',
+  description:
+    'Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide ' +
+    'an opening along its wall use update_opening). Corner joins are recomputed.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      elementIds: { type: 'array', items: { type: 'string' }, description: 'Element ids to move.' },
+      delta: {
+        type: 'array',
+        items: { type: 'number' },
+        description: 'Plan translation [dx, dy].',
+      },
+    },
+    required: ['elementIds', 'delta'],
+  },
+  run: (doc, { elementIds, delta }): CommandResult => {
+    if (!isVec2(delta))
+      return noChange(doc, 'move_building_element failed: delta must be [dx, dy].');
+    const building = getBuilding(doc);
+    const known = Array.isArray(elementIds)
+      ? elementIds.filter((id) => building.elements[id] !== undefined)
+      : [];
+    if (known.length === 0) {
+      return noChange(doc, 'move_building_element: none of the given ids is a building element.');
+    }
+    let next = building;
+    for (const id of known) {
+      const element = building.elements[id] as BuildingElement;
+      next = withElement(next, translated(element, delta[0], delta[1]));
+    }
+    const document = regenerateBuilding(doc, next);
+    const moved = withHostedOpenings(building, known);
+    return {
+      document,
+      summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.`,
+      affected: [...moved].flatMap((id) => document.building?.elements[id]?.entityIds ?? []),
+    };
+  },
+};
+
+interface CopyLevelElementsParams {
+  sourceLevelId: string;
+  targetLevelIds: string[];
+  categories?: string[];
+}
+
+const COPYABLE = ['wall', 'slab', 'column', 'beam', 'stair', 'room'] as const;
+
+/**
+ * @command copy_level_elements
+ * @pure
+ * @affects duplicates the source level's elements (and hosted openings) onto each target level
+ * @failure unknown levels / nothing to copy -> no-op
+ */
+export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
+  name: 'copy_level_elements',
+  description:
+    'Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the ' +
+    'source level onto each target level (typical floors of a multi-storey building). Optionally restrict ' +
+    'to some categories.',
+  paramsSchema: {
+    type: 'object',
+    properties: {
+      sourceLevelId: { type: 'string', description: 'Level to copy from.' },
+      targetLevelIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Levels to copy to.',
+      },
+      categories: {
+        type: 'array',
+        items: { type: 'string', enum: [...COPYABLE] },
+        description: `Subset of categories to copy (${COPYABLE.join(', ')}). Default all.`,
+      },
+    },
+    required: ['sourceLevelId', 'targetLevelIds'],
+  },
+  run: (doc, { sourceLevelId, targetLevelIds, categories }): CommandResult => {
+    const building = getBuilding(doc);
+    const targets = Array.isArray(targetLevelIds) ? targetLevelIds : [];
+    const missing = [sourceLevelId, ...targets].filter((id) => !building.levels[id]);
+    if (missing.length > 0 || targets.length === 0) {
+      return noChange(
+        doc,
+        `copy_level_elements failed: unknown or missing level(s) ${missing.join(', ') || '(no targets)'}.`,
+      );
+    }
+    const allowed = new Set<string>(categories && categories.length > 0 ? categories : COPYABLE);
+    const sourceElements = building.elementOrder
+      .map((id) => building.elements[id])
+      .filter(
+        (element): element is Exclude<BuildingElement, { category: 'grid' | 'door' | 'window' }> =>
+          element !== undefined &&
+          'levelId' in element &&
+          element.levelId === sourceLevelId &&
+          allowed.has(element.category),
+      );
+    if (sourceElements.length === 0) {
+      return noChange(doc, `copy_level_elements: level ${sourceLevelId} has nothing to copy.`);
+    }
+    let next = building;
+    const created: string[] = [];
+    for (const targetLevelId of targets) {
+      if (targetLevelId === sourceLevelId) continue;
+      const levelIndex = next.levelOrder.indexOf(targetLevelId);
+      for (const element of sourceElements) {
+        const id = nextElementId(next, element.category);
+        const mark =
+          element.category === 'room'
+            ? `${levelIndex}${element.mark.slice(-2)}`
+            : nextMark(next, element.category);
+        next = withElement(next, { ...element, id, mark, levelId: targetLevelId, entityIds: [] });
+        created.push(id);
+        if (element.category !== 'wall') continue;
+        for (const openingId of building.elementOrder) {
+          const opening = building.elements[openingId];
+          if (!opening || (opening.category !== 'door' && opening.category !== 'window')) continue;
+          if (opening.hostId !== element.id) continue;
+          const copyId = nextElementId(next, opening.category);
+          next = withElement(next, {
+            ...opening,
+            id: copyId,
+            mark: nextMark(next, opening.category),
+            hostId: id,
+            entityIds: [],
+          });
+          created.push(copyId);
+        }
+      }
+    }
+    const document = regenerateBuilding(doc, next);
+    return {
+      document,
+      summary: `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targets.join(', ')}: ${created.length} new element(s).`,
+      affected: created.flatMap((id) => document.building?.elements[id]?.entityIds ?? []),
+      data: { elementIds: created },
+    };
+  },
+};

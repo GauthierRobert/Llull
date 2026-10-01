@@ -99,6 +99,7 @@ import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
 import { deleteEntities } from './deleteMany';
+import { buildingCommands } from './building';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
   if (typeof value === 'number') return !Number.isFinite(value);
@@ -329,6 +330,7 @@ const rawDefinitions = [
   drawBeltAround,
   distributeAlongPath,
   deleteEntities,
+  ...buildingCommands,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 const definitions: ReadonlyArray<CommandDefinition<unknown>> = rawDefinitions.map(guardCommand);
