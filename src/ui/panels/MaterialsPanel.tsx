@@ -112,10 +112,15 @@ function CreateMaterialForm(): React.ReactElement {
 
   const isValid =
     name.trim() !== '' &&
-    !isNaN(densityNum) && densityNum > 0 &&
+    !isNaN(densityNum) &&
+    densityNum > 0 &&
     /^#[0-9a-fA-F]{6}$/.test(color) &&
-    !isNaN(metalnessNum) && metalnessNum >= 0 && metalnessNum <= 1 &&
-    !isNaN(roughnessNum) && roughnessNum >= 0 && roughnessNum <= 1;
+    !isNaN(metalnessNum) &&
+    metalnessNum >= 0 &&
+    metalnessNum <= 1 &&
+    !isNaN(roughnessNum) &&
+    roughnessNum >= 0 &&
+    roughnessNum <= 1;
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {

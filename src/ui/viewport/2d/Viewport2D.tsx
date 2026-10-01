@@ -340,13 +340,7 @@ function SceneContents2D({
   return (
     <>
       {/* ---- Camera: top-down orthographic, looking along -Z ---- */}
-      <OrthographicCamera
-        makeDefault
-        position={[0, 0, 100]}
-        near={0.01}
-        far={10000}
-        zoom={50}
-      />
+      <OrthographicCamera makeDefault position={[0, 0, 100]} near={0.01} far={10000} zoom={50} />
 
       {/* ---- Controls: pan + zoom only; disabled while drawing or modifying ---- */}
       <MapControls
@@ -410,8 +404,14 @@ function SceneContents2D({
 // ---------------------------------------------------------------------------
 
 export function Viewport2D(): React.ReactElement {
-  const { activeTool, collectedPoints, setActiveTool: setDrawTool, handleClick, finishPolyline, finishSpline } =
-    useDrawTool();
+  const {
+    activeTool,
+    collectedPoints,
+    setActiveTool: setDrawTool,
+    handleClick,
+    finishPolyline,
+    finishSpline,
+  } = useDrawTool();
 
   const {
     activeTool: activeModifyTool,

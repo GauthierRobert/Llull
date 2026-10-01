@@ -15,6 +15,7 @@ import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { MAX_TEMPLATE_ENTITIES } from './limits';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -114,6 +115,9 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       if (!Number.isFinite(params.count) || params.count < 1 || !Number.isInteger(params.count)) {
         return `bolt_hole_pattern: count must be an integer >= 1 (got ${params.count}).`;
       }
+      if (params.count > MAX_TEMPLATE_ENTITIES) {
+        return `bolt_hole_pattern: count ${params.count} exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`;
+      }
       if (!Number.isFinite(params.boltCircleRadius) || params.boltCircleRadius <= 0) {
         return `bolt_hole_pattern: boltCircleRadius must be > 0 (got ${params.boltCircleRadius}).`;
       }
@@ -148,8 +152,15 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       if (params.boreRadius >= params.outerRadius) {
         return `flange: boreRadius (${params.boreRadius}) must be < outerRadius (${params.outerRadius}).`;
       }
-      if (!Number.isFinite(params.boltCount) || params.boltCount < 1 || !Number.isInteger(params.boltCount)) {
+      if (
+        !Number.isFinite(params.boltCount) ||
+        params.boltCount < 1 ||
+        !Number.isInteger(params.boltCount)
+      ) {
         return `flange: boltCount must be an integer >= 1 (got ${params.boltCount}).`;
+      }
+      if (params.boltCount + 2 > MAX_TEMPLATE_ENTITIES) {
+        return `flange: boltCount ${params.boltCount} exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`;
       }
       if (!Number.isFinite(params.boltCircleRadius) || params.boltCircleRadius <= 0) {
         return `flange: boltCircleRadius must be > 0 (got ${params.boltCircleRadius}).`;
@@ -189,11 +200,22 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       if (!Number.isFinite(params.height) || params.height <= 0) {
         return `rectangular_plate_with_holes: height must be > 0 (got ${params.height}).`;
       }
-      if (!Number.isFinite(params.holeRows) || params.holeRows < 1 || !Number.isInteger(params.holeRows)) {
+      if (
+        !Number.isFinite(params.holeRows) ||
+        params.holeRows < 1 ||
+        !Number.isInteger(params.holeRows)
+      ) {
         return `rectangular_plate_with_holes: holeRows must be an integer >= 1 (got ${params.holeRows}).`;
       }
-      if (!Number.isFinite(params.holeCols) || params.holeCols < 1 || !Number.isInteger(params.holeCols)) {
+      if (
+        !Number.isFinite(params.holeCols) ||
+        params.holeCols < 1 ||
+        !Number.isInteger(params.holeCols)
+      ) {
         return `rectangular_plate_with_holes: holeCols must be an integer >= 1 (got ${params.holeCols}).`;
+      }
+      if (params.holeRows * params.holeCols + 1 > MAX_TEMPLATE_ENTITIES) {
+        return `rectangular_plate_with_holes: holeRows*holeCols (${params.holeRows * params.holeCols}) exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`;
       }
       if (!Number.isFinite(params.holeRadius) || params.holeRadius <= 0) {
         return `rectangular_plate_with_holes: holeRadius must be > 0 (got ${params.holeRadius}).`;
@@ -215,8 +237,10 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       // Grid of holes, centered in the plate with margin inset.
       // Plate lower-left corner is at position (work-plane local origin),
       // so hole local coords are offset from [0,0] by marginX/marginY.
-      const colSpacing = params.holeCols > 1 ? (params.width - 2 * params.marginX) / (params.holeCols - 1) : 0;
-      const rowSpacing = params.holeRows > 1 ? (params.height - 2 * params.marginY) / (params.holeRows - 1) : 0;
+      const colSpacing =
+        params.holeCols > 1 ? (params.width - 2 * params.marginX) / (params.holeCols - 1) : 0;
+      const rowSpacing =
+        params.holeRows > 1 ? (params.height - 2 * params.marginY) / (params.holeRows - 1) : 0;
 
       for (let row = 0; row < params.holeRows; row++) {
         for (let col = 0; col < params.holeCols; col++) {
@@ -292,7 +316,8 @@ export const instantiateTemplate: CommandDefinition<InstantiateTemplateParams> =
       },
       color: {
         type: 'string',
-        description: 'Hex color string for all created entities, e.g. "#4a90d9". Defaults to "#4a90d9".',
+        description:
+          'Hex color string for all created entities, e.g. "#4a90d9". Defaults to "#4a90d9".',
       },
     },
     required: ['template', 'params'],

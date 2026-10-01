@@ -73,9 +73,11 @@ function drawVerticalPolyline(
  * Draw a 2-pulley belt (closed polyline loop) and return the path entity id
  * plus the chord-approximated total arc length.
  */
-function drawBeltLoop(
-  doc: ReturnType<typeof createEmptyDocument>,
-): { doc: ReturnType<typeof createEmptyDocument>; pathId: string; totalLength: number } {
+function drawBeltLoop(doc: ReturnType<typeof createEmptyDocument>): {
+  doc: ReturnType<typeof createEmptyDocument>;
+  pathId: string;
+  totalLength: number;
+} {
   const result = execute(doc, 'draw_belt_around', {
     pulleys: [
       { center: [0, 0], radius: 5 },
@@ -355,7 +357,7 @@ describe('distribute_along_path', () => {
     const xValues = positions.map((p) => p[0]);
     const minX = Math.min(...xValues);
     const maxX = Math.max(...xValues);
-    expect(minX).toBeLessThan(5);   // instances near the left pulley (x=0, r=5)
+    expect(minX).toBeLessThan(5); // instances near the left pulley (x=0, r=5)
     expect(maxX).toBeGreaterThan(25); // instances near the right pulley (x=30, r=5)
   });
 

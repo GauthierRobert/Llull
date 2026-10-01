@@ -1,6 +1,15 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '@ui/App';
+import { AppErrorBoundary } from '@ui/components/AppErrorBoundary';
+import '@fontsource/geist-sans/latin-300.css';
+import '@fontsource/geist-sans/latin-400.css';
+import '@fontsource/geist-sans/latin-500.css';
+import '@fontsource/geist-sans/latin-600.css';
+import '@fontsource/geist-sans/latin-700.css';
+import '@fontsource/geist-mono/latin-400.css';
+import '@fontsource/geist-mono/latin-500.css';
+import '@fontsource/geist-mono/latin-600.css';
 import '@ui/styles.css';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@ui/geometry/manifoldKernel';
@@ -43,6 +52,8 @@ if (!rootEl) throw new Error('Root element #root not found.');
 
 createRoot(rootEl).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 );

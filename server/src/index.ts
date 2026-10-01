@@ -14,15 +14,31 @@
  *
  * /live is intentionally OUTSIDE the /mcp bearer-auth middleware because
  * EventSource (browser API) cannot send Authorization headers.
- * CORS already permits GET from http://localhost:5173.
+ * /command, /undo, /redo are guarded by `guardMutation` (see security.ts) and rate limited.
+ *
+ * Env: PORT (3001), HOST (127.0.0.1), LLULL_ALLOWED_ORIGINS, LLULL_BODY_LIMIT (2mb),
+ * MCP_AUTH_TOKEN, LLULL_REQUIRE_TOKEN_FOR_REST, LLULL_ALLOWED_HOSTS, LLULL_ALLOW_UNAUTHENTICATED, LLULL_REST_RATE_LIMIT_*; see server/README.md.
  */
 
+import './loadEnv';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { buildMcpRouter } from './mcp';
 import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
-import { subscribeLive } from './liveDocument';
+import { subscribeLive, flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
+import { closeAllSessions } from './mcp';
+import {
+  getAllowedOrigins,
+  guardMutation,
+  hostAllowlist,
+  checkBindSafety,
+  buildRestRateLimiter,
+  sanitizeFilename,
+  jsonErrorHandler,
+  isLoopbackAddress,
+} from './security';
+import type { Server } from 'http';
 import { applyCommand, undo, redo } from './commandBus';
 import type { ExportStlData } from '@core/commands/export';
 
@@ -32,29 +48,23 @@ import type { ExportStlData } from '@core/commands/export';
 
 const app = express();
 
-app.use(express.json({ limit: '2mb' }));
+app.use(hostAllowlist());
 
-// Allow the Vite dev server and common localhost origins.
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
-];
+app.use(express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' }));
 
+// Disallowed origins simply get no CORS headers (browser blocks); no error is raised.
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. curl, Postman, same-origin).
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS: origin ${origin} not allowed`));
-      }
+      callback(null, !origin || getAllowedOrigins().includes(origin));
     },
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
+
+const restLimiter = buildRestRateLimiter();
+const mutationGuard = guardMutation();
 
 // ---------------------------------------------------------------------------
 // Routes
@@ -68,21 +78,21 @@ app.get('/health', (_req: Request, res: Response) => {
  * GET /live — Server-Sent Events stream of the shared CadDocument.
  *
  * Contract:
- *   - On connect: immediately emits one SSE message containing the current
- *     document snapshot: `data: <JSON>\n\n`
- *   - On every MCP mutation: emits a new message with the updated document.
+ *   - On connect: immediately emits a `snapshot` event with the current document.
+ *   - On every mutation: emits a `patch` event (a `snapshot` after undo/redo).
  *   - Keepalive: sends `:keepalive\n\n` every ~25 s to prevent proxy timeouts.
  *   - On client disconnect: cleans up the subscription and the keepalive timer.
  *
- * Message format (standard SSE `data:` event — no `event:` field):
- *   data: <JSON-serialized CadDocument>\n\n
+ * Named SSE events:
+ *   event: snapshot  data: <CadDocument>   — on connect and after undo/redo
+ *   event: patch     data: <DocPatch>      — entity-level delta after each mutation
  *
  * The browser connects with:
  *   const es = new EventSource('http://localhost:3001/live');
- *   es.onmessage = (e) => { const doc = JSON.parse(e.data); ... };
+ *   es.addEventListener('snapshot', (e) => { ... });
+ *   es.addEventListener('patch', (e) => { ... });
  *
  * No auth required (EventSource cannot send Authorization headers).
- * CORS already allows GET from http://localhost:5173.
  */
 app.get('/live', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -128,9 +138,9 @@ app.get('/live', (req: Request, res: Response) => {
  * Response 400: { error } — missing or malformed body.
  *
  * Mutations automatically broadcast to all /live SSE subscribers.
- * CORS already allows POST from http://localhost:5173.
+ * Guarded by `guardMutation` (origin allowlist / bearer token) and rate limited.
  */
-app.post('/command', (req: Request, res: Response) => {
+app.post('/command', restLimiter, mutationGuard, (req: Request, res: Response) => {
   const body = req.body as unknown;
   if (typeof body !== 'object' || body === null || !('name' in body)) {
     res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
@@ -154,7 +164,7 @@ app.post('/command', (req: Request, res: Response) => {
  * If the undo stack is empty, returns summary "Nothing to undo." — not an error.
  * Broadcasts the restored document to all /live SSE subscribers when a step is available.
  */
-app.post('/undo', (_req: Request, res: Response) => {
+app.post('/undo', restLimiter, mutationGuard, (_req: Request, res: Response) => {
   res.status(200).json(undo());
 });
 
@@ -167,7 +177,7 @@ app.post('/undo', (_req: Request, res: Response) => {
  * If the redo stack is empty, returns summary "Nothing to redo." — not an error.
  * Broadcasts the redone document to all /live SSE subscribers when a step is available.
  */
-app.post('/redo', (_req: Request, res: Response) => {
+app.post('/redo', restLimiter, mutationGuard, (_req: Request, res: Response) => {
   res.status(200).json(redo());
 });
 
@@ -181,7 +191,7 @@ app.post('/redo', (_req: Request, res: Response) => {
  *
  * Query params:
  *   format  — 'ascii' (default) or 'binary'. Anything other than 'binary' → 'ascii'.
- *   name    — solid name embedded in the STL header and used as the download filename
+ *   name    — solid name / download filename; sanitized to [A-Za-z0-9._-], max 64 chars
  *             (default 'llull').  The response Content-Disposition will be
  *             `attachment; filename="<name>.stl"`.
  *
@@ -196,12 +206,11 @@ app.post('/redo', (_req: Request, res: Response) => {
  * No auth required.
  * CORS already allows GET from http://localhost:5173.
  */
-app.get('/export/stl', (req: Request, res: Response) => {
+app.get('/export/stl', restLimiter, (req: Request, res: Response) => {
   const rawFormat = req.query['format'];
   const format: 'ascii' | 'binary' = rawFormat === 'binary' ? 'binary' : 'ascii';
 
-  const rawName = req.query['name'];
-  const name: string = typeof rawName === 'string' && rawName.length > 0 ? rawName : 'llull';
+  const name = sanitizeFilename(req.query['name']);
 
   const result = applyCommand('export_stl', { format, name });
 
@@ -237,6 +246,8 @@ app.use('/ui-bridge', buildUiBridgeRouter());
 // See server/src/mcp.ts for the implementation.
 app.use('/mcp', buildMcpRouter(inMemoryBridge));
 
+app.use(jsonErrorHandler);
+
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
@@ -244,22 +255,77 @@ app.use('/mcp', buildMcpRouter(inMemoryBridge));
 const PORT = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 3001;
 
 /**
- * Only start listening when this file is the process entry-point.
- * When imported by tests (supertest, vitest) the module-level `app` is exported
- * without binding a port — supertest creates its own ephemeral server.
- *
- * Detection: `require.main === module` works for CommonJS entry-points (tsx / node dist/).
- * The `TEST` env var provides an explicit escape hatch for environments where the
- * detection is unreliable.
+ * Bind address. Default 127.0.0.1: llull is a local tool and /command is unauthenticated for
+ * the browser UI, so it must not be reachable from the network unless explicitly opted in
+ * (`HOST=0.0.0.0`, ideally together with MCP_AUTH_TOKEN).
+ */
+const HOST = process.env['HOST'] ?? '127.0.0.1';
+
+const SESSION_CLOSE_TIMEOUT_MS = 3_000;
+const DRAIN_TIMEOUT_MS = 5_000;
+
+const delay = (ms: number): Promise<void> =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
+
+/**
+ * Stop accepting connections, end SSE/MCP streams, drain, flush autosave. Resolves when closed.
+ * Autosave is switched to synchronous-write mode first so an edit finishing mid-drain is persisted.
+ */
+export async function shutdown(server: Server): Promise<void> {
+  stopAutosave();
+  const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+  closeAllSubscribers();
+  await Promise.race([closeAllSessions(), delay(SESSION_CLOSE_TIMEOUT_MS)]);
+  server.closeIdleConnections();
+  await Promise.race([closed, delay(DRAIN_TIMEOUT_MS)]);
+  server.closeAllConnections();
+  flushAutosave();
+}
+
+/** Listen on HOST:PORT, log startup, install SIGTERM/SIGINT/uncaughtException handlers. */
+export function startServer(port: number = PORT, host: string = HOST): Server {
+  const refusal = checkBindSafety(host);
+  if (refusal !== null) throw new Error(refusal);
+  if (!isLoopbackAddress(host) && !process.env['MCP_AUTH_TOKEN']) {
+    console.warn(
+      '[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).',
+    );
+  }
+  const server = app.listen(port, host, () => {
+    console.warn(`[llull-server] listening on http://${host}:${port}`);
+  });
+  let stopping = false;
+  const onSignal = (signal: string): void => {
+    if (stopping) {
+      console.warn(`[llull-server] second ${signal}, forcing exit`);
+      flushAutosave();
+      process.exit(1);
+    }
+    stopping = true;
+    console.warn(`[llull-server] ${signal} received, shutting down`);
+    shutdown(server)
+      .catch((err: unknown) => console.error('[llull-server] shutdown failed:', err))
+      .finally(() => {
+        flushAutosave();
+        process.exit(0);
+      });
+  };
+  process.on('SIGTERM', () => onSignal('SIGTERM'));
+  process.on('SIGINT', () => onSignal('SIGINT'));
+  process.on('uncaughtException', (err: Error) => {
+    console.error('[llull-server] uncaughtException:', err);
+    flushAutosave();
+    process.exit(1);
+  });
+  return server;
+}
+
+/**
+ * Only start listening when this file is the process entry-point (tests import `app` and use
+ * supertest's ephemeral server). `TEST=true` is an explicit escape hatch.
  */
 if (require.main === module && process.env['TEST'] !== 'true') {
-  app.listen(PORT, () => {
-    if (!process.env['MCP_AUTH_TOKEN']) {
-      console.warn(
-        '[warn] MCP_AUTH_TOKEN is not set — /mcp endpoint is unprotected. Set it in production.',
-      );
-    }
-  });
+  startServer();
 }
 
 export { app };

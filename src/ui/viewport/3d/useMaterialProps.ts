@@ -134,13 +134,5 @@ export function useMaterialProps({
         };
       }
     }
-  }, [
-    displayMode,
-    selected,
-    color,
-    roughness,
-    metalness,
-    envMapIntensity,
-    pbrOverride,
-  ]);
+  }, [displayMode, selected, color, roughness, metalness, envMapIntensity, pbrOverride]);
 }

@@ -39,6 +39,10 @@ function resetStore(): void {
     lastSummary: null,
     canUndo: false,
     canRedo: false,
+    liveStatus: 'connecting',
+    hasUnsyncedLocalEdits: false,
+    localUndoStack: [],
+    localRedoStack: [],
   });
 }
 
@@ -66,7 +70,13 @@ describe('undo — server-authoritative', () => {
   });
 
   it('undo() POSTs to /undo', async () => {
-    const spy = mockFetch({ summary: 'Undone.', affected: [], isError: false, canUndo: false, canRedo: true });
+    const spy = mockFetch({
+      summary: 'Undone.',
+      affected: [],
+      isError: false,
+      canUndo: false,
+      canRedo: true,
+    });
 
     getState().undo();
     await flushPromises();
@@ -123,7 +133,7 @@ describe('undo — server-authoritative', () => {
     await flushPromises();
 
     expect(getState().liveStatus).toBe('disconnected');
-    expect(getState().lastSummary).toContain('Network');
+    expect(getState().lastSummary).toContain('ran locally');
   });
 });
 
@@ -142,7 +152,13 @@ describe('redo — server-authoritative', () => {
   });
 
   it('redo() POSTs to /redo', async () => {
-    const spy = mockFetch({ summary: 'Redone.', affected: [], isError: false, canUndo: true, canRedo: false });
+    const spy = mockFetch({
+      summary: 'Redone.',
+      affected: [],
+      isError: false,
+      canUndo: true,
+      canRedo: false,
+    });
 
     getState().redo();
     await flushPromises();
@@ -179,7 +195,7 @@ describe('redo — server-authoritative', () => {
     await flushPromises();
 
     expect(getState().liveStatus).toBe('disconnected');
-    expect(getState().lastSummary).toContain('Network');
+    expect(getState().lastSummary).toContain('ran locally');
   });
 });
 
@@ -203,7 +219,13 @@ describe('canUndo / canRedo state', () => {
   });
 
   it('dispatch updates canUndo/canRedo from server response', async () => {
-    mockFetch({ summary: 'Box added.', affected: ['e1'], isError: false, canUndo: true, canRedo: false });
+    mockFetch({
+      summary: 'Box added.',
+      affected: ['e1'],
+      isError: false,
+      canUndo: true,
+      canRedo: false,
+    });
 
     getState().dispatch('add_box', { size: [1, 1, 1] });
     await flushPromises();

@@ -275,7 +275,7 @@ describe('collectSnapCandidates', () => {
     const endpoints = candidates.filter((c) => c.type === 'endpoint');
     // start (angle=0): [5, 0], end (angle=π): [-5, 0]
     expect(endpoints).toContainEqual(expect.objectContaining({ x: 5, y: 0 }));
-    expect(endpoints.some((e) => Math.abs(e.x - (-5)) < 1e-6 && Math.abs(e.y) < 1e-6)).toBe(true);
+    expect(endpoints.some((e) => Math.abs(e.x - -5) < 1e-6 && Math.abs(e.y) < 1e-6)).toBe(true);
 
     const midpoints = candidates.filter((c) => c.type === 'midpoint');
     // midAngle = π/2 → [0, 5]
@@ -316,7 +316,11 @@ describe('collectSnapCandidates', () => {
     const entity: PolylineEntity = {
       id: 'p1',
       kind: 'polyline',
-      points: [[0, 0], [4, 0], [4, 3]],
+      points: [
+        [0, 0],
+        [4, 0],
+        [4, 3],
+      ],
       closed: false,
       position: [0, 0, 0],
       rotation: [0, 0, 0],
@@ -511,7 +515,11 @@ describe('applyOrthoPolar', () => {
     const length = 5;
     const angle = (22.5 * Math.PI) / 180;
     const cursor: [number, number] = [length * Math.cos(angle), length * Math.sin(angle)];
-    const result = applyOrthoPolar(origin, cursor, { ortho: false, polar: true, polarIncrement: 0 });
+    const result = applyOrthoPolar(origin, cursor, {
+      ortho: false,
+      polar: true,
+      polarIncrement: 0,
+    });
     expect(Number.isNaN(result[0])).toBe(false);
     expect(Number.isNaN(result[1])).toBe(false);
     // Falls back to 15° increment → nearest is 30°.
@@ -755,7 +763,6 @@ describe('nearestOnArc', () => {
   });
 });
 
-
 // ---------------------------------------------------------------------------
 // collectSnapCandidates — advanced snaps wired in
 // ---------------------------------------------------------------------------
@@ -901,5 +908,4 @@ describe('snap priority — advanced types', () => {
     const result = snap([5, 0], candidates, 1, 0.5);
     expect(result.type).toBe('extension');
   });
-
 });

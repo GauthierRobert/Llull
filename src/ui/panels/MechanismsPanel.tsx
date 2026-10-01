@@ -75,7 +75,11 @@ interface ConstraintRowProps {
   onHighlight: (id: string) => void;
 }
 
-function ConstraintRow({ constraint, highlighted, onHighlight }: ConstraintRowProps): React.ReactElement {
+function ConstraintRow({
+  constraint,
+  highlighted,
+  onHighlight,
+}: ConstraintRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const handleDelete = useCallback(
@@ -117,8 +121,12 @@ function ConstraintRow({ constraint, highlighted, onHighlight }: ConstraintRowPr
       style={{ cursor: 'pointer' }}
     >
       <span style={kindChipStyle(chipColor)}>{constraint.kind}</span>
-      <span className="mechanisms-row-info" style={{ flex: 1, fontSize: 12, color: 'var(--color-text-secondary, #9aa)' }}>
-        {aRef} → {bRef}{value}
+      <span
+        className="mechanisms-row-info"
+        style={{ flex: 1, fontSize: 12, color: 'var(--color-text-secondary, #9aa)' }}
+      >
+        {aRef} → {bRef}
+        {value}
       </span>
       <button
         type="button"
@@ -196,7 +204,9 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   }, [onHighlight, joint.id]);
 
   const chipColor = JOINT_CHIP_COLOR[joint.kind] ?? '#888';
-  const axisLabel = Array.isArray(joint.axis) ? `[${(joint.axis as number[]).join(',')}]` : joint.axis;
+  const axisLabel = Array.isArray(joint.axis)
+    ? `[${(joint.axis as number[]).join(',')}]`
+    : joint.axis;
   const unit = joint.kind === 'revolute' ? 'rad' : 'mm';
 
   return (
@@ -209,7 +219,10 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
       style={{ cursor: 'pointer' }}
     >
       <span style={kindChipStyle(chipColor)}>{joint.kind}</span>
-      <span className="mechanisms-row-info" style={{ flex: 1, fontSize: 12, color: 'var(--color-text-secondary, #9aa)' }}>
+      <span
+        className="mechanisms-row-info"
+        style={{ flex: 1, fontSize: 12, color: 'var(--color-text-secondary, #9aa)' }}
+      >
         {joint.a.instanceId.slice(-6)} → {joint.b.instanceId.slice(-6)} · axis {axisLabel}
       </span>
       <input
@@ -224,7 +237,9 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
         style={{ width: 64, marginRight: 4, fontSize: 12 }}
         onClick={(e) => e.stopPropagation()}
       />
-      <span style={{ fontSize: 10, marginRight: 6, color: 'var(--color-text-secondary, #9aa)' }}>{unit}</span>
+      <span style={{ fontSize: 10, marginRight: 6, color: 'var(--color-text-secondary, #9aa)' }}>
+        {unit}
+      </span>
       <button
         type="button"
         className="mechanisms-action-btn mechanisms-action-btn--danger"
@@ -264,16 +279,15 @@ function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactEleme
       : '';
 
   return (
-    <li
-      className="mechanisms-row"
-      data-testid={`drive-row-${relation.id}`}
-    >
+    <li className="mechanisms-row" data-testid={`drive-row-${relation.id}`}>
       <span style={{ flex: 1, fontSize: 12, color: 'var(--color-text-secondary, #9aa)' }}>
         <span style={{ fontWeight: 600 }}>{relation.driver.slice(-6)}</span>
         {' → '}
         <span style={{ fontWeight: 600 }}>{relation.driven.slice(-6)}</span>
         {' · ratio '}
-        <span style={{ color: 'var(--color-text-primary, #ddd)' }}>{relation.ratio.toFixed(4)}</span>
+        <span style={{ color: 'var(--color-text-primary, #ddd)' }}>
+          {relation.ratio.toFixed(4)}
+        </span>
         {offsetLabel}
       </span>
       <button
@@ -322,7 +336,14 @@ function Section({ title, count, children, defaultOpen = true }: SectionProps): 
           gap: 6,
         }}
       >
-        <span style={{ fontSize: 10, opacity: 0.6, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
+        <span
+          style={{
+            fontSize: 10,
+            opacity: 0.6,
+            transform: open ? 'rotate(90deg)' : 'none',
+            transition: 'transform 0.15s',
+          }}
+        >
           ▶
         </span>
         <span style={{ fontWeight: 600, fontSize: 12 }}>{title}</span>
@@ -340,7 +361,11 @@ function Section({ title, count, children, defaultOpen = true }: SectionProps): 
           {count}
         </span>
       </button>
-      {open && <div className="mechanisms-section-body" style={{ paddingBottom: 4 }}>{children}</div>}
+      {open && (
+        <div className="mechanisms-section-body" style={{ paddingBottom: 4 }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -366,7 +391,8 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
 
   const handleHighlightConstraint = useCallback(
     (id: string) => {
-      const alreadySelected = mechanismSelection?.kind === 'constraint' && mechanismSelection.id === id;
+      const alreadySelected =
+        mechanismSelection?.kind === 'constraint' && mechanismSelection.id === id;
       setMechanismSelection(alreadySelected ? null : { kind: 'constraint', id });
     },
     [mechanismSelection, setMechanismSelection],
@@ -380,9 +406,13 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
     [mechanismSelection, setMechanismSelection],
   );
 
-  const constraintList = constraintOrder.map((id) => constraints[id]).filter((c): c is Constraint => c !== undefined);
+  const constraintList = constraintOrder
+    .map((id) => constraints[id])
+    .filter((c): c is Constraint => c !== undefined);
   const jointList = jointOrder.map((id) => joints[id]).filter((j): j is Joint => j !== undefined);
-  const driveList = driveRelationOrder.map((id) => driveRelations[id]).filter((d): d is DriveRelation => d !== undefined);
+  const driveList = driveRelationOrder
+    .map((id) => driveRelations[id])
+    .filter((d): d is DriveRelation => d !== undefined);
 
   return (
     <aside
@@ -392,7 +422,10 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
       {/* ---- Section A: Constraints ---- */}
       <Section title="Constraints" count={constraintList.length}>
         {constraintList.length === 0 ? (
-          <p className="mechanisms-empty-hint" style={{ padding: '4px 12px', fontSize: 12, opacity: 0.6 }}>
+          <p
+            className="mechanisms-empty-hint"
+            style={{ padding: '4px 12px', fontSize: 12, opacity: 0.6 }}
+          >
             No constraints defined.
           </p>
         ) : (
@@ -406,7 +439,9 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
               <ConstraintRow
                 key={c.id}
                 constraint={c}
-                highlighted={mechanismSelection?.kind === 'constraint' && mechanismSelection.id === c.id}
+                highlighted={
+                  mechanismSelection?.kind === 'constraint' && mechanismSelection.id === c.id
+                }
                 onHighlight={handleHighlightConstraint}
               />
             ))}
@@ -417,7 +452,10 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
       {/* ---- Section B: Joints ---- */}
       <Section title="Joints" count={jointList.length}>
         {jointList.length === 0 ? (
-          <p className="mechanisms-empty-hint" style={{ padding: '4px 12px', fontSize: 12, opacity: 0.6 }}>
+          <p
+            className="mechanisms-empty-hint"
+            style={{ padding: '4px 12px', fontSize: 12, opacity: 0.6 }}
+          >
             No joints defined.
           </p>
         ) : (
@@ -442,7 +480,10 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
       {/* ---- Section C: Drive Relations ---- */}
       <Section title="Drive Relations" count={driveList.length}>
         {driveList.length === 0 ? (
-          <p className="mechanisms-empty-hint" style={{ padding: '4px 12px', fontSize: 12, opacity: 0.6 }}>
+          <p
+            className="mechanisms-empty-hint"
+            style={{ padding: '4px 12px', fontSize: 12, opacity: 0.6 }}
+          >
             No drive relations defined.
           </p>
         ) : (

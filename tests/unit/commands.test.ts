@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createEmptyDocument, is2D } from '@core/model/types';
 import type { Entity, TextEntity } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
@@ -259,7 +259,11 @@ describe('command layer', () => {
     doc = created.document;
     const id = created.affected[0]!;
 
-    const result = execute(doc, 'set_entity_name', { id, name: 'Left wall', tags: ['structural', 'visible'] });
+    const result = execute(doc, 'set_entity_name', {
+      id,
+      name: 'Left wall',
+      tags: ['structural', 'visible'],
+    });
     expect(result.affected).toEqual([id]);
     const entity = result.document.entities[id]!;
     expect(entity.name).toBe('Left wall');
@@ -682,7 +686,7 @@ describe('set_parameter', () => {
     const paramA = result.document.parameters['a']!;
     const paramB = result.document.parameters['b']!;
     // At least one of them must have an error (cycle detected).
-    const hasCycleError = (paramA.error !== undefined) || (paramB.error !== undefined);
+    const hasCycleError = paramA.error !== undefined || paramB.error !== undefined;
     expect(hasCycleError).toBe(true);
   });
 
@@ -896,7 +900,12 @@ describe('draw_spline', () => {
 
   it('creates one spline entity with correct through-points', () => {
     const doc = createEmptyDocument();
-    const pts = [[0, 0], [1, 2], [3, 1], [4, 3]];
+    const pts = [
+      [0, 0],
+      [1, 2],
+      [3, 1],
+      [4, 3],
+    ];
     const result = execute(doc, 'draw_spline', { points: pts });
 
     expect(result.affected).toHaveLength(1);
@@ -916,7 +925,14 @@ describe('draw_spline', () => {
 
   it('creates a closed spline when closed=true', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_spline', { points: [[0, 0], [1, 1], [2, 0]], closed: true });
+    const result = execute(doc, 'draw_spline', {
+      points: [
+        [0, 0],
+        [1, 1],
+        [2, 0],
+      ],
+      closed: true,
+    });
     const id = result.affected[0]!;
     const entity = result.document.entities[id]!;
     if (entity.kind === 'spline') {
@@ -927,7 +943,12 @@ describe('draw_spline', () => {
 
   it('is2D returns true for a spline entity', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_spline', { points: [[0, 0], [1, 1]] });
+    const result = execute(doc, 'draw_spline', {
+      points: [
+        [0, 0],
+        [1, 1],
+      ],
+    });
     const id = result.affected[0]!;
     const entity = result.document.entities[id]!;
     expect(is2D(entity)).toBe(true);
@@ -951,7 +972,13 @@ describe('draw_spline', () => {
   it('is pure — the input document is not mutated', () => {
     const doc = createEmptyDocument();
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'draw_spline', { points: [[0, 0], [1, 1], [2, 0]] });
+    execute(doc, 'draw_spline', {
+      points: [
+        [0, 0],
+        [1, 1],
+        [2, 0],
+      ],
+    });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });
@@ -982,7 +1009,13 @@ describe('scale_entity — ellipse and spline', () => {
 
   it('scales spline points uniformly by factor', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_spline', { points: [[1, 0], [2, 2], [3, 0]] }).document;
+    doc = execute(doc, 'draw_spline', {
+      points: [
+        [1, 0],
+        [2, 2],
+        [3, 0],
+      ],
+    }).document;
     const id = Object.keys(doc.entities)[0]!;
 
     const result = execute(doc, 'scale_entity', { id, factor: 3 });
@@ -1007,7 +1040,12 @@ describe('scale_entity — ellipse and spline', () => {
 
   it('scale_entity on spline is pure', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_spline', { points: [[0, 0], [1, 1]] }).document;
+    doc = execute(doc, 'draw_spline', {
+      points: [
+        [0, 0],
+        [1, 1],
+      ],
+    }).document;
     const id = Object.keys(doc.entities)[0]!;
     const snapshot = JSON.stringify(doc);
     execute(doc, 'scale_entity', { id, factor: 0.5 });
@@ -1368,7 +1406,10 @@ describe('scale_entity — ellipse and spline', () => {
     doc = a.document;
     const b = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = b.document;
-    const grouped = execute(doc, 'group_entities', { ids: [a.affected[0]!, b.affected[0]!], name: 'Wheel' });
+    const grouped = execute(doc, 'group_entities', {
+      ids: [a.affected[0]!, b.affected[0]!],
+      name: 'Wheel',
+    });
     doc = grouped.document;
     const groupId = grouped.affected[0]!;
 
@@ -1621,7 +1662,11 @@ describe('scale_entity — ellipse and spline', () => {
     const entityId = created.affected[0]!;
 
     doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 1.0 }).document;
-    doc = execute(doc, 'animate_oscillate', { targetId: entityId, amplitude: 0.5, frequency: 1.0 }).document;
+    doc = execute(doc, 'animate_oscillate', {
+      targetId: entityId,
+      amplitude: 0.5,
+      frequency: 1.0,
+    }).document;
     expect(Object.keys(doc.animations)).toHaveLength(2);
 
     const result = execute(doc, 'stop_animation', {});
@@ -1667,7 +1712,15 @@ describe('scale_entity — ellipse and spline', () => {
     // Add one spin animation.
     doc = execute(doc, 'animate_spin', { targetId: entityId, speed: 2.0 }).document;
     result = execute(doc, 'describe_scene', {});
-    const snapshot2 = result.data as { animations: Array<{ id: string; targetId: string; targetKind: string; channel: string; mode: string }> };
+    const snapshot2 = result.data as {
+      animations: Array<{
+        id: string;
+        targetId: string;
+        targetKind: string;
+        channel: string;
+        mode: string;
+      }>;
+    };
     expect(snapshot2.animations).toHaveLength(1);
     expect(snapshot2.animations[0]!.targetId).toBe(entityId);
     expect(snapshot2.animations[0]!.targetKind).toBe('entity');
@@ -1698,7 +1751,11 @@ describe('render_view', () => {
       height: number;
       entityCount: number;
       bounds: null;
-      camera: { position: [number, number, number]; target: [number, number, number]; up: [number, number, number] };
+      camera: {
+        position: [number, number, number];
+        target: [number, number, number];
+        up: [number, number, number];
+      };
     };
 
     expect(data.entityCount).toBe(0);
@@ -1724,7 +1781,11 @@ describe('render_view', () => {
       svg: string;
       entityCount: number;
       bounds: { min: [number, number, number]; max: [number, number, number] };
-      camera: { position: [number, number, number]; target: [number, number, number]; up: [number, number, number] };
+      camera: {
+        position: [number, number, number];
+        target: [number, number, number];
+        up: [number, number, number];
+      };
     };
 
     expect(data.entityCount).toBe(1);
@@ -1853,7 +1914,12 @@ describe('render_view', () => {
   it('renders extrusion without throwing', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'extrude_profile', {
-      profile: [[0, 0], [2, 0], [2, 2], [0, 2]],
+      profile: [
+        [0, 0],
+        [2, 0],
+        [2, 2],
+        [0, 2],
+      ],
       depth: 1,
     }).document;
 
@@ -1867,11 +1933,28 @@ describe('render_view', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'draw_rectangle', { width: 2, height: 1 }).document;
     doc = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 1, radiusY: 2 }).document;
-    doc = execute(doc, 'draw_spline', { points: [[0, 0], [1, 1], [2, 0]] }).document;
+    doc = execute(doc, 'draw_spline', {
+      points: [
+        [0, 0],
+        [1, 1],
+        [2, 0],
+      ],
+    }).document;
     doc = execute(doc, 'draw_point', { position: [0, 0, 0] }).document;
-    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 1, startAngle: 0, endAngle: 1 }).document;
+    doc = execute(doc, 'draw_arc', {
+      center: [0, 0],
+      radius: 1,
+      startAngle: 0,
+      endAngle: 1,
+    }).document;
     doc = execute(doc, 'draw_line', { start: [0, 0], end: [1, 1] }).document;
-    doc = execute(doc, 'draw_polyline', { points: [[0, 0], [1, 0], [1, 1]] }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
+    }).document;
 
     const result = execute(doc, 'render_view', { view: 'top' });
     const data = result.data as { entityCount: number; svg: string };
@@ -1883,8 +1966,22 @@ describe('render_view', () => {
 
   it('closed polyline and closed spline add the closing vertex', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', { points: [[0, 0], [1, 0], [0.5, 1]], closed: true }).document;
-    doc = execute(doc, 'draw_spline', { points: [[0, 0], [1, 0], [0.5, 1]], closed: true }).document;
+    doc = execute(doc, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 0],
+        [0.5, 1],
+      ],
+      closed: true,
+    }).document;
+    doc = execute(doc, 'draw_spline', {
+      points: [
+        [0, 0],
+        [1, 0],
+        [0.5, 1],
+      ],
+      closed: true,
+    }).document;
 
     const result = execute(doc, 'render_view', { view: 'top' });
     const data = result.data as { svg: string };
@@ -1894,7 +1991,12 @@ describe('render_view', () => {
   it('arc with endAngle < startAngle wraps span correctly', () => {
     let doc = createEmptyDocument();
     // endAngle < startAngle → span goes negative → must add 2π
-    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 2, startAngle: 3, endAngle: 1 }).document;
+    doc = execute(doc, 'draw_arc', {
+      center: [0, 0],
+      radius: 2,
+      startAngle: 3,
+      endAngle: 1,
+    }).document;
 
     const result = execute(doc, 'render_view', { view: 'front' });
     expect(result.affected).toEqual([]);
@@ -1903,7 +2005,14 @@ describe('render_view', () => {
 
   it('extrusion with valid profile renders polygons and returns valid SVG', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'extrude_profile', { profile: [[0, 0], [1, 0], [1, 1]], depth: 2 }).document;
+    doc = execute(doc, 'extrude_profile', {
+      profile: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
+      depth: 2,
+    }).document;
 
     const result = execute(doc, 'render_view', { view: 'iso' });
     expect((result.data as { svg: string }).svg).toContain('<svg');
@@ -1954,9 +2063,17 @@ describe('render_view', () => {
   it('painter depth sort (descending) — nearer object polygons appear later in SVG than farther ones', () => {
     let doc = createEmptyDocument();
     // Blue box: centered at z = -5 (FAR from top camera — all faces have large depth)
-    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, -5], color: '#0000ff' }).document;
+    doc = execute(doc, 'add_box', {
+      size: [2, 2, 2],
+      position: [0, 0, -5],
+      color: '#0000ff',
+    }).document;
     // Red box: centered at z = +5 (NEAR the top camera — all faces have small depth)
-    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 5], color: '#ff0000' }).document;
+    doc = execute(doc, 'add_box', {
+      size: [2, 2, 2],
+      position: [0, 0, 5],
+      color: '#ff0000',
+    }).document;
 
     const result = execute(doc, 'render_view', { view: 'top' });
     const svg = (result.data as { svg: string }).svg;
@@ -2077,16 +2194,20 @@ describe('render_view', () => {
     expect(result.summary).toContain('position');
   });
 
-  it('add_text — failure: short position array is a no-op', () => {
+  it('add_text — failure: 1-element position array is a no-op', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: 'Hi', position: [0, 0], height: 1 });
+    const result = execute(doc, 'add_text', { content: 'Hi', position: [0], height: 1 });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
 
   it('scale_entity — text: scales height by factor', () => {
     let doc = createEmptyDocument();
-    const created = execute(doc, 'add_text', { content: 'Scale me', position: [0, 0, 0], height: 4 });
+    const created = execute(doc, 'add_text', {
+      content: 'Scale me',
+      position: [0, 0, 0],
+      height: 4,
+    });
     doc = created.document;
     const id = created.affected[0]!;
 
@@ -2105,7 +2226,11 @@ describe('render_view', () => {
    * Helper: build a minimal doc with two InstanceEntities.
    * Returns { doc, idA, idB } where idA and idB are instance ids.
    */
-  function makeDocWithInstances(): { doc: ReturnType<typeof createEmptyDocument>; idA: string; idB: string } {
+  function makeDocWithInstances(): {
+    doc: ReturnType<typeof createEmptyDocument>;
+    idA: string;
+    idB: string;
+  } {
     let doc = createEmptyDocument();
     // Build a Component out of a real entity (create_component requires entityIds).
     const seed = execute(doc, 'add_box', { size: [1, 1, 1] });
@@ -2124,7 +2249,12 @@ describe('render_view', () => {
 
   it('add_joint — revolute happy path: creates joint, appends to jointOrder', () => {
     const { doc, idA, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' });
+    const result = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    });
     expect(result.affected).toHaveLength(1);
     const jid = result.affected[0]!;
     expect(result.document.joints[jid]).toBeDefined();
@@ -2144,12 +2274,22 @@ describe('render_view', () => {
     expect(result.affected).toHaveLength(1);
     const jid = result.affected[0]!;
     expect(result.document.joints[jid]!.kind).toBe('prismatic');
-    expect((result.document.joints[jid] as Extract<typeof result.document.joints[string], { kind: 'prismatic' }>)!.displacement).toBe(0);
+    expect(
+      (result.document.joints[jid] as Extract<
+        (typeof result.document.joints)[string],
+        { kind: 'prismatic' }
+      >)!.displacement,
+    ).toBe(0);
   });
 
   it('add_joint — failure: unknown instanceId a is a no-op', () => {
     const { doc, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: 'ghost' }, b: { instanceId: idB }, axis: 'x' });
+    const result = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: 'ghost' },
+      b: { instanceId: idB },
+      axis: 'x',
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('ghost');
@@ -2157,7 +2297,12 @@ describe('render_view', () => {
 
   it('add_joint — failure: unknown instanceId b is a no-op', () => {
     const { doc, idA } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: 'ghost' }, axis: 'y' });
+    const result = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: 'ghost' },
+      axis: 'y',
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('ghost');
@@ -2165,14 +2310,24 @@ describe('render_view', () => {
 
   it('add_joint — failure: invalid kind is a no-op', () => {
     const { doc, idA, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', { kind: 'weld', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' });
+    const result = execute(doc, 'add_joint', {
+      kind: 'weld',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
 
   it('add_joint — failure: invalid axis is a no-op', () => {
     const { doc, idA, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'diagonal' });
+    const result = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'diagonal',
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
@@ -2180,13 +2335,23 @@ describe('render_view', () => {
   it('is pure — add_joint does not mutate input doc', () => {
     const { doc, idA, idB } = makeDocWithInstances();
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' });
+    execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
   it('set_joint_value — numeric value updates revolute angle', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     const result = execute(doc, 'set_joint_value', { id: jid, value: Math.PI / 2 });
@@ -2199,12 +2364,20 @@ describe('render_view', () => {
   it('set_joint_value — expression string resolves via doc.parameters', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
     let doc = execute(d0, 'set_parameter', { name: 'angle', expression: '1.5708' }).document;
-    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     const result = execute(doc, 'set_joint_value', { id: jid, value: 'angle' });
     expect(result.affected).toEqual([jid]);
-    const joint = result.document.joints[jid]! as Extract<(typeof result.document.joints)[string], { kind: 'revolute' }>;
+    const joint = result.document.joints[jid]! as Extract<
+      (typeof result.document.joints)[string],
+      { kind: 'revolute' }
+    >;
     expect(joint.angle).toBeCloseTo(1.5708, 3);
   });
 
@@ -2217,11 +2390,21 @@ describe('render_view', () => {
 
   it('delete_joint — removes joint and cascades dependent drive relations', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     // Add a second joint so we can add a drive relation
-    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'y',
+    }).document;
     const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     // Add a drive relation from jid1 → jid2
@@ -2246,11 +2429,21 @@ describe('render_view', () => {
 
   it('add_drive_relation — ratio applied: driver=π/2, ratio=2 → driven=π', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'set_joint_value', { id: jid1, value: Math.PI / 2 }).document;
 
-    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'y',
+    }).document;
     const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 2 }).document;
@@ -2266,9 +2459,19 @@ describe('render_view', () => {
 
   it('add_drive_relation — cycle detection rejects A→B→A', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'y',
+    }).document;
     const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     // jid1 → jid2
@@ -2282,7 +2485,12 @@ describe('render_view', () => {
 
   it('add_drive_relation — failure: self-coupling is a no-op', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     const result = execute(doc, 'add_drive_relation', { driver: jid, driven: jid, ratio: 1 });
@@ -2293,7 +2501,12 @@ describe('render_view', () => {
 
   it('add_drive_relation — failure: unknown driver joint is a no-op', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     const result = execute(doc, 'add_drive_relation', { driver: 'ghost', driven: jid, ratio: 1 });
@@ -2303,9 +2516,19 @@ describe('render_view', () => {
 
   it('delete_drive_relation — removes coupling, leaves joints intact', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'y',
+    }).document;
     const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 3 }).document;
     const drid = doc.driveRelationOrder[0]!;
@@ -2330,26 +2553,39 @@ describe('render_view', () => {
     const result = execute(doc, 'evaluate_motion', {});
     expect(result.document).toBe(doc);
     expect(result.affected).toHaveLength(0);
-    const data = result.data as { resolvedJoints: Record<string, number>; instancePositions: Record<string, unknown> };
+    const data = result.data as {
+      resolvedJoints: Record<string, number>;
+      instancePositions: Record<string, unknown>;
+    };
     expect(Object.keys(data.resolvedJoints)).toHaveLength(0);
     expect(Object.keys(data.instancePositions)).toHaveLength(0);
   });
 
   it('evaluate_motion — does not mutate doc even when joints are present', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'set_joint_value', { id: jid, value: Math.PI / 4 }).document;
 
     const snapshot = JSON.stringify(doc);
     const result = execute(doc, 'evaluate_motion', {});
-    expect(JSON.stringify(doc)).toBe(snapshot);      // input not mutated
-    expect(result.document).toBe(doc);               // same reference returned
+    expect(JSON.stringify(doc)).toBe(snapshot); // input not mutated
+    expect(result.document).toBe(doc); // same reference returned
   });
 
   it('evaluate_motion — returns position delta for prismatic joint', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'x' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'prismatic',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'x',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'set_joint_value', { id: jid, value: 5 }).document;
 
@@ -2362,7 +2598,12 @@ describe('render_view', () => {
 
   it('bake_motion — updates instance positions in the document', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'y' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'prismatic',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'y',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'set_joint_value', { id: jid, value: 3 }).document;
 
@@ -2381,7 +2622,12 @@ describe('render_view', () => {
 
   it('bake_motion — is pure: does not mutate input doc', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'set_joint_value', { id: jid, value: 1 }).document;
 
@@ -2392,11 +2638,26 @@ describe('render_view', () => {
 
   it('round-trip save/load preserves joints and driveRelations', async () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'x' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'prismatic',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'x',
+    }).document;
     const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 0.5, offset: 1 }).document;
+    doc = execute(doc, 'add_drive_relation', {
+      driver: jid1,
+      driven: jid2,
+      ratio: 0.5,
+      offset: 1,
+    }).document;
     const drid = doc.driveRelationOrder[0]!;
 
     // Save then reload
@@ -2422,7 +2683,12 @@ describe('render_view', () => {
     // A revolute joint swept from π/4 to 3π/4 in 5 steps.
     // Instance b starts at [2, 0, 0] (offset from a at [0,0,0]).
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
 
@@ -2461,7 +2727,12 @@ describe('render_view', () => {
     // Sweep "angle" from 0 to π in 4 steps; check that resolvedJoints[jid] changes.
     const { doc: d0, idA, idB } = makeDocWithInstances();
     let doc = execute(d0, 'set_parameter', { name: 'angle', expression: '0' }).document;
-    doc = execute(doc, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     // Manually set the joint value to match the parameter value (0 → 0).
     doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
@@ -2492,7 +2763,10 @@ describe('render_view', () => {
     let doc = createEmptyDocument();
     const seedA = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
     doc = seedA.document;
-    const compA = execute(doc, 'create_component', { name: 'PartA', entityIds: [seedA.affected[0]!] });
+    const compA = execute(doc, 'create_component', {
+      name: 'PartA',
+      entityIds: [seedA.affected[0]!],
+    });
     doc = compA.document;
     const compId = Object.keys(doc.components)[0]!;
     const idA = compA.affected[0]!;
@@ -2503,7 +2777,12 @@ describe('render_view', () => {
     const idB = instB.affected[0]!;
 
     // Add a prismatic joint along X; sweep from 0 to 0 (same position) — already overlapping
-    doc = execute(doc, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'x' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'prismatic',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'x',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
 
@@ -2530,7 +2809,10 @@ describe('render_view', () => {
     let doc = createEmptyDocument();
     const seedA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     doc = seedA.document;
-    const compA = execute(doc, 'create_component', { name: 'PartA', entityIds: [seedA.affected[0]!] });
+    const compA = execute(doc, 'create_component', {
+      name: 'PartA',
+      entityIds: [seedA.affected[0]!],
+    });
     doc = compA.document;
     const compId = Object.keys(doc.components)[0]!;
     const idA = compA.affected[0]!;
@@ -2542,7 +2824,12 @@ describe('render_view', () => {
 
     // Prismatic joint along X: B's evaluated position = A.pos + axis * sweepValue.
     // Sweep from 500 to 501 — B stays far from A (which is at [0,0,0]).
-    doc = execute(doc, 'add_joint', { kind: 'prismatic', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'x' }).document;
+    doc = execute(doc, 'add_joint', {
+      kind: 'prismatic',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'x',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
 
     const result = execute(doc, 'motion_study', {
@@ -2603,7 +2890,12 @@ describe('render_view', () => {
 
   it('motion_study — failure: steps=1 is a graceful no-op', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     const result = execute(doc, 'motion_study', {
       mode: 'joint',
@@ -2620,7 +2912,12 @@ describe('render_view', () => {
 
   it('motion_study — failure: start === end returns friendly summary with empty steps', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    const doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     const result = execute(doc, 'motion_study', {
       mode: 'joint',
@@ -2637,7 +2934,12 @@ describe('render_view', () => {
 
   it('motion_study — purity: result.document === input doc', () => {
     const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', { kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' }).document;
+    let doc = execute(d0, 'add_joint', {
+      kind: 'revolute',
+      a: { instanceId: idA },
+      b: { instanceId: idB },
+      axis: 'z',
+    }).document;
     const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
     doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
 
@@ -2723,7 +3025,9 @@ describe('add_dimension', () => {
       entityIds: [lineId, ln2.affected[0]!],
     });
     expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[
+      result.affected[0]!
+    ]! as import('@core/model/types').DimensionEntity;
     expect(e.dimensionKind).toBe('linear');
   });
 
@@ -2734,7 +3038,9 @@ describe('add_dimension', () => {
       entityIds: [pointId1, pointId2],
     });
     expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[
+      result.affected[0]!
+    ]! as import('@core/model/types').DimensionEntity;
     expect(e.kind).toBe('dimension');
     expect(e.dimensionKind).toBe('aligned');
   });
@@ -2747,7 +3053,9 @@ describe('add_dimension', () => {
       label: 'R5',
     });
     expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[
+      result.affected[0]!
+    ]! as import('@core/model/types').DimensionEntity;
     expect(e.dimensionKind).toBe('radial');
     expect(e.entityIds).toEqual([circleId]);
     expect(e.label).toBe('R5');
@@ -2755,7 +3063,12 @@ describe('add_dimension', () => {
 
   it('radial — accepts an arc entity', () => {
     let doc = createEmptyDocument();
-    const arc = execute(doc, 'draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: Math.PI });
+    const arc = execute(doc, 'draw_arc', {
+      center: [0, 0],
+      radius: 3,
+      startAngle: 0,
+      endAngle: Math.PI,
+    });
     doc = arc.document;
     const result = execute(doc, 'add_dimension', {
       dimensionKind: 'radial',
@@ -2772,7 +3085,9 @@ describe('add_dimension', () => {
       precision: 1,
     });
     expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[
+      result.affected[0]!
+    ]! as import('@core/model/types').DimensionEntity;
     expect(e.dimensionKind).toBe('angular');
     expect(e.entityIds).toHaveLength(3);
     expect(e.precision).toBe(1);
@@ -2797,7 +3112,9 @@ describe('add_dimension', () => {
       precision: 2,
       label: '≈ 10 mm',
     });
-    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[
+      result.affected[0]!
+    ]! as import('@core/model/types').DimensionEntity;
     expect(e.offset).toBe(12);
     expect(e.precision).toBe(2);
     expect(e.label).toBe('≈ 10 mm');
@@ -3370,7 +3687,9 @@ describe('add_dimension', () => {
       document: {
         entities: {},
         order: [],
-        layers: { 'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false } },
+        layers: {
+          'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false },
+        },
         layerOrder: ['layer-default'],
         selection: [],
         camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
@@ -3453,7 +3772,9 @@ describe('KI3 — =expr param resolution in replay_history', () => {
     // Replay should reproduce the same entity count and kinds.
     const result = execute(doc, 'replay_history', {});
     expect(Object.keys(result.document.entities)).toHaveLength(2);
-    const kinds = Object.values(result.document.entities).map((e) => e.kind).sort();
+    const kinds = Object.values(result.document.entities)
+      .map((e) => e.kind)
+      .sort();
     expect(kinds).toEqual(['box', 'sphere']);
   });
 
@@ -3490,48 +3811,31 @@ describe('KI3 — =expr param resolution in replay_history', () => {
   });
 
   it('resolveStepParams: =expr string is replaced by evaluated number', () => {
-    const { resolved, errors } = resolveStepParams(
-      { radius: '=r' },
-      { r: 7 },
-    );
+    const { resolved, errors } = resolveStepParams({ radius: '=r' }, { r: 7 });
     expect(errors).toHaveLength(0);
     expect((resolved as { radius: number }).radius).toBe(7);
   });
 
   it('resolveStepParams: =expr arithmetic expression is evaluated correctly', () => {
-    const { resolved, errors } = resolveStepParams(
-      { size: '=width * 2' },
-      { width: 5 },
-    );
+    const { resolved, errors } = resolveStepParams({ size: '=width * 2' }, { width: 5 });
     expect(errors).toHaveLength(0);
     expect((resolved as { size: number }).size).toBe(10);
   });
 
   it('resolveStepParams: array elements with =expr strings are resolved', () => {
-    const { resolved, errors } = resolveStepParams(
-      { position: ['=x', 0, '=z'] },
-      { x: 3, z: 7 },
-    );
+    const { resolved, errors } = resolveStepParams({ position: ['=x', 0, '=z'] }, { x: 3, z: 7 });
     expect(errors).toHaveLength(0);
     expect((resolved as { position: number[] }).position).toEqual([3, 0, 7]);
   });
 
   it('resolveStepParams: nested object keys are resolved recursively', () => {
-    const { resolved, errors } = resolveStepParams(
-      { outer: { inner: '=val' } },
-      { val: 42 },
-    );
+    const { resolved, errors } = resolveStepParams({ outer: { inner: '=val' } }, { val: 42 });
     expect(errors).toHaveLength(0);
-    expect(
-      (resolved as { outer: { inner: number } }).outer.inner,
-    ).toBe(42);
+    expect((resolved as { outer: { inner: number } }).outer.inner).toBe(42);
   });
 
   it('resolveStepParams: unknown parameter reference → error recorded, original string kept', () => {
-    const { resolved, errors } = resolveStepParams(
-      { radius: '=missing_param' },
-      {},
-    );
+    const { resolved, errors } = resolveStepParams({ radius: '=missing_param' }, {});
     expect(errors).toHaveLength(1);
     expect(errors[0]!.expression).toBe('=missing_param');
     expect(errors[0]!.reason).toContain('unknown parameter');
@@ -3540,20 +3844,14 @@ describe('KI3 — =expr param resolution in replay_history', () => {
   });
 
   it('resolveStepParams: malformed =expr → error recorded, original string kept', () => {
-    const { resolved, errors } = resolveStepParams(
-      { size: '=width +' },
-      { width: 5 },
-    );
+    const { resolved, errors } = resolveStepParams({ size: '=width +' }, { width: 5 });
     expect(errors).toHaveLength(1);
     expect(errors[0]!.path).toBe('size');
     expect((resolved as { size: string }).size).toBe('=width +');
   });
 
   it('resolveStepParams: boolean and null values pass through unchanged', () => {
-    const { resolved, errors } = resolveStepParams(
-      { flag: true, nothing: null },
-      {},
-    );
+    const { resolved, errors } = resolveStepParams({ flag: true, nothing: null }, {});
     expect(errors).toHaveLength(0);
     const r = resolved as { flag: boolean; nothing: null };
     expect(r.flag).toBe(true);
@@ -3651,8 +3949,14 @@ describe('KI3 — =expr param resolution in replay_history', () => {
 
   it('create_configuration replaces an existing configuration with the same name', () => {
     let doc = createEmptyDocument();
-    doc = execute(doc, 'create_configuration', { name: 'cfg', parameterValues: { w: '10' } }).document;
-    const result = execute(doc, 'create_configuration', { name: 'cfg', parameterValues: { w: '99' } });
+    doc = execute(doc, 'create_configuration', {
+      name: 'cfg',
+      parameterValues: { w: '10' },
+    }).document;
+    const result = execute(doc, 'create_configuration', {
+      name: 'cfg',
+      parameterValues: { w: '99' },
+    });
     expect(result.document.configurations['cfg']!.parameterValues).toEqual({ w: '99' });
   });
 
@@ -3707,8 +4011,14 @@ describe('KI3 — =expr param resolution in replay_history', () => {
     }).document;
 
     // Create two configurations.
-    doc = execute(doc, 'create_configuration', { name: 'small', parameterValues: { w: '10' } }).document;
-    doc = execute(doc, 'create_configuration', { name: 'large', parameterValues: { w: '40' } }).document;
+    doc = execute(doc, 'create_configuration', {
+      name: 'small',
+      parameterValues: { w: '10' },
+    }).document;
+    doc = execute(doc, 'create_configuration', {
+      name: 'large',
+      parameterValues: { w: '40' },
+    }).document;
 
     // Activate small — box should be 10×10×10.
     const smallResult = execute(doc, 'activate_configuration', { name: 'small' });
@@ -3730,7 +4040,10 @@ describe('KI3 — =expr param resolution in replay_history', () => {
   it('activate_configuration updates doc.parameters to the config values', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
-    doc = execute(doc, 'create_configuration', { name: 'big', parameterValues: { w: '100' } }).document;
+    doc = execute(doc, 'create_configuration', {
+      name: 'big',
+      parameterValues: { w: '100' },
+    }).document;
 
     const result = execute(doc, 'activate_configuration', { name: 'big' });
     expect(result.document.parameters['w']!.expression).toBe('100');
@@ -3741,7 +4054,10 @@ describe('KI3 — =expr param resolution in replay_history', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
     doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'create_configuration', { name: 'v', parameterValues: { w: '20' } }).document;
+    doc = execute(doc, 'create_configuration', {
+      name: 'v',
+      parameterValues: { w: '20' },
+    }).document;
 
     const historyBefore = JSON.stringify(doc.featureHistory);
     const result = execute(doc, 'activate_configuration', { name: 'v' });
@@ -3751,7 +4067,10 @@ describe('KI3 — =expr param resolution in replay_history', () => {
   it('activate_configuration is pure — input document is not mutated', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
-    doc = execute(doc, 'create_configuration', { name: 'v', parameterValues: { w: '20' } }).document;
+    doc = execute(doc, 'create_configuration', {
+      name: 'v',
+      parameterValues: { w: '20' },
+    }).document;
 
     const snapshot = JSON.stringify(doc);
     execute(doc, 'activate_configuration', { name: 'v' });
@@ -3817,7 +4136,9 @@ describe('KI3 — =expr param resolution in replay_history', () => {
       document: {
         entities: {},
         order: [],
-        layers: { 'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false } },
+        layers: {
+          'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false },
+        },
         layerOrder: ['layer-default'],
         selection: [],
         camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
@@ -4157,7 +4478,10 @@ describe('KI3 — =expr param resolution in replay_history', () => {
 
     // Assign different materials.
     doc = execute(doc, 'assign_material', { materialName: 'steel', entityIds: [steelId] }).document;
-    doc = execute(doc, 'assign_material', { materialName: 'aluminium', entityIds: [alumId] }).document;
+    doc = execute(doc, 'assign_material', {
+      materialName: 'aluminium',
+      entityIds: [alumId],
+    }).document;
 
     // Compute mass — pass a dummy density; should be overridden by the assigned material.
     const steelResult = execute(doc, 'mass_properties', { entityId: steelId, density: 1 });
@@ -4258,7 +4582,9 @@ describe('KI3 — =expr param resolution in replay_history', () => {
       document: {
         entities: {},
         order: [],
-        layers: { 'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false } },
+        layers: {
+          'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false },
+        },
         layerOrder: ['layer-default'],
         selection: [],
         camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
@@ -4464,7 +4790,10 @@ describe('Q4 — replayHistory id-remapping', () => {
 
   it('remapIds: remaps ids inside arrays', async () => {
     const { remapIds } = await import('@core/commands/regenerate');
-    const idMap = new Map([['a', 'x'], ['b', 'y']]);
+    const idMap = new Map([
+      ['a', 'x'],
+      ['b', 'y'],
+    ]);
     const result = remapIds({ entityIds: ['a', 'b', 'c'] }, idMap) as {
       entityIds: string[];
     };
@@ -4563,7 +4892,9 @@ describe('instantiate_template (templates.ts generators)', () => {
     expect(result.affected).toHaveLength(4);
     const expectedAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
     for (let i = 0; i < 4; i++) {
-      const entity = result.document.entities[result.affected[i]!]! as { center: readonly [number, number] };
+      const entity = result.document.entities[result.affected[i]!]! as {
+        center: readonly [number, number];
+      };
       expect(entity.center[0]!).toBeCloseTo(R * Math.cos(expectedAngles[i]!), 5);
       expect(entity.center[1]!).toBeCloseTo(R * Math.sin(expectedAngles[i]!), 5);
     }
@@ -4607,8 +4938,14 @@ describe('instantiate_template (templates.ts generators)', () => {
       expect(result.document.entities[id]!.kind).toBe('circle');
     }
     // First two are at [0,0] (outer and bore)
-    const outerE = result.document.entities[result.affected[0]!]! as { center: readonly [number, number]; radius: number };
-    const boreE = result.document.entities[result.affected[1]!]! as { center: readonly [number, number]; radius: number };
+    const outerE = result.document.entities[result.affected[0]!]! as {
+      center: readonly [number, number];
+      radius: number;
+    };
+    const boreE = result.document.entities[result.affected[1]!]! as {
+      center: readonly [number, number];
+      radius: number;
+    };
     expect(outerE.center).toEqual([0, 0]);
     expect(outerE.radius).toBe(60);
     expect(boreE.center).toEqual([0, 0]);
@@ -4620,7 +4957,15 @@ describe('instantiate_template (templates.ts generators)', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'instantiate_template', {
       template: 'rectangular_plate_with_holes',
-      params: { width: 100, height: 60, holeRows: 2, holeCols: 3, holeRadius: 4, marginX: 10, marginY: 10 },
+      params: {
+        width: 100,
+        height: 60,
+        holeRows: 2,
+        holeCols: 3,
+        holeRadius: 4,
+        marginX: 10,
+        marginY: 10,
+      },
     });
     // 1 rectangle + 2*3=6 circles = 7 entities
     expect(result.affected).toHaveLength(7);
@@ -4635,12 +4980,22 @@ describe('instantiate_template (templates.ts generators)', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'instantiate_template', {
       template: 'rectangular_plate_with_holes',
-      params: { width: 50, height: 50, holeRows: 1, holeCols: 1, holeRadius: 5, marginX: 15, marginY: 15 },
+      params: {
+        width: 50,
+        height: 50,
+        holeRows: 1,
+        holeCols: 1,
+        holeRadius: 5,
+        marginX: 15,
+        marginY: 15,
+      },
     });
     // 1 rectangle + 1 circle = 2 entities
     expect(result.affected).toHaveLength(2);
     expect(result.document.entities[result.affected[0]!]!.kind).toBe('rectangle');
-    const hole = result.document.entities[result.affected[1]!]! as { center: readonly [number, number] };
+    const hole = result.document.entities[result.affected[1]!]! as {
+      center: readonly [number, number];
+    };
     // Single hole placed at [marginX, marginY]
     expect(hole.center[0]!).toBeCloseTo(15, 5);
     expect(hole.center[1]!).toBeCloseTo(15, 5);
@@ -4705,7 +5060,13 @@ describe('instantiate_template (templates.ts generators)', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'instantiate_template', {
       template: 'flange',
-      params: { outerRadius: 30, boreRadius: 40, boltCount: 4, boltCircleRadius: 20, holeRadius: 3 },
+      params: {
+        outerRadius: 30,
+        boreRadius: 40,
+        boltCount: 4,
+        boltCircleRadius: 20,
+        holeRadius: 3,
+      },
     });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
@@ -4716,7 +5077,15 @@ describe('instantiate_template (templates.ts generators)', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'instantiate_template', {
       template: 'rectangular_plate_with_holes',
-      params: { width: 0, height: 50, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: 5, marginY: 5 },
+      params: {
+        width: 0,
+        height: 50,
+        holeRows: 2,
+        holeCols: 2,
+        holeRadius: 4,
+        marginX: 5,
+        marginY: 5,
+      },
     });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
@@ -4724,12 +5093,30 @@ describe('instantiate_template (templates.ts generators)', () => {
   });
 
   it.each([
-    ['height', { width: 50, height: 0, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: 5, marginY: 5 }],
-    ['holeRows', { width: 50, height: 50, holeRows: 0, holeCols: 2, holeRadius: 4, marginX: 5, marginY: 5 }],
-    ['holeCols', { width: 50, height: 50, holeRows: 2, holeCols: 0, holeRadius: 4, marginX: 5, marginY: 5 }],
-    ['holeRadius', { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 0, marginX: 5, marginY: 5 }],
-    ['marginX', { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: -1, marginY: 5 }],
-    ['marginY', { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: 5, marginY: -1 }],
+    [
+      'height',
+      { width: 50, height: 0, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: 5, marginY: 5 },
+    ],
+    [
+      'holeRows',
+      { width: 50, height: 50, holeRows: 0, holeCols: 2, holeRadius: 4, marginX: 5, marginY: 5 },
+    ],
+    [
+      'holeCols',
+      { width: 50, height: 50, holeRows: 2, holeCols: 0, holeRadius: 4, marginX: 5, marginY: 5 },
+    ],
+    [
+      'holeRadius',
+      { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 0, marginX: 5, marginY: 5 },
+    ],
+    [
+      'marginX',
+      { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: -1, marginY: 5 },
+    ],
+    [
+      'marginY',
+      { width: 50, height: 50, holeRows: 2, holeCols: 2, holeRadius: 4, marginX: 5, marginY: -1 },
+    ],
   ])(
     'instantiate_template rectangular_plate_with_holes — invalid %s is a graceful no-op',
     (field, params) => {
@@ -4855,7 +5242,12 @@ describe('export_stl', () => {
   it('extrusion produces > 0 triangles', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'extrude_profile', {
-      profile: [[0, 0], [2, 0], [2, 2], [0, 2]],
+      profile: [
+        [0, 0],
+        [2, 0],
+        [2, 2],
+        [0, 2],
+      ],
       depth: 1,
     }).document;
 
@@ -4925,7 +5317,10 @@ describe('export_stl', () => {
     doc = createEmptyDocument();
     const added = execute(doc, 'add_box', { size: [2, 1, 1], position: [0, 0, 0] });
     doc = added.document;
-    doc = execute(doc, 'rotate_entity', { id: added.affected[0]!, delta: [0, 0, Math.PI / 4] }).document;
+    doc = execute(doc, 'rotate_entity', {
+      id: added.affected[0]!,
+      delta: [0, 0, Math.PI / 4],
+    }).document;
     const withRot = execute(doc, 'export_stl', { format: 'ascii' });
 
     // The STL vertex data should differ
@@ -5162,7 +5557,10 @@ describe('export_stl', () => {
       let doc = createEmptyDocument();
       doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
 
-      const result = execute(doc, 'save_recipe', { name: 'labelled', label: 'A simple box recipe' });
+      const result = execute(doc, 'save_recipe', {
+        name: 'labelled',
+        label: 'A simple box recipe',
+      });
       const recipe = result.document.recipes['labelled'];
       expect(recipe!.label).toBe('A simple box recipe');
     });
@@ -5462,7 +5860,11 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('add_cylinder stores non-zero rotation on the entity', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cylinder', { radius: 3, height: 5, rotation: [0, 0, Math.PI / 2] });
+    const result = execute(doc, 'add_cylinder', {
+      radius: 3,
+      height: 5,
+      rotation: [0, 0, Math.PI / 2],
+    });
     const id = result.affected[0]!;
     const r = result.document.entities[id]!.rotation;
     expect(r[0]).toBeCloseTo(0);
@@ -5509,7 +5911,11 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('add_cone stores non-zero rotation on the entity', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cone', { radius: 2, height: 5, rotation: [0, Math.PI / 4, 0] });
+    const result = execute(doc, 'add_cone', {
+      radius: 2,
+      height: 5,
+      rotation: [0, Math.PI / 4, 0],
+    });
     const id = result.affected[0]!;
     expect(result.document.entities[id]!.rotation[1]).toBeCloseTo(Math.PI / 4);
   });
@@ -5531,14 +5937,22 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('add_torus stores non-zero rotation on the entity', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'add_torus', { ringRadius: 5, tubeRadius: 1, rotation: [0.5, 0, 0] });
+    const result = execute(doc, 'add_torus', {
+      ringRadius: 5,
+      tubeRadius: 1,
+      rotation: [0.5, 0, 0],
+    });
     const id = result.affected[0]!;
     expect(result.document.entities[id]!.rotation[0]).toBeCloseTo(0.5);
   });
 
   it('add_torus ignores non-finite rotation and still creates entity', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1, rotation: [0, NaN, 0] });
+    const result = execute(doc, 'add_torus', {
+      ringRadius: 4,
+      tubeRadius: 1,
+      rotation: [0, NaN, 0],
+    });
     expect(result.affected).toHaveLength(1);
     expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
   });
@@ -5608,7 +6022,12 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
   it('extrude_profile stores non-zero rotation on the entity', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'extrude_profile', {
-      profile: [[0, 0], [4, 0], [4, 3], [0, 3]],
+      profile: [
+        [0, 0],
+        [4, 0],
+        [4, 3],
+        [0, 3],
+      ],
       depth: 5,
       rotation: [0, Math.PI / 3, 0],
     });
@@ -5619,7 +6038,11 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
   it('extrude_profile ignores malformed rotation and still creates entity', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'extrude_profile', {
-      profile: [[0, 0], [2, 0], [1, 2]],
+      profile: [
+        [0, 0],
+        [2, 0],
+        [1, 2],
+      ],
       depth: 3,
       rotation: [0, Infinity, 0],
     });
@@ -5630,7 +6053,12 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
   it('extrude_profile summary contains world AABB', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'extrude_profile', {
-      profile: [[0, 0], [3, 0], [3, 2], [0, 2]],
+      profile: [
+        [0, 0],
+        [3, 0],
+        [3, 2],
+        [0, 2],
+      ],
       depth: 4,
     });
     expect(result.summary).toContain('world AABB');
@@ -5638,7 +6066,13 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 
   it('extrude_profile no-ops on a profile with fewer than 3 points', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'extrude_profile', { profile: [[0, 0], [1, 0]], depth: 4 });
+    const result = execute(doc, 'extrude_profile', {
+      profile: [
+        [0, 0],
+        [1, 0],
+      ],
+      depth: 4,
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
     expect(result.summary).toMatch(/at least 3/i);
@@ -5647,7 +6081,11 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
   it('extrude_profile no-ops on non-positive depth', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'extrude_profile', {
-      profile: [[0, 0], [2, 0], [1, 2]],
+      profile: [
+        [0, 0],
+        [2, 0],
+        [1, 2],
+      ],
       depth: 0,
     });
     expect(result.affected).toHaveLength(0);
@@ -5686,41 +6124,67 @@ describe('W4B — unified placement anchor', () => {
   // ── Back-compat: omitting anchor reproduces today's stored position ──────
 
   it('add_box default (no anchor) keeps "center" — stored position === position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 4, 6], position: [5, 6, 7] });
+    const e = createdEntity(createEmptyDocument(), 'add_box', {
+      size: [2, 4, 6],
+      position: [5, 6, 7],
+    });
     expectVec(e.position, [5, 6, 7]);
   });
 
   it('add_cylinder default keeps "center"', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_cylinder', { radius: 1, height: 4, position: [1, 2, 3] });
+    const e = createdEntity(createEmptyDocument(), 'add_cylinder', {
+      radius: 1,
+      height: 4,
+      position: [1, 2, 3],
+    });
     expectVec(e.position, [1, 2, 3]);
   });
 
   it('add_sphere default keeps "center"', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_sphere', { radius: 2, position: [1, 2, 3] });
+    const e = createdEntity(createEmptyDocument(), 'add_sphere', {
+      radius: 2,
+      position: [1, 2, 3],
+    });
     expectVec(e.position, [1, 2, 3]);
   });
 
   it('add_torus default keeps "center"', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_torus', { ringRadius: 3, tubeRadius: 1, position: [1, 1, 1] });
+    const e = createdEntity(createEmptyDocument(), 'add_torus', {
+      ringRadius: 3,
+      tubeRadius: 1,
+      position: [1, 1, 1],
+    });
     expectVec(e.position, [1, 1, 1]);
   });
 
   it('add_cone default keeps "base-center" — base sits at position.z', () => {
-    const result = execute(createEmptyDocument(), 'add_cone', { radius: 1, height: 4, position: [0, 0, 4] });
+    const result = execute(createEmptyDocument(), 'add_cone', {
+      radius: 1,
+      height: 4,
+      position: [0, 0, 4],
+    });
     const e = result.document.entities[result.affected[0]!]!;
     expectVec(e.position, [0, 0, 4]);
     expect(entityBounds(e).min[2]).toBeCloseTo(4, 9); // base at z = position.z
   });
 
   it('add_pyramid default keeps "base-center" — base sits at position.z', () => {
-    const result = execute(createEmptyDocument(), 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 2, position: [0, 0, 3] });
+    const result = execute(createEmptyDocument(), 'add_pyramid', {
+      baseWidth: 2,
+      baseDepth: 2,
+      height: 2,
+      position: [0, 0, 3],
+    });
     const e = result.document.entities[result.affected[0]!]!;
     expectVec(e.position, [0, 0, 3]);
     expect(entityBounds(e).min[2]).toBeCloseTo(3, 9);
   });
 
   it('add_wedge default keeps "min" — AABB min corner at position', () => {
-    const result = execute(createEmptyDocument(), 'add_wedge', { size: [2, 2, 2], position: [2, 2, 2] });
+    const result = execute(createEmptyDocument(), 'add_wedge', {
+      size: [2, 2, 2],
+      position: [2, 2, 2],
+    });
     const e = result.document.entities[result.affected[0]!]!;
     expectVec(e.position, [2, 2, 2]);
     expectVec(entityBounds(e).min, [2, 2, 2]);
@@ -5729,47 +6193,79 @@ describe('W4B — unified placement anchor', () => {
   // ── Explicit anchors place the right AABB point at position ──────────────
 
   it('add_box anchor "min" puts the AABB min corner at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 4, 6], position: [0, 0, 0], anchor: 'min' });
+    const e = createdEntity(createEmptyDocument(), 'add_box', {
+      size: [2, 4, 6],
+      position: [0, 0, 0],
+      anchor: 'min',
+    });
     const b = entityBounds(e);
     expectVec(b.min, [0, 0, 0]);
     expectVec(b.max, [2, 4, 6]);
   });
 
   it('add_box anchor "base-center" centers XY and puts AABB min-Z at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 2, 2], position: [1, 1, 0], anchor: 'base-center' });
+    const e = createdEntity(createEmptyDocument(), 'add_box', {
+      size: [2, 2, 2],
+      position: [1, 1, 0],
+      anchor: 'base-center',
+    });
     const b = entityBounds(e);
     expectVec(b.min, [0, 0, 0]);
     expectVec(b.max, [2, 2, 2]);
   });
 
   it('add_cylinder anchor "min" puts the AABB min corner at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_cylinder', { radius: 1, height: 4, position: [0, 0, 0], anchor: 'min' });
+    const e = createdEntity(createEmptyDocument(), 'add_cylinder', {
+      radius: 1,
+      height: 4,
+      position: [0, 0, 0],
+      anchor: 'min',
+    });
     const b = entityBounds(e);
     expectVec(b.min, [0, 0, 0]);
-    expectVec(b.max, [2, 4, 2]);
+    expectVec(b.max, [2, 2, 4]);
   });
 
   it('add_sphere anchor "min" puts the AABB min corner at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_sphere', { radius: 1, position: [0, 0, 0], anchor: 'min' });
+    const e = createdEntity(createEmptyDocument(), 'add_sphere', {
+      radius: 1,
+      position: [0, 0, 0],
+      anchor: 'min',
+    });
     const b = entityBounds(e);
     expectVec(b.min, [0, 0, 0]);
     expectVec(b.max, [2, 2, 2]);
   });
 
   it('add_cone anchor "center" centers the AABB on position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_cone', { radius: 1, height: 4, position: [0, 0, 0], anchor: 'center' });
+    const e = createdEntity(createEmptyDocument(), 'add_cone', {
+      radius: 1,
+      height: 4,
+      position: [0, 0, 0],
+      anchor: 'center',
+    });
     const b = entityBounds(e);
     expect(b.min[2]).toBeCloseTo(-2, 9);
     expect(b.max[2]).toBeCloseTo(2, 9);
   });
 
   it('add_pyramid anchor "min" puts the AABB min corner at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 2, position: [0, 0, 0], anchor: 'min' });
+    const e = createdEntity(createEmptyDocument(), 'add_pyramid', {
+      baseWidth: 2,
+      baseDepth: 2,
+      height: 2,
+      position: [0, 0, 0],
+      anchor: 'min',
+    });
     expectVec(entityBounds(e).min, [0, 0, 0]);
   });
 
   it('add_wedge anchor "center" centers the AABB on position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_wedge', { size: [2, 2, 2], position: [0, 0, 0], anchor: 'center' });
+    const e = createdEntity(createEmptyDocument(), 'add_wedge', {
+      size: [2, 2, 2],
+      position: [0, 0, 0],
+      anchor: 'center',
+    });
     const b = entityBounds(e);
     expectVec(b.min, [-1, -1, -1]);
     expectVec(b.max, [1, 1, 1]);
@@ -5778,12 +6274,20 @@ describe('W4B — unified placement anchor', () => {
   // ── Failure / robustness: unknown or non-string anchor → command default ─
 
   it('add_box with an unknown anchor string falls back to "center" (no throw)', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 2, 2], position: [3, 3, 3], anchor: 'garbage' });
+    const e = createdEntity(createEmptyDocument(), 'add_box', {
+      size: [2, 2, 2],
+      position: [3, 3, 3],
+      anchor: 'garbage',
+    });
     expectVec(e.position, [3, 3, 3]); // identical to the default-center placement
   });
 
   it('add_box with a non-string anchor falls back to "center"', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', { size: [2, 2, 2], position: [3, 3, 3], anchor: 123 } as object);
+    const e = createdEntity(createEmptyDocument(), 'add_box', {
+      size: [2, 2, 2],
+      position: [3, 3, 3],
+      anchor: 123,
+    } as object);
     expectVec(e.position, [3, 3, 3]);
   });
 
@@ -6021,7 +6525,9 @@ describe('look_at', () => {
 
   it('graceful no-op when target has wrong length', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'look_at', { target: [1, 2] as unknown as [number, number, number] });
+    const result = execute(doc, 'look_at', {
+      target: [1, 2] as unknown as [number, number, number],
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
@@ -6070,8 +6576,40 @@ describe('fit_view', () => {
     doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
     const result = execute(doc, 'fit_view', { direction: 'front' });
 
-    expect(result.document.camera.azimuth).toBeCloseTo(0, 5);
+    expect(result.document.camera.azimuth).toBeCloseTo(Math.PI, 5);
     expect(result.document.camera.polar).toBeCloseTo(Math.PI / 2, 5);
+  });
+
+  it('places the eye on the Z-up CAD side for each preset (front -Y, right +X, iso +X-Y+Z)', () => {
+    const eyeOffset = (azimuth: number, polar: number): [number, number, number] => [
+      Math.sin(polar) * Math.sin(azimuth),
+      Math.sin(polar) * Math.cos(azimuth),
+      Math.cos(polar),
+    ];
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const eyeFor = (direction: string): [number, number, number] => {
+      const { azimuth, polar } = execute(doc, 'fit_view', { direction }).document.camera;
+      return eyeOffset(azimuth, polar);
+    };
+    expect(eyeFor('front')[1]).toBeLessThan(-0.99);
+    expect(eyeFor('back')[1]).toBeGreaterThan(0.99);
+    expect(eyeFor('right')[0]).toBeGreaterThan(0.99);
+    expect(eyeFor('left')[0]).toBeLessThan(-0.99);
+    const top = eyeFor('top');
+    expect(top[2]).toBeGreaterThan(0.99);
+    expect(top[1]).toBeLessThan(0);
+    const iso = eyeFor('iso');
+    expect(iso[0]).toBeGreaterThan(0);
+    expect(iso[1]).toBeLessThan(0);
+    expect(iso[2]).toBeGreaterThan(0);
+  });
+
+  it('default camera views the XY plane unmirrored (eye at +X, -Y, +Z)', () => {
+    const { azimuth, polar } = createEmptyDocument().camera;
+    expect(Math.sin(polar) * Math.sin(azimuth)).toBeGreaterThan(0);
+    expect(Math.sin(polar) * Math.cos(azimuth)).toBeLessThan(0);
+    expect(Math.cos(polar)).toBeGreaterThan(0);
   });
 
   it('applies correct azimuth/polar for top preset', () => {
@@ -6100,10 +6638,7 @@ describe('fit_view', () => {
     const tight = execute(doc, 'fit_view', { direction: 'iso', padding: 1.0 });
     const loose = execute(doc, 'fit_view', { direction: 'iso', padding: 2.0 });
 
-    expect(loose.document.camera.distance).toBeCloseTo(
-      tight.document.camera.distance * 2,
-      5,
-    );
+    expect(loose.document.camera.distance).toBeCloseTo(tight.document.camera.distance * 2, 5);
   });
 
   it('empty document falls back to default framing with explanatory summary', () => {
@@ -6294,7 +6829,12 @@ describe('export_obj', () => {
   it('revolution entity: triangleCount > 0 in OBJ export', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'revolve_profile', {
-      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      profile: [
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [1, 1],
+      ],
       axis: 'z',
       angle: Math.PI * 2,
       segments: 8,
@@ -6364,7 +6904,9 @@ describe('export_gltf', () => {
 
     // BIN buffer inlined as data: URI
     const buffers = gltf['buffers'] as Array<Record<string, unknown>>;
-    expect((buffers[0]!['uri'] as string).startsWith('data:application/octet-stream;base64,')).toBe(true);
+    expect((buffers[0]!['uri'] as string).startsWith('data:application/octet-stream;base64,')).toBe(
+      true,
+    );
   });
 
   it('box: triangleCount=12 in glTF JSON mode', () => {
@@ -6392,8 +6934,8 @@ describe('export_gltf', () => {
     // Decode and check GLB magic 0x46546C67 ('glTF') at offset 0
     const bytes = base64ToUint8Array(data.base64!);
     const view = new DataView(bytes.buffer);
-    expect(view.getUint32(0, true)).toBe(0x46546C67); // 'glTF' little-endian
-    expect(view.getUint32(4, true)).toBe(2);           // version 2
+    expect(view.getUint32(0, true)).toBe(0x46546c67); // 'glTF' little-endian
+    expect(view.getUint32(4, true)).toBe(2); // version 2
   });
 
   it('GLB total byte length matches header field', () => {
@@ -6415,7 +6957,7 @@ describe('export_gltf', () => {
     const bytes = base64ToUint8Array(data.base64!);
     const view = new DataView(bytes.buffer);
     // First chunk type at offset 16
-    expect(view.getUint32(16, true)).toBe(0x4E4F534A); // 'JSON'
+    expect(view.getUint32(16, true)).toBe(0x4e4f534a); // 'JSON'
   });
 
   // ── failure path: empty doc ───────────────────────────────────────────────
@@ -6441,7 +6983,7 @@ describe('export_gltf', () => {
 
     const bytes = base64ToUint8Array(data.base64!);
     const view = new DataView(bytes.buffer);
-    expect(view.getUint32(0, true)).toBe(0x46546C67); // valid GLB magic
+    expect(view.getUint32(0, true)).toBe(0x46546c67); // valid GLB magic
   });
 
   it('unknown entityIds: triangleCount=0, summary mentions id', () => {
@@ -6483,7 +7025,12 @@ describe('export_gltf', () => {
   it('revolution entity: triangleCount > 0 in glTF JSON export', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'revolve_profile', {
-      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      profile: [
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [1, 1],
+      ],
       axis: 'z',
       angle: Math.PI * 2,
       segments: 8,
@@ -6496,7 +7043,12 @@ describe('export_gltf', () => {
   it('revolution entity: triangleCount > 0 in GLB export', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'revolve_profile', {
-      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      profile: [
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [1, 1],
+      ],
       axis: 'z',
       angle: Math.PI * 2,
       segments: 8,
@@ -6521,7 +7073,12 @@ describe('export revolution regression', () => {
   it('revolve_profile entity serialises non-empty in export_stl', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'revolve_profile', {
-      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      profile: [
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [1, 1],
+      ],
       axis: 'z',
       angle: Math.PI * 2,
       segments: 12,
@@ -6535,7 +7092,12 @@ describe('export revolution regression', () => {
   it('revolve_profile entity serialises non-empty in export_obj', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'revolve_profile', {
-      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      profile: [
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [1, 1],
+      ],
       axis: 'z',
       angle: Math.PI * 2,
       segments: 12,
@@ -6549,7 +7111,12 @@ describe('export revolution regression', () => {
   it('revolve_profile entity serialises non-empty in export_gltf', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'revolve_profile', {
-      profile: [[1, 0], [2, 0], [2, 1], [1, 1]],
+      profile: [
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [1, 1],
+      ],
       axis: 'z',
       angle: Math.PI * 2,
       segments: 12,
@@ -6596,7 +7163,11 @@ describe('align', () => {
     doc = tR.document;
     const tId = tR.affected[0]!;
 
-    const result = execute(doc, 'align', { targetIds: [tId], edge: 'center-z', referenceId: refId });
+    const result = execute(doc, 'align', {
+      targetIds: [tId],
+      edge: 'center-z',
+      referenceId: refId,
+    });
     expect(result.affected).toContain(tId);
     // ref center-z = 10; target should now have position.z such that center = 10
     expect(result.document.entities[tId]!.position[2]).toBeCloseTo(10);
@@ -6604,7 +7175,11 @@ describe('align', () => {
 
   it('returns affected:[] and unchanged doc when reference is missing', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'align', { targetIds: ['some-id'], edge: 'min-x', referenceId: 'no-such' });
+    const result = execute(doc, 'align', {
+      targetIds: ['some-id'],
+      edge: 'min-x',
+      referenceId: 'no-such',
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('no-such');
@@ -6614,7 +7189,11 @@ describe('align', () => {
     let doc = createEmptyDocument();
     const refR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
     doc = refR.document;
-    const result = execute(doc, 'align', { targetIds: ['ghost'], edge: 'max-x', referenceId: refR.affected[0]! });
+    const result = execute(doc, 'align', {
+      targetIds: ['ghost'],
+      edge: 'max-x',
+      referenceId: refR.affected[0]!,
+    });
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
   });
@@ -6626,7 +7205,11 @@ describe('align', () => {
     const tR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
     doc = tR.document;
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'align', { targetIds: [tR.affected[0]!], edge: 'min-x', referenceId: refR.affected[0]! });
+    execute(doc, 'align', {
+      targetIds: [tR.affected[0]!],
+      edge: 'min-x',
+      referenceId: refR.affected[0]!,
+    });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });
@@ -6704,7 +7287,10 @@ describe('distribute', () => {
     const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [20, 0, 0] });
     doc = r2.document;
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'distribute', { targetIds: [r0.affected[0]!, r1.affected[0]!, r2.affected[0]!], axis: 'x' });
+    execute(doc, 'distribute', {
+      targetIds: [r0.affected[0]!, r1.affected[0]!, r2.affected[0]!],
+      axis: 'x',
+    });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });
@@ -6741,7 +7327,11 @@ describe('stack_on', () => {
     const movR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
     doc = movR.document;
 
-    const result = execute(doc, 'stack_on', { movingId: movR.affected[0]!, baseId: baseR.affected[0]!, axis: 'x' });
+    const result = execute(doc, 'stack_on', {
+      movingId: movR.affected[0]!,
+      baseId: baseR.affected[0]!,
+      axis: 'x',
+    });
     expect(result.affected).toEqual([movR.affected[0]!]);
     // base max-x = 0 + 4/2 = 2; moving min-x after move = 2 → position.x = 2 + 1 = 3
     expect(result.document.entities[movR.affected[0]!]!.position[0]).toBeCloseTo(3);
@@ -6790,7 +7380,10 @@ describe('array_along_path', () => {
     doc = srcR.document;
     const srcId = srcR.affected[0]!;
 
-    const path = [[0, 0, 0], [20, 0, 0]] as [number, number, number][];
+    const path = [
+      [0, 0, 0],
+      [20, 0, 0],
+    ] as [number, number, number][];
     const result = execute(doc, 'array_along_path', { sourceId: srcId, path, count: 5 });
     expect(result.affected).toHaveLength(5);
     expect(result.document.order).toHaveLength(6); // original + 5 copies
@@ -6809,7 +7402,11 @@ describe('array_along_path', () => {
     const srcId = srcR.affected[0]!;
 
     // L-shaped path: (0,0,0)→(10,0,0)→(10,10,0); total length = 20
-    const path = [[0, 0, 0], [10, 0, 0], [10, 10, 0]] as [number, number, number][];
+    const path = [
+      [0, 0, 0],
+      [10, 0, 0],
+      [10, 10, 0],
+    ] as [number, number, number][];
     const result = execute(doc, 'array_along_path', { sourceId: srcId, path, count: 3 });
     expect(result.affected).toHaveLength(3);
 
@@ -6828,7 +7425,10 @@ describe('array_along_path', () => {
     doc = srcR.document;
     const result = execute(doc, 'array_along_path', {
       sourceId: srcR.affected[0]!,
-      path: [[0, 0, 0], [10, 0, 0]],
+      path: [
+        [0, 0, 0],
+        [10, 0, 0],
+      ],
       count: 1,
     });
     expect(result.affected).toHaveLength(1);
@@ -6839,7 +7439,10 @@ describe('array_along_path', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'array_along_path', {
       sourceId: 'ghost',
-      path: [[0, 0, 0], [10, 0, 0]],
+      path: [
+        [0, 0, 0],
+        [10, 0, 0],
+      ],
       count: 3,
     });
     expect(result.affected).toHaveLength(0);
@@ -6867,7 +7470,10 @@ describe('array_along_path', () => {
     doc = srcR.document;
     const result = execute(doc, 'array_along_path', {
       sourceId: srcR.affected[0]!,
-      path: [[0, 0, 0], [10, 0, 0]],
+      path: [
+        [0, 0, 0],
+        [10, 0, 0],
+      ],
       count: 0,
     });
     expect(result.affected).toHaveLength(0);
@@ -6882,7 +7488,10 @@ describe('array_along_path', () => {
     const snapshot = JSON.stringify(doc);
     execute(doc, 'array_along_path', {
       sourceId: srcR.affected[0]!,
-      path: [[0, 0, 0], [10, 0, 0]],
+      path: [
+        [0, 0, 0],
+        [10, 0, 0],
+      ],
       count: 3,
     });
     expect(JSON.stringify(doc)).toBe(snapshot);
@@ -7245,7 +7854,11 @@ describe('build_project repeat/for_each', () => {
     doc = b.document;
 
     const result = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
       id: 'my-constraint',
     });
 
@@ -7260,13 +7873,21 @@ describe('build_project repeat/for_each', () => {
     const b = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = b.document;
     const first = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
       id: 'dup',
     });
     doc = first.document;
 
     const second = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
       id: 'dup',
     });
 
@@ -7302,7 +7923,11 @@ describe('build_project repeat/for_each', () => {
     const snapshot = JSON.stringify(doc);
 
     execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
     });
 
     expect(JSON.stringify(doc)).toBe(snapshot);
@@ -7317,7 +7942,11 @@ describe('build_project repeat/for_each', () => {
     const b = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = b.document;
     const added = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
     });
     doc = added.document;
     const cid = added.affected[0]!;
@@ -7345,7 +7974,11 @@ describe('build_project repeat/for_each', () => {
     const b = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = b.document;
     const added = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
     });
     doc = added.document;
     const snapshot = JSON.stringify(doc);
@@ -7363,7 +7996,12 @@ describe('build_project repeat/for_each', () => {
     const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [5, 0, 0] });
     doc = b.document;
     const added = execute(doc, 'add_constraint', {
-      constraint: { kind: 'distance', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! }, value: 5 },
+      constraint: {
+        kind: 'distance',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+        value: 5,
+      },
     });
     doc = added.document;
     const cid = added.affected[0]!;
@@ -7385,7 +8023,12 @@ describe('build_project repeat/for_each', () => {
     doc = b.document;
     execute(doc, 'set_parameter', { name: 'gap', expression: '7' });
     const added = execute(doc, 'add_constraint', {
-      constraint: { kind: 'distance', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! }, value: 5 },
+      constraint: {
+        kind: 'distance',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+        value: 5,
+      },
     });
     doc = added.document;
     const cid = added.affected[0]!;
@@ -7412,7 +8055,11 @@ describe('build_project repeat/for_each', () => {
     const b = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = b.document;
     const added = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
     });
     doc = added.document;
     const cid = added.affected[0]!;
@@ -7429,7 +8076,12 @@ describe('build_project repeat/for_each', () => {
     const b = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = b.document;
     const added = execute(doc, 'add_constraint', {
-      constraint: { kind: 'distance', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! }, value: 5 },
+      constraint: {
+        kind: 'distance',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+        value: 5,
+      },
     });
     doc = added.document;
     const snapshot = JSON.stringify(doc);
@@ -7471,9 +8123,7 @@ describe('build_project repeat/for_each', () => {
     // After solving, the two entities should be much closer together.
     const posA = solved.document.entities[idA]!.position;
     const posB = solved.document.entities[idB]!.position;
-    const dist = Math.sqrt(
-      (posA[0] - posB[0]) ** 2 + (posA[1] - posB[1]) ** 2,
-    );
+    const dist = Math.sqrt((posA[0] - posB[0]) ** 2 + (posA[1] - posB[1]) ** 2);
     expect(dist).toBeLessThan(0.01);
     expect(data.converged).toBe(true);
     expect(data.residual).toBeLessThan(1e-6);
@@ -7496,7 +8146,8 @@ describe('build_project repeat/for_each', () => {
     const solved = execute(doc, 'solve_constraints', {});
     const posA = solved.document.entities[idA]!.position;
     const posB = solved.document.entities[idB]!.position;
-    void posA; void posB;
+    void posA;
+    void posB;
     // The solver should have moved the entities apart toward the target distance.
     // When starting at same position the gradient is zero so solver won't converge,
     // but at least no error is thrown and data.residual is defined.
@@ -7549,7 +8200,11 @@ describe('build_project repeat/for_each', () => {
     const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [4, 0, 0] });
     doc = b.document;
     const constrained = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
     });
     doc = constrained.document;
     const snapshot = JSON.stringify(doc);
@@ -7565,7 +8220,11 @@ describe('build_project repeat/for_each', () => {
     const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [6, 0, 0] });
     doc = b.document;
     const constrained = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: a.affected[0]! }, b: { entityId: b.affected[0]! } },
+      constraint: {
+        kind: 'coincident',
+        a: { entityId: a.affected[0]! },
+        b: { entityId: b.affected[0]! },
+      },
     });
     doc = constrained.document;
 
@@ -7584,7 +8243,10 @@ describe('build_project repeat/for_each', () => {
     // Create two components and insert instances at different positions
     const boxA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     doc = boxA.document;
-    const compA = execute(doc, 'create_component', { name: 'CompA', entityIds: [boxA.affected[0]!] });
+    const compA = execute(doc, 'create_component', {
+      name: 'CompA',
+      entityIds: [boxA.affected[0]!],
+    });
     doc = compA.document;
     const instA = compA.affected[0]!;
 
@@ -7593,7 +8255,10 @@ describe('build_project repeat/for_each', () => {
 
     const boxB = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     doc = boxB.document;
-    const compB = execute(doc, 'create_component', { name: 'CompB', entityIds: [boxB.affected[0]!] });
+    const compB = execute(doc, 'create_component', {
+      name: 'CompB',
+      entityIds: [boxB.affected[0]!],
+    });
     doc = compB.document;
     const instB = compB.affected[0]!;
 
@@ -7631,13 +8296,19 @@ describe('build_project repeat/for_each', () => {
     let doc = createEmptyDocument();
     const boxA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     doc = boxA.document;
-    const compA = execute(doc, 'create_component', { name: 'PartA', entityIds: [boxA.affected[0]!] });
+    const compA = execute(doc, 'create_component', {
+      name: 'PartA',
+      entityIds: [boxA.affected[0]!],
+    });
     doc = compA.document;
     const instA = compA.affected[0]!;
 
     const boxB = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     doc = boxB.document;
-    const compB = execute(doc, 'create_component', { name: 'PartB', entityIds: [boxB.affected[0]!] });
+    const compB = execute(doc, 'create_component', {
+      name: 'PartB',
+      entityIds: [boxB.affected[0]!],
+    });
     doc = compB.document;
     const instB = compB.affected[0]!;
 
@@ -7684,7 +8355,11 @@ describe('build_project repeat/for_each', () => {
     const instB = compB.affected[0]!;
 
     const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_mate', { kind: 'coincident', a: { instanceId: instA }, b: { instanceId: instB } });
+    execute(doc, 'add_mate', {
+      kind: 'coincident',
+      a: { instanceId: instA },
+      b: { instanceId: instB },
+    });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
@@ -7851,7 +8526,11 @@ describe('build_project repeat/for_each', () => {
     const result = execute(doc, 'bill_of_materials', {});
     expect(result.affected).toHaveLength(0);
     expect(result.document).toBe(doc);
-    const data = result.data as { rows: unknown[]; totalInstances: number; distinctComponents: number };
+    const data = result.data as {
+      rows: unknown[];
+      totalInstances: number;
+      distinctComponents: number;
+    };
     expect(data.rows).toHaveLength(0);
     expect(data.totalInstances).toBe(0);
     expect(data.distinctComponents).toBe(0);
@@ -7861,7 +8540,10 @@ describe('build_project repeat/for_each', () => {
     let doc = createEmptyDocument();
     const box = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = box.document;
-    const comp = execute(doc, 'create_component', { name: 'Widget', entityIds: [box.affected[0]!] });
+    const comp = execute(doc, 'create_component', {
+      name: 'Widget',
+      entityIds: [box.affected[0]!],
+    });
     doc = comp.document;
 
     const snapshot = JSON.stringify(doc);
@@ -7882,7 +8564,12 @@ describe('build_project repeat/for_each', () => {
 
     const result = execute(doc, 'bill_of_materials', {});
     const data = result.data as {
-      rows: Array<{ componentId: string; componentName: string; count: number; perEntityKindCounts: Record<string, number> }>;
+      rows: Array<{
+        componentId: string;
+        componentName: string;
+        count: number;
+        perEntityKindCounts: Record<string, number>;
+      }>;
       totalInstances: number;
       distinctComponents: number;
     };
@@ -7901,14 +8588,20 @@ describe('build_project repeat/for_each', () => {
     // Component 1: "Wheel" — 1 cylinder
     const cyl = execute(doc, 'add_cylinder', { radius: 1, height: 0.5 });
     doc = cyl.document;
-    const wheelComp = execute(doc, 'create_component', { name: 'Wheel', entityIds: [cyl.affected[0]!] });
+    const wheelComp = execute(doc, 'create_component', {
+      name: 'Wheel',
+      entityIds: [cyl.affected[0]!],
+    });
     doc = wheelComp.document;
     const wheelCompId = Object.keys(doc.components)[0]!;
 
     // Component 2: "Hub" — 1 sphere
     const sph = execute(doc, 'add_sphere', { radius: 0.5 });
     doc = sph.document;
-    const hubComp = execute(doc, 'create_component', { name: 'Hub', entityIds: [sph.affected[0]!] });
+    const hubComp = execute(doc, 'create_component', {
+      name: 'Hub',
+      entityIds: [sph.affected[0]!],
+    });
     doc = hubComp.document;
     const hubCompId = Object.keys(doc.components).find((id) => id !== wheelCompId)!;
 
@@ -7919,7 +8612,12 @@ describe('build_project repeat/for_each', () => {
 
     const result = execute(doc, 'bill_of_materials', {});
     const data = result.data as {
-      rows: Array<{ componentId: string; componentName: string; count: number; perEntityKindCounts: Record<string, number> }>;
+      rows: Array<{
+        componentId: string;
+        componentName: string;
+        count: number;
+        perEntityKindCounts: Record<string, number>;
+      }>;
       totalInstances: number;
       distinctComponents: number;
     };
@@ -7977,11 +8675,328 @@ describe('build_project repeat/for_each', () => {
     let doc = createEmptyDocument();
     const box = execute(doc, 'add_box', { size: [1, 1, 1] });
     doc = box.document;
-    const comp = execute(doc, 'create_component', { name: 'Bracket', entityIds: [box.affected[0]!] });
+    const comp = execute(doc, 'create_component', {
+      name: 'Bracket',
+      entityIds: [box.affected[0]!],
+    });
     doc = comp.document;
 
     const result = execute(doc, 'bill_of_materials', {});
     expect(result.summary).toContain('1');
     expect(result.summary).toContain('Bracket');
+  });
+});
+
+describe('replayHistory preserves non-regenerated document state', () => {
+  beforeEach(() => __resetIdCounter());
+
+  const steel = {
+    name: 'steel',
+    density: 0.00785,
+    color: '#808080',
+    metalness: 0.9,
+    roughness: 0.1,
+  };
+
+  it('configurations, materials and components survive edit_step_params without duplication', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_configuration', {
+      name: 'small',
+      parameterValues: { w: '10' },
+    }).document;
+    doc = execute(doc, 'create_material', steel).document;
+    const first = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = first.document;
+    doc = execute(doc, 'create_component', { name: 'Unit', entityIds: first.affected }).document;
+    const second = execute(doc, 'add_box', { size: [2, 2, 2] });
+    doc = second.document;
+    const stepId = doc.featureHistory[doc.featureHistory.length - 1]!.id;
+
+    const edited = execute(doc, 'edit_step_params', {
+      stepId,
+      params: { size: [3, 3, 3] },
+    }).document;
+
+    expect(edited.configurations['small']).toBeDefined();
+    expect(edited.materials['steel']).toBeDefined();
+    expect(Object.keys(edited.components)).toHaveLength(1);
+    expect(Object.keys(edited.components)).toHaveLength(Object.keys(doc.components).length);
+  });
+
+  it('orphan materials, components and joints (no producing step) survive suppress', () => {
+    let doc = createEmptyDocument();
+    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
+    doc = {
+      ...box.document,
+      materials: { loaded: { ...steel, name: 'loaded' } },
+      components: { 'comp-x': { id: 'comp-x', name: 'X', entities: {}, order: [] } },
+      constraints: { 'con-x': { id: 'con-x' } as never },
+      constraintOrder: ['con-x'],
+    };
+    const stepId = doc.featureHistory[0]!.id;
+    const result = execute(doc, 'set_step_suppressed', { stepId, suppressed: true }).document;
+    expect(Object.keys(result.entities)).toHaveLength(0);
+    expect(result.materials['loaded']).toBeDefined();
+    expect(result.components['comp-x']).toBeDefined();
+    expect(result.constraintOrder).toEqual(['con-x']);
+    expect(result.constraints['con-x']).toBeDefined();
+  });
+
+  it('a material produced by a history step is regenerated, so suppressing its step removes it', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'create_material', steel).document;
+    const stepId = doc.featureHistory[0]!.id;
+    const result = execute(doc, 'set_step_suppressed', { stepId, suppressed: true }).document;
+    expect(result.materials['steel']).toBeUndefined();
+  });
+});
+
+describe('build_project / template / spline / recipe allocation limits', () => {
+  beforeEach(() => __resetIdCounter());
+
+  const box = { command: 'add_box', params: { size: [1, 1, 1] } };
+
+  it('build_project rejects more than MAX_PROJECT_ACTIONS actions', () => {
+    const doc = createEmptyDocument();
+    const r = execute(doc, 'build_project', { actions: Array.from({ length: 1001 }, () => box) });
+    expect(r.document).toBe(doc);
+    expect(r.affected).toEqual([]);
+    expect(r.summary).toContain('MAX_PROJECT_ACTIONS');
+  });
+
+  it('build_project rejects a repeat expanding past MAX_PROJECT_STEPS', () => {
+    const doc = createEmptyDocument();
+    const r = execute(doc, 'build_project', {
+      actions: [{ repeat: { count: 1_000_000 }, step: box }],
+    });
+    expect(r.document).toBe(doc);
+    expect(r.summary).toContain('MAX_PROJECT_STEPS');
+  });
+
+  it('build_project rejects a for_each expanding past MAX_PROJECT_STEPS', () => {
+    const doc = createEmptyDocument();
+    const r = execute(doc, 'build_project', {
+      actions: [{ for_each: { values: new Array(10_001).fill(1), as: 'v' }, step: box }],
+    });
+    expect(r.document).toBe(doc);
+    expect(r.summary).toContain('MAX_PROJECT_STEPS');
+  });
+
+  it('build_project still runs a plan within limits', () => {
+    const r = execute(createEmptyDocument(), 'build_project', {
+      actions: [{ repeat: { count: 3 }, step: box }],
+    });
+    expect(r.affected).toHaveLength(3);
+  });
+
+  it('build_project aborts when nested build_project exceeds MAX_PROJECT_DEPTH', () => {
+    let plan: unknown = box;
+    for (let i = 0; i < 6; i++) {
+      plan = { command: 'build_project', params: { actions: [plan] } };
+    }
+    const doc = createEmptyDocument();
+    const r = execute(doc, 'build_project', { actions: [plan] });
+    expect(r.document).toBe(doc);
+    expect(r.summary).toContain('MAX_PROJECT_DEPTH');
+  });
+
+  it('draw_spline rejects more than MAX_SPLINE_CONTROL_POINTS points', () => {
+    const doc = createEmptyDocument();
+    const points = Array.from({ length: 10_001 }, (_, i) => [i, 0]);
+    const r = execute(doc, 'draw_spline', { points });
+    expect(r.document).toBe(doc);
+    expect(r.summary).toContain('MAX_SPLINE_CONTROL_POINTS');
+  });
+
+  it('instantiate_template rejects unbounded hole counts', () => {
+    const doc = createEmptyDocument();
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ['bolt_hole_pattern', { count: 1e9, boltCircleRadius: 5, holeRadius: 1 }],
+      [
+        'flange',
+        { outerRadius: 10, boreRadius: 2, boltCount: 1e9, boltCircleRadius: 6, holeRadius: 1 },
+      ],
+      [
+        'rectangular_plate_with_holes',
+        {
+          width: 10,
+          height: 10,
+          holeRows: 1e5,
+          holeCols: 1e5,
+          holeRadius: 0.1,
+          marginX: 1,
+          marginY: 1,
+        },
+      ],
+    ];
+    for (const [template, params] of cases) {
+      const r = execute(doc, 'instantiate_template', { template, params });
+      expect(r.document).toBe(doc);
+      expect(r.summary).toContain('MAX_TEMPLATE_ENTITIES');
+    }
+  });
+
+  it('instantiate_recipe stops self-referential recipes at MAX_PROJECT_DEPTH', () => {
+    let doc = createEmptyDocument();
+    doc = {
+      ...doc,
+      recipes: {
+        loop: {
+          name: 'loop',
+          steps: [
+            {
+              id: 's1',
+              name: 'instantiate_recipe',
+              params: { name: 'loop' },
+              suppressed: false,
+              affected: [],
+            },
+          ],
+        } as never,
+      },
+    };
+    const r = execute(doc, 'instantiate_recipe', { name: 'loop' });
+    expect(r.summary).toBeDefined();
+    expect(r.affected).toEqual([]);
+  });
+});
+
+describe('guardCommand contract', () => {
+  beforeEach(() => __resetIdCounter());
+
+  it('free text equal to an Object.prototype key is accepted (add_text, set_entity_name, add_layer)', () => {
+    const text = execute(createEmptyDocument(), 'add_text', {
+      content: 'constructor',
+      position: [0, 0, 0],
+      height: 1,
+    });
+    expect(text.affected).toHaveLength(1);
+    const named = execute(text.document, 'set_entity_name', {
+      id: text.affected[0],
+      name: 'valueOf',
+    });
+    expect(named.affected).toHaveLength(1);
+    const layer = execute(createEmptyDocument(), 'add_layer', { name: 'hasOwnProperty' });
+    expect(layer.document).not.toBe(createEmptyDocument());
+  });
+
+  it('a build_project plan containing prototype-key free text still runs', () => {
+    const r = execute(createEmptyDocument(), 'build_project', {
+      actions: [
+        { command: 'add_text', params: { content: 'toString', position: [0, 0, 0], height: 1 } },
+      ],
+    });
+    expect(r.affected).toHaveLength(1);
+  });
+
+  it('id-like params equal to a prototype key are a no-op', () => {
+    const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
+    for (const id of ['constructor', '__proto__', 'toString']) {
+      const r = execute(doc, 'delete_entity', { id });
+      expect(r.document).toBe(doc);
+      expect(r.affected).toEqual([]);
+    }
+    const many = execute(doc, 'delete_entities', { ids: ['constructor'] });
+    expect(many.document).toBe(doc);
+  });
+
+  it('non-array or 1-element position is a no-op; [x, y] is padded to z=0', () => {
+    const doc = createEmptyDocument();
+    for (const position of ['abc', [1], 5]) {
+      const r = execute(doc, 'add_box', { size: [1, 1, 1], position });
+      expect(r.document).toBe(doc);
+      expect(r.affected).toEqual([]);
+    }
+    const planar = execute(doc, 'add_box', { size: [1, 1, 1], position: [2, 3] });
+    expect(planar.document.entities[planar.affected[0]!]!.position).toEqual([2, 3, 0]);
+  });
+
+  it('position schema descriptions state the [x, y] shorthand contract', () => {
+    const box = toToolSchemas().find((t) => t.name === 'add_box')!;
+    expect(box.input_schema.properties['position']!.description).toContain(
+      '[x, y] is accepted and placed at z=0',
+    );
+  });
+
+  it('query command data survives the guard', () => {
+    const r = execute(createEmptyDocument(), 'describe_scene', {});
+    expect(r.data).toBeDefined();
+  });
+
+  it('a throwing command yields the no-op path and warns with the command name', () => {
+    const doc = createEmptyDocument();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const params = {};
+    Object.defineProperty(params, 'size', {
+      enumerable: false,
+      get(): never {
+        throw new Error('boom');
+      },
+    });
+    const r = execute(doc, 'add_box', params);
+    expect(r.document).toBe(doc);
+    expect(r.affected).toEqual([]);
+    expect(r.summary).toBe('add_box failed: boom; document unchanged.');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('add_box'), expect.anything());
+    warn.mockRestore();
+  });
+
+  it('corruption rejection names the specific cause', () => {
+    const doc = createEmptyDocument();
+    const r = execute(doc, 'add_box', { size: [1, 1, 1], position: [1] });
+    expect(r.summary).toContain('malformed position');
+  });
+});
+
+describe('delete_entities', () => {
+  beforeEach(() => __resetIdCounter());
+
+  function threeBoxes(): { doc: ReturnType<typeof createEmptyDocument>; ids: string[] } {
+    let doc = createEmptyDocument();
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const r = execute(doc, 'add_box', { size: [1, 1, 1] });
+      doc = r.document;
+      ids.push(r.affected[0]!);
+    }
+    return { doc, ids };
+  }
+
+  it('deletes several entities in one history step, skipping missing ids', () => {
+    const { doc, ids } = threeBoxes();
+    const before = doc.featureHistory.length;
+    const r = execute(doc, 'delete_entities', { ids: [ids[0]!, ids[1]!, 'ghost', ids[0]!] });
+    expect(r.affected).toEqual([ids[0], ids[1]]);
+    expect(r.document.order).toEqual([ids[2]]);
+    expect(Object.keys(r.document.entities)).toEqual([ids[2]]);
+    expect(r.document.featureHistory).toHaveLength(before + 1);
+    expect(r.summary).toContain('Skipped missing: [ghost]');
+  });
+
+  it('prunes selection and dissolves groups that fall below 2 members', () => {
+    const { doc, ids } = threeBoxes();
+    const grouped = execute(doc, 'group_entities', { ids: [ids[0]!, ids[1]!] }).document;
+    const selected = { ...grouped, selection: [ids[0]!, ids[2]!] };
+    const r = execute(selected, 'delete_entities', { ids: [ids[0]!] });
+    expect(r.document.selection).toEqual([ids[2]]);
+    expect(Object.keys(r.document.groups)).toHaveLength(0);
+    expect(r.summary).toContain('Dissolved');
+  });
+
+  it('is a no-op for empty, malformed, oversized or all-missing ids', () => {
+    const { doc } = threeBoxes();
+    const cases: unknown[] = [[], 'a', [1], ['ghost'], new Array(10_001).fill('x')];
+    for (const ids of cases) {
+      const r = execute(doc, 'delete_entities', { ids });
+      expect(r.document).toBe(doc);
+      expect(r.affected).toEqual([]);
+    }
+  });
+
+  it('is pure', () => {
+    const { doc, ids } = threeBoxes();
+    const snapshot = JSON.stringify(doc);
+    execute(doc, 'delete_entities', { ids });
+    expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });

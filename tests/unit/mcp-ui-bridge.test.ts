@@ -15,10 +15,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { __resetIdCounter } from '@lib/id';
 import { execute } from '@core/commands/registry';
-import {
-  buildBridgeToolDefinitions,
-  applyBridgeToolCall,
-} from '@core/mcp';
+import { buildBridgeToolDefinitions, applyBridgeToolCall } from '@core/mcp';
 import type { UiBridge } from '@core/mcp';
 
 // ---------------------------------------------------------------------------
@@ -196,7 +193,7 @@ describe('applyBridgeToolCall() — snapshot_in_from_ui (bridge returns null)', 
 
   it('returns a non-null result (graceful no-op)', async () => {
     const sessionDoc = createEmptyDocument();
-    const bridge = makeFakeBridge(null);   // no live doc
+    const bridge = makeFakeBridge(null); // no live doc
     const result = await applyBridgeToolCall(sessionDoc, 'snapshot_in_from_ui', bridge);
     expect(result).not.toBeNull();
   });

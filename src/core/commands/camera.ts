@@ -11,16 +11,17 @@
  * Convention (matches +Z-up sphericalToCartesian in Viewport3D.tsx):
  *   polar   = 0      → camera directly above along +Z
  *   polar   = π/2   → camera in the XY plane
- *   azimuth          → angle in XY plane measured from +Y toward +X
+ *   azimuth          → angle in XY plane measured from +Y toward +X; the eye sits at
+ *                      target + distance·(sin p·sin a, sin p·cos a, cos p)
  *
- * Direction preset azimuths/polars (+Z-up right-handed):
- *   front   → azimuth=0,     polar=π/2   (looking along -Y)
- *   back    → azimuth=π,     polar=π/2   (looking along +Y)
- *   right   → azimuth=π/2,   polar=π/2   (looking along -X)
- *   left    → azimuth=-π/2,  polar=π/2   (looking along +X)
- *   top     → azimuth=0,     polar=0.01  (overhead; avoid gimbal lock at polar=0)
- *   bottom  → azimuth=0,     polar=π-0.01 (below; avoid gimbal lock at polar=π)
- *   iso     → azimuth=π/4,   polar=π/4   (classic isometric)
+ * Direction preset azimuths/polars (+Z-up right-handed; eye position → view direction):
+ *   front   → azimuth=π,     polar=π/2   (eye at -Y, looking along +Y)
+ *   back    → azimuth=0,     polar=π/2   (eye at +Y, looking along -Y)
+ *   right   → azimuth=π/2,   polar=π/2   (eye at +X, looking along -X)
+ *   left    → azimuth=-π/2,  polar=π/2   (eye at -X, looking along +X)
+ *   top     → azimuth=π,     polar=0.01  (overhead, +Y up on screen; avoids gimbal lock)
+ *   bottom  → azimuth=π,     polar=π-0.01 (below; avoids gimbal lock at polar=π)
+ *   iso     → azimuth=3π/4,  polar=π/4   (eye at +X,-Y,+Z; XY plane reads unmirrored)
  *   current → preserve existing azimuth/polar; only adjust distance/target
  */
 
@@ -41,13 +42,13 @@ const HALF_FOV_RAD = (DEFAULT_FOV_DEG / 2) * (Math.PI / 180);
  * Follows +Z-up spherical convention matching Viewport3D.tsx.
  */
 const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
-  front:   { azimuth: 0,               polar: Math.PI / 2 },
-  back:    { azimuth: Math.PI,         polar: Math.PI / 2 },
-  right:   { azimuth: Math.PI / 2,     polar: Math.PI / 2 },
-  left:    { azimuth: -Math.PI / 2,    polar: Math.PI / 2 },
-  top:     { azimuth: 0,               polar: 0.01 },
-  bottom:  { azimuth: 0,               polar: Math.PI - 0.01 },
-  iso:     { azimuth: Math.PI / 4,     polar: Math.PI / 4 },
+  front: { azimuth: Math.PI, polar: Math.PI / 2 },
+  back: { azimuth: 0, polar: Math.PI / 2 },
+  right: { azimuth: Math.PI / 2, polar: Math.PI / 2 },
+  left: { azimuth: -Math.PI / 2, polar: Math.PI / 2 },
+  top: { azimuth: Math.PI, polar: 0.01 },
+  bottom: { azimuth: Math.PI, polar: Math.PI - 0.01 },
+  iso: { azimuth: (3 * Math.PI) / 4, polar: Math.PI / 4 },
 };
 
 // ---------------------------------------------------------------------------
@@ -92,7 +93,8 @@ export const setCamera: CommandDefinition<SetCameraParams> = {
         type: 'number',
         description:
           'Horizontal orbit angle in radians measured in the XY plane from +Y toward +X. ' +
-          '0 = front view (+Y direction), π/2 = right view (+X direction). Omit to keep current value.',
+          'Eye offset from target is (sin a, cos a) in XY: 0 = eye at +Y (back view), π = eye at -Y ' +
+          '(front view), π/2 = eye at +X (right view). Omit to keep current value.',
       },
       polar: {
         type: 'number',
@@ -102,7 +104,8 @@ export const setCamera: CommandDefinition<SetCameraParams> = {
       },
       distance: {
         type: 'number',
-        description: 'Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.',
+        description:
+          'Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.',
       },
     },
     required: [],
@@ -122,14 +125,14 @@ export const setCamera: CommandDefinition<SetCameraParams> = {
     const next: CameraState = {
       target: p.target !== undefined ? (p.target as Vec3) : prev.target,
       azimuth: p.azimuth !== undefined ? p.azimuth : prev.azimuth,
-      polar:   p.polar   !== undefined ? p.polar   : prev.polar,
+      polar: p.polar !== undefined ? p.polar : prev.polar,
       distance: p.distance !== undefined ? p.distance : prev.distance,
     };
 
     const changed = ([] as string[]).concat(
-      p.target   !== undefined ? ['target']   : [],
-      p.azimuth  !== undefined ? ['azimuth']  : [],
-      p.polar    !== undefined ? ['polar']    : [],
+      p.target !== undefined ? ['target'] : [],
+      p.azimuth !== undefined ? ['azimuth'] : [],
+      p.polar !== undefined ? ['polar'] : [],
       p.distance !== undefined ? ['distance'] : [],
     );
 
@@ -216,9 +219,9 @@ export const lookAt: CommandDefinition<LookAtParams> = {
 
     const prev: CameraState = doc.camera;
     const next: CameraState = {
-      target:   p.target as Vec3,
-      azimuth:  p.azimuth !== undefined ? p.azimuth : prev.azimuth,
-      polar:    p.polar   !== undefined ? p.polar   : prev.polar,
+      target: p.target as Vec3,
+      azimuth: p.azimuth !== undefined ? p.azimuth : prev.azimuth,
+      polar: p.polar !== undefined ? p.polar : prev.polar,
       distance: prev.distance,
     };
 
@@ -254,7 +257,7 @@ export const fitView: CommandDefinition<FitViewParams> = {
   description:
     'Frame the entire document in the camera so all entities are visible. ' +
     'direction presets the viewing angle: ' +
-    '"front" (looking along -Y), "back" (+Y), "right" (-X), "left" (+X), ' +
+    '"front" (eye at -Y looking along +Y), "back" (looking along -Y), "right" (looking along -X), "left" (looking along +X), ' +
     '"top" (overhead +Z), "bottom" (below -Z), "iso" (isometric, default), ' +
     '"current" (keep existing azimuth/polar, only adjust distance and target). ' +
     'padding multiplies the computed distance so geometry has breathing room (default 1.2). ' +
@@ -285,7 +288,9 @@ export const fitView: CommandDefinition<FitViewParams> = {
     const direction: FitDirection = p.direction ?? 'iso';
     const padding: number = p.padding ?? 1.2;
 
-    if (!['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current'].includes(direction)) {
+    if (
+      !['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current'].includes(direction)
+    ) {
       return {
         document: doc,
         summary: `fit_view: unknown direction "${direction}". Valid values: front, back, left, right, top, bottom, iso, current. Camera unchanged.`,
@@ -314,7 +319,7 @@ export const fitView: CommandDefinition<FitViewParams> = {
       distance = 10;
       const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
       const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
-      const polar   = preset ? preset.polar   : doc.camera.polar;
+      const polar = preset ? preset.polar : doc.camera.polar;
       const next: CameraState = { target, azimuth, polar, distance };
       return {
         document: { ...doc, camera: next },
@@ -339,7 +344,7 @@ export const fitView: CommandDefinition<FitViewParams> = {
 
     const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
     const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
-    const polar   = preset ? preset.polar   : doc.camera.polar;
+    const polar = preset ? preset.polar : doc.camera.polar;
 
     const next: CameraState = { target, azimuth, polar, distance };
     return {

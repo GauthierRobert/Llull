@@ -74,9 +74,7 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
       ];
 
       // 2. Apply instance rotation around the component origin [0,0,0].
-      const rotatedPos: Vec3 = hasRotation
-        ? applyEulerXYZ(localPos, [0, 0, 0], rot)
-        : localPos;
+      const rotatedPos: Vec3 = hasRotation ? applyEulerXYZ(localPos, [0, 0, 0], rot) : localPos;
 
       // 3. Translate by the instance world position.
       const worldPos: Vec3 = [
@@ -141,7 +139,8 @@ export const createComponent: CommandDefinition<CreateComponentParams> = {
     properties: {
       name: {
         type: 'string',
-        description: 'Human-readable name for the component, e.g. "Wheel". Used as the component label.',
+        description:
+          'Human-readable name for the component, e.g. "Wheel". Used as the component label.',
       },
       entityIds: {
         type: 'array',
@@ -296,13 +295,17 @@ export const insertInstance: CommandDefinition<InsertInstanceParams> = {
       },
       scale: {
         type: 'array',
-        description: 'Per-axis scale factors [sx, sy, sz]. Default: [1, 1, 1]. All components must be finite.',
+        description:
+          'Per-axis scale factors [sx, sy, sz]. Default: [1, 1, 1]. All components must be finite.',
         items: { type: 'number' },
       },
     },
     required: ['componentId'],
   },
-  run: (doc, { componentId, position = [0, 0, 0], rotation = [0, 0, 0], scale = [1, 1, 1] }): CommandResult => {
+  run: (
+    doc,
+    { componentId, position = [0, 0, 0], rotation = [0, 0, 0], scale = [1, 1, 1] },
+  ): CommandResult => {
     const component = doc.components[componentId];
     if (!component) {
       return {
@@ -368,7 +371,7 @@ interface ExplodeInstanceParams {
 export const explodeInstance: CommandDefinition<ExplodeInstanceParams> = {
   name: 'explode_instance',
   description:
-    'Replace an InstanceEntity with concrete copies of its component\'s entities baked into world space. ' +
+    "Replace an InstanceEntity with concrete copies of its component's entities baked into world space. " +
     'Each produced entity receives a fresh id. The component definition is NOT removed. ' +
     'The instance entity is removed and its order position is filled with the produced entities. ' +
     'Returns the new entity ids in affected.',

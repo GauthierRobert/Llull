@@ -167,7 +167,7 @@ function applyConstraintGradient(
       if (target === null) return 0;
       // Angle from da to db (z-component of cross product + dot product).
       const cross = da[0] * db[1] - da[1] * db[0]; // da × db
-      const dot = da[0] * db[0] + da[1] * db[1];   // da · db
+      const dot = da[0] * db[0] + da[1] * db[1]; // da · db
       const angle = Math.atan2(cross, dot);
       const err = angle - target;
       const err2 = err * err;
@@ -340,7 +340,12 @@ export function runSolver(doc: CadDocument): {
 // ---------------------------------------------------------------------------
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
-  'coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle',
+  'coincident',
+  'parallel',
+  'perpendicular',
+  'tangent',
+  'distance',
+  'angle',
 ]);
 
 function isEntityRef(v: unknown): v is EntityRef {
@@ -485,7 +490,7 @@ export const addConstraint: CommandDefinition<AddConstraintParams> = {
       };
     }
 
-    const constraintId = (typeof id === 'string' && id.length > 0) ? id : nextId('con');
+    const constraintId = typeof id === 'string' && id.length > 0 ? id : nextId('con');
 
     if (constraintId in doc.constraints) {
       return {

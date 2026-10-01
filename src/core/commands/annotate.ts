@@ -75,13 +75,14 @@ export const addText: CommandDefinition<AddTextParams> = {
       },
       rotation: {
         type: 'array',
-        description: 'Euler rotation angles [rx, ry, rz] in radians that orient the work plane. Defaults to [0,0,0].',
+        description:
+          'Euler rotation angles [rx, ry, rz] in radians that orient the work plane. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       anchor: {
         type: 'string',
         description:
-          "Horizontal alignment of the text relative to position. " +
+          'Horizontal alignment of the text relative to position. ' +
           "'left' (default): position is the left edge of the first glyph. " +
           "'center': position is the horizontal midpoint. " +
           "'right': position is the right edge of the last glyph.",
@@ -97,7 +98,10 @@ export const addText: CommandDefinition<AddTextParams> = {
     },
     required: ['content', 'position', 'height'],
   },
-  run: (doc, { content, position, height, rotation = [0, 0, 0], anchor = 'left', color = '#333333', layer }): CommandResult => {
+  run: (
+    doc,
+    { content, position, height, rotation = [0, 0, 0], anchor = 'left', color = '#333333', layer },
+  ): CommandResult => {
     if (typeof content !== 'string' || content.trim().length === 0) {
       return {
         document: doc,
@@ -137,11 +141,7 @@ export const addText: CommandDefinition<AddTextParams> = {
       content,
       height,
       position: [position[0], position[1], position[2]] as Vec3,
-      rotation: [
-        rotation[0] ?? 0,
-        rotation[1] ?? 0,
-        rotation[2] ?? 0,
-      ] as Vec3,
+      rotation: [rotation[0] ?? 0, rotation[1] ?? 0, rotation[2] ?? 0] as Vec3,
       anchor,
       layerId,
       color,
@@ -228,15 +228,18 @@ export const addDimension: CommandDefinition<AddDimensionParams> = {
       },
       offset: {
         type: 'number',
-        description: 'Perpendicular distance (model units) from the measured geometry to the dimension line. Default: 5.',
+        description:
+          'Perpendicular distance (model units) from the measured geometry to the dimension line. Default: 5.',
       },
       precision: {
         type: 'number',
-        description: 'Number of decimal places to display for this dimension, overriding the document displayPrecision. Omit to use the document default.',
+        description:
+          'Number of decimal places to display for this dimension, overriding the document displayPrecision. Omit to use the document default.',
       },
       label: {
         type: 'string',
-        description: "Custom text to display instead of the computed value, e.g. 'REF' or '≈ 42 mm'. Omit to show the computed measurement.",
+        description:
+          "Custom text to display instead of the computed value, e.g. 'REF' or '≈ 42 mm'. Omit to show the computed measurement.",
       },
       layer: {
         type: 'string',

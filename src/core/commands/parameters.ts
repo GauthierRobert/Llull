@@ -105,9 +105,7 @@ export function reEvaluateAll(
       // Only label as "cycle detected" when the node is genuinely in the Kahn
       // residue (cycleSet). Otherwise surface the evaluator's real error string
       // so parse errors and unknown-reference errors remain truthful (AC5).
-      const errorMsg = cycleSet.has(name)
-        ? `cycle detected involving: ${name}`
-        : evalResult.error;
+      const errorMsg = cycleSet.has(name) ? `cycle detected involving: ${name}` : evalResult.error;
       result[name] = {
         name,
         expression: param.expression,
@@ -288,7 +286,9 @@ export const deleteParameter: CommandDefinition<DeleteParameterParams> = {
     // "unknown parameter: <name>" naturally via the evaluator.
     const evaluated = reEvaluateAll(withoutDeleted);
 
-    const erroredDependents = Object.values(evaluated).filter((p) => p.error).map((p) => p.name);
+    const erroredDependents = Object.values(evaluated)
+      .filter((p) => p.error)
+      .map((p) => p.name);
 
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
 

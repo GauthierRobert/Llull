@@ -8,6 +8,7 @@
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { MAX_COPIES_PER_COMMAND } from './limits';
 
 // ---------------------------------------------------------------------------
 // rotate_entity
@@ -35,7 +36,8 @@ export const rotateEntity: CommandDefinition<RotateEntityParams> = {
       id: { type: 'string', description: 'Id of the entity to rotate.' },
       delta: {
         type: 'array',
-        description: 'Euler-angle increments [dRx, dRy, dRz] in radians to add to the current rotation.',
+        description:
+          'Euler-angle increments [dRx, dRy, dRz] in radians to add to the current rotation.',
         items: { type: 'number' },
       },
     },
@@ -88,7 +90,8 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
       id: { type: 'string', description: 'Id of the entity to scale.' },
       factor: {
         type: 'number',
-        description: 'Uniform scale factor. Must be greater than 0. A value of 2 doubles the size; 0.5 halves it.',
+        description:
+          'Uniform scale factor. Must be greater than 0. A value of 2 doubles the size; 0.5 halves it.',
       },
     },
     required: ['id', 'factor'],
@@ -430,18 +433,14 @@ export const arrayLinear: CommandDefinition<ArrayLinearParams> = {
     if (!target) {
       return { document: doc, summary: `array_linear: No entity ${id}.`, affected: [] };
     }
-    if (!Number.isInteger(count) || count < 2) {
+    if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return {
         document: doc,
-        summary: `array_linear: count must be an integer >= 2 (got ${count}); entity ${id} unchanged.`,
+        summary: `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
         affected: [],
       };
     }
-    if (
-      !Number.isFinite(offset[0]) ||
-      !Number.isFinite(offset[1]) ||
-      !Number.isFinite(offset[2])
-    ) {
+    if (!Number.isFinite(offset[0]) || !Number.isFinite(offset[1]) || !Number.isFinite(offset[2])) {
       return {
         document: doc,
         summary: `array_linear: offset must be finite (got [${offset.join(', ')}]); entity ${id} unchanged.`,
@@ -452,11 +451,7 @@ export const arrayLinear: CommandDefinition<ArrayLinearParams> = {
     const [ox, oy, oz] = target.position;
     const copies: Entity[] = [];
     for (let k = 1; k < count; k++) {
-      const newPosition: Vec3 = [
-        ox + k * offset[0],
-        oy + k * offset[1],
-        oz + k * offset[2],
-      ];
+      const newPosition: Vec3 = [ox + k * offset[0], oy + k * offset[1], oz + k * offset[2]];
       copies.push(cloneEntityAt(target, newPosition));
     }
 
@@ -527,10 +522,10 @@ export const arrayPolar: CommandDefinition<ArrayPolarParams> = {
     if (!target) {
       return { document: doc, summary: `array_polar: No entity ${id}.`, affected: [] };
     }
-    if (!Number.isInteger(count) || count < 2) {
+    if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return {
         document: doc,
-        summary: `array_polar: count must be an integer >= 2 (got ${count}); entity ${id} unchanged.`,
+        summary: `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
         affected: [],
       };
     }

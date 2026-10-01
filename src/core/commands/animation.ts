@@ -5,7 +5,13 @@
  * @layer core/commands
  */
 
-import type { Animation, AnimationChannel, AnimationTrigger, CadDocument, Vec3 } from '../model/types';
+import type {
+  Animation,
+  AnimationChannel,
+  AnimationTrigger,
+  CadDocument,
+  Vec3,
+} from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
 
@@ -17,10 +23,7 @@ import { nextId } from '../../lib/id';
  * Resolve `targetId` to its kind: 'group' if found in doc.groups, 'entity' if
  * found in doc.entities, or null when absent (caller must handle null as no-op).
  */
-function resolveTargetKind(
-  doc: CadDocument,
-  targetId: string,
-): 'entity' | 'group' | null {
+function resolveTargetKind(doc: CadDocument, targetId: string): 'entity' | 'group' | null {
   if (doc.groups[targetId] !== undefined) return 'group';
   if (doc.entities[targetId] !== undefined) return 'entity';
   return null;

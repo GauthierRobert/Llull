@@ -28,11 +28,7 @@
  */
 
 import * as THREE from 'three';
-import {
-  acceleratedRaycast,
-  computeBoundsTree,
-  disposeBoundsTree,
-} from 'three-mesh-bvh';
+import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 
 /** True after the first successful patch; prevents double-application. */
 let _patched = false;

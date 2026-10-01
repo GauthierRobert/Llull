@@ -206,11 +206,7 @@ describe('groupEntitiesForInstancing — all singletons (unique geometry)', () =
   });
 
   it('entities with different kinds are in separate batches', () => {
-    const entities: Entity[] = [
-      makeBox('b1'),
-      makeCylinder('c1'),
-      makeSphere('s1'),
-    ];
+    const entities: Entity[] = [makeBox('b1'), makeCylinder('c1'), makeSphere('s1')];
     const result = groupEntitiesForInstancing(entities);
     expect(result.size).toBe(3);
   });
@@ -260,9 +256,9 @@ describe('groupEntitiesForInstancing — mixed batchable and non-batchable', () 
     const entities: Entity[] = [
       makeBox('b1', [10, 20, 30], '#ff0000'), // key A
       makeBox('b2', [10, 20, 30], '#ff0000'), // key A (same batch)
-      makeBox('b3', [5, 5, 5], '#ff0000'),    // key B (different size)
-      makeSphere('s1', 7),                    // key C
-      makeConeStub('cone-1'),                 // non-batchable → omitted
+      makeBox('b3', [5, 5, 5], '#ff0000'), // key B (different size)
+      makeSphere('s1', 7), // key C
+      makeConeStub('cone-1'), // non-batchable → omitted
     ];
     const result = groupEntitiesForInstancing(entities);
     expect(result.size).toBe(3); // key A, key B, key C
@@ -304,8 +300,9 @@ describe('groupEntitiesForInstancing — sort determinism', () => {
   });
 
   it('100 unique-id entities → stable index ordering', () => {
-    const entities: Entity[] = Array.from({ length: 100 }, (_, i) =>
-      makeBox(`id-${String(100 - i).padStart(3, '0')}`, [2, 4, 6]), // descending order
+    const entities: Entity[] = Array.from(
+      { length: 100 },
+      (_, i) => makeBox(`id-${String(100 - i).padStart(3, '0')}`, [2, 4, 6]), // descending order
     );
     const result = groupEntitiesForInstancing(entities);
     const [batch] = result.values();

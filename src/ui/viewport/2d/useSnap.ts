@@ -11,11 +11,7 @@
 import { useMemo } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
-import {
-  collectSnapCandidates,
-  snap,
-  applyOrthoPolar,
-} from './snapping';
+import { collectSnapCandidates, snap, applyOrthoPolar } from './snapping';
 import type { SnapResult, SnapPoint, CollectOpts, OrthoPolarOpts } from './snapping';
 
 /** Shared empty result — avoids per-render allocation when no cursor snaps apply. */
@@ -50,13 +46,7 @@ export interface UseSnapOpts {
 export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
   const document = useStore((s) => s.document);
 
-  const {
-    gridSize = 1,
-    tolerance = 0.5,
-    orthoPolar,
-    drawOrigin,
-    collectOpts,
-  } = opts;
+  const { gridSize = 1, tolerance = 0.5, orthoPolar, drawOrigin, collectOpts } = opts;
 
   // Apply ortho/polar tracking first (constrains the cursor direction from origin).
   // We need the adjusted cursor before computing advanced snap candidates.
@@ -66,11 +56,11 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
       return applyOrthoPolar(drawOrigin, cursor, orthoPolar);
     }
     return cursor;
-  // orthoPolar is typically a stable literal object from the draw-tool component;
-  // depending on object identity is intentional — callers must memoise it or accept
-  // the extra (cheap) recompute. Primitive-field deps would require spreading the
-  // object here and would be noisier without measurable benefit.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // orthoPolar is typically a stable literal object from the draw-tool component;
+    // depending on object identity is intentional — callers must memoise it or accept
+    // the extra (cheap) recompute. Primitive-field deps would require spreading the
+    // object here and would be noisier without measurable benefit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, orthoPolar, drawOrigin]);
 
   // Cursor-INDEPENDENT candidates: endpoint / midpoint / center / intersection
@@ -126,9 +116,7 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
   // snap() is order-independent (it ranks by distance then snap-type priority),
   // so the union below is equivalent to the single pre-split collectSnapCandidates call.
   const candidates =
-    cursorCandidates.length === 0
-      ? staticCandidates
-      : [...staticCandidates, ...cursorCandidates];
+    cursorCandidates.length === 0 ? staticCandidates : [...staticCandidates, ...cursorCandidates];
 
   return snap(adjustedCursor, candidates, gridSize, tolerance);
 }

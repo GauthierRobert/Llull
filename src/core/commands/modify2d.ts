@@ -22,14 +22,7 @@
  * @layer core/commands
  */
 
-import type {
-  CadDocument,
-  Entity,
-  Vec2,
-  Vec3,
-  LineEntity,
-  PolylineEntity,
-} from '../model/types';
+import type { CadDocument, Entity, Vec2, Vec3, LineEntity, PolylineEntity } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
 
@@ -77,12 +70,7 @@ export function perp2(v: Vec2): Vec2 {
  * Returns null if lines are parallel / collinear.
  * Does NOT clamp t/u — callers decide whether [0,1] is required.
  */
-export function segIntersect(
-  p: Vec2,
-  q: Vec2,
-  r: Vec2,
-  s: Vec2,
-): { t: number; u: number } | null {
+export function segIntersect(p: Vec2, q: Vec2, r: Vec2, s: Vec2): { t: number; u: number } | null {
   const dx1 = q[0] - p[0];
   const dy1 = q[1] - p[1];
   const dx2 = s[0] - r[0];
@@ -387,8 +375,8 @@ export const offset2D: CommandDefinition<Offset2DParams> = {
 
     if (entity.kind === 'circle') {
       const circle = entity as { kind: 'circle'; center: Vec2; radius: number } & typeof base & {
-        id: string;
-      };
+          id: string;
+        };
       const newRadius = circle.radius + distance;
       if (newRadius <= 0) {
         return {
@@ -413,8 +401,8 @@ export const offset2D: CommandDefinition<Offset2DParams> = {
 
     if (entity.kind === 'rectangle') {
       const rect = entity as { kind: 'rectangle'; width: number; height: number } & typeof base & {
-        id: string;
-      };
+          id: string;
+        };
       const newWidth = rect.width + 2 * distance;
       const newHeight = rect.height + 2 * distance;
       if (newWidth <= 0 || newHeight <= 0) {
@@ -1117,14 +1105,8 @@ export const chamfer2D: CommandDefinition<Chamfer2DParams> = {
     const dirPrev = normalize2(toPrev);
     const dirNext = normalize2(toNext);
 
-    const bevelPrev: Vec2 = [
-      vertex[0] + dirPrev[0] * distance,
-      vertex[1] + dirPrev[1] * distance,
-    ];
-    const bevelNext: Vec2 = [
-      vertex[0] + dirNext[0] * distance,
-      vertex[1] + dirNext[1] * distance,
-    ];
+    const bevelPrev: Vec2 = [vertex[0] + dirPrev[0] * distance, vertex[1] + dirPrev[1] * distance];
+    const bevelNext: Vec2 = [vertex[0] + dirNext[0] * distance, vertex[1] + dirNext[1] * distance];
 
     // Build updated polyline
     const newPoints: Vec2[] = [];

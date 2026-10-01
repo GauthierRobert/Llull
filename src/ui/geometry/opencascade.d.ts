@@ -6,7 +6,10 @@
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare module 'opencascade.js' {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const factory: (opts?: { wasmBinary?: Uint8Array; locateFile?: (path: string) => string }) => Promise<any>;
+  const factory: (opts?: {
+    wasmBinary?: Uint8Array;
+    locateFile?: (path: string) => string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }) => Promise<any>;
   export default factory;
 }

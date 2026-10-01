@@ -26,6 +26,7 @@
 import { type Request, type Response, type Router, Router as createRouter } from 'express';
 import type { CadDocument } from '@core/model/types';
 import { pushLiveDocument, popPendingPublish } from './uiBridge';
+import { hasValidBearer, guardMutation } from './security';
 
 // ---------------------------------------------------------------------------
 // Auth middleware (re-uses the same token as /mcp)
@@ -37,9 +38,8 @@ function buildAuthMiddleware(): (req: Request, res: Response, next: () => void) 
     // No token configured — allow all (mirrors /mcp behaviour in dev mode).
     return (_req, _res, next) => next();
   }
-  const expected = `Bearer ${token}`;
   return (req: Request, res: Response, next: () => void) => {
-    if (req.headers['authorization'] !== expected) {
+    if (!hasValidBearer(req, token)) {
       res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
       return;
     }
@@ -62,21 +62,17 @@ export function buildUiBridgeRouter(): Router {
   const auth = buildAuthMiddleware();
 
   router.use(auth);
+  const mutationGuard = guardMutation();
 
   // -------------------------------------------------------------------------
   // POST /ui-bridge/push — UI pushes its current document
   // -------------------------------------------------------------------------
 
-  router.post('/push', (req: Request, res: Response) => {
+  router.post('/push', mutationGuard, (req: Request, res: Response) => {
     const body = req.body as unknown;
 
     // Basic structural validation — must be an object with entities + order.
-    if (
-      typeof body !== 'object' ||
-      body === null ||
-      !('entities' in body) ||
-      !('order' in body)
-    ) {
+    if (typeof body !== 'object' || body === null || !('entities' in body) || !('order' in body)) {
       res.status(400).json({
         error:
           'Request body must be a serialised CadDocument ' +
@@ -98,7 +94,7 @@ export function buildUiBridgeRouter(): Router {
   // POST /ui-bridge/pull — UI pops the pending staged document
   // -------------------------------------------------------------------------
 
-  router.post('/pull', (_req: Request, res: Response) => {
+  router.post('/pull', mutationGuard, (_req: Request, res: Response) => {
     const doc = popPendingPublish();
 
     if (doc === null) {

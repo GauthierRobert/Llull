@@ -20,10 +20,30 @@ export type DocumentUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export type Vec2 = readonly [number, number];
 
 /** Primitive solids supported in v1. Extend this union to add new geometry. */
-export type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid' | 'revolution';
+export type SolidKind =
+  | 'box'
+  | 'cylinder'
+  | 'sphere'
+  | 'extrusion'
+  | 'mesh'
+  | 'cone'
+  | 'torus'
+  | 'wedge'
+  | 'pyramid'
+  | 'revolution';
 
 /** 2D drafting shape kinds. Geometry is LOCAL to the entity work plane; BaseEntity.position places that plane in 3D space. */
-export type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text' | 'dimension';
+export type Shape2DKind =
+  | 'line'
+  | 'polyline'
+  | 'arc'
+  | 'circle'
+  | 'rectangle'
+  | 'point'
+  | 'ellipse'
+  | 'spline'
+  | 'text'
+  | 'dimension';
 
 /** All entity kinds — 3D solids, 2D shapes, and assembly references. */
 export type EntityKind = SolidKind | Shape2DKind | 'instance';
@@ -994,7 +1014,7 @@ export function createEmptyDocument(): CadDocument {
     selection: [],
     camera: {
       target: [0, 0, 0],
-      azimuth: Math.PI / 4,
+      azimuth: (3 * Math.PI) / 4,
       polar: Math.PI / 3,
       distance: 12,
     },

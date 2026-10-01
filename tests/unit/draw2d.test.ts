@@ -78,7 +78,12 @@ describe('2D draw commands', () => {
   describe('draw_polyline', () => {
     it('creates a polyline entity with correct geometry', () => {
       const doc = createEmptyDocument();
-      const pts = [[0, 0], [2, 0], [2, 2], [0, 2]];
+      const pts = [
+        [0, 0],
+        [2, 0],
+        [2, 2],
+        [0, 2],
+      ];
       const result = execute(doc, 'draw_polyline', { points: pts });
 
       expect(result.affected).toHaveLength(1);
@@ -95,7 +100,11 @@ describe('2D draw commands', () => {
     it('creates a closed polyline when closed=true', () => {
       const doc = createEmptyDocument();
       const result = execute(doc, 'draw_polyline', {
-        points: [[0, 0], [1, 0], [0, 1]],
+        points: [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+        ],
         closed: true,
       });
       const entity = result.document.entities[result.affected[0]!]! as PolylineEntity;
@@ -118,7 +127,12 @@ describe('2D draw commands', () => {
     it('is pure — input document is not mutated', () => {
       const doc = createEmptyDocument();
       const snapshot = JSON.stringify(doc);
-      execute(doc, 'draw_polyline', { points: [[0, 0], [1, 1]] });
+      execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 1],
+        ],
+      });
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });
@@ -306,7 +320,12 @@ describe('2D draw commands', () => {
       expect(is2D(line.document.entities[line.affected[0]!]!)).toBe(true);
       expect(is3D(line.document.entities[line.affected[0]!]!)).toBe(false);
 
-      const poly = execute(doc, 'draw_polyline', { points: [[0, 0], [1, 1]] });
+      const poly = execute(doc, 'draw_polyline', {
+        points: [
+          [0, 0],
+          [1, 1],
+        ],
+      });
       expect(is2D(poly.document.entities[poly.affected[0]!]!)).toBe(true);
 
       const arc = execute(doc, 'draw_arc', {
@@ -356,7 +375,11 @@ describe('2D draw commands', () => {
     it('scales a polyline points', () => {
       const doc = createEmptyDocument();
       const created = execute(doc, 'draw_polyline', {
-        points: [[1, 0], [2, 0], [2, 1]],
+        points: [
+          [1, 0],
+          [2, 0],
+          [2, 1],
+        ],
       });
       const id = created.affected[0]!;
 

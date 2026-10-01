@@ -13,14 +13,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  applyCommand,
-  undo,
-  redo,
-  canUndo,
-  canRedo,
-  _resetHistory,
-} from '../src/commandBus';
+import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
+import { applyCommand, undo, redo, canUndo, canRedo, _resetHistory } from '../src/commandBus';
 import { getLiveDoc, _resetLiveDoc, subscribeLive } from '../src/liveDocument';
 
 // ---------------------------------------------------------------------------
@@ -98,9 +92,8 @@ describe('applyCommand — mutating command', () => {
     expect(fakeRes.written).toHaveLength(2);
 
     const msg = fakeRes.written[1] ?? '';
-    const parsed = JSON.parse(msg.slice('data: '.length)) as Record<string, unknown>;
-    const entities = parsed['entities'] as Record<string, unknown>;
-    expect(Object.keys(entities)).toHaveLength(1);
+    expect(parseSseFrame(msg).event).toBe('patch');
+    expect(frameEntityIds(msg)).toHaveLength(1);
 
     unsub();
   });
@@ -238,12 +231,12 @@ describe('undo / redo', () => {
 
     // Undo once.
     const u1 = undo();
-    expect(u1.canUndo).toBe(true);   // still 1 step left
+    expect(u1.canUndo).toBe(true); // still 1 step left
     expect(u1.canRedo).toBe(true);
 
     // Undo again.
     const u2 = undo();
-    expect(u2.canUndo).toBe(false);  // stack empty
+    expect(u2.canUndo).toBe(false); // stack empty
     expect(u2.canRedo).toBe(true);
 
     // Redo once.
@@ -266,10 +259,9 @@ describe('undo / redo', () => {
     expect(fakeRes.written).toHaveLength(writesBefore + 1);
 
     const msg = fakeRes.written[fakeRes.written.length - 1] ?? '';
-    const parsed = JSON.parse(msg.slice('data: '.length)) as Record<string, unknown>;
-    const entities = parsed['entities'] as Record<string, unknown>;
-    // Undo reverted the add_box → 0 entities.
-    expect(Object.keys(entities)).toHaveLength(0);
+    // Undo reverted the add_box → full snapshot with 0 entities.
+    expect(parseSseFrame(msg).event).toBe('snapshot');
+    expect(frameEntityIds(msg)).toHaveLength(0);
 
     unsub();
   });

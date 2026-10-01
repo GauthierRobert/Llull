@@ -46,10 +46,7 @@ interface ParsedToolResult {
   isError: boolean;
 }
 
-function parseToolResult(result: {
-  content: ContentItem[];
-  isError?: boolean;
-}): ParsedToolResult {
+function parseToolResult(result: { content: ContentItem[]; isError?: boolean }): ParsedToolResult {
   const texts = result.content.filter(isTextContent).map((c) => c.text);
   const summary = texts[0] ?? '(no summary)';
   const affectedLine = texts.find((t) => t.startsWith('Affected entity ids:'));
@@ -114,11 +111,10 @@ async function main(): Promise<void> {
   const fakeUiDoc: CadDocument = createEmptyDocument();
 
   console.log('Step 1: POST /ui-bridge/push');
-  const pushResult = (await httpPost(
-    `${serverUrl}/ui-bridge/push`,
-    fakeUiDoc,
-    authToken,
-  )) as { ok: boolean; summary: string };
+  const pushResult = (await httpPost(`${serverUrl}/ui-bridge/push`, fakeUiDoc, authToken)) as {
+    ok: boolean;
+    summary: string;
+  };
 
   assert(pushResult.ok === true, `push should succeed (got: ${JSON.stringify(pushResult)})`);
   console.log(`  ok: ${pushResult.ok}`);
@@ -165,8 +161,14 @@ async function main(): Promise<void> {
   const hasSnapshotIn = toolNames.includes('snapshot_in_from_ui');
   const hasSnapshotOut = toolNames.includes('snapshot_out_to_ui');
 
-  assert(hasSnapshotIn, `snapshot_in_from_ui should be in tools/list (got: ${toolNames.join(', ')})`);
-  assert(hasSnapshotOut, `snapshot_out_to_ui should be in tools/list (got: ${toolNames.join(', ')})`);
+  assert(
+    hasSnapshotIn,
+    `snapshot_in_from_ui should be in tools/list (got: ${toolNames.join(', ')})`,
+  );
+  assert(
+    hasSnapshotOut,
+    `snapshot_out_to_ui should be in tools/list (got: ${toolNames.join(', ')})`,
+  );
 
   console.log(`  Total tools: ${tools.length}`);
   console.log(`  snapshot_in_from_ui: present ✓`);
@@ -244,11 +246,10 @@ async function main(): Promise<void> {
   // --------------------------------------------------------------------------
 
   console.log('Step 7: POST /ui-bridge/pull — retrieve staged document');
-  const pullResult = (await httpPost(
-    `${serverUrl}/ui-bridge/pull`,
-    {},
-    authToken,
-  )) as { pending: boolean; document?: CadDocument };
+  const pullResult = (await httpPost(`${serverUrl}/ui-bridge/pull`, {}, authToken)) as {
+    pending: boolean;
+    document?: CadDocument;
+  };
 
   assert(pullResult.pending === true, `pull should have a pending document`);
   assert(pullResult.document !== undefined, `pull response should contain a document`);
@@ -270,11 +271,9 @@ async function main(): Promise<void> {
   // --------------------------------------------------------------------------
 
   console.log('Step 8: POST /ui-bridge/pull again — should be empty');
-  const pullResult2 = (await httpPost(
-    `${serverUrl}/ui-bridge/pull`,
-    {},
-    authToken,
-  )) as { pending: boolean };
+  const pullResult2 = (await httpPost(`${serverUrl}/ui-bridge/pull`, {}, authToken)) as {
+    pending: boolean;
+  };
 
   assert(pullResult2.pending === false, `second pull should have no pending document`);
   console.log(`  pending: ${pullResult2.pending} ✓\n`);

@@ -117,7 +117,9 @@ async function main(): Promise<void> {
 
   // JSON text block check
   const textBlocks = scene.content.filter((c) => c.type === 'text');
-  const jsonBlock = textBlocks.find((c) => typeof c['text'] === 'string' && (c['text'] as string).includes('```json'));
+  const jsonBlock = textBlocks.find(
+    (c) => typeof c['text'] === 'string' && (c['text'] as string).includes('```json'),
+  );
   assert(jsonBlock !== undefined, 'content includes a ```json text block for text-only clients');
 
   // ---------------------------------------------------------------------------

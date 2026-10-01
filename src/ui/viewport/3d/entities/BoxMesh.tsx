@@ -20,7 +20,12 @@ interface BoxMeshProps {
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function BoxMesh({ entity, selected, onSelect, pbrMaterial }: BoxMeshProps): React.ReactElement {
+export function BoxMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: BoxMeshProps): React.ReactElement {
   const { size, position, rotation, color } = entity;
 
   const [sx, sy, sz] = size;
@@ -40,7 +45,14 @@ export function BoxMesh({ entity, selected, onSelect, pbrMaterial }: BoxMeshProp
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.45,
+    metalness: 0.08,
+    envMapIntensity: 0.8,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

@@ -32,17 +32,17 @@ describe('evaluateAnimationScalar', () => {
     // frequency=0.5 Hz → period=2s → quarter period = 0.5s
     // sin(2π * 0.5 * 0.5) = sin(π/2) = 1  → amplitude * 1
     const quarterPeriod = 1 / (4 * base.frequency);
-    expect(
-      evaluateAnimationScalar({ ...base, mode: 'oscillate' }, quarterPeriod),
-    ).toBeCloseTo(base.amplitude);
+    expect(evaluateAnimationScalar({ ...base, mode: 'oscillate' }, quarterPeriod)).toBeCloseTo(
+      base.amplitude,
+    );
   });
 
   it('oscillate: −amplitude at three-quarter period', () => {
     // phase = 3/(4*frequency): sin = −1 → value = −amplitude
     const threeQtrPeriod = 3 / (4 * base.frequency);
-    expect(
-      evaluateAnimationScalar({ ...base, mode: 'oscillate' }, threeQtrPeriod),
-    ).toBeCloseTo(-base.amplitude);
+    expect(evaluateAnimationScalar({ ...base, mode: 'oscillate' }, threeQtrPeriod)).toBeCloseTo(
+      -base.amplitude,
+    );
   });
 });
 
@@ -111,14 +111,18 @@ describe('composeAnimatedPose', () => {
 
   it('rotation contribution: position is rotated around pivot', () => {
     // Entity at [1,0,0]; pivot at origin; rotate π about Y → position becomes [−1,0,0]
-    const { position, quaternion } = composeAnimatedPose([1, 0, 0], [0, 0, 0], [
-      {
-        channel: 'rotation',
-        axis: new THREE.Vector3(0, 1, 0),
-        scalar: Math.PI,
-        pivot: new THREE.Vector3(0, 0, 0),
-      },
-    ]);
+    const { position, quaternion } = composeAnimatedPose(
+      [1, 0, 0],
+      [0, 0, 0],
+      [
+        {
+          channel: 'rotation',
+          axis: new THREE.Vector3(0, 1, 0),
+          scalar: Math.PI,
+          pivot: new THREE.Vector3(0, 0, 0),
+        },
+      ],
+    );
     expect(position[0]).toBeCloseTo(-1);
     expect(position[1]).toBeCloseTo(0);
     expect(position[2]).toBeCloseTo(0);
@@ -128,14 +132,18 @@ describe('composeAnimatedPose', () => {
   });
 
   it('position contribution: translates along axis', () => {
-    const { position } = composeAnimatedPose([0, 0, 0], [0, 0, 0], [
-      {
-        channel: 'position',
-        axis: new THREE.Vector3(1, 0, 0),
-        scalar: 5,
-        pivot: new THREE.Vector3(0, 0, 0),
-      },
-    ]);
+    const { position } = composeAnimatedPose(
+      [0, 0, 0],
+      [0, 0, 0],
+      [
+        {
+          channel: 'position',
+          axis: new THREE.Vector3(1, 0, 0),
+          scalar: 5,
+          pivot: new THREE.Vector3(0, 0, 0),
+        },
+      ],
+    );
     expect(position[0]).toBeCloseTo(5);
     expect(position[1]).toBeCloseTo(0);
     expect(position[2]).toBeCloseTo(0);
@@ -144,20 +152,24 @@ describe('composeAnimatedPose', () => {
   it('two rotation contributions compose multiplicatively', () => {
     // Two quarter-turns about Z: net = half-turn about Z
     // [1,0,0] rotated π/2 about Z → [0,1,0], then another π/2 → [−1,0,0]
-    const { position } = composeAnimatedPose([1, 0, 0], [0, 0, 0], [
-      {
-        channel: 'rotation',
-        axis: new THREE.Vector3(0, 0, 1),
-        scalar: Math.PI / 2,
-        pivot: new THREE.Vector3(0, 0, 0),
-      },
-      {
-        channel: 'rotation',
-        axis: new THREE.Vector3(0, 0, 1),
-        scalar: Math.PI / 2,
-        pivot: new THREE.Vector3(0, 0, 0),
-      },
-    ]);
+    const { position } = composeAnimatedPose(
+      [1, 0, 0],
+      [0, 0, 0],
+      [
+        {
+          channel: 'rotation',
+          axis: new THREE.Vector3(0, 0, 1),
+          scalar: Math.PI / 2,
+          pivot: new THREE.Vector3(0, 0, 0),
+        },
+        {
+          channel: 'rotation',
+          axis: new THREE.Vector3(0, 0, 1),
+          scalar: Math.PI / 2,
+          pivot: new THREE.Vector3(0, 0, 0),
+        },
+      ],
+    );
     expect(position[0]).toBeCloseTo(-1);
     expect(position[1]).toBeCloseTo(0);
     expect(position[2]).toBeCloseTo(0);

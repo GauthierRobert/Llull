@@ -193,7 +193,10 @@ function parsePrimary(s: ParseState): EvalResult {
     if (!inner.ok) return inner;
     const closing = peek(s);
     if (closing.kind !== 'rparen') {
-      return { ok: false, error: `expected ')' but found '${closing.text || 'end of expression'}'` };
+      return {
+        ok: false,
+        error: `expected ')' but found '${closing.text || 'end of expression'}'`,
+      };
     }
     consume(s); // consume ')'
     return inner;

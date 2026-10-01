@@ -34,15 +34,15 @@ import type { SnapType } from './snapping';
 // ---------------------------------------------------------------------------
 
 const SNAP_COLORS: Record<SnapType, string> = {
-  endpoint: '#e040fb',      // magenta
-  midpoint: '#00e5ff',      // cyan
-  center: '#ffee58',        // yellow
-  intersection: '#ff9800',  // orange
+  endpoint: '#e040fb', // magenta
+  midpoint: '#00e5ff', // cyan
+  center: '#ffee58', // yellow
+  intersection: '#ff9800', // orange
   perpendicular: '#69f0ae', // green
-  tangent: '#b9f6ca',       // lime
-  extension: '#26c6da',     // teal
-  nearest: '#40c4ff',       // blue
-  grid: '#546e7a',          // muted blue-grey
+  tangent: '#b9f6ca', // lime
+  extension: '#26c6da', // teal
+  nearest: '#40c4ff', // blue
+  grid: '#546e7a', // muted blue-grey
 };
 
 /**
@@ -71,10 +71,30 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       // Square: 4 line segments forming a box.
       const geo = new THREE.BufferGeometry();
       const v = new Float32Array([
-        -s, -s, 0,  s, -s, 0,
-         s, -s, 0,  s,  s, 0,
-         s,  s, 0, -s,  s, 0,
-        -s,  s, 0, -s, -s, 0,
+        -s,
+        -s,
+        0,
+        s,
+        -s,
+        0,
+        s,
+        -s,
+        0,
+        s,
+        s,
+        0,
+        s,
+        s,
+        0,
+        -s,
+        s,
+        0,
+        -s,
+        s,
+        0,
+        -s,
+        -s,
+        0,
       ]);
       geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
@@ -84,9 +104,24 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       const h = s * Math.sqrt(3);
       const geo = new THREE.BufferGeometry();
       const v = new Float32Array([
-        0,      h * 2 / 3, 0,  s, -h / 3, 0,
-        s,     -h / 3,     0, -s, -h / 3, 0,
-       -s,     -h / 3,     0,  0,  h * 2 / 3, 0,
+        0,
+        (h * 2) / 3,
+        0,
+        s,
+        -h / 3,
+        0,
+        s,
+        -h / 3,
+        0,
+        -s,
+        -h / 3,
+        0,
+        -s,
+        -h / 3,
+        0,
+        0,
+        (h * 2) / 3,
+        0,
       ]);
       geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
@@ -98,10 +133,7 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       for (let i = 0; i < segments; i++) {
         const a0 = (i / segments) * Math.PI * 2;
         const a1 = ((i + 1) / segments) * Math.PI * 2;
-        verts.push(
-          s * Math.cos(a0), s * Math.sin(a0), 0,
-          s * Math.cos(a1), s * Math.sin(a1), 0,
-        );
+        verts.push(s * Math.cos(a0), s * Math.sin(a0), 0, s * Math.cos(a1), s * Math.sin(a1), 0);
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
@@ -110,10 +142,7 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
     case 'intersection': {
       // X: two diagonal lines.
       const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([
-        -s, -s, 0,  s,  s, 0,
-        -s,  s, 0,  s, -s, 0,
-      ]);
+      const v = new Float32Array([-s, -s, 0, s, s, 0, -s, s, 0, s, -s, 0]);
       geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
     }
@@ -121,11 +150,31 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       // Right-angle symbol: two segments forming an L-shape with a corner tick.
       const geo = new THREE.BufferGeometry();
       const v = new Float32Array([
-        0, -s, 0,  0,  0, 0,   // vertical leg
-        0,  0, 0,  s,  0, 0,   // horizontal leg
+        0,
+        -s,
+        0,
+        0,
+        0,
+        0, // vertical leg
+        0,
+        0,
+        0,
+        s,
+        0,
+        0, // horizontal leg
         // small corner square tick
-        s * 0.35, 0, 0,  s * 0.35, s * 0.35, 0,
-        s * 0.35, s * 0.35, 0,  0, s * 0.35, 0,
+        s * 0.35,
+        0,
+        0,
+        s * 0.35,
+        s * 0.35,
+        0,
+        s * 0.35,
+        s * 0.35,
+        0,
+        0,
+        s * 0.35,
+        0,
       ]);
       geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
@@ -134,8 +183,18 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       // T-mark: horizontal bar with vertical stem.
       const geo = new THREE.BufferGeometry();
       const v = new Float32Array([
-        -s, s * 0.5, 0,   s, s * 0.5, 0,   // top bar
-         0, s * 0.5, 0,   0,     -s, 0,   // stem
+        -s,
+        s * 0.5,
+        0,
+        s,
+        s * 0.5,
+        0, // top bar
+        0,
+        s * 0.5,
+        0,
+        0,
+        -s,
+        0, // stem
       ]);
       geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
@@ -144,9 +203,24 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       // Dashed line cap: short horizontal line with a gap-mark (two lines).
       const geo = new THREE.BufferGeometry();
       const v = new Float32Array([
-        -s,       0, 0,  -s * 0.3, 0, 0,   // left segment
-         s * 0.3, 0, 0,         s, 0, 0,   // right segment (gap in middle)
-        -s * 0.1, -s * 0.4, 0,  -s * 0.1, s * 0.4, 0,  // vertical tick at gap
+        -s,
+        0,
+        0,
+        -s * 0.3,
+        0,
+        0, // left segment
+        s * 0.3,
+        0,
+        0,
+        s,
+        0,
+        0, // right segment (gap in middle)
+        -s * 0.1,
+        -s * 0.4,
+        0,
+        -s * 0.1,
+        s * 0.4,
+        0, // vertical tick at gap
       ]);
       geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
@@ -165,7 +239,14 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
         const a0 = (i / inner) * Math.PI * 2;
         const a1 = ((i + 1) / inner) * Math.PI * 2;
         const r2 = s * 0.3;
-        verts.push(r2 * Math.cos(a0), r2 * Math.sin(a0), 0, r2 * Math.cos(a1), r2 * Math.sin(a1), 0);
+        verts.push(
+          r2 * Math.cos(a0),
+          r2 * Math.sin(a0),
+          0,
+          r2 * Math.cos(a1),
+          r2 * Math.sin(a1),
+          0,
+        );
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
@@ -174,10 +255,7 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
     case 'grid': {
       // Plus: two orthogonal lines.
       const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([
-        -s, 0, 0,  s, 0, 0,
-         0, -s, 0,  0, s, 0,
-      ]);
+      const v = new Float32Array([-s, 0, 0, s, 0, 0, 0, -s, 0, 0, s, 0]);
       geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
       return geo;
     }

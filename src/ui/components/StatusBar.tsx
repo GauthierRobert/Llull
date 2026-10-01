@@ -4,7 +4,7 @@
  * StatusBar — a bottom bar that surfaces live document state at a glance.
  *
  * Reads (all via narrow Zustand selectors — react R3):
- *   - liveStatus                              → live connection indicator
+ *   - liveStatus + syncState + hasUnsyncedLocalEdits → live / syncing / sync-failed indicator
  *   - document.units + document.displayPrecision → formatted unit label
  *   - document.selection.length               → selection count
  *   - lastSummary                             → most recent command feedback
@@ -27,7 +27,11 @@ interface StatusItemProps {
   'aria-label'?: string;
 }
 
-function StatusItem({ label, value, 'aria-label': ariaLabel }: StatusItemProps): React.ReactElement {
+function StatusItem({
+  label,
+  value,
+  'aria-label': ariaLabel,
+}: StatusItemProps): React.ReactElement {
   return (
     <span className="status-item" aria-label={ariaLabel ?? `${label}: ${value}`}>
       <span className="status-item__label">{label}</span>
@@ -43,8 +47,19 @@ function StatusItem({ label, value, 'aria-label': ariaLabel }: StatusItemProps):
 function LiveIndicator(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
 
-  const isConnected = liveStatus === 'connected';
-  const label = isConnected ? 'Live' : liveStatus === 'connecting' ? 'Connecting…' : 'Disconnected';
+  const syncState = useStore((s) => s.syncState);
+  const hasUnsynced = useStore((s) => s.hasUnsyncedLocalEdits);
+
+  const label =
+    liveStatus === 'connected'
+      ? syncState === 'failed'
+        ? 'Sync failed — retrying'
+        : syncState === 'syncing' || hasUnsynced
+          ? 'Syncing…'
+          : 'Live'
+      : liveStatus === 'connecting'
+        ? 'Connecting…'
+        : 'Offline (local)';
 
   return (
     <span
@@ -90,11 +105,12 @@ export function StatusBar(): React.ReactElement {
   const lastSummary = useStore((s) => s.lastSummary);
 
   const unitLabel = `${units} (${displayPrecision}dp)`;
-  const selectionLabel = selectionCount === 0
-    ? 'None'
-    : selectionCount === 1
-      ? '1 entity'
-      : `${selectionCount} entities`;
+  const selectionLabel =
+    selectionCount === 0
+      ? 'None'
+      : selectionCount === 1
+        ? '1 entity'
+        : `${selectionCount} entities`;
 
   return (
     <footer className="status-bar-bottom" aria-label="Document status">

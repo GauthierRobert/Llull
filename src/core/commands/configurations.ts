@@ -156,7 +156,7 @@ export const activateConfiguration: CommandDefinition<ActivateConfigurationParam
   description:
     'Apply a named configuration to the document: set each parameter listed in the ' +
     'configuration to its expression value, re-evaluate the parameter table in topological ' +
-    'order, then replay featureHistory so all =expr geometry regenerates with the variant\'s values. ' +
+    "order, then replay featureHistory so all =expr geometry regenerates with the variant's values. " +
     'Use after create_configuration to switch between model variants (e.g. "small" vs "large"). ' +
     'The configuration must already exist in the document (call create_configuration first).',
   paramsSchema: {
@@ -237,12 +237,7 @@ export const activateConfiguration: CommandDefinition<ActivateConfigurationParam
 
     // Replay featureHistory to regenerate entities with the new parameter values.
     const warnings: string[] = [];
-    const regenerated = replayHistory(
-      baseDoc,
-      doc.featureHistory,
-      resolveGetCommand(),
-      warnings,
-    );
+    const regenerated = replayHistory(baseDoc, doc.featureHistory, resolveGetCommand(), warnings);
 
     const entityCount = Object.keys(regenerated.entities).length;
 
@@ -256,9 +251,7 @@ export const activateConfiguration: CommandDefinition<ActivateConfigurationParam
       );
     }
     if (warnings.length > 0) {
-      parts.push(
-        `Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`,
-      );
+      parts.push(`Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`);
     }
 
     return {

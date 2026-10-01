@@ -13,7 +13,12 @@ export type { McpTextContent, McpShapedResult, McpToolCallResult } from './dispa
 export { shapeToolCallContent, applyMcpToolCall } from './dispatch';
 
 export type { McpResourceDescriptor, McpResourceContent, CadResourceUri } from './resources';
-export { listMcpResources, readMcpResource, readConventionsResource, CAD_RESOURCE_URIS } from './resources';
+export {
+  listMcpResources,
+  readMcpResource,
+  readConventionsResource,
+  CAD_RESOURCE_URIS,
+} from './resources';
 
 export { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 

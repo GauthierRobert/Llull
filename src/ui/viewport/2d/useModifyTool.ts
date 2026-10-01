@@ -206,7 +206,15 @@ export function useModifyTool(): UseModifyToolResult {
       resetProgress();
       setPhase('pick-entity');
     }
-  }, [activeTool, dispatch, entities, pendingValue, pickedEntityId, pickedVertexIndex, resetProgress]);
+  }, [
+    activeTool,
+    dispatch,
+    entities,
+    pendingValue,
+    pickedEntityId,
+    pickedVertexIndex,
+    resetProgress,
+  ]);
 
   const handleEntityPick = useCallback(
     (entityId: string, worldPoint: Vec2, entityPoints?: ReadonlyArray<Vec2>) => {
@@ -281,9 +289,7 @@ export function useModifyTool(): UseModifyToolResult {
       // Do not steal keys from text inputs.
       const target = e.target as HTMLElement;
       const isInput =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable;
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
       if (e.key === 'Escape') {
         cancel();

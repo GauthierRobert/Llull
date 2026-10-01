@@ -15,10 +15,7 @@ import type {
   SphereEntity,
   ExtrusionEntity,
 } from '@core/model/types';
-import {
-  collectSnapCandidates3D,
-  snap3d,
-} from '../../src/ui/viewport/3d/snap3d';
+import { collectSnapCandidates3D, snap3d } from '../../src/ui/viewport/3d/snap3d';
 import type { SnapPoint3D } from '../../src/ui/viewport/3d/snap3d';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +26,15 @@ function emptyDoc(): CadDocument {
   return createEmptyDocument();
 }
 
-function docWithBox(id: string, px: number, py: number, pz: number, w: number, h: number, d: number): CadDocument {
+function docWithBox(
+  id: string,
+  px: number,
+  py: number,
+  pz: number,
+  w: number,
+  h: number,
+  d: number,
+): CadDocument {
   const doc = emptyDoc();
   const entity: BoxEntity = {
     id,
@@ -43,7 +48,14 @@ function docWithBox(id: string, px: number, py: number, pz: number, w: number, h
   return { ...doc, entities: { [id]: entity }, order: [id] };
 }
 
-function docWithCylinder(id: string, px: number, py: number, pz: number, radius: number, height: number): CadDocument {
+function docWithCylinder(
+  id: string,
+  px: number,
+  py: number,
+  pz: number,
+  radius: number,
+  height: number,
+): CadDocument {
   const doc = emptyDoc();
   const entity: CylinderEntity = {
     id,
@@ -58,7 +70,13 @@ function docWithCylinder(id: string, px: number, py: number, pz: number, radius:
   return { ...doc, entities: { [id]: entity }, order: [id] };
 }
 
-function docWithSphere(id: string, px: number, py: number, pz: number, radius: number): CadDocument {
+function docWithSphere(
+  id: string,
+  px: number,
+  py: number,
+  pz: number,
+  radius: number,
+): CadDocument {
   const doc = emptyDoc();
   const entity: SphereEntity = {
     id,
@@ -77,7 +95,12 @@ function docWithExtrusion(id: string, px: number, py: number, pz: number): CadDo
   const entity: ExtrusionEntity = {
     id,
     kind: 'extrusion',
-    profile: [[0, 0], [2, 0], [2, 2], [0, 2]],
+    profile: [
+      [0, 0],
+      [2, 0],
+      [2, 2],
+      [0, 2],
+    ],
     depth: 3,
     position: [px, py, pz],
     rotation: [0, 0, 0],
@@ -177,9 +200,7 @@ describe('collectSnapCandidates3D', () => {
     const doc = docWithSphere('s1', 1, 2, 3, 5);
     const candidates = collectSnapCandidates3D(doc, undefined);
     // The centre point is at (1, 2, 3); poles are each 5 units away.
-    const nonCentre = candidates.filter(
-      (c) => !(c.x === 1 && c.y === 2 && c.z === 3),
-    );
+    const nonCentre = candidates.filter((c) => !(c.x === 1 && c.y === 2 && c.z === 3));
     for (const p of nonCentre) {
       const dx = p.x - 1;
       const dy = p.y - 2;
@@ -325,19 +346,13 @@ describe('snap3d', () => {
   });
 
   it('vertex beats edge at equal distance (priority)', () => {
-    const candidates: SnapPoint3D[] = [
-      makeEdge(0, 0, 0),
-      makeVertex(0, 0, 0),
-    ];
+    const candidates: SnapPoint3D[] = [makeEdge(0, 0, 0), makeVertex(0, 0, 0)];
     const result = snap3d(0.1, 0, 0, candidates, TOLERANCE, GRID_STEP);
     expect(result.type).toBe('vertex');
   });
 
   it('edge beats face-center at equal distance (priority)', () => {
-    const candidates: SnapPoint3D[] = [
-      makeFaceCenter(0, 0, 0),
-      makeEdge(0, 0, 0),
-    ];
+    const candidates: SnapPoint3D[] = [makeFaceCenter(0, 0, 0), makeEdge(0, 0, 0)];
     const result = snap3d(0.1, 0, 0, candidates, TOLERANCE, GRID_STEP);
     expect(result.type).toBe('edge');
   });

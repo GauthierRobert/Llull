@@ -28,7 +28,7 @@
 // ---------------------------------------------------------------------------
 
 /** Target minimum fraction of the viewport width a major cell should span. */
-const MIN_STEP_FRACTION = 0.04;   // ~8 major lines across a 100 % view
+const MIN_STEP_FRACTION = 0.04; // ~8 major lines across a 100 % view
 
 /** Nice step candidates per decade (the "1-2-5 sequence"). */
 const NICE_STEPS = [1, 2, 5] as const;

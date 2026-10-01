@@ -73,18 +73,15 @@ export function TopBar(): React.ReactElement {
       {/* File breadcrumbs */}
       <nav className="file-crumbs" aria-label="File location">
         <span className="file-crumb">Workshop</span>
-        <span className="file-crumb-sep" aria-hidden="true">/</span>
+        <span className="file-crumb-sep" aria-hidden="true">
+          /
+        </span>
         <span className="file-crumb file-crumb--active">Untitled</span>
       </nav>
 
       {/* Tab bar */}
       <nav className="tabbar" aria-label="Workspace tabs">
-        <button
-          type="button"
-          className="tab tab--active"
-          aria-pressed={true}
-          aria-current="page"
-        >
+        <button type="button" className="tab tab--active" aria-pressed={true} aria-current="page">
           Design
         </button>
         <button

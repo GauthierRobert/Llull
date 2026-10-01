@@ -108,12 +108,14 @@ export const groupEntities: CommandDefinition<GroupEntitiesParams> = {
     properties: {
       ids: {
         type: 'array',
-        description: 'Array of entity ids to include in the group. Must contain >= 2 ids that exist in the document.',
+        description:
+          'Array of entity ids to include in the group. Must contain >= 2 ids that exist in the document.',
         items: { type: 'string' },
       },
       name: {
         type: 'string',
-        description: 'Optional human-readable label for the group, e.g. "Wheel assembly". Defaults to "Group".',
+        description:
+          'Optional human-readable label for the group, e.g. "Wheel assembly". Defaults to "Group".',
       },
     },
     required: ['ids'],
@@ -220,7 +222,7 @@ export const setEntityName: CommandDefinition<SetEntityNameParams> = {
   name: 'set_entity_name',
   annotations: { idempotent: true },
   description:
-    'Set an entity\'s display name and/or tags. ' +
+    "Set an entity's display name and/or tags. " +
     'Both fields are optional and independent — omitting a field leaves it unchanged. ' +
     'Pass name:"" to clear the name, or tags:[] to clear all tags. ' +
     'Enables AI/MCP plans to reference entities by meaning instead of generated ids, ' +
@@ -248,7 +250,11 @@ export const setEntityName: CommandDefinition<SetEntityNameParams> = {
   run: (doc, { id, name, tags }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return { document: doc, summary: `No entity ${id} — set_entity_name is a no-op.`, affected: [] };
+      return {
+        document: doc,
+        summary: `No entity ${id} — set_entity_name is a no-op.`,
+        affected: [],
+      };
     }
 
     // Build a patched entity; only override fields that were provided.

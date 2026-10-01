@@ -3,7 +3,7 @@
  *
  * useMcpLiveDocument — subscribes to the server-side SSE document stream.
  *
- * Opens `GET http://localhost:3001/live` as an EventSource.
+ * Opens `GET <SERVER_BASE>/live` as an EventSource (SERVER_BASE from @ui/serverConfig).
  *
  * Protocol (named SSE events):
  *   - `snapshot` event: full CadDocument JSON. Used on initial connect and after
@@ -17,7 +17,7 @@
  *   - onopen  → setLiveStatus('connected')
  *   - snapshot → JSON.parse → hydrateLiveDocument (full replace)
  *   - patch   → JSON.parse → applyLivePatch (incremental update)
- *   - onerror → setLiveStatus('disconnected') (EventSource retries automatically)
+ *   - onerror → setLiveStatus('disconnected'), close, reconnect with exponential backoff (1s..30s)
  *   - unmount → EventSource.close()
  *
  * Mount once at the App root. Uses narrow store selectors (R3).
@@ -28,8 +28,11 @@ import { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import type { CadDocument } from '@core/model/types';
 import type { DocPatch } from '@core/mcp/docPatch';
+import { SERVER_BASE } from '@ui/serverConfig';
 
-const LIVE_URL = 'http://localhost:3001/live';
+const LIVE_URL = `${SERVER_BASE}/live`;
+const RETRY_BASE_MS = 1000;
+const RETRY_MAX_MS = 30000;
 
 /**
  * Open the SSE stream and keep the Zustand store hydrated.
@@ -41,56 +44,70 @@ export function useMcpLiveDocument(): void {
   const setLiveStatus = useStore((s) => s.setLiveStatus);
 
   useEffect(() => {
-    setLiveStatus('connecting');
+    let source: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    let disposed = false;
 
-    const source = new EventSource(LIVE_URL);
-
-    source.onopen = () => {
-      setLiveStatus('connected');
+    const scheduleReconnect = (): void => {
+      if (disposed || retryTimer !== null) return;
+      const delay = Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS);
+      attempt += 1;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        connect();
+      }, delay);
     };
 
-    // Named event: `snapshot` — full document replacement.
-    // Used on initial connect and after undo/redo.
-    source.addEventListener('snapshot', (e: Event) => {
-      const me = e as MessageEvent<string>;
-      try {
-        const doc = JSON.parse(me.data) as CadDocument;
-        hydrateLiveDocument(doc);
-      } catch {
-        // Malformed JSON from server — ignore, stay connected.
-      }
-    });
+    const connect = (): void => {
+      setLiveStatus('connecting');
+      const es = new EventSource(LIVE_URL);
+      source = es;
 
-    // Named event: `patch` — incremental entity-level delta.
-    // Used after every normal mutating command.
-    source.addEventListener('patch', (e: Event) => {
-      const me = e as MessageEvent<string>;
-      try {
-        const patch = JSON.parse(me.data) as DocPatch;
-        applyLivePatch(patch);
-      } catch {
-        // Malformed JSON from server — ignore, stay connected.
-      }
-    });
+      es.onopen = () => {
+        attempt = 0;
+        setLiveStatus('connected');
+      };
 
-    // Fallback: unnamed `onmessage` (server emitting without `event:` field).
-    // Treats it as a full snapshot for backward compatibility.
-    source.onmessage = (e: MessageEvent<string>) => {
-      try {
-        const doc = JSON.parse(e.data) as CadDocument;
-        hydrateLiveDocument(doc);
-      } catch {
-        // Malformed JSON — ignore.
-      }
+      es.addEventListener('snapshot', (e: Event) => {
+        try {
+          hydrateLiveDocument(JSON.parse((e as MessageEvent<string>).data) as CadDocument);
+        } catch {
+          // Malformed JSON from server — ignore, stay connected.
+        }
+      });
+
+      es.addEventListener('patch', (e: Event) => {
+        try {
+          applyLivePatch(JSON.parse((e as MessageEvent<string>).data) as DocPatch);
+        } catch {
+          // Malformed JSON from server — ignore, stay connected.
+        }
+      });
+
+      // Unnamed events: treated as a full snapshot (backward compatibility).
+      es.onmessage = (e: MessageEvent<string>) => {
+        try {
+          hydrateLiveDocument(JSON.parse(e.data) as CadDocument);
+        } catch {
+          // Malformed JSON — ignore.
+        }
+      };
+
+      // Close the native auto-retry (fixed ~3s, noisy) and back off exponentially instead.
+      es.onerror = () => {
+        es.close();
+        setLiveStatus('disconnected');
+        scheduleReconnect();
+      };
     };
 
-    source.onerror = () => {
-      // EventSource will auto-reconnect; we just reflect the transient state.
-      setLiveStatus('disconnected');
-    };
+    connect();
 
     return () => {
-      source.close();
+      disposed = true;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      source?.close();
     };
   }, [hydrateLiveDocument, applyLivePatch, setLiveStatus]);
 }

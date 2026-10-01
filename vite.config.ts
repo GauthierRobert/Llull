@@ -2,12 +2,28 @@ import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
   // Serve .wasm files with the correct MIME type so WebAssembly.instantiateStreaming
   // succeeds in the browser (manifold-3d, opencascade.js). Vite dev-server otherwise
   // serves them as application/octet-stream which browsers reject for streaming compile.
   assetsInclude: ['**/*.wasm'],
+  build: {
+    chunkSizeWarningLimit: 900, // three.js alone is ~800 kB and cannot be split further
+    rollupOptions: {
+      output: {
+        manualChunks(id: string): string | undefined {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('/three/') || id.includes('three-stdlib') || id.includes('three-mesh-bvh'))
+            return 'vendor-three';
+          if (id.includes('@react-three') || id.includes('/postprocessing/')) return 'vendor-r3f';
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/'))
+            return 'vendor-react';
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     headers: {
       // Required for SharedArrayBuffer / COOP-COEP if needed; harmless otherwise.
@@ -18,6 +34,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // manifold-3d's Node-only branch imports node:module; stub it for browser bundles only
+      // (the vitest/node run keeps the real module).
+      ...(command === 'build'
+        ? { 'node:module': resolve(__dirname, 'src/ui/geometry/nodeModuleStub.ts') }
+        : {}),
       '@core': resolve(__dirname, 'src/core'),
       '@ui': resolve(__dirname, 'src/ui'),
       '@lib': resolve(__dirname, 'src/lib'),
@@ -46,4 +67,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

@@ -83,11 +83,7 @@ export function rasterizeSvg(svg: string, width?: number): string | null {
  * @returns A new record with `svg` omitted, or the original value if not a record.
  */
 export function stripSvgFromData(data: unknown): unknown {
-  if (
-    typeof data !== 'object' ||
-    data === null ||
-    Array.isArray(data)
-  ) {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     return data;
   }
   const record = data as Record<string, unknown>;
@@ -125,9 +121,7 @@ export function buildImageBlock(data: unknown): ImageContentBlock | null {
   if (svg.length === 0) return null;
 
   const width =
-    typeof record['width'] === 'number' && record['width'] > 0
-      ? record['width']
-      : undefined;
+    typeof record['width'] === 'number' && record['width'] > 0 ? record['width'] : undefined;
 
   const base64 = rasterizeSvg(svg, width);
   if (base64 === null) return null;

@@ -15,7 +15,10 @@ interface PolylineRendererProps {
   selected: boolean;
 }
 
-export function PolylineRenderer({ entity, selected }: PolylineRendererProps): React.ReactElement | null {
+export function PolylineRenderer({
+  entity,
+  selected,
+}: PolylineRendererProps): React.ReactElement | null {
   const { points, closed, position, color } = entity;
 
   const lineObject = useMemo(() => {
@@ -24,7 +27,7 @@ export function PolylineRenderer({ entity, selected }: PolylineRendererProps): R
     const pts = closed ? [...points, points[0]] : points;
     const vertices = new Float32Array(pts.length * 3);
     for (let i = 0; i < pts.length; i++) {
-      vertices[i * 3]     = pts[i]![0];
+      vertices[i * 3] = pts[i]![0];
       vertices[i * 3 + 1] = pts[i]![1];
       vertices[i * 3 + 2] = 0;
     }

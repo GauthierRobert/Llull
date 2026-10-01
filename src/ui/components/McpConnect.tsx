@@ -12,6 +12,7 @@
  */
 
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { SERVER_BASE } from '@ui/serverConfig';
 
 // ---------------------------------------------------------------------------
 // Static constants (no registry import — pure UI)
@@ -19,7 +20,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server run dev';
 const SERVER_START_CMD = 'npm --prefix server run dev';
-const ENDPOINT_URL = 'http://localhost:3001/mcp';
+const ENDPOINT_URL = `${SERVER_BASE}/mcp`;
 
 interface CapabilityBadge {
   readonly label: string;
@@ -42,7 +43,8 @@ const AGENT_LOOP_STEPS: readonly AgentLoopStep[] = [
   {
     index: 1,
     tool: 'read cad://conventions',
-    description: 'Load the llull conventions resource to understand coordinate axes, units, and entity kinds.',
+    description:
+      'Load the llull conventions resource to understand coordinate axes, units, and entity kinds.',
   },
   {
     index: 2,
@@ -52,12 +54,14 @@ const AGENT_LOOP_STEPS: readonly AgentLoopStep[] = [
   {
     index: 3,
     tool: 'add_box (or any create/edit command)',
-    description: 'Create or modify geometry via any registered command (add_box, draw_line, extrude_profile, …).',
+    description:
+      'Create or modify geometry via any registered command (add_box, draw_line, extrude_profile, …).',
   },
   {
     index: 4,
     tool: 'render_view',
-    description: 'Render a screenshot with axes, grid, units, and showLabels:true to verify the result visually.',
+    description:
+      'Render a screenshot with axes, grid, units, and showLabels:true to verify the result visually.',
   },
   {
     index: 5,
@@ -202,11 +206,7 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
   );
 
   return (
-    <div
-      className="mcp-connect-backdrop"
-      onClick={handleBackdropClick}
-      aria-hidden="false"
-    >
+    <div className="mcp-connect-backdrop" onClick={handleBackdropClick} aria-hidden="false">
       <div
         ref={dialogRef}
         role="dialog"
@@ -267,8 +267,9 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
               <CopyButton text={ENDPOINT_URL} label="endpoint URL" />
             </div>
             <p className="mcp-connect__hint mcp-connect__hint--inline">
-              Point your MCP client (Claude Desktop, Cursor, etc.) at this URL.
-              Set <code className="mcp-connect__inline-code">MCP_AUTH_TOKEN</code> to protect the endpoint in production.
+              Point your MCP client (Claude Desktop, Cursor, etc.) at this URL. Set{' '}
+              <code className="mcp-connect__inline-code">MCP_AUTH_TOKEN</code> to protect the
+              endpoint in production.
             </p>
           </section>
 

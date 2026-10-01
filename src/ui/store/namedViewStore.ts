@@ -89,10 +89,7 @@ export interface NamedViewStoreState {
    * (via the bridge ref) that returns the live camera position and target.
    * Returns the new view's id, or null if the snapshot could not be captured.
    */
-  saveNamedView(
-    name: string,
-    getCameraSnapshot: () => NamedViewCamera | null,
-  ): string | null;
+  saveNamedView(name: string, getCameraSnapshot: () => NamedViewCamera | null): string | null;
 
   /**
    * Restore a previously saved named view by id.
@@ -102,7 +99,12 @@ export interface NamedViewStoreState {
    */
   restoreNamedView(
     id: string,
-    applyCamera: ((position: readonly [number, number, number], target: readonly [number, number, number]) => void) | null,
+    applyCamera:
+      | ((
+          position: readonly [number, number, number],
+          target: readonly [number, number, number],
+        ) => void)
+      | null,
   ): void;
 
   /**
@@ -118,10 +120,7 @@ export interface NamedViewStoreState {
 export const useNamedViewStore = create<NamedViewStoreState>()((set, get) => ({
   namedViews: readStoredViews(),
 
-  saveNamedView(
-    name: string,
-    getCameraSnapshot: () => NamedViewCamera | null,
-  ): string | null {
+  saveNamedView(name: string, getCameraSnapshot: () => NamedViewCamera | null): string | null {
     const snapshot = getCameraSnapshot();
     if (!snapshot) return null;
 
@@ -142,7 +141,12 @@ export const useNamedViewStore = create<NamedViewStoreState>()((set, get) => ({
 
   restoreNamedView(
     id: string,
-    applyCamera: ((position: readonly [number, number, number], target: readonly [number, number, number]) => void) | null,
+    applyCamera:
+      | ((
+          position: readonly [number, number, number],
+          target: readonly [number, number, number],
+        ) => void)
+      | null,
   ): void {
     if (!applyCamera) return;
     const view = get().namedViews.find((v) => v.id === id);

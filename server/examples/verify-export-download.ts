@@ -77,7 +77,10 @@ async function run(): Promise<void> {
   const triangleCount = binBuf.readUInt32LE(80);
   const expectedLength = 84 + triangleCount * 50;
   assert(triangleCount > 0, `triangleCount=${triangleCount} > 0`);
-  assert(binBuf.length === expectedLength, `buffer length = 84 + ${triangleCount}*50 = ${expectedLength}`);
+  assert(
+    binBuf.length === expectedLength,
+    `buffer length = 84 + ${triangleCount}*50 = ${expectedLength}`,
+  );
 
   // ------------------------------------------------------------------
   // 4. Custom name param.

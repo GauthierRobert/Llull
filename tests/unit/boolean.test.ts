@@ -12,18 +12,8 @@ import { __resetIdCounter } from '@lib/id';
 // ---------------------------------------------------------------------------
 
 const CANNED_MESH: MeshData = {
-  positions: [
-    0, 0, 0,
-    1, 0, 0,
-    0, 1, 0,
-    0, 0, 1,
-  ], // 4 vertices × 3 = 12 floats
-  indices: [
-    0, 1, 2,
-    0, 1, 3,
-    0, 2, 3,
-    1, 2, 3,
-  ], // 4 triangles × 3 = 12 indices
+  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], // 4 vertices × 3 = 12 floats
+  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3], // 4 triangles × 3 = 12 indices
 };
 
 // ---------------------------------------------------------------------------
@@ -143,7 +133,10 @@ describe('boolean commands', () => {
     it('new mesh entity inherits layerId and color from operand a', () => {
       const { doc, idA } = docWithTwoBoxes();
       const entityA = doc.entities[idA]!;
-      const result = execute(doc, 'boolean_union', { a: idA, b: Object.keys(doc.entities).find(id => id !== idA)! });
+      const result = execute(doc, 'boolean_union', {
+        a: idA,
+        b: Object.keys(doc.entities).find((id) => id !== idA)!,
+      });
       const newId = result.affected[0]!;
       const entity = result.document.entities[newId]!;
       expect(entity.layerId).toBe(entityA.layerId);

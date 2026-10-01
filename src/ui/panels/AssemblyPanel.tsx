@@ -169,10 +169,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
       <div className="assembly-panel-section">
         <div className="assembly-panel-header">
           <h2 className="assembly-panel-title">Components</h2>
-          <span
-            className="assembly-panel-count"
-            aria-label={`${componentList.length} components`}
-          >
+          <span className="assembly-panel-count" aria-label={`${componentList.length} components`}>
             {componentList.length}
           </span>
         </div>
@@ -180,11 +177,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
         {componentList.length === 0 ? (
           <p className="assembly-empty-hint">No components defined.</p>
         ) : (
-          <ul
-            className="assembly-component-list"
-            aria-label="Component list"
-            role="list"
-          >
+          <ul className="assembly-component-list" aria-label="Component list" role="list">
             {componentList.map((comp) => (
               <ComponentRow key={comp.id} component={comp} />
             ))}
@@ -196,10 +189,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
       <div className="assembly-panel-section">
         <div className="assembly-panel-header">
           <h2 className="assembly-panel-title">Instances</h2>
-          <span
-            className="assembly-panel-count"
-            aria-label={`${instanceList.length} instances`}
-          >
+          <span className="assembly-panel-count" aria-label={`${instanceList.length} instances`}>
             {instanceList.length}
           </span>
         </div>
@@ -207,11 +197,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
         {instanceList.length === 0 ? (
           <p className="assembly-empty-hint">No instances in the scene.</p>
         ) : (
-          <ul
-            className="assembly-instance-list"
-            aria-label="Instance list"
-            role="listbox"
-          >
+          <ul className="assembly-instance-list" aria-label="Instance list" role="listbox">
             {instanceList.map((inst) => {
               const comp = components[inst.componentId];
               const compName = comp ? comp.name : inst.componentId;

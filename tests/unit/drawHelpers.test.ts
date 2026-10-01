@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { rectParamsFromCorners, circleRadiusFromPoints } from '../../src/ui/viewport/2d/drawHelpers';
+import {
+  rectParamsFromCorners,
+  circleRadiusFromPoints,
+} from '../../src/ui/viewport/2d/drawHelpers';
 
 // ---------------------------------------------------------------------------
 // rectParamsFromCorners

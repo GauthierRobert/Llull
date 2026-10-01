@@ -9,11 +9,12 @@
  *
  * Error handling:
  *   - Network failure / non-ok status → throws a ServerCommandError.
- *   - Callers (`dispatch`, `undo`, `redo` in the store) catch and reflect the error
- *     as a 'disconnected' liveStatus + descriptive lastSummary.
+ *   - Callers (`dispatch`, `undo`, `redo` in the store) catch it; see store.ts for the
+ *     network-vs-HTTP and offline policy.
+ * Server URL and optional bearer token come from @ui/serverConfig.
  */
 
-const SERVER_BASE = 'http://localhost:3001';
+import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 
 // ---------------------------------------------------------------------------
 // Response type
@@ -38,8 +39,14 @@ export interface ServerCommandResponse {
 // ---------------------------------------------------------------------------
 
 export class ServerCommandError extends Error {
-  constructor(message: string) {
+  /** 'network' = fetch failed (server unreachable); 'http' = server answered non-2xx. */
+  readonly kind: 'network' | 'http';
+  readonly status: number | undefined;
+
+  constructor(message: string, kind: 'network' | 'http' = 'network', status?: number) {
     super(message);
+    this.kind = kind;
+    this.status = status;
     this.name = 'ServerCommandError';
   }
 }
@@ -53,15 +60,21 @@ async function postJson(path: string, body: unknown): Promise<ServerCommandRespo
   try {
     response = await fetch(`${SERVER_BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() },
       body: JSON.stringify(body),
     });
   } catch (cause) {
-    throw new ServerCommandError(`Network error: ${cause instanceof Error ? cause.message : String(cause)}`);
+    throw new ServerCommandError(
+      `Network error: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
   }
 
   if (!response.ok) {
-    throw new ServerCommandError(`Server responded with HTTP ${response.status} for ${path}`);
+    throw new ServerCommandError(
+      `Server responded with HTTP ${response.status} for ${path}`,
+      'http',
+      response.status,
+    );
   }
 
   return response.json() as Promise<ServerCommandResponse>;

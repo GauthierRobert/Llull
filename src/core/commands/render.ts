@@ -22,11 +22,18 @@
 
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { revolutionPolygons } from '../geometry/revolution';
 import { computeSceneSnapshot } from './scene';
 import type { Bounds } from './scene';
 import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
 export { applyEulerXYZ } from '@lib/eulerRotation';
-import { SEG_CIRCLE, SEG_SPHERE_LAT, SEG_SPHERE_LON, SEG_TORUS_TUBE, circlePoints as _circlePoints } from './tessellation';
+import {
+  SEG_CIRCLE,
+  SEG_SPHERE_LAT,
+  SEG_SPHERE_LON,
+  SEG_TORUS_TUBE,
+  circlePoints as _circlePoints,
+} from './tessellation';
 
 // ---------------------------------------------------------------------------
 // Public result type — a second agent depends on these field names exactly.
@@ -44,7 +51,11 @@ export interface RenderViewData {
   /** World-space AABB of all entities, or null when the document is empty. */
   bounds: Bounds | null;
   /** Camera position, target, and up vector used for the render. */
-  camera: { position: [number, number, number]; target: [number, number, number]; up: [number, number, number] };
+  camera: {
+    position: [number, number, number];
+    target: [number, number, number];
+    up: [number, number, number];
+  };
   /** Complete, self-contained SVG document string. */
   svg: string;
 }
@@ -105,8 +116,14 @@ function normalize3(a: Vec3): Vec3 {
 
 function centroid3(verts: Vec3[]): Vec3 {
   if (verts.length === 0) return [0, 0, 0];
-  let x = 0, y = 0, z = 0;
-  for (const v of verts) { x += v[0]; y += v[1]; z += v[2]; }
+  let x = 0,
+    y = 0,
+    z = 0;
+  for (const v of verts) {
+    x += v[0];
+    y += v[1];
+    z += v[2];
+  }
   const n = verts.length;
   return [x / n, y / n, z / n];
 }
@@ -136,7 +153,11 @@ function rotateNormalXYZ(n: Vec3, euler: Vec3): Vec3 {
  *
  * @pure
  */
-function applyRotation(polys: PreDepthPolygon[], position: Vec3, rotation: Vec3): PreDepthPolygon[] {
+function applyRotation(
+  polys: PreDepthPolygon[],
+  position: Vec3,
+  rotation: Vec3,
+): PreDepthPolygon[] {
   if (isZeroRotation(rotation)) return polys;
   return polys.map((poly) => ({
     ...poly,
@@ -150,7 +171,15 @@ function applyRotation(polys: PreDepthPolygon[], position: Vec3, rotation: Vec3)
 // ---------------------------------------------------------------------------
 
 type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso';
-const VALID_VIEWS: ReadonlySet<string> = new Set<ViewName>(['top', 'bottom', 'front', 'back', 'left', 'right', 'iso']);
+const VALID_VIEWS: ReadonlySet<string> = new Set<ViewName>([
+  'top',
+  'bottom',
+  'front',
+  'back',
+  'left',
+  'right',
+  'iso',
+]);
 
 /** Camera described in world space (all Z-up). */
 interface Camera {
@@ -223,8 +252,8 @@ function toScreenCoords(
   height: number,
 ): [number, number] {
   const margin = 0.9; // 90 % of canvas used
-  const scaleX = (width / 2) * margin / orthoHalf;
-  const scaleY = (height / 2) * margin / orthoHalf;
+  const scaleX = ((width / 2) * margin) / orthoHalf;
+  const scaleY = ((height / 2) * margin) / orthoHalf;
   const scale = Math.min(scaleX, scaleY);
   const sx = width / 2 + u * scale;
   const sy = height / 2 - v * scale; // flip Y (SVG Y grows down)
@@ -288,29 +317,85 @@ function makePolygon(verts: Vec3[], color: string, stroke = false): PreDepthPoly
 function tessellateBox(e: { position: Vec3; size: Vec3; color: string }): PreDepthPolygon[] {
   const [px, py, pz] = e.position;
   const [w, h, d] = e.size;
-  const x0 = px - w / 2, x1 = px + w / 2;
-  const y0 = py - h / 2, y1 = py + h / 2;
-  const z0 = pz - d / 2, z1 = pz + d / 2;
+  const x0 = px - w / 2,
+    x1 = px + w / 2;
+  const y0 = py - h / 2,
+    y1 = py + h / 2;
+  const z0 = pz - d / 2,
+    z1 = pz + d / 2;
   const c = e.color;
   // 6 quads (CCW when viewed from outside, Z-up)
   return [
     // bottom (-Z)
-    makePolygon([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], c),
+    makePolygon(
+      [
+        [x0, y0, z0],
+        [x1, y0, z0],
+        [x1, y1, z0],
+        [x0, y1, z0],
+      ],
+      c,
+    ),
     // top (+Z)
-    makePolygon([[x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [x1, y0, z1]], c),
+    makePolygon(
+      [
+        [x0, y0, z1],
+        [x0, y1, z1],
+        [x1, y1, z1],
+        [x1, y0, z1],
+      ],
+      c,
+    ),
     // front (-Y)
-    makePolygon([[x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0]], c),
+    makePolygon(
+      [
+        [x0, y0, z0],
+        [x0, y0, z1],
+        [x1, y0, z1],
+        [x1, y0, z0],
+      ],
+      c,
+    ),
     // back (+Y)
-    makePolygon([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], c),
+    makePolygon(
+      [
+        [x0, y1, z0],
+        [x1, y1, z0],
+        [x1, y1, z1],
+        [x0, y1, z1],
+      ],
+      c,
+    ),
     // left (-X)
-    makePolygon([[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], c),
+    makePolygon(
+      [
+        [x0, y0, z0],
+        [x0, y1, z0],
+        [x0, y1, z1],
+        [x0, y0, z1],
+      ],
+      c,
+    ),
     // right (+X)
-    makePolygon([[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], c),
+    makePolygon(
+      [
+        [x1, y0, z0],
+        [x1, y0, z1],
+        [x1, y1, z1],
+        [x1, y1, z0],
+      ],
+      c,
+    ),
   ];
 }
 
 /** Z-up cylinder: axis along Z, centered at position. */
-function tessellateCylinder(e: { position: Vec3; radius: number; height: number; color: string }): PreDepthPolygon[] {
+function tessellateCylinder(e: {
+  position: Vec3;
+  radius: number;
+  height: number;
+  color: string;
+}): PreDepthPolygon[] {
   const [px, py, pz] = e.position;
   const { radius, height, color } = e;
   const zb = pz - height / 2;
@@ -342,10 +427,26 @@ function tessellateSphere(e: { position: Vec3; radius: number; color: string }):
     for (let lon = 0; lon < SEG_SPHERE_LON; lon++) {
       const b0 = (2 * Math.PI * lon) / SEG_SPHERE_LON;
       const b1 = (2 * Math.PI * (lon + 1)) / SEG_SPHERE_LON;
-      const v00: Vec3 = [px + radius * Math.cos(a0) * Math.cos(b0), py + radius * Math.cos(a0) * Math.sin(b0), pz + radius * Math.sin(a0)];
-      const v01: Vec3 = [px + radius * Math.cos(a0) * Math.cos(b1), py + radius * Math.cos(a0) * Math.sin(b1), pz + radius * Math.sin(a0)];
-      const v10: Vec3 = [px + radius * Math.cos(a1) * Math.cos(b0), py + radius * Math.cos(a1) * Math.sin(b0), pz + radius * Math.sin(a1)];
-      const v11: Vec3 = [px + radius * Math.cos(a1) * Math.cos(b1), py + radius * Math.cos(a1) * Math.sin(b1), pz + radius * Math.sin(a1)];
+      const v00: Vec3 = [
+        px + radius * Math.cos(a0) * Math.cos(b0),
+        py + radius * Math.cos(a0) * Math.sin(b0),
+        pz + radius * Math.sin(a0),
+      ];
+      const v01: Vec3 = [
+        px + radius * Math.cos(a0) * Math.cos(b1),
+        py + radius * Math.cos(a0) * Math.sin(b1),
+        pz + radius * Math.sin(a0),
+      ];
+      const v10: Vec3 = [
+        px + radius * Math.cos(a1) * Math.cos(b0),
+        py + radius * Math.cos(a1) * Math.sin(b0),
+        pz + radius * Math.sin(a1),
+      ];
+      const v11: Vec3 = [
+        px + radius * Math.cos(a1) * Math.cos(b1),
+        py + radius * Math.cos(a1) * Math.sin(b1),
+        pz + radius * Math.sin(a1),
+      ];
       polys.push(makePolygon([v00, v01, v11, v10], color));
     }
   }
@@ -353,7 +454,12 @@ function tessellateSphere(e: { position: Vec3; radius: number; color: string }):
 }
 
 /** Z-up cone: base circle in XY at position, apex at position+[0,0,height]. */
-function tessellateCone(e: { position: Vec3; radius: number; height: number; color: string }): PreDepthPolygon[] {
+function tessellateCone(e: {
+  position: Vec3;
+  radius: number;
+  height: number;
+  color: string;
+}): PreDepthPolygon[] {
   const [px, py, pz] = e.position;
   const { radius, height, color } = e;
   const base = circlePoints(px, py, pz, radius, SEG_CIRCLE);
@@ -371,7 +477,12 @@ function tessellateCone(e: { position: Vec3; radius: number; height: number; col
 }
 
 /** Torus: ring in XY plane, tube extends ±tubeRadius in Z. */
-function tessellateTorus(e: { position: Vec3; ringRadius: number; tubeRadius: number; color: string }): PreDepthPolygon[] {
+function tessellateTorus(e: {
+  position: Vec3;
+  ringRadius: number;
+  tubeRadius: number;
+  color: string;
+}): PreDepthPolygon[] {
   const [px, py, pz] = e.position;
   const { ringRadius, tubeRadius, color } = e;
   const RING_SEGS = SEG_CIRCLE;
@@ -381,19 +492,39 @@ function tessellateTorus(e: { position: Vec3; ringRadius: number; tubeRadius: nu
   for (let i = 0; i < RING_SEGS; i++) {
     const a0 = (2 * Math.PI * i) / RING_SEGS;
     const a1 = (2 * Math.PI * (i + 1)) / RING_SEGS;
-    const ca0 = Math.cos(a0), sa0 = Math.sin(a0);
-    const ca1 = Math.cos(a1), sa1 = Math.sin(a1);
+    const ca0 = Math.cos(a0),
+      sa0 = Math.sin(a0);
+    const ca1 = Math.cos(a1),
+      sa1 = Math.sin(a1);
     for (let j = 0; j < TUBE_SEGS; j++) {
       const b0 = (2 * Math.PI * j) / TUBE_SEGS;
       const b1 = (2 * Math.PI * (j + 1)) / TUBE_SEGS;
       // tube cross-section: radial direction in XY + Z
-      const cb0 = Math.cos(b0), sb0 = Math.sin(b0);
-      const cb1 = Math.cos(b1), sb1 = Math.sin(b1);
+      const cb0 = Math.cos(b0),
+        sb0 = Math.sin(b0);
+      const cb1 = Math.cos(b1),
+        sb1 = Math.sin(b1);
 
-      const v00: Vec3 = [px + (ringRadius + tubeRadius * cb0) * ca0, py + (ringRadius + tubeRadius * cb0) * sa0, pz + tubeRadius * sb0];
-      const v01: Vec3 = [px + (ringRadius + tubeRadius * cb1) * ca0, py + (ringRadius + tubeRadius * cb1) * sa0, pz + tubeRadius * sb1];
-      const v10: Vec3 = [px + (ringRadius + tubeRadius * cb0) * ca1, py + (ringRadius + tubeRadius * cb0) * sa1, pz + tubeRadius * sb0];
-      const v11: Vec3 = [px + (ringRadius + tubeRadius * cb1) * ca1, py + (ringRadius + tubeRadius * cb1) * sa1, pz + tubeRadius * sb1];
+      const v00: Vec3 = [
+        px + (ringRadius + tubeRadius * cb0) * ca0,
+        py + (ringRadius + tubeRadius * cb0) * sa0,
+        pz + tubeRadius * sb0,
+      ];
+      const v01: Vec3 = [
+        px + (ringRadius + tubeRadius * cb1) * ca0,
+        py + (ringRadius + tubeRadius * cb1) * sa0,
+        pz + tubeRadius * sb1,
+      ];
+      const v10: Vec3 = [
+        px + (ringRadius + tubeRadius * cb0) * ca1,
+        py + (ringRadius + tubeRadius * cb0) * sa1,
+        pz + tubeRadius * sb0,
+      ];
+      const v11: Vec3 = [
+        px + (ringRadius + tubeRadius * cb1) * ca1,
+        py + (ringRadius + tubeRadius * cb1) * sa1,
+        pz + tubeRadius * sb1,
+      ];
       polys.push(makePolygon([v00, v10, v11, v01], color));
     }
   }
@@ -437,9 +568,16 @@ function tessellateWedge(e: { position: Vec3; size: Vec3; color: string }): PreD
 /**
  * Pyramid: rectangular base centered at position in XY, apex at position+[0,0,height].
  */
-function tessellatePyramid(e: { position: Vec3; baseWidth: number; baseDepth: number; height: number; color: string }): PreDepthPolygon[] {
+function tessellatePyramid(e: {
+  position: Vec3;
+  baseWidth: number;
+  baseDepth: number;
+  height: number;
+  color: string;
+}): PreDepthPolygon[] {
   const [px, py, pz] = e.position;
-  const hw = e.baseWidth / 2, hd = e.baseDepth / 2;
+  const hw = e.baseWidth / 2,
+    hd = e.baseDepth / 2;
   const b00: Vec3 = [px - hw, py - hd, pz];
   const b10: Vec3 = [px + hw, py - hd, pz];
   const b11: Vec3 = [px + hw, py + hd, pz];
@@ -476,70 +614,18 @@ function tessellateRevolution(e: {
   segments: number;
   color: string;
 }): PreDepthPolygon[] {
-  if (e.profile.length < 3) return [];
-  const { profile, angle, segments, color } = e;
-  const [px, py, pz] = e.position;
-  const [ax, ay, az] = e.axis;
-  const absX = Math.abs(ax), absY = Math.abs(ay), absZ = Math.abs(az);
-
-  // Map a [radial, axial] profile point to a 3D world point at a given sweep angle `theta`.
-  // Basis choice: for each primary axis, the radial plane is the two orthogonal axes.
-  function profileToWorld(r: number, a: number, theta: number): Vec3 {
-    const cosT = Math.cos(theta);
-    const sinT = Math.sin(theta);
-    if (absZ >= absX && absZ >= absY) {
-      // Z-axis revolution: axial=Z, radial sweeps in XY
-      return [px + r * cosT, py + r * sinT, pz + a];
-    } else if (absY >= absX) {
-      // Y-axis revolution: axial=Y, radial sweeps in XZ
-      return [px + r * cosT, py + a, pz + r * sinT];
-    } else {
-      // X-axis revolution: axial=X, radial sweeps in YZ
-      return [px + a, py + r * cosT, pz + r * sinT];
-    }
-  }
-
-  const n = profile.length;
-  const isFull = angle >= 2 * Math.PI - 1e-6;
-  const polys: PreDepthPolygon[] = [];
-
-  // Build rings: one ring per segment step (segments+1 total for open, segments for full).
-  const ringCount = isFull ? segments : segments + 1;
-  const rings: Vec3[][] = [];
-  for (let s = 0; s < ringCount; s++) {
-    const theta = (angle * s) / segments;
-    const ring: Vec3[] = [];
-    for (let i = 0; i < n; i++) {
-      const [r, a] = profile[i]!;
-      ring.push(profileToWorld(r, a, theta));
-    }
-    rings.push(ring);
-  }
-
-  // Stitch side quads between consecutive rings.
-  const numRings = rings.length;
-  for (let s = 0; s < segments; s++) {
-    const ringA = rings[s]!;
-    const ringB = rings[(s + 1) % numRings]!;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      polys.push(makePolygon([ringA[i]!, ringA[j]!, ringB[j]!, ringB[i]!], color));
-    }
-  }
-
-  // End caps for partial revolutions.
-  if (!isFull) {
-    // Start cap (theta=0): profile ring at s=0, winding reversed for outward normal.
-    polys.push(makePolygon([...rings[0]!].reverse(), color));
-    // End cap (theta=angle): profile ring at s=segments.
-    polys.push(makePolygon([...rings[segments]!], color));
-  }
-
-  return polys;
+  return revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position).map((vertices) =>
+    makePolygon(vertices, e.color),
+  );
 }
 
 /** Extrusion: closed XY profile at position, extruded +Z by depth. */
-function tessellateExtrusion(e: { position: Vec3; profile: ReadonlyArray<readonly [number, number]>; depth: number; color: string }): PreDepthPolygon[] {
+function tessellateExtrusion(e: {
+  position: Vec3;
+  profile: ReadonlyArray<readonly [number, number]>;
+  depth: number;
+  color: string;
+}): PreDepthPolygon[] {
   if (e.profile.length < 3) return [];
   const [px, py, pz] = e.position;
   const n = e.profile.length;
@@ -560,7 +646,11 @@ function tessellateExtrusion(e: { position: Vec3; profile: ReadonlyArray<readonl
 }
 
 /** Mesh solid: world-space triangle soup. Groups every 3 vertices as one triangle. */
-function tessellateMesh(e: { position: Vec3; mesh: { positions: readonly number[] }; color: string }): PreDepthPolygon[] {
+function tessellateMesh(e: {
+  position: Vec3;
+  mesh: { positions: readonly number[] };
+  color: string;
+}): PreDepthPolygon[] {
   const p = e.mesh.positions;
   const polys: PreDepthPolygon[] = [];
   for (let i = 0; i + 8 < p.length; i += 9) {
@@ -580,19 +670,36 @@ function place2D(localPt: Vec2, position: Vec3): Vec3 {
   return [position[0] + localPt[0], position[1] + localPt[1], position[2]];
 }
 
-function tessellate2DLine(e: { position: Vec3; start: Vec2; end: Vec2; color: string }): PreDepthPolygon[] {
+function tessellate2DLine(e: {
+  position: Vec3;
+  start: Vec2;
+  end: Vec2;
+  color: string;
+}): PreDepthPolygon[] {
   const verts: Vec3[] = [place2D(e.start, e.position), place2D(e.end, e.position)];
   return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
 }
 
-function tessellate2DPolyline(e: { position: Vec3; points: ReadonlyArray<Vec2>; closed: boolean; color: string }): PreDepthPolygon[] {
+function tessellate2DPolyline(e: {
+  position: Vec3;
+  points: ReadonlyArray<Vec2>;
+  closed: boolean;
+  color: string;
+}): PreDepthPolygon[] {
   if (e.points.length < 2) return [];
   const verts: Vec3[] = e.points.map((pt) => place2D(pt, e.position));
   if (e.closed) verts.push(verts[0]!);
   return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
 }
 
-function tessellate2DArc(e: { position: Vec3; center: Vec2; radius: number; startAngle: number; endAngle: number; color: string }): PreDepthPolygon[] {
+function tessellate2DArc(e: {
+  position: Vec3;
+  center: Vec2;
+  radius: number;
+  startAngle: number;
+  endAngle: number;
+  color: string;
+}): PreDepthPolygon[] {
   const segs = SEG_CIRCLE;
   const { startAngle, endAngle, radius, color } = e;
   let span = endAngle - startAngle;
@@ -606,7 +713,12 @@ function tessellate2DArc(e: { position: Vec3; center: Vec2; radius: number; star
   return [{ verts, color, normal: [0, 0, 1], stroke: true }];
 }
 
-function tessellate2DCircle(e: { position: Vec3; center: Vec2; radius: number; color: string }): PreDepthPolygon[] {
+function tessellate2DCircle(e: {
+  position: Vec3;
+  center: Vec2;
+  radius: number;
+  color: string;
+}): PreDepthPolygon[] {
   const { radius, color } = e;
   const verts: Vec3[] = [];
   for (let i = 0; i <= SEG_CIRCLE; i++) {
@@ -617,7 +729,12 @@ function tessellate2DCircle(e: { position: Vec3; center: Vec2; radius: number; c
   return [{ verts, color, normal: [0, 0, 1], stroke: true }];
 }
 
-function tessellate2DRectangle(e: { position: Vec3; width: number; height: number; color: string }): PreDepthPolygon[] {
+function tessellate2DRectangle(e: {
+  position: Vec3;
+  width: number;
+  height: number;
+  color: string;
+}): PreDepthPolygon[] {
   const [px, py, pz] = e.position;
   const verts: Vec3[] = [
     [px, py, pz],
@@ -629,11 +746,20 @@ function tessellate2DRectangle(e: { position: Vec3; width: number; height: numbe
   return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
 }
 
-function tessellate2DEllipse(e: { position: Vec3; center: Vec2; radiusX: number; radiusY: number; color: string }): PreDepthPolygon[] {
+function tessellate2DEllipse(e: {
+  position: Vec3;
+  center: Vec2;
+  radiusX: number;
+  radiusY: number;
+  color: string;
+}): PreDepthPolygon[] {
   const verts: Vec3[] = [];
   for (let i = 0; i <= SEG_CIRCLE; i++) {
     const a = (2 * Math.PI * i) / SEG_CIRCLE;
-    const local: Vec2 = [e.center[0] + e.radiusX * Math.cos(a), e.center[1] + e.radiusY * Math.sin(a)];
+    const local: Vec2 = [
+      e.center[0] + e.radiusX * Math.cos(a),
+      e.center[1] + e.radiusY * Math.sin(a),
+    ];
     verts.push(place2D(local, e.position));
   }
   return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
@@ -643,7 +769,12 @@ function tessellate2DEllipse(e: { position: Vec3; center: Vec2; radiusX: number;
  * Catmull-Rom spline tessellation with centripetal parameterization.
  * The through-points ARE the control points.
  */
-function tessellate2DSpline(e: { position: Vec3; points: ReadonlyArray<Vec2>; closed: boolean; color: string }): PreDepthPolygon[] {
+function tessellate2DSpline(e: {
+  position: Vec3;
+  points: ReadonlyArray<Vec2>;
+  closed: boolean;
+  color: string;
+}): PreDepthPolygon[] {
   if (e.points.length < 2) return [];
   const pts = [...e.points];
   if (e.closed) pts.push(pts[0]!); // close loop
@@ -660,9 +791,20 @@ function tessellate2DSpline(e: { position: Vec3; points: ReadonlyArray<Vec2>; cl
     const p3 = extended[i + 2]!;
     for (let s = 0; s <= STEPS; s++) {
       const t = s / STEPS;
-      const t2 = t * t, t3 = t2 * t;
-      const x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
-      const y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+      const t2 = t * t,
+        t3 = t2 * t;
+      const x =
+        0.5 *
+        (2 * p1[0] +
+          (-p0[0] + p2[0]) * t +
+          (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
+          (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+      const y =
+        0.5 *
+        (2 * p1[1] +
+          (-p0[1] + p2[1]) * t +
+          (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
+          (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
       if (s === 0 && verts.length > 0) continue; // avoid duplicating junction
       verts.push(place2D([x, y], e.position));
     }
@@ -675,8 +817,24 @@ function tessellate2DPoint(e: { position: Vec3; color: string }): PreDepthPolygo
   const [px, py, pz] = e.position;
   const s = 0.1; // small cross arm
   return [
-    { verts: [[px - s, py, pz], [px + s, py, pz]], color: e.color, normal: [0, 0, 1], stroke: true },
-    { verts: [[px, py - s, pz], [px, py + s, pz]], color: e.color, normal: [0, 0, 1], stroke: true },
+    {
+      verts: [
+        [px - s, py, pz],
+        [px + s, py, pz],
+      ],
+      color: e.color,
+      normal: [0, 0, 1],
+      stroke: true,
+    },
+    {
+      verts: [
+        [px, py - s, pz],
+        [px, py + s, pz],
+      ],
+      color: e.color,
+      normal: [0, 0, 1],
+      stroke: true,
+    },
   ];
 }
 
@@ -687,28 +845,49 @@ function tessellate2DPoint(e: { position: Vec3; color: string }): PreDepthPolygo
 function tessellateEntity(e: Entity): PreDepthPolygon[] {
   switch (e.kind) {
     // 3D solids — apply entity rotation (three.js intrinsic XYZ Euler order)
-    case 'box':      return applyRotation(tessellateBox(e),       e.position, e.rotation);
-    case 'cylinder': return applyRotation(tessellateCylinder(e),  e.position, e.rotation);
-    case 'sphere':   return applyRotation(tessellateSphere(e),    e.position, e.rotation);
-    case 'cone':     return applyRotation(tessellateCone(e),      e.position, e.rotation);
-    case 'torus':    return applyRotation(tessellateTorus(e),     e.position, e.rotation);
-    case 'wedge':    return applyRotation(tessellateWedge(e),     e.position, e.rotation);
-    case 'pyramid':  return applyRotation(tessellatePyramid(e),   e.position, e.rotation);
-    case 'extrusion':  return applyRotation(tessellateExtrusion(e),  e.position, e.rotation);
-    case 'revolution': return applyRotation(tessellateRevolution(e), e.position, e.rotation);
-    case 'mesh':       return applyRotation(tessellateMesh(e),       e.position, e.rotation);
+    case 'box':
+      return applyRotation(tessellateBox(e), e.position, e.rotation);
+    case 'cylinder':
+      return applyRotation(tessellateCylinder(e), e.position, e.rotation);
+    case 'sphere':
+      return applyRotation(tessellateSphere(e), e.position, e.rotation);
+    case 'cone':
+      return applyRotation(tessellateCone(e), e.position, e.rotation);
+    case 'torus':
+      return applyRotation(tessellateTorus(e), e.position, e.rotation);
+    case 'wedge':
+      return applyRotation(tessellateWedge(e), e.position, e.rotation);
+    case 'pyramid':
+      return applyRotation(tessellatePyramid(e), e.position, e.rotation);
+    case 'extrusion':
+      return applyRotation(tessellateExtrusion(e), e.position, e.rotation);
+    case 'revolution':
+      return applyRotation(tessellateRevolution(e), e.position, e.rotation);
+    case 'mesh':
+      return applyRotation(tessellateMesh(e), e.position, e.rotation);
     // 2D shapes — rotation not applied here (2D plane orientation is out of scope)
-    case 'line':     return tessellate2DLine(e);
-    case 'polyline': return tessellate2DPolyline(e);
-    case 'arc':      return tessellate2DArc(e);
-    case 'circle':   return tessellate2DCircle(e);
-    case 'rectangle':return tessellate2DRectangle(e);
-    case 'point':    return tessellate2DPoint(e);
-    case 'ellipse':  return tessellate2DEllipse(e);
-    case 'spline':   return tessellate2DSpline(e);
-    case 'text':      return []; // render deferred to VT1 (viewport-engineer)
-    case 'dimension': return []; // render deferred to VT2 (viewport-engineer)
-    case 'instance':  return []; // expanded form not yet tessellated; use explode_instance to export
+    case 'line':
+      return tessellate2DLine(e);
+    case 'polyline':
+      return tessellate2DPolyline(e);
+    case 'arc':
+      return tessellate2DArc(e);
+    case 'circle':
+      return tessellate2DCircle(e);
+    case 'rectangle':
+      return tessellate2DRectangle(e);
+    case 'point':
+      return tessellate2DPoint(e);
+    case 'ellipse':
+      return tessellate2DEllipse(e);
+    case 'spline':
+      return tessellate2DSpline(e);
+    case 'text':
+      return []; // render deferred to VT1 (viewport-engineer)
+    case 'dimension':
+      return []; // render deferred to VT2 (viewport-engineer)
+    case 'instance':
+      return []; // expanded form not yet tessellated; use explode_instance to export
     default: {
       const exhaustive: never = e;
       void exhaustive;
@@ -742,7 +921,9 @@ function buildSvg(
   const sorted = [...filled, ...stroked];
 
   const lines: string[] = [];
-  lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`);
+  lines.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+  );
 
   // Background
   lines.push(`  <rect width="${width}" height="${height}" fill="#1a1a2e"/>`);
@@ -776,7 +957,9 @@ function buildSvg(
   lines.push(triadSvg);
 
   // Overlay: view label + entity count
-  lines.push(`  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`);
+  lines.push(
+    `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,
+  );
 
   lines.push('</svg>');
   return lines.join('\n');
@@ -796,7 +979,8 @@ function buildGroundGrid(
   const start = -orthoHalf;
   const end = orthoHalf;
   // Grid center at world origin
-  const cx = cam.target[0], cy = cam.target[1];
+  const cx = cam.target[0],
+    cy = cam.target[1];
   const parts: string[] = [];
   for (let i = 0; i <= GRID_LINES; i++) {
     const offset = start + step * i;
@@ -805,13 +989,17 @@ function buildGroundGrid(
     const p1 = projectPoint([cx + end, cy + offset, 0], cam, basis);
     const s0 = toScreenCoords(p0[0], p0[1], orthoHalf, width, height);
     const s1 = toScreenCoords(p1[0], p1[1], orthoHalf, width, height);
-    parts.push(`<line x1="${r2(s0[0])}" y1="${r2(s0[1])}" x2="${r2(s1[0])}" y2="${r2(s1[1])}" stroke="#333355" stroke-width="0.5"/>`);
+    parts.push(
+      `<line x1="${r2(s0[0])}" y1="${r2(s0[1])}" x2="${r2(s1[0])}" y2="${r2(s1[1])}" stroke="#333355" stroke-width="0.5"/>`,
+    );
     // Vertical lines (constant X, vary Y)
     const q0 = projectPoint([cx + offset, cy + start, 0], cam, basis);
     const q1 = projectPoint([cx + offset, cy + end, 0], cam, basis);
     const sq0 = toScreenCoords(q0[0], q0[1], orthoHalf, width, height);
     const sq1 = toScreenCoords(q1[0], q1[1], orthoHalf, width, height);
-    parts.push(`<line x1="${r2(sq0[0])}" y1="${r2(sq0[1])}" x2="${r2(sq1[0])}" y2="${r2(sq1[1])}" stroke="#333355" stroke-width="0.5"/>`);
+    parts.push(
+      `<line x1="${r2(sq0[0])}" y1="${r2(sq0[1])}" x2="${r2(sq1[0])}" y2="${r2(sq1[1])}" stroke="#333355" stroke-width="0.5"/>`,
+    );
   }
   return `  <g id="grid">${parts.join('')}</g>`;
 }
@@ -844,12 +1032,16 @@ function buildAxisTriad(
   for (const [tip, color, label] of axes) {
     const [tu, tv] = projectPoint(tip, cam, basis);
     const [tsx, tsy] = toScreenCoords(tu, tv, orthoHalf, width, height);
-    const dx = (tsx - osx) / (width / 2) * triadScale;
-    const dy = (tsy - osy) / (height / 2) * triadScale;
+    const dx = ((tsx - osx) / (width / 2)) * triadScale;
+    const dy = ((tsy - osy) / (height / 2)) * triadScale;
     const tx = r2(triadX + dx);
     const ty = r2(triadY + dy);
-    parts.push(`<line x1="${triadX}" y1="${triadY}" x2="${tx}" y2="${ty}" stroke="${color}" stroke-width="2"/>`);
-    parts.push(`<text x="${tx}" y="${ty}" font-family="monospace" font-size="10" fill="${color}">${label}</text>`);
+    parts.push(
+      `<line x1="${triadX}" y1="${triadY}" x2="${tx}" y2="${ty}" stroke="${color}" stroke-width="2"/>`,
+    );
+    parts.push(
+      `<text x="${tx}" y="${ty}" font-family="monospace" font-size="10" fill="${color}">${label}</text>`,
+    );
   }
   return `  <g id="axis-triad">${parts.join('')}</g>`;
 }
@@ -858,7 +1050,12 @@ function buildAxisTriad(
 // Main render function
 // ---------------------------------------------------------------------------
 
-function renderDocument(doc: CadDocument, view: ViewName, width: number, height: number): RenderViewData {
+function renderDocument(
+  doc: CadDocument,
+  view: ViewName,
+  width: number,
+  height: number,
+): RenderViewData {
   const snapshot = computeSceneSnapshot(doc);
   const bounds = snapshot.bounds;
 

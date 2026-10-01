@@ -11,7 +11,14 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getLiveDoc, setLiveDoc, subscribeLive, _resetLiveDoc, _subscriberCount } from '../src/liveDocument';
+import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
+import {
+  getLiveDoc,
+  setLiveDoc,
+  subscribeLive,
+  _resetLiveDoc,
+  _subscriberCount,
+} from '../src/liveDocument';
 import { applyMcpToolCall } from '@core/mcp/dispatch';
 import { createEmptyDocument } from '@core/model/types';
 
@@ -126,11 +133,9 @@ describe('subscribeLive', () => {
     // Exactly one SSE message written at subscription time.
     expect(res.written).toHaveLength(1);
     const msg = res.written[0] ?? '';
-    expect(msg.startsWith('data: ')).toBe(true);
+    expect(msg.startsWith('event: snapshot\ndata: ')).toBe(true);
     expect(msg.endsWith('\n\n')).toBe(true);
-
-    const parsed = JSON.parse(msg.slice('data: '.length)) as Record<string, unknown>;
-    expect(typeof parsed['entities']).toBe('object');
+    expect(frameEntityIds(msg)).toHaveLength(1);
 
     unsubscribe();
   });
@@ -160,9 +165,8 @@ describe('subscribeLive', () => {
 
     // The second write carries the updated document.
     const mutationMsg = resA.written[1] ?? '';
-    const updatedDoc = JSON.parse(mutationMsg.slice('data: '.length)) as Record<string, unknown>;
-    const entities = updatedDoc['entities'] as Record<string, unknown>;
-    expect(Object.keys(entities)).toHaveLength(1);
+    expect(parseSseFrame(mutationMsg).event).toBe('patch');
+    expect(frameEntityIds(mutationMsg)).toHaveLength(1);
 
     unsubA();
     unsubB();

@@ -38,7 +38,12 @@ const _namedViewsRef: {
   /** Capture current camera position + target. Returns null if controls not ready. */
   getCameraSnapshot: (() => NamedViewCamera | null) | null;
   /** Drive the OrbitControls to the given position + target, then update + invalidate. */
-  applyCamera: ((position: readonly [number, number, number], target: readonly [number, number, number]) => void) | null;
+  applyCamera:
+    | ((
+        position: readonly [number, number, number],
+        target: readonly [number, number, number],
+      ) => void)
+    | null;
 } = {
   getCameraSnapshot: null,
   applyCamera: null,

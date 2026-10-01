@@ -10,7 +10,9 @@ describe('transform commands', () => {
   // Helpers
   // -------------------------------------------------------------------------
 
-  function docWithBox(position = [0, 0, 0] as [number, number, number]): ReturnType<typeof execute> {
+  function docWithBox(
+    position = [0, 0, 0] as [number, number, number],
+  ): ReturnType<typeof execute> {
     const doc = createEmptyDocument();
     return execute(doc, 'add_box', { size: [2, 4, 6], position });
   }

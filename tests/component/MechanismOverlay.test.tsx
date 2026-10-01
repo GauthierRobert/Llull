@@ -62,13 +62,18 @@ describe('MechanismOverlay — constraint line geometry', () => {
     expect(entityB).toBeDefined();
 
     // Mirror the geometry build in ConstraintLine.
-    const posA = new THREE.Vector3(entityA!.position[0], entityA!.position[1], entityA!.position[2]);
-    const posB = new THREE.Vector3(entityB!.position[0], entityB!.position[1], entityB!.position[2]);
+    const posA = new THREE.Vector3(
+      entityA!.position[0],
+      entityA!.position[1],
+      entityA!.position[2],
+    );
+    const posB = new THREE.Vector3(
+      entityB!.position[0],
+      entityB!.position[1],
+      entityB!.position[2],
+    );
 
-    const positions = new Float32Array([
-      posA.x, posA.y, posA.z,
-      posB.x, posB.y, posB.z,
-    ]);
+    const positions = new Float32Array([posA.x, posA.y, posA.z, posB.x, posB.y, posB.z]);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
 
@@ -112,7 +117,8 @@ describe('MechanismOverlay — joint arrow', () => {
     const rb2 = localDispatch('add_box', { size: [1, 1, 1] });
     const rc1 = localDispatch('create_component', { name: 'CA', entityIds: [rb1.affected[0]!] });
     const rc2 = localDispatch('create_component', { name: 'CB', entityIds: [rb2.affected[0]!] });
-    void rc1; void rc2;
+    void rc1;
+    void rc2;
     const doc = useStore.getState().document;
     const compIds = Object.keys(doc.components);
     const ri1 = localDispatch('insert_instance', { componentId: compIds[0]! });
@@ -134,7 +140,11 @@ describe('MechanismOverlay — joint arrow', () => {
     expect(joint!.kind).toBe('revolute');
 
     const entity = doc.entities[joint!.a.instanceId];
-    const origin = new THREE.Vector3(entity?.position[0] ?? 0, entity?.position[1] ?? 0, entity?.position[2] ?? 0);
+    const origin = new THREE.Vector3(
+      entity?.position[0] ?? 0,
+      entity?.position[1] ?? 0,
+      entity?.position[2] ?? 0,
+    );
     const axis = new THREE.Vector3(0, 0, 1); // 'z'
     const color = '#00e5ff';
 
@@ -160,7 +170,11 @@ describe('MechanismOverlay — joint arrow', () => {
     expect(joint!.kind).toBe('prismatic');
 
     const entity = doc.entities[joint!.a.instanceId];
-    const origin = new THREE.Vector3(entity?.position[0] ?? 0, entity?.position[1] ?? 0, entity?.position[2] ?? 0);
+    const origin = new THREE.Vector3(
+      entity?.position[0] ?? 0,
+      entity?.position[1] ?? 0,
+      entity?.position[2] ?? 0,
+    );
     const axis = new THREE.Vector3(0, 0, 1);
     const color = '#e040fb';
 

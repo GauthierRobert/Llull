@@ -54,6 +54,24 @@ npm --prefix server install
 npm --prefix server run dev
 ```
 
+## Production
+
+```bash
+npm ci && npm run build            # static web app in dist/ — serve with any static host
+npm ci --prefix server
+npm --prefix server run build      # bundles the MCP host to server/dist/index.js
+MCP_AUTH_TOKEN=<secret> npm --prefix server start
+```
+
+- Requires Node >= 20.12. Variables are read from the environment, `.env`, or `server/.env`.
+- The server binds `127.0.0.1:3001` by default. Binding a non-loopback `HOST` requires
+  `MCP_AUTH_TOKEN`; remote REST mutations then need the bearer token too.
+- Serve the web app from an origin listed in `LLULL_ALLOWED_ORIGINS`, and list public
+  hostnames in `LLULL_ALLOWED_HOSTS` (DNS-rebinding guard).
+- The OpenCascade kernel (~65 MB wasm) loads only with `?kernel=occt`; the default is Manifold.
+- Web app build vars: `VITE_LLULL_SERVER_URL` (server base URL), `VITE_LLULL_API_TOKEN` (bearer for REST when the server requires it).
+- Full env reference: [`server/README.md`](server/README.md).
+
 ## Project layout
 
 ```

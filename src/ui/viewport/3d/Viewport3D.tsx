@@ -59,6 +59,7 @@ import {
   GizmoViewport,
   PerspectiveCamera,
   Environment,
+  Lightformer,
   ContactShadows,
   SoftShadows,
 } from '@react-three/drei';
@@ -129,21 +130,21 @@ function ViewportStoreInvalidator(): null {
   const invalidate = useThree((s) => s.invalidate);
 
   useEffect(() => {
-    let prevMode    = useViewportStore.getState().displayMode;
-    let prevClip    = useViewportStore.getState().clipPlane;
-    let prevHidden  = useViewportStore.getState().hiddenEntityIds;
+    let prevMode = useViewportStore.getState().displayMode;
+    let prevClip = useViewportStore.getState().clipPlane;
+    let prevHidden = useViewportStore.getState().hiddenEntityIds;
     let prevQuality = useViewportStore.getState().qualityOverride;
 
     return useViewportStore.subscribe((state) => {
       if (
-        state.displayMode     !== prevMode    ||
-        state.clipPlane       !== prevClip    ||
-        state.hiddenEntityIds !== prevHidden  ||
+        state.displayMode !== prevMode ||
+        state.clipPlane !== prevClip ||
+        state.hiddenEntityIds !== prevHidden ||
         state.qualityOverride !== prevQuality
       ) {
-        prevMode    = state.displayMode;
-        prevClip    = state.clipPlane;
-        prevHidden  = state.hiddenEntityIds;
+        prevMode = state.displayMode;
+        prevClip = state.clipPlane;
+        prevHidden = state.hiddenEntityIds;
         prevQuality = state.qualityOverride;
         invalidate();
       }
@@ -156,6 +157,9 @@ function ViewportStoreInvalidator(): null {
 // ---------------------------------------------------------------------------
 // Camera initializer
 // ---------------------------------------------------------------------------
+
+/** drei Grid/ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
+const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
 
 /**
  * Convert spherical CameraState → a cartesian THREE.Vector3 eye position.
@@ -281,7 +285,11 @@ interface SceneContentsProps {
   onDraggingChanged: (dragging: boolean) => void;
 }
 
-function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
+function SceneContents({
+  orbitEnabled,
+  gizmoMode,
+  onDraggingChanged,
+}: SceneContentsProps): React.ReactElement {
   const document = useStore((s) => s.document);
   const renderOrigin = useStore((s) => s.renderOrigin);
   const selection = useStore((s) => s.document.selection);
@@ -292,7 +300,13 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   const quality = useRenderQuality();
 
   const initialPosition = useMemo(
-    () => sphericalToCartesian(cam.target as [number, number, number], cam.azimuth, cam.polar, cam.distance),
+    () =>
+      sphericalToCartesian(
+        cam.target as [number, number, number],
+        cam.azimuth,
+        cam.polar,
+        cam.distance,
+      ),
     // Only used for initial mount — intentionally not reactive to later cam changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -311,8 +325,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   // Raycasting is automatically correct: three.js resolves click events in
   // world space using the mesh's matrixWorld, which accounts for the group offset.
   const groupOffset = useMemo(
-    () =>
-      new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]),
+    () => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]),
     [renderOrigin],
   );
 
@@ -320,7 +333,14 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
     <>
       {/* ---- Camera + controls ---- */}
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention). */}
-      <PerspectiveCamera makeDefault fov={45} near={0.01} far={1e8} position={initialPosition} up={[0, 0, 1]} />
+      <PerspectiveCamera
+        makeDefault
+        fov={45}
+        near={0.01}
+        far={1e8}
+        position={initialPosition}
+        up={[0, 0, 1]}
+      />
       <OrbitControls
         makeDefault
         target={targetVec}
@@ -347,7 +367,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* ---- View preset camera driver — reads store via props to avoid Canvas re-render ---- */}
       <ViewPresetsInner
-        entities={document.entities as Record<string, { position: readonly [number, number, number] }>}
+        entities={
+          document.entities as Record<string, { position: readonly [number, number, number] }>
+        }
         selection={selection}
         allEntityIds={allEntityIds}
       />
@@ -364,7 +386,16 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       {/* ---- IBL environment: studio preset for reflections/ambient; no background.
            Kept on across all quality tiers — it is a single texture sample (cheap)
            and significantly improves material quality. ---- */}
-      {quality.environmentEnabled && <Environment preset="studio" background={false} />}
+      {quality.environmentEnabled && (
+        // Procedural studio IBL — no network fetch (preset="studio" pulls an HDR from a CDN
+        // and crashes the viewport offline).
+        <Environment background={false} resolution={256}>
+          <Lightformer form="rect" intensity={2} position={[0, 5, 5]} scale={[10, 6, 1]} />
+          <Lightformer form="rect" intensity={1} position={[-6, -2, 2]} scale={[6, 4, 1]} />
+          <Lightformer form="rect" intensity={1} position={[6, -2, 2]} scale={[6, 4, 1]} />
+          <Lightformer form="ring" intensity={0.6} position={[0, 0, -4]} scale={8} />
+        </Environment>
+      )}
 
       {/* ---- Soft shadow patch: PCSS-style softening on the shadow map.
            Disabled in Low tier (softShadowSamples === 0) to save per-fragment cost.
@@ -378,9 +409,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
            directional key: high-angle from front-right, casts shadows.
              shadow-mapSize scales with quality tier (2048 High / 1024 Medium+Low).
            directional rim: cool back-left counter fill.  */}
-      <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} />
+      <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} position={[0, 0, 1]} />
       <directionalLight
-        position={[8, 14, 6]}
+        position={[8, -6, 14]}
         intensity={1.8}
         castShadow
         shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
@@ -392,13 +423,14 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         shadow-camera-bottom={-30}
         shadow-bias={-0.0004}
       />
-      <directionalLight position={[-6, 4, -8]} intensity={0.4} color="#a8c8ff" />
+      <directionalLight position={[-6, 8, 4]} intensity={0.4} color="#a8c8ff" />
 
       {/* ---- Contact shadows: rendered once (frames=1) — safe under demand frameloop.
            Disabled in Low tier to avoid the extra render pass. ---- */}
       {quality.contactShadowsEnabled && (
         <ContactShadows
-          position={[0, -0.001, 0]}
+          position={[0, 0, -0.001]}
+          rotation={GROUND_PLANE_ROTATION}
           opacity={0.55}
           scale={40}
           blur={2.5}
@@ -420,6 +452,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         fadeDistance={80}
         fadeStrength={1.5}
         position={[0, 0, 0]}
+        rotation={GROUND_PLANE_ROTATION}
         infiniteGrid
       />
 
@@ -439,10 +472,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* ---- Orientation gizmo (bottom-right corner) ---- */}
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
-        <GizmoViewport
-          axisColors={['#e05252', '#52c05a', '#4e8de0']}
-          labelColor="#e8eaed"
-        />
+        <GizmoViewport axisColors={['#e05252', '#52c05a', '#4e8de0']} labelColor="#e8eaed" />
       </GizmoHelper>
     </>
   );
@@ -511,9 +541,7 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       {/* Mode toggle overlay — only visible when a single entity is selected */}
-      {showModeToggle && (
-        <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />
-      )}
+      {showModeToggle && <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />}
 
       {/* View preset buttons (top-right) */}
       <ViewPresetsOverlay />

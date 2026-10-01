@@ -17,6 +17,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createAutosaver } from './autosave';
 import type { Response } from 'express';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
@@ -33,8 +34,8 @@ import type { DocPatch } from './docPatch';
  * server bundle. Autosave is disabled inside tests (vitest sets `VITEST`, our
  * own harness sets `TEST`) to avoid clobbering a user's saved project.
  */
-const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH']
-  ?? path.resolve(__dirname, '..', '.autosave.json');
+const AUTOSAVE_PATH =
+  process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
 
 const AUTOSAVE_ENABLED =
   process.env['VITEST'] === undefined &&
@@ -48,19 +49,44 @@ function loadAutosave(): CadDocument {
     const json = fs.readFileSync(AUTOSAVE_PATH, 'utf8');
     return deserializeDocument(json);
   } catch (err) {
-    console.warn(`[liveDocument] autosave load failed (${(err as Error).message}); starting empty.`);
+    console.warn(
+      `[liveDocument] autosave load failed (${(err as Error).message}); starting empty.`,
+    );
     return createEmptyDocument();
   }
 }
 
+const autosaver = createAutosaver({
+  filePath: AUTOSAVE_PATH,
+  debounceMs: Number.parseInt(process.env['LLULL_AUTOSAVE_DEBOUNCE_MS'] ?? '', 10) || 300,
+  serialize: serializeDocument,
+});
+
 function writeAutosave(doc: CadDocument): void {
   if (!AUTOSAVE_ENABLED) return;
-  try {
-    fs.mkdirSync(path.dirname(AUTOSAVE_PATH), { recursive: true });
-    fs.writeFileSync(AUTOSAVE_PATH, serializeDocument(doc), 'utf8');
-  } catch (err) {
-    console.warn(`[liveDocument] autosave write failed: ${(err as Error).message}`);
+  autosaver.schedule(doc);
+}
+
+/** Write any debounced autosave immediately (shutdown path). */
+export function flushAutosave(): void {
+  if (AUTOSAVE_ENABLED) autosaver.flush();
+}
+
+/** Flush, then write every later mutation synchronously (no debounce). Call at shutdown start. */
+export function stopAutosave(): void {
+  if (AUTOSAVE_ENABLED) autosaver.stop();
+}
+
+/** End every open SSE stream and forget the subscribers (shutdown path). */
+export function closeAllSubscribers(): void {
+  for (const res of _subscribers) {
+    try {
+      res.end();
+    } catch {
+      // already closed
+    }
   }
+  _subscribers.clear();
 }
 
 // ---------------------------------------------------------------------------

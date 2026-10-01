@@ -99,9 +99,7 @@ export function ModifyPickInteraction({
 
       const bestEntity = document.entities[bestId]!;
       const entityPoints =
-        bestEntity.kind === 'polyline'
-          ? (bestEntity as PolylineEntity).points
-          : undefined;
+        bestEntity.kind === 'polyline' ? (bestEntity as PolylineEntity).points : undefined;
 
       onEntityPick(bestId, worldPick, entityPoints);
     },

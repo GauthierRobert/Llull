@@ -39,16 +39,20 @@ import { evaluateAnimationScalar } from './animationMath';
 function normalise(v: Vec3): THREE.Vector3 {
   const vec = new THREE.Vector3(v[0], v[1], v[2]);
   const len = vec.length();
-  if (len < 1e-9) return new THREE.Vector3(0, 1, 0); // safe fallback: Y axis
+  if (len < 1e-9) return new THREE.Vector3(0, 0, 1); // safe fallback: Z axis (Z-up)
   return vec.divideScalar(len);
 }
 
 /** Compute the centroid of a list of document positions. */
 function centroid(positions: Vec3[]): Vec3 {
   if (positions.length === 0) return [0, 0, 0];
-  let x = 0, y = 0, z = 0;
+  let x = 0,
+    y = 0,
+    z = 0;
   for (const p of positions) {
-    x += p[0]; y += p[1]; z += p[2];
+    x += p[0];
+    y += p[1];
+    z += p[2];
   }
   const n = positions.length;
   return [x / n, y / n, z / n];
@@ -79,7 +83,9 @@ export function AnimationPlayer(): null {
 
   // Keep a ref to invalidate so useFrame closure captures the ref, not a stale fn.
   const invalidateRef = useRef(invalidate);
-  useEffect(() => { invalidateRef.current = invalidate; }, [invalidate]);
+  useEffect(() => {
+    invalidateRef.current = invalidate;
+  }, [invalidate]);
 
   useFrame((_state, delta) => {
     const vpState = useViewportStore.getState();
@@ -120,9 +126,7 @@ export function AnimationPlayer(): null {
 
     for (const anim of animList) {
       const running =
-        anim.trigger === 'auto'
-          ? animationPlaying
-          : activeClickAnimationIds.has(anim.id);
+        anim.trigger === 'auto' ? animationPlaying : activeClickAnimationIds.has(anim.id);
 
       // Advance phase (frozen when not running).
       const prevPhase = phaseMap.current.get(anim.id) ?? 0;
@@ -178,9 +182,7 @@ export function AnimationPlayer(): null {
         if (!composed.has(memberId)) {
           const basePos = entity.position;
           const baseRot = entity.rotation;
-          _baseQ.current.setFromEuler(
-            new THREE.Euler(baseRot[0], baseRot[1], baseRot[2], 'XYZ'),
-          );
+          _baseQ.current.setFromEuler(new THREE.Euler(baseRot[0], baseRot[1], baseRot[2], 'XYZ'));
           entry = {
             position: new THREE.Vector3(basePos[0], basePos[1], basePos[2]),
             quaternion: _baseQ.current.clone(),

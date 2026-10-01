@@ -10,6 +10,7 @@
 
 import type { CadDocument, FeatureStep, Recipe } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
 import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
 
 // ---------------------------------------------------------------------------
@@ -221,7 +222,7 @@ interface InstantiateRecipeParams {
 export const instantiateRecipe: CommandDefinition<InstantiateRecipeParams> = {
   name: 'instantiate_recipe',
   description:
-    'Replay a named recipe\'s steps ADDITIVELY on top of the current document, ' +
+    "Replay a named recipe's steps ADDITIVELY on top of the current document, " +
     'assigning fresh entity ids each time. Existing entities are never removed or changed. ' +
     'Each call is independent — instantiating the same recipe twice produces two separate ' +
     'copies, each with their own unique ids. ' +
@@ -241,49 +242,76 @@ export const instantiateRecipe: CommandDefinition<InstantiateRecipeParams> = {
   },
   // Normal constructive command — execute() appends a FeatureStep automatically.
   // No metaHistory, no readOnly, not idempotent (each call creates new entities).
-  run: (doc, { name }): CommandResult => {
-    if (typeof name !== 'string' || name.trim() === '') {
+  run: (doc, params): CommandResult => {
+    if (recipeDepth >= MAX_PROJECT_DEPTH) {
       return {
         document: doc,
-        summary: 'instantiate_recipe failed: name must be a non-empty string.',
+        summary: `instantiate_recipe failed: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,
         affected: [],
       };
     }
-
-    const recipe = doc.recipes[name];
-    if (!recipe) {
-      const available = Object.keys(doc.recipes);
-      const hint =
-        available.length > 0
-          ? ` Available recipes: ${available.join(', ')}.`
-          : ' No recipes have been saved yet (call save_recipe first).';
-      return {
-        document: doc,
-        summary: `instantiate_recipe failed: recipe '${name}' not found.${hint}`,
-        affected: [],
-      };
+    recipeDepth++;
+    try {
+      return instantiateRecipeOnce(doc, params.name);
+    } finally {
+      recipeDepth--;
     }
-
-    const warnings: string[] = [];
-    const { doc: newDoc, allAffected } = replayRecipeAdditive(
-      doc,
-      recipe.steps,
-      resolveGetCommand(),
-      warnings,
-    );
-
-    const warnSuffix =
-      warnings.length > 0
-        ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`
-        : '';
-
-    return {
-      document: newDoc,
-      summary:
-        `instantiate_recipe '${name}': replayed ${recipe.steps.length} step${recipe.steps.length === 1 ? '' : 's'}, ` +
-        `created ${allAffected.length} entit${allAffected.length === 1 ? 'y' : 'ies'} ` +
-        `(ids: ${allAffected.join(', ')}).${warnSuffix}`,
-      affected: allAffected,
-    };
   },
 };
+
+/** Current instantiate_recipe nesting depth (a recipe may contain instantiate_recipe steps). */
+let recipeDepth = 0;
+
+function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
+  if (typeof name !== 'string' || name.trim() === '') {
+    return {
+      document: doc,
+      summary: 'instantiate_recipe failed: name must be a non-empty string.',
+      affected: [],
+    };
+  }
+
+  const recipe = doc.recipes[name];
+  if (!recipe) {
+    const available = Object.keys(doc.recipes);
+    const hint =
+      available.length > 0
+        ? ` Available recipes: ${available.join(', ')}.`
+        : ' No recipes have been saved yet (call save_recipe first).';
+    return {
+      document: doc,
+      summary: `instantiate_recipe failed: recipe '${name}' not found.${hint}`,
+      affected: [],
+    };
+  }
+
+  if (recipe.steps.length > MAX_PROJECT_STEPS) {
+    return {
+      document: doc,
+      summary: `instantiate_recipe failed: recipe '${name}' has ${recipe.steps.length} steps, exceeding MAX_PROJECT_STEPS (${MAX_PROJECT_STEPS}).`,
+      affected: [],
+    };
+  }
+
+  const warnings: string[] = [];
+  const { doc: newDoc, allAffected } = replayRecipeAdditive(
+    doc,
+    recipe.steps,
+    resolveGetCommand(),
+    warnings,
+  );
+
+  const warnSuffix =
+    warnings.length > 0
+      ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`
+      : '';
+
+  return {
+    document: newDoc,
+    summary:
+      `instantiate_recipe '${name}': replayed ${recipe.steps.length} step${recipe.steps.length === 1 ? '' : 's'}, ` +
+      `created ${allAffected.length} entit${allAffected.length === 1 ? 'y' : 'ies'} ` +
+      `(ids: ${allAffected.join(', ')}).${warnSuffix}`,
+    affected: allAffected,
+  };
+}

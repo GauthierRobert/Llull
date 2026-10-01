@@ -65,7 +65,14 @@ export function MeshSolidMesh({
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.5, metalness: 0.15, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.5,
+    metalness: 0.15,
+    envMapIntensity: 0.8,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

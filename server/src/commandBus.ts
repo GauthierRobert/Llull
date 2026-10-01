@@ -41,7 +41,7 @@ let _redoStack: CadDocument[] = [];
  * Fields:
  * - `summary`  — human + AI readable description of what happened.
  * - `affected` — ids created/changed (empty for queries, undo/redo, and no-ops).
- * - `isError`  — true only when the command name is unknown.
+ * - `isError`  — true when the command name is unknown or the command threw.
  * - `data`     — present only for query commands (result.data !== undefined).
  * - `canUndo`  — whether undo is currently available.
  * - `canRedo`  — whether redo is currently available.
@@ -75,7 +75,19 @@ export interface CommandBusResult {
 export function applyCommand(name: string, params: unknown): CommandBusResult {
   const isError = getCommand(name) === undefined;
   const prior = getLiveDoc();
-  const result = execute(prior, name, params);
+  let result: ReturnType<typeof execute>;
+  try {
+    result = execute(prior, name, params);
+  } catch (err) {
+    // A throwing command must surface as an error result, never a transport failure.
+    return {
+      summary: `Command ${name} failed: ${err instanceof Error ? err.message : String(err)}`,
+      affected: [],
+      isError: true,
+      canUndo: canUndo(),
+      canRedo: canRedo(),
+    };
+  }
 
   if (result.data !== undefined) {
     // Query command — return data, leave document + history untouched.

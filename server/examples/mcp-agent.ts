@@ -54,10 +54,7 @@ interface ParsedToolResult {
   isError: boolean;
 }
 
-function parseToolResult(result: {
-  content: ContentItem[];
-  isError?: boolean;
-}): ParsedToolResult {
+function parseToolResult(result: { content: ContentItem[]; isError?: boolean }): ParsedToolResult {
   const texts = result.content.filter(isTextContent).map((c) => c.text);
 
   const summary = texts[0] ?? '(no summary)';
@@ -149,17 +146,13 @@ async function main(): Promise<void> {
     name: 'draw_circle',
     arguments: { center: [0, 0], radius: 1 },
   });
-  const circleResult = parseToolResult(
-    circleRaw as { content: ContentItem[]; isError?: boolean },
-  );
+  const circleResult = parseToolResult(circleRaw as { content: ContentItem[]; isError?: boolean });
   printStep(2, 'draw_circle', circleResult);
 
   // --- Step 3: extrude_sketch (uses the circle id from step 2) ---
   const circleId = circleResult.affected[0];
   if (!circleId) {
-    console.error(
-      '\nCould not find circle entity id in step 2 result — skipping extrude_sketch.',
-    );
+    console.error('\nCould not find circle entity id in step 2 result — skipping extrude_sketch.');
   } else {
     const extrudeRaw = await client.callTool({
       name: 'extrude_sketch',

@@ -61,9 +61,7 @@ export const clearDocument: CommandDefinition<ClearDocumentParams> = {
     const isRecipesEmpty = Object.keys(doc.recipes).length === 0;
     const isComponentsEmpty = Object.keys(doc.components).length === 0;
     const isLayersDefault =
-      layerCount === 1 &&
-      doc.layerOrder.length === 1 &&
-      doc.layerOrder[0] === fresh.layerOrder[0];
+      layerCount === 1 && doc.layerOrder.length === 1 && doc.layerOrder[0] === fresh.layerOrder[0];
 
     const isAlreadyEmpty =
       isEntitiesEmpty &&

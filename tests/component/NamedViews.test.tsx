@@ -124,9 +124,7 @@ describe('namedViewStore — restoreNamedView', () => {
 
   it('calls applyCamera with the stored position and target', () => {
     const applySpy = vi.fn();
-    const id = useNamedViewStore
-      .getState()
-      .saveNamedView('Iso', makeSnapshot(MOCK_CAMERA_A));
+    const id = useNamedViewStore.getState().saveNamedView('Iso', makeSnapshot(MOCK_CAMERA_A));
     useNamedViewStore.getState().restoreNamedView(id!, applySpy);
     expect(applySpy).toHaveBeenCalledOnce();
     expect(applySpy).toHaveBeenCalledWith(MOCK_CAMERA_A.position, MOCK_CAMERA_A.target);
@@ -139,9 +137,7 @@ describe('namedViewStore — restoreNamedView', () => {
   });
 
   it('does nothing if applyCamera is null (bridge not ready)', () => {
-    const id = useNamedViewStore
-      .getState()
-      .saveNamedView('Side', makeSnapshot(MOCK_CAMERA_B));
+    const id = useNamedViewStore.getState().saveNamedView('Side', makeSnapshot(MOCK_CAMERA_B));
     // Should not throw
     expect(() => {
       useNamedViewStore.getState().restoreNamedView(id!, null);
@@ -150,9 +146,7 @@ describe('namedViewStore — restoreNamedView', () => {
 
   it('does not mutate the CadDocument when restoring', () => {
     const docBefore = useStore.getState().document;
-    const id = useNamedViewStore
-      .getState()
-      .saveNamedView('Test', makeSnapshot(MOCK_CAMERA_A));
+    const id = useNamedViewStore.getState().saveNamedView('Test', makeSnapshot(MOCK_CAMERA_A));
     useNamedViewStore.getState().restoreNamedView(id!, vi.fn());
     expect(useStore.getState().document).toBe(docBefore);
   });
@@ -169,18 +163,14 @@ describe('namedViewStore — deleteNamedView', () => {
   });
 
   it('removes the view with the given id', () => {
-    const id = useNamedViewStore
-      .getState()
-      .saveNamedView('Delete me', makeSnapshot(MOCK_CAMERA_A));
+    const id = useNamedViewStore.getState().saveNamedView('Delete me', makeSnapshot(MOCK_CAMERA_A));
     useNamedViewStore.getState().deleteNamedView(id!);
     expect(useNamedViewStore.getState().namedViews).toHaveLength(0);
   });
 
   it('does not affect other views when deleting one', () => {
     useNamedViewStore.getState().saveNamedView('Keep A', makeSnapshot(MOCK_CAMERA_A));
-    const idB = useNamedViewStore
-      .getState()
-      .saveNamedView('Delete B', makeSnapshot(MOCK_CAMERA_B));
+    const idB = useNamedViewStore.getState().saveNamedView('Delete B', makeSnapshot(MOCK_CAMERA_B));
     useNamedViewStore.getState().deleteNamedView(idB!);
     const { namedViews } = useNamedViewStore.getState();
     expect(namedViews).toHaveLength(1);

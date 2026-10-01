@@ -216,6 +216,23 @@ export function useDrawTool(): UseDrawToolResult {
     return () => window.removeEventListener('keydown', onKey);
   }, [activeTool, cancel, finishPolyline, finishSpline]);
 
+  // Ctrl/Cmd+Z mid-operation removes the last collected point instead of undoing the document.
+  // Capture phase + stopPropagation so the global undo shortcut never sees it.
+  const hasCollectedPoints = collectedPoints.length > 0;
+  useEffect(() => {
+    if (!hasCollectedPoints) return;
+    const onUndoKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
+      const target = e.composedPath()[0];
+      if (target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setCollectedPoints((prev) => prev.slice(0, -1));
+    };
+    window.addEventListener('keydown', onUndoKey, true);
+    return () => window.removeEventListener('keydown', onUndoKey, true);
+  }, [hasCollectedPoints]);
+
   return {
     activeTool,
     collectedPoints,

@@ -189,7 +189,7 @@ export const assignMaterial: CommandDefinition<AssignMaterialParams> = {
   description:
     'Assign a named material to one or more entities. ' +
     'The material must already exist in the document (create it first with create_material). ' +
-    'Once assigned, mass_properties uses the material\'s density for that entity ' +
+    "Once assigned, mass_properties uses the material's density for that entity " +
     '(mass = volume × material.density), overriding the caller-supplied density param. ' +
     'Multiple entity ids can be assigned in a single call; unknown ids are skipped with a note. ' +
     'Assigning a material is a replayable document edit recorded in featureHistory.',

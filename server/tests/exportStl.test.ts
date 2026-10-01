@@ -138,9 +138,7 @@ describe('GET /export/stl — empty document', () => {
 
 describe('GET /export/stl — custom name', () => {
   it('uses the name query param in Content-Disposition and inside the STL body (ascii)', async () => {
-    const res = await request(app)
-      .get('/export/stl')
-      .query({ name: 'mypart' });
+    const res = await request(app).get('/export/stl').query({ name: 'mypart' });
 
     expect(res.status).toBe(200);
     expect(res.headers['content-disposition']).toMatch(/filename="mypart\.stl"/);
@@ -156,9 +154,7 @@ describe('GET /export/stl — custom name', () => {
 
 describe('GET /export/stl — format fallback', () => {
   it('falls back to ascii for an unknown format value', async () => {
-    const res = await request(app)
-      .get('/export/stl')
-      .query({ format: 'svg' }); // not a recognised format
+    const res = await request(app).get('/export/stl').query({ format: 'svg' }); // not a recognised format
 
     expect(res.status).toBe(200);
     expect(res.text.startsWith('solid ')).toBe(true);

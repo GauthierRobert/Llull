@@ -96,9 +96,27 @@ function isValidHexColor(v: unknown): v is string {
 /** All legal entity kinds (must stay in sync with EntityKind union in types.ts). */
 const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set<EntityKind>([
   // 3D solids
-  'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution',
+  'box',
+  'cylinder',
+  'sphere',
+  'extrusion',
+  'mesh',
+  'cone',
+  'torus',
+  'wedge',
+  'pyramid',
+  'revolution',
   // 2D shapes
-  'line', 'polyline', 'arc', 'circle', 'rectangle', 'point', 'ellipse', 'spline', 'text', 'dimension',
+  'line',
+  'polyline',
+  'arc',
+  'circle',
+  'rectangle',
+  'point',
+  'ellipse',
+  'spline',
+  'text',
+  'dimension',
   // Assembly
   'instance',
 ]);
@@ -113,9 +131,12 @@ function validateCamera(v: unknown): v is CameraState {
   if (!isRecord(v)) return false;
   return (
     isFiniteVec3(v['target']) &&
-    typeof v['azimuth'] === 'number' && Number.isFinite(v['azimuth']) &&
-    typeof v['polar'] === 'number' && Number.isFinite(v['polar']) &&
-    typeof v['distance'] === 'number' && Number.isFinite(v['distance'])
+    typeof v['azimuth'] === 'number' &&
+    Number.isFinite(v['azimuth']) &&
+    typeof v['polar'] === 'number' &&
+    Number.isFinite(v['polar']) &&
+    typeof v['distance'] === 'number' &&
+    Number.isFinite(v['distance'])
   );
 }
 
@@ -149,14 +170,16 @@ function validateEntityValue(v: unknown): string | null {
   if (!isFiniteVec3(position)) return `entity ${id}: position must be a Vec3 of finite numbers`;
   if (!isFiniteVec3(rotation)) return `entity ${id}: rotation must be a Vec3 of finite numbers`;
   if (typeof layerId !== 'string') return `entity ${id}: layerId is not a string`;
-  if (!isValidHexColor(color)) return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
+  if (!isValidHexColor(color))
+    return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
 
   // Kind-specific numeric invariants.
   switch (kind) {
     case 'box':
     case 'wedge': {
       const size = v['size'];
-      if (!Array.isArray(size) || size.length !== 3) return `entity ${id} (${kind}): size must be a 3-element array`;
+      if (!Array.isArray(size) || size.length !== 3)
+        return `entity ${id} (${kind}): size must be a 3-element array`;
       for (let i = 0; i < 3; i++) {
         const c = size[i] as unknown;
         if (typeof c !== 'number' || !Number.isFinite(c) || c <= 0)
@@ -274,9 +297,19 @@ function validateMaterialValue(name: string, v: unknown): string | null {
     return `material '${name}': density must be finite and > 0, got ${String(density)}`;
   if (!isValidHexColor(color))
     return `material '${name}': color '${String(color)}' is not a valid hex color (#rrggbb)`;
-  if (typeof metalness !== 'number' || !Number.isFinite(metalness) || metalness < 0 || metalness > 1)
+  if (
+    typeof metalness !== 'number' ||
+    !Number.isFinite(metalness) ||
+    metalness < 0 ||
+    metalness > 1
+  )
     return `material '${name}': metalness must be a finite number in [0, 1], got ${String(metalness)}`;
-  if (typeof roughness !== 'number' || !Number.isFinite(roughness) || roughness < 0 || roughness > 1)
+  if (
+    typeof roughness !== 'number' ||
+    !Number.isFinite(roughness) ||
+    roughness < 0 ||
+    roughness > 1
+  )
     return `material '${name}': roughness must be a finite number in [0, 1], got ${String(roughness)}`;
   return null;
 }
@@ -287,20 +320,24 @@ function validateMaterialValue(name: string, v: unknown): string | null {
 function validateParameterValue(name: string, v: unknown): string | null {
   if (!isRecord(v)) return `parameter '${name}' is not an object`;
   if (typeof v['name'] !== 'string') return `parameter '${name}': name field must be a string`;
-  if (typeof v['expression'] !== 'string') return `parameter '${name}': expression must be a string`;
+  if (typeof v['expression'] !== 'string')
+    return `parameter '${name}': expression must be a string`;
   if (typeof v['value'] !== 'number') return `parameter '${name}': value must be a number`;
   return null;
 }
 
 /** All legal constraint kinds (must stay in sync with ConstraintKind union in types.ts). */
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
-  'coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle',
+  'coincident',
+  'parallel',
+  'perpendicular',
+  'tangent',
+  'distance',
+  'angle',
 ]);
 
 /** All legal joint kinds (must stay in sync with JointKind union in types.ts). */
-const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>([
-  'revolute', 'prismatic',
-]);
+const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>(['revolute', 'prismatic']);
 
 /**
  * Validate a JointMateRef embedded object. Returns error string or null.
@@ -325,7 +362,11 @@ function validateJointMateRef(id: string, field: string, v: unknown): string | n
  */
 function validateJointAxis(id: string, axis: unknown): string | null {
   if (axis === 'x' || axis === 'y' || axis === 'z') return null;
-  if (Array.isArray(axis) && axis.length === 3 && (axis as unknown[]).every((c) => typeof c === 'number' && Number.isFinite(c))) {
+  if (
+    Array.isArray(axis) &&
+    axis.length === 3 &&
+    (axis as unknown[]).every((c) => typeof c === 'number' && Number.isFinite(c))
+  ) {
     return null;
   }
   return `joint '${id}': axis must be 'x', 'y', 'z', or a [x,y,z] finite-number array, got ${JSON.stringify(axis)}`;
@@ -423,7 +464,8 @@ function validateRecipeValue(name: string, v: unknown): string | null {
     const step = v['steps'][i] as unknown;
     if (!isRecord(step)) return `recipe '${name}': steps[${i}] is not an object`;
     if (typeof step['id'] !== 'string') return `recipe '${name}': steps[${i}].id must be a string`;
-    if (typeof step['name'] !== 'string') return `recipe '${name}': steps[${i}].name must be a string`;
+    if (typeof step['name'] !== 'string')
+      return `recipe '${name}': steps[${i}].name must be a string`;
   }
   return null;
 }
@@ -446,6 +488,7 @@ function validateDocumentShape(v: unknown): v is Record<string, unknown> {
 
 /**
  * Deep value validation of the document record. Returns an array of error strings.
+ * Integrity policy: dangling selection ids, entity key != entity.id, and duplicate order ids are REJECTED (not repaired).
  * An empty array means the document is valid.
  */
 function validateDocumentValues(v: Record<string, unknown>): string[] {
@@ -456,13 +499,48 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
   for (const [eid, entity] of Object.entries(entities)) {
     const err = validateEntityValue(entity);
     if (err !== null) errors.push(err);
+    if (isRecord(entity) && entity['id'] !== eid) {
+      errors.push(`entity record key '${eid}' does not match entity.id '${String(entity['id'])}'`);
+    }
 
     // Validate layer reference
     const layerIdVal = isRecord(entity) ? entity['layerId'] : undefined;
     const layers = v['layers'] as Record<string, unknown>;
-    if (typeof layerIdVal === 'string' && !Object.prototype.hasOwnProperty.call(layers, layerIdVal)) {
+    if (
+      typeof layerIdVal === 'string' &&
+      !Object.prototype.hasOwnProperty.call(layers, layerIdVal)
+    ) {
       errors.push(`entity ${eid}: layerId '${layerIdVal}' does not reference a known layer`);
     }
+  }
+
+  // Order must reference existing entities (renderers index entities[id] directly)
+  for (const orderedId of v['order'] as string[]) {
+    if (!Object.prototype.hasOwnProperty.call(entities, orderedId)) {
+      errors.push(`order: '${orderedId}' does not reference a known entity`);
+    }
+  }
+
+  // Duplicate ids in order would render/process an entity twice
+  const orderIds = v['order'] as string[];
+  if (new Set(orderIds).size !== orderIds.length) {
+    errors.push('order contains duplicate entity ids');
+  }
+
+  // Selection must reference existing entities (policy: reject, same as order — no silent repair)
+  for (const selectedId of v['selection'] as string[]) {
+    if (!Object.prototype.hasOwnProperty.call(entities, selectedId)) {
+      errors.push(`selection: '${selectedId}' does not reference a known entity`);
+    }
+  }
+
+  // Feature history steps are replayed by name/params — each must be a well-formed record
+  if (Array.isArray(v['featureHistory'])) {
+    v['featureHistory'].forEach((step: unknown, index: number) => {
+      if (!isRecord(step) || typeof step['id'] !== 'string' || typeof step['name'] !== 'string') {
+        errors.push(`featureHistory[${index}] is malformed (needs string id and name)`);
+      }
+    });
   }
 
   // Layers
@@ -546,7 +624,9 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
 function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<string, unknown> {
   // Units
   const units: DocumentUnit =
-    typeof raw['units'] === 'string' && VALID_UNITS.has(raw['units']) ? (raw['units'] as DocumentUnit) : 'mm';
+    typeof raw['units'] === 'string' && VALID_UNITS.has(raw['units'])
+      ? (raw['units'] as DocumentUnit)
+      : 'mm';
 
   // Display precision
   const displayPrecision: number =

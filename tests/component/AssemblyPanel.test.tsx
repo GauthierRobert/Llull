@@ -166,7 +166,8 @@ describe('AssemblyPanel — instances section', () => {
 
     render(<AssemblyPanel />);
 
-    const explodeBtn = screen.getByTestId(`assembly-instance-${instanceId}`)
+    const explodeBtn = screen
+      .getByTestId(`assembly-instance-${instanceId}`)
       .querySelector('button');
     expect(explodeBtn).toBeDefined();
     fireEvent.click(explodeBtn!);

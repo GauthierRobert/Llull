@@ -41,7 +41,11 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
   }, []);
 
   const commitExpression = useCallback(() => {
-    if (editingExpression !== null && editingExpression.trim() !== '' && editingExpression !== param.expression) {
+    if (
+      editingExpression !== null &&
+      editingExpression.trim() !== '' &&
+      editingExpression !== param.expression
+    ) {
       dispatch('set_parameter', { name: param.name, expression: editingExpression.trim() });
     }
     setEditingExpression(null);
@@ -104,18 +108,29 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
         title={`Delete parameter ${param.name}`}
       >
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-          <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <line
+            x1="1"
+            y1="1"
+            x2="9"
+            y2="9"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <line
+            x1="9"
+            y1="1"
+            x2="1"
+            y2="9"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
         </svg>
       </button>
 
       {hasError && (
-        <p
-          id={`param-error-${param.name}`}
-          className="param-error"
-          role="alert"
-          aria-live="polite"
-        >
+        <p id={`param-error-${param.name}`} className="param-error" role="alert" aria-live="polite">
           {param.error}
         </p>
       )}

@@ -48,7 +48,10 @@ function collectTriangles(
   for (const id of idsToProcess) {
     const e = doc.entities[id];
     if (!e) continue;
-    if (!is3D(e)) { skipped2D++; continue; }
+    if (!is3D(e)) {
+      skipped2D++;
+      continue;
+    }
     const entityTris = entityToTriangles(e, doc);
     for (const t of entityTris) tris.push(t);
   }
@@ -65,11 +68,7 @@ function sub3(a: Vec3, b: Vec3): Vec3 {
 }
 
 function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function len3(a: Vec3): number {
@@ -116,10 +115,7 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
  * Indices are 1-based (OBJ convention).
  */
 function buildObjText(tris: Triangle[], objectName: string): string {
-  const lines: string[] = [
-    `# Exported by llull`,
-    `o ${objectName}`,
-  ];
+  const lines: string[] = [`# Exported by llull`, `o ${objectName}`];
 
   // Write all vertices then all normals then all faces.
   const normals: Vec3[] = [];
@@ -140,7 +136,7 @@ function buildObjText(tris: Triangle[], objectName: string): string {
   // f v//vn  v//vn  v//vn  (one face per triangle, 1-based)
   for (let i = 0; i < tris.length; i++) {
     const vi = i * 3 + 1; // first vertex index of this triangle (1-based)
-    const ni = i + 1;     // normal index (1-based)
+    const ni = i + 1; // normal index (1-based)
     lines.push(`f ${vi}//${ni} ${vi + 1}//${ni} ${vi + 2}//${ni}`);
   }
 
@@ -270,16 +266,35 @@ function buildGltfBuffers(tris: Triangle[]): {
 }
 
 /** Compute axis-aligned bounding box [minX,minY,minZ] / [maxX,maxY,maxZ]. */
-function computeAabb(positions: Float32Array): { min: [number, number, number]; max: [number, number, number] } {
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+function computeAabb(positions: Float32Array): {
+  min: [number, number, number];
+  max: [number, number, number];
+} {
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity;
+  let maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity;
   for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i]!, y = positions[i + 1]!, z = positions[i + 2]!;
-    if (x < minX) minX = x; if (x > maxX) maxX = x;
-    if (y < minY) minY = y; if (y > maxY) maxY = y;
-    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    const x = positions[i]!,
+      y = positions[i + 1]!,
+      z = positions[i + 2]!;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
   }
-  if (!isFinite(minX)) { minX = 0; minY = 0; minZ = 0; maxX = 0; maxY = 0; maxZ = 0; }
+  if (!isFinite(minX)) {
+    minX = 0;
+    minY = 0;
+    minZ = 0;
+    maxX = 0;
+    maxY = 0;
+    maxZ = 0;
+  }
   return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
 }
 
@@ -293,10 +308,7 @@ function align4(n: number): number {
  * Positions and normals are stored as separate bufferview/accessor pairs.
  * The binary buffer payload is returned as a separate Uint8Array.
  */
-function buildGltfJson(
-  tris: Triangle[],
-  binBuffer: Uint8Array,
-): Record<string, unknown> {
+function buildGltfJson(tris: Triangle[], binBuffer: Uint8Array): Record<string, unknown> {
   const vertexCount = tris.length * 3;
   // Buffer layout: positions (float32×3 per vertex) then normals (float32×3 per vertex)
   const posByteLength = vertexCount * 3 * 4;
@@ -350,9 +362,7 @@ function buildGltfJson(
       { buffer: 0, byteOffset: 0, byteLength: posByteLength, target: 34962 }, // ARRAY_BUFFER
       { buffer: 0, byteOffset: posByteLength, byteLength: normByteLength, target: 34962 },
     ],
-    buffers: [
-      { byteLength: binBuffer.byteLength },
-    ],
+    buffers: [{ byteLength: binBuffer.byteLength }],
   };
 }
 
@@ -375,13 +385,18 @@ function buildGlb(jsonObj: Record<string, unknown>, binPayload: Uint8Array): Uin
 
   let off = 0;
   // File header
-  view.setUint32(off, 0x46546C67, true); off += 4; // magic 'glTF'
-  view.setUint32(off, 2, true);           off += 4; // version 2
-  view.setUint32(off, totalLength, true); off += 4; // total length
+  view.setUint32(off, 0x46546c67, true);
+  off += 4; // magic 'glTF'
+  view.setUint32(off, 2, true);
+  off += 4; // version 2
+  view.setUint32(off, totalLength, true);
+  off += 4; // total length
 
   // JSON chunk
-  view.setUint32(off, jsonPadded, true);       off += 4;
-  view.setUint32(off, 0x4E4F534A, true);       off += 4; // 'JSON'
+  view.setUint32(off, jsonPadded, true);
+  off += 4;
+  view.setUint32(off, 0x4e4f534a, true);
+  off += 4; // 'JSON'
   buf.set(jsonBytes, off);
   // pad with spaces (0x20)
   for (let i = jsonBytes.length; i < jsonPadded; i++) buf[off + i] = 0x20;
@@ -389,8 +404,10 @@ function buildGlb(jsonObj: Record<string, unknown>, binPayload: Uint8Array): Uin
 
   if (binPayload.length > 0) {
     // BIN chunk
-    view.setUint32(off, binPadded, true);        off += 4;
-    view.setUint32(off, 0x004E4942, true);       off += 4; // 'BIN\0'
+    view.setUint32(off, binPadded, true);
+    off += 4;
+    view.setUint32(off, 0x004e4942, true);
+    off += 4; // 'BIN\0'
     buf.set(binPayload, off);
     // pad with zeros
     for (let i = binPayload.length; i < binPadded; i++) buf[off + i] = 0;

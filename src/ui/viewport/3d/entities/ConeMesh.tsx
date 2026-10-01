@@ -2,7 +2,7 @@
  * @layer ui/viewport/3d
  *
  * Render branch for `kind:'cone'` entities.
- * Uses THREE.ConeGeometry — apex at +Y, base centered on position (Y-up, consistent with CylinderMesh).
+ * Uses THREE.ConeGeometry — apex at +Z*height, base centered on position (Z-up, matches core tessellation).
  * Geometry is memoized on the entity's geometric fields; disposed on unmount.
  * Material props reflect the active display mode (shaded/wireframe/xray).
  */
@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { ConeEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
-import { radialSegmentsForDiag, cylinderDiag } from '../lodSegments';
+import { buildConeGeometry } from './primitiveGeometry';
 
 interface ConeMeshProps {
   entity: ConeEntity;
@@ -22,15 +22,15 @@ interface ConeMeshProps {
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function ConeMesh({ entity, selected, onSelect, pbrMaterial }: ConeMeshProps): React.ReactElement {
+export function ConeMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: ConeMeshProps): React.ReactElement {
   const { radius, height, position, rotation, color } = entity;
 
-  const geometry = useMemo(() => {
-    const segments = radialSegmentsForDiag(cylinderDiag(radius, height));
-    // radiusTop=0, radiusBottom=radius, height, radialSegments — apex along +Y (three.js default).
-    const geo = new THREE.ConeGeometry(radius, height, segments);
-    return geo;
-  }, [radius, height]);
+  const geometry = useMemo(() => buildConeGeometry(radius, height), [radius, height]);
 
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -43,7 +43,14 @@ export function ConeMesh({ entity, selected, onSelect, pbrMaterial }: ConeMeshPr
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.45,
+    metalness: 0.08,
+    envMapIntensity: 0.8,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

@@ -31,10 +31,15 @@ import { applyEulerXYZ } from '@core/commands/render';
  * return the union bounding box [minX, minY, maxX, maxY] in SVG screen space.
  * Returns null when no polygon points are found.
  */
-function svgPolygonBbox(svg: string): { minX: number; minY: number; maxX: number; maxY: number } | null {
+function svgPolygonBbox(
+  svg: string,
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
   // Match all points="..." attributes (polygon and polyline elements)
   const pointsRe = /points="([^"]*)"/g;
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   let found = false;
 
   let m: RegExpExecArray | null;
@@ -207,11 +212,19 @@ describe('render_view rotation — torus', () => {
 
   it('torus rotated [π/2,0,0] produces different bbox from unrotated torus', () => {
     let docA = createEmptyDocument();
-    docA = execute(docA, 'add_torus', { ringRadius: 2, tubeRadius: 0.5, position: [0, 0, 0] }).document;
+    docA = execute(docA, 'add_torus', {
+      ringRadius: 2,
+      tubeRadius: 0.5,
+      position: [0, 0, 0],
+    }).document;
     const svgA = renderSvg(docA, 'front');
 
     let docB = createEmptyDocument();
-    docB = execute(docB, 'add_torus', { ringRadius: 2, tubeRadius: 0.5, position: [0, 0, 0] }).document;
+    docB = execute(docB, 'add_torus', {
+      ringRadius: 2,
+      tubeRadius: 0.5,
+      position: [0, 0, 0],
+    }).document;
     const idB = docB.order[0]!;
     docB = execute(docB, 'rotate_entity', { id: idB, delta: [Math.PI / 2, 0, 0] }).document;
     const svgB = renderSvg(docB, 'front');
@@ -307,11 +320,21 @@ describe('render_view rotation — pyramid', () => {
 
   it('pyramid rotated [π/2,0,0] has different front-view bbox than unrotated', () => {
     let docA = createEmptyDocument();
-    docA = execute(docA, 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 4, position: [0, 0, 0] }).document;
+    docA = execute(docA, 'add_pyramid', {
+      baseWidth: 2,
+      baseDepth: 2,
+      height: 4,
+      position: [0, 0, 0],
+    }).document;
     const svgA = renderSvg(docA, 'front');
 
     let docB = createEmptyDocument();
-    docB = execute(docB, 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 4, position: [0, 0, 0] }).document;
+    docB = execute(docB, 'add_pyramid', {
+      baseWidth: 2,
+      baseDepth: 2,
+      height: 4,
+      position: [0, 0, 0],
+    }).document;
     const idB = docB.order[0]!;
     docB = execute(docB, 'rotate_entity', { id: idB, delta: [Math.PI / 2, 0, 0] }).document;
     const svgB = renderSvg(docB, 'front');

@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { SphereEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
-import { radialSegmentsForDiag, sphereDiag } from '../lodSegments';
+import { buildSphereGeometry } from './primitiveGeometry';
 
 interface SphereMeshProps {
   entity: SphereEntity;
@@ -21,16 +21,15 @@ interface SphereMeshProps {
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function SphereMesh({ entity, selected, onSelect, pbrMaterial }: SphereMeshProps): React.ReactElement {
+export function SphereMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: SphereMeshProps): React.ReactElement {
   const { radius, position, rotation, color } = entity;
 
-  const geometry = useMemo(() => {
-    const segments = radialSegmentsForDiag(sphereDiag(radius));
-    // heightSegments = half of radialSegments, clamped to [4, 32] for correct normals.
-    const heightSeg = Math.max(4, Math.min(32, Math.floor(segments / 2)));
-    const geo = new THREE.SphereGeometry(radius, segments, heightSeg);
-    return geo;
-  }, [radius]);
+  const geometry = useMemo(() => buildSphereGeometry(radius), [radius]);
 
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -43,7 +42,14 @@ export function SphereMesh({ entity, selected, onSelect, pbrMaterial }: SphereMe
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.35, metalness: 0.12, envMapIntensity: 1.0, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.35,
+    metalness: 0.12,
+    envMapIntensity: 1.0,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

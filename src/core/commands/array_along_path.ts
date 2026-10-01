@@ -17,6 +17,7 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { MAX_COPIES_PER_COMMAND } from './limits';
 import { DEFAULT_LAYER_ID } from '../model/types';
 
 // ---------------------------------------------------------------------------
@@ -135,7 +136,8 @@ export const arrayAlongPath: CommandDefinition<ArrayAlongPathParams> = {
       },
       mode: {
         type: 'string',
-        description: '"place" (default): independent copies. "instance": treated as place in the current version.',
+        description:
+          '"place" (default): independent copies. "instance": treated as place in the current version.',
       },
     },
     required: ['sourceId', 'path', 'count'],
@@ -145,7 +147,11 @@ export const arrayAlongPath: CommandDefinition<ArrayAlongPathParams> = {
 
     const source = doc.entities[sourceId];
     if (!source) {
-      return { document: doc, summary: `array_along_path: source entity "${sourceId}" not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `array_along_path: source entity "${sourceId}" not found.`,
+        affected: [],
+      };
     }
     if (!Array.isArray(path) || path.length < 2) {
       return {
@@ -154,16 +160,30 @@ export const arrayAlongPath: CommandDefinition<ArrayAlongPathParams> = {
         affected: [],
       };
     }
-    if (!Number.isFinite(count) || count < 1) {
-      return { document: doc, summary: `array_along_path: count must be >= 1 (got ${count}).`, affected: [] };
+    if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
+      return {
+        document: doc,
+        summary: `array_along_path: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
+        affected: [],
+      };
     }
 
     // Validate path points are Vec3.
     const validatedPath: Vec3[] = [];
     for (let i = 0; i < path.length; i++) {
       const pt = path[i];
-      if (!Array.isArray(pt) || pt.length < 3 || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1]) || !Number.isFinite(pt[2])) {
-        return { document: doc, summary: `array_along_path: path[${i}] is not a valid [x,y,z] triple.`, affected: [] };
+      if (
+        !Array.isArray(pt) ||
+        pt.length < 3 ||
+        !Number.isFinite(pt[0]) ||
+        !Number.isFinite(pt[1]) ||
+        !Number.isFinite(pt[2])
+      ) {
+        return {
+          document: doc,
+          summary: `array_along_path: path[${i}] is not a valid [x,y,z] triple.`,
+          affected: [],
+        };
       }
       validatedPath.push([pt[0] as number, pt[1] as number, pt[2] as number]);
     }
@@ -257,7 +277,8 @@ export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
       },
       startAngle: {
         type: 'number',
-        description: 'Start angle of the arc sweep in radians (measured from the plane\'s local +X axis).',
+        description:
+          "Start angle of the arc sweep in radians (measured from the plane's local +X axis).",
       },
       endAngle: {
         type: 'number',
@@ -273,19 +294,39 @@ export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
   run: (doc, { sourceId, center, normal, radius, startAngle, endAngle, count }): CommandResult => {
     const source = doc.entities[sourceId];
     if (!source) {
-      return { document: doc, summary: `distribute_on_arc: source entity "${sourceId}" not found.`, affected: [] };
+      return {
+        document: doc,
+        summary: `distribute_on_arc: source entity "${sourceId}" not found.`,
+        affected: [],
+      };
     }
     if (!Number.isFinite(radius) || radius <= 0) {
-      return { document: doc, summary: `distribute_on_arc: radius must be > 0 (got ${radius}).`, affected: [] };
+      return {
+        document: doc,
+        summary: `distribute_on_arc: radius must be > 0 (got ${radius}).`,
+        affected: [],
+      };
     }
-    if (!Number.isFinite(count) || count < 1) {
-      return { document: doc, summary: `distribute_on_arc: count must be >= 1 (got ${count}).`, affected: [] };
+    if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
+      return {
+        document: doc,
+        summary: `distribute_on_arc: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
+        affected: [],
+      };
     }
     if (!Array.isArray(center) || center.length < 3) {
-      return { document: doc, summary: 'distribute_on_arc: center must be a [x,y,z] triple.', affected: [] };
+      return {
+        document: doc,
+        summary: 'distribute_on_arc: center must be a [x,y,z] triple.',
+        affected: [],
+      };
     }
     if (!Array.isArray(normal) || normal.length < 3) {
-      return { document: doc, summary: 'distribute_on_arc: normal must be a [x,y,z] triple.', affected: [] };
+      return {
+        document: doc,
+        summary: 'distribute_on_arc: normal must be a [x,y,z] triple.',
+        affected: [],
+      };
     }
 
     const c: Vec3 = [center[0] as number, center[1] as number, center[2] as number];
@@ -308,11 +349,12 @@ export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
 
     for (let i = 0; i < intCount; i++) {
       // Angle for this copy.
-      const angle = intCount === 1
-        ? startAngle + angleRange / 2
-        : isFullCircle
-          ? startAngle + (angleRange / intCount) * i
-          : startAngle + (angleRange / (intCount - 1)) * i;
+      const angle =
+        intCount === 1
+          ? startAngle + angleRange / 2
+          : isFullCircle
+            ? startAngle + (angleRange / intCount) * i
+            : startAngle + (angleRange / (intCount - 1)) * i;
 
       const cosA = Math.cos(angle);
       const sinA = Math.sin(angle);
@@ -326,7 +368,7 @@ export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
       // atan2 gives the rotation about the normal axis (Z for XY plane).
       const rotationAboutNormal = Math.atan2(
         radial[1] * n[2] - radial[2] * n[1], // cross(radial, n).x-ish... use angle directly
-        cosA * u[0] + sinA * v[0],            // projection — just use angle directly
+        cosA * u[0] + sinA * v[0], // projection — just use angle directly
       );
       void rotationAboutNormal; // computed above, replaced by cleaner approach below
 
@@ -355,11 +397,7 @@ export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
 
 /** Cross product of two Vec3. */
 function cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 /**
@@ -370,7 +408,11 @@ function buildPerpendicularInPlane(n: Vec3): Vec3 {
   // Pick a vector not parallel to n, then project out the n component.
   const candidate: Vec3 = Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const dot = candidate[0] * n[0] + candidate[1] * n[1] + candidate[2] * n[2];
-  const proj: Vec3 = [candidate[0] - dot * n[0], candidate[1] - dot * n[1], candidate[2] - dot * n[2]];
+  const proj: Vec3 = [
+    candidate[0] - dot * n[0],
+    candidate[1] - dot * n[1],
+    candidate[2] - dot * n[2],
+  ];
   return vecNormalize(proj);
 }
 
@@ -388,7 +430,9 @@ function rotationForRadial(radial: Vec3, normal: Vec3, angle: number): Vec3 {
   // For Y-axis normal, rotate about Y. For X-axis normal, rotate about X.
   // For other normals, compose the rotation.
   const [nx, ny, nz] = normal;
-  const abx = Math.abs(nx), aby = Math.abs(ny), abz = Math.abs(nz);
+  const abx = Math.abs(nx),
+    aby = Math.abs(ny),
+    abz = Math.abs(nz);
   void radial; // radial direction is captured by the angle parameter
 
   if (abz >= abx && abz >= aby) {

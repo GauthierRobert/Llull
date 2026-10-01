@@ -38,11 +38,7 @@ export interface FindEntitiesResult {
 
 /** Returns the centroid of a world-space AABB. */
 function bboxCentroid(b: Bounds): readonly [number, number, number] {
-  return [
-    (b.min[0] + b.max[0]) / 2,
-    (b.min[1] + b.max[1]) / 2,
-    (b.min[2] + b.max[2]) / 2,
-  ];
+  return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
 }
 
 /** 3D euclidean distance squared between two points. */
@@ -63,9 +59,12 @@ function insideAabb(
   qMax: readonly [number, number, number],
 ): boolean {
   return (
-    b.min[0] >= qMin[0] && b.max[0] <= qMax[0] &&
-    b.min[1] >= qMin[1] && b.max[1] <= qMax[1] &&
-    b.min[2] >= qMin[2] && b.max[2] <= qMax[2]
+    b.min[0] >= qMin[0] &&
+    b.max[0] <= qMax[0] &&
+    b.min[1] >= qMin[1] &&
+    b.max[1] <= qMax[1] &&
+    b.min[2] >= qMin[2] &&
+    b.max[2] <= qMax[2]
   );
 }
 
@@ -76,9 +75,12 @@ function overlapsAabb(
   qMax: readonly [number, number, number],
 ): boolean {
   return (
-    b.max[0] >= qMin[0] && b.min[0] <= qMax[0] &&
-    b.max[1] >= qMin[1] && b.min[1] <= qMax[1] &&
-    b.max[2] >= qMin[2] && b.min[2] <= qMax[2]
+    b.max[0] >= qMin[0] &&
+    b.min[0] <= qMax[0] &&
+    b.max[1] >= qMin[1] &&
+    b.min[1] <= qMax[1] &&
+    b.max[2] >= qMin[2] &&
+    b.min[2] <= qMax[2]
   );
 }
 
@@ -177,13 +179,29 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
           '"cone", "torus", "wedge", "pyramid", "line", "polyline", "arc", "circle", "rectangle", ' +
           '"point", "ellipse", "spline". Omit to match all kinds.',
         enum: [
-          'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid',
-          'line', 'polyline', 'arc', 'circle', 'rectangle', 'point', 'ellipse', 'spline',
+          'box',
+          'cylinder',
+          'sphere',
+          'extrusion',
+          'mesh',
+          'cone',
+          'torus',
+          'wedge',
+          'pyramid',
+          'line',
+          'polyline',
+          'arc',
+          'circle',
+          'rectangle',
+          'point',
+          'ellipse',
+          'spline',
         ],
       },
       layerId: {
         type: 'string',
-        description: 'Filter by layer id. Only entities assigned to this layer are returned. Omit to match all layers.',
+        description:
+          'Filter by layer id. Only entities assigned to this layer are returned. Omit to match all layers.',
       },
       name: {
         type: 'string',
@@ -261,7 +279,7 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
       tagFuzzy: {
         type: 'string',
         description:
-          'Fuzzy tag filter: case-insensitive substring match on any tag in the entity\'s tags array. ' +
+          "Fuzzy tag filter: case-insensitive substring match on any tag in the entity's tags array. " +
           'Matches if ANY tag contains this substring. Omit to skip this filter.',
       },
     },
@@ -269,10 +287,19 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
   },
   run: (doc, params): CommandResult => {
     const {
-      kind, layerId, name, nameExact = false, tag,
-      bboxMin, bboxMax,
-      nearPoint, insideBBox, overlapsBBox, touchingId,
-      nameFuzzy, tagFuzzy,
+      kind,
+      layerId,
+      name,
+      nameExact = false,
+      tag,
+      bboxMin,
+      bboxMax,
+      nearPoint,
+      insideBBox,
+      overlapsBBox,
+      touchingId,
+      nameFuzzy,
+      tagFuzzy,
     } = params;
 
     // --- Validate legacy bbox: must supply both or neither ---
@@ -292,7 +319,11 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
       if (pointErr !== null) {
         return { document: doc, summary: `find_entities: ${pointErr}`, affected: [] };
       }
-      if (typeof nearPoint.radius !== 'number' || !isFinite(nearPoint.radius) || nearPoint.radius <= 0) {
+      if (
+        typeof nearPoint.radius !== 'number' ||
+        !isFinite(nearPoint.radius) ||
+        nearPoint.radius <= 0
+      ) {
         return {
           document: doc,
           summary: 'find_entities: nearPoint.radius must be a finite number > 0.',
@@ -311,9 +342,11 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
         };
       }
       const minErr = validateVec3(insideBBox[0], 'insideBBox[0]');
-      if (minErr !== null) return { document: doc, summary: `find_entities: ${minErr}`, affected: [] };
+      if (minErr !== null)
+        return { document: doc, summary: `find_entities: ${minErr}`, affected: [] };
       const maxErr = validateVec3(insideBBox[1], 'insideBBox[1]');
-      if (maxErr !== null) return { document: doc, summary: `find_entities: ${maxErr}`, affected: [] };
+      if (maxErr !== null)
+        return { document: doc, summary: `find_entities: ${maxErr}`, affected: [] };
       const qMin = insideBBox[0] as readonly [number, number, number];
       const qMax = insideBBox[1] as readonly [number, number, number];
       if (qMin[0] > qMax[0] || qMin[1] > qMax[1] || qMin[2] > qMax[2]) {
@@ -335,9 +368,11 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
         };
       }
       const minErr = validateVec3(overlapsBBox[0], 'overlapsBBox[0]');
-      if (minErr !== null) return { document: doc, summary: `find_entities: ${minErr}`, affected: [] };
+      if (minErr !== null)
+        return { document: doc, summary: `find_entities: ${minErr}`, affected: [] };
       const maxErr = validateVec3(overlapsBBox[1], 'overlapsBBox[1]');
-      if (maxErr !== null) return { document: doc, summary: `find_entities: ${maxErr}`, affected: [] };
+      if (maxErr !== null)
+        return { document: doc, summary: `find_entities: ${maxErr}`, affected: [] };
       const qMin = overlapsBBox[0] as readonly [number, number, number];
       const qMax = overlapsBBox[1] as readonly [number, number, number];
       if (qMin[0] > qMax[0] || qMin[1] > qMax[1] || qMin[2] > qMax[2]) {
@@ -363,24 +398,19 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
     }
 
     // --- Precompute typed spatial params ---
-    const npPoint = nearPoint !== undefined
-      ? (nearPoint.point as readonly [number, number, number])
-      : null;
+    const npPoint =
+      nearPoint !== undefined ? (nearPoint.point as readonly [number, number, number]) : null;
     const npRadiusSq = nearPoint !== undefined ? nearPoint.radius * nearPoint.radius : 0;
 
-    const insideMin = insideBBox !== undefined
-      ? (insideBBox[0] as readonly [number, number, number])
-      : null;
-    const insideMax = insideBBox !== undefined
-      ? (insideBBox[1] as readonly [number, number, number])
-      : null;
+    const insideMin =
+      insideBBox !== undefined ? (insideBBox[0] as readonly [number, number, number]) : null;
+    const insideMax =
+      insideBBox !== undefined ? (insideBBox[1] as readonly [number, number, number]) : null;
 
-    const overlapMin = overlapsBBox !== undefined
-      ? (overlapsBBox[0] as readonly [number, number, number])
-      : null;
-    const overlapMax = overlapsBBox !== undefined
-      ? (overlapsBBox[1] as readonly [number, number, number])
-      : null;
+    const overlapMin =
+      overlapsBBox !== undefined ? (overlapsBBox[0] as readonly [number, number, number]) : null;
+    const overlapMax =
+      overlapsBBox !== undefined ? (overlapsBBox[1] as readonly [number, number, number]) : null;
 
     const nameFuzzyLc = nameFuzzy !== undefined ? nameFuzzy.toLowerCase() : null;
     const tagFuzzyLc = tagFuzzy !== undefined ? tagFuzzy.toLowerCase() : null;

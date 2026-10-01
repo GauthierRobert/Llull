@@ -212,16 +212,45 @@ describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)',
     // 8-vertex closed box mesh (manifold — all 12 triangles close the surface).
     const boxMesh: MeshData = {
       positions: [
-        -1, -1, -1,  1, -1, -1,  1,  1, -1, -1,  1, -1,
-        -1, -1,  1,  1, -1,  1,  1,  1,  1, -1,  1,  1,
+        -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
       ],
       indices: [
-        0, 1, 2,  0, 2, 3,   // bottom
-        4, 6, 5,  4, 7, 6,   // top
-        0, 4, 1,  4, 5, 1,   // front
-        1, 5, 2,  5, 6, 2,   // right
-        2, 6, 3,  6, 7, 3,   // back
-        3, 7, 0,  7, 4, 0,   // left
+        0,
+        1,
+        2,
+        0,
+        2,
+        3, // bottom
+        4,
+        6,
+        5,
+        4,
+        7,
+        6, // top
+        0,
+        4,
+        1,
+        4,
+        5,
+        1, // front
+        1,
+        5,
+        2,
+        5,
+        6,
+        2, // right
+        2,
+        6,
+        3,
+        6,
+        7,
+        3, // back
+        3,
+        7,
+        0,
+        7,
+        4,
+        0, // left
       ],
     };
     const result = kernel.filletEdges(boxMesh, [], 0.2);

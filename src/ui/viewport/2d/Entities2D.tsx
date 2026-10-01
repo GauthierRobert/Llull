@@ -82,7 +82,14 @@ export function Entities2D({ document }: Entities2DProps): React.ReactElement {
         if (layer && !layer.visible) return null;
         if (hiddenLayerIds.has(entity.layerId)) return null;
 
-        return <Entity2DRenderer key={id} entity={entity} selected={selectionSet.has(id)} document={document} />;
+        return (
+          <Entity2DRenderer
+            key={id}
+            entity={entity}
+            selected={selectionSet.has(id)}
+            document={document}
+          />
+        );
       })}
     </group>
   );

@@ -115,10 +115,10 @@ describe('adaptiveGridStep3D', () => {
 
   it('golden table: step grows with distance (order of magnitude)', () => {
     // Each decade of distance should increase the step by approximately a decade.
-    const step1   = adaptiveGridStep3D(1);
-    const step10  = adaptiveGridStep3D(10);
+    const step1 = adaptiveGridStep3D(1);
+    const step10 = adaptiveGridStep3D(10);
     const step100 = adaptiveGridStep3D(100);
-    const step1k  = adaptiveGridStep3D(1000);
+    const step1k = adaptiveGridStep3D(1000);
     const step10k = adaptiveGridStep3D(10000);
 
     expect(step10).toBeGreaterThan(step1);
@@ -224,7 +224,7 @@ describe('scaleBarLength3D', () => {
 
   it('worldLength grows with camera distance (zoomed out → bigger world label)', () => {
     const near = scaleBarLength3D(1, 800).worldLength;
-    const far  = scaleBarLength3D(1000, 800).worldLength;
+    const far = scaleBarLength3D(1000, 800).worldLength;
     expect(far).toBeGreaterThan(near);
   });
 

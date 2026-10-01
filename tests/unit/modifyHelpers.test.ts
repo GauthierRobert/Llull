@@ -13,7 +13,12 @@ import {
   entityDistSq,
 } from '../../src/ui/viewport/2d/modifyHelpers';
 import type { Vec2 } from '../../src/core/model/types';
-import type { LineEntity, PolylineEntity, CircleEntity, RectangleEntity } from '../../src/core/model/types';
+import type {
+  LineEntity,
+  PolylineEntity,
+  CircleEntity,
+  RectangleEntity,
+} from '../../src/core/model/types';
 
 // ---------------------------------------------------------------------------
 // nearestVertex
@@ -55,21 +60,30 @@ describe('nearestVertex', () => {
   });
 
   it('returns distSq 0 when the pick is exactly on a vertex', () => {
-    const points: Vec2[] = [[5, 7], [2, 3]];
+    const points: Vec2[] = [
+      [5, 7],
+      [2, 3],
+    ];
     const result = nearestVertex(points, [5, 7]);
     expect(result!.vertexIndex).toBe(0);
     expect(result!.distSq).toBe(0);
   });
 
   it('returns correct distSq', () => {
-    const points: Vec2[] = [[0, 0], [3, 4]];
+    const points: Vec2[] = [
+      [0, 0],
+      [3, 4],
+    ];
     const result = nearestVertex(points, [0, 0]);
     // Nearest is [0,0], distSq = 0
     expect(result!.distSq).toBe(0);
   });
 
   it('works with negative coordinates', () => {
-    const points: Vec2[] = [[-5, -5], [5, 5]];
+    const points: Vec2[] = [
+      [-5, -5],
+      [5, 5],
+    ];
     const result = nearestVertex(points, [-4, -4]);
     expect(result!.vertexIndex).toBe(0);
   });
@@ -279,7 +293,12 @@ describe('entityDistSq — rectangle with non-zero position', () => {
   });
 
   it('returns Infinity for unsupported entity kinds', () => {
-    const box = { ...BASE, kind: 'box' as const, position: [0, 0, 0] as const, size: [1, 1, 1] as const };
+    const box = {
+      ...BASE,
+      kind: 'box' as const,
+      position: [0, 0, 0] as const,
+      size: [1, 1, 1] as const,
+    };
     expect(entityDistSq(box as never, [0, 0])).toBe(Infinity);
   });
 });

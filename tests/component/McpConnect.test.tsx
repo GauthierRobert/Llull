@@ -23,8 +23,8 @@ import { McpConnect, McpConnectButton } from '@ui/components/McpConnect';
 // Mock clipboard
 // ---------------------------------------------------------------------------
 
-const writeTextMock: Mock<(text: string) => Promise<void>> = vi.fn(
-  (_text: string) => Promise.resolve(),
+const writeTextMock: Mock<(text: string) => Promise<void>> = vi.fn((_text: string) =>
+  Promise.resolve(),
 );
 
 beforeEach(() => {
@@ -65,7 +65,9 @@ describe('McpConnect — structure', () => {
 
   it('shows the server install and start command in a code block', () => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('npm --prefix server install && npm --prefix server run dev')).toBeDefined();
+    expect(
+      screen.getByText('npm --prefix server install && npm --prefix server run dev'),
+    ).toBeDefined();
   });
 
   it('shows the endpoint URL in a code block', () => {
@@ -340,7 +342,9 @@ describe('McpConnect — copy buttons', () => {
 
   it('Copy button for read cad://conventions calls clipboard.writeText with the tool name', async () => {
     render(<McpConnect onClose={() => undefined} />);
-    const copyBtns = screen.getAllByRole('button', { name: /copy read cad:\/\/conventions tool name/i });
+    const copyBtns = screen.getAllByRole('button', {
+      name: /copy read cad:\/\/conventions tool name/i,
+    });
     expect(copyBtns.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(copyBtns[0]!);
 

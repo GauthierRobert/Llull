@@ -146,7 +146,12 @@ describe('ModifyTools', () => {
 
   it('calls onCommitValue when Enter is pressed in the input', () => {
     const onCommitValue = vi.fn();
-    renderModifyTools({ activeTool: 'offset', phase: 'enter-value', pendingValue: 1, onCommitValue });
+    renderModifyTools({
+      activeTool: 'offset',
+      phase: 'enter-value',
+      pendingValue: 1,
+      onCommitValue,
+    });
     const input = screen.getByRole('spinbutton');
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onCommitValue).toHaveBeenCalled();
@@ -154,7 +159,12 @@ describe('ModifyTools', () => {
 
   it('calls onCommitValue when the Apply button is clicked', () => {
     const onCommitValue = vi.fn();
-    renderModifyTools({ activeTool: 'fillet', phase: 'enter-value', pendingValue: 1, onCommitValue });
+    renderModifyTools({
+      activeTool: 'fillet',
+      phase: 'enter-value',
+      pendingValue: 1,
+      onCommitValue,
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(onCommitValue).toHaveBeenCalled();
   });

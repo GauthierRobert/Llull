@@ -3,7 +3,7 @@
  *
  * Render branch for `kind:'torus'` entities.
  * Uses THREE.TorusGeometry — torus ring lies in the XY plane (hole faces +Z),
- * centered on position. Consistent with the Y-up viewport convention.
+ * centered on position. Matches core tessellation (Z-up).
  * Geometry is memoized on the entity's geometric fields; disposed on unmount.
  * Material props reflect the active display mode (shaded/wireframe/xray).
  */
@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { TorusEntity } from '@core/model/types';
 import { useMaterialProps } from '../useMaterialProps';
-import { radialSegmentsForDiag, torusDiag } from '../lodSegments';
+import { buildTorusGeometry } from './primitiveGeometry';
 
 interface TorusMeshProps {
   entity: TorusEntity;
@@ -23,18 +23,18 @@ interface TorusMeshProps {
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 
-export function TorusMesh({ entity, selected, onSelect, pbrMaterial }: TorusMeshProps): React.ReactElement {
+export function TorusMesh({
+  entity,
+  selected,
+  onSelect,
+  pbrMaterial,
+}: TorusMeshProps): React.ReactElement {
   const { ringRadius, tubeRadius, position, rotation, color } = entity;
 
-  const geometry = useMemo(() => {
-    const diag = torusDiag(ringRadius, tubeRadius);
-    const tubularSeg = radialSegmentsForDiag(diag);
-    // radialSegments (tube cross-section) = half of tubularSegments, min 8.
-    const radialSeg = Math.max(8, Math.floor(tubularSeg / 2));
-    // TorusGeometry(radius, tube, radialSegments, tubularSegments)
-    const geo = new THREE.TorusGeometry(ringRadius, tubeRadius, radialSeg, tubularSeg);
-    return geo;
-  }, [ringRadius, tubeRadius]);
+  const geometry = useMemo(
+    () => buildTorusGeometry(ringRadius, tubeRadius),
+    [ringRadius, tubeRadius],
+  );
 
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -47,7 +47,14 @@ export function TorusMesh({ entity, selected, onSelect, pbrMaterial }: TorusMesh
     };
   }, [geometry]);
 
-  const matProps = useMaterialProps({ color, selected, roughness: 0.4, metalness: 0.1, envMapIntensity: 0.9, ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}) });
+  const matProps = useMaterialProps({
+    color,
+    selected,
+    roughness: 0.4,
+    metalness: 0.1,
+    envMapIntensity: 0.9,
+    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
+  });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();

@@ -22,6 +22,7 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
+import { PRESET_DIRECTIONS, type PresetDirection, type PresetName } from './viewPresetDirections';
 
 // ---------------------------------------------------------------------------
 // Geometry helpers (pure — no three.js side-effects)
@@ -98,20 +99,18 @@ function computeSceneBounds(
 // Preset definitions
 // ---------------------------------------------------------------------------
 
-type PresetName = 'front' | 'top' | 'right' | 'iso';
-
 interface Preset {
   name: PresetName;
   label: string;
-  /** Unit direction of the camera eye RELATIVE to the scene centre. */
-  direction: [number, number, number];
+  /** Unit direction of the camera eye RELATIVE to the scene centre (+Z-up). */
+  direction: PresetDirection;
 }
 
 const PRESETS: Preset[] = [
-  { name: 'front', label: 'Front', direction: [0, 0, 1] },
-  { name: 'top',   label: 'Top',   direction: [0, 1, 0] },
-  { name: 'right', label: 'Right', direction: [1, 0, 0] },
-  { name: 'iso',   label: 'Iso',   direction: [1, 1, 1] },
+  { name: 'front', label: 'Front', direction: PRESET_DIRECTIONS.front },
+  { name: 'top', label: 'Top', direction: PRESET_DIRECTIONS.top },
+  { name: 'right', label: 'Right', direction: PRESET_DIRECTIONS.right },
+  { name: 'iso', label: 'Iso', direction: PRESET_DIRECTIONS.iso },
 ];
 
 // ---------------------------------------------------------------------------
@@ -139,13 +138,14 @@ export function ViewPresetsInner({
   const { camera, controls, invalidate } = useThree();
 
   const applyPreset = useCallback(
-    (direction: [number, number, number], target: THREE.Vector3, distance: number) => {
+    (direction: PresetDirection, target: THREE.Vector3, distance: number) => {
       const orbit = controls as OrbitControlsImpl | null;
       if (!orbit) return;
 
-      const dir = new THREE.Vector3(...direction).normalize();
+      const dir = new THREE.Vector3(direction[0], direction[1], direction[2]).normalize();
       const newPos = target.clone().addScaledVector(dir, distance);
 
+      camera.up.set(0, 0, 1);
       camera.position.copy(newPos);
       camera.lookAt(target);
       orbit.target.copy(target);
@@ -187,7 +187,7 @@ export function ViewPresetsInner({
 // or context across the Canvas boundary. The ref holds ONLY imperative callbacks
 // and read-only data — it never mutates the document.
 const _innerRef: {
-  applyPreset: ((dir: [number, number, number], target: THREE.Vector3, distance: number) => void) | null;
+  applyPreset: ((dir: PresetDirection, target: THREE.Vector3, distance: number) => void) | null;
   entities: Record<string, { position: readonly [number, number, number] }>;
   selection: string[];
   allEntityIds: string[];
@@ -220,7 +220,7 @@ export function ViewPresetsOverlay(): React.ReactElement {
   _innerRef.selection = selection;
   _innerRef.allEntityIds = allIds;
 
-  const handlePreset = useCallback((direction: [number, number, number]) => {
+  const handlePreset = useCallback((direction: PresetDirection) => {
     if (!_innerRef.applyPreset) return;
     // Default target: origin, default distance: 10.
     const target = new THREE.Vector3(0, 0, 0);
@@ -232,7 +232,7 @@ export function ViewPresetsOverlay(): React.ReactElement {
     const bounds = computeSceneBounds(_innerRef.entities, ids);
     if (!bounds) return;
     // Use the current camera direction (iso) for fit operations.
-    _innerRef.applyPreset([1, 1, 1], bounds.center, bounds.radius);
+    _innerRef.applyPreset(PRESET_DIRECTIONS.iso, bounds.center, bounds.radius);
   }, []);
 
   return (

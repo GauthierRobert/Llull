@@ -17,6 +17,7 @@ import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
+import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from './limits';
 import { sampleInvolute } from './gears';
 
 /** Clone the document shallowly with a new entity added. Keeps commands pure. */
@@ -67,7 +68,8 @@ export const drawLine: CommandDefinition<DrawLineParams> = {
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       color: {
@@ -145,7 +147,8 @@ export const drawPolyline: CommandDefinition<DrawPolylineParams> = {
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       color: {
@@ -155,7 +158,10 @@ export const drawPolyline: CommandDefinition<DrawPolylineParams> = {
     },
     required: ['points'],
   },
-  run: (doc, { points, closed = false, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+  run: (
+    doc,
+    { points, closed = false, position = [0, 0, 0], color = '#4a90d9' },
+  ): CommandResult => {
     if (!Array.isArray(points) || points.length < 2) {
       return {
         document: doc,
@@ -235,7 +241,8 @@ export const drawArc: CommandDefinition<DrawArcParams> = {
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       color: {
@@ -315,7 +322,8 @@ export const drawCircle: CommandDefinition<DrawCircleParams> = {
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       color: {
@@ -391,7 +399,8 @@ export const drawRectangle: CommandDefinition<DrawRectangleParams> = {
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin (lower-left corner). Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin (lower-left corner). Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       color: {
@@ -518,15 +527,18 @@ export const drawEllipse: CommandDefinition<DrawEllipseParams> = {
       },
       radiusX: {
         type: 'number',
-        description: 'Semi-axis length along the local X axis (half-width). Must be greater than 0.',
+        description:
+          'Semi-axis length along the local X axis (half-width). Must be greater than 0.',
       },
       radiusY: {
         type: 'number',
-        description: 'Semi-axis length along the local Y axis (half-height). Must be greater than 0.',
+        description:
+          'Semi-axis length along the local Y axis (half-height). Must be greater than 0.',
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       color: {
@@ -536,7 +548,10 @@ export const drawEllipse: CommandDefinition<DrawEllipseParams> = {
     },
     required: ['center', 'radiusX', 'radiusY'],
   },
-  run: (doc, { center, radiusX, radiusY, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+  run: (
+    doc,
+    { center, radiusX, radiusY, position = [0, 0, 0], color = '#4a90d9' },
+  ): CommandResult => {
     if (radiusX <= 0 || radiusY <= 0) {
       return {
         document: doc,
@@ -582,7 +597,7 @@ interface DrawSplineParams {
  * @layer core/commands
  * @affects creates 1 spline entity
  * @invariant points.length >= 2; each point is a 2-element [x,y] array
- * @failure fewer than 2 points -> no-op, affected:[]
+ * @failure fewer than 2 points or more than MAX_SPLINE_CONTROL_POINTS -> no-op, affected:[]
  */
 export const drawSpline: CommandDefinition<DrawSplineParams> = {
   name: 'draw_spline',
@@ -608,7 +623,8 @@ export const drawSpline: CommandDefinition<DrawSplineParams> = {
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       color: {
@@ -618,11 +634,21 @@ export const drawSpline: CommandDefinition<DrawSplineParams> = {
     },
     required: ['points'],
   },
-  run: (doc, { points, closed = false, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+  run: (
+    doc,
+    { points, closed = false, position = [0, 0, 0], color = '#4a90d9' },
+  ): CommandResult => {
     if (!Array.isArray(points) || points.length < 2) {
       return {
         document: doc,
         summary: `draw_spline: requires at least 2 points (got ${Array.isArray(points) ? points.length : 0}).`,
+        affected: [],
+      };
+    }
+    if (points.length > MAX_SPLINE_CONTROL_POINTS) {
+      return {
+        document: doc,
+        summary: `draw_spline: ${points.length} points exceeds MAX_SPLINE_CONTROL_POINTS (${MAX_SPLINE_CONTROL_POINTS}).`,
         affected: [],
       };
     }
@@ -717,7 +743,8 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       rotation: {
@@ -789,10 +816,10 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
       };
     }
     const samplesInt = Math.round(samples);
-    if (samplesInt < 2) {
+    if (samplesInt < 2 || samplesInt > MAX_CURVE_SAMPLES) {
       return {
         document: doc,
-        summary: `draw_involute: samples must be >= 2, got ${samples}.`,
+        summary: `draw_involute: samples must be in [2, ${MAX_CURVE_SAMPLES}], got ${samples}.`,
         affected: [],
       };
     }
@@ -806,7 +833,8 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
 
     // --- Resolve position/rotation (clamp non-finite to 0) ---
     const resolvedPos: Vec3 =
-      Array.isArray(position) && position.length === 3 &&
+      Array.isArray(position) &&
+      position.length === 3 &&
       Number.isFinite((position as number[])[0]) &&
       Number.isFinite((position as number[])[1]) &&
       Number.isFinite((position as number[])[2])
@@ -814,7 +842,8 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
         : [0, 0, 0];
 
     const resolvedRot: Vec3 =
-      Array.isArray(rotation) && rotation.length === 3 &&
+      Array.isArray(rotation) &&
+      rotation.length === 3 &&
       Number.isFinite((rotation as number[])[0]) &&
       Number.isFinite((rotation as number[])[1]) &&
       Number.isFinite((rotation as number[])[2])
@@ -826,7 +855,10 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
     const pts: ReadonlyArray<Vec2> = rawPoints.map(([x, y]) => [x, y] as Vec2);
 
     // --- Compute 2D AABB for summary ---
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const [x, y] of pts) {
       if (x < minX) minX = x;
       if (y < minY) minY = y;
@@ -885,8 +917,12 @@ interface DrawBeltAroundParams {
  * Returns null when no external tangent exists (one circle inside the other).
  */
 function externalTangentPoints(
-  c1x: number, c1y: number, r1: number,
-  c2x: number, c2y: number, r2: number,
+  c1x: number,
+  c1y: number,
+  r1: number,
+  c2x: number,
+  c2y: number,
+  r2: number,
 ): readonly [readonly [number, number], readonly [number, number]] | null {
   const dx = c2x - c1x;
   const dy = c2y - c1y;
@@ -898,14 +934,8 @@ function externalTangentPoints(
   const theta = Math.atan2(dy, dx);
   // Top-side tangent (CCW outer envelope)
   const angle = theta + Math.PI / 2 + alpha;
-  const tp1: readonly [number, number] = [
-    c1x + r1 * Math.cos(angle),
-    c1y + r1 * Math.sin(angle),
-  ];
-  const tp2: readonly [number, number] = [
-    c2x + r2 * Math.cos(angle),
-    c2y + r2 * Math.sin(angle),
-  ];
+  const tp1: readonly [number, number] = [c1x + r1 * Math.cos(angle), c1y + r1 * Math.sin(angle)];
+  const tp2: readonly [number, number] = [c2x + r2 * Math.cos(angle), c2y + r2 * Math.sin(angle)];
   return [tp1, tp2] as const;
 }
 
@@ -983,7 +1013,8 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
       },
       position: {
         type: 'array',
-        description: 'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+        description:
+          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
         items: { type: 'number' },
       },
       rotation: {
@@ -1024,10 +1055,10 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
     }
 
     // --- Validate arcSamples ---
-    if (!Number.isFinite(arcSamples) || arcSamples < 2) {
+    if (!Number.isFinite(arcSamples) || arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
       return {
         document: doc,
-        summary: `draw_belt_around: arcSamples must be a finite number >= 2 (got ${String(arcSamples)}).`,
+        summary: `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
         affected: [],
       };
     }
@@ -1079,8 +1110,7 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
       if (d < Math.abs(p1.radius - p2.radius)) {
         return {
           document: doc,
-          summary:
-            `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${fmtN(d)} < |r1−r2|=${fmtN(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
+          summary: `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${fmtN(d)} < |r1−r2|=${fmtN(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
           affected: [],
         };
       }
@@ -1099,8 +1129,12 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
       const p1 = pulleys[i]!;
       const p2 = pulleys[ni]!;
       const result = externalTangentPoints(
-        p1.center[0]!, p1.center[1]!, p1.radius,
-        p2.center[0]!, p2.center[1]!, p2.radius,
+        p1.center[0]!,
+        p1.center[1]!,
+        p1.radius,
+        p2.center[0]!,
+        p2.center[1]!,
+        p2.radius,
       );
       if (result === null) {
         // Shouldn't happen since we checked above, but guard for safety
@@ -1133,7 +1167,7 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
     for (let i = 0; i < n; i++) {
       const ni = (i + 1) % n;
       const outTP = tangentPairs[i]![0]; // outgoing TP on pulley i
-      const inTP = tangentPairs[i]![1];  // incoming TP on pulley ni
+      const inTP = tangentPairs[i]![1]; // incoming TP on pulley ni
 
       // 1. Outgoing tangent point on pulley i
       points.push(outTP);
@@ -1150,7 +1184,14 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
       const inAngle = Math.atan2(inTP[1] - pni.center[1]!, inTP[0] - pni.center[0]!);
       const outAngle = Math.atan2(outTPni[1] - pni.center[1]!, outTPni[0] - pni.center[0]!);
 
-      const arcPts = sampleArc(pni.center[0]!, pni.center[1]!, pni.radius, inAngle, outAngle, samplesInt);
+      const arcPts = sampleArc(
+        pni.center[0]!,
+        pni.center[1]!,
+        pni.radius,
+        inAngle,
+        outAngle,
+        samplesInt,
+      );
       for (const pt of arcPts) {
         points.push(pt);
       }
@@ -1164,7 +1205,8 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
 
     // --- Resolve position / rotation ---
     const resolvedPos: Vec3 =
-      Array.isArray(position) && position.length >= 3 &&
+      Array.isArray(position) &&
+      position.length >= 3 &&
       Number.isFinite((position as number[])[0]) &&
       Number.isFinite((position as number[])[1]) &&
       Number.isFinite((position as number[])[2])
@@ -1172,7 +1214,8 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
         : [0, 0, 0];
 
     const resolvedRot: Vec3 =
-      Array.isArray(rotation) && rotation.length >= 3 &&
+      Array.isArray(rotation) &&
+      rotation.length >= 3 &&
       Number.isFinite((rotation as number[])[0]) &&
       Number.isFinite((rotation as number[])[1]) &&
       Number.isFinite((rotation as number[])[2])
@@ -1180,7 +1223,10 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
         : [0, 0, 0];
 
     // --- Compute AABB for summary ---
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const [x, y] of points) {
       if (x < minX) minX = x;
       if (y < minY) minY = y;

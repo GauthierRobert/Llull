@@ -17,6 +17,7 @@
 import type { ThreeEvent } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import type { TextEntity } from '@core/model/types';
+import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 
 interface TextMeshProps {
   entity: TextEntity;
@@ -50,6 +51,7 @@ export function TextMesh({ entity, selected, onSelect }: TextMeshProps): React.R
   // text entity count is high (> ~50 text entities).
   return (
     <Text
+      font={TEXT_FONT_URL}
       position={[position[0], position[1], position[2]]}
       rotation={[rotation[0], rotation[1], rotation[2]]}
       fontSize={height}
