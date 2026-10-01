@@ -46,6 +46,9 @@ function resetStore(): void {
     canRedo: false,
     renderOrigin: [0, 0, 0],
     liveStatus: 'connecting',
+    hasUnsyncedLocalEdits: false,
+    localUndoStack: [],
+    localRedoStack: [],
   });
 }
 
@@ -150,14 +153,15 @@ describe('CadStore — networked dispatch', () => {
     expect(getState().lastMeasure?.command).toBe('measure_distance');
   });
 
-  it('dispatch sets liveStatus to disconnected on network failure', async () => {
+  it('dispatch sets liveStatus to disconnected on network failure and falls back locally', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')));
 
     getState().dispatch('add_box', { size: [1, 1, 1] });
     await flushPromises();
 
     expect(getState().liveStatus).toBe('disconnected');
-    expect(getState().lastSummary).toContain('Network');
+    expect(getState().document.order).toHaveLength(1);
+    expect(getState().lastSummary).toContain('ran locally');
   });
 
   it('dispatch keeps liveStatus on HTTP 429 and surfaces the error in lastSummary', async () => {
@@ -347,5 +351,140 @@ describe('CadStore — renderOrigin (floating-origin)', () => {
     const serialized = serializeDocument(getState().document);
     expect(serialized).not.toContain('renderOrigin');
     expect(serialized).not.toContain('1234');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Offline fallback + reconnect reconciliation
+// ---------------------------------------------------------------------------
+
+describe('CadStore — offline fallback', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    resetStore();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('offline dispatch runs execute locally without any fetch', () => {
+    const spy = vi.fn();
+    vi.stubGlobal('fetch', spy);
+    useStore.setState({ liveStatus: 'disconnected' });
+
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(getState().document.order).toHaveLength(1);
+    expect(getState().lastSummary).toContain('ran locally');
+    expect(getState().hasUnsyncedLocalEdits).toBe(true);
+    expect(getState().canUndo).toBe(true);
+  });
+
+  it('offline no-op command pushes no history', () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('delete_entity', { id: 'missing' });
+    expect(getState().localUndoStack).toHaveLength(0);
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+  });
+
+  it('offline undo and redo walk the local snapshot stack', () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    getState().dispatch('add_box', { size: [2, 2, 2] });
+    expect(getState().document.order).toHaveLength(2);
+
+    getState().undo();
+    expect(getState().document.order).toHaveLength(1);
+    expect(getState().canRedo).toBe(true);
+
+    getState().undo();
+    expect(getState().document.order).toHaveLength(0);
+    expect(getState().canUndo).toBe(false);
+
+    getState().redo();
+    expect(getState().document.order).toHaveLength(1);
+    getState().redo();
+    expect(getState().document.order).toHaveLength(2);
+    expect(getState().canRedo).toBe(false);
+  });
+
+  it('bounds the local undo stack', () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    for (let i = 0; i < 105; i++) getState().dispatch('add_box', { size: [1, 1, 1] });
+    expect(getState().localUndoStack).toHaveLength(100);
+  });
+
+  it('first dispatch while connecting falls back locally on a network error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('refused')));
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    await flushPromises();
+    expect(getState().document.order).toHaveLength(1);
+    expect(getState().liveStatus).toBe('disconnected');
+  });
+
+  it('network failure on undo while connecting falls back to local history', async () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    useStore.setState({ liveStatus: 'connected' });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('refused')));
+    getState().undo();
+    await flushPromises();
+    expect(getState().document.order).toHaveLength(0);
+  });
+
+  it('HTTP 4xx does NOT fall back locally', async () => {
+    useStore.setState({ liveStatus: 'connected' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({}) }));
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    await flushPromises();
+    expect(getState().document.order).toHaveLength(0);
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+    expect(getState().liveStatus).toBe('connected');
+  });
+
+  it('reconnect with unsynced edits pushes load_document with the local doc', async () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    const localDoc = getState().document;
+    const spy = mockFetch(DEFAULT_RESPONSE);
+    useStore.setState({ liveStatus: 'connected' });
+
+    getState().hydrateLiveDocument(createEmptyDocument());
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledOnce();
+    const body = JSON.parse((spy.mock.calls[0] as [string, RequestInit])[1].body as string) as {
+      name: string;
+      params: { json: string };
+    };
+    expect(body.name).toBe('load_document');
+    expect(body.params.json).toBe(serializeDocument(localDoc));
+    expect(getState().document).toBe(localDoc);
+    expect(getState().hasUnsyncedLocalEdits).toBe(false);
+  });
+
+  it('failed push keeps the local doc and the unsynced flag', async () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('refused')));
+
+    getState().hydrateLiveDocument(createEmptyDocument());
+    await flushPromises();
+
+    expect(getState().document.order).toHaveLength(1);
+    expect(getState().hasUnsyncedLocalEdits).toBe(true);
+  });
+
+  it('reconnect without local edits just hydrates and clears local stacks', () => {
+    const spy = vi.fn();
+    vi.stubGlobal('fetch', spy);
+    useStore.setState({ localUndoStack: [createEmptyDocument()] });
+    const result = localDispatch('add_box', { size: [1, 1, 1] });
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(getState().document.order).toEqual(result.affected);
+    expect(getState().localUndoStack).toHaveLength(0);
   });
 });

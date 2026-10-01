@@ -44,7 +44,7 @@ function LiveIndicator(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
 
   const isConnected = liveStatus === 'connected';
-  const label = isConnected ? 'Live' : liveStatus === 'connecting' ? 'Connecting…' : 'Disconnected';
+  const label = isConnected ? 'Live' : liveStatus === 'connecting' ? 'Connecting…' : 'Offline (local)';
 
   return (
     <span

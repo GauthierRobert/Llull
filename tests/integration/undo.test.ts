@@ -39,6 +39,10 @@ function resetStore(): void {
     lastSummary: null,
     canUndo: false,
     canRedo: false,
+    liveStatus: 'connecting',
+    hasUnsyncedLocalEdits: false,
+    localUndoStack: [],
+    localRedoStack: [],
   });
 }
 
@@ -123,7 +127,7 @@ describe('undo — server-authoritative', () => {
     await flushPromises();
 
     expect(getState().liveStatus).toBe('disconnected');
-    expect(getState().lastSummary).toContain('Network');
+    expect(getState().lastSummary).toContain('ran locally');
   });
 });
 
@@ -179,7 +183,7 @@ describe('redo — server-authoritative', () => {
     await flushPromises();
 
     expect(getState().liveStatus).toBe('disconnected');
-    expect(getState().lastSummary).toContain('Network');
+    expect(getState().lastSummary).toContain('ran locally');
   });
 });
 

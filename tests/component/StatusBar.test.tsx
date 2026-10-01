@@ -52,10 +52,10 @@ describe('StatusBar — live indicator', () => {
     expect(screen.getByLabelText(/mcp stream: live/i)).toBeDefined();
   });
 
-  it('shows "Disconnected" when liveStatus is disconnected', () => {
+  it('shows "Offline (local)" when liveStatus is disconnected', () => {
     useStore.setState({ liveStatus: 'disconnected' });
     render(<StatusBar />);
-    expect(screen.getByLabelText(/mcp stream: disconnected/i)).toBeDefined();
+    expect(screen.getByLabelText(/mcp stream: offline \(local\)/i)).toBeDefined();
   });
 
   it('shows "Connecting" text when liveStatus is connecting', () => {
