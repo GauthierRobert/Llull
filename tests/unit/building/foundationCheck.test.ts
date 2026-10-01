@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
+  consolidationSettlement,
   foundationCheck,
+  type ClayLayer,
   type FoundationRow,
 } from '@core/commands/building/industrial/foundationCheck';
 import { baseReactions } from '@core/commands/building/industrial/frameModel';
@@ -230,5 +232,110 @@ describe('slab friction with a thrust tie', () => {
       (result.data as { maxUtilisation: number }).maxUtilisation;
     expect(max(tied)).toBeLessThan(1);
     expect(max(untied)).toBeGreaterThan(1);
+  });
+});
+
+describe('consolidation settlement (clayLayer)', () => {
+  const CLAY: ClayLayer = { topDepth: 1, thickness: 4, compressionIndex: 0.4, voidRatio: 1.2 };
+  const settlementRow = (rows: FoundationRow[]): FoundationRow => {
+    const found = rows.find((row) => row.check.startsWith('settlement'));
+    if (!found) throw new Error('no settlement row');
+    return found;
+  };
+  const valueOf = (clayLayer?: ClayLayer): number =>
+    settlementRow(rowsOf(hall(), clayLayer ? { clayLayer } : {})).value;
+
+  it('leaves results unchanged without a clay layer', () => {
+    const plain = rowsOf(hall(), {});
+    expect(plain.find((row) => row.check.startsWith('settlement'))?.check).not.toContain(
+      'consolidation',
+    );
+    expect(rowsOf(hall(), { clayLayer: undefined })).toEqual(plain);
+  });
+
+  it('adds consolidation to the elastic settlement, reports both parts and can fail', () => {
+    const plain = valueOf();
+    const soft = settlementRow(
+      rowsOf(hall(), { clayLayer: { ...CLAY, thickness: 8, compressionIndex: 1.2 } }),
+    );
+    expect(soft.value).toBeGreaterThan(plain);
+    expect(soft.check).toMatch(/elastic [\d.]+ mm \+ consolidation [\d.]+ mm/);
+    expect(soft.limit).toBe(25);
+    expect(valueOf(CLAY)).toBeGreaterThan(plain);
+    const failing = foundationCheck.run(hall(), {
+      clayLayer: { topDepth: 0.5, thickness: 10, compressionIndex: 2, voidRatio: 1.5 },
+    });
+    expect((failing.data as { failures: string[] }).failures.length).toBeGreaterThan(0);
+    expect(failing.summary).toMatch(/settlement/);
+  });
+
+  it('feeds the differential settlement row', () => {
+    const differential = (clayLayer?: ClayLayer): FoundationRow | undefined =>
+      rowsOf(hall(), clayLayer ? { clayLayer } : {}).find((row) =>
+        row.check.startsWith('differential settlement'),
+      );
+    expect(differential(CLAY)).toBeDefined();
+    expect(differential(CLAY)?.value).toBeGreaterThanOrEqual(differential()?.value ?? 0);
+  });
+
+  it('settles less when deeper or thinner and when preconsolidated', () => {
+    const base = valueOf(CLAY);
+    expect(valueOf({ ...CLAY, topDepth: 6 })).toBeLessThan(base);
+    expect(valueOf({ ...CLAY, thickness: 2 })).toBeLessThan(base);
+    expect(valueOf({ ...CLAY, preconsolidationPressure: 80 })).toBeLessThan(base);
+  });
+
+  it('matches a hand computation of the 5 sublayers', () => {
+    const q = 100;
+    const layer: ClayLayer = { topDepth: 1, thickness: 5, compressionIndex: 0.3, voidRatio: 1 };
+    // h = 1 m, centres z = 1.5 … 5.5, gamma' = 19 − 9.81 = 9.19, B = L = 2.
+    const first = ((0.3 * 1) / 2) * Math.log10((9.19 * 1.5 + (q * 4) / (3.5 * 3.5)) / (9.19 * 1.5));
+    expect(first * 1000).toBeCloseTo(79.1, 0);
+    let total = 0;
+    for (let index = 0; index < 5; index++) {
+      const z = 1.5 + index;
+      const initial = 9.19 * z;
+      total += (0.3 / 2) * Math.log10((initial + (q * 4) / ((2 + z) * (2 + z))) / initial);
+    }
+    expect(consolidationSettlement(q, 2, 2, layer)).toBeCloseTo(total * 1000, 6);
+    // Preconsolidated above the final stress: Cr = Cc/5 only.
+    const recompressed = consolidationSettlement(q, 2, 2, {
+      ...layer,
+      preconsolidationPressure: 1e6,
+    });
+    expect(recompressed).toBeCloseTo((total * 1000) / 5, 6);
+    // Straddling σ'p of the first sublayer (13.785 < 30 < 46.4): Cr then Cc.
+    const straddle = consolidationSettlement(q, 2, 2, {
+      ...layer,
+      thickness: 0.5,
+      topDepth: 1.25,
+      preconsolidationPressure: 30,
+      recompressionIndex: 0.05,
+    });
+    expect(straddle).toBeGreaterThan(0);
+  });
+
+  it('is a no-op for bad clayLayer values', () => {
+    const doc = hall();
+    const bad: unknown[] = [
+      'clay',
+      [],
+      { ...CLAY, topDepth: -1 },
+      { ...CLAY, thickness: 0 },
+      { ...CLAY, compressionIndex: Number.NaN },
+      { ...CLAY, voidRatio: 0 },
+      { ...CLAY, unitWeight: 9 },
+      { ...CLAY, recompressionIndex: 0.9 },
+      { ...CLAY, recompressionIndex: 0 },
+      { ...CLAY, preconsolidationPressure: -5 },
+      { topDepth: 1, thickness: 2, voidRatio: 1 },
+    ];
+    for (const clayLayer of bad) {
+      const result = foundationCheck.run(doc, { clayLayer: clayLayer as ClayLayer });
+      expect(result.document).toBe(doc);
+      expect(result.affected).toEqual([]);
+      expect(result.data).toBeUndefined();
+      expect(result.summary).toContain('clayLayer');
+    }
   });
 });

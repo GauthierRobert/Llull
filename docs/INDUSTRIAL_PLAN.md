@@ -131,10 +131,10 @@ Each step ships with unit tests and is covered by the Playwright suite.
       EN 1991-1-4 roof zones F / G / H / I (edge and corner suction on the outer purlins) and wall
       zones A / B / D; bending, uplift with the free flange restrained only by the sheeting
       (reduced χLT), shear, deflection span/200 (purlins) and span/150 (rails).
-- [ ] **I33 — Consolidation settlement.** `check_foundations` optional clay layer
+- [x] **I33 — Consolidation settlement.** `check_foundations` optional clay layer
       (compressionIndex, voidRatio, layerThickness, unit weight): primary consolidation
       s = Cc H/(1+e0) log((σ'0+Δσ)/σ'0) with 2:1 stress spreading, added to the elastic settlement.
-- [ ] **I34 — Crane runway local wheel stresses.** `check_crane_runways`: local vertical web
+- [x] **I34 — Crane runway local wheel stresses.** `check_crane_runways`: local vertical web
       stress under the wheel σoz = Fz / (leff tw), leff from the rail + flange inertia
       (EN 1993-6 §5.7.1), static check and fatigue of the web-to-flange junction under wheel
       passages (detail category per EN 1993-1-9 Tab. 8.10).
