@@ -36,7 +36,7 @@ import {
   trayOutline,
   type ConnectionSolid,
 } from './industrial/evaluate';
-import { curvedWallBand, tangentWall } from './curvedWallGeometry';
+import { curvedWallArc, curvedWallBand, tangentWall } from './curvedWallGeometry';
 import { findProfile, type SteelProfile } from './steel/profiles';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
@@ -210,7 +210,7 @@ function exportWallLayers(context: Context, wall: WallElement, wallRef: string):
   const layers = (wall.layers ?? []).map((layer) => {
     const material = writer.add(`IFCMATERIAL(${ifcString(layer.material)},$,$)`);
     return writer.add(
-      `IFCMATERIALLAYER(${material},${ifcReal(mm(layer.thickness))},$,${ifcString(layer.material)},$,${ifcString(layer.function)},$)`,
+      `IFCMATERIALLAYER(${material},${ifcReal(mm(layer.thickness))},$,${ifcString(layer.material)},$,${ifcString(layer.function ?? 'structure')},$)`,
     );
   });
   const set = writer.add(
@@ -805,8 +805,12 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
       if (element.category === 'wall') {
         const wall = exportWall(context, element, wallExtent(building, element), storeyPlacement);
         contained.push(wall.ref);
-        if (element.layers) exportWallLayers(context, element, wall.ref);
-        else record(wall);
+        if (element.layers) {
+          exportWallLayers(context, element, wall.ref);
+          record({ ...wall, material: null });
+        } else {
+          record(wall);
+        }
         for (const openingId of building.elementOrder) {
           const opening = building.elements[openingId];
           if (
@@ -852,7 +856,19 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
               wallFrame(tangent).angle,
             ),
           };
-          record(exportOpening(context, opening, tangent, host, contained));
+          // The arc leaves the tangent by its sagitta at the jambs: deepen the void to cut through.
+          const radius = curvedWallArc(element)?.radius ?? 0;
+          const half = Math.min(opening.width / 2, radius);
+          const sagitta = radius - Math.sqrt(radius * radius - half * half);
+          record(
+            exportOpening(
+              context,
+              opening,
+              { ...tangent, thickness: element.thickness + 2 * sagitta },
+              host,
+              contained,
+            ),
+          );
         }
         continue;
       }

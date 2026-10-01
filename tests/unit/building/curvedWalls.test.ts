@@ -241,3 +241,32 @@ describe('openings in curved walls', () => {
     expect(buildingErrors(doc.building)).toEqual([]);
   });
 });
+
+describe('curved wall opening review regressions', () => {
+  it('re-checks curved-wall openings when the level height shrinks', () => {
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_window', {
+      wallId: 'curvedWall-1',
+      width: 1200,
+      height: 1200,
+      sillHeight: 1500,
+    }).document;
+    const result = execute(doc, 'update_level', { levelId: 'level-1', height: 2000 });
+    expect(result.summary).toMatch(/refused|exceeds/);
+    expect(wallOf(result.document).height).toBe(3000);
+  });
+
+  it('deepens the IFC void so it cuts through the arc at the jambs', () => {
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', {
+      start: [-3000, 0],
+      through: [0, 3000],
+      end: [3000, 0],
+      thickness: 200,
+    }).document;
+    doc = execute(doc, 'add_door', { wallId: 'curvedWall-1', width: 2000 }).document;
+    const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
+    // Sagitta of a 2 m opening on R = 3 m: 3000 − √(3000² − 1000²) ≈ 171.6 mm (each side).
+    const voids = [...ifc.matchAll(/IFCRECTANGLEPROFILEDEF\(\.AREA\.,\$,#\d+,2000\.,([\d.]+)\)/g)];
+    expect(Number(voids[0]?.[1])).toBeGreaterThan(200 + 2 * 171);
+  });
+});

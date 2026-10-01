@@ -227,10 +227,15 @@ function elementErrors(
     errors.push(`building element ${key}: start, through and end are collinear`);
   }
   if (category === 'wall' && element['layers'] !== undefined) {
-    const layers = parseWallLayers(element['layers']);
+    const raw = element['layers'];
+    const layers = parseWallLayers(raw);
     const thickness = element['thickness'];
     if (typeof layers === 'string') errors.push(`building element ${key}: ${layers}`);
     else if (
+      !(raw as unknown[]).every((layer) => isRecord(layer) && typeof layer['function'] === 'string')
+    ) {
+      errors.push(`building element ${key}: every stored layer needs a function`);
+    } else if (
       typeof thickness === 'number' &&
       Math.abs(layers.reduce((sum, layer) => sum + layer.thickness, 0) - thickness) >
         1e-6 * Math.max(1, thickness)

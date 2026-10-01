@@ -22,6 +22,7 @@ import {
   elementAffected,
 } from './model';
 import { openingsOf, regenerateBuilding, wallExtent, wallFrame, type WallExtent } from './evaluate';
+import { curvedWallLength } from './curvedWallGeometry';
 
 /**
  * Why `opening` does not fit in `wall` (alongside `others`), or null when it fits.
@@ -302,9 +303,13 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
     if (levelId !== undefined && !building.levels[levelId]) {
       return noChange(doc, `update_wall failed: no level '${levelId}'.`);
     }
-    // A new overall thickness no longer matches a build-up: the wall becomes single-layer.
+    // A new overall thickness or material no longer matches a build-up: the wall becomes
+    // single-layer.
     const { layers, ...single } = wall;
-    const keepLayers = thickness === undefined || thickness === wall.thickness;
+    const newMaterial = material?.trim();
+    const keepLayers =
+      (thickness === undefined || thickness === wall.thickness) &&
+      (!newMaterial || newMaterial === wall.material);
     const updated: WallElement = {
       ...single,
       ...(keepLayers && layers ? { layers } : {}),
@@ -341,9 +346,13 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
 export function openingFitIssues(building: BuildingModel, levelIds: ReadonlySet<string>): string[] {
   const issues: string[] = [];
   for (const element of Object.values(building.elements)) {
-    if (element.category !== 'wall' || !levelIds.has(element.levelId)) continue;
+    if (element.category !== 'wall' && element.category !== 'curvedWall') continue;
+    if (!levelIds.has(element.levelId)) continue;
     const openings = openingsOf(building, element.id);
-    const extent = wallExtent(building, element);
+    const extent =
+      element.category === 'wall'
+        ? wallExtent(building, element)
+        : { start: 0, end: curvedWallLength(element) };
     for (const opening of openings) {
       const error = openingFitError(element, opening, openings, extent);
       if (error) issues.push(error);

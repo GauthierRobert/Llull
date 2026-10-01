@@ -74,7 +74,8 @@ describe('add_moment_connections', () => {
       boltDiameter: 24,
       haunchLength: 1500,
     });
-    expect(connections(result.document).map((c) => c.kind)).toEqual(['eaves']);
+    // The higher-id rafter of the apex pair also gets its apex detailed.
+    expect(connections(result.document).map((c) => c.kind)).toEqual(['eaves', 'apex']);
     expect(connections(result.document)[0]).toMatchObject({
       plateThickness: 30,
       boltDiameter: 24,
@@ -162,5 +163,109 @@ describe('add_moment_connections', () => {
     ]);
     const element: BuildingElement | undefined = doc.building?.elements['connection-1'];
     expect(element?.mark).toBe('MC1');
+  });
+});
+
+describe('phase 3 review regressions', () => {
+  it('places the apex partner plate at the joint for spliced rafters', () => {
+    let doc = createEmptyDocument();
+    for (const [start, end] of [
+      [
+        [0, 0, 6000],
+        [5000, 0, 6500],
+      ],
+      [
+        [5000, 0, 6500],
+        [10000, 0, 7000],
+      ],
+    ]) {
+      doc = execute(doc, 'add_steel_member', {
+        profile: 'IPE400',
+        role: 'rafter',
+        start,
+        end,
+      }).document;
+    }
+    doc = execute(doc, 'add_moment_connections', {}).document;
+    const xs = meshXs(doc, 'connection-1:plate-2');
+    expect(Math.min(...xs)).toBeGreaterThan(4900);
+    expect(Math.max(...xs)).toBeLessThan(5100);
+  });
+
+  it('drops connections whose joint disappears on update_steel_member', () => {
+    const doc = execute(frame(), 'add_moment_connections', {}).document;
+    const role = execute(doc, 'update_steel_member', { memberId: 'member-1', role: 'beam' });
+    expect(role.summary).toMatch(/Moment connection\(s\) connection-1 removed/);
+    expect(connections(role.document).map((c) => c.id)).toEqual(['connection-2', 'connection-3']);
+    const moved = execute(doc, 'update_steel_member', {
+      memberId: 'member-3',
+      start: [0, 0, 5000],
+    });
+    expect(moved.summary).toMatch(/connection-1 removed/);
+    expect(
+      execute(doc, 'update_steel_member', { memberId: 'member-1', note: 'x' }).summary,
+    ).not.toMatch(/removed/);
+  });
+
+  it('refuses to move a column away from its connected rafter', () => {
+    const doc = execute(frame(), 'add_moment_connections', {}).document;
+    expect(
+      execute(doc, 'move_building_element', { elementIds: ['member-1'], delta: [3000, 0] }).summary,
+    ).toMatch(/connection-1 tie the moved member\(s\) to rafters/);
+    const together = execute(doc, 'move_building_element', {
+      elementIds: ['member-1', 'member-2', 'member-3', 'member-4'],
+      delta: [3000, 0],
+    });
+    expect(together.affected.length).toBeGreaterThan(0);
+    expect(
+      execute(doc, 'move_building_element', { elementIds: ['connection-1'], delta: [1, 0] })
+        .summary,
+    ).toMatch(/follow their host \(a wall, a steel column or a rafter\)/);
+  });
+
+  it('copies connections with their members to another level', () => {
+    let doc = execute(frame(), 'add_moment_connections', {}).document;
+    doc = execute(doc, 'add_level', { name: 'Upper' }).document;
+    const result = execute(doc, 'copy_level_elements', {
+      sourceLevelId: 'level-1',
+      targetLevelIds: ['level-2'],
+    });
+    const copied = connections(result.document).filter((c) => c.levelId === 'level-2');
+    expect(copied.map((c) => [c.kind, c.rafterId, c.otherId])).toEqual([
+      ['eaves', 'member-7', 'member-5'],
+      ['apex', 'member-7', 'member-8'],
+      ['eaves', 'member-8', 'member-6'],
+    ]);
+    expect(buildingErrors(result.document.building)).toEqual([]);
+  });
+
+  it('details the apex when only the higher-id rafter is requested', () => {
+    const result = execute(frame(), 'add_moment_connections', { rafterIds: ['member-4'] });
+    expect(connections(result.document).map((c) => c.kind)).toEqual(['eaves', 'apex']);
+    expect(execute(result.document, 'add_moment_connections', {}).summary).toMatch(
+      /Added 1 moment connection\(s\): 1 eaves/,
+    );
+  });
+
+  it('weighs the modelled plates (taller on a steep rafter)', () => {
+    const steep = (pitchRise: number): number => {
+      let doc = createEmptyDocument();
+      doc = execute(doc, 'add_steel_member', {
+        profile: 'HEA300',
+        role: 'column',
+        start: [0, 0, 0],
+        end: [0, 0, 6000],
+      }).document;
+      doc = execute(doc, 'add_steel_member', {
+        profile: 'IPE400',
+        role: 'rafter',
+        start: [0, 0, 6000],
+        end: [6000, 0, 6000 + pitchRise],
+      }).document;
+      doc = execute(doc, 'add_moment_connections', { haunchLength: 1000 }).document;
+      const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
+      return lines.find((line) => line.key === 'connection.S355.kg')?.quantity ?? 0;
+    };
+    expect(steep(3000)).toBeGreaterThan(steep(300));
   });
 });

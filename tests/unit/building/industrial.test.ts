@@ -999,7 +999,7 @@ describe('add_base_plates', () => {
     expect(doc.entities['plate-1:body']?.position).toEqual([1000, 0, -10]);
     expect(
       execute(doc, 'move_building_element', { elementIds: ['plate-1'], delta: [1, 0] }).summary,
-    ).toMatch(/refused: plate-1 are hosted/);
+    ).toMatch(/refused: plate-1 follow their host/);
     doc = run(doc, 'add_level', { name: 'Upper' });
     doc = run(doc, 'copy_level_elements', {
       sourceLevelId: 'level-1',

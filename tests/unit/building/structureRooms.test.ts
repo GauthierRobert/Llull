@@ -346,7 +346,7 @@ describe('review follow-ups', () => {
     doc = run(doc, 'add_door', { wallId: 'wall-1' });
     expect(
       execute(doc, 'move_building_element', { elementIds: ['door-1'], delta: [1, 0] }).summary,
-    ).toMatch(/are hosted .* slide openings with update_opening/);
+    ).toMatch(/follow their host .* slide openings with update_opening/);
   });
 
   it('slab openings travel with their slab', () => {
