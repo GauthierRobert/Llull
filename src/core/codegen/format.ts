@@ -5,7 +5,7 @@
  * @pure
  */
 
-import type { Feature, FeatureProgram, Term } from './featureProgram';
+import type { Feature, FeatureProgram, Term } from './program';
 
 /** Shortest faithful decimal for a coordinate (12 significant digits, no `-0`). */
 export function formatNumber(value: number): string {
@@ -34,11 +34,25 @@ export function quote(text: string): string {
   return JSON.stringify(text);
 }
 
+/**
+ * Text safe inside a single-line comment or a Python docstring of ANY target language: document
+ * strings (names, command names) are untrusted, and a newline or `"""` would escape into code.
+ */
+export function commentText(text: string): string {
+  return (
+    String(text)
+      // eslint-disable-next-line no-control-regex -- stripping control characters is the point
+      .replace(/[\r\n\u2028\u2029\u0000-\u001f\u007f]+/g, ' ')
+      .replace(/"""/g, "'''")
+      .replace(/\*\//g, '* /')
+  );
+}
+
 /** `# step 3 · add_box` style heading, emitted once per contiguous run of features from a step. */
 export function stepHeading(feature: Feature, previous: Feature | undefined): string | null {
-  if (feature.step === null) return feature.command;
+  if (feature.step === null) return commentText(feature.command);
   if (previous !== undefined && previous.step === feature.step) return null;
-  return `step ${feature.step} · ${feature.command}`;
+  return `step ${feature.step} · ${commentText(feature.command)}`;
 }
 
 /** Numbers packed `perLine` per line, for long mesh arrays. */
@@ -58,11 +72,11 @@ export function numberRows(values: readonly number[], perLine: number): string[]
 /** One-paragraph provenance shared by every emitter's header. */
 export function provenance(program: FeatureProgram): string[] {
   const lines = [
-    `Units: ${program.units}. Right-handed frame, +Z up.`,
+    `Units: ${commentText(program.units)}. Right-handed frame, +Z up.`,
     program.source === 'history'
       ? 'Features follow the llull feature history in order; parameter-driven dimensions are expressions.'
       : 'The document had no reproducible feature history; this is its current geometry.',
   ];
-  for (const note of program.notes) lines.push(`Note: ${note}`);
+  for (const note of program.notes) lines.push(`Note: ${commentText(note)}`);
   return lines;
 }

@@ -1,7 +1,8 @@
 /**
  * Manifold-backed geometry kernel for boolean solid operations.
  *
- * @layer ui/geometry
+ * @layer core/geometry (concrete adapter; injected by the app and the server — commands only
+ *   see the GeometryKernel interface, architecture L9)
  *
  * Implements `GeometryKernel` using the manifold-3d WASM library.
  * Called once at startup via `createManifoldKernel()`; the returned kernel is
@@ -25,10 +26,10 @@
  * only concession to the WASM boundary.
  */
 
-import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
-import type { Entity } from '@core/model/types';
-import { createEmptyDocument } from '@core/model/types';
-import { entityToTriangles } from '@core/commands/export';
+import type { GeometryKernel, MeshData, BooleanOp } from './kernel';
+import type { Entity } from '../model/types';
+import { createEmptyDocument } from '../model/types';
+import { entityToTriangles } from '../commands/export';
 
 // ---------------------------------------------------------------------------
 // Minimal local interface for the Manifold WASM module (avoids `any`).
@@ -162,9 +163,7 @@ function weldedManifold(
   if (signedVolume(vertProperties, triVerts) < 0) {
     // Inside-out input (consistent but inward winding): flip every triangle.
     for (let i = 0; i + 2 < triVerts.length; i += 3) {
-      const second = triVerts[i + 1]!;
-      triVerts[i + 1] = triVerts[i + 2]!;
-      triVerts[i + 2] = second;
+      [triVerts[i + 1], triVerts[i + 2]] = [triVerts[i + 2] ?? 0, triVerts[i + 1] ?? 0];
     }
   }
   try {
@@ -185,12 +184,11 @@ function weldedManifold(
 function signedVolume(vertices: readonly number[], triangles: readonly number[]): number {
   let sum = 0;
   for (let i = 0; i + 2 < triangles.length; i += 3) {
-    const a = triangles[i]! * 3;
-    const b = triangles[i + 1]! * 3;
-    const c = triangles[i + 2]! * 3;
-    const [ax, ay, az] = [vertices[a]!, vertices[a + 1]!, vertices[a + 2]!];
-    const [bx, by, bz] = [vertices[b]!, vertices[b + 1]!, vertices[b + 2]!];
-    const [cx, cy, cz] = [vertices[c]!, vertices[c + 1]!, vertices[c + 2]!];
+    const at = (corner: number, axis: number): number =>
+      vertices[(triangles[i + corner] ?? 0) * 3 + axis] ?? 0;
+    const [ax, ay, az] = [at(0, 0), at(0, 1), at(0, 2)];
+    const [bx, by, bz] = [at(1, 0), at(1, 1), at(1, 2)];
+    const [cx, cy, cz] = [at(2, 0), at(2, 1), at(2, 2)];
     sum += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
   }
   return sum / 6;

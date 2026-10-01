@@ -23,9 +23,10 @@
 import './loadEnv';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
-import { buildMcpRouter, exchangeOptionsFromEnv } from './mcp';
+import { buildMcpRouter } from './mcp';
+import { exchangeOptionsFromEnv } from './pythonExchange';
 import { installGeometryKernel } from './geometryKernel';
-import { applyExchangeToolCall } from '@core/mcp';
+import { exportStepFile } from '@core/mcp';
 import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
 import {
@@ -278,26 +279,29 @@ app.get('/export/code', restLimiter, (req: Request, res: Response) => {
  * not configured, 500 with { error } when the bridge fails.
  */
 app.get('/export/step', restLimiter, (req: Request, res: Response) => {
-  void (async () => {
-    const name = sanitizeFilename(req.query['name'], 'model');
-    const language = req.query['language'] === 'build123d' ? 'build123d' : 'cadquery';
-    const result = await applyExchangeToolCall(
-      'export_step',
-      { name, language, save: false },
-      { ...exchange, getDoc: getLiveDoc, applyCommand },
-    );
-    const stepBase64 = result?.structuredContent?.['stepBase64'];
-    if (typeof stepBase64 !== 'string') {
-      const message = result?.content[0]?.text ?? 'export_step failed.';
-      res.status(exchange.port === null ? 503 : 500).json({ error: message });
-      return;
-    }
-    const body = Buffer.from(stepBase64, 'base64');
-    res.setHeader('Content-Disposition', `attachment; filename="${name}.step"`);
-    res.setHeader('Content-Type', 'model/step');
-    res.setHeader('Content-Length', body.length);
-    res.status(200).end(body);
-  })();
+  const port = exchange.port;
+  if (port === null) {
+    res.status(503).json({ error: 'STEP export needs the Python bridge (LLULL_PYTHON is off).' });
+    return;
+  }
+  const name = sanitizeFilename(req.query['name'], 'model');
+  exportStepFile(getLiveDoc, port, { name, language: req.query['language'], save: false })
+    .then((file) => {
+      if ('error' in file) {
+        res.status(500).json({ error: file.error });
+        return;
+      }
+      const body = Buffer.from(file.stepBase64, 'base64');
+      res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+      res.setHeader('Content-Type', 'model/step');
+      res.setHeader('Content-Length', body.length);
+      res.status(200).end(body);
+    })
+    .catch((error: unknown) => {
+      res.status(500).json({
+        error: `export_step failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    });
 });
 
 // UI↔MCP live-sync bridge routes — guarded by the same bearer auth as /mcp.

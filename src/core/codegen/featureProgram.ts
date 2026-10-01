@@ -1,253 +1,33 @@
 /**
- * Feature program — the language-neutral intermediate form a document is lowered to before it is
- * emitted as parametric source code (CadQuery, build123d, OpenSCAD, FreeCAD).
+ * Lower a CadDocument to a FeatureProgram (program.ts): replay the feature history, diff each step's
+ * solids, and bind numeric fields to the `=expr` params that produced them.
  *
  * @layer core/codegen
  * @pure
- * @invariant every Term's `value` equals the evaluated document geometry; `expression` (identifiers
- *   already mapped through `program.parameters`) is attached only when it evaluates to that value.
- * @invariant features follow featureHistory order; one variable per live solid.
  */
 
-import type { CadDocument, DocumentUnit, Entity, FeatureStep, Vec3 } from '../model/types';
+import type { CadDocument, Entity, FeatureStep, Vec3 } from '../model/types';
 import { is3D } from '../model/types';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/history';
 import { buildParamEnv } from '../commands/regenerate';
 import { evaluateExpression, extractReferences } from '../commands/expression';
 import { entityToTriangles } from '../commands/export';
-
-export interface Term {
-  readonly value: number;
-  readonly expression?: string;
-}
-
-export type Term3 = readonly [Term, Term, Term];
-export type Term2 = readonly [Term, Term];
-export type Axis = 'x' | 'y' | 'z';
-
-export type ShapeSpec =
-  | { readonly kind: 'box'; readonly size: Term3 }
-  | { readonly kind: 'cylinder'; readonly radius: Term; readonly height: Term }
-  | { readonly kind: 'sphere'; readonly radius: Term }
-  | { readonly kind: 'cone'; readonly radius: Term; readonly height: Term }
-  | { readonly kind: 'torus'; readonly ringRadius: Term; readonly tubeRadius: Term }
-  | { readonly kind: 'wedge'; readonly size: Term3 }
-  | {
-      readonly kind: 'pyramid';
-      readonly baseWidth: Term;
-      readonly baseDepth: Term;
-      readonly height: Term;
-    }
-  | { readonly kind: 'extrusion'; readonly profile: readonly Term2[]; readonly depth: Term }
-  | {
-      readonly kind: 'revolution';
-      readonly profile: readonly Term2[];
-      readonly axis: Axis;
-      readonly angle: Term;
-      readonly segments: number;
-    }
-  /** Fallback for geometry without an analytic form: world-space triangle soup (9 numbers each). */
-  | { readonly kind: 'mesh'; readonly positions: readonly number[] };
-
-interface FeatureBase {
-  /** 1-based featureHistory index that produced the feature; null in snapshot mode. */
-  readonly step: number | null;
-  /** Registry command name that produced the feature (or the entity kind in snapshot mode). */
-  readonly command: string;
-  readonly variable: string;
-}
-
-export type Feature =
-  | (FeatureBase & {
-      readonly op: 'solid';
-      readonly shape: ShapeSpec;
-      readonly position: Term3;
-      /** Euler XYZ in radians (llull convention: Rz applied first, then Ry, then Rx). */
-      readonly rotation: Term3;
-      readonly color: string;
-      readonly name?: string;
-    })
-  | (FeatureBase & {
-      readonly op: 'boolean';
-      readonly kind: 'union' | 'cut' | 'intersect';
-      readonly left: string;
-      readonly right: string;
-    })
-  | (FeatureBase & { readonly op: 'translate'; readonly delta: Term3 })
-  | (FeatureBase & { readonly op: 'remove' })
-  | (FeatureBase & { readonly op: 'label'; readonly name: string });
-
-export interface ProgramParameter {
-  /** llull parameter name (document key). */
-  readonly name: string;
-  /** Safe source-code identifier for the parameter. */
-  readonly identifier: string;
-  readonly value: number;
-  /** Defining expression over other parameter identifiers; absent for literals and errors. */
-  readonly expression?: string;
-}
-
-export interface ProgramOutput {
-  readonly variable: string;
-  readonly color: string;
-  readonly name?: string;
-}
-
-export interface FeatureProgram {
-  readonly units: DocumentUnit;
-  /** `history` = lowered from featureHistory (parametric); `snapshot` = current geometry only. */
-  readonly source: 'history' | 'snapshot';
-  readonly parameters: readonly ProgramParameter[];
-  readonly features: readonly Feature[];
-  readonly outputs: readonly ProgramOutput[];
-  /** Human/AI-readable notes about steps that could not be expressed analytically. */
-  readonly notes: readonly string[];
-}
-
-/** Identifiers that must never be used for a parameter or a variable in any target language. */
-const RESERVED = new Set([
-  // Python keywords + builtins the generated code relies on
-  'False',
-  'None',
-  'True',
-  'and',
-  'as',
-  'assert',
-  'async',
-  'await',
-  'break',
-  'class',
-  'continue',
-  'def',
-  'del',
-  'elif',
-  'else',
-  'except',
-  'finally',
-  'for',
-  'from',
-  'global',
-  'if',
-  'import',
-  'in',
-  'is',
-  'lambda',
-  'nonlocal',
-  'not',
-  'or',
-  'pass',
-  'raise',
-  'return',
-  'try',
-  'while',
-  'with',
-  'yield',
-  'match',
-  'case',
-  'print',
-  'range',
-  'len',
-  'min',
-  'max',
-  'abs',
-  'round',
-  'float',
-  'int',
-  'list',
-  'tuple',
-  'dict',
-  'str',
-  'math',
-  'pi',
-  'cq',
-  'bd',
-  'App',
-  'Part',
-  'Base',
-  'FreeCAD',
-  'doc',
-  'result',
-  // OpenSCAD keywords
-  'module',
-  'function',
-  'let',
-  'each',
-  'true',
-  'false',
-  'undef',
-  'include',
-  'use',
-  // llull runtime helpers emitted in generated code
-  'param',
-  'box',
-  'cylinder',
-  'sphere',
-  'cone',
-  'torus',
-  'wedge',
-  'pyramid',
-  'extrude',
-  'revolve',
-  'mesh',
-  'union',
-  'cut',
-  'intersect',
-  'translate',
-  'remove',
-  'label',
-  'finish',
-]);
+import { Namer, translateExpression } from './identifiers';
+import type {
+  Axis,
+  Feature,
+  FeatureBase,
+  FeatureProgram,
+  ProgramOutput,
+  ProgramParameter,
+  ShapeSpec,
+  Term,
+  Term2,
+  Term3,
+} from './program';
 
 const EPSILON = 1e-9;
-
-/** Allocates unique, language-safe identifiers. */
-class Namer {
-  private readonly used = new Set<string>();
-
-  take(preferred: string): string {
-    let base = preferred.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_');
-    if (base === '' || base === '_') base = 'item';
-    if (!/^[A-Za-z_]/.test(base)) base = `n_${base}`;
-    // A reserved word (e.g. the helper `box`) is numbered from 1: box_1, box_2, ...
-    const numbered = RESERVED.has(base);
-    let candidate = numbered ? `${base}_1` : base;
-    for (let n = 2; this.used.has(candidate); n++) candidate = `${base}_${n}`;
-    this.used.add(candidate);
-    return candidate;
-  }
-}
-
-/**
- * Rewrite a llull expression into target-language source: identifiers mapped, grammar unchanged
- * (`+ - * /`, parentheses, decimal numbers are valid Python, OpenSCAD and FreeCAD Python).
- * @returns null when the expression contains anything outside the grammar or an unknown name.
- */
-export function translateExpression(
-  expression: string,
-  identifiers: ReadonlyMap<string, string>,
-): string | null {
-  const token =
-    /\s*(?:(\d+\.?\d*(?:[eE][-+]?\d+)?|\.\d+(?:[eE][-+]?\d+)?)|([A-Za-z_]\w*)|([-+*/()]))/y;
-  const parts: string[] = [];
-  let index = 0;
-  const source = expression.trim();
-  while (index < source.length) {
-    token.lastIndex = index;
-    const match = token.exec(source);
-    if (!match) return null;
-    index = token.lastIndex;
-    const [, number, name, operator] = match;
-    if (number !== undefined) parts.push(number);
-    else if (name !== undefined) {
-      const mapped = identifiers.get(name);
-      if (mapped === undefined) return null;
-      parts.push(mapped);
-    } else if (operator !== undefined) parts.push(operator);
-  }
-  if (parts.length === 0) return null;
-  return parts.join(' ').replace(/\( /g, '(').replace(/ \)/g, ')');
-}
 
 interface LowerContext {
   readonly identifiers: ReadonlyMap<string, string>;
@@ -286,6 +66,11 @@ function profileTerms(
     const rawPoint = child(raw, i);
     return [term(x, child(rawPoint, 0), ctx), term(y, child(rawPoint, 1), ctx)];
   });
+}
+
+function safeSegments(value: unknown): number {
+  const segments = Math.trunc(Number(value));
+  return Number.isFinite(segments) && segments >= 3 ? segments : 32;
 }
 
 function dominantAxis(axis: Vec3): Axis {
@@ -341,7 +126,8 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         profile: profileTerms(entity.profile, field('profile'), ctx),
         axis: dominantAxis(entity.axis),
         angle: term(entity.angle, field('angle'), ctx),
-        segments: entity.segments,
+        // Untrusted documents (load_document) reach code generation: force a safe integer.
+        segments: safeSegments(entity.segments),
       };
     default: {
       const positions: number[] = [];
@@ -380,13 +166,31 @@ function zero3(): Term3 {
 /** Non-geometric entity fields: a change limited to these is metadata, not a new feature. */
 const METADATA_FIELDS = new Set(['name', 'tags', 'layerId', 'materialId', 'color']);
 
+/** Deep equality with a numeric tolerance (replayed floats may differ in the last bits). */
+function nearlyEqual(left: unknown, right: unknown): boolean {
+  if (typeof left === 'number' && typeof right === 'number') {
+    return Math.abs(left - right) <= EPSILON * Math.max(1, Math.abs(left), Math.abs(right));
+  }
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length && left.every((item, i) => nearlyEqual(item, right[i]));
+  }
+  if (left !== null && right !== null && typeof left === 'object' && typeof right === 'object') {
+    const a = left as Record<string, unknown>;
+    const b = right as Record<string, unknown>;
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    return [...keys].every((key) => nearlyEqual(a[key], b[key]));
+  }
+  return left === right;
+}
+
+/** Same shape and placement, ignoring id and metadata (name, colour, layer, tags, material). */
 function geometryEqual(a: Entity, b: Entity): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const key of keys) {
-    if (METADATA_FIELDS.has(key)) continue;
+    if (key === 'id' || METADATA_FIELDS.has(key)) continue;
     const left = (a as unknown as Record<string, unknown>)[key];
     const right = (b as unknown as Record<string, unknown>)[key];
-    if (left !== right && JSON.stringify(left) !== JSON.stringify(right)) return false;
+    if (!nearlyEqual(left, right)) return false;
   }
   return true;
 }
@@ -434,25 +238,29 @@ function lowerParameters(
   };
   for (const name of Object.keys(doc.parameters).sort()) visit(name);
 
-  const parameters = ordered.map((name): ProgramParameter => {
-    const parameter = doc.parameters[name]!;
-    const identifier = identifiers.get(name)!;
+  const parameters = ordered.flatMap((name): ProgramParameter[] => {
+    const parameter = doc.parameters[name];
+    const identifier = identifiers.get(name);
+    if (parameter === undefined || identifier === undefined) return [];
     const literal = Number(parameter.expression);
     if (parameter.error !== undefined || Number.isFinite(literal)) {
-      return { name, identifier, value: parameter.value };
+      return [{ name, identifier, value: parameter.value }];
     }
     const expression = translateExpression(parameter.expression, identifiers);
-    return expression === null
-      ? { name, identifier, value: parameter.value }
-      : { name, identifier, value: parameter.value, expression };
+    return [
+      expression === null
+        ? { name, identifier, value: parameter.value }
+        : { name, identifier, value: parameter.value, expression },
+    ];
   });
   return { parameters, identifiers };
 }
 
-function solidIds(doc: CadDocument): string[] {
-  return doc.order.filter((id) => {
+/** 3D entities in document order. */
+function solids(doc: CadDocument): Entity[] {
+  return doc.order.flatMap((id) => {
     const entity = doc.entities[id];
-    return entity !== undefined && is3D(entity);
+    return entity !== undefined && is3D(entity) ? [entity] : [];
   });
 }
 
@@ -461,9 +269,8 @@ function preferredVariable(entity: Entity): string {
 }
 
 function outputsFor(doc: CadDocument, variables: ReadonlyMap<string, string>): ProgramOutput[] {
-  return solidIds(doc).flatMap((id): ProgramOutput[] => {
-    const entity = doc.entities[id]!;
-    const variable = variables.get(id);
+  return solids(doc).flatMap((entity): ProgramOutput[] => {
+    const variable = variables.get(entity.id);
     if (variable === undefined) return [];
     return [
       entity.name !== undefined
@@ -482,10 +289,9 @@ function lowerSnapshot(
 ): FeatureProgram {
   const variables = new Map<string, string>();
   const features: Feature[] = [];
-  for (const id of solidIds(doc)) {
-    const entity = doc.entities[id]!;
+  for (const entity of solids(doc)) {
     const variable = namer.take(preferredVariable(entity));
-    variables.set(id, variable);
+    variables.set(entity.id, variable);
     const feature = solidFeature(entity, doc, undefined, ctx, {
       step: null,
       command: entity.kind,
@@ -517,13 +323,15 @@ function lowerStep(
   notes: string[],
 ): Feature[] {
   const { before, after, step, rawParams } = event;
-  const beforeIds = new Set(solidIds(before));
-  const afterIds = solidIds(after);
-  const created = afterIds.filter((id) => !beforeIds.has(id));
+  const beforeIds = new Set(solids(before).map((e) => e.id));
+  const afterSolids = solids(after);
+  const created = afterSolids.filter((e) => !beforeIds.has(e.id));
   const removed = [...beforeIds].filter((id) => after.entities[id] === undefined);
-  const changed = afterIds.filter(
-    (id) => beforeIds.has(id) && after.entities[id] !== before.entities[id],
-  );
+  const changed = afterSolids.flatMap((current): Array<[Entity, Entity]> => {
+    const previous = before.entities[current.id];
+    return previous !== undefined && previous !== current ? [[previous, current]] : [];
+  });
+  const [createdSolid] = created;
   const base = (variable: string): FeatureBase => ({
     step: stepNumber,
     command: step.name,
@@ -535,6 +343,7 @@ function lowerStep(
   const right = variables.get(String(child(event.params, 'b')));
   if (
     booleanKind !== undefined &&
+    createdSolid !== undefined &&
     created.length === 1 &&
     removed.length === 2 &&
     changed.length === 0 &&
@@ -543,7 +352,7 @@ function lowerStep(
   ) {
     variables.delete(String(child(event.params, 'b')));
     variables.delete(String(child(event.params, 'a')));
-    variables.set(created[0]!, left);
+    variables.set(createdSolid.id, left);
     return [{ ...base(left), op: 'boolean', kind: booleanKind, left, right }];
   }
 
@@ -554,10 +363,8 @@ function lowerStep(
     variables.delete(id);
     features.push({ ...base(variable), op: 'remove' });
   }
-  for (const id of changed) {
-    const variable = variables.get(id);
-    const previous = before.entities[id]!;
-    const current = after.entities[id]!;
+  for (const [previous, current] of changed) {
+    const variable = variables.get(current.id);
     if (variable === undefined) continue;
     const delta = child(event.params, 'delta');
     if (step.name === 'move_entity' && isPureTranslation(previous, current, delta)) {
@@ -576,24 +383,42 @@ function lowerStep(
       features.push(solidFeature(current, after, rawParams, ctx, base(variable)));
     }
   }
-  for (const id of created) {
-    const entity = after.entities[id]!;
+  for (const entity of created) {
     const variable = namer.take(preferredVariable(entity));
-    variables.set(id, variable);
+    variables.set(entity.id, variable);
     features.push(solidFeature(entity, after, rawParams, ctx, base(variable)));
     if (entity.kind === 'mesh' || entity.kind === 'instance') {
       notes.push(
-        `step ${stepNumber} (${step.name}): ${entity.kind} '${id}' has no analytic form; exported as a triangle mesh.`,
+        `step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`,
       );
     }
   }
   return features;
 }
 
+/** Why the replayed history does not reproduce `doc`'s solids (count or geometry), or null. */
+function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null {
+  const expected = solids(doc);
+  const actual = solids(replayed);
+  if (expected.length !== actual.length) {
+    return `featureHistory replays to ${actual.length} solid(s) but the document has ${expected.length}`;
+  }
+  const differing = expected.find((original, i) => {
+    const regenerated = actual[i];
+    return regenerated === undefined || !geometryEqual(original, regenerated);
+  });
+  return differing === undefined
+    ? null
+    : `featureHistory regenerates solid '${differing.id}' with different geometry`;
+}
+
 /**
  * Lower a document to a FeatureProgram. Prefers the featureHistory (parametric, ordered); falls
  * back to the current geometry when there is no history or replay does not reproduce the document.
  * @pure — replay works on fresh documents; `doc` is never mutated.
+ * @invariant replay draws entity ids from the global `nextId` counter (as replay_history does), so
+ *   ids minted after an export differ from ids minted without one; no document content changes.
+ * @invariant history is used only when it regenerates every solid of `doc` (count + geometry).
  */
 export function buildFeatureProgram(
   doc: CadDocument,
@@ -614,12 +439,9 @@ export function buildFeatureProgram(
     features.push(...lowerStep(event, stepNumber, variables, ctx, namer, notes));
   });
 
-  const expected = solidIds(doc).length;
-  const actual = solidIds(replayed).length;
-  if (expected !== actual) {
-    notes.push(
-      `featureHistory replays to ${actual} solid(s) but the document has ${expected}; exported the current geometry without its feature history.`,
-    );
+  const mismatch = historyMismatch(doc, replayed);
+  if (mismatch !== null) {
+    notes.push(`${mismatch}; exported the current geometry without its feature history.`);
     const freshNamer = new Namer();
     for (const parameter of parameters) freshNamer.take(parameter.identifier);
     return lowerSnapshot(doc, parameters, ctx, freshNamer, notes);

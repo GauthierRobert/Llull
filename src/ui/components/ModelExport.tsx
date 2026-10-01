@@ -27,7 +27,8 @@ function download(blob: Blob, fileName: string): void {
   anchor.href = url;
   anchor.download = fileName;
   anchor.click();
-  URL.revokeObjectURL(url);
+  // Revoking synchronously can cancel the download in some browsers.
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export function ModelExport(): React.ReactElement {
@@ -58,7 +59,7 @@ export function ModelExport(): React.ReactElement {
         return;
       }
       download(await response.blob(), 'model.step');
-      setStatus('STEP exported from the server model.');
+      setStatus('STEP exported from the server’s live model.');
     } catch {
       setStatus(`STEP export needs the llull server at ${SERVER_BASE}.`);
     }
@@ -88,10 +89,13 @@ export function ModelExport(): React.ReactElement {
         className="project-io__btn"
         onClick={handleExport}
         aria-label="Export the model in the selected format"
-        title={status !== '' ? status : 'Export model'}
+        title="Export model (STEP is generated from the server’s live model)"
       >
         Export
       </button>
+      <span className="visually-hidden" role="status" aria-live="polite">
+        {status}
+      </span>
     </span>
   );
 }

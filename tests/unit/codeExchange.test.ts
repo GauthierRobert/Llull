@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { BoxEntity, CadDocument } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { stripOuterParens } from '@core/commands/code_exchange';
+import { stripOuterParens } from '@core/commands/code_trace';
 import { MAX_TRACE_FEATURES } from '@core/commands/limits';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import { createManifoldKernel } from '@ui/geometry/manifoldKernel';
+import { createManifoldKernel } from '@core/geometry/manifoldKernel';
 import { __resetIdCounter } from '@lib/id';
 
 interface CodeData {
@@ -276,7 +276,8 @@ describe('export_code', () => {
   it('sanitizes the file name', () => {
     const data = codeOf(buildRichDoc(), 'cadquery', 'my part/../x y');
     expect(data.fileName).toBe('my_part_.._x_y.py');
-    expect(codeOf(buildRichDoc(), 'openscad', '///').fileName).toBe('___.scad');
+    expect(codeOf(buildRichDoc(), 'openscad', '///').fileName).toBe('model.scad');
+    expect(codeOf(buildRichDoc(), 'cadquery', '.hidden').fileName).toBe('hidden.py');
     expect(codeOf(buildRichDoc(), 'cadquery', '').fileName).toBe('model.py');
   });
 

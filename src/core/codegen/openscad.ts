@@ -6,8 +6,9 @@
  * @pure
  */
 
-import type { FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './featureProgram';
+import type { FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
 import {
+  commentText,
   formatDegrees,
   formatNumber,
   formatTerm,
@@ -116,7 +117,9 @@ export function emitOpenScad(program: FeatureProgram): string {
   ];
   if (program.parameters.length === 0) lines.push('// (none)');
   for (const p of program.parameters) {
-    lines.push(`${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${p.name}`);
+    lines.push(
+      `${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${commentText(p.name)}`,
+    );
   }
   lines.push('', '/* [Hidden] */', '');
 
@@ -161,7 +164,7 @@ export function emitOpenScad(program: FeatureProgram): string {
 
   lines.push('', '// ── result ──');
   for (const output of program.outputs) {
-    const label = output.name !== undefined ? ` // ${output.name}` : '';
+    const label = output.name !== undefined ? ` // ${commentText(output.name)}` : '';
     lines.push(`color(${quote(output.color)}) ${current(output.variable)}();${label}`);
   }
   lines.push('');

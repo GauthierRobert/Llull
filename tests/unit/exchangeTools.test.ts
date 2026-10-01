@@ -111,7 +111,7 @@ describe('buildExchangeToolDefinitions', () => {
     const tools = buildExchangeToolDefinitions();
     expect(tools.map((t) => t.name)).toEqual(['export_step', 'import_step', 'import_code']);
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-    expect(byName.export_step?.annotations).toEqual({ readOnlyHint: true, idempotentHint: true });
+    expect(byName.export_step?.annotations).toEqual({ idempotentHint: true });
     expect(byName.import_step?.annotations).toBeUndefined();
     expect(byName.import_code?.annotations).toEqual({ destructiveHint: true });
     for (const tool of tools) {

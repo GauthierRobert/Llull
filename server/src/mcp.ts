@@ -56,30 +56,11 @@ import {
   buildExchangeToolDefinitions,
   applyExchangeToolCall,
 } from '@core/mcp';
-import type { CadExchangePort, UiBridge } from '@core/mcp';
+import type { UiBridge } from '@core/mcp';
 import type { CadDocument } from '@core/model/types';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
-import {
-  codeExecutionAllowed,
-  createPythonExchangePort,
-  pythonExchangeConfigFromEnv,
-} from './pythonExchange';
-
-/** STEP / parametric-code exchange wiring (Python bridge), injected into each MCP server. */
-export interface ExchangeOptions {
-  readonly port: CadExchangePort | null;
-  readonly allowCodeExecution: boolean;
-}
-
-/** Exchange options from the environment (LLULL_PYTHON, LLULL_ALLOW_CODE_EXECUTION, ...). */
-export function exchangeOptionsFromEnv(): ExchangeOptions {
-  const config = pythonExchangeConfigFromEnv();
-  return {
-    port: config === null ? null : createPythonExchangePort(config),
-    allowCodeExecution: codeExecutionAllowed(),
-  };
-}
+import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
 import { hasValidBearer } from './security';
 import { buildImageBlock, stripSvgFromData, rasterizeSvg } from './renderImage';
 import {

@@ -48,7 +48,11 @@ function toTriangleSoup(body: MeshBodyParams): number[] | string {
     if (!Number.isInteger(index) || index < 0 || index >= vertexCount) {
       return `index ${String(index)} is outside 0..${vertexCount - 1}`;
     }
-    soup.push(positions[index * 3]!, positions[index * 3 + 1]!, positions[index * 3 + 2]!);
+    soup.push(
+      positions[index * 3] ?? 0,
+      positions[index * 3 + 1] ?? 0,
+      positions[index * 3 + 2] ?? 0,
+    );
   }
   return soup;
 }

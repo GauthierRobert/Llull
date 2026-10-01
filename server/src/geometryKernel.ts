@@ -7,7 +7,7 @@
  */
 
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { createManifoldKernel } from '../../src/ui/geometry/manifoldKernel';
+import { createManifoldKernel } from '@core/geometry/manifoldKernel';
 
 /** Load the WASM kernel; on failure booleans keep their graceful "no kernel" no-op. */
 export async function installGeometryKernel(): Promise<boolean> {

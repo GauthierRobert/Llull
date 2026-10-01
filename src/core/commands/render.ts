@@ -33,6 +33,7 @@ import {
   SEG_SPHERE_LON,
   SEG_TORUS_TUBE,
   circlePoints as _circlePoints,
+  meshTriangles,
 } from './tessellation';
 
 // ---------------------------------------------------------------------------
@@ -651,17 +652,7 @@ function tessellateMesh(e: {
   mesh: { positions: readonly number[]; indices: readonly number[] };
   color: string;
 }): PreDepthPolygon[] {
-  const p = e.mesh.positions;
-  const vertex = (i: number): Vec3 => [p[i * 3] ?? 0, p[i * 3 + 1] ?? 0, p[i * 3 + 2] ?? 0];
-  const corners =
-    e.mesh.indices.length > 0 ? e.mesh.indices : p.map((_, i) => i).slice(0, p.length / 3);
-  const polys: PreDepthPolygon[] = [];
-  for (let i = 0; i + 2 < corners.length; i += 3) {
-    polys.push(
-      makePolygon([vertex(corners[i]!), vertex(corners[i + 1]!), vertex(corners[i + 2]!)], e.color),
-    );
-  }
-  return polys;
+  return meshTriangles(e.mesh).map((triangle) => makePolygon(triangle, e.color));
 }
 
 // ---------------------------------------------------------------------------

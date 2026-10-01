@@ -76,7 +76,8 @@ import {
 } from './measure';
 import { exportStl } from './export';
 import { exportObj, exportGltf } from './export_formats';
-import { exportCode, applyCodeTrace } from './code_exchange';
+import { exportCode } from './code_exchange';
+import { applyCodeTrace } from './code_trace';
 import { importMesh } from './import_mesh';
 import { createComponent, insertInstance, explodeInstance } from './assemblies';
 import { clearDocument } from './document';

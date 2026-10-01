@@ -4,14 +4,9 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import {
-  buildFeatureProgram,
-  translateExpression,
-  type Feature,
-  type FeatureProgram,
-  type ShapeSpec,
-  type Term,
-} from '@core/codegen/featureProgram';
+import { buildFeatureProgram } from '@core/codegen/featureProgram';
+import { translateExpression } from '@core/codegen/identifiers';
+import type { Feature, FeatureProgram, ShapeSpec, Term } from '@core/codegen/program';
 import { emitPython } from '@core/codegen/python';
 import { emitOpenScad } from '@core/codegen/openscad';
 import { emitFreeCad } from '@core/codegen/freecad';

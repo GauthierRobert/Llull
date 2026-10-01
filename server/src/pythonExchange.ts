@@ -14,11 +14,31 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { CadExchangePort, ProgramRun, PythonLanguage } from '@core/mcp';
 
-const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
+/** Response size cap (it is JSON.parse'd in memory). ~96 MB of STEP once base64-encoded. */
+const MAX_OUTPUT_BYTES = 128 * 1024 * 1024;
+/** Only the tail of stderr is kept for error messages. */
+const MAX_STDERR_BYTES = 64 * 1024;
+/** CadQuery processes are heavy; at most this many run at once, the rest queue. */
+const MAX_CONCURRENT_RUNS = 2;
+
+/** Environment variables the Python child may see — never the server's secrets (tokens, keys). */
+const ENV_ALLOWLIST =
+  /^(PATH|HOME|USER|LOGNAME|LANG|LC_\w+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|COMSPEC|PYTHON\w*|VIRTUAL_ENV|CONDA_\w+|LD_LIBRARY_PATH|DYLD_LIBRARY_PATH|CASROOT)$/;
+
+/** The subset of `env` passed to the bridge process. */
+export function bridgeEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => ENV_ALLOWLIST.test(key)));
+}
+
+/** STEP / parametric-code exchange wiring (Python bridge), injected into each MCP server. */
+export interface ExchangeOptions {
+  readonly port: CadExchangePort | null;
+  readonly allowCodeExecution: boolean;
+}
 
 export interface PythonExchangeConfig {
   readonly python: string;
@@ -64,9 +84,12 @@ export function callBridge(
   timeoutMs: number,
 ): Promise<BridgeResponse> {
   return new Promise((resolve, reject) => {
-    const child = spawn(python, [bridgeScript], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(python, [bridgeScript], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: bridgeEnvironment(),
+    });
     const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
+    let stderr = Buffer.alloc(0);
     let size = 0;
     let settled = false;
     const finish = (error: Error | null, value?: BridgeResponse): void => {
@@ -85,12 +108,14 @@ export function callBridge(
       size += chunk.length;
       if (size > MAX_OUTPUT_BYTES) {
         child.kill('SIGKILL');
-        finish(new Error('Python bridge output exceeded 512 MB'));
+        finish(new Error(`Python bridge output exceeded ${MAX_OUTPUT_BYTES / 1024 / 1024} MB`));
         return;
       }
       stdout.push(chunk);
     });
-    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr = Buffer.concat([stderr, chunk]).subarray(-MAX_STDERR_BYTES);
+    });
     child.on('error', (error) => {
       finish(
         new Error(
@@ -103,7 +128,7 @@ export function callBridge(
       try {
         finish(null, JSON.parse(text) as BridgeResponse);
       } catch {
-        const detail = Buffer.concat(stderr).toString('utf8').trim().slice(-2000);
+        const detail = stderr.toString('utf8').trim().slice(-2000);
         finish(
           new Error(`Python bridge exited with code ${String(code)} without a response. ${detail}`),
         );
@@ -134,13 +159,57 @@ export function resolveInside(root: string, relative: string): string {
   return resolved;
 }
 
+/**
+ * Resolve `relative` inside `root` and re-check after following symlinks, so a link placed in the
+ * exchange directory cannot read or write outside it. Writes refuse an existing symlink target.
+ */
+async function confinedPath(
+  root: string,
+  relative: string,
+  mode: 'read' | 'write',
+): Promise<string> {
+  const target = resolveInside(root, relative);
+  const realRoot = await realpath(root);
+  const checked = mode === 'read' ? await realpath(target) : await realpath(path.dirname(target));
+  const fromRealRoot = path.relative(realRoot, checked);
+  if (fromRealRoot.startsWith('..') || path.isAbsolute(fromRealRoot)) {
+    throw new Error(`path "${relative}" resolves outside the exchange directory (symbolic link)`);
+  }
+  if (mode === 'write') {
+    const existing = await lstat(target).catch(() => null);
+    if (existing?.isSymbolicLink() === true) {
+      throw new Error(`path "${relative}" is a symbolic link; refusing to overwrite it`);
+    }
+  }
+  return target;
+}
+
+/** A FIFO limiter: at most `limit` tasks in flight. */
+function concurrencyLimiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    if (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve));
+    active++;
+    try {
+      return await task();
+    } finally {
+      active--;
+      waiting.shift()?.();
+    }
+  };
+}
+
 export function createPythonExchangePort(config: PythonExchangeConfig): CadExchangePort {
+  const limit = concurrencyLimiter(MAX_CONCURRENT_RUNS);
   const run = async (
     language: PythonLanguage | 'step',
     request: Record<string, unknown>,
   ): Promise<BridgeResponse> => {
     const python = language === 'build123d' ? config.build123dPython : config.python;
-    const response = await callBridge(python, config.bridgeScript, request, config.timeoutMs);
+    const response = await limit(() =>
+      callBridge(python, config.bridgeScript, request, config.timeoutMs),
+    );
     if (!response.ok) throw bridgeError(response);
     return response;
   };
@@ -170,13 +239,23 @@ export function createPythonExchangePort(config: PythonExchangeConfig): CadExcha
   return {
     ...port,
     async readExchangeFile(relative, encoding): Promise<string> {
-      return readFile(resolveInside(root, relative), encoding === 'base64' ? 'base64' : 'utf8');
+      const target = await confinedPath(root, relative, 'read');
+      return readFile(target, encoding === 'base64' ? 'base64' : 'utf8');
     },
     async writeExchangeFile(fileName, base64): Promise<string> {
       await mkdir(root, { recursive: true });
-      const target = resolveInside(root, fileName);
+      const target = await confinedPath(root, fileName, 'write');
       await writeFile(target, Buffer.from(base64, 'base64'));
       return target;
     },
+  };
+}
+
+/** Exchange options from the environment (LLULL_PYTHON, LLULL_ALLOW_CODE_EXECUTION, ...). */
+export function exchangeOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): ExchangeOptions {
+  const config = pythonExchangeConfigFromEnv(env);
+  return {
+    port: config === null ? null : createPythonExchangePort(config),
+    allowCodeExecution: codeExecutionAllowed(env),
   };
 }

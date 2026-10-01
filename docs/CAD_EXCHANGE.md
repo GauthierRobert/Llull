@@ -101,6 +101,20 @@ LLULL_PYTHON=python3 npm --prefix server run dev   # python3 is the default
 | `LLULL_ALLOW_CODE_EXECUTION` | unset | `1` enables `import_code`. **It runs arbitrary Python with server privileges.** Enable it only on a machine whose MCP clients you trust. |
 | `LLULL_BODY_LIMIT` | `2mb` | Raise it to send large STEP files inline as base64, or use `path` instead. |
 
+Each bridge process runs with these limits:
+
+- **Environment:** it gets an allow-listed environment (`PATH`, `HOME`, locale, `PYTHON*`,
+  virtualenv/conda variables). Server secrets such as `MCP_AUTH_TOKEN` never reach it.
+- **Concurrency:** at most two bridge processes run at once. The rest wait in a queue.
+- **Output:** a response may be at most 128 MB.
+- **Paths:** `path` arguments are checked again after following symbolic links. A link inside
+  the exchange directory cannot read or write outside it, and an existing symbolic link is never
+  overwritten.
+
+Generated code never carries raw document text. Names go in string literals, and comments are
+stripped of line breaks and `"""`. Numbers are formatted, and expressions are re-tokenised. So
+a hostile document loaded with `load_document` cannot inject code into `export_step`.
+
 ### MCP tools
 
 | Tool | What it does |

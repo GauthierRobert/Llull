@@ -143,16 +143,16 @@ def _run_script(source, language):
     def show_object(obj, name=None, options=None, **_kwargs):  # CQ-editor compatible collector
         shown.append((obj, name))
 
-    workdir = tempfile.mkdtemp(prefix="llull-run-")
-    path = os.path.join(workdir, "model.py")
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(source)
     cwd = os.getcwd()
-    try:
-        os.chdir(workdir)
-        namespace = runpy.run_path(path, init_globals={"show_object": show_object}, run_name="__llull__")
-    finally:
-        os.chdir(cwd)
+    with tempfile.TemporaryDirectory(prefix="llull-run-") as workdir:
+        path = os.path.join(workdir, "model.py")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(source)
+        try:
+            os.chdir(workdir)
+            namespace = runpy.run_path(path, init_globals={"show_object": show_object}, run_name="__llull__")
+        finally:
+            os.chdir(cwd)
     return namespace, shown
 
 
@@ -221,38 +221,21 @@ def _hex(color):
 
 
 def _assembly_bodies(path, tolerance):
+    """One body per solid of every assembly node, placed by its accumulated (world) location."""
     import cadquery as cq
 
-    assembly = cq.Assembly.importStep(path)
     bodies = []
-    for name, child in assembly.traverse():
-        if child.obj is None:
-            continue
-        shape = child.obj.moved(child.loc) if hasattr(child.obj, "moved") else child.obj
-        location = _world_location(assembly, child)
-        if location is not None:
-            shape = child.obj.moved(location)
-        color = _hex(child.color) if child.color is not None else None
-        bodies.extend(_bodies_from(shape, tolerance, name.split("/")[-1] or "solid", color))
-    return bodies
 
-
-def _world_location(root, target):
-    """Accumulated location of `target` from the assembly root (None if not found)."""
-
-    def walk(node, location):
-        current = location * node.loc
-        if node is target:
-            return current
+    def walk(node, parent_location):
+        location = parent_location * node.loc
+        if node.obj is not None and hasattr(node.obj, "moved"):
+            color = _hex(node.color) if node.color is not None else None
+            bodies.extend(_bodies_from(node.obj.moved(location), tolerance, node.name or "solid", color))
         for child in node.children:
-            found = walk(child, current)
-            if found is not None:
-                return found
-        return None
+            walk(child, location)
 
-    import cadquery as cq
-
-    return walk(root, cq.Location())
+    walk(cq.Assembly.importStep(path), cq.Location())
+    return bodies
 
 
 def op_import_step(request):
@@ -305,7 +288,7 @@ def main():
             else:
                 raise ValueError("unknown op %r" % op)
     except Exception as error:  # noqa: BLE001 - every failure becomes a structured error
-        response = {"ok": False, "error": "%s: %s" % (type(error).__name__, error), "trace": traceback.format_exc(limit=8)}
+        response = {"ok": False, "error": "%s: %s" % (type(error).__name__, error), "traceback": traceback.format_exc(limit=8)}
     response["log"] = log.getvalue()[-20000:]
     sys.stdout.write(json.dumps(response))
     sys.stdout.flush()

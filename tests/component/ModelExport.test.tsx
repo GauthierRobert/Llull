@@ -48,11 +48,7 @@ describe('ModelExport', () => {
     render(<ModelExport />);
     fireEvent.change(screen.getByLabelText('Export format'), { target: { value: 'step' } });
     fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
-    await vi.waitFor(() =>
-      expect(screen.getByRole('button', { name: /export the model/i }).title).toMatch(
-        /Python bridge/,
-      ),
-    );
+    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Python bridge/));
     expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/export\/step\?name=model$/);
     expect(downloads).toEqual([]);
     vi.unstubAllGlobals();

@@ -7,17 +7,9 @@
  *   llull feature history (parameters + expressions + order) — the code is a round-trippable recipe.
  */
 
-import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './featureProgram';
-import {
-  formatDegrees,
-  formatNumber,
-  formatTerm,
-  isZero,
-  numberRows,
-  provenance,
-  quote,
-  stepHeading,
-} from './format';
+import type { Feature, FeatureProgram } from './program';
+import { formatNumber, provenance, quote, stepHeading } from './format';
+import { placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
 
 const LIBRARY: Readonly<Record<PythonBackend, string>> = {
@@ -25,64 +17,18 @@ const LIBRARY: Readonly<Record<PythonBackend, string>> = {
   build123d: 'build123d',
 };
 
-function tuple(terms: readonly Term[]): string {
-  return `(${terms.map(formatTerm).join(', ')})`;
-}
-
-function points(profile: readonly Term2[]): string {
-  return `[${profile.map((p) => tuple(p)).join(', ')}]`;
-}
-
-function shapeCall(shape: ShapeSpec): string {
-  switch (shape.kind) {
-    case 'box':
-      return `box(${tuple(shape.size)}`;
-    case 'cylinder':
-      return `cylinder(${formatTerm(shape.radius)}, ${formatTerm(shape.height)}`;
-    case 'sphere':
-      return `sphere(${formatTerm(shape.radius)}`;
-    case 'cone':
-      return `cone(${formatTerm(shape.radius)}, ${formatTerm(shape.height)}`;
-    case 'torus':
-      return `torus(${formatTerm(shape.ringRadius)}, ${formatTerm(shape.tubeRadius)}`;
-    case 'wedge':
-      return `wedge(${tuple(shape.size)}`;
-    case 'pyramid':
-      return `pyramid(${formatTerm(shape.baseWidth)}, ${formatTerm(shape.baseDepth)}, ${formatTerm(shape.height)}`;
-    case 'extrusion':
-      return `extrude(${points(shape.profile)}, ${formatTerm(shape.depth)}`;
-    case 'revolution':
-      return (
-        `revolve(${points(shape.profile)}, axis=${quote(shape.axis)}, ` +
-        `angle=${formatDegrees(shape.angle, 'math.pi')}, segments=${shape.segments}`
-      );
-    case 'mesh':
-      return `mesh([\n    ${numberRows(shape.positions, 9).join(',\n    ')},\n]`;
-  }
-}
-
-function placement(position: Term3, rotation: Term3): string {
-  let text = '';
-  if (!isZero(position)) text += `, position=${tuple(position)}`;
-  if (!isZero(rotation)) {
-    text += `, rotation=(${rotation.map((r) => formatDegrees(r, 'math.pi')).join(', ')})`;
-  }
-  return text;
-}
-
 function featureLine(feature: Feature): string {
   const v = feature.variable;
   switch (feature.op) {
     case 'solid': {
       const name = feature.name !== undefined ? `, name=${quote(feature.name)}` : '';
-      const place =
-        feature.shape.kind === 'mesh' ? '' : placement(feature.position, feature.rotation);
-      return `${v} = ${shapeCall(feature.shape)}${place}, color=${quote(feature.color)}${name})`;
+      const place = placementKwargs(feature.shape, feature.position, feature.rotation);
+      return `${v} = ${shapeCallOpen(feature.shape)}${place}, color=${quote(feature.color)}${name})`;
     }
     case 'boolean':
       return `${v} = ${feature.kind}(${feature.left}, ${feature.right})`;
     case 'translate':
-      return `${v} = translate(${v}, ${tuple(feature.delta)})`;
+      return `${v} = translate(${v}, ${pythonTuple(feature.delta)})`;
     case 'remove':
       return `remove(${v})`;
     case 'label':

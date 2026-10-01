@@ -3980,3 +3980,13 @@ body,
   border-color: oklch(0.50 0.18 25 / 0.28);
   color: oklch(0.45 0.20 25);
 }
+
+/* Screen-reader-only text (live status regions) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

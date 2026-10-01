@@ -44,5 +44,10 @@ export type {
   ExchangeCommandResult,
   ProgramRun,
   PythonLanguage,
+  StepFile,
 } from './exchangeTools';
-export { buildExchangeToolDefinitions, applyExchangeToolCall } from './exchangeTools';
+export {
+  buildExchangeToolDefinitions,
+  applyExchangeToolCall,
+  exportStepFile,
+} from './exchangeTools';

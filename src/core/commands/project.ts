@@ -32,6 +32,7 @@ import { executeRecorded } from './record';
 import { computeSceneSnapshot, type SceneSnapshot } from './scene';
 import { evaluateExpression, extractReferences } from './expression';
 import { MAX_PROJECT_ACTIONS, MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
+import { isRecord } from '../../lib/isRecord';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -332,10 +333,6 @@ function recordableParams(
     return out;
   }
   return resolved;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**

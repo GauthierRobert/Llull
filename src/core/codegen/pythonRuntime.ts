@@ -4,7 +4,9 @@
  * @layer core/codegen
  * @invariant the TRACE half is backend-independent: every helper records the llull command it maps
  *   to (`LLULL_TRACE`), so running the script reproduces the llull feature history exactly.
- * @invariant the BACKEND half only builds geometry (`_make_*`, `_place`, `_boolean`, `_assemble`).
+ * @invariant a BACKEND block only wraps library calls (`_polygon_face`, `_extrude`, `_revolve`,
+ *   `_solid_from_faces`, `_make_box`…`_make_torus`, `_place`, `_assemble`); SHARED_GEOMETRY holds the
+ *   llull frame conventions once for both libraries.
  * @see apply_code_trace (consumes LLULL_TRACE), server/python/llull_bridge.py (runs the script)
  */
 
@@ -235,9 +237,48 @@ def finish():
     return _assemble(list(LLULL_LIVE.values()))
 `;
 
-const CADQUERY_BACKEND = String.raw`
-import math
+/** Library-independent geometry, built on the backend primitives (`_polygon_face`, `_extrude`,
+ * `_revolve`, `_solid_from_faces`) so every llull frame convention lives in one place. */
+const SHARED_GEOMETRY = String.raw`
+def _make_wedge(w, h, d):
+    return _extrude(_polygon_face([(0, 0, 0), (0, h, 0), (0, 0, d)]), (w, 0, 0))
 
+
+def _make_polyhedron(points, faces):
+    return _solid_from_faces([_polygon_face([points[i] for i in face]) for face in faces])
+
+
+def _make_pyramid(w, d, h):
+    points = [(-w / 2, -d / 2, 0), (w / 2, -d / 2, 0), (w / 2, d / 2, 0), (-w / 2, d / 2, 0), (0, 0, h)]
+    return _make_polyhedron(points, [(0, 3, 2, 1), (0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)])
+
+
+def _make_extrusion(profile, depth):
+    return _extrude(_polygon_face([(x, y, 0) for x, y in profile]), (0, 0, depth))
+
+
+def _make_revolution(profile, axis, angle):
+    # llull frames (src/core/geometry/revolution.ts): profile (radial r, axial a); sweep from +X.
+    if axis == "x":
+        points, direction = [(a, r, 0) for r, a in profile], (1, 0, 0)
+    elif axis == "y":
+        points, direction = [(r, a, 0) for r, a in profile], (0, -1, 0)
+    else:
+        points, direction = [(r, 0, a) for r, a in profile], (0, 0, 1)
+    return _revolve(_polygon_face(points), direction, angle)
+
+
+def _make_mesh(positions):
+    points = [tuple(positions[i:i + 3]) for i in range(0, len(positions), 3)]
+    return _make_polyhedron(points, [(i, i + 1, i + 2) for i in range(0, len(points), 3)])
+
+
+def _boolean(kind, a, b):
+    result = {"union": a.fuse, "cut": a.cut, "intersect": a.intersect}[kind](b)
+    return result.clean()
+`;
+
+const CADQUERY_BACKEND = String.raw`
 import cadquery as cq
 
 
@@ -254,6 +295,18 @@ def _translate(shape, delta):
 
 def _polygon_face(points3d):
     return cq.Face.makeFromWires(cq.Wire.makePolygon([cq.Vector(*p) for p in points3d], close=True))
+
+
+def _extrude(face, vector):
+    return cq.Solid.extrudeLinear(face, cq.Vector(*vector))
+
+
+def _revolve(face, direction, angle):
+    return cq.Solid.revolve(face.outerWire(), [], angle, cq.Vector(0, 0, 0), cq.Vector(*direction))
+
+
+def _solid_from_faces(faces):
+    return cq.Solid.makeSolid(cq.Shell.makeShell(faces))
 
 
 def _make_box(w, h, d):
@@ -274,46 +327,6 @@ def _make_cone(r, h):
 
 def _make_torus(ring, tube):
     return cq.Solid.makeTorus(ring, tube)
-
-
-def _make_wedge(w, h, d):
-    face = _polygon_face([(0, 0, 0), (0, h, 0), (0, 0, d)])
-    return cq.Solid.extrudeLinear(face, cq.Vector(w, 0, 0))
-
-
-def _make_polyhedron(points, faces):
-    polygons = [_polygon_face([points[i] for i in face]) for face in faces]
-    return cq.Solid.makeSolid(cq.Shell.makeShell(polygons))
-
-
-def _make_pyramid(w, d, h):
-    points = [(-w / 2, -d / 2, 0), (w / 2, -d / 2, 0), (w / 2, d / 2, 0), (-w / 2, d / 2, 0), (0, 0, h)]
-    return _make_polyhedron(points, [(0, 3, 2, 1), (0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)])
-
-
-def _make_extrusion(profile, depth):
-    return cq.Solid.extrudeLinear(_polygon_face([(x, y, 0) for x, y in profile]), cq.Vector(0, 0, depth))
-
-
-def _make_revolution(profile, axis, angle):
-    if axis == "x":
-        points, direction = [(a, r, 0) for r, a in profile], (1, 0, 0)
-    elif axis == "y":
-        points, direction = [(r, a, 0) for r, a in profile], (0, -1, 0)
-    else:
-        points, direction = [(r, 0, a) for r, a in profile], (0, 0, 1)
-    wire = cq.Wire.makePolygon([cq.Vector(*p) for p in points], close=True)
-    return cq.Solid.revolve(wire, [], angle, cq.Vector(0, 0, 0), cq.Vector(*direction))
-
-
-def _make_mesh(positions):
-    points = [tuple(positions[i:i + 3]) for i in range(0, len(positions), 3)]
-    return _make_polyhedron(points, [(i, i + 1, i + 2) for i in range(0, len(points), 3)])
-
-
-def _boolean(kind, a, b):
-    result = {"union": a.fuse, "cut": a.cut, "intersect": a.intersect}[kind](b)
-    return result.clean()
 
 
 def _shape_of(shape):
@@ -340,8 +353,6 @@ def export_step(model, path):
 `;
 
 const BUILD123D_BACKEND = String.raw`
-import math
-
 import build123d as bd
 
 
@@ -357,6 +368,18 @@ def _translate(shape, delta):
 
 def _polygon_face(points3d):
     return bd.Face(bd.Wire.make_polygon([bd.Vector(*p) for p in points3d], close=True))
+
+
+def _extrude(face, vector):
+    return bd.Solid.extrude(face, bd.Vector(*vector))
+
+
+def _revolve(face, direction, angle):
+    return bd.Solid.revolve(face, angle, bd.Axis((0, 0, 0), direction))
+
+
+def _solid_from_faces(faces):
+    return bd.Solid(bd.Shell(faces))
 
 
 def _make_box(w, h, d):
@@ -377,44 +400,6 @@ def _make_cone(r, h):
 
 def _make_torus(ring, tube):
     return bd.Solid.make_torus(ring, tube)
-
-
-def _make_wedge(w, h, d):
-    return bd.Solid.extrude(_polygon_face([(0, 0, 0), (0, h, 0), (0, 0, d)]), bd.Vector(w, 0, 0))
-
-
-def _make_polyhedron(points, faces):
-    polygons = [_polygon_face([points[i] for i in face]) for face in faces]
-    return bd.Solid(bd.Shell(polygons))
-
-
-def _make_pyramid(w, d, h):
-    points = [(-w / 2, -d / 2, 0), (w / 2, -d / 2, 0), (w / 2, d / 2, 0), (-w / 2, d / 2, 0), (0, 0, h)]
-    return _make_polyhedron(points, [(0, 3, 2, 1), (0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)])
-
-
-def _make_extrusion(profile, depth):
-    return bd.Solid.extrude(_polygon_face([(x, y, 0) for x, y in profile]), bd.Vector(0, 0, depth))
-
-
-def _make_revolution(profile, axis, angle):
-    if axis == "x":
-        points, direction = [(a, r, 0) for r, a in profile], (1, 0, 0)
-    elif axis == "y":
-        points, direction = [(r, a, 0) for r, a in profile], (0, -1, 0)
-    else:
-        points, direction = [(r, 0, a) for r, a in profile], (0, 0, 1)
-    return bd.Solid.revolve(_polygon_face(points), angle, bd.Axis((0, 0, 0), direction))
-
-
-def _make_mesh(positions):
-    points = [tuple(positions[i:i + 3]) for i in range(0, len(positions), 3)]
-    return _make_polyhedron(points, [(i, i + 1, i + 2) for i in range(0, len(points), 3)])
-
-
-def _boolean(kind, a, b):
-    result = {"union": a.fuse, "cut": a.cut, "intersect": a.intersect}[kind](b)
-    return result.clean()
 
 
 def _triangles(shape, tolerance=0.01):
@@ -439,5 +424,8 @@ def export_step(model, path):
 /** Full runtime block for a backend: geometry builders first, then the traced helpers. */
 export function pythonRuntime(backend: PythonBackend): string {
   const builders = backend === 'cadquery' ? CADQUERY_BACKEND : BUILD123D_BACKEND;
-  return `${builders.trim()}\n\n${TRACE_RUNTIME.trim()}\n`;
+  return ['import math', builders, SHARED_GEOMETRY, TRACE_RUNTIME]
+    .map((block) => block.trim())
+    .join('\n\n\n')
+    .concat('\n');
 }

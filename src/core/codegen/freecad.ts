@@ -6,17 +6,9 @@
  * @pure
  */
 
-import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './featureProgram';
-import {
-  formatDegrees,
-  formatNumber,
-  formatTerm,
-  isZero,
-  numberRows,
-  provenance,
-  quote,
-  stepHeading,
-} from './format';
+import type { Feature, FeatureProgram } from './program';
+import { commentText, formatNumber, provenance, quote, stepHeading } from './format';
+import { placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 
 const HELPERS = String.raw`
 import math
@@ -89,7 +81,7 @@ def extrude(profile, depth, **placement):
     return _place(face.extrude(_vec(0, 0, depth)), **placement)
 
 
-def revolve(profile, axis="z", angle=360, **placement):
+def revolve(profile, axis="z", angle=360, segments=None, **placement):  # segments: llull tessellation only
     if axis == "x":
         points, direction = [(a, r, 0) for r, a in profile], (1, 0, 0)
     elif axis == "y":
@@ -119,48 +111,6 @@ def show(shape, name, color):
     return feature
 `;
 
-function tuple(terms: readonly Term[]): string {
-  return `(${terms.map(formatTerm).join(', ')})`;
-}
-
-function points(profile: readonly Term2[]): string {
-  return `[${profile.map((p) => tuple(p)).join(', ')}]`;
-}
-
-function shapeCall(shape: ShapeSpec): string {
-  switch (shape.kind) {
-    case 'box':
-      return `box(${tuple(shape.size)}`;
-    case 'cylinder':
-      return `cylinder(${formatTerm(shape.radius)}, ${formatTerm(shape.height)}`;
-    case 'sphere':
-      return `sphere(${formatTerm(shape.radius)}`;
-    case 'cone':
-      return `cone(${formatTerm(shape.radius)}, ${formatTerm(shape.height)}`;
-    case 'torus':
-      return `torus(${formatTerm(shape.ringRadius)}, ${formatTerm(shape.tubeRadius)}`;
-    case 'wedge':
-      return `wedge(${tuple(shape.size)}`;
-    case 'pyramid':
-      return `pyramid(${formatTerm(shape.baseWidth)}, ${formatTerm(shape.baseDepth)}, ${formatTerm(shape.height)}`;
-    case 'extrusion':
-      return `extrude(${points(shape.profile)}, ${formatTerm(shape.depth)}`;
-    case 'revolution':
-      return `revolve(${points(shape.profile)}, axis=${quote(shape.axis)}, angle=${formatDegrees(shape.angle, 'math.pi')}`;
-    case 'mesh':
-      return `mesh([\n    ${numberRows(shape.positions, 9).join(',\n    ')},\n]`;
-  }
-}
-
-function placement(position: Term3, rotation: Term3): string {
-  let text = '';
-  if (!isZero(position)) text += `, position=${tuple(position)}`;
-  if (!isZero(rotation)) {
-    text += `, rotation=(${rotation.map((r) => formatDegrees(r, 'math.pi')).join(', ')})`;
-  }
-  return text;
-}
-
 const OPERATIONS: Readonly<Record<'union' | 'cut' | 'intersect', string>> = {
   union: 'fuse',
   cut: 'cut',
@@ -171,14 +121,13 @@ function featureLine(feature: Feature): string {
   const v = feature.variable;
   switch (feature.op) {
     case 'solid': {
-      const place =
-        feature.shape.kind === 'mesh' ? '' : placement(feature.position, feature.rotation);
-      return `${v} = ${shapeCall(feature.shape)}${place})`;
+      const place = placementKwargs(feature.shape, feature.position, feature.rotation);
+      return `${v} = ${shapeCallOpen(feature.shape)}${place})`;
     }
     case 'boolean':
       return `${v} = ${feature.left}.${OPERATIONS[feature.kind]}(${feature.right}).removeSplitter()`;
     case 'translate':
-      return `${v} = ${v}.translated(${'_vec' + tuple(feature.delta)})`;
+      return `${v} = ${v}.translated(_vec${pythonTuple(feature.delta)})`;
     case 'remove':
       return `${v} = None`;
     case 'label':
@@ -201,7 +150,9 @@ export function emitFreeCad(program: FeatureProgram): string {
   ];
   if (program.parameters.length === 0) lines.push('# (none)');
   for (const p of program.parameters) {
-    lines.push(`${p.identifier} = ${p.expression ?? formatNumber(p.value)}  # ${p.name}`);
+    lines.push(
+      `${p.identifier} = ${p.expression ?? formatNumber(p.value)}  # ${commentText(p.name)}`,
+    );
   }
   lines.push('', `# ── MODEL ${'─'.repeat(55)}`);
   program.features.forEach((feature, i) => {

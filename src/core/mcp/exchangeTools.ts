@@ -11,6 +11,9 @@
  *   export_step  doc → export_code (CadQuery) → port runs it → exact B-rep STEP
  *   import_step  STEP → port tessellates (names + colours kept) → import_mesh
  *   import_code  CadQuery/build123d source → port runs it → LLULL_TRACE → apply_code_trace
+ *
+ * Their schemas are hand-written (like bridgeTools.ts) because they are transport-level tools, not
+ * registry commands; the registry commands they call keep `toToolSchemas()` as their contract (L5).
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -89,7 +92,8 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
         },
         required: [],
       },
-      annotations: { readOnlyHint: true, idempotentHint: true },
+      // Not read-only: it may write <name>.step into the exchange directory.
+      annotations: { idempotentHint: true },
     },
     {
       name: 'import_step',
@@ -152,8 +156,9 @@ function stringArg(args: Record<string, unknown>, key: string): string | undefin
   return typeof value === 'string' && value !== '' ? value : undefined;
 }
 
-function languageArg(args: Record<string, unknown>): PythonLanguage | null {
-  const value = args.language ?? 'cadquery';
+/** A tool's `language` argument (default cadquery), or null when it names another library. */
+function pythonLanguage(raw: unknown): PythonLanguage | null {
+  const value = raw ?? 'cadquery';
   return value === 'cadquery' || value === 'build123d' ? value : null;
 }
 
@@ -179,42 +184,77 @@ async function readInput(
   return port.readExchangeFile(path, encoding);
 }
 
+export interface StepFile {
+  readonly stepBase64: string;
+  readonly fileName: string;
+  readonly bytes: number;
+  readonly summary: string;
+  readonly savedTo?: string;
+}
+
+/**
+ * Generate the model's STEP file: export_code → Python port → exact B-rep. Shared by the
+ * export_step tool and the server's GET /export/step route.
+ * @failure no solids / bad language / bridge error → { error } (port errors propagate as throws)
+ */
+export async function exportStepFile(
+  getDoc: () => CadDocument,
+  port: CadExchangePort,
+  options: { name?: string; language?: unknown; save?: boolean },
+): Promise<StepFile | { error: string }> {
+  const language = pythonLanguage(options.language);
+  if (language === null) {
+    return { error: 'export_step: language must be "cadquery" or "build123d".' };
+  }
+  const code = execute(getDoc(), 'export_code', { language, name: options.name ?? 'model' });
+  const codeData = code.data as
+    | { text: string; fileName: string; solidCount: number; source: string }
+    | undefined;
+  if (codeData === undefined) return { error: `export_step: ${code.summary}` };
+  if (codeData.solidCount === 0)
+    return { error: 'export_step: the model has no 3D solids to export.' };
+
+  const run = await port.runProgram({ language, source: codeData.text, step: true });
+  if (run.stepBase64 === undefined) {
+    return { error: 'export_step: the Python bridge returned no STEP data.' };
+  }
+  // export_code already sanitised the base name; only the extension changes.
+  const fileName = codeData.fileName.replace(/\.[^.]+$/, '.step');
+  const savedTo =
+    options.save !== false && port.writeExchangeFile !== undefined
+      ? await port.writeExchangeFile(fileName, run.stepBase64)
+      : undefined;
+  const bytes = Math.floor((run.stepBase64.length * 3) / 4);
+  const summary =
+    `export_step: ${codeData.solidCount} solid(s) from ${codeData.source} → ${fileName} ` +
+    `(${bytes} bytes, exact B-rep via ${language})` +
+    (savedTo !== undefined ? `; saved to ${savedTo}.` : '; returned as data.stepBase64.');
+  return {
+    stepBase64: run.stepBase64,
+    fileName,
+    bytes,
+    summary,
+    ...(savedTo !== undefined ? { savedTo } : {}),
+  };
+}
+
 async function exportStep(
   deps: ExchangeDeps,
   port: CadExchangePort,
   args: Record<string, unknown>,
 ): Promise<McpShapedResult> {
-  const language = languageArg(args);
-  if (language === null) return failure('export_step: language must be "cadquery" or "build123d".');
-  const name = stringArg(args, 'name') ?? 'model';
-  const code = execute(deps.getDoc(), 'export_code', { language, name });
-  const codeData = code.data as { text?: string; solidCount?: number; source?: string } | undefined;
-  if (codeData?.text === undefined) return failure(`export_step: ${code.summary}`);
-  if (codeData.solidCount === 0)
-    return failure('export_step: the model has no 3D solids to export.');
-
-  const run = await port.runProgram({ language, source: codeData.text, step: true });
-  if (run.stepBase64 === undefined)
-    return failure('export_step: the Python bridge returned no STEP data.');
-  const fileName = `${name.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 64) || 'model'}.step`;
-  let savedTo: string | undefined;
-  if (args.save !== false && port.writeExchangeFile !== undefined) {
-    savedTo = await port.writeExchangeFile(fileName, run.stepBase64);
-  }
-  const bytes = Math.floor((run.stepBase64.length * 3) / 4);
-  const summary =
-    `export_step: ${codeData.solidCount ?? 0} solid(s) from ${codeData.source ?? 'history'} → ${fileName} ` +
-    `(${bytes} bytes, exact B-rep via ${language})` +
-    (savedTo !== undefined ? `; saved to ${savedTo}.` : '; returned as data.stepBase64.');
-  const meta = {
-    format: 'step',
-    fileName,
-    bytes,
-    language,
-    ...(savedTo !== undefined ? { savedTo } : {}),
-  };
-  const shaped = shapeToolCallContent({ summary, affected: [], isError: false, data: meta });
-  return { ...shaped, structuredContent: { ...meta, stepBase64: run.stepBase64 } };
+  const name = stringArg(args, 'name');
+  const file = await exportStepFile(deps.getDoc, port, {
+    language: args.language,
+    save: args.save !== false,
+    ...(name !== undefined ? { name } : {}),
+  });
+  if ('error' in file) return failure(file.error);
+  const { stepBase64, summary, ...meta } = file;
+  const data = { format: 'step', language: pythonLanguage(args.language), ...meta };
+  // The base64 payload travels only in structuredContent, never in the text an agent reads.
+  const shaped = shapeToolCallContent({ summary, affected: [], isError: false, data });
+  return { ...shaped, structuredContent: { ...data, stepBase64 } };
 }
 
 async function importStep(
@@ -248,7 +288,7 @@ async function importCode(
         '(only on a machine you trust the MCP clients of — the script runs with server privileges).',
     );
   }
-  const language = languageArg(args);
+  const language = pythonLanguage(args.language);
   if (language === null) return failure('import_code: language must be "cadquery" or "build123d".');
   const mode = args.mode === 'append' ? 'append' : 'replace';
   const source = await readInput(port, stringArg(args, 'code'), stringArg(args, 'path'), 'utf8');
