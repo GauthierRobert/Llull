@@ -3,7 +3,7 @@
  *
  * useMcpLiveDocument — subscribes to the server-side SSE document stream.
  *
- * Opens `GET http://localhost:3001/live` as an EventSource.
+ * Opens `GET <SERVER_BASE>/live` as an EventSource (SERVER_BASE from @ui/serverConfig).
  *
  * Protocol (named SSE events):
  *   - `snapshot` event: full CadDocument JSON. Used on initial connect and after
@@ -28,8 +28,9 @@ import { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import type { CadDocument } from '@core/model/types';
 import type { DocPatch } from '@core/mcp/docPatch';
+import { SERVER_BASE } from '@ui/serverConfig';
 
-const LIVE_URL = 'http://localhost:3001/live';
+const LIVE_URL = `${SERVER_BASE}/live`;
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30000;
 

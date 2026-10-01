@@ -9,11 +9,12 @@
  *
  * Error handling:
  *   - Network failure / non-ok status → throws a ServerCommandError.
- *   - Callers (`dispatch`, `undo`, `redo` in the store) catch and reflect the error
- *     as a 'disconnected' liveStatus + descriptive lastSummary.
+ *   - Callers (`dispatch`, `undo`, `redo` in the store) catch it; see store.ts for the
+ *     network-vs-HTTP and offline policy.
+ * Server URL and optional bearer token come from @ui/serverConfig.
  */
 
-const SERVER_BASE = 'http://localhost:3001';
+import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 
 // ---------------------------------------------------------------------------
 // Response type
@@ -59,7 +60,7 @@ async function postJson(path: string, body: unknown): Promise<ServerCommandRespo
   try {
     response = await fetch(`${SERVER_BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() },
       body: JSON.stringify(body),
     });
   } catch (cause) {

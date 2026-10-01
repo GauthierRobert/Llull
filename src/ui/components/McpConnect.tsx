@@ -12,6 +12,7 @@
  */
 
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { SERVER_BASE } from '@ui/serverConfig';
 
 // ---------------------------------------------------------------------------
 // Static constants (no registry import — pure UI)
@@ -19,7 +20,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server run dev';
 const SERVER_START_CMD = 'npm --prefix server run dev';
-const ENDPOINT_URL = 'http://localhost:3001/mcp';
+const ENDPOINT_URL = `${SERVER_BASE}/mcp`;
 
 interface CapabilityBadge {
   readonly label: string;

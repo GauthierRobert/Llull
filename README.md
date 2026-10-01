@@ -69,6 +69,7 @@ MCP_AUTH_TOKEN=<secret> npm --prefix server start
 - Serve the web app from an origin listed in `LLULL_ALLOWED_ORIGINS`, and list public
   hostnames in `LLULL_ALLOWED_HOSTS` (DNS-rebinding guard).
 - The OpenCascade kernel (~65 MB wasm) loads only with `?kernel=occt`; the default is Manifold.
+- Web app build vars: `VITE_LLULL_SERVER_URL` (server base URL), `VITE_LLULL_API_TOKEN` (bearer for REST when the server requires it).
 - Full env reference: [`server/README.md`](server/README.md).
 
 ## Project layout
