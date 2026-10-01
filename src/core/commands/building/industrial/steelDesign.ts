@@ -99,8 +99,8 @@ export interface BucklingCheck {
 
 /**
  * Member stability under compression N (N, ≥ 0) + major-axis bending M (N·mm):
- * N/(χy Npl) + kyy M/Mrd and N/(χz Npl) + 0.6 kyy M/Mrd, kyy = Cm (1 + min(λ̄y − 0.2, 0.8) n),
- * Cm = 0.9 (sway). Lateral-torsional buckling is not checked (restrained compression flange).
+ * N/(χy Npl) + kyy M/Mrd and N/(χz Npl) + 0.6 kyy M/Mrd (method 2), Cm = 0.9 (sway).
+ * Lateral-torsional buckling is not checked (restrained compression flange).
  * @invariant lengths in mm
  */
 export function memberBuckling(
@@ -120,7 +120,12 @@ export function memberBuckling(
   const chiMinor = bucklingReduction(slenderness(section.minorInertia, lengths.minor), minor);
   const axial = Math.max(0, compression);
   const n = axial / ((chiMajor * resistance.axial) / GAMMA_M1);
-  const kyy = 0.9 * (1 + Math.min(Math.max(lambdaMajor - 0.2, 0), 0.8) * n);
+  // Annex B Tab. B.1 — class 1–2: Cm (1 + (λ̄ − 0.2) n) ≤ Cm (1 + 0.8 n);
+  // class 3: Cm (1 + 0.6 λ̄ n) ≤ Cm (1 + 0.6 n).
+  const kyy =
+    resistance.sectionClass <= 2
+      ? 0.9 * (1 + Math.min(Math.max(lambdaMajor - 0.2, 0), 0.8) * n)
+      : 0.9 * (1 + 0.6 * Math.min(lambdaMajor, 1) * n);
   const bending = Math.abs(moment) / (resistance.moment / GAMMA_M1);
   return {
     utilisation: Math.max(

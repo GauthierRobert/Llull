@@ -1,6 +1,6 @@
 /**
  * Portal frame verification: 2D frame analysis of every frame under the EN 1990 combinations of
- * dead, snow, wind and crane actions (global imperfections, Horne αcr and amplified sway moments),
+ * dead, snow, wind and crane actions (global imperfections, Horne αcr and amplified moments),
  * EN 1993 member checks (cross-section, flexural buckling), moment connection bolt checks and
  * SLS deflections.
  * @layer core/commands/building/industrial
@@ -62,19 +62,42 @@ function ultimateCombinations(wind: boolean, crane: boolean): Combination[] {
     );
   }
   if (crane) {
-    const windShare = wind ? 0.9 : 0;
-    combinations.push(
-      {
-        name: `1.35G+1.35C(left)+0.75S${wind ? '+0.9W→' : ''}`,
-        factors: { G: 1.35, CL: 1.35, S: 0.75, WL: windShare },
-        sway: 1,
-      },
-      {
-        name: `1.35G+1.35C(right)+0.75S${wind ? '+0.9W←' : ''}`,
-        factors: { G: 1.35, CR: 1.35, S: 0.75, WR: windShare },
-        sway: -1,
-      },
-    );
+    // Crane leading (with and without snow, alone or with either wind), then wind leading with the
+    // crane accompanying (ψ0 = 1.0, EN 1991-3 Tab. A.2).
+    const sides = [
+      { load: 'CL', label: 'C(left)', sway: 1 },
+      { load: 'CR', label: 'C(right)', sway: -1 },
+    ] as const;
+    const winds = [
+      { load: 'WL', label: 'W→', sway: 1 },
+      { load: 'WR', label: 'W←', sway: -1 },
+    ] as const;
+    for (const side of sides) {
+      for (const snow of [0.75, 0]) {
+        const snowLabel = snow > 0 ? '+0.75S' : '';
+        combinations.push({
+          name: `1.35G+1.35${side.label}${snowLabel}`,
+          factors: { G: 1.35, [side.load]: 1.35, S: snow },
+          sway: side.sway,
+        });
+        if (!wind) continue;
+        for (const direction of winds) {
+          combinations.push({
+            name: `1.35G+1.35${side.label}${snowLabel}+0.9${direction.label}`,
+            factors: { G: 1.35, [side.load]: 1.35, S: snow, [direction.load]: 0.9 },
+            sway: direction.sway,
+          });
+        }
+      }
+      if (!wind) continue;
+      for (const direction of winds) {
+        combinations.push({
+          name: `1.35G+1.5${direction.label}+0.75S+1.35${side.label}`,
+          factors: { G: 1.35, [direction.load]: 1.5, S: 0.75, [side.load]: 1.35 },
+          sway: direction.sway,
+        });
+      }
+    }
   }
   return combinations;
 }
@@ -121,62 +144,106 @@ function solveCombination(
 
 interface UltimateResult {
   readonly result: FrameResult;
-  /** Elastic critical load factor (Horne, EN 1993-1-1 5.2.1(4)); Infinity without compression. */
+  /** Elastic critical load factor; Infinity without compression. */
   readonly alphaCritical: number;
-  /** Column governing αcr. */
-  readonly criticalColumn: string | null;
-  /** Sway amplification 1 / (1 − 1/αcr) applied to moments when αcr < 10 (5.2.2(5)). */
+  /** Column (or rafter, when Horne is not applicable) governing αcr. */
+  readonly criticalMember: string | null;
+  /** How αcr was found, e.g. "Horne" / "rafter axial (Horne not applicable)". */
+  readonly method: string;
+  /** Moment amplification 1 / (1 − 1/αcr) applied to all moments when αcr < 10 (5.2.2(5)). */
   readonly amplification: number;
 }
 
-/** One ULS combination with sway imperfections and the amplified sway moment method. */
+const HORNE_MAX_SLOPE = Math.tan((26 * Math.PI) / 180);
+
+/**
+ * One ULS combination with sway imperfections (5.3.2) and amplified moments (5.2.2(5)).
+ * Each column piece between nodes (base, crane bracket, top) is a storey: imperfection and Horne
+ * forces act where the compression enters (φ ΔN, ΔN/200) and αcr = min h_i / (200 Δδ_i).
+ */
 function solveUltimate(frame: FrameModel, combination: Combination): UltimateResult | null {
   const first = solveCombination(frame, combination.factors);
   if (!first) return null;
-  const compressionAt = (result: FrameResult, elementId: string): number => {
-    const index = frame.members.findIndex(
-      (member) => member.elementId === elementId && member.ends[1],
-    );
-    const forces = result.members[index];
-    return forces ? Math.max(0, -forces.axial[1]) : 0;
-  };
-  const tops = frame.columnTops.map((top) => ({
-    ...top,
-    compression: compressionAt(first, top.elementId),
-  }));
-  // Global imperfection φ = φ0 αh αm (5.3.2), as equivalent horizontal forces φ N at column tops.
-  const tallest = Math.max(...tops.map((top) => top.height), 1) / 1000;
+  const pieces = frame.members.flatMap((member, index) => {
+    const forces = first.members[index];
+    if (member.role !== 'column' || !forces) return [];
+    const [a, b] = [frame.nodes[member.geometry.a], frame.nodes[member.geometry.b]];
+    if (!a || !b) return [];
+    return [
+      {
+        member,
+        height: Math.hypot(b.x - a.x, b.y - a.y),
+        compression: Math.max(0, -forces.axial[1]),
+      },
+    ];
+  });
+  // Compression entering at each node: the piece below minus the piece above.
+  const entering = new Map<number, number>();
+  for (const piece of pieces) {
+    const above = pieces.find((other) => other.member.geometry.a === piece.member.geometry.b);
+    const increment = Math.max(0, piece.compression - (above?.compression ?? 0));
+    if (increment > 0) entering.set(piece.member.geometry.b, increment);
+  }
+  const tallest = Math.max(...frame.columnTops.map((top) => top.height), 1) / 1000;
   const alphaH = Math.min(1, Math.max(2 / 3, 2 / Math.sqrt(tallest)));
-  const loaded = tops.filter((top) => top.compression > 0).length;
+  const loaded = frame.columnTops.filter((top) =>
+    pieces.some((piece) => piece.member.elementId === top.elementId && piece.compression > 0),
+  ).length;
   const phi = loaded > 0 ? (alphaH * Math.sqrt(0.5 * (1 + 1 / loaded))) / 200 : 0;
   const result = solveCombination(
     frame,
     combination.factors,
-    tops.map((top) => ({ node: top.node, fx: combination.sway * phi * top.compression })),
+    [...entering].map(([node, increment]) => ({ node, fx: combination.sway * phi * increment })),
   );
   if (!result) return null;
-  // Horne: horizontal forces N/200 alone; αcr = min h / (200 δ).
   const horne = solveFrame(
-    frame.nodes.map((node, index) => {
-      const top = tops.find((candidate) => candidate.node === index);
-      return { ...node, load: { fx: (top?.compression ?? 0) / 200, fy: 0, mz: 0 } };
-    }),
+    frame.nodes.map((node, index) => ({
+      ...node,
+      load: { fx: (entering.get(index) ?? 0) / 200, fy: 0, mz: 0 },
+    })),
     frame.members.map((member) => member.geometry),
   );
   let alphaCritical = Infinity;
-  let criticalColumn: string | null = null;
-  for (const top of tops) {
-    const sway = Math.abs(horne?.displacements[top.node]?.[0] ?? 0);
-    if (top.compression <= 0 || !(sway > 0)) continue;
-    const alpha = top.height / (200 * sway);
+  let criticalMember: string | null = null;
+  let method = 'Horne';
+  for (const piece of pieces) {
+    const drift = Math.abs(
+      (horne?.displacements[piece.member.geometry.b]?.[0] ?? 0) -
+        (horne?.displacements[piece.member.geometry.a]?.[0] ?? 0),
+    );
+    if (piece.compression <= 0 || !(drift > 0)) continue;
+    const alpha = piece.height / (200 * drift);
     if (alpha < alphaCritical) {
       alphaCritical = alpha;
-      criticalColumn = top.elementId;
+      criticalMember = piece.member.elementId;
     }
+  }
+  // Horne scope (5.2.1(4)B Note 2B): slopes ≤ 26° and rafter N ≤ 0.09 Ncr (Ncr over the span).
+  // Otherwise the modified estimate αcr = 0.8 αH (1 − N/Ncr)max (SCI P397, Lim & King) is used.
+  let rafterRatio = 0;
+  let steep = false;
+  frame.members.forEach((member, index) => {
+    const forces = first.members[index];
+    const [a, b] = [frame.nodes[member.geometry.a], frame.nodes[member.geometry.b]];
+    if (member.role !== 'rafter' || !forces || !a || !b) return;
+    steep ||= Math.abs(b.y - a.y) > HORNE_MAX_SLOPE * Math.abs(b.x - a.x);
+    const middle = (a.x + b.x) / 2;
+    const span = frame.spans.find(([x0, x1]) => middle >= x0 && middle <= x1);
+    const length = span ? span[1] - span[0] : Math.hypot(b.x - a.x, b.y - a.y);
+    const critical = (Math.PI ** 2 * member.geometry.E * member.geometry.I) / length ** 2;
+    const compression = Math.max(0, ...forces.axial.map((value) => -value));
+    if (compression / critical > rafterRatio) {
+      rafterRatio = compression / critical;
+      if (rafterRatio > 0.09) criticalMember ??= member.elementId;
+    }
+  });
+  if ((steep || rafterRatio > 0.09) && Number.isFinite(alphaCritical)) {
+    alphaCritical = 0.8 * alphaCritical * Math.max(0, 1 - rafterRatio);
+    method = `modified Horne 0.8 αH (1 − N/Ncr), ${steep ? 'roof slope > 26°' : 'rafter N > 0.09 Ncr'}`;
   }
   const amplification =
     alphaCritical >= 10 ? 1 : alphaCritical > 1.05 ? 1 / (1 - 1 / alphaCritical) : 20;
-  return { result, alphaCritical, criticalColumn, amplification };
+  return { result, alphaCritical, criticalMember, method, amplification };
 }
 
 /** Elastic bolt-group check of an end-plate connection under (M, V); N, mm. */
@@ -261,18 +328,20 @@ export function checkFrames(
       unstable += 1;
       continue;
     }
-    let stability: { alpha: number; column: string; combination: string } | null = null;
+    let stability: { alpha: number; column: string; combination: string; method: string } | null =
+      null;
     for (const { combination, outcome } of ultimate) {
       if (!outcome) continue;
       const { result, amplification } = outcome;
       if (
-        outcome.criticalColumn !== null &&
+        outcome.criticalMember !== null &&
         (stability === null || outcome.alphaCritical < stability.alpha)
       ) {
         stability = {
           alpha: outcome.alphaCritical,
-          column: outcome.criticalColumn,
+          column: outcome.criticalMember,
           combination: combination.name,
+          method: outcome.method,
         };
       }
       frame.members.forEach((analysis, index) => {
@@ -353,7 +422,7 @@ export function checkFrames(
           moment: 0,
           shear: 0,
           utilisation: 3 / stability.alpha,
-          check: `sway stability αcr ${stability.alpha.toFixed(1)} ≥ 3 (Horne; moments amplified when < 10)`,
+          check: `sway stability αcr ${stability.alpha.toFixed(1)} ≥ 3 (${stability.method}; moments amplified when < 10)`,
         },
         `${frame.label}:stability`,
       );
@@ -526,8 +595,8 @@ export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
     'section properties from the profile outline, no root radii) for every EN 1990 combination of ' +
     'dead G (deadLoad + self-weight), snow S, wind W (windPressure, both directions, incl. uplift) ' +
     'and crane C (from add_crane_runway capacity: vertical wheel reactions with dynamic factors + ' +
-    'lateral surge at the brackets), with sway imperfections and Horne αcr (moments amplified when ' +
-    'αcr < 10). Checks: member cross-section (EN 1993-1-1 §6.2), flexural buckling with N–M ' +
+    'lateral surge at the brackets), with sway imperfections and Horne αcr per storey (all moments amplified ' +
+    'by 1/(1−1/αcr) when αcr < 10). Checks: member cross-section (EN 1993-1-1 §6.2), flexural buckling with N–M ' +
     'interaction (§6.3, columns full height, rafters between purlins), frame sway stability ' +
     '(αcr ≥ 3), end-plate bolt groups (EN 1993-1-8, grade 8.8) and SLS deflections (rafters ' +
     'span/200 under snow, eaves h/150 under wind, rail level h/400 under crane). Returns the worst ' +

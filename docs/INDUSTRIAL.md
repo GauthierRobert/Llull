@@ -45,10 +45,14 @@ stiffness method, pinned bases, section properties from the profile outline — 
   option, or `craneCapacity` to override, 0 to ignore): maximum / minimum wheel reactions with
   dynamic factors and a 10 % lateral surge, applied at the brackets with their eccentricity.
 
-Combinations: 1.35G+1.5S, 1.35G+1.5W+0.75S, 1.0G+1.5W (uplift), 1.35G+1.35C+0.75S(+0.9W), each in
-both directions. Every combination includes sway imperfections (EN 1993-1-1 §5.3.2); the frame's
-elastic critical factor αcr is estimated with Horne's method, sway moments are amplified by
-1/(1 − 1/αcr) when αcr < 10 and the frame fails when αcr < 3.
+Combinations: 1.35G+1.5S, 1.35G+1.5W+0.75S, 1.0G+1.5W (uplift); with cranes, crane-leading
+1.35G+1.35C(+0.75S)(+0.9W, either direction) and wind-leading 1.35G+1.5W+0.75S+1.35C — crane at
+either rail, each wind direction. Every combination includes sway imperfections (EN 1993-1-1
+§5.3.2) applied where column compression enters (column tops and crane brackets). The elastic
+critical factor αcr is estimated with Horne's method per column storey; outside Horne's scope
+(roof slope > 26° or rafter N > 0.09 Ncr) the modified estimate 0.8 αH (1 − N/Ncr) is used. All
+moments are amplified by 1/(1 − 1/αcr) when αcr < 10 (conservative) and the frame fails when
+αcr < 3.
 
 Checks, worst per element with the governing combination: member cross-section (§6.2), flexural
 buckling with N–M interaction (§6.3.3; columns over their full height, rafters between purlins),

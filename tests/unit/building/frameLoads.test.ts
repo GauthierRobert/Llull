@@ -8,7 +8,7 @@ import {
   sectionResistance,
 } from '@core/commands/building/industrial/steelDesign';
 import { craneActions, craneCapacityOf } from '@core/commands/building/industrial/frameModel';
-import { findProfile } from '@core/commands/building/steel/profiles';
+import { findProfile, sectionProperties } from '@core/commands/building/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';
 import { __resetIdCounter } from '@lib/id';
 
@@ -65,6 +65,25 @@ describe('member buckling (EN 1993-1-1 §6.3)', () => {
       memberBuckling(findProfile('IPE300')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor,
     ).toBeGreaterThan(0.9);
   });
+
+  it('uses the class 3 interaction factor for class 3 sections', () => {
+    const profile = findProfile('HEA300')!;
+    const resistance = sectionResistance(profile, 355);
+    expect(resistance.sectionClass).toBe(3);
+    const lengths = { major: 6000, minor: 100 };
+    const result = memberBuckling(
+      profile,
+      355,
+      0.3 * resistance.axial,
+      0.3 * resistance.moment,
+      lengths,
+    );
+    const n = 0.3 / result.chiMajor;
+    const lambda = Math.sqrt(
+      resistance.axial / ((Math.PI ** 2 * 210000 * sectionProperties(profile).inertia) / 6000 ** 2),
+    );
+    expect(result.utilisation).toBeCloseTo(n + 0.9 * (1 + 0.6 * Math.min(lambda, 1) * n) * 0.3, 6);
+  });
 });
 
 describe('load combinations', () => {
@@ -108,7 +127,8 @@ describe('load combinations', () => {
     const doc = hall({ crane: { capacity: 16, railHeight: 6000 } });
     const withCrane = check(doc);
     const without = check(doc, { craneCapacity: 0 });
-    expect(withCrane.combinations).toHaveLength(4);
+    expect(withCrane.combinations).toHaveLength(6);
+    expect(withCrane.combinations).toContain('1.35G+1.35C(right)');
     expect(withCrane.combinations[2]).toBe('1.35G+1.35C(left)+0.75S');
     expect(without.combinations).toHaveLength(2);
     const rail = withCrane.rows.find((candidate) => candidate.check.startsWith('rail-level'))!;
@@ -123,7 +143,11 @@ describe('load combinations', () => {
       heavier.rows.find((candidate) => candidate.check.startsWith('rail-level'))!.utilisation,
     );
     const both = check(doc, { windPressure: 0.8 });
-    expect(both.combinations).toContain('1.35G+1.35C(right)+0.75S+0.9W←');
+    expect(both.combinations).toHaveLength(22);
+    expect(both.combinations).toContain('1.35G+1.35C(right)+0.75S+0.9W→');
+    expect(both.combinations).toContain('1.35G+1.5W←+0.75S+1.35C(left)');
+    // Crane reactions enter below the column tops: they lower αcr (storey-wise Horne).
+    expect(heavier.alphaCritical!).toBeLessThan(without.alphaCritical!);
   });
 
   it('reads crane capacities and actions', () => {
@@ -145,6 +169,40 @@ describe('load combinations', () => {
     expect(row(data, 'RF5', 'rafter').check).toMatch(/sway ×\d\.\d\d/);
   });
 
+  it('caps αcr by rafter buckling where Horne does not apply (steep roofs)', () => {
+    const steep = check(hall({ roofPitch: 30 }));
+    const stability = steep.rows.find((candidate) => candidate.kind === 'stability')!;
+    expect(stability.check).toMatch(/modified Horne 0\.8 αH \(1 − N\/Ncr\), roof slope > 26°/);
+    expect(check(hall()).rows.find((candidate) => candidate.kind === 'stability')!.check).toMatch(
+      /\(Horne;/,
+    );
+  });
+
+  it('reports frames that are mechanisms as unstable', () => {
+    let doc = createEmptyDocument();
+    for (const y of [0, 6000]) {
+      for (const [start, end] of [
+        [
+          [0, y, 6000],
+          [6000, y, 6500],
+        ],
+        [
+          [6000, y, 6500],
+          [12000, y, 6000],
+        ],
+      ]) {
+        doc = execute(doc, 'add_steel_member', {
+          profile: 'IPE300',
+          role: 'rafter',
+          start,
+          end,
+        }).document;
+      }
+    }
+    const result = execute(doc, 'check_portal_frames', {});
+    expect(result.summary).toMatch(/no analysable portal frame.*\(unstable\)/);
+  });
+
   it('rejects negative wind or crane input', () => {
     const doc = hall();
     expect(execute(doc, 'check_portal_frames', { windPressure: -1 }).summary).toMatch(
@@ -160,7 +218,7 @@ describe('design_portal_frames with wind and crane', () => {
   it('designs a crane hall under wind so every check passes', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 6000 } });
     const result = execute(doc, 'design_portal_frames', { windPressure: 0.7 });
-    expect(result.summary).toMatch(/Designed 6 frame\(s\) for 8 ULS combination\(s\)/);
+    expect(result.summary).toMatch(/Designed 6 frame\(s\) for 22 ULS combination\(s\)/);
     const after = check(result.document, { windPressure: 0.7 });
     expect(after.maxUtilisation).toBeLessThanOrEqual(1);
   });

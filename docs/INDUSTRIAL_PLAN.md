@@ -83,11 +83,12 @@ Each step ships with unit tests and is covered by the Playwright suite.
       runway capacity (or `craneCapacity`): vertical wheel reactions at maximum / minimum hook
       approach with dynamic factors φ1 = 1.1, φ2 = 1.15, lateral surge 10 %, applied at the brackets
       with their eccentricity; runway self-weight in G.
-- [x] **I21 — EN 1990 combinations.** 1.35G+1.5S, 1.35G+1.5W+0.75S, 1.0G+1.5W (uplift) and
-      1.35G+1.35C+0.75S(+0.9W), each direction; worst row per element with its governing
-      combination.
+- [x] **I21 — EN 1990 combinations.** 1.35G+1.5S, 1.35G+1.5W+0.75S, 1.0G+1.5W (uplift),
+      crane-leading 1.35G+1.35C(+0.75S)(+0.9W) and wind-leading 1.35G+1.5W+0.75S+1.35C, crane at
+      either rail and wind either way; worst row per element with its governing combination.
 - [x] **I22 — Stability.** Sway imperfections φ = φ0 αh αm (EN 1993-1-1 §5.3.2), Horne αcr
-      (§5.2.1(4)), sway moments amplified by 1/(1 − 1/αcr) when αcr < 10, frame fails when αcr < 3.
+      (§5.2.1(4)) per column storey (crane brackets split columns), modified 0.8 αH (1 − N/Ncr) outside
+      Horne's scope, moments amplified by 1/(1 − 1/αcr) when αcr < 10, frame fails when αcr < 3.
       Member flexural buckling with the §6.3.3 interaction (buckling curves by section shape;
       columns full height, rafters between purlins).
 - [x] **I23 — Serviceability.** Rafter deflection under snow ≤ span/200, eaves sway under wind
