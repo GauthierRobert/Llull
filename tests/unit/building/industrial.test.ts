@@ -573,3 +573,174 @@ describe('industrial takeoff, schedules, plan and IFC', () => {
     );
   });
 });
+
+describe('review regressions', () => {
+  it('a second hall adds footings only under its own columns; underColumns skips existing ones', () => {
+    let doc = run(createEmptyDocument(), 'add_portal_frame_building', SMALL_HALL);
+    const first = elementsOf(doc, 'footing').length;
+    doc = run(doc, 'add_portal_frame_building', { ...SMALL_HALL, origin: [40000, 0] });
+    expect(elementsOf(doc, 'footing')).toHaveLength(2 * first);
+    expect(execute(doc, 'add_footing', { underColumns: true }).summary).toMatch(
+      /every column already has a footing/,
+    );
+  });
+
+  it('closes the front gable cladding flush with the side walls', () => {
+    const doc = execute(createEmptyDocument(), 'add_portal_frame_building', SMALL_HALL).document;
+    const gables = elementsOf(doc, 'panel').filter(
+      (panel) =>
+        panel.category === 'panel' &&
+        panel.role === 'wall' &&
+        new Set(panel.corners.map((corner) => corner[1])).size === 1,
+    );
+    const ys = gables.map((panel) => (panel.category === 'panel' ? panel.corners[0]![1] : 0));
+    expect(ys.sort((a, b) => a - b)).toEqual([-200, 30200]);
+  });
+
+  it('orients gable wind posts on their strong axis', () => {
+    const doc = execute(createEmptyDocument(), 'add_portal_frame_building', SMALL_HALL).document;
+    const posts = elementsOf(doc, 'member').filter(
+      (m) => m.category === 'member' && m.profile === 'HEA200',
+    );
+    expect(posts.length).toBeGreaterThan(0);
+    expect(posts.every((m) => m.category === 'member' && m.roll === Math.PI / 2)).toBe(true);
+  });
+
+  it('refuses generators that would create an excessive number of members', () => {
+    const doc = createEmptyDocument();
+    expect(execute(doc, 'add_portal_frame_building', { purlinSpacing: 1 }).summary).toMatch(
+      /over the 5000 limit/,
+    );
+    expect(
+      execute(doc, 'add_crane_runway', {
+        start: [0, 0],
+        end: [100000, 0],
+        railHeight: 5000,
+        supportSpacing: 1,
+      }).summary,
+    ).toMatch(/supportSpacing too small/);
+    expect(
+      execute(doc, 'add_crane_runway', { start: [0, 0], end: [6000, 0], railHeight: 400 }).summary,
+    ).toMatch(/railHeight must exceed/);
+  });
+
+  it('draws a diagonal wall panel along its true plan line', () => {
+    const doc = run(createEmptyDocument(), 'add_panel', {
+      corners: [
+        [0, 10000, 0],
+        [10000, 0, 0],
+        [10000, 0, 3000],
+        [0, 10000, 3000],
+      ],
+    });
+    const line = buildPlanDrawing(doc, undefined)!.primitives.find(
+      (p) => p.type === 'line' && p.layer === 'A-CLAD',
+    );
+    expect(line?.type === 'line' && [line.a, line.b]).toEqual([
+      [0, 10000],
+      [10000, 0],
+    ]);
+  });
+
+  it('treats a pipe tee as a connection but still reports pipes on other levels', () => {
+    let doc = run(createEmptyDocument(), 'add_pipe_run', {
+      points: [
+        [0, 0, 3000],
+        [10000, 0, 3000],
+      ],
+    });
+    doc = run(doc, 'add_pipe_run', {
+      points: [
+        [5000, 0, 3000],
+        [5000, 5000, 3000],
+      ],
+    });
+    expect(execute(doc, 'check_clashes', {}).summary).toBe('No clashes found.');
+    // Same local coordinates one level up: no longer touching.
+    doc = run(doc, 'add_level', { name: 'Upper', height: 3000 });
+    doc = run(doc, 'add_pipe_run', {
+      points: [
+        [5000, -2000, -50],
+        [5000, 2000, -50],
+      ],
+      diameter: 200,
+    });
+    expect(execute(doc, 'check_clashes', {}).summary).toMatch(/1 hard clash.*PL1 × PL3/);
+  });
+
+  it('reports a pipe ending inside a steel column and each clearance pair once', () => {
+    let doc = run(createEmptyDocument(), 'add_steel_member', {
+      profile: 'HEA300',
+      role: 'column',
+      start: [0, 0, 0],
+      end: [0, 0, 6000],
+    });
+    doc = run(doc, 'add_pipe_run', {
+      points: [
+        [0, 0, 3000],
+        [5000, 0, 3000],
+      ],
+    });
+    doc = run(doc, 'add_equipment', { name: 'A', location: [20000, 0], size: [1000, 1000, 1000] });
+    doc = run(doc, 'add_equipment', { name: 'B', location: [21500, 0], size: [1000, 1000, 1000] });
+    const result = execute(doc, 'check_clashes', {});
+    const clashes = (result.data as { clashes: Clash[] }).clashes;
+    expect(clashes.filter((c) => c.kind === 'hard')).toHaveLength(1);
+    expect(clashes.filter((c) => c.kind === 'clearance')).toHaveLength(1);
+    expect(result.summary).toMatch(/\(\d+ mm\)/);
+  });
+
+  it('reports clash depths in mm in a metre document', () => {
+    let doc = execute(createEmptyDocument(), 'set_units', { units: 'm' }).document;
+    doc = run(doc, 'add_steel_member', {
+      profile: 'HEA300',
+      role: 'column',
+      start: [0, 0, 0],
+      end: [0, 0, 6],
+    });
+    doc = run(doc, 'add_equipment', { name: 'Press', location: [0.6, 0], size: [1, 1, 1] });
+    expect(execute(doc, 'check_clashes', {}).summary).toMatch(/EQ1 × SC1 \(45 mm\)/);
+  });
+
+  it('keeps role-based marks when copying members or changing their role', () => {
+    let doc = run(createEmptyDocument(), 'add_steel_member', {
+      profile: 'HEA300',
+      role: 'column',
+      start: [0, 0, 0],
+      end: [0, 0, 3000],
+    });
+    doc = run(doc, 'update_steel_member', { memberId: 'member-1', role: 'brace' });
+    expect(element(doc, 'member-1').mark).toBe('BR1');
+    doc = run(doc, 'add_level', { name: 'Upper' });
+    doc = run(doc, 'copy_level_elements', {
+      sourceLevelId: 'level-1',
+      targetLevelIds: ['level-2'],
+    });
+    expect(element(doc, 'member-2').mark).toBe('BR2');
+  });
+
+  it('fails gracefully on non-string profiles and families', () => {
+    const doc = createEmptyDocument();
+    expect(
+      execute(doc, 'add_steel_member', { profile: 300, start: [0, 0, 0], end: [1, 0, 0] }).summary,
+    ).toMatch(/unknown steel profile/);
+    expect(execute(doc, 'list_steel_profiles', { family: 3 }).summary).toMatch(/^0 steel/);
+  });
+
+  it('rejects saved buildings with invalid industrial fields', () => {
+    const doc = run(createEmptyDocument(), 'add_steel_member', {
+      profile: 'HEA300',
+      start: [0, 0, 0],
+      end: [1000, 0, 0],
+    });
+    const broken = JSON.parse(JSON.stringify(doc.building)) as {
+      elements: Record<string, Record<string, unknown>>;
+    };
+    broken.elements['member-1']!['role'] = 'girder';
+    broken.elements['member-1']!['material'] = 5;
+    expect(buildingErrors(broken)).toEqual([
+      expect.stringMatching(/role must be one of/),
+      expect.stringMatching(/material must be a string/),
+    ]);
+  });
+});

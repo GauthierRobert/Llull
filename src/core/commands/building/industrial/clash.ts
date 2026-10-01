@@ -6,7 +6,7 @@
 import type { CadDocument, Vec3 } from '../../../model/types';
 import type { BimCategory, BuildingElement, BuildingModel } from '../../../model/building';
 import type { CommandDefinition, CommandResult } from '../../types';
-import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
+import { fromMm, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import { sweepFrame } from '../mesh';
 import { findProfile } from '../steel/profiles';
 import { atLevel } from './evaluate';
@@ -166,31 +166,42 @@ export interface Clash {
   readonly depth: number;
 }
 
-function pipeEndsInside(
-  doc: CadDocument,
-  building: BuildingModel,
-  pipe: BuildingElement,
-  box: OrientedBox,
-): boolean {
-  if (pipe.category !== 'pipe') return false;
+/** World-space centreline of a pipe (empty when its level is missing). */
+function pipeWorldPoints(building: BuildingModel, pipe: BuildingElement): Vec3[] {
+  if (pipe.category !== 'pipe') return [];
   const level = building.levels[pipe.levelId];
-  if (!level) return false;
-  const ends = [pipe.points[0], pipe.points[pipe.points.length - 1]].filter(
-    (point): point is Vec3 => point !== undefined,
-  );
-  return ends.some((point) => {
-    const world = atLevel(level, point);
-    const offset: Vec3 = [
-      world[0] - box.center[0],
-      world[1] - box.center[1],
-      world[2] - box.center[2],
-    ];
-    return box.axes.every(
-      (axis, index) => Math.abs(dot(offset, axis)) <= (box.half[index] as number) + fromMm(doc, 1),
-    );
-  });
+  return level ? pipe.points.map((point) => atLevel(level, point)) : [];
 }
 
+function pipeEnds(points: ReadonlyArray<Vec3>): Vec3[] {
+  const [first, last] = [points[0], points[points.length - 1]];
+  return first && last ? [first, last] : [];
+}
+
+function pointInBox(point: Vec3, box: OrientedBox, margin: number): boolean {
+  const offset: Vec3 = [
+    point[0] - box.center[0],
+    point[1] - box.center[1],
+    point[2] - box.center[2],
+  ];
+  return box.axes.every(
+    (axis, index) => Math.abs(dot(offset, axis)) <= (box.half[index] as number) + margin,
+  );
+}
+
+function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number {
+  let best = Infinity;
+  for (let index = 0; index + 1 < polyline.length; index++) {
+    const [a, b] = [polyline[index] as Vec3, polyline[index + 1] as Vec3];
+    const ab: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ap: Vec3 = [point[0] - a[0], point[1] - a[1], point[2] - a[2]];
+    const t = Math.max(0, Math.min(1, dot(ap, ab) / (dot(ab, ab) || 1)));
+    best = Math.min(best, Math.hypot(ap[0] - ab[0] * t, ap[1] - ab[1] * t, ap[2] - ab[2] * t));
+  }
+  return best;
+}
+
+/** Intentional connections: a pipe ending on another pipe (tee / joint) or inside equipment. */
 function connected(
   doc: CadDocument,
   building: BuildingModel,
@@ -200,21 +211,19 @@ function connected(
   boxB: OrientedBox,
 ): boolean {
   if (a.category === 'pipe' && b.category === 'pipe') {
-    const ends = (pipe: typeof a): Vec3[] => [
-      pipe.points[0] as Vec3,
-      pipe.points[pipe.points.length - 1] as Vec3,
-    ];
+    const [pointsA, pointsB] = [pipeWorldPoints(building, a), pipeWorldPoints(building, b)];
     const tolerance = Math.max(a.diameter, b.diameter);
     return (
-      ends(a).some((p) =>
-        b.points.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) <= tolerance),
-      ) ||
-      ends(b).some((p) =>
-        a.points.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) <= tolerance),
-      )
+      pipeEnds(pointsA).some((point) => distanceToPolyline(point, pointsB) <= tolerance) ||
+      pipeEnds(pointsB).some((point) => distanceToPolyline(point, pointsA) <= tolerance)
     );
   }
-  return pipeEndsInside(doc, building, a, boxB) || pipeEndsInside(doc, building, b, boxA);
+  const margin = fromMm(doc, 1);
+  const endsIn = (pipe: BuildingElement, other: BuildingElement, box: OrientedBox): boolean =>
+    pipe.category === 'pipe' &&
+    other.category === 'equipment' &&
+    pipeEnds(pipeWorldPoints(building, pipe)).some((point) => pointInBox(point, box, margin));
+  return endsIn(a, b, boxB) || endsIn(b, a, boxA);
 }
 
 /** All clashes on the given levels (or every level). @pure */
@@ -232,7 +241,7 @@ export function findClashes(
   }
   const found = new Map<string, Clash>();
   const record = (clash: Clash): void => {
-    const key = `${clash.kind}:${clash.a}:${clash.b}`;
+    const key = `${clash.kind}:${[clash.a, clash.b].sort().join(':')}`;
     const existing = found.get(key);
     if (!existing || existing.depth < clash.depth) found.set(key, clash);
   };
@@ -303,8 +312,8 @@ export const checkClashes: CommandDefinition<CheckClashesParams> = {
   description:
     'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, equipment, steel ' +
     'members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. ' +
-    'Steel-to-steel joints and pipe connections (pipe ends inside equipment or on another pipe) are not ' +
-    'reported. Returns element ids, kind and penetration depth.',
+    'Steel-to-steel joints and pipe connections (a pipe end inside equipment, or on another pipe) are not ' +
+    'reported. Returns element ids, kind and penetration depth (document units; summary in mm).',
   paramsSchema: {
     type: 'object',
     properties: {
@@ -331,7 +340,7 @@ export const checkClashes: CommandDefinition<CheckClashesParams> = {
     );
     const describe = (clash: Clash): string => {
       const [a, b] = [building.elements[clash.a], building.elements[clash.b]];
-      return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${clash.depth.toFixed(0)} ${doc.units})`;
+      return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${Math.round(toMetres(doc, clash.depth) * 1000)} mm)`;
     };
     const hard = clashes.filter((clash) => clash.kind === 'hard').length;
     return {

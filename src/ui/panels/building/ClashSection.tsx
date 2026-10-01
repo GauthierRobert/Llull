@@ -9,25 +9,33 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import type { Clash } from '@core/commands/building/industrial/clash';
+import { toMetres } from '@core/commands/building/model';
+import type { BuildingModel } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
 
 interface ClashReport {
   readonly summary: string;
   readonly clashes: ReadonlyArray<Clash>;
+  /** Building the report was computed for; a later edit makes it stale. */
+  readonly building: BuildingModel | undefined;
 }
 
 export function ClashSection(): React.ReactElement {
-  const document = useStore((s) => s.document);
+  const building = useStore((s) => s.document.building);
+  const units = useStore((s) => s.document.units);
   const select = useStore((s) => s.select);
-  const [report, setReport] = useState<ClashReport | null>(null);
+  const [computed, setReport] = useState<ClashReport | null>(null);
+  const report = computed !== null && computed.building === building ? computed : null;
 
   const runCheck = (): void => {
+    const document = useStore.getState().document;
     const result = execute(document, 'check_clashes', {});
     const data = result.data as { clashes: Clash[] } | undefined;
-    setReport({ summary: result.summary, clashes: data?.clashes ?? [] });
+    setReport({ summary: result.summary, clashes: data?.clashes ?? [], building });
   };
 
-  const elements = document.building?.elements ?? {};
+  const millimetres = (depth: number): number => Math.round(toMetres({ units }, depth) * 1000);
+  const elements = building?.elements ?? {};
   const markOf = (id: string): string => elements[id]?.mark ?? id;
   const entitiesOf = (clash: Clash): string[] => [
     ...(elements[clash.a]?.entityIds ?? []),
@@ -67,9 +75,7 @@ export function ClashSection(): React.ReactElement {
                     <span className="panel__row-main">
                       {markOf(clash.a)} × {markOf(clash.b)}
                     </span>
-                    <span className="panel__row-meta">
-                      {Math.round(clash.depth)} {document.units}
-                    </span>
+                    <span className="panel__row-meta">{millimetres(clash.depth)} mm</span>
                   </button>
                 </li>
               ))}

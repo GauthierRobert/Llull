@@ -29,6 +29,7 @@ import {
 import { regenerateBuilding } from './evaluate';
 import { wallLoop } from './structure';
 import { openingFitIssues } from './walls';
+import { nextMemberMark } from './industrial/members';
 
 interface AddRoomParams {
   name: string;
@@ -413,7 +414,9 @@ export const copyLevelElements: CommandDefinition<CopyLevelElementsParams> = {
         const mark =
           element.category === 'room'
             ? copiedRoomNumber(next, element.mark, levelIndex)
-            : nextMark(next, element.category);
+            : element.category === 'member'
+              ? nextMemberMark(next, element.role)
+              : nextMark(next, element.category);
         const sourceHeight = building.levels[sourceLevelId]?.height ?? 0;
         const targetHeight = next.levels[targetLevelId]?.height ?? sourceHeight;
         next = withElement(

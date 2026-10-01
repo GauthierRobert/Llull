@@ -23,6 +23,7 @@ import {
   nextMark,
   noChange,
   resolveLevel,
+  toMetres,
   toVec2,
   withElement,
 } from '../model';
@@ -150,7 +151,9 @@ export const listSteelProfiles: CommandDefinition<ListSteelProfilesParams> = {
   },
   run: (doc, { family }): CommandResult => {
     const profiles = STEEL_PROFILES.filter(
-      (profile) => family === undefined || profile.family === family.trim().toUpperCase(),
+      (profile) =>
+        family === undefined ||
+        (typeof family === 'string' && profile.family === family.trim().toUpperCase()),
     );
     return {
       document: doc,
@@ -248,7 +251,7 @@ export const addSteelMember: CommandDefinition<AddSteelMemberParams> = {
     const member = document.building?.elements[added.ids[0] as string];
     const section = findProfile(profile) as SteelProfile;
     const length = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
-    const metres = length * fromMm(doc, 1) ** -1 * 0.001;
+    const metres = toMetres(doc, length);
     return {
       document,
       summary: `Added ${role} ${member?.mark ?? ''} (${added.ids[0] ?? ''}) ${profileSummary(section)}, length ${length.toFixed(1)} ${doc.units}, ${(metres * section.massPerMetre).toFixed(1)} kg.`,
@@ -322,6 +325,8 @@ export const updateSteelMember: CommandDefinition<UpdateSteelMemberParams> = {
       start: from,
       end: to,
       role: role ?? member.role,
+      mark:
+        role !== undefined && role !== member.role ? nextMemberMark(building, role) : member.mark,
       roll: roll ?? member.roll,
       material: material?.trim() || member.material,
       ...(note !== undefined ? { note } : {}),
@@ -346,11 +351,23 @@ interface AddFootingParams {
   material?: string;
 }
 
-/** Plan positions of every column foot on a level (steel columns and concrete columns), de-duplicated. */
-export function columnFeet(building: BuildingModel, levelId: string, tolerance: number): Vec2[] {
+/** Upper bound on members one generator call may create (keeps agents from hanging the host). */
+export const MAX_GENERATED_MEMBERS = 5000;
+
+/**
+ * Plan positions of every column foot on a level (steel columns and concrete columns),
+ * de-duplicated; restricted to `onlyIds` when given.
+ */
+export function columnFeet(
+  building: BuildingModel,
+  levelId: string,
+  tolerance: number,
+  onlyIds?: ReadonlySet<string>,
+): Vec2[] {
   const feet: Vec2[] = [];
   for (const element of Object.values(building.elements)) {
     if (!('levelId' in element) || element.levelId !== levelId) continue;
+    if (onlyIds && !onlyIds.has(element.id)) continue;
     let foot: Vec2 | null = null;
     if (element.category === 'column') foot = element.location;
     if (element.category === 'member' && element.role === 'column') {
@@ -369,6 +386,24 @@ export function columnFeet(building: BuildingModel, levelId: string, tolerance: 
     }
   }
   return feet;
+}
+
+/** `locations` without the ones already carrying a footing on the level. */
+export function withoutFootings(
+  building: BuildingModel,
+  levelId: string,
+  locations: ReadonlyArray<Vec2>,
+  tolerance: number,
+): Vec2[] {
+  const existing = Object.values(building.elements).flatMap((element) =>
+    element.category === 'footing' && element.levelId === levelId ? [element.location] : [],
+  );
+  return locations.filter(
+    (location) =>
+      !existing.some(
+        (footing) => Math.hypot(footing[0] - location[0], footing[1] - location[1]) <= tolerance,
+      ),
+  );
 }
 
 /** Adds pad footings (no regeneration). */
@@ -448,17 +483,22 @@ export const addFooting: CommandDefinition<AddFootingParams> = {
     }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noChange(doc, `add_footing failed: ${resolution.reason}.`);
-    const locations = params.underColumns
+    const feet = params.underColumns
       ? columnFeet(resolution.building, resolution.level.id, fromMm(doc, 10))
+      : [];
+    const locations = params.underColumns
+      ? withoutFootings(resolution.building, resolution.level.id, feet, fromMm(doc, 10))
       : isVec2(params.location)
         ? [toVec2(params.location)]
         : [];
     if (locations.length === 0) {
       return noChange(
         doc,
-        params.underColumns
-          ? 'add_footing failed: the level has no columns.'
-          : 'add_footing failed: location must be [x, y] (or set underColumns).',
+        !params.underColumns
+          ? 'add_footing failed: location must be [x, y] (or set underColumns).'
+          : feet.length === 0
+            ? 'add_footing failed: the level has no columns.'
+            : 'add_footing failed: every column already has a footing.',
       );
     }
     const added = appendFootings(doc, resolution.building, resolution.level.id, locations, {

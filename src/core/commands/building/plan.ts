@@ -414,18 +414,16 @@ function industrialPrimitives(
     }
     case 'panel': {
       if (element.role !== 'wall') return [];
+      // A wall panel seen from above is a line: its two plan points farthest apart.
       const points = element.corners.map(flat);
-      const xs = points.map((point) => point[0]);
-      const ys = points.map((point) => point[1]);
-      return [
-        {
-          type: 'line',
-          layer: layerName('panel'),
-          style: 'thin',
-          a: [Math.min(...xs), Math.min(...ys)],
-          b: [Math.max(...xs), Math.max(...ys)],
-        },
-      ];
+      let [a, b, longest] = [points[0] as Vec2, points[0] as Vec2, -1];
+      for (const p of points) {
+        for (const q of points) {
+          const distance = Math.hypot(q[0] - p[0], q[1] - p[1]);
+          if (distance > longest) [a, b, longest] = [p, q, distance];
+        }
+      }
+      return [{ type: 'line', layer: layerName('panel'), style: 'thin', a, b }];
     }
     case 'equipment': {
       const [length, width] = element.size;

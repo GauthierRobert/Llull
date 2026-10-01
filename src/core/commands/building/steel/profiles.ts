@@ -301,8 +301,9 @@ export const STEEL_PROFILES: ReadonlyArray<SteelProfile> = [
 const BY_NAME = new Map(STEEL_PROFILES.map((profile) => [profile.name.toUpperCase(), profile]));
 
 /** Case- and space-insensitive lookup ("ipe 300", "HEA200", "shs100x5"). */
-export function findProfile(name: string): SteelProfile | undefined {
-  return BY_NAME.get(name.replace(/\s+/g, '').toUpperCase());
+/** @failure non-string / unknown name -> undefined */
+export function findProfile(name: unknown): SteelProfile | undefined {
+  return typeof name === 'string' ? BY_NAME.get(name.replace(/\s+/g, '').toUpperCase()) : undefined;
 }
 
 export interface ProfileOutline {

@@ -5,6 +5,7 @@
  */
 
 import { isRecord } from '../../../lib/isRecord';
+import { MEMBER_LAYER } from './entities';
 
 const CATEGORIES: ReadonlySet<string> = new Set([
   'grid',
@@ -145,8 +146,35 @@ function elementErrors(
   if (category === 'member' && typeof element['profile'] !== 'string') {
     errors.push(`building element ${key}: profile must be a string`);
   }
-  if (category === 'equipment' && !isPoint3(element['size'])) {
-    errors.push(`building element ${key}: size must be [length, width, height]`);
+  if (
+    category === 'equipment' &&
+    !(isPoint3(element['size']) && (element['size'] as number[]).every((n) => n > 0))
+  ) {
+    errors.push(`building element ${key}: size must be [length, width, height], all > 0`);
+  }
+  const role = element['role'];
+  if (
+    category === 'member' &&
+    !(typeof role === 'string' && Object.keys(MEMBER_LAYER).includes(role))
+  ) {
+    errors.push(
+      `building element ${key}: role must be one of ${Object.keys(MEMBER_LAYER).join(', ')}`,
+    );
+  }
+  if (category === 'panel' && role !== 'roof' && role !== 'wall') {
+    errors.push(`building element ${key}: role must be roof or wall`);
+  }
+  const textFields: Partial<Record<string, ReadonlyArray<string>>> = {
+    member: ['material'],
+    footing: ['material'],
+    panel: ['material'],
+    equipment: ['name'],
+    pipe: ['service', 'material'],
+  };
+  for (const field of textFields[category] ?? []) {
+    if (typeof element[field] !== 'string') {
+      errors.push(`building element ${key}: ${field} must be a string`);
+    }
   }
   for (const [field, minimum] of [
     ['corners', 3],

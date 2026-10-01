@@ -22,7 +22,14 @@ import {
 } from '../model';
 import { regenerateBuilding } from '../evaluate';
 import { findProfile, type SteelProfile } from '../steel/profiles';
-import { appendFootings, appendMembers, appendPanel, columnFeet } from './members';
+import {
+  appendFootings,
+  appendMembers,
+  appendPanel,
+  columnFeet,
+  MAX_GENERATED_MEMBERS,
+  withoutFootings,
+} from './members';
 import { panelFrame } from './evaluate';
 import { addGrid, gridLabels, nextFreeLabel } from '../grid';
 
@@ -177,6 +184,18 @@ export const addCraneRunway: CommandDefinition<AddCraneRunwayParams> = {
     const bracket = findProfile(params.bracketProfile ?? 'HEB200');
     if (!profile || !bracket)
       return noChange(doc, 'add_crane_runway failed: unknown steel profile.');
+    if (params.railHeight <= fromMm(doc, profile.h + bracket.h)) {
+      return noChange(
+        doc,
+        `add_crane_runway failed: railHeight must exceed the runway beam + bracket depth (${profile.h + bracket.h} mm).`,
+      );
+    }
+    if (length / spacing > MAX_GENERATED_MEMBERS) {
+      return noChange(
+        doc,
+        `add_crane_runway failed: supportSpacing too small (over ${MAX_GENERATED_MEMBERS} segments).`,
+      );
+    }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noChange(doc, `add_crane_runway failed: ${resolution.reason}.`);
     const supports: number[] = [];
@@ -223,16 +242,6 @@ interface PortalHallParams {
   floorSlab?: boolean;
   crane?: { capacity?: number; railHeight: number; profile?: string };
   levelId?: string;
-}
-
-interface HallGeometry {
-  readonly x0: number;
-  readonly x1: number;
-  readonly xm: number;
-  readonly ys: number[];
-  readonly eave: number;
-  readonly ridge: number;
-  readonly pitch: number;
 }
 
 /** Outward-facing panel corners: reversed when the Newell normal points against `outward`. */
@@ -367,16 +376,20 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
     const bays = Math.max(1, Math.round(hallLength / targetBay));
     const bay = hallLength / bays;
     const pitch = (pitchDegrees * Math.PI) / 180;
-    const geometry: HallGeometry = {
-      x0: origin[0],
-      x1: origin[0] + span,
-      xm: origin[0] + span / 2,
-      ys: Array.from({ length: bays + 1 }, (_, index) => origin[1] + index * bay),
-      eave,
-      ridge: eave + (span / 2) * Math.tan(pitch),
-      pitch,
-    };
-    const { x0, x1, xm, ys, ridge } = geometry;
+    const estimatedMembers =
+      bays *
+      (6 +
+        2 * (Math.ceil(span / 2 / Math.cos(pitch) / purlinSpacing) + 1) +
+        2 * Math.ceil(eave / railSpacing));
+    if (estimatedMembers > MAX_GENERATED_MEMBERS) {
+      return noChange(
+        doc,
+        `add_portal_frame_building failed: about ${estimatedMembers} members — over the ${MAX_GENERATED_MEMBERS} limit; increase baySpacing, purlinSpacing or railSpacing.`,
+      );
+    }
+    const [x0, x1, xm] = [origin[0], origin[0] + span, origin[0] + span / 2];
+    const ys = Array.from({ length: bays + 1 }, (_, index) => origin[1] + index * bay);
+    const ridge = eave + (span / 2) * Math.tan(pitch);
     const y0 = ys[0] as number;
     const yEnd = ys[ys.length - 1] as number;
     const h = (profile: SteelProfile): number => mm(profile.h);
@@ -398,21 +411,26 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         const x = x0 + (span * index) / (posts + 1);
         const roofZ =
           eave + Math.min(x - x0, x1 - x) * Math.tan(pitch) - h(p.rafter) / 2 / Math.cos(pitch);
-        specs.push({ role: 'column', profile: p.gable.name, start: [x, y, 0], end: [x, y, roofZ] });
+        // Wind posts span out of the gable plane: strong axis along Y.
+        specs.push({
+          role: 'column',
+          profile: p.gable.name,
+          start: [x, y, 0],
+          end: [x, y, roofZ],
+          roll: Math.PI / 2,
+        });
       }
     }
     // Purlins on both slopes, one per bay.
     const slopeLength = span / 2 / Math.cos(pitch);
     const purlinCount = Math.max(1, Math.ceil(slopeLength / purlinSpacing));
     const lift = h(p.rafter) / 2 + h(p.purlin) / 2;
-    const slopeLines: Array<{ x: number; z: number }> = [];
     for (const side of [-1, 1] as const) {
       const fromX = side === -1 ? x0 : x1;
       for (let index = 0; index <= purlinCount; index++) {
         const t = (index * slopeLength) / purlinCount;
         const x = fromX - side * t * Math.cos(pitch) + side * lift * Math.sin(pitch);
         const z = eave + t * Math.sin(pitch) + lift * Math.cos(pitch);
-        slopeLines.push({ x, z });
         for (let j = 0; j < bays; j++) {
           specs.push({
             role: 'purlin',
@@ -512,7 +530,12 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         doc,
         building,
         levelId,
-        columnFeet(building, levelId, mm(10)),
+        withoutFootings(
+          building,
+          levelId,
+          columnFeet(building, levelId, mm(10), new Set(membersAdded.ids)),
+          mm(10),
+        ),
         {},
       );
       building = footings.building;
@@ -591,7 +614,7 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         },
       ];
       for (const [y, outward] of [
-        [ya - mm(80), -1],
+        [ya, -1],
         [yb, 1],
       ] as const) {
         panels.push({
