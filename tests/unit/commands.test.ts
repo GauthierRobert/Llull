@@ -6576,8 +6576,40 @@ describe('fit_view', () => {
     doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
     const result = execute(doc, 'fit_view', { direction: 'front' });
 
-    expect(result.document.camera.azimuth).toBeCloseTo(0, 5);
+    expect(result.document.camera.azimuth).toBeCloseTo(Math.PI, 5);
     expect(result.document.camera.polar).toBeCloseTo(Math.PI / 2, 5);
+  });
+
+  it('places the eye on the Z-up CAD side for each preset (front -Y, right +X, iso +X-Y+Z)', () => {
+    const eyeOffset = (azimuth: number, polar: number): [number, number, number] => [
+      Math.sin(polar) * Math.sin(azimuth),
+      Math.sin(polar) * Math.cos(azimuth),
+      Math.cos(polar),
+    ];
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const eyeFor = (direction: string): [number, number, number] => {
+      const { azimuth, polar } = execute(doc, 'fit_view', { direction }).document.camera;
+      return eyeOffset(azimuth, polar);
+    };
+    expect(eyeFor('front')[1]).toBeLessThan(-0.99);
+    expect(eyeFor('back')[1]).toBeGreaterThan(0.99);
+    expect(eyeFor('right')[0]).toBeGreaterThan(0.99);
+    expect(eyeFor('left')[0]).toBeLessThan(-0.99);
+    const top = eyeFor('top');
+    expect(top[2]).toBeGreaterThan(0.99);
+    expect(top[1]).toBeLessThan(0);
+    const iso = eyeFor('iso');
+    expect(iso[0]).toBeGreaterThan(0);
+    expect(iso[1]).toBeLessThan(0);
+    expect(iso[2]).toBeGreaterThan(0);
+  });
+
+  it('default camera views the XY plane unmirrored (eye at +X, -Y, +Z)', () => {
+    const { azimuth, polar } = createEmptyDocument().camera;
+    expect(Math.sin(polar) * Math.sin(azimuth)).toBeGreaterThan(0);
+    expect(Math.sin(polar) * Math.cos(azimuth)).toBeLessThan(0);
+    expect(Math.cos(polar)).toBeGreaterThan(0);
   });
 
   it('applies correct azimuth/polar for top preset', () => {

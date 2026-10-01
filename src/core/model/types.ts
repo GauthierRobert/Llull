@@ -994,7 +994,7 @@ export function createEmptyDocument(): CadDocument {
     selection: [],
     camera: {
       target: [0, 0, 0],
-      azimuth: Math.PI / 4,
+      azimuth: (3 * Math.PI) / 4,
       polar: Math.PI / 3,
       distance: 12,
     },
