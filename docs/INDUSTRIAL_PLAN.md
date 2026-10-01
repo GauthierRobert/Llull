@@ -150,3 +150,15 @@ Each step ships with unit tests and is covered by the Playwright suite.
 - [ ] **I37 — Multi-span roof wind.** EN 1991-1-4 §7.2.7: windward span with the duopitch
       coefficients, downwind spans reduced (factor 0.6 on suction for the downwind roofs per
       Fig. 7.10), internal valleys; frame and purlin checks use them.
+
+## Phase 10 — fixed bases, monopitch roofs
+
+- [ ] **I38 — Fixed column bases.** `add_portal_frame_building` / base plates: `columnBase:
+      'pinned' | 'fixed'`. Fixed bases restrain rotation in the frame analysis (sway stiffness for
+      crane halls), carry base moments into `baseReactions`, size the base plate and anchor bolts
+      for M + N (EN 1993-1-8 §6.2.8, T-stub tension zone simplified), and the footing checks /
+      design take the moment (eccentric bearing, overturning).
+- [ ] **I39 — Monopitch roofs.** `add_portal_frame_building` `roofType: 'duopitch' | 'monopitch'`
+      (single slope from the low to the high eaves); wind with EN 1991-1-4 Tab. 7.3a monopitch
+      coefficients (zones F / G / H for wind on the high and the low eaves) in the frame and purlin
+      checks; elevations, IFC and quantities work unchanged.
