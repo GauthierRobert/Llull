@@ -298,8 +298,28 @@ export interface ConnectionWelds {
 }
 
 /**
+ * Throat / thickness ratio of a full-strength double fillet weld (EN 1993-1-8 §4.5.3.3,
+ * directional method): a/t = βw · fy · γM2 / (√2 · fu · γM0). S235 0.46, S275 0.48, S355 0.58,
+ * S460 0.75.
+ */
+export function fullStrengthFactor(fy: number): number {
+  const grades: ReadonlyArray<readonly [number, number, number]> = [
+    // fy, fu, βw
+    [235, 360, 0.8],
+    [275, 430, 0.85],
+    [355, 490, 0.9],
+    [420, 520, 1.0],
+    [460, 540, 1.0],
+  ];
+  const [, fu, beta] =
+    grades.find(([grade]) => grade >= fy) ??
+    (grades[grades.length - 1] as readonly [number, number, number]);
+  return (beta * fy * 1.25) / (Math.SQRT2 * fu);
+}
+
+/**
  * Full-strength double fillet welds of the rafter (and haunch) to the end plate(s):
- * throat a = 0.55 t for S355 (EN 1993-1-8 §4.5, simplified), rounded up to whole mm, ≥ 3 mm.
+ * throat a = fullStrengthFactor(fy) · t, rounded up to whole mm, ≥ 3 mm.
  */
 export function connectionWelds(
   doc: Pick<CadDocument, 'units'>,
@@ -309,7 +329,10 @@ export function connectionWelds(
   const rafter = building.elements[connection.rafterId];
   const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
   if (!profile) return null;
-  const throat = (thickness: number): number => Math.max(3, Math.ceil(0.55 * thickness));
+  const fy =
+    Number(/S\s*(\d{3})/i.exec(rafter?.category === 'member' ? rafter.material : '')?.[1]) || 355;
+  const factor = fullStrengthFactor(fy);
+  const throat = (thickness: number): number => Math.max(3, Math.ceil(factor * thickness));
   const [flangeThroat, webThroat] = [throat(profile.tf), throat(profile.tw)];
   const flanges = 2 * (2 * profile.b - profile.tw);
   const web = 2 * (profile.h - 2 * profile.tf);

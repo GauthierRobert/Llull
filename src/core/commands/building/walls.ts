@@ -22,7 +22,7 @@ import {
   elementAffected,
 } from './model';
 import { openingsOf, regenerateBuilding, wallExtent, wallFrame, type WallExtent } from './evaluate';
-import { curvedWallLength } from './curvedWallGeometry';
+import { curvedWallExtent } from './curvedWallGeometry';
 
 /**
  * Why `opening` does not fit in `wall` (alongside `others`), or null when it fits.
@@ -352,7 +352,7 @@ export function openingFitIssues(building: BuildingModel, levelIds: ReadonlySet<
     const extent =
       element.category === 'wall'
         ? wallExtent(building, element)
-        : { start: 0, end: curvedWallLength(element) };
+        : curvedWallExtent(building, element);
     for (const opening of openings) {
       const error = openingFitError(element, opening, openings, extent);
       if (error) issues.push(error);

@@ -23,7 +23,7 @@ import { trayLength } from './industrial/trays';
 import { plateMass } from './industrial/plates';
 import { connectionMass, connectionWelds, type ConnectionWelds } from './industrial/connections';
 import { boltSize } from './industrial/evaluate';
-import { curvedWallLength } from './curvedWallGeometry';
+import { curvedWallExtent } from './curvedWallGeometry';
 
 export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
@@ -181,7 +181,8 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
     }
   }
   for (const wall of elementsOf(building, 'curvedWall')) {
-    const length = curvedWallLength(wall);
+    const extent = curvedWallExtent(building, wall);
+    const length = extent.end - extent.start;
     const voids = curvedVoids(building, wall.id);
     takeoff.add(
       'wall',
@@ -501,7 +502,8 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
             ];
           }),
           ...elementsOf(building, 'curvedWall').map((wall) => {
-            const length = curvedWallLength(wall);
+            const extent = curvedWallExtent(building, wall);
+            const length = extent.end - extent.start;
             return [
               wall.mark,
               levelName(building, wall.levelId),
@@ -816,6 +818,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           'Haunch',
           'Mass (kg)',
           'Level',
+          'Welds',
         ],
         rows: elementsOf(building, 'connection').map((connection) => [
           connection.mark,

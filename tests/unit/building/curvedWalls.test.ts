@@ -293,3 +293,37 @@ describe('straight walls joining curved walls', () => {
     expect(extent?.end).toBeCloseTo(4000 - 150, 6);
   });
 });
+
+describe('curved / straight corner review regressions', () => {
+  it('closes the corner the same way in metre documents', async () => {
+    const { wallExtent } = await import('@core/commands/building/evaluate');
+    let doc = execute(createEmptyDocument(), 'set_units', { units: 'm' }).document;
+    doc = execute(doc, 'add_curved_wall', {
+      start: [-5, 0],
+      through: [0, 5],
+      end: [5, 0],
+      thickness: 0.3,
+    }).document;
+    doc = execute(doc, 'add_wall', { start: [5, 0], end: [9, 0], thickness: 0.2 }).document;
+    const wall = doc.building!.elements['wall-1']!;
+    const extent = wall.category === 'wall' ? wallExtent(doc.building!, wall) : null;
+    expect(extent?.start).toBeCloseTo(-0.15, 9);
+  });
+
+  it('trims the curved wall end so the corner does not overlap', async () => {
+    const { curvedWallExtent, curvedWallLength } =
+      await import('@core/commands/building/curvedWallGeometry');
+    let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
+    doc = execute(doc, 'add_wall', { start: [-5000, 0], end: [-9000, 0], thickness: 200 }).document;
+    const extent = curvedWallExtent(doc.building!, wallOf(doc));
+    expect(extent.start).toBeCloseTo(100, 6);
+    expect(extent.end).toBeCloseTo(curvedWallLength(wallOf(doc)), 6);
+    const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
+    // Curved 300 × 3000 over (L − 100) + straight 200 × 3000 over (4000 + 150).
+    const expected = (Math.PI * 5000 - 100) * 0.3 * 3 * 1e-3 + 4150 * 0.2 * 3 * 1e-3;
+    expect(lines.find((line) => line.key === 'wall.concrete.m3')?.quantity).toBeCloseTo(
+      expected,
+      2,
+    );
+  });
+});

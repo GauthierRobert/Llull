@@ -33,7 +33,7 @@ Building panel, _Check clashes_ lists them; click a row to select both elements.
 ## Structural check and design
 
 `check_portal_frames` (read-only) solves every portal frame of a level as a 2D frame (direct
-stiffness method, pinned bases, exact section properties from the profile outline) under ULS
+stiffness method, pinned bases, section properties from the profile outline (no root radii, ≈ 4–5 % conservative)) under ULS
 1.35 G + 1.5 S — roof dead load + member self-weight + snow on the tributary width — and checks
 member cross-sections (N/Npl + M/Mpl, EN 1993-1-1 §6.2) and moment-connection bolt groups (grade
 8.8 bolt tension / shear, EN 1993-1-8 Tab. 3.4, elastic distribution about the compression flange).

@@ -66,7 +66,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 ## Phase 4 — structural verification
 
 - [x] **I18 — Frame analysis & design checks.** `check_portal_frames`: every portal frame is solved
-      as a 2D frame (direct stiffness method, pinned bases, exact section properties) under the
+      as a 2D frame (direct stiffness method, pinned bases, section properties from the profile outline (no root radii)) under the
       ULS gravity combination 1.35 G + 1.5 S (self-weight + roof dead load + snow on the plan
       area). Members are checked for cross-section resistance (EN 1993-1-1 §6.2: N/Npl,Rd +
       M/Mpl,Rd), moment connections for bolt tension and shear (EN 1993-1-8 Tab. 3.4, elastic

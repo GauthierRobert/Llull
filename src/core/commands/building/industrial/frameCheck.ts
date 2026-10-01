@@ -9,7 +9,7 @@ import type {
   MomentConnectionElement,
   SteelMemberElement,
 } from '../../../model/building';
-import type { CadDocument } from '../../../model/types';
+import type { CadDocument, Vec3 } from '../../../model/types';
 import type { CommandDefinition, CommandResult } from '../../types';
 import {
   solveFrame,
@@ -27,12 +27,17 @@ import {
 } from '../model';
 import { regenerateBuilding } from '../evaluate';
 import { refitPlates } from './plates';
-import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
+import {
+  findProfile,
+  sectionProperties,
+  STEEL_PROFILES,
+  type SteelProfile,
+} from '../steel/profiles';
 import { toCsv } from '../quantities';
 import { connectionSolids } from './evaluate';
+import { sweepFrame } from '../mesh';
 
 const E_STEEL = 210000; // N/mm²
-const GAMMA_M0 = 1.0;
 const GAMMA_M2 = 1.25;
 const BOLT_FUB = 800; // grade 8.8, N/mm²
 /** Tensile stress areas of metric bolts, mm² (ISO 898-1). */
@@ -67,6 +72,34 @@ export function boltResistance(diameterMm: number): { tension: number; shear: nu
   };
 }
 
+/**
+ * Cross-section resistances (EN 1993-1-1 §6.2, γM0 = 1): Npl, Mpl (class 1–2) or Mel (class 3),
+ * Vpl with Av ≈ h·tw; classification of I-sections in bending (Tab. 5.2), other shapes class 1.
+ * Section properties from the outline (no root radii, ≈ 4–5 % conservative).
+ */
+export function sectionResistance(
+  profile: SteelProfile,
+  fy: number,
+): { axial: number; moment: number; shear: number; sectionClass: 1 | 2 | 3 | 4 } {
+  const section = sectionProperties(profile);
+  const epsilon = Math.sqrt(235 / fy);
+  let sectionClass: 1 | 2 | 3 | 4 = 1;
+  if (profile.shape === 'I') {
+    const flange = (profile.b - profile.tw) / 2 / profile.tf / epsilon;
+    const web = (profile.h - 2 * profile.tf) / profile.tw / epsilon;
+    const flangeClass = flange <= 9 ? 1 : flange <= 10 ? 2 : flange <= 14 ? 3 : 4;
+    const webClass = web <= 72 ? 1 : web <= 83 ? 2 : web <= 124 ? 3 : 4;
+    sectionClass = Math.max(flangeClass, webClass) as 1 | 2 | 3 | 4;
+  }
+  const shearArea = profile.shape === 'I' ? profile.h * profile.tw : section.area / 2;
+  return {
+    axial: section.area * fy,
+    moment: (sectionClass <= 2 ? section.plasticModulus : section.elasticModulus) * fy,
+    shear: (shearArea * fy) / Math.sqrt(3),
+    sectionClass,
+  };
+}
+
 export interface CheckRow {
   readonly frame: string;
   readonly elementId: string;
@@ -89,15 +122,21 @@ interface FrameModel {
   readonly nodes: FrameNode[];
   readonly members: FrameMember[];
   readonly memberIds: string[];
+  /** True when the analysis member runs end → start of the element (kept left → right). */
+  readonly reversed: boolean[];
 }
 
-/** Frames of a level: steel rafters in vertical planes y = const with the columns under their ends. */
+/**
+ * Frames of a level: steel rafters in vertical planes y = const with the columns under their ends.
+ * Planes are grouped per hall (overlapping rafter x-ranges) for tributary widths; a hall with a
+ * single frame plane has no tributary width and is reported in `skipped`.
+ */
 function framesOf(
   doc: Pick<CadDocument, 'units'>,
   building: BuildingModel,
   levelId: string,
   loads: { readonly line: (tributary: number) => number },
-): FrameModel[] {
+): { frames: FrameModel[]; skipped: string[] } {
   const mm = (value: number): number => value / fromMm(doc, 1);
   const tolerance = 10;
   const members = Object.values(building.elements).filter(
@@ -108,9 +147,55 @@ function framesOf(
     (member) =>
       member.role === 'rafter' && Math.abs(mm(member.start[1] - member.end[1])) < tolerance,
   );
-  const planes = [...new Set(rafters.map((rafter) => Math.round(mm(rafter.start[1]))))].sort(
-    (a, b) => a - b,
-  );
+  const planeOf = (member: SteelMemberElement): number => Math.round(mm(member.start[1]));
+  const xRange = (member: SteelMemberElement): [number, number] => [
+    Math.min(mm(member.start[0]), mm(member.end[0])),
+    Math.max(mm(member.start[0]), mm(member.end[0])),
+  ];
+  // Frame candidates: rafters of one plane chained by touching / overlapping x-ranges.
+  interface Candidate {
+    readonly y: number;
+    range: [number, number];
+    readonly rafters: SteelMemberElement[];
+  }
+  const candidates: Candidate[] = [];
+  for (const y of [...new Set(rafters.map(planeOf))].sort((a, b) => a - b)) {
+    const inPlane = rafters
+      .filter((rafter) => planeOf(rafter) === y)
+      .sort((a, b) => xRange(a)[0] - xRange(b)[0]);
+    for (const rafter of inPlane) {
+      const [low, high] = xRange(rafter);
+      const last = candidates[candidates.length - 1];
+      if (last && last.y === y && low <= last.range[1] + tolerance) {
+        last.range = [last.range[0], Math.max(last.range[1], high)];
+        last.rafters.push(rafter);
+      } else {
+        candidates.push({ y, range: [low, high], rafters: [rafter] });
+      }
+    }
+  }
+  // Halls: candidates (across planes) whose x-ranges overlap; tributary widths per hall.
+  const hallOf = new Map<Candidate, Candidate[]>();
+  for (const candidate of candidates) {
+    const hall = [...new Set(hallOf.values())].find((members) =>
+      members.some(
+        (other) => candidate.range[0] < other.range[1] && candidate.range[1] > other.range[0],
+      ),
+    );
+    if (hall) {
+      hall.push(candidate);
+      hallOf.set(candidate, hall);
+    } else {
+      hallOf.set(candidate, [candidate]);
+    }
+  }
+  const tributaryOf = (candidate: Candidate): number => {
+    const ys = [...new Set((hallOf.get(candidate) ?? [candidate]).map((other) => other.y))].sort(
+      (a, b) => a - b,
+    );
+    const index = ys.indexOf(candidate.y);
+    return ((ys[index + 1] ?? candidate.y) - (ys[index - 1] ?? candidate.y)) / 2;
+  };
   const gridLabel = (y: number): string => {
     const grid = Object.values(building.elements).find(
       (element) =>
@@ -120,10 +205,15 @@ function framesOf(
     );
     return grid ? `frame ${grid.mark}` : `frame y=${y}`;
   };
-  return planes.flatMap((y, index): FrameModel[] => {
-    const previous = planes[index - 1];
-    const next = planes[index + 1];
-    const tributary = ((next ?? y) - (previous ?? y)) / 2 || 0;
+  const skipped: string[] = [];
+  const frames = candidates.flatMap((candidate): FrameModel[] => {
+    const { y } = candidate;
+    const [low, high] = candidate.range;
+    const tributary = tributaryOf(candidate);
+    if (!(tributary > 0)) {
+      skipped.push(`${gridLabel(y)} (single frame: no tributary width)`);
+      return [];
+    }
     const nodes: FrameNode[] = [];
     const nodeAt = (x: number, z: number, restraint: FrameNode['restraint']): number => {
       const found = nodes.findIndex(
@@ -135,17 +225,16 @@ function framesOf(
     };
     const frameMembers: FrameMember[] = [];
     const memberIds: string[] = [];
+    const reversed: boolean[] = [];
     const free: FrameNode['restraint'] = [false, false, false];
-    for (const rafter of rafters.filter((candidate) => Math.round(mm(candidate.start[1])) === y)) {
+    for (const rafter of candidate.rafters) {
       const profile = findProfile(rafter.profile);
       if (!profile) continue;
       const section = sectionProperties(profile);
-      const [x0, z0, x1, z1] = [
-        mm(rafter.start[0]),
-        mm(rafter.start[2]),
-        mm(rafter.end[0]),
-        mm(rafter.end[2]),
-      ];
+      // Analyse left → right so the internal moment sign is global (sagging +) for every rafter.
+      const flip = rafter.start[0] > rafter.end[0];
+      const [first, second] = flip ? [rafter.end, rafter.start] : [rafter.start, rafter.end];
+      const [x0, z0, x1, z1] = [mm(first[0]), mm(first[2]), mm(second[0]), mm(second[2])];
       const length = Math.hypot(x1 - x0, z1 - z0);
       // Roof load per horizontal length, spread along the rafter; plus self-weight.
       const roof = (loads.line(tributary) * Math.abs(x1 - x0)) / length;
@@ -159,12 +248,15 @@ function framesOf(
         load: { qx: 0, qy: -(roof + selfWeight) },
       });
       memberIds.push(rafter.id);
+      reversed.push(flip);
     }
     for (const column of members.filter(
-      (candidate) =>
-        candidate.role === 'column' &&
-        Math.abs(mm(candidate.start[1]) - y) < tolerance &&
-        Math.abs(mm(candidate.end[1]) - y) < tolerance,
+      (member) =>
+        member.role === 'column' &&
+        Math.abs(mm(member.start[1]) - y) < tolerance &&
+        Math.abs(mm(member.end[1]) - y) < tolerance &&
+        mm(member.start[0]) > low - tolerance &&
+        mm(member.start[0]) < high + tolerance,
     )) {
       const [bottom, top] =
         column.start[2] <= column.end[2] ? [column.start, column.end] : [column.end, column.start];
@@ -173,7 +265,7 @@ function framesOf(
           Math.abs(node.x - mm(top[0])) < tolerance && Math.abs(node.y - mm(top[2])) < tolerance,
       );
       const profile = findProfile(column.profile);
-      if (topNode < 0 || !profile) continue; // gable posts under the rafter span are ignored
+      if (topNode < 0 || !profile) continue; // gable posts under the rafter span are not analysed
       const section = sectionProperties(profile);
       frameMembers.push({
         a: nodeAt(mm(bottom[0]), mm(bottom[2]), [true, true, false]),
@@ -184,11 +276,24 @@ function framesOf(
         load: { qx: 0, qy: -((profile.massPerMetre * 9.81) / 1000) * 1.35 },
       });
       memberIds.push(column.id);
+      reversed.push(column.start[2] > column.end[2]);
     }
     return frameMembers.length > 0
-      ? [{ label: gridLabel(y), nodes, members: frameMembers, memberIds }]
+      ? [
+          {
+            label:
+              candidates.filter((other) => other.y === y).length > 1
+                ? `${gridLabel(y)} @x=${low}`
+                : gridLabel(y),
+            nodes,
+            members: frameMembers,
+            memberIds,
+            reversed,
+          },
+        ]
       : [];
   });
+  return { frames, skipped };
 }
 
 /** Elastic bolt-group check of an end-plate connection under (M, V); N, mm. */
@@ -243,27 +348,29 @@ export function checkFrames(
   const building = getBuilding(doc);
   // ULS 1.35 G + 1.5 S, kN/m² → N/mm² (× tributary width in mm → N/mm).
   const area = (1.35 * loads.deadLoad + 1.5 * loads.snowLoad) * 1e-3;
-  const frames = framesOf(doc, building, levelId, { line: (tributary) => area * tributary });
+  const { frames, skipped } = framesOf(doc, building, levelId, {
+    line: (tributary) => area * tributary,
+  });
   const rows: CheckRow[] = [];
-  const skipped: string[] = [];
+  let unstable = 0;
   for (const frame of frames) {
     const result = solveFrame(frame.nodes, frame.members);
     if (!result) {
-      skipped.push(frame.label);
+      skipped.push(`${frame.label} (unstable)`);
+      unstable += 1;
       continue;
     }
-    const byId = new Map<string, MemberResult>();
+    const byId = new Map<string, { forces: MemberResult; reversed: boolean }>();
     frame.memberIds.forEach((id, index) => {
       const member = building.elements[id];
       const forces = result.members[index];
       if (member?.category !== 'member' || !forces) return;
-      byId.set(id, forces);
+      byId.set(id, { forces, reversed: frame.reversed[index] === true });
       const profile = findProfile(member.profile);
       if (!profile) return;
-      const section = sectionProperties(profile);
-      const fy = yieldStrength(member.material);
-      const npl = (section.area * fy) / GAMMA_M0;
-      const mpl = (section.plasticModulus * fy) / GAMMA_M0;
+      const resistance = sectionResistance(profile, yieldStrength(member.material));
+      const shear = Math.max(...forces.shear.map(Math.abs));
+      const bending = forces.maxAxial / resistance.axial + forces.maxMoment / resistance.moment;
       rows.push({
         frame: frame.label,
         elementId: id,
@@ -271,16 +378,18 @@ export function checkFrames(
         kind: member.role === 'column' ? 'column' : 'rafter',
         axial: forces.maxAxial / 1000,
         moment: forces.maxMoment / 1e6,
-        shear: Math.max(...forces.shear.map(Math.abs)) / 1000,
-        utilisation: forces.maxAxial / npl + forces.maxMoment / mpl,
-        check: `N/Npl + M/Mpl (${member.profile}, ${member.material})`,
+        shear: shear / 1000,
+        utilisation: Math.max(bending, shear / resistance.shear),
+        check: `N/Npl + M/M${resistance.sectionClass <= 2 ? 'pl' : 'el'}, V/Vpl (${member.profile} class ${resistance.sectionClass}, ${member.material})`,
       });
     });
     for (const connection of Object.values(building.elements)) {
       if (connection.category !== 'connection') continue;
-      const forces = byId.get(connection.rafterId);
-      if (!forces) continue;
-      const end = connection.end === 'start' ? 0 : 1;
+      const analysed = byId.get(connection.rafterId);
+      if (!analysed) continue;
+      const { forces } = analysed;
+      // Map the rafter end to the analysis member end (members are analysed left → right).
+      const end = (connection.end === 'start') !== analysed.reversed ? 0 : 1;
       const moment = forces.moment[end];
       const shear = forces.shear[end];
       const verdict = connectionCheck(doc, building, connection, moment, shear);
@@ -299,7 +408,7 @@ export function checkFrames(
       });
     }
   }
-  return { rows, frames: frames.length - skipped.length, skipped };
+  return { rows, frames: frames.length - unstable, skipped };
 }
 
 interface CheckPortalFramesParams {
@@ -320,7 +429,7 @@ export const checkPortalFrames: CommandDefinition<CheckPortalFramesParams> = {
   description:
     'Structural check of the steel portal frames of a level: each frame (rafters in a vertical ' +
     'plane + the columns under their ends, pinned bases) is solved as a 2D frame (direct stiffness ' +
-    'method, exact section properties) under ULS 1.35 G + 1.5 S, with G = deadLoad (kN/m², roof ' +
+    'method, section properties from the profile outline (no root radii)) under ULS 1.35 G + 1.5 S, with G = deadLoad (kN/m², roof ' +
     'build-up, purlins, services) + member self-weight and S = snowLoad (kN/m²) on the tributary ' +
     'width. Checks: member cross-section resistance N/Npl + M/Mpl (EN 1993-1-1 §6.2) and moment ' +
     'connection bolt tension / shear (EN 1993-1-8 Tab. 3.4, grade 8.8, elastic bolt group). ' +
@@ -348,7 +457,7 @@ export const checkPortalFrames: CommandDefinition<CheckPortalFramesParams> = {
     if (frames === 0) {
       return noChange(
         doc,
-        `check_portal_frames failed: no analysable portal frame on the level${skipped.length > 0 ? ` (unstable: ${skipped.join(', ')})` : ''}.`,
+        `check_portal_frames failed: no analysable portal frame on the level${skipped.length > 0 ? ` (${skipped.join(', ')})` : ''}.`,
       );
     }
     const failures = rows.filter((row) => row.utilisation > 1);
@@ -389,12 +498,12 @@ export const checkPortalFrames: CommandDefinition<CheckPortalFramesParams> = {
         `Checked ${frames} frame(s), ${rows.length} element(s) at ULS 1.35 G + 1.5 S (G = ${deadLoad} kN/m² + self-weight, S = ${snowLoad} kN/m²): ` +
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'}, ${worst?.frame ?? '—'}); ` +
         (failures.length === 0
-          ? 'all OK.'
+          ? 'all OK (cross-section and bolt checks only).'
           : `${failures.length} failure(s): ${failures
               .slice(0, 8)
               .map((row) => `${row.mark} ${round(row.utilisation)}`)
               .join(', ')}${failures.length > 8 ? ', …' : ''}.`) +
-        `${skipped.length > 0 ? ` Unstable (not checked): ${skipped.join(', ')}.` : ''}`,
+        `${skipped.length > 0 ? ` Not checked: ${skipped.join(', ')}.` : ''}`,
       affected: [],
       data: {
         rows,
@@ -485,6 +594,7 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
     }
     const loads = { deadLoad, snowLoad };
     let current = doc;
+    const analysed = new Set<string>();
     const changes: string[] = [];
     const changed = new Set<string>();
     let limited = false;
@@ -497,6 +607,7 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
         );
       }
       const building = getBuilding(current);
+      for (const row of rows) if (row.kind !== 'connection') analysed.add(row.elementId);
       const groups = new Map<string, { role: string; profile: string }>();
       for (const row of rows) {
         if (row.kind === 'connection' || row.utilisation <= targetUtilisation) continue;
@@ -518,10 +629,11 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
         }
         progressed = true;
         changes.push(`${role}s ${profile} → ${larger}`);
+        const resizedIds: string[] = [];
         for (const element of Object.values(next.elements)) {
           if (
             element.category !== 'member' ||
-            element.levelId !== levelId ||
+            !analysed.has(element.id) ||
             element.role !== role ||
             element.profile !== profile
           )
@@ -529,10 +641,15 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
           const resized: SteelMemberElement = { ...element, profile: larger };
           next = refitPlates(current, withElement(next, resized), resized, profile).building;
           changed.add(element.id);
+          resizedIds.push(element.id);
         }
+        const reseated = reseatDependents(current, next, resizedIds, profile, larger, analysed);
+        next = reseated.building;
+        for (const id of reseated.moved) changed.add(id);
       }
       current = { ...current, building: next };
       if (!progressed) break;
+      if (iteration === 14) limited = true;
     }
     // Bolt groups: smallest bolt diameter / row count that passes for every connection of a kind.
     const { rows } = checkFrames(current, levelId, loads);
@@ -586,6 +703,12 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
       changes.push(`${kind} connections: ${chosen.rows * 2} × M${chosen.diameter}`);
       for (const row of targets) {
         const original = building.elements[row.elementId] as MomentConnectionElement;
+        if (
+          original.boltRows === chosen.rows &&
+          original.boltDiameter === fromMm(current, chosen.diameter)
+        ) {
+          continue;
+        }
         building = withElement(building, {
           ...original,
           boltRows: chosen.rows,
@@ -594,8 +717,29 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
         changed.add(original.id);
       }
     }
+    if (changed.size === 0) {
+      const final = checkFrames(doc, levelId, loads);
+      const worst = Math.max(0, ...final.rows.map((row) => row.utilisation));
+      return {
+        document: doc,
+        summary: `Designed ${final.frames} frame(s): no change needed (max utilisation ${worst.toFixed(2)}${limited ? '; largest available size reached for some elements' : ''}).`,
+        affected: [],
+        data: {
+          changes: [],
+          maxUtilisation: worst,
+          failures: final.rows.filter((row) => row.utilisation > 1).length,
+        },
+      };
+    }
     const document = regenerateBuilding(doc, building);
     const final = checkFrames(document, levelId, loads);
+    const unanalysedPosts = Object.values(building.elements).some(
+      (element) =>
+        element.category === 'member' &&
+        element.levelId === levelId &&
+        element.role === 'column' &&
+        !analysed.has(element.id),
+    );
     const worst = Math.max(0, ...final.rows.map((row) => row.utilisation));
     const failures = final.rows.filter((row) => row.utilisation > 1).length;
     return {
@@ -604,14 +748,97 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
         `Designed ${final.frames} frame(s) for ULS 1.35 G + 1.5 S (G = ${deadLoad}, S = ${snowLoad} kN/m²): ` +
         `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ` +
         `Max utilisation now ${worst.toFixed(2)}${failures > 0 ? `, ${failures} element(s) still failing` : ''}` +
-        `${limited ? ' (largest available size reached for some elements)' : ''}.`,
+        `${limited ? ' (largest available size reached for some elements)' : ''}. ` +
+        `Cross-section and bolt checks only (no buckling, wind, crane loads or deflections)` +
+        `${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
       affected: elementAffected(document, [...changed]),
       data: { changes, maxUtilisation: worst, failures },
     };
   },
 };
 
-/** Bolt rows at least 2.2 d apart (EN 1993-1-8 Tab. 3.3, p1 ≥ 2.2 d0). */
+/**
+ * Members placed from a resized member's depth follow it: purlins on a rafter move along the
+ * rafter normal, gable-post tops drop under a deeper rafter, side rails move out with a deeper
+ * column (by half the depth change).
+ */
+function reseatDependents(
+  doc: Pick<CadDocument, 'units'>,
+  building: BuildingModel,
+  resizedIds: ReadonlyArray<string>,
+  before: string,
+  after: string,
+  analysed: ReadonlySet<string>,
+): { building: BuildingModel; moved: string[] } {
+  const [old, larger] = [findProfile(before), findProfile(after)];
+  if (!old || !larger || resizedIds.length === 0) return { building, moved: [] };
+  const half = fromMm(doc, larger.h - old.h) / 2;
+  const tolerance = fromMm(doc, 10);
+  const resized = resizedIds
+    .map((id) => building.elements[id])
+    .filter((element): element is SteelMemberElement => element?.category === 'member');
+  const onPlane = (member: SteelMemberElement, y: number): boolean =>
+    Math.abs(member.start[1] - y) < tolerance && Math.abs(member.end[1] - y) < tolerance;
+  const shift = (point: Vec3, by: Vec3): Vec3 => [
+    point[0] + by[0],
+    point[1] + by[1],
+    point[2] + by[2],
+  ];
+  let next = building;
+  const moved: string[] = [];
+  for (const element of Object.values(building.elements)) {
+    if (element.category !== 'member' || analysed.has(element.id)) continue;
+    let offset: Vec3 | null = null;
+    let topOnly = false;
+    if (element.role === 'purlin' || element.role === 'column') {
+      // Purlins span between frame planes; gable posts stand in one.
+      const rafter = resized.find((candidate) => {
+        if (candidate.role !== 'rafter') return false;
+        const y = candidate.start[1];
+        const inPlane =
+          element.role === 'purlin'
+            ? Math.abs(element.start[1] - y) < tolerance || Math.abs(element.end[1] - y) < tolerance
+            : onPlane(element, y);
+        const [low, high] = [
+          Math.min(candidate.start[0], candidate.end[0]),
+          Math.max(candidate.start[0], candidate.end[0]),
+        ];
+        // Gable posts stand strictly inside the rafter span (frame columns sit at its ends).
+        const margin = element.role === 'purlin' ? -fromMm(doc, larger.h) : tolerance;
+        return inPlane && element.start[0] > low + margin && element.start[0] < high - margin;
+      });
+      const frame = rafter ? sweepFrame(rafter.start, rafter.end, rafter.roll) : null;
+      if (frame && element.role === 'purlin')
+        offset = [frame.v[0] * half, frame.v[1] * half, frame.v[2] * half];
+      if (frame && element.role === 'column' && Math.abs(frame.v[2]) > 1e-6) {
+        offset = [0, 0, -half / frame.v[2]];
+        topOnly = true;
+      }
+    }
+    if (element.role === 'rail') {
+      const column = resized.find(
+        (candidate) =>
+          candidate.role === 'column' &&
+          (Math.abs(candidate.start[1] - element.start[1]) < tolerance ||
+            Math.abs(candidate.start[1] - element.end[1]) < tolerance) &&
+          Math.abs(candidate.start[0] - element.start[0]) < fromMm(doc, larger.h + 500),
+      );
+      if (column) offset = [Math.sign(element.start[0] - column.start[0]) * half, 0, 0];
+    }
+    if (!offset) continue;
+    const by = offset;
+    const updated: SteelMemberElement = topOnly
+      ? element.start[2] >= element.end[2]
+        ? { ...element, start: shift(element.start, by) }
+        : { ...element, end: shift(element.end, by) }
+      : { ...element, start: shift(element.start, by), end: shift(element.end, by) };
+    next = withElement(next, updated);
+    moved.push(element.id);
+  }
+  return { building: next, moved };
+}
+
+/** Bolt rows at least 2.2 d0 apart (EN 1993-1-8 Tab. 3.3; d0 = d + 2 mm up to M24, + 3 mm above). */
 function rowSpacingOk(
   doc: Pick<CadDocument, 'units'>,
   building: BuildingModel,
@@ -625,9 +852,12 @@ function rowSpacingOk(
     if (element?.category === 'member') members[id] = element;
   }
   const solids = level ? connectionSolids(doc, connection, members, level) : null;
+  if (!solids) return false;
+  const diameter = connection.boltDiameter / fromMm(doc, 1);
+  const hole = fromMm(doc, diameter + (diameter <= 24 ? 2 : 3));
   const ys = [
     ...new Set(
-      (solids ?? [])
+      solids
         .filter((solid) => solid.part.startsWith('bolt') && solid.part.endsWith('-l'))
         .map((solid) => {
           const values = solid.outline.map(([, y]) => y);
@@ -635,7 +865,5 @@ function rowSpacingOk(
         }),
     ),
   ].sort((a, b) => a - b);
-  return ys.every(
-    (y, index) => index === 0 || y - (ys[index - 1] as number) >= 2.2 * connection.boltDiameter,
-  );
+  return ys.every((y, index) => index === 0 || y - (ys[index - 1] as number) >= 2.2 * hole);
 }

@@ -36,7 +36,12 @@ import {
   trayOutline,
   type ConnectionSolid,
 } from './industrial/evaluate';
-import { curvedWallArc, curvedWallBand, tangentWall } from './curvedWallGeometry';
+import {
+  curvedBandBetween,
+  curvedWallArc,
+  curvedWallExtent,
+  tangentWall,
+} from './curvedWallGeometry';
 import { findProfile, type SteelProfile } from './steel/profiles';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
@@ -227,10 +232,11 @@ function exportWallLayers(context: Context, wall: WallElement, wallRef: string):
 function exportCurvedWall(
   context: Context,
   wall: CurvedWallElement,
+  extent: { start: number; end: number },
   storeyPlacement: string,
 ): Exported | null {
   const { mm } = context;
-  const band = curvedWallBand(wall);
+  const band = curvedBandBetween(wall, extent.start, extent.end);
   if (!band) return null;
   const local = placement(context, storeyPlacement, 0, 0, mm(wall.baseOffset));
   const profile = polygonProfile(
@@ -838,7 +844,12 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
         continue;
       }
       if (element.category === 'curvedWall') {
-        const exported = exportCurvedWall(context, element, storeyPlacement);
+        const exported = exportCurvedWall(
+          context,
+          element,
+          curvedWallExtent(building, element),
+          storeyPlacement,
+        );
         if (!exported) continue;
         contained.push(exported.ref);
         record(exported);

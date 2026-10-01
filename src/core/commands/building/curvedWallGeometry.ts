@@ -5,6 +5,7 @@
  */
 
 import type {
+  BuildingModel,
   BuildingLevel,
   CurvedWallElement,
   OpeningElement,
@@ -83,10 +84,11 @@ export function curvedWallBand(wall: CurvedWallElement): Vec2[] | null {
 export function curvedWallPieces(
   wall: CurvedWallElement,
   openings: ReadonlyArray<OpeningElement>,
+  extent: { start: number; end: number } = { start: 0, end: curvedWallLength(wall) },
 ): Array<{ s0: number; s1: number; z0: number; z1: number }> {
-  const length = curvedWallLength(wall);
+  const length = extent.end;
   const pieces: Array<{ s0: number; s1: number; z0: number; z1: number }> = [];
-  let cursor = 0;
+  let cursor = extent.start;
   for (const opening of [...openings].sort((a, b) => a.offset - b.offset)) {
     const [left, right] = [opening.offset - opening.width / 2, opening.offset + opening.width / 2];
     if (left > cursor) pieces.push({ s0: cursor, s1: left, z0: 0, z1: wall.height });
@@ -103,10 +105,11 @@ export function evaluateCurvedWall(
   wall: CurvedWallElement,
   level: BuildingLevel,
   openings: ReadonlyArray<OpeningElement> = [],
+  extent: { start: number; end: number } = { start: 0, end: curvedWallLength(wall) },
 ): Entity[] {
   const bottom = level.elevation + wall.baseOffset;
   const color = colorForMaterial(wall.material, '#c9c4b8');
-  const pieces = curvedWallPieces(wall, openings);
+  const pieces = curvedWallPieces(wall, openings, extent);
   return pieces.flatMap((piece, index): Entity[] => {
     const band = curvedBandBetween(wall, piece.s0, piece.s1);
     const mesh = band
@@ -150,7 +153,8 @@ export function arcOffsetOf(wall: CurvedWallElement, at: Vec2): number {
  */
 export function tangentWall(wall: CurvedWallElement, offset: number): WallElement {
   const arc = curvedWallArc(wall);
-  const length = Math.max(curvedWallLength(wall), offset + 1);
+  // Ends exactly at the arc end when the offset is clamped there (unit-independent).
+  const length = Math.max(curvedWallLength(wall), offset);
   const { point, tangent } = arc
     ? arcFrame(arc, offset)
     : { point: wall.start, tangent: [1, 0] as Vec2 };
@@ -184,4 +188,41 @@ export function curvedBandBetween(wall: CurvedWallElement, s0: number, s1: numbe
     ...arcPoints(piece, arc.radius + wall.thickness / 2),
     ...arcPoints(piece, arc.radius - wall.thickness / 2).reverse(),
   ]);
+}
+
+/**
+ * Arc-length interval actually built: each end is cut back where a straight wall closes the
+ * corner (that wall extends over the curved wall's end, as in straight L joints).
+ */
+export function curvedWallExtent(
+  building: BuildingModel,
+  wall: CurvedWallElement,
+): { start: number; end: number } {
+  const length = curvedWallLength(wall);
+  const arc = curvedWallArc(wall);
+  if (!arc) return { start: 0, end: length };
+  const tolerance = Math.max(wall.thickness * 0.05, 1e-9);
+  const trimAt = (offset: number, inward: 1 | -1): number => {
+    const { point, tangent } = arcFrame(arc, offset);
+    const away: Vec2 = [tangent[0] * inward, tangent[1] * inward];
+    for (const id of building.elementOrder) {
+      const other = building.elements[id];
+      if (other?.category !== 'wall' || other.levelId !== wall.levelId) continue;
+      const atStart = Math.hypot(other.start[0] - point[0], other.start[1] - point[1]) <= tolerance;
+      const atEnd = Math.hypot(other.end[0] - point[0], other.end[1] - point[1]) <= tolerance;
+      if (!atStart && !atEnd) continue;
+      const [from, to] = atStart ? [other.start, other.end] : [other.end, other.start];
+      const span = Math.hypot(to[0] - from[0], to[1] - from[1]);
+      if (span === 0) continue;
+      const direction: Vec2 = [(to[0] - from[0]) / span, (to[1] - from[1]) / span];
+      const sine = Math.abs(away[0] * direction[1] - away[1] * direction[0]);
+      if (sine < 0.05) continue;
+      const cosine = Math.abs(away[0] * direction[0] + away[1] * direction[1]);
+      return Math.max(0, (other.thickness / 2 - (wall.thickness / 2) * cosine) / sine);
+    }
+    return 0;
+  };
+  const start = trimAt(0, 1);
+  const end = length - trimAt(length, -1);
+  return end > start ? { start, end } : { start: 0, end: length };
 }

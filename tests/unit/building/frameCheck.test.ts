@@ -8,7 +8,7 @@ import {
   type CheckRow,
 } from '@core/commands/building/industrial/frameCheck';
 import { connectionWelds } from '@core/commands/building/industrial/connections';
-import type { MomentConnectionElement } from '@core/model/building';
+import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import type { TakeoffLine } from '@core/commands/building/quantities';
 import { __resetIdCounter } from '@lib/id';
 
@@ -134,5 +134,99 @@ describe('weld detailing', () => {
     expect(lines.find((line) => line.key === 'connection.weld metal.kg')?.quantity).toBeGreaterThan(
       5,
     );
+  });
+});
+
+describe('structural review regressions', () => {
+  it('gives mirror-image eaves the same (hogging) moment sign', () => {
+    const rows = (execute(hall(), 'check_portal_frames', {}).data as { rows: CheckRow[] }).rows;
+    const eaves = rows.filter(
+      (row) =>
+        row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('eaves'),
+    );
+    expect(eaves).toHaveLength(2);
+    expect(eaves.every((row) => (row.forces?.moment ?? 0) < 0)).toBe(true);
+    expect(eaves[0]!.forces!.moment).toBeCloseTo(eaves[1]!.forces!.moment, 0);
+    const apex = rows.filter(
+      (row) => row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('apex'),
+    );
+    expect(apex.every((row) => (row.forces?.moment ?? 0) > 0)).toBe(true);
+  });
+
+  it('re-seats purlins, rails and gable posts and keeps gable posts unchanged', () => {
+    const doc = hall({
+      rafterProfile: 'IPE300',
+      columnProfile: 'HEA240',
+      gablePostProfile: 'HEA240',
+    });
+    const result = execute(doc, 'design_portal_frames', {});
+    expect(result.summary).toMatch(/gable posts are not analysed/);
+    expect(result.summary).toMatch(/Cross-section and bolt checks only/);
+    const members = (d: CadDocument): SteelMemberElement[] =>
+      Object.values(d.building!.elements).flatMap((e) => (e.category === 'member' ? [e] : []));
+    const before = new Map(members(doc).map((m) => [m.id, m]));
+    const after = members(result.document);
+    const gablePosts = after.filter(
+      (m) => m.role === 'column' && m.start[0] !== 0 && m.start[0] !== 24000,
+    );
+    expect(gablePosts.length).toBeGreaterThan(0);
+    expect(gablePosts.every((m) => m.profile === 'HEA240')).toBe(true);
+    // Gable post tops drop by half the rafter depth increase (on the slope).
+    const post = gablePosts[0]!;
+    expect(Math.max(post.start[2], post.end[2])).toBeLessThan(
+      Math.max(before.get(post.id)!.start[2], before.get(post.id)!.end[2]),
+    );
+    // Purlins move up with the deeper rafter; rails move out with the deeper column.
+    const purlin = after.find((m) => m.role === 'purlin')!;
+    expect(purlin.start[2]).toBeGreaterThan(before.get(purlin.id)!.start[2]);
+    const rail = after.find((m) => m.role === 'rail' && m.start[0] < 0)!;
+    expect(rail.start[0]).toBeLessThan(before.get(rail.id)!.start[0]);
+  });
+
+  it('skips single-frame halls and keeps tributary widths per hall', () => {
+    const single = execute(createEmptyDocument(), 'add_steel_member', {
+      profile: 'IPE400',
+      role: 'rafter',
+      start: [0, 0, 6000],
+      end: [6000, 0, 6600],
+    }).document;
+    expect(execute(single, 'check_portal_frames', {}).summary).toMatch(
+      /single frame: no tributary width/,
+    );
+    let two = hall();
+    two = execute(two, 'add_portal_frame_building', {
+      origin: [40000, 0],
+      span: 24000,
+      length: 30000,
+      baySpacing: 5000,
+    }).document;
+    const rows = (execute(two, 'check_portal_frames', {}).data as { rows: CheckRow[] }).rows;
+    const internal = (mark: string): number => rows.find((row) => row.mark === mark)!.moment;
+    // First hall: 6 m bays; second hall: 5 m bays → smaller internal-frame moments.
+    expect(internal('RF3')).toBeGreaterThan(internal('RF15') * 1.1);
+  });
+
+  it('returns the unchanged document when nothing needs designing', () => {
+    const designed = execute(hall(), 'design_portal_frames', {}).document;
+    const again = execute(designed, 'design_portal_frames', {});
+    expect(again.document).toBe(designed);
+    expect(again.affected).toEqual([]);
+    expect(again.summary).toMatch(/no change needed/);
+  });
+
+  it('sizes weld throats by steel grade', async () => {
+    const { fullStrengthFactor } = await import('@core/commands/building/industrial/connections');
+    expect(fullStrengthFactor(235)).toBeCloseTo(0.46, 2);
+    expect(fullStrengthFactor(355)).toBeCloseTo(0.58, 2);
+    expect(fullStrengthFactor(460)).toBeCloseTo(0.75, 2);
+  });
+
+  it('labels every connection schedule column', () => {
+    const data = execute(hall(), 'building_schedule', { kind: 'connection' }).data as {
+      columns: string[];
+      rows: unknown[][];
+    };
+    expect(data.columns).toHaveLength(data.rows[0]!.length);
+    expect(data.columns.at(-1)).toBe('Welds');
   });
 });

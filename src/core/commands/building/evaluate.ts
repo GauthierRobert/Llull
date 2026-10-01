@@ -45,7 +45,12 @@ import {
 } from '../../../lib/polygon';
 import { fromMm, toMetres } from './model';
 import { prismMesh } from './mesh';
-import { arcOffsetOf, evaluateCurvedWall, tangentWall } from './curvedWallGeometry';
+import {
+  arcOffsetOf,
+  curvedWallExtent,
+  evaluateCurvedWall,
+  tangentWall,
+} from './curvedWallGeometry';
 import {
   evaluateEquipment,
   evaluateFooting,
@@ -576,7 +581,12 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluateConnection(context.doc, leveled, members, level);
     }
     case 'curvedWall':
-      return evaluateCurvedWall(leveled, level, openingsOf(building, leveled.id));
+      return evaluateCurvedWall(
+        leveled,
+        level,
+        openingsOf(building, leveled.id),
+        curvedWallExtent(building, leveled),
+      );
     case 'plate': {
       const member = building.elements[leveled.memberId];
       return member?.category === 'member'

@@ -24,7 +24,7 @@ import {
   elementAffected,
 } from './model';
 import { openingsOf, regenerateBuilding, wallExtent, wallFrame, type WallExtent } from './evaluate';
-import { arcOffsetOf, curvedWallLength } from './curvedWallGeometry';
+import { arcOffsetOf, curvedWallExtent, curvedWallLength } from './curvedWallGeometry';
 import { openingFitError } from './walls';
 
 type OpeningKind = 'door' | 'window';
@@ -63,9 +63,7 @@ function resolveOffset(
 
 /** Built extent of a host wall along its axis (curved walls: the whole arc length). */
 function hostExtent(building: BuildingModel, host: WallElement | CurvedWallElement): WallExtent {
-  return host.category === 'wall'
-    ? wallExtent(building, host)
-    : { start: 0, end: curvedWallLength(host) };
+  return host.category === 'wall' ? wallExtent(building, host) : curvedWallExtent(building, host);
 }
 
 function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParams): CommandResult {
