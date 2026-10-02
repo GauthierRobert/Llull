@@ -20,7 +20,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { serializeDocument } from '@core/commands/persistence';
-import { localDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
+import { localDispatch, liveSnapshot, TEST_EPOCH } from '../helpers/storeTestHelpers';
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
 
 /** Flush all pending microtasks (multiple promise chain hops). */
@@ -54,6 +54,8 @@ function resetStore(): void {
     hasUnsyncedLocalEdits: false,
     localUndoStack: [],
     localRedoStack: [],
+    liveEpoch: null,
+    liveSeq: -1,
   });
 }
 
@@ -513,8 +515,12 @@ function httpFail(status: number): { ok: false; status: number; json: () => Prom
   return { ok: false, status, json: () => Promise.resolve({}) };
 }
 
-function okResponse(): { ok: true; json: () => Promise<ServerCommandResponse> } {
-  return { ok: true, json: () => Promise.resolve(DEFAULT_RESPONSE) };
+function okResponse(affected?: string[]): {
+  ok: true;
+  json: () => Promise<ServerCommandResponse>;
+} {
+  const response = affected === undefined ? DEFAULT_RESPONSE : { ...DEFAULT_RESPONSE, affected };
+  return { ok: true, json: () => Promise.resolve(response) };
 }
 
 /** Simulated server: POST /command applies via execute; GET /live/snapshot returns state. */
@@ -522,10 +528,14 @@ function simulatedServer(failFirst?: number): {
   fetch: ReturnType<typeof vi.fn>;
   commands: () => string[];
   doc: () => CadDocument;
+  bodies: () => { name: string; params: unknown; commandId?: string }[];
+  /** A concurrent change by another client (e.g. an MCP agent). Returns its affected ids. */
+  inject: (name: string, params: unknown) => string[];
 } {
   let serverDoc = createEmptyDocument();
   let seq = 0;
   const received: string[] = [];
+  const bodies: { name: string; params: unknown; commandId?: string }[] = [];
   let failuresLeft = failFirst === undefined ? 0 : 1;
   const fetch = vi.fn((url: string, init?: RequestInit) => {
     if (failuresLeft > 0) {
@@ -538,14 +548,30 @@ function simulatedServer(failFirst?: number): {
         json: () => Promise.resolve(liveSnapshot(serverDoc, seq)),
       });
     }
-    const body = JSON.parse(init?.body as string) as { name: string; params: unknown };
+    const body = JSON.parse(init?.body as string) as {
+      name: string;
+      params: unknown;
+      commandId?: string;
+    };
     received.push(body.name);
+    bodies.push(body);
     const result = execute(serverDoc, body.name, body.params);
     if (result.document !== serverDoc) seq += 1;
     serverDoc = result.document;
-    return Promise.resolve(okResponse());
+    return Promise.resolve(okResponse(result.affected));
   });
-  return { fetch, commands: () => received, doc: () => serverDoc };
+  return {
+    fetch,
+    commands: () => received,
+    doc: () => serverDoc,
+    bodies: () => bodies,
+    inject: (name, params) => {
+      const result = execute(serverDoc, name, params);
+      if (result.document !== serverDoc) seq += 1;
+      serverDoc = result.document;
+      return result.affected;
+    },
+  };
 }
 
 function makeOfflineEdit(): void {
@@ -607,7 +633,13 @@ describe('CadStore — sync race fixes', () => {
     expect(getState().syncState).toBe('syncing');
 
     expect(
-      getState().applyLiveCommand({ seq: 99, name: 'add_box', params: {}, stateHash: 'x' }),
+      getState().applyLiveCommand({
+        epoch: TEST_EPOCH,
+        seq: 99,
+        name: 'add_box',
+        params: {},
+        stateHash: 'x',
+      }),
     ).toBe(true);
     await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
     expect(getState().hasUnsyncedLocalEdits).toBe(false);
@@ -661,6 +693,7 @@ describe('CadStore — live command log', () => {
     getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
     const after = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     const ok = getState().applyLiveCommand({
+      epoch: TEST_EPOCH,
       seq: 4,
       name: 'add_box',
       params: { size: [1, 1, 1] },
@@ -676,10 +709,17 @@ describe('CadStore — live command log', () => {
   it('refuses a gap or a mismatching hash so the caller resyncs', () => {
     getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
     expect(
-      getState().applyLiveCommand({ seq: 9, name: 'add_box', params: {}, stateHash: '' }),
+      getState().applyLiveCommand({
+        epoch: TEST_EPOCH,
+        seq: 9,
+        name: 'add_box',
+        params: {},
+        stateHash: '',
+      }),
     ).toBe(false);
     expect(
       getState().applyLiveCommand({
+        epoch: TEST_EPOCH,
         seq: 4,
         name: 'add_box',
         params: { size: [1, 1, 1] },
@@ -687,5 +727,175 @@ describe('CadStore — live command log', () => {
       }),
     ).toBe(false);
     expect(getState().liveSeq).toBe(3);
+  });
+});
+
+describe('CadStore — outbox flush correctness', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    getState().setDocument(createEmptyDocument());
+  });
+
+  it('outbox entries get unique client commandIds that are sent to the server', async () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    getState().dispatch('add_sphere', { radius: 2 });
+    const ids = getState().localOutbox.map((entry) => entry.commandId);
+    expect(new Set(ids).size).toBe(2);
+
+    const server = simulatedServer();
+    vi.stubGlobal('fetch', server.fetch);
+    useStore.setState({ liveStatus: 'connected' });
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
+    await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
+
+    expect(server.bodies().map((body) => body.commandId)).toEqual(ids);
+  });
+
+  it('live dispatch also carries a commandId', async () => {
+    useStore.setState({ liveStatus: 'connected' });
+    const spy = mockFetch(DEFAULT_RESPONSE);
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    await flushPromises();
+    const body = JSON.parse((spy.mock.calls[0]?.[1] as RequestInit).body as string) as {
+      commandId?: string;
+    };
+    expect(typeof body.commandId).toBe('string');
+    expect(body.commandId?.length).toBeGreaterThan(0);
+  });
+
+  it('undo/redo during a flush are refused and never touch the outbox', async () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    getState().dispatch('add_sphere', { radius: 2 });
+    const queued = getState().localOutbox.map((entry) => entry.commandId);
+    const server = simulatedServer();
+    vi.stubGlobal('fetch', server.fetch);
+    useStore.setState({ liveStatus: 'connected' });
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
+    expect(getState().syncState).toBe('syncing');
+
+    getState().undo();
+    getState().redo();
+    expect(getState().lastSummary).toContain('Sync in progress');
+    expect(getState().localOutbox.map((entry) => entry.commandId)).toEqual(queued);
+
+    await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
+    expect(server.commands()).toEqual(['add_box', 'add_sphere']);
+    expect(getState().document.order).toEqual(server.doc().order);
+  });
+
+  it('a dispatch during the flush is appended and the ack removes the right entry', async () => {
+    makeOfflineEdit();
+    const server = simulatedServer();
+    vi.stubGlobal('fetch', server.fetch);
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
+    getState().dispatch('add_sphere', { radius: 2 });
+    await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
+    expect(server.commands()).toEqual(['add_box', 'add_sphere']);
+    expect(getState().localOutbox).toEqual([]);
+  });
+
+  it('flush remaps ids: a later move lands on the client box, not a concurrent agent box', async () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    const localBoxId = getState().document.order[0]!;
+    getState().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
+
+    const server = simulatedServer();
+    const agentBoxId = server.inject('add_box', { size: [2, 2, 2] })[0]!;
+    expect(agentBoxId).toBe(localBoxId); // step-scoped ids collide across branches
+    vi.stubGlobal('fetch', server.fetch);
+    useStore.setState({ liveStatus: 'connected' });
+    getState().hydrateLiveDocument(liveSnapshot(server.doc()));
+    await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
+
+    const serverDoc = server.doc();
+    expect(serverDoc.order).toHaveLength(2);
+    const clientBoxId = serverDoc.order.find((id) => id !== agentBoxId)!;
+    expect(serverDoc.entities[agentBoxId]?.position).toEqual([0, 0, 0]);
+    expect(serverDoc.entities[clientBoxId]?.position).toEqual([5, 0, 0]);
+    expect(getState().document.order).toEqual(serverDoc.order);
+  });
+
+  it('the id map survives a failed attempt (retry still remaps)', async () => {
+    vi.useFakeTimers();
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    const localBoxId = getState().document.order[0]!;
+    getState().dispatch('move_entity', { id: localBoxId, delta: [5, 0, 0] });
+    const server = simulatedServer();
+    const agentBoxId = server.inject('add_box', { size: [2, 2, 2] })[0]!;
+    const realFetch = server.fetch;
+    let posts = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (!url.endsWith('/live/snapshot')) {
+          posts += 1;
+          if (posts === 2) return Promise.reject(new Error('flaky')); // the move, first try
+        }
+        return realFetch(url, init);
+      }),
+    );
+    useStore.setState({ liveStatus: 'connected' });
+    getState().hydrateLiveDocument(liveSnapshot(server.doc()));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getState().syncState).toBe('failed');
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(getState().syncState).toBe('idle');
+    const serverDoc = server.doc();
+    const clientBoxId = serverDoc.order.find((id) => id !== agentBoxId)!;
+    expect(serverDoc.entities[agentBoxId]?.position).toEqual([0, 0, 0]);
+    expect(serverDoc.entities[clientBoxId]?.position).toEqual([5, 0, 0]);
+  });
+
+  it('offline add_box, undo, add_box does not re-mint the undone id', () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    const undoneId = getState().document.order[0]!;
+    getState().undo();
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    expect(getState().document.order).toHaveLength(1);
+    expect(getState().document.order[0]).not.toBe(undoneId);
+  });
+});
+
+describe('CadStore — live epoch ordering', () => {
+  beforeEach(() => {
+    resetStore();
+    useStore.setState({ liveEpoch: null, liveSeq: -1 });
+  });
+
+  it('ignores a stale snapshot from the same epoch with a lower seq', () => {
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 5));
+    const stale = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
+    getState().hydrateLiveDocument(liveSnapshot(stale, 3));
+    expect(getState().liveSeq).toBe(5);
+    expect(getState().document.order).toHaveLength(0);
+  });
+
+  it('accepts an equal-seq snapshot and a lower seq from a new epoch (server restart)', () => {
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 5));
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 5));
+    expect(getState().liveSeq).toBe(5);
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 0, 'restarted'));
+    expect(getState().liveSeq).toBe(0);
+    expect(getState().liveEpoch).toBe('restarted');
+  });
+
+  it('treats an already-applied event as handled and a foreign epoch as a gap', () => {
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 5));
+    const event = { epoch: TEST_EPOCH, seq: 5, name: 'add_box', params: {}, stateHash: 'x' };
+    expect(getState().applyLiveCommand(event)).toBe(true);
+    expect(getState().applyLiveCommand({ ...event, seq: 2 })).toBe(true);
+    expect(getState().liveSeq).toBe(5);
+    expect(getState().applyLiveCommand({ ...event, epoch: 'other', seq: 6 })).toBe(false);
   });
 });

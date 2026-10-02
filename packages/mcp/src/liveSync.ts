@@ -16,6 +16,8 @@ import { hashText } from '@lib/hash';
 
 /** SSE `command` event: one mutating command, applied server-side as number `seq`. */
 export interface LiveCommandEvent {
+  /** Server process id (random per start); `seq` is only comparable within one epoch. */
+  readonly epoch: string;
   readonly seq: number;
   readonly name: string;
   readonly params: unknown;
@@ -25,6 +27,7 @@ export interface LiveCommandEvent {
 
 /** SSE `snapshot` event and `GET /live/snapshot` body: the full server document at `seq`. */
 export interface LiveSnapshotEvent {
+  readonly epoch: string;
   readonly seq: number;
   readonly stateHash: string;
   readonly document: CadDocument;

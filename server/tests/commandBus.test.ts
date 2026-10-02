@@ -285,3 +285,62 @@ describe('canUndo / canRedo', () => {
     expect(canUndo()).toBe(false);
   });
 });
+
+describe('applyCommand — idempotent commandId', () => {
+  it('a repeated commandId returns the first result without re-applying', () => {
+    const first = applyCommand('add_box', { size: [1, 1, 1] }, 'cmd-1');
+    const repeat = applyCommand('add_box', { size: [1, 1, 1] }, 'cmd-1');
+    expect(repeat).toEqual(first);
+    expect(getLiveDoc().order).toHaveLength(1);
+  });
+
+  it('different ids apply independently, and calls without an id are never cached', () => {
+    applyCommand('add_box', { size: [1, 1, 1] }, 'a');
+    applyCommand('add_box', { size: [1, 1, 1] }, 'b');
+    applyCommand('add_box', { size: [1, 1, 1] });
+    applyCommand('add_box', { size: [1, 1, 1] });
+    expect(getLiveDoc().order).toHaveLength(4);
+  });
+
+  it('the cache is a bounded LRU: the oldest id is evicted after 1000 entries', () => {
+    applyCommand('add_box', { size: [1, 1, 1] }, 'first');
+    for (let index = 0; index < 1000; index++) {
+      applyCommand('measure_volume', { id: 'none' }, `q-${index}`);
+    }
+    const before = getLiveDoc().order.length;
+    applyCommand('add_box', { size: [1, 1, 1] }, 'first'); // evicted -> applies again
+    expect(getLiveDoc().order.length).toBe(before + 1);
+  });
+
+  it('a recently used id survives eviction', () => {
+    applyCommand('add_box', { size: [1, 1, 1] }, 'keep');
+    for (let index = 0; index < 998; index++) {
+      applyCommand('measure_volume', { id: 'none' }, `f-${index}`);
+    }
+    applyCommand('add_box', { size: [1, 1, 1] }, 'keep'); // refresh LRU position
+    applyCommand('measure_volume', { id: 'none' }, 'push-1');
+    applyCommand('measure_volume', { id: 'none' }, 'push-2');
+    const before = getLiveDoc().order.length;
+    applyCommand('add_box', { size: [1, 1, 1] }, 'keep');
+    expect(getLiveDoc().order.length).toBe(before);
+  });
+});
+
+describe('undo/redo — monotonic step counter', () => {
+  it('add_box, undo, add_box mints a different id than the undone one', () => {
+    const undone = applyCommand('add_box', { size: [1, 1, 1] }).affected[0];
+    undo();
+    const next = applyCommand('add_box', { size: [1, 1, 1] }).affected[0];
+    expect(next).toBeDefined();
+    expect(next).not.toBe(undone);
+  });
+
+  it('redo never rewinds the counter either', () => {
+    applyCommand('add_box', { size: [1, 1, 1] });
+    undo();
+    const counter = getLiveDoc().nextStepNumber ?? 1;
+    redo();
+    undo();
+    expect(getLiveDoc().nextStepNumber ?? 1).toBeGreaterThanOrEqual(counter);
+  });
+});

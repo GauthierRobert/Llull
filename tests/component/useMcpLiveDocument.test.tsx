@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
 
@@ -17,7 +17,10 @@ class FakeEventSource {
   constructor(public url: string) {
     FakeEventSource.instances.push(this);
   }
-  addEventListener(): void {}
+  listeners = new Map<string, (e: Event) => void>();
+  addEventListener(type: string, listener: (e: Event) => void): void {
+    this.listeners.set(type, listener);
+  }
   close(): void {
     this.closed = true;
   }
@@ -64,5 +67,42 @@ describe('useMcpLiveDocument', () => {
     unmount();
     vi.advanceTimersByTime(60000);
     expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it('coalesces resyncs: one snapshot fetch in flight, one follow-up for failures meanwhile', async () => {
+    vi.useRealTimers();
+    const resolvers: (() => void)[] = [];
+    const snapshot = {
+      epoch: 'e',
+      seq: 1,
+      stateHash: 'h',
+      document: useStore.getState().document,
+    };
+    const fetchSpy = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(() => resolve({ ok: true, json: () => Promise.resolve(snapshot) }));
+        }),
+    );
+    vi.stubGlobal('fetch', fetchSpy);
+    render(<Harness />);
+    const listener = FakeEventSource.instances[0]?.listeners.get('command');
+    const gapEvent = {
+      data: JSON.stringify({ epoch: 'e', seq: 9, name: 'x', params: {}, stateHash: 'h' }),
+    };
+    act(() => {
+      listener?.(gapEvent as MessageEvent);
+      listener?.(gapEvent as MessageEvent);
+      listener?.(gapEvent as MessageEvent);
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolvers[0]?.();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

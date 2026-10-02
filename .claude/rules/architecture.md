@@ -64,7 +64,9 @@ business logic in the server — it forwards to the same registry/commands.
   `{ seq, name, params, stateHash }` and `snapshot` `{ seq, stateHash, document }` events;
   clients re-run each command with `execute` and check `stateHash`; a seq gap or hash mismatch ⇒
   `GET /live/snapshot`. There is no document-diff channel and no UI bridge.
-- Offline: the UI queues commands in an outbox and replays them to the server on reconnect.
+- Offline: the UI queues commands in an outbox (client `commandId` per entry, acked by id) and replays
+  them on reconnect, remapping ids the server minted differently; `POST /command` is idempotent per
+  `commandId`; events carry a server `epoch` so `(epoch, seq)` orders resyncs across restarts.
 
 ## L7 — 2D and 3D are one model, one command layer
 

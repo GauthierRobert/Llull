@@ -37,7 +37,13 @@ export function localDispatch(name: string, params: unknown): CommandResult {
   return result;
 }
 
+export const TEST_EPOCH = 'test-epoch';
+
 /** Wrap a document as a live snapshot event (live-sync protocol). USE IN TESTS ONLY. */
-export function liveSnapshot(document: CadDocument, seq = 0): LiveSnapshotEvent {
-  return { seq, stateHash: documentHash(document), document };
+export function liveSnapshot(
+  document: CadDocument,
+  seq = 0,
+  epoch = TEST_EPOCH,
+): LiveSnapshotEvent {
+  return { epoch, seq, stateHash: documentHash(document), document };
 }

@@ -7,7 +7,7 @@ import type { LiveCommandEvent } from '@mcp/liveSync';
 
 function serverStep(name: string, params: unknown): LiveCommandEvent {
   const after = execute(createEmptyDocument(), name, params).document;
-  return { seq: 1, name, params, stateHash: documentHash(after) };
+  return { epoch: 'e', seq: 1, name, params, stateHash: documentHash(after) };
 }
 
 describe('live sync protocol', () => {

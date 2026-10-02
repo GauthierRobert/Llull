@@ -5,7 +5,7 @@
  *
  * Opens `GET <SERVER_BASE>/live` as an EventSource (SERVER_BASE from @ui/serverConfig).
  *
- * Protocol (named SSE events, types in `@core/mcp/liveSync`):
+ * Protocol (named SSE events, types in `@mcp/liveSync`; `epoch` = server process id, seq is per epoch):
  *   - `snapshot` `{ seq, stateHash, document }`: on connect and after undo/redo → hydrateLiveDocument.
  *   - `command` `{ seq, name, params, stateHash }`: after every mutating command. The store re-runs
  *     it through `execute` (applyLiveCommand); on a seq gap or hash mismatch this hook fetches
@@ -39,6 +39,27 @@ export function useMcpLiveDocument(): void {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
     let disposed = false;
+    let resyncInFlight = false;
+    let resyncQueued = false;
+
+    // One snapshot fetch at a time; failures arriving meanwhile coalesce into one follow-up.
+    const resync = (): void => {
+      if (resyncInFlight) {
+        resyncQueued = true;
+        return;
+      }
+      resyncInFlight = true;
+      void fetchLiveSnapshot()
+        .then(hydrateLiveDocument)
+        .catch(() => undefined) // next event or reconnect resyncs
+        .finally(() => {
+          resyncInFlight = false;
+          if (resyncQueued && !disposed) {
+            resyncQueued = false;
+            resync();
+          }
+        });
+    };
 
     const scheduleReconnect = (): void => {
       if (disposed || retryTimer !== null) return;
@@ -76,9 +97,7 @@ export function useMcpLiveDocument(): void {
           return; // Malformed JSON from server — ignore, stay connected.
         }
         if (applyLiveCommand(event)) return;
-        void fetchLiveSnapshot()
-          .then(hydrateLiveDocument)
-          .catch(() => undefined); // next event or reconnect resyncs
+        resync();
       });
 
       // Close the native auto-retry (fixed ~3s, noisy) and back off exponentially instead.
