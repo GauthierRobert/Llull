@@ -354,7 +354,7 @@ describe('load combinations', () => {
       const result = execute(doc, 'check_portal_frames', bad);
       expect(result.document).toBe(doc);
       expect(result.data).toBeUndefined();
-      expect(result.summary).toMatch(/^check_portal_frames failed: /);
+      expect(result.summary).toMatch(/^check_portal_frames (failed|rejected): /);
     }
   });
 

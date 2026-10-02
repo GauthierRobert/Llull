@@ -110,7 +110,7 @@ describe('add_portal_frame_building columnBase', () => {
     const bad = execute(doc, 'add_portal_frame_building', { ...HALL, columnBase: 'hinged' });
     expect(bad.document).toBe(doc);
     expect(bad.affected).toEqual([]);
-    expect(bad.summary).toContain("columnBase must be 'pinned' or 'fixed'");
+    expect(bad.summary).toContain('add_portal_frame_building rejected: invalid params');
     const noPlates = execute(doc, 'add_portal_frame_building', {
       ...HALL,
       columnBase: 'fixed',

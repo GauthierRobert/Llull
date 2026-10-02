@@ -11,7 +11,8 @@ import type {
   SteelMemberElement,
 } from '../../../model/building';
 import type { CadDocument, Vec3 } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import { fileSlug, fromMm, getBuilding, noChange } from '../model';
 import { sweepFrame } from '../mesh';
 import { findProfile, type SteelProfile } from '../steel/profiles';
@@ -65,12 +66,6 @@ export interface NcFile {
 export interface NcExport {
   readonly files: NcFile[];
   readonly count: number;
-}
-
-interface ExportNcFilesParams {
-  memberIds?: string[];
-  includePlates?: boolean;
-  levelId?: string;
 }
 
 const CODE_BY_SHAPE: Readonly<Record<SteelProfile['shape'], string>> = {
@@ -352,7 +347,7 @@ function buildFiles(
  * @invariant identical pieces (profile, length, cuts, holes, grade) share one file with quantity > 1
  * @failure no steel members / unknown level / bad params -> no-op, affected:[]
  */
-export const exportNcFiles: CommandDefinition<ExportNcFilesParams> = {
+export const exportNcFiles = defineCommand({
   name: 'export_nc_files',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -363,38 +358,26 @@ export const exportNcFiles: CommandDefinition<ExportNcFilesParams> = {
     'connection end plates become separate code-B files with an AK contour and BO holes. Identical ' +
     'pieces are grouped into one file with a quantity. All numbers are millimetres whatever the ' +
     'document unit. data.files[].content holds each NC1 file text.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      memberIds: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'Steel member ids to export (also selects the base plates and end plates they host). Default: every steel member.',
-      },
-      includePlates: {
-        type: 'boolean',
-        description:
-          'Also export base plates and connection end plates as separate NC files. Default true.',
-      },
-      levelId: {
-        type: 'string',
-        description: 'Only export pieces of this level id. Default: all levels.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    memberIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Steel member ids to export (also selects the base plates and end plates they host). Default: every steel member.',
+      ),
+    includePlates: z
+      .boolean()
+      .optional()
+      .describe(
+        'Also export base plates and connection end plates as separate NC files. Default true.',
+      ),
+    levelId: z
+      .string()
+      .optional()
+      .describe('Only export pieces of this level id. Default: all levels.'),
+  }),
   run: (doc, params): CommandResult => {
     const { memberIds, includePlates = true, levelId } = params;
-    if (
-      memberIds !== undefined &&
-      !(Array.isArray(memberIds) && memberIds.every((id) => typeof id === 'string'))
-    ) {
-      return noChange(doc, 'export_nc_files failed: memberIds must be an array of strings.');
-    }
-    if (typeof includePlates !== 'boolean') {
-      return noChange(doc, 'export_nc_files failed: includePlates must be a boolean.');
-    }
     const building = getBuilding(doc);
     if (levelId !== undefined && !building.levels[levelId]) {
       return noChange(doc, `export_nc_files failed: no level '${String(levelId)}'.`);
@@ -537,4 +520,4 @@ export const exportNcFiles: CommandDefinition<ExportNcFilesParams> = {
       data,
     };
   },
-};
+});

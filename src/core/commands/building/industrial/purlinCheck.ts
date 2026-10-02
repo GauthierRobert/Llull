@@ -7,7 +7,8 @@
 
 import type { SteelMemberElement } from '../../../model/building';
 import type { CadDocument } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
 import { toCsv } from '../quantities';
 import { findProfile, sectionProperties, type SteelProfile } from '../steel/profiles';
@@ -88,13 +89,6 @@ export interface ZoneSummary {
   readonly cpe: number;
   readonly members: number;
   readonly maxUtilisation: number;
-}
-
-interface CheckPurlinsParams {
-  windPressure?: number;
-  snowLoad?: number;
-  roofDeadLoad?: number;
-  levelId?: string;
 }
 
 type Point = readonly [number, number, number];
@@ -281,7 +275,7 @@ function beamVerdicts(
  * @invariant simply supported over one bay; ULS gravity 1.35G + 1.5S; uplift 1.5 W - 1.0 G
  * @failure negative loads / unknown level / no purlins -> no data
  */
-export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
+export const checkPurlins = defineCommand({
   name: 'check_purlins',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -311,27 +305,22 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
     'modulus (EN 1993-1-3 §5.5 / 1993-1-5 §4.4, simplified: flange kσ 4 with 0.9 when λp > 0.673, web ψ -1, lips fully effective, no distortional buckling); weak-axis, torsion and cladding self-weight on rails are not ' +
     'checked. Returns one row per member with its governing check; values > 1 fail. Preliminary - ' +
     'not a substitute for the engineer of record.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      windPressure: {
-        type: 'number',
-        description:
-          'Peak velocity pressure qp, kN/m² (EN 1991-1-4, e.g. 0.6-1.0), >= 0. Default 0.6. 0 = no wind.',
-      },
-      snowLoad: {
-        type: 'number',
-        description: 'Roof snow load on plan, kN/m², >= 0. Default 0.8.',
-      },
-      roofDeadLoad: {
-        type: 'number',
-        description:
-          'Roof build-up dead load carried by the purlins (sheeting, insulation, services) per m² of roof, kN/m², >= 0. Purlin self-weight is added automatically. Default 0.3.',
-      },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-    },
-    required: [],
-  },
+  params: z.object({
+    windPressure: z
+      .number()
+      .optional()
+      .describe(
+        'Peak velocity pressure qp, kN/m² (EN 1991-1-4, e.g. 0.6-1.0), >= 0. Default 0.6. 0 = no wind.',
+      ),
+    snowLoad: z.number().optional().describe('Roof snow load on plan, kN/m², >= 0. Default 0.8.'),
+    roofDeadLoad: z
+      .number()
+      .optional()
+      .describe(
+        'Roof build-up dead load carried by the purlins (sheeting, insulation, services) per m² of roof, kN/m², >= 0. Purlin self-weight is added automatically. Default 0.3.',
+      ),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, snowLoad = 0.8, roofDeadLoad = 0.3 } = params;
     const nonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
@@ -810,4 +799,4 @@ export const checkPurlins: CommandDefinition<CheckPurlinsParams> = {
       },
     };
   },
-};
+});

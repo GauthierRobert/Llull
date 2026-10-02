@@ -5,7 +5,8 @@
 
 import type { CadDocument, Vec2, Vec3 } from '../../../model/types';
 import type { BimCategory, BuildingElement, BuildingModel } from '../../../model/building';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import { fromMm, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import { sweepFrame } from '../mesh';
 import { findProfile } from '../steel/profiles';
@@ -339,18 +340,13 @@ export function findClashes(
   );
 }
 
-interface CheckClashesParams {
-  levelId?: string;
-  tolerance?: number;
-}
-
 /**
  * @command check_clashes
  * @pure read-only
  * @affects none; data = { clashes: Clash[] }
  * @failure unknown level / negative tolerance -> no data
  */
-export const checkClashes: CommandDefinition<CheckClashesParams> = {
+export const checkClashes = defineCommand({
   name: 'check_clashes',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -358,17 +354,13 @@ export const checkClashes: CommandDefinition<CheckClashesParams> = {
     'members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. ' +
     'Steel-to-steel joints and run connections (a pipe end inside equipment, a pipe / tray ending on another) are not ' +
     'reported. Returns element ids, kind and penetration depth (document units; summary in mm).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      levelId: { type: 'string', description: 'Only this level. Default: the whole building.' },
-      tolerance: {
-        type: 'number',
-        description: 'Ignore penetrations up to this depth. Default 5 mm.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    levelId: z.string().optional().describe('Only this level. Default: the whole building.'),
+    tolerance: z
+      .number()
+      .optional()
+      .describe('Ignore penetrations up to this depth. Default 5 mm.'),
+  }),
   run: (doc, { levelId, tolerance }): CommandResult => {
     const building = getBuilding(doc);
     if (levelId !== undefined && !building.levels[levelId])
@@ -397,4 +389,4 @@ export const checkClashes: CommandDefinition<CheckClashesParams> = {
       data: { clashes },
     };
   },
-};
+});

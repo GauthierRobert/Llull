@@ -6,7 +6,8 @@
 
 import type { FootingElement } from '../../../model/building';
 import type { CadDocument } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -17,12 +18,7 @@ import {
   withElement,
 } from '../model';
 import { findProfile } from '../steel/profiles';
-import {
-  describeLoads,
-  FRAME_LOAD_PROPERTIES,
-  resolveFrameLoads,
-  type FrameLoadParams,
-} from './frameCheck';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheck';
 import { baseReactions, type BaseReaction } from './frameModel';
 import {
   clayLayerError,
@@ -32,14 +28,13 @@ import {
   footingRows,
   findFooting,
   findPlate,
-  foundationCheck,
   groundSlabWeight,
   slidingHorizontalOf,
   ultimateCombinations,
   hasCase,
   type ClayLayer,
   type Combination,
-  type FoundationCheckParams,
+  SOIL_SHAPE,
 } from './foundationCheck';
 
 const FCK = 25; // N/mm², C25/30
@@ -67,13 +62,6 @@ const MIN_THICKNESS_MM = 300;
 const MAX_THICKNESS_MM = 1500;
 const DEFAULT_SOIL_BEARING = 150;
 const DEFAULT_SOIL_MODULUS = 20;
-
-export interface FootingDesignParams
-  extends
-    FrameLoadParams,
-    Pick<FoundationCheckParams, 'soilBearing' | 'thrustTie' | 'soilModulus' | 'clayLayer'> {
-  allowShrink?: boolean;
-}
 
 /** Plan width, plan length and thickness, mm. */
 export type PadSize = readonly [number, number, number];
@@ -439,6 +427,19 @@ function trialSizes(current: PadSize, face: { x: number; y: number }, grow: bool
   return sizes.sort((a, b) => volume(a) - volume(b) || b[0] - a[0]);
 }
 
+const footingDesignParams = z.object({
+  ...FRAME_LOAD_SHAPE,
+  ...SOIL_SHAPE,
+  allowShrink: z
+    .boolean()
+    .optional()
+    .describe(
+      'true = also reduce oversized pads that already pass to the smallest passing size. Default false (pads are only grown, never shrunk).',
+    ),
+});
+
+export type FootingDesignParams = z.output<typeof footingDesignParams>;
+
 /**
  * @command design_footings
  * @pure
@@ -446,7 +447,7 @@ function trialSizes(current: PadSize, face: { x: number; y: number }, grow: bool
  *          with no passing size within 6 m × 6 m × 1.5 m is left unchanged
  * @failure bad loads / unknown level / no footing under an analysed frame column -> no-op
  */
-export const designFootings: CommandDefinition<FootingDesignParams> = {
+export const designFootings = defineCommand({
   name: 'design_footings',
   description:
     'Size and design the reinforced-concrete pad footings under the portal-frame columns of a level ' +
@@ -470,22 +471,7 @@ export const designFootings: CommandDefinition<FootingDesignParams> = {
     'Simplifications: bending in the frame plane (x) from the horizontal reaction and, for fixed column bases, the base moment (eccentric pressure), ' +
     'uniform pressure across the other side, no uplift (tension) design, bar anchorage not checked. ' +
     'Preliminary design, not a substitute for a structural engineer.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      ...FRAME_LOAD_PROPERTIES,
-      soilBearing: foundationCheck.paramsSchema.properties.soilBearing!,
-      thrustTie: foundationCheck.paramsSchema.properties.thrustTie!,
-      soilModulus: foundationCheck.paramsSchema.properties.soilModulus!,
-      clayLayer: foundationCheck.paramsSchema.properties.clayLayer!,
-      allowShrink: {
-        type: 'boolean',
-        description:
-          'true = also reduce oversized pads that already pass to the smallest passing size. Default false (pads are only grown, never shrunk).',
-      },
-    },
-    required: [],
-  },
+  params: footingDesignParams,
   run: (doc, params): CommandResult => {
     const soilBearing = params.soilBearing ?? DEFAULT_SOIL_BEARING;
     const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
@@ -494,12 +480,6 @@ export const designFootings: CommandDefinition<FootingDesignParams> = {
     }
     if (!isFiniteNumber(soilModulus) || soilModulus <= 0) {
       return noChange(doc, 'design_footings failed: soilModulus must be a number > 0 (MPa).');
-    }
-    if (
-      (params.thrustTie !== undefined && typeof params.thrustTie !== 'boolean') ||
-      (params.allowShrink !== undefined && typeof params.allowShrink !== 'boolean')
-    ) {
-      return noChange(doc, 'design_footings failed: thrustTie and allowShrink must be booleans.');
     }
     if (params.clayLayer !== undefined) {
       const clayError = clayLayerError(params.clayLayer);
@@ -702,4 +682,4 @@ export const designFootings: CommandDefinition<FootingDesignParams> = {
       data: { footings: rows, changes },
     };
   },
-};
+});

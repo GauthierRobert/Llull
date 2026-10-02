@@ -20,7 +20,7 @@ function run(
   doc: CadDocument,
   params: Record<string, unknown> = {},
 ): ReturnType<typeof exportNcFiles.run> {
-  return exportNcFiles.run(doc, params);
+  return execute(doc, 'export_nc_files', params);
 }
 
 function files(doc: CadDocument, params: Record<string, unknown> = {}): NcFile[] {

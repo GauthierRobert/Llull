@@ -11,17 +11,13 @@ import type {
   SteelMemberElement,
 } from '../../../model/building';
 import type { CadDocument } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import { getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import { toCsv } from '../quantities';
 import { findProfile } from '../steel/profiles';
 import { polygonArea } from '../../../../lib/polygon';
-import {
-  describeLoads,
-  FRAME_LOAD_PROPERTIES,
-  resolveFrameLoads,
-  type FrameLoadParams,
-} from './frameCheck';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheck';
 import {
   baseReactions,
   WIND_CASES,
@@ -48,14 +44,6 @@ export interface FoundationRow {
   readonly combination: string;
 }
 
-export interface FoundationCheckParams extends FrameLoadParams {
-  soilBearing?: number;
-  thrustTie?: boolean;
-  tieCapacity?: number;
-  soilModulus?: number;
-  clayLayer?: ClayLayer;
-}
-
 export interface ClayLayer {
   /** Depth of the layer top below the founding level, m. */
   readonly topDepth: number;
@@ -64,13 +52,13 @@ export interface ClayLayer {
   /** Virgin compression index Cc. */
   readonly compressionIndex: number;
   /** Recompression index Cr (default Cc / 5; only used with preconsolidationPressure). */
-  readonly recompressionIndex?: number;
+  readonly recompressionIndex?: number | undefined;
   /** Initial void ratio e0. */
   readonly voidRatio: number;
   /** Bulk unit weight, kN/m³ (default 19). */
-  readonly unitWeight?: number;
+  readonly unitWeight?: number | undefined;
   /** Preconsolidation pressure σ'p, kPa (default: normally consolidated). */
-  readonly preconsolidationPressure?: number;
+  readonly preconsolidationPressure?: number | undefined;
 }
 
 export type Factors = Partial<Record<LoadCase, number>>;
@@ -864,13 +852,73 @@ export function checkFoundations(
 const round = (value: number, digits = 2): number =>
   Math.round(value * 10 ** digits) / 10 ** digits;
 
+export const SOIL_SHAPE = {
+  soilBearing: z
+    .number()
+    .optional()
+    .describe('Allowable (SLS) soil bearing pressure in kPa. Default 150. Must be > 0.'),
+  thrustTie: z
+    .boolean()
+    .optional()
+    .describe(
+      'true = the frame thrust is carried by a tie (ground slab cast around the columns or tie ' +
+        "bars): each frame's columns share the frame's net horizontal reaction for the sliding " +
+        'check and one tie-force row per frame is added. false = every pad resists its own ' +
+        'horizontal reaction by friction. Default true when the level has a slab element, else false.',
+    ),
+  soilModulus: z
+    .number()
+    .optional()
+    .describe(
+      'Soil elastic (Young) modulus Es in MPa for the settlement rows. Default 20. Must be > 0.',
+    ),
+  clayLayer: z
+    .object({
+      topDepth: z.number().describe('Layer top below founding level, m (>= 0).'),
+      thickness: z.number().describe('Layer thickness, m (> 0).'),
+      compressionIndex: z.number().describe('Compression index Cc (> 0).'),
+      recompressionIndex: z
+        .number()
+        .optional()
+        .describe('Recompression index Cr (> 0, <= Cc). Default Cc/5.'),
+      voidRatio: z.number().describe('Initial void ratio e0 (> 0).'),
+      unitWeight: z.number().optional().describe('Bulk unit weight kN/m³ (> 9.81). Default 19.'),
+      preconsolidationPressure: z
+        .number()
+        .optional()
+        .describe("Preconsolidation pressure σ'p in kPa (> 0). Default: normally consolidated."),
+    })
+    .optional()
+    .describe(
+      'Optional compressible clay layer under the pads, adds primary consolidation settlement to the settlement rows. ' +
+        'topDepth: depth of the layer top below the founding level, m (>= 0). thickness: m (> 0). compressionIndex: Cc (> 0). ' +
+        'recompressionIndex: Cr (> 0, <= Cc; default Cc/5, used only with preconsolidationPressure). voidRatio: e0 (> 0). ' +
+        'unitWeight: bulk kN/m³ (> 9.81, default 19; groundwater assumed at the founding level; σ′0 = 18 kN/m³ × founding depth + γ′·z). ' +
+        'preconsolidationPressure: σ′p in kPa (> 0; omit for normally consolidated clay). Required: topDepth, thickness, compressionIndex, voidRatio.',
+    ),
+};
+
+const foundationCheckParams = z.object({
+  ...FRAME_LOAD_SHAPE,
+  ...SOIL_SHAPE,
+  tieCapacity: z
+    .number()
+    .optional()
+    .describe(
+      'Tie capacity in kN used for the tie-force row (thrustTie only). Default 175 = 2 × H16 B500 ' +
+        'bars (fyd 435 N/mm²). Must be > 0.',
+    ),
+});
+
+export type FoundationCheckParams = z.output<typeof foundationCheckParams>;
+
 /**
  * @command check_foundations
  * @pure read-only
  * @affects none; data = { rows: FoundationRow[], csv, maxUtilisation, failures }
  * @failure bad params / unknown level / no footing or base plate under a frame column -> no data
  */
-export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
+export const foundationCheck = defineCommand({
   name: 'check_foundations',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -899,65 +947,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
     'shear check, no footing reinforcement or punching (see design_footings). (5) Elastic settlement of each pad under SLS G+S, s = q B (1 − ν²) Is / Es (net pressure q − 18 kN/m³ × founding depth, i.e. footing + backfill weight replaces excavated soil; Is 0.88 rigid square, ν 0.3, Es = `soilModulus`, default 20 MPa) vs 25 mm, plus the worst differential settlement between adjacent columns of a frame vs L/500. With the optional `clayLayer` the primary consolidation of a clay layer below the footing (5 sublayers, groundwater at the founding level, γ′ = unitWeight − 9.81, σ′0 = 18 kN/m³ × founding depth + γ′ z, Δσ by 2:1 spreading, s = Σ Cc h/(1+e0) log10((σ′0+Δσ)/σ′0), Cr up to preconsolidationPressure and Cc beyond) is added to the elastic settlement (same 25 mm limit, row text gives both parts) and feeds the differential row. Returns one row per check ' +
     'and column (worst combination); utilisation > 1 fails. Not a substitute for a geotechnical ' +
     'or structural engineer.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      ...FRAME_LOAD_PROPERTIES,
-      soilBearing: {
-        type: 'number',
-        description: 'Allowable (SLS) soil bearing pressure in kPa. Default 150. Must be > 0.',
-      },
-      thrustTie: {
-        type: 'boolean',
-        description:
-          'true = the frame thrust is carried by a tie (ground slab cast around the columns or tie ' +
-          "bars): each frame's columns share the frame's net horizontal reaction for the sliding " +
-          'check and one tie-force row per frame is added. false = every pad resists its own ' +
-          'horizontal reaction by friction. Default true when the level has a slab element, else false.',
-      },
-      soilModulus: {
-        type: 'number',
-        description:
-          'Soil elastic (Young) modulus Es in MPa for the settlement rows. Default 20. Must be > 0.',
-      },
-      clayLayer: {
-        type: 'object',
-        description:
-          'Optional compressible clay layer under the pads, adds primary consolidation settlement to the settlement rows. ' +
-          'topDepth: depth of the layer top below the founding level, m (>= 0). thickness: m (> 0). compressionIndex: Cc (> 0). ' +
-          'recompressionIndex: Cr (> 0, <= Cc; default Cc/5, used only with preconsolidationPressure). voidRatio: e0 (> 0). ' +
-          'unitWeight: bulk kN/m³ (> 9.81, default 19; groundwater assumed at the founding level; σ′0 = 18 kN/m³ × founding depth + γ′·z). ' +
-          'preconsolidationPressure: σ′p in kPa (> 0; omit for normally consolidated clay). Required: topDepth, thickness, compressionIndex, voidRatio.',
-        properties: {
-          topDepth: { type: 'number', description: 'Layer top below founding level, m (>= 0).' },
-          thickness: { type: 'number', description: 'Layer thickness, m (> 0).' },
-          compressionIndex: { type: 'number', description: 'Compression index Cc (> 0).' },
-          recompressionIndex: {
-            type: 'number',
-            description: 'Recompression index Cr (> 0, <= Cc). Default Cc/5.',
-          },
-          voidRatio: { type: 'number', description: 'Initial void ratio e0 (> 0).' },
-          unitWeight: {
-            type: 'number',
-            description: 'Bulk unit weight kN/m³ (> 9.81). Default 19.',
-          },
-          preconsolidationPressure: {
-            type: 'number',
-            description:
-              "Preconsolidation pressure σ'p in kPa (> 0). Default: normally consolidated.",
-          },
-        },
-        required: ['topDepth', 'thickness', 'compressionIndex', 'voidRatio'],
-      },
-      tieCapacity: {
-        type: 'number',
-        description:
-          'Tie capacity in kN used for the tie-force row (thrustTie only). Default 175 = 2 × H16 B500 ' +
-          'bars (fyd 435 N/mm²). Must be > 0.',
-      },
-    },
-    required: [],
-  },
+  params: foundationCheckParams,
   run: (doc, params): CommandResult => {
     const soilBearing = params.soilBearing ?? 150;
     if (!isFiniteNumber(soilBearing) || soilBearing <= 0) {
@@ -975,15 +965,8 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
     if ('reason' in resolved) return noChange(doc, `check_foundations failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     const tieCapacity = params.tieCapacity ?? DEFAULT_TIE_CAPACITY;
-    if (
-      !isFiniteNumber(tieCapacity) ||
-      tieCapacity <= 0 ||
-      (params.thrustTie !== undefined && typeof params.thrustTie !== 'boolean')
-    ) {
-      return noChange(
-        doc,
-        'check_foundations failed: tieCapacity must be a number > 0 (kN) and thrustTie a boolean.',
-      );
+    if (!isFiniteNumber(tieCapacity) || tieCapacity <= 0) {
+      return noChange(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
     }
     const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
     const { rows, footings, plates, unchecked } = checkFoundations(
@@ -1053,4 +1036,4 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
       },
     };
   },
-};
+});

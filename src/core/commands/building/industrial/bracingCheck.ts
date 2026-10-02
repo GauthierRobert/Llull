@@ -6,7 +6,8 @@
 
 import type { SteelMemberElement } from '../../../model/building';
 import type { CadDocument } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
 import { toCsv } from '../quantities';
 import { findProfile, sectionProperties, type SteelProfile } from '../steel/profiles';
@@ -99,17 +100,6 @@ export interface BracingRow {
   readonly check: string;
 }
 
-interface CheckBracingParams {
-  windPressure?: number;
-  deadLoad?: number;
-  snowLoad?: number;
-  craneCapacity?: number;
-  craneSelfWeight?: number;
-  travelSpeed?: number;
-  bufferStiffness?: number;
-  levelId?: string;
-}
-
 type Point = readonly [number, number, number];
 
 interface Located {
@@ -154,7 +144,7 @@ interface Panel {
  * @invariant ULS wind = 1.5 · qp · 1.3 · gable area; tension-only diagonals; Npl,Rd = A·fy
  * @failure negative loads / unknown level / no bracing / no rafters -> no data
  */
-export const checkBracing: CommandDefinition<CheckBracingParams> = {
+export const checkBracing = defineCommand({
   name: 'check_bracing',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -186,44 +176,43 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
     'report the crane-only part; data.crane gives the horizontal force (along y) at the foundations of the braced-bay columns. ' +
     'Rows are grouped (roof bracing, wall bracing per side, gable posts); utilisation > 1 ' +
     'fails. Not covered: frame action, uplift, self-weight, connections - a preliminary check.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      windPressure: {
-        type: 'number',
-        description:
-          'Peak velocity pressure qp, kN/m² (EN 1991-1-4). Default 0.6. Frame gable coefficient 0.8 + 0.5; gable posts use net cpe + cpi = 0.8 + 0.2.',
-      },
-      deadLoad: {
-        type: 'number',
-        description: 'Roof dead load, kN/m², for the stabilising force only. Default 0.5.',
-      },
-      snowLoad: {
-        type: 'number',
-        description: 'Roof snow load, kN/m², for the stabilising force only. Default 0.8.',
-      },
-      craneCapacity: {
-        type: 'number',
-        description:
-          'Crane capacity in tonnes (> 0) for the crane longitudinal force. Default: read from the runway beam notes (add_crane_runway); no runway and no value = no crane force.',
-      },
-      craneSelfWeight: {
-        type: 'number',
-        description: 'Crane self-weight Gc in kN (> 0). Default 0.5 Q + 20 kN.',
-      },
-      travelSpeed: {
-        type: 'number',
-        description:
-          'Crane long travel speed in m/s (> 0) for the buffer force (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
-      },
-      bufferStiffness: {
-        type: 'number',
-        description: 'Buffer spring constant SB in kN/m (> 0). Default 1000.',
-      },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-    },
-    required: [],
-  },
+  params: z.object({
+    windPressure: z
+      .number()
+      .optional()
+      .describe(
+        'Peak velocity pressure qp, kN/m² (EN 1991-1-4). Default 0.6. Frame gable coefficient 0.8 + 0.5; gable posts use net cpe + cpi = 0.8 + 0.2.',
+      ),
+    deadLoad: z
+      .number()
+      .optional()
+      .describe('Roof dead load, kN/m², for the stabilising force only. Default 0.5.'),
+    snowLoad: z
+      .number()
+      .optional()
+      .describe('Roof snow load, kN/m², for the stabilising force only. Default 0.8.'),
+    craneCapacity: z
+      .number()
+      .optional()
+      .describe(
+        'Crane capacity in tonnes (> 0) for the crane longitudinal force. Default: read from the runway beam notes (add_crane_runway); no runway and no value = no crane force.',
+      ),
+    craneSelfWeight: z
+      .number()
+      .optional()
+      .describe('Crane self-weight Gc in kN (> 0). Default 0.5 Q + 20 kN.'),
+    travelSpeed: z
+      .number()
+      .optional()
+      .describe(
+        'Crane long travel speed in m/s (> 0) for the buffer force (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
+      ),
+    bufferStiffness: z
+      .number()
+      .optional()
+      .describe('Buffer spring constant SB in kN/m (> 0). Default 1000.'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, deadLoad = 0.5, snowLoad = 0.8 } = params;
     const nonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
@@ -625,4 +614,4 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       },
     };
   },
-};
+});

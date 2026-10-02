@@ -59,7 +59,7 @@ describe('add_portal_frame_building roofType', () => {
     const result = execute(doc, 'add_portal_frame_building', { ...HALL, roofType: 'sawtooth' });
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
-    expect(result.summary).toContain("roofType must be 'duopitch' or 'monopitch'");
+    expect(result.summary).toContain('add_portal_frame_building rejected: invalid params');
   });
 
   it('generates one rafter per frame rising from the low eaves (left) to the high eaves', () => {

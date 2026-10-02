@@ -5,7 +5,8 @@
 
 import type { BasePlateElement, BuildingModel, SteelMemberElement } from '../../../model/building';
 import type { CadDocument } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -138,46 +139,32 @@ export function columnsWithoutPlates(
   });
 }
 
-interface AddBasePlatesParams {
-  memberIds?: string[];
-  levelId?: string;
-  margin?: number;
-  thickness?: number;
-  boltCount?: number;
-  boltDiameter?: number;
-}
-
 /**
  * @command add_base_plates
  * @pure
  * @affects creates 1 base plate (+ anchor bolts) per steel column without one
  * @failure bad sizes / odd bolt count / no unplated columns -> no-op
  */
-export const addBasePlates: CommandDefinition<AddBasePlatesParams> = {
+export const addBasePlates = defineCommand({
   name: 'add_base_plates',
   description:
     'Add steel base plates with anchor bolts under steel columns (the given memberIds, or every steel ' +
     'column of the level that has none yet). Plate = column profile + margin on each side; follows its ' +
     'column when it moves and is deleted / copied with it. Plate mass and bolt counts feed the takeoff.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      memberIds: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Steel column ids. Default: every unplated steel column of the level.',
-      },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-      margin: { type: 'number', description: 'Plate overhang beyond the profile. Default 100 mm.' },
-      thickness: {
-        type: 'number',
-        description: 'Plate thickness. Default 25 mm (20 mm for profiles < 300 deep).',
-      },
-      boltCount: { type: 'number', description: 'Anchor bolts, even, 2–12. Default 4.' },
-      boltDiameter: { type: 'number', description: 'Bolt diameter. Default 24 mm (M24).' },
-    },
-    required: [],
-  },
+  params: z.object({
+    memberIds: z
+      .array(z.string())
+      .optional()
+      .describe('Steel column ids. Default: every unplated steel column of the level.'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    margin: z.number().optional().describe('Plate overhang beyond the profile. Default 100 mm.'),
+    thickness: z
+      .number()
+      .optional()
+      .describe('Plate thickness. Default 25 mm (20 mm for profiles < 300 deep).'),
+    boltCount: z.number().optional().describe('Anchor bolts, even, 2–12. Default 4.'),
+    boltDiameter: z.number().optional().describe('Bolt diameter. Default 24 mm (M24).'),
+  }),
   run: (doc, params): CommandResult => {
     const positive = (value: number | undefined): boolean =>
       value === undefined || (isFiniteNumber(value) && value > 0);
@@ -222,4 +209,4 @@ export const addBasePlates: CommandDefinition<AddBasePlatesParams> = {
       data: { elementIds: added.ids },
     };
   },
-};
+});

@@ -12,7 +12,8 @@ import type {
   SteelMemberElement,
 } from '../../../model/building';
 import type { CadDocument } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import { solveFrame, type FrameResult } from '../../../../lib/frame2d';
 import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
 import { findProfile } from '../steel/profiles';
@@ -22,10 +23,8 @@ import {
   framesOf,
   solveCombination,
   windCasesOf,
-  HOISTING_CLASSES,
   type CraneModel,
   type FrameLoads,
-  type HoistingClass,
   type FrameModel,
   type WindCase,
   type LoadCase,
@@ -503,66 +502,60 @@ export function checkFrames(
 }
 
 /** Load parameters shared by check_portal_frames and design_portal_frames. */
-export interface FrameLoadParams {
-  deadLoad?: number;
-  snowLoad?: number;
-  windPressure?: number;
-  craneCapacity?: number;
-  hoistingClass?: HoistingClass;
-  hoistingSpeed?: number;
-  craneSelfWeight?: number;
-  minHookApproach?: number;
-  wheelBase?: number;
-  levelId?: string;
-}
-
-export const FRAME_LOAD_PROPERTIES = {
-  deadLoad: {
-    type: 'number',
-    description: 'Roof dead load (build-up, purlins, services), kN/m². Default 0.5.',
-  },
-  snowLoad: { type: 'number', description: 'Roof snow load, kN/m². Default 0.8.' },
-  windPressure: {
-    type: 'number',
-    description:
+export const FRAME_LOAD_SHAPE = {
+  deadLoad: z
+    .number()
+    .optional()
+    .describe('Roof dead load (build-up, purlins, services), kN/m². Default 0.5.'),
+  snowLoad: z.number().optional().describe('Roof snow load, kN/m². Default 0.8.'),
+  windPressure: z
+    .number()
+    .optional()
+    .describe(
       'Peak velocity pressure qp, kN/m² (EN 1991-1-4; e.g. 0.6–1.0). Default 0 = wind not applied. ' +
-      'Coefficients: walls cpe +0.8 / −0.5, roof −0.6 (monopitch roofs, EN 1991-1-4 Tab. 7.3a zone H: −0.6 with ' +
-      'wind on the low eaves, −0.8 on the high eaves), each with internal pressure cpi +0.2 and −0.3.',
-  },
-  craneCapacity: {
-    type: 'number',
-    description:
+        'Coefficients: walls cpe +0.8 / −0.5, roof −0.6 (monopitch roofs, EN 1991-1-4 Tab. 7.3a zone H: −0.6 with ' +
+        'wind on the low eaves, −0.8 on the high eaves), each with internal pressure cpi +0.2 and −0.3.',
+    ),
+  craneCapacity: z
+    .number()
+    .optional()
+    .describe(
       'Crane capacity in tonnes for every runway on the level. Default: read from the runways ' +
-      '(add_crane_runway capacity); 0 = ignore cranes.',
-  },
-  hoistingClass: {
-    type: 'string',
-    enum: ['HC1', 'HC2', 'HC3', 'HC4'],
-    description:
+        '(add_crane_runway capacity); 0 = ignore cranes.',
+    ),
+  hoistingClass: z
+    .enum(['HC1', 'HC2', 'HC3', 'HC4'])
+    .optional()
+    .describe(
       'EN 1991-3 hoisting class for the dynamic factor φ2 = φ2,min + β2 vh (HC1 1.05 + 0.17 vh, ' +
-      'HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.',
-  },
-  hoistingSpeed: {
-    type: 'number',
-    description: 'Hoisting speed vh in m/s (>= 0) for φ2. Default 0.1.',
-  },
-  craneSelfWeight: {
-    type: 'number',
-    description:
+        'HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.',
+    ),
+  hoistingSpeed: z
+    .number()
+    .optional()
+    .describe('Hoisting speed vh in m/s (>= 0) for φ2. Default 0.1.'),
+  craneSelfWeight: z
+    .number()
+    .optional()
+    .describe(
       'Crane self-weight Gc in kN (> 0, bridge + trolley; trolley = 0.2 Gc). Default 0.5 Q + 20 kN.',
-  },
-  minHookApproach: {
-    type: 'number',
-    description:
+    ),
+  minHookApproach: z
+    .number()
+    .optional()
+    .describe(
       'Minimum approach of the hook to a rail in m (>= 0): the trolley position that maximises the wheel load. Default 1.0.',
-  },
-  wheelBase: {
-    type: 'number',
-    description:
+    ),
+  wheelBase: z
+    .number()
+    .optional()
+    .describe(
       'Wheel base a of a crane rail wheel group in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.',
-  },
-  levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-} as const;
+    ),
+  levelId: z.string().optional().describe('Level id. Default: the active level.'),
+};
+
+export type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>>;
 
 /** Validated loads + level, or the failure reason. */
 export function resolveFrameLoads(
@@ -580,9 +573,6 @@ export function resolveFrameLoads(
     return { reason: 'deadLoad, snowLoad, windPressure and craneCapacity must be >= 0' };
   }
   const { hoistingClass, hoistingSpeed, craneSelfWeight, minHookApproach, wheelBase } = params;
-  if (hoistingClass !== undefined && !(hoistingClass in HOISTING_CLASSES)) {
-    return { reason: "hoistingClass must be 'HC1', 'HC2', 'HC3' or 'HC4'" };
-  }
   if (
     (hoistingSpeed !== undefined && !nonNegative(hoistingSpeed)) ||
     (minHookApproach !== undefined && !nonNegative(minHookApproach))
@@ -635,7 +625,7 @@ export function describeLoads(loads: FrameLoads): string {
  * @affects none; data = { rows: CheckRow[], csv, maxUtilisation, failures, combinations, alphaCritical }
  * @failure negative loads / unknown level / no frame -> no data
  */
-export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
+export const checkPortalFrames = defineCommand({
   name: 'check_portal_frames',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -654,11 +644,7 @@ export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
     'utilisation per element; values > 1 fail. Bracing, foundations and crane runway beams are ' +
     'checked by check_bracing, check_foundations and check_crane_runways. A preliminary design ' +
     'check, not a substitute for the engineer of record.',
-  paramsSchema: {
-    type: 'object',
-    properties: FRAME_LOAD_PROPERTIES,
-    required: [],
-  },
+  params: z.object(FRAME_LOAD_SHAPE),
   run: (doc, params): CommandResult => {
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved)
@@ -733,4 +719,4 @@ export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
       },
     };
   },
-};
+});

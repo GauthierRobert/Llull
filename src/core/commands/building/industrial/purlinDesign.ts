@@ -6,7 +6,8 @@
 
 import type { BuildingModel, SteelMemberElement } from '../../../model/building';
 import type { CadDocument, Vec3 } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -22,14 +23,6 @@ import { nextProfile } from './frameDesign';
 import { checkPurlins, type PurlinRow } from './purlinCheck';
 
 const MAX_ITERATIONS = 15;
-
-interface DesignPurlinsParams {
-  windPressure?: number;
-  snowLoad?: number;
-  roofDeadLoad?: number;
-  levelId?: string;
-  targetUtilisation?: number;
-}
 
 const byMass = (a: { massPerMetre: number }, b: { massPerMetre: number }): number =>
   a.massPerMetre - b.massPerMetre;
@@ -63,7 +56,7 @@ export function nextSecondaryProfile(name: string): string | null {
  * @invariant a deeper purlin moves along the rafter normal, a deeper rail outwards, by half the depth change
  * @failure bad loads / unknown level / no purlins / no section large enough -> no-op or partial report
  */
-export const designPurlins: CommandDefinition<DesignPurlinsParams> = {
+export const designPurlins = defineCommand({
   name: 'design_purlins',
   description:
     'Preliminary design of the roof purlins and side rails of a level with the same loads and checks ' +
@@ -74,30 +67,24 @@ export const designPurlins: CommandDefinition<DesignPurlinsParams> = {
     'rafter normal and a rail outwards from the column by half the depth change. Reports every ' +
     'change and the final maximum utilisation; no change returns the document untouched. ' +
     'Bracing eaves struts are not sized (see check_bracing).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      windPressure: {
-        type: 'number',
-        description: 'Peak velocity pressure qp, kN/m² (EN 1991-1-4), >= 0. Default 0.6.',
-      },
-      snowLoad: {
-        type: 'number',
-        description: 'Roof snow load on plan, kN/m², >= 0. Default 0.8.',
-      },
-      roofDeadLoad: {
-        type: 'number',
-        description:
-          'Roof build-up dead load per m² of roof carried by the purlins, kN/m², >= 0. Default 0.3.',
-      },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-      targetUtilisation: {
-        type: 'number',
-        description: 'Maximum accepted utilisation (0.5–1). Default 0.95.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    windPressure: z
+      .number()
+      .optional()
+      .describe('Peak velocity pressure qp, kN/m² (EN 1991-1-4), >= 0. Default 0.6.'),
+    snowLoad: z.number().optional().describe('Roof snow load on plan, kN/m², >= 0. Default 0.8.'),
+    roofDeadLoad: z
+      .number()
+      .optional()
+      .describe(
+        'Roof build-up dead load per m² of roof carried by the purlins, kN/m², >= 0. Default 0.3.',
+      ),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    targetUtilisation: z
+      .number()
+      .optional()
+      .describe('Maximum accepted utilisation (0.5–1). Default 0.95.'),
+  }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95, ...loadParams } = params;
     if (
@@ -192,7 +179,7 @@ export const designPurlins: CommandDefinition<DesignPurlinsParams> = {
       data: { changes, maxUtilisation: worst, failures },
     };
   },
-};
+});
 
 /** Level of the checked rows (all rows of one check share one level). */
 function levelOf(building: BuildingModel, rows: ReadonlyArray<PurlinRow>): string | undefined {
