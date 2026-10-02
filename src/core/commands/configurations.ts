@@ -11,6 +11,7 @@
 import type { CadDocument, Configuration, Parameter } from '../model/types';
 import { currentContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { reEvaluateAll } from './parameters';
 import { replayHistory } from './history';
 
@@ -120,10 +121,6 @@ export const createConfiguration: CommandDefinition<CreateConfigurationParams> =
 // activate_configuration
 // ---------------------------------------------------------------------------
 
-interface ActivateConfigurationParams {
-  name: string;
-}
-
 /**
  * @command activate_configuration
  * @pure
@@ -132,7 +129,7 @@ interface ActivateConfigurationParams {
  * @invariant featureHistory is preserved unchanged after replay
  * @failure unknown config name → no-op; unknown parameter in config → summary note, no throw
  */
-export const activateConfiguration: CommandDefinition<ActivateConfigurationParams> = {
+export const activateConfiguration = defineCommand({
   name: 'activate_configuration',
   description:
     'Apply a named configuration to the document: set each parameter listed in the ' +
@@ -140,25 +137,21 @@ export const activateConfiguration: CommandDefinition<ActivateConfigurationParam
     "order, then replay featureHistory so all =expr geometry regenerates with the variant's values. " +
     'Use after create_configuration to switch between model variants (e.g. "small" vs "large"). ' +
     'The configuration must already exist in the document (call create_configuration first).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Name of the configuration to activate. Must match an existing configuration ' +
+  params: z.object({
+    name: z
+      .string()
+      .describe(
+        'Name of the configuration to activate. Must match an existing configuration ' +
           'created by create_configuration (case-sensitive). ' +
           'Example: "small", "large", "production_v2".',
-      },
-    },
-    required: ['name'],
-  },
+      ),
+  }),
   // idempotent: activating the same configuration twice yields the same end-state
   // (sets the same parameter values, replays the same history). metaHistory: it sets
   // document INPUT state and triggers a replay, so it must not append/recurse (L8).
   annotations: { idempotent: true, metaHistory: true },
   run: (doc, { name }): CommandResult => {
-    if (typeof name !== 'string' || name.trim() === '') {
+    if (name.trim() === '') {
       return {
         document: doc,
         summary: 'activate_configuration failed: name must be a non-empty string.',
@@ -246,4 +239,4 @@ export const activateConfiguration: CommandDefinition<ActivateConfigurationParam
       affected: regenerated.order,
     };
   },
-};
+});

@@ -18,7 +18,8 @@
  */
 
 import type { Component, Entity, InstanceEntity, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, vec3, z } from './schema';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../../lib/id';
 import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
@@ -104,18 +105,6 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
 // create_component
 // ---------------------------------------------------------------------------
 
-interface CreateComponentParams {
-  /** Human-readable name for the new component. */
-  name: string;
-  /** Ids of existing document entities to promote into the component. Must contain at least 1 id. */
-  entityIds: string[];
-  /**
-   * Optional explicit component id. When omitted a fresh id is generated.
-   * Useful for deterministic tests or agent plans that need to reference the id immediately.
-   */
-  componentId?: string;
-}
-
 /**
  * @command create_component
  * @pure
@@ -126,7 +115,7 @@ interface CreateComponentParams {
  * @failure any entityId missing -> no-op, affected:[]
  * @failure entityIds empty -> no-op, affected:[]
  */
-export const createComponent: CommandDefinition<CreateComponentParams> = {
+export const createComponent = defineCommand({
   name: 'create_component',
   description:
     'Promote a set of existing entities into a reusable Component definition. ' +
@@ -134,33 +123,29 @@ export const createComponent: CommandDefinition<CreateComponentParams> = {
     'at position [0,0,0] referencing the new component. ' +
     'All ids in entityIds must exist in the document; any missing id causes a graceful no-op. ' +
     'Returns the new instance id in affected.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Human-readable name for the component, e.g. "Wheel". Used as the component label.',
-      },
-      entityIds: {
-        type: 'array',
-        description:
-          'Ids of existing document entities to collect into the component. ' +
+  params: z.object({
+    name: z
+      .string()
+      .describe(
+        'Human-readable name for the component, e.g. "Wheel". Used as the component label.',
+      ),
+    entityIds: z
+      .array(z.string())
+      .describe(
+        'Ids of existing document entities to collect into the component. ' +
           'Must contain at least 1 id; all ids must exist in the document.',
-        items: { type: 'string' },
-      },
-      componentId: {
-        type: 'string',
-        description:
-          'Optional explicit component id to assign. When omitted a fresh id is generated via nextId("comp"). ' +
+      ),
+    componentId: z
+      .string()
+      .optional()
+      .describe(
+        'Optional explicit component id to assign. When omitted a fresh id is generated via nextId("comp"). ' +
           'Useful for deterministic agent plans that reference the component id immediately after creation.',
-      },
-    },
-    required: ['name', 'entityIds'],
-  },
+      ),
+  }),
   run: (doc, { name, entityIds, componentId }): CommandResult => {
     // Validate: non-empty list
-    if (!Array.isArray(entityIds) || entityIds.length === 0) {
+    if (entityIds.length === 0) {
       return {
         document: doc,
         summary: 'create_component: entityIds must be a non-empty array.',
@@ -242,22 +227,17 @@ export const createComponent: CommandDefinition<CreateComponentParams> = {
       affected: [instanceId],
     };
   },
-};
+});
+
+function toVec3(value: readonly unknown[] | undefined, fallback: Vec3): Vec3 {
+  if (value === undefined) return fallback;
+  const [x, y, z] = value;
+  return [Number(x), Number(y), Number(z)];
+}
 
 // ---------------------------------------------------------------------------
 // insert_instance
 // ---------------------------------------------------------------------------
-
-interface InsertInstanceParams {
-  /** Id of an existing Component in doc.components. */
-  componentId: string;
-  /** World-space placement [x, y, z]. Default: [0, 0, 0]. */
-  position?: Vec3;
-  /** Euler rotation [rx, ry, rz] in radians. Default: [0, 0, 0]. */
-  rotation?: Vec3;
-  /** Per-axis scale [sx, sy, sz]. Default: [1, 1, 1]. */
-  scale?: Vec3;
-}
 
 /**
  * @command insert_instance
@@ -269,43 +249,32 @@ interface InsertInstanceParams {
  * @failure unknown componentId -> no-op, affected:[]
  * @failure non-finite transform values -> no-op, affected:[]
  */
-export const insertInstance: CommandDefinition<InsertInstanceParams> = {
+export const insertInstance = defineCommand({
   name: 'insert_instance',
   description:
     'Place a new InstanceEntity referencing an existing Component definition. ' +
     'The instance carries its own world-space transform (position, rotation, scale). ' +
     'Editing the component later automatically updates all its instances. ' +
     'componentId must exist in doc.components. Returns the new instance id in affected.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      componentId: {
-        type: 'string',
-        description: 'Id of an existing Component in doc.components. Obtain via create_component.',
-      },
-      position: {
-        type: 'array',
-        description: 'World-space origin [x, y, z] for the instance. Default: [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      rotation: {
-        type: 'array',
-        description: 'Euler rotation [rx, ry, rz] in radians (XYZ order). Default: [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      scale: {
-        type: 'array',
-        description:
-          'Per-axis scale factors [sx, sy, sz]. Default: [1, 1, 1]. All components must be finite.',
-        items: { type: 'number' },
-      },
-    },
-    required: ['componentId'],
-  },
+  params: z.object({
+    componentId: z
+      .string()
+      .describe('Id of an existing Component in doc.components. Obtain via create_component.'),
+    position: vec3('World-space origin [x, y, z] for the instance. Default: [0, 0, 0].').optional(),
+    rotation: vec3(
+      'Euler rotation [rx, ry, rz] in radians (XYZ order). Default: [0, 0, 0].',
+    ).optional(),
+    scale: vec3(
+      'Per-axis scale factors [sx, sy, sz]. Default: [1, 1, 1]. All components must be finite.',
+    ).optional(),
+  }),
   run: (
     doc,
-    { componentId, position = [0, 0, 0], rotation = [0, 0, 0], scale = [1, 1, 1] },
+    { componentId, position: rawPosition, rotation: rawRotation, scale: rawScale },
   ): CommandResult => {
+    const position = toVec3(rawPosition, [0, 0, 0]);
+    const rotation = toVec3(rawRotation, [0, 0, 0]);
+    const scale = toVec3(rawScale, [1, 1, 1]);
     const component = doc.components[componentId];
     if (!component) {
       return {
@@ -347,16 +316,11 @@ export const insertInstance: CommandDefinition<InsertInstanceParams> = {
       affected: [instanceId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // explode_instance
 // ---------------------------------------------------------------------------
-
-interface ExplodeInstanceParams {
-  /** Id of an InstanceEntity to explode. */
-  id: string;
-}
 
 /**
  * @command explode_instance
@@ -368,23 +332,18 @@ interface ExplodeInstanceParams {
  * @failure id is not an instance -> no-op, affected:[]
  * @failure instance's componentId not found in doc.components -> no-op, affected:[]
  */
-export const explodeInstance: CommandDefinition<ExplodeInstanceParams> = {
+export const explodeInstance = defineCommand({
   name: 'explode_instance',
   description:
     "Replace an InstanceEntity with concrete copies of its component's entities baked into world space. " +
     'Each produced entity receives a fresh id. The component definition is NOT removed. ' +
     'The instance entity is removed and its order position is filled with the produced entities. ' +
     'Returns the new entity ids in affected.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of an InstanceEntity to explode into its world-space component entities.',
-      },
-    },
-    required: ['id'],
-  },
+  params: z.object({
+    id: z
+      .string()
+      .describe('Id of an InstanceEntity to explode into its world-space component entities.'),
+  }),
   run: (doc, { id }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity || entity.kind !== 'instance') {
@@ -452,4 +411,4 @@ export const explodeInstance: CommandDefinition<ExplodeInstanceParams> = {
       affected: bakedIds,
     };
   },
-};
+});

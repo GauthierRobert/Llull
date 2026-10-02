@@ -14,7 +14,8 @@
  */
 
 import type { CadDocument, Constraint, ConstraintKind, EntityRef, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { nextId } from '../../lib/id';
 import { evaluateExpression } from './expression';
 
@@ -385,16 +386,6 @@ function validateConstraintShape(v: unknown): string | null {
 // add_constraint
 // ---------------------------------------------------------------------------
 
-interface AddConstraintParams {
-  constraint: {
-    kind: string;
-    a: { entityId: string; kind?: string };
-    b: { entityId: string; kind?: string };
-    value?: number | string;
-  };
-  id?: string;
-}
-
 /**
  * @command add_constraint
  * @pure
@@ -403,7 +394,7 @@ interface AddConstraintParams {
  * @invariant constraint.id is unique within the document
  * @failure malformed constraint shape → no-op, affected:[]
  */
-export const addConstraint: CommandDefinition<AddConstraintParams> = {
+export const addConstraint = defineCommand({
   name: 'add_constraint',
   description:
     'Add a geometric or dimensional constraint between two entity references. ' +
@@ -412,77 +403,66 @@ export const addConstraint: CommandDefinition<AddConstraintParams> = {
     'Dimensional kinds (distance, angle) require a numeric "value" field. ' +
     'Call solve_constraints afterward to update entity positions. ' +
     'Returns the new constraint id in affected[0].',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      constraint: {
-        type: 'object',
-        description:
-          'The constraint to add. Must have: "kind" (one of coincident|parallel|perpendicular|tangent|distance|angle), ' +
-          '"a" (EntityRef: { entityId: string, kind?: "start"|"end"|"center"|"mid" }), ' +
-          '"b" (EntityRef: same shape). ' +
-          'Dimensional kinds also require "value": a number or parameter expression string.',
-        properties: {
-          kind: {
-            type: 'string',
-            description:
-              'Constraint type. Geometric: "coincident" (two points share a location), ' +
+  params: z.object({
+    constraint: z
+      .object({
+        kind: z
+          .enum(['coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle'])
+          .describe(
+            'Constraint type. Geometric: "coincident" (two points share a location), ' +
               '"parallel" (two lines are parallel), "perpendicular" (two lines are at 90°), ' +
               '"tangent" (line tangent to circle/arc, or two arcs externally tangent). ' +
               'Dimensional: "distance" (distance between two points equals value), ' +
               '"angle" (angle between two line directions equals value in radians).',
-            enum: ['coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle'],
-          },
-          a: {
-            type: 'object',
-            description:
-              'First entity reference. Minimum: { entityId: "<id>" }. ' +
+          ),
+        a: z
+          .object({
+            entityId: z.string().describe('Id of the first entity.'),
+            kind: z
+              .enum(['start', 'end', 'center', 'mid'])
+              .optional()
+              .describe('Sub-point selector: start, end, center, or mid.'),
+          })
+          .describe(
+            'First entity reference. Minimum: { entityId: "<id>" }. ' +
               'Optional sub-point: { entityId: "<id>", kind: "start"|"end"|"center"|"mid" } ' +
               'to target a specific geometric point on a line, arc, or circle.',
-            properties: {
-              entityId: { type: 'string', description: 'Id of the first entity.' },
-              kind: {
-                type: 'string',
-                description: 'Sub-point selector: start, end, center, or mid.',
-                enum: ['start', 'end', 'center', 'mid'],
-              },
-            },
-            required: ['entityId'],
-          },
-          b: {
-            type: 'object',
-            description:
-              'Second entity reference. Same shape as "a". ' +
+          ),
+        b: z
+          .object({
+            entityId: z.string().describe('Id of the second entity.'),
+            kind: z
+              .enum(['start', 'end', 'center', 'mid'])
+              .optional()
+              .describe('Sub-point selector: start, end, center, or mid.'),
+          })
+          .describe(
+            'Second entity reference. Same shape as "a". ' +
               '{ entityId: "<id>" } or { entityId: "<id>", kind: "start"|"end"|"center"|"mid" }.',
-            properties: {
-              entityId: { type: 'string', description: 'Id of the second entity.' },
-              kind: {
-                type: 'string',
-                description: 'Sub-point selector: start, end, center, or mid.',
-                enum: ['start', 'end', 'center', 'mid'],
-              },
-            },
-            required: ['entityId'],
-          },
-          value: {
-            type: 'string',
-            description:
-              'Required for dimensional constraints (distance, angle). ' +
+          ),
+        value: z
+          .union([z.string(), z.number()])
+          .optional()
+          .describe(
+            'Required for dimensional constraints (distance, angle). ' +
               'A numeric literal ("10", "1.5708") or a parameter expression string ' +
               '("width", "height / 2"). Angle is in radians.',
-          },
-        },
-        required: ['kind', 'a', 'b'],
-      },
-      id: {
-        type: 'string',
-        description:
-          'Optional explicit constraint id. When omitted a unique id is generated. ' +
+          ),
+      })
+      .describe(
+        'The constraint to add. Must have: "kind" (one of coincident|parallel|perpendicular|tangent|distance|angle), ' +
+          '"a" (EntityRef: { entityId: string, kind?: "start"|"end"|"center"|"mid" }), ' +
+          '"b" (EntityRef: same shape). ' +
+          'Dimensional kinds also require "value": a number or parameter expression string.',
+      ),
+    id: z
+      .string()
+      .optional()
+      .describe(
+        'Optional explicit constraint id. When omitted a unique id is generated. ' +
           'If the id already exists in the document the command is a no-op.',
-      },
-    },
-    required: ['constraint'],
-  },
+      ),
+  }),
   run: (doc, { constraint, id }): CommandResult => {
     const err = validateConstraintShape(constraint);
     if (err !== null) {
@@ -518,15 +498,11 @@ export const addConstraint: CommandDefinition<AddConstraintParams> = {
       affected: [constraintId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // delete_constraint
 // ---------------------------------------------------------------------------
-
-interface DeleteConstraintParams {
-  id: string;
-}
 
 /**
  * @command delete_constraint
@@ -536,27 +512,23 @@ interface DeleteConstraintParams {
  * @invariant constraintOrder and constraints remain consistent after deletion
  * @failure unknown constraint id → no-op, affected:[]
  */
-export const deleteConstraint: CommandDefinition<DeleteConstraintParams> = {
+export const deleteConstraint = defineCommand({
   name: 'delete_constraint',
   annotations: { destructive: true },
   description:
     'Remove a constraint from the document by its id. ' +
     'Entity positions are NOT automatically updated; call solve_constraints if needed. ' +
     'If the constraint id does not exist the document is left unchanged.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description:
-          'Id of the constraint to remove. Must match an existing constraint id exactly. ' +
+  params: z.object({
+    id: z
+      .string()
+      .describe(
+        'Id of the constraint to remove. Must match an existing constraint id exactly. ' +
           'Use describe_scene or list the document constraints to find valid ids.',
-      },
-    },
-    required: ['id'],
-  },
+      ),
+  }),
   run: (doc, { id }): CommandResult => {
-    if (typeof id !== 'string' || !(id in doc.constraints)) {
+    if (!(id in doc.constraints)) {
       return {
         document: doc,
         summary: `delete_constraint: constraint '${String(id)}' does not exist — no change made.`,
@@ -580,20 +552,11 @@ export const deleteConstraint: CommandDefinition<DeleteConstraintParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // update_constraint
 // ---------------------------------------------------------------------------
-
-interface UpdateConstraintParams {
-  id: string;
-  patch: {
-    value?: number | string;
-    a?: { entityId: string; kind?: string };
-    b?: { entityId: string; kind?: string };
-  };
-}
 
 /**
  * @command update_constraint
@@ -603,7 +566,7 @@ interface UpdateConstraintParams {
  * @invariant only value, a, b may be patched; kind is immutable after creation
  * @failure unknown constraint id / invalid patch → no-op, affected:[]
  */
-export const updateConstraint: CommandDefinition<UpdateConstraintParams> = {
+export const updateConstraint = defineCommand({
   name: 'update_constraint',
   description:
     'Update a mutable field of an existing constraint. ' +
@@ -611,68 +574,46 @@ export const updateConstraint: CommandDefinition<UpdateConstraintParams> = {
     '"a" and "b" (EntityRef objects to retarget the constraint to different entity points). ' +
     'The constraint kind cannot be changed; delete and re-add to change the kind. ' +
     'Call solve_constraints after updating to propagate the new constraint value to entity positions.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the constraint to update. Must exist in the document.',
-      },
-      patch: {
-        type: 'object',
-        description:
-          'Fields to update. All fields are optional; omitted fields are not changed. ' +
+  params: z.object({
+    id: z.string().describe('Id of the constraint to update. Must exist in the document.'),
+    patch: z
+      .object({
+        value: z
+          .union([z.string(), z.number()])
+          .optional()
+          .describe('New value for distance/angle constraints. Number or expression string.'),
+        a: z
+          .object({
+            entityId: z.string().describe('Entity id.'),
+            kind: z
+              .enum(['start', 'end', 'center', 'mid'])
+              .optional()
+              .describe('Sub-point selector.'),
+          })
+          .optional()
+          .describe('New first entity reference { entityId, kind? }.'),
+        b: z
+          .object({
+            entityId: z.string().describe('Entity id.'),
+            kind: z
+              .enum(['start', 'end', 'center', 'mid'])
+              .optional()
+              .describe('Sub-point selector.'),
+          })
+          .optional()
+          .describe('New second entity reference { entityId, kind? }.'),
+      })
+      .describe(
+        'Fields to update. All fields are optional; omitted fields are not changed. ' +
           '"value": new numeric target or parameter expression for distance/angle constraints. ' +
           '"a" / "b": new EntityRef objects ({ entityId, kind? }) to retarget the constraint.',
-        properties: {
-          value: {
-            type: 'string',
-            description: 'New value for distance/angle constraints. Number or expression string.',
-          },
-          a: {
-            type: 'object',
-            description: 'New first entity reference { entityId, kind? }.',
-            properties: {
-              entityId: { type: 'string', description: 'Entity id.' },
-              kind: {
-                type: 'string',
-                description: 'Sub-point selector.',
-                enum: ['start', 'end', 'center', 'mid'],
-              },
-            },
-            required: ['entityId'],
-          },
-          b: {
-            type: 'object',
-            description: 'New second entity reference { entityId, kind? }.',
-            properties: {
-              entityId: { type: 'string', description: 'Entity id.' },
-              kind: {
-                type: 'string',
-                description: 'Sub-point selector.',
-                enum: ['start', 'end', 'center', 'mid'],
-              },
-            },
-            required: ['entityId'],
-          },
-        },
-      },
-    },
-    required: ['id', 'patch'],
-  },
+      ),
+  }),
   run: (doc, { id, patch }): CommandResult => {
-    if (typeof id !== 'string' || !(id in doc.constraints)) {
+    if (!(id in doc.constraints)) {
       return {
         document: doc,
         summary: `update_constraint: constraint '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
-    }
-
-    if (typeof patch !== 'object' || patch === null) {
-      return {
-        document: doc,
-        summary: `update_constraint: 'patch' must be an object — no change made.`,
         affected: [],
       };
     }
@@ -734,7 +675,7 @@ export const updateConstraint: CommandDefinition<UpdateConstraintParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // solve_constraints
@@ -748,7 +689,7 @@ export const updateConstraint: CommandDefinition<UpdateConstraintParams> = {
  * @invariant all entity ids and kinds are preserved; only position XY is changed
  * @failure non-convergence → best-effort positions returned; converged:false in data
  */
-export const solveConstraints: CommandDefinition<Record<string, never>> = {
+export const solveConstraints = defineCommand({
   name: 'solve_constraints',
   description:
     'Run the constraint solver and update entity positions so that all declared ' +
@@ -758,11 +699,7 @@ export const solveConstraints: CommandDefinition<Record<string, never>> = {
     '{ residual: number, iterations: number, converged: boolean }. ' +
     'Non-convergent results are returned with the best-effort positions and converged:false. ' +
     'No parameters required.',
-  paramsSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-  },
+  params: z.object({}),
   run: (doc, _params): CommandResult => {
     const { document: newDoc, residual, iterations, converged } = runSolver(doc);
 
@@ -784,4 +721,4 @@ export const solveConstraints: CommandDefinition<Record<string, never>> = {
       data: { residual, iterations, converged },
     };
   },
-};
+});

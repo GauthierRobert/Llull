@@ -26,7 +26,8 @@
  */
 
 import type { CadDocument } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { getCommand } from './registry';
 import { currentContext, runInContext } from './context';
 import { executeRecorded } from './record';
@@ -427,7 +428,7 @@ function estimateSteps(actions: ActionItem[], doc: CadDocument): number {
  * @invariant onError:'abort' on failure returns the input doc unchanged (full rollback)
  * @failure empty/invalid actions -> no-op, affected:[]; validate:true never mutates
  */
-export const buildProject: CommandDefinition<BuildProjectParams> = {
+export const buildProject = defineCommand({
   name: 'build_project',
   description:
     'Apply an ordered list of command actions as one project. Each action is one of: ' +
@@ -440,31 +441,24 @@ export const buildProject: CommandDefinition<BuildProjectParams> = {
     'params values starting with "=" are evaluated as arithmetic expressions against doc.parameters plus $i/$as. ' +
     'onError="abort" (default) rolls the whole document back on the first failing step; "continue" applies what it can. ' +
     'validate=true performs a dry run without changing the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      actions: {
-        type: 'array',
-        description:
-          'Ordered list of actions. Each item is { command, params?, as? } OR ' +
+  params: z.object({
+    actions: z
+      .array(z.unknown())
+      .describe(
+        'Ordered list of actions. Each item is { command, params?, as? } OR ' +
           '{ repeat: { count, as? }, step: { command, params? } } OR ' +
           '{ for_each: { values, as }, step: { command, params? } }. ' +
           'Params values may be "$alias" references or "=expr" arithmetic expressions.',
-        items: { type: 'object' },
-      },
-      onError: {
-        type: 'string',
-        description:
-          'Failure policy: "abort" (default, full rollback on first failure) or "continue".',
-        enum: ['abort', 'continue'],
-      },
-      validate: {
-        type: 'boolean',
-        description: 'When true, dry-run only: validate every step without modifying the document.',
-      },
-    },
-    required: ['actions'],
-  },
+      ),
+    onError: z
+      .enum(['abort', 'continue'])
+      .optional()
+      .describe('Failure policy: "abort" (default, full rollback on first failure) or "continue".'),
+    validate: z
+      .boolean()
+      .optional()
+      .describe('When true, dry-run only: validate every step without modifying the document.'),
+  }),
   // Each inner step is recorded in featureHistory by `execute`; recording the plan itself too
   // would replay every step twice.
   annotations: { metaHistory: true },
@@ -478,16 +472,16 @@ export const buildProject: CommandDefinition<BuildProjectParams> = {
       );
     }
     return runInContext({ ...context, projectDepth: context.projectDepth + 1 }, () =>
-      runProject(doc, params),
+      runProject(doc, params as unknown as BuildProjectParams),
     );
   },
-};
+});
 
 function runProject(
   doc: CadDocument,
   { actions, onError = 'abort', validate = false }: BuildProjectParams,
 ): CommandResult {
-  if (!Array.isArray(actions) || actions.length === 0) {
+  if (actions.length === 0) {
     return noop(
       doc,
       { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null },

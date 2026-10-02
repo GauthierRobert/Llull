@@ -284,6 +284,6 @@ describe('build_project — empty / invalid input', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', { actions: 'nope' as unknown as [] });
     expect(result.document).toBe(doc);
-    expect(result.summary).toContain('no actions');
+    expect(result.summary).toContain('build_project rejected: invalid params');
   });
 });

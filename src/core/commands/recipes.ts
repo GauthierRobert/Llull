@@ -11,6 +11,7 @@
 import type { CadDocument, FeatureStep, Recipe } from '../model/types';
 import { currentContext, runInContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
 import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
 
@@ -105,11 +106,6 @@ function replayRecipeAdditive(
 // save_recipe
 // ---------------------------------------------------------------------------
 
-interface SaveRecipeParams {
-  name: string;
-  label?: string;
-}
-
 /**
  * @command save_recipe
  * @pure
@@ -118,7 +114,7 @@ interface SaveRecipeParams {
  * @invariant featureHistory is not modified; existing recipes with other names are untouched
  * @failure blank/whitespace-only name → no-op, affected:[]
  */
-export const saveRecipe: CommandDefinition<SaveRecipeParams> = {
+export const saveRecipe = defineCommand({
   name: 'save_recipe',
   description:
     'Snapshot the current featureHistory into a named recipe stored in the document. ' +
@@ -126,29 +122,26 @@ export const saveRecipe: CommandDefinition<SaveRecipeParams> = {
     'times (on this or any document) via instantiate_recipe, each time producing independent ' +
     'entities with fresh ids. Saving does NOT change any geometry. ' +
     'If a recipe with the same name already exists it is replaced.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Unique lookup key for the recipe, e.g. "bracket_v1", "wheel_assembly". ' +
+  params: z.object({
+    name: z
+      .string()
+      .describe(
+        'Unique lookup key for the recipe, e.g. "bracket_v1", "wheel_assembly". ' +
           'Must be a non-empty, non-whitespace-only string. ' +
           'Used as both the display name and the key for instantiate_recipe.',
-      },
-      label: {
-        type: 'string',
-        description:
-          'Optional human/AI note describing the recipe\'s purpose, e.g. "L-bracket with 3 holes".',
-      },
-    },
-    required: ['name'],
-  },
+      ),
+    label: z
+      .string()
+      .optional()
+      .describe(
+        'Optional human/AI note describing the recipe\'s purpose, e.g. "L-bracket with 3 holes".',
+      ),
+  }),
   // Does not change geometry → metaHistory so execute() does not append a FeatureStep.
   // idempotent: saving the same recipe name twice with the same history yields the same result.
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, label }): CommandResult => {
-    if (typeof name !== 'string' || name.trim() === '') {
+    if (name.trim() === '') {
       return {
         document: doc,
         summary: 'save_recipe failed: name must be a non-empty, non-whitespace-only string.',
@@ -181,15 +174,11 @@ export const saveRecipe: CommandDefinition<SaveRecipeParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // instantiate_recipe
 // ---------------------------------------------------------------------------
-
-interface InstantiateRecipeParams {
-  name: string;
-}
 
 /**
  * @command instantiate_recipe
@@ -199,7 +188,7 @@ interface InstantiateRecipeParams {
  * @invariant existing entities are untouched; recipe steps are applied additively
  * @failure unknown recipe name → no-op, affected:[]
  */
-export const instantiateRecipe: CommandDefinition<InstantiateRecipeParams> = {
+export const instantiateRecipe = defineCommand({
   name: 'instantiate_recipe',
   description:
     "Replay a named recipe's steps ADDITIVELY on top of the current document, " +
@@ -208,18 +197,14 @@ export const instantiateRecipe: CommandDefinition<InstantiateRecipeParams> = {
     'copies, each with their own unique ids. ' +
     'The recipe must already exist (call save_recipe first). ' +
     'The step is recorded in featureHistory so replaying the history re-expands the recipe.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Name of the recipe to instantiate. Must match an existing recipe created by ' +
+  params: z.object({
+    name: z
+      .string()
+      .describe(
+        'Name of the recipe to instantiate. Must match an existing recipe created by ' +
           'save_recipe (case-sensitive). Example: "bracket_v1", "wheel_assembly".',
-      },
-    },
-    required: ['name'],
-  },
+      ),
+  }),
   // Normal constructive command — execute() appends a FeatureStep automatically.
   // No metaHistory, no readOnly, not idempotent (each call creates new entities).
   run: (doc, params, ctx): CommandResult => {
@@ -235,10 +220,10 @@ export const instantiateRecipe: CommandDefinition<InstantiateRecipeParams> = {
       instantiateRecipeOnce(doc, params.name),
     );
   },
-};
+});
 
 function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
-  if (typeof name !== 'string' || name.trim() === '') {
+  if (name.trim() === '') {
     return {
       document: doc,
       summary: 'instantiate_recipe failed: name must be a non-empty string.',
