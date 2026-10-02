@@ -4,14 +4,14 @@
  */
 
 import type { CurvedWallElement } from '../../model/building';
-import type { Vec2 } from '../../model/types';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
+import { vec2 } from './params';
 import {
   elementAffected,
   fromMm,
   getBuilding,
   isFiniteNumber,
-  isVec2,
   nextElementId,
   nextMark,
   noChange,
@@ -23,52 +23,30 @@ import {
 import { regenerateBuilding } from './evaluate';
 import { curvedWallArc, curvedWallBand, curvedWallLength } from './curvedWallGeometry';
 
-interface AddCurvedWallParams {
-  start: Vec2;
-  through: Vec2;
-  end: Vec2;
-  thickness?: number;
-  height?: number;
-  baseOffset?: number;
-  material?: string;
-  levelId?: string;
-}
-
 /**
  * @command add_curved_wall
  * @pure
  * @affects creates 1 curved wall (mesh on layer A-WALL)
  * @failure collinear points / thickness >= diameter / sizes <= 0 -> no-op
  */
-export const addCurvedWall: CommandDefinition<AddCurvedWallParams> = {
+export const addCurvedWall = defineCommand({
   name: 'add_curved_wall',
   description:
     'Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point ' +
     'on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and ' +
     'material as for add_wall. Counted with the walls in quantities and schedules. Hosts doors and ' +
     'windows (add_door / add_window with its id; offset = distance along the arc).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      start: { type: 'array', items: { type: 'number' }, description: 'Arc start [x, y].' },
-      through: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Any point on the arc between start and end [x, y] (sets the curvature).',
-      },
-      end: { type: 'array', items: { type: 'number' }, description: 'Arc end [x, y].' },
-      thickness: { type: 'number', description: 'Wall thickness. Default 200 mm.' },
-      height: { type: 'number', description: 'Wall height. Default: the level height.' },
-      baseOffset: { type: 'number', description: 'Base above the level. Default 0.' },
-      material: { type: 'string', description: 'Default concrete.' },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-    },
-    required: ['start', 'through', 'end'],
-  },
+  params: z.object({
+    start: vec2('Arc start [x, y].'),
+    through: vec2('Any point on the arc between start and end [x, y] (sets the curvature).'),
+    end: vec2('Arc end [x, y].'),
+    thickness: z.number().optional().describe('Wall thickness. Default 200 mm.'),
+    height: z.number().optional().describe('Wall height. Default: the level height.'),
+    baseOffset: z.number().optional().describe('Base above the level. Default 0.'),
+    material: z.string().optional().describe('Default concrete.'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  }),
   run: (doc, params): CommandResult => {
-    if (!isVec2(params.start) || !isVec2(params.through) || !isVec2(params.end)) {
-      return noChange(doc, 'add_curved_wall failed: start, through and end must be [x, y].');
-    }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noChange(doc, `add_curved_wall failed: ${resolution.reason}.`);
     const thickness = params.thickness ?? fromMm(doc, 200);
@@ -110,4 +88,4 @@ export const addCurvedWall: CommandDefinition<AddCurvedWallParams> = {
       data: { elementId: wall.id, radius: arc.radius },
     };
   },
-};
+});

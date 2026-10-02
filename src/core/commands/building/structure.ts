@@ -9,11 +9,12 @@ import type {
   BuildingModel,
   ColumnElement,
   SlabElement,
-  SlabRole,
   StairElement,
   WallElement,
 } from '../../model/building';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
+import { vec2 } from './params';
 import { distance, isValidPolygon, offsetPolygon, polygonArea } from '../../../lib/polygon';
 import {
   fromMm,
@@ -32,10 +33,11 @@ import {
 } from './model';
 import { regenerateBuilding } from './evaluate';
 
-const LEVEL_ID_PROPERTY = {
-  type: 'string',
-  description: 'Level id. Default: active level (a "Level 0" is created if none).',
-} as const;
+const levelIdParam = (): z.ZodOptional<z.ZodString> =>
+  z
+    .string()
+    .optional()
+    .describe('Level id. Default: active level (a "Level 0" is created if none).');
 
 function positiveOrUndefined(value: number | undefined): boolean {
   return value === undefined || (isFiniteNumber(value) && value > 0);
@@ -85,63 +87,46 @@ export function wallLoop(walls: ReadonlyArray<WallElement>): Vec2[] | null {
   return distance(cursor, first.start) <= tolerance ? loop : null;
 }
 
-interface AddSlabParams {
-  boundary?: Vec2[];
-  wallIds?: string[];
-  wallFace?: 'outer' | 'center' | 'inner';
-  levelId?: string;
-  thickness?: number;
-  offset?: number;
-  role?: SlabRole;
-  material?: string;
-}
-
 /**
  * @command add_slab
  * @pure
  * @affects creates 1 slab (extrusion on layer S-SLAB)
  * @failure no valid boundary / walls not a closed loop / thickness <= 0 -> no-op
  */
-export const addSlab: CommandDefinition<AddSlabParams> = {
+export const addSlab = defineCommand({
   name: 'add_slab',
   description:
     'Add a floor, roof or foundation slab whose TOP sits at the level elevation + offset. Give either ' +
     'a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      boundary: {
-        type: 'array',
-        items: { type: 'array', items: { type: 'number' } },
-        description: 'Closed plan polygon [[x, y], …] (≥ 3 vertices).',
-      },
-      wallIds: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Alternative to boundary: wall ids forming a closed loop.',
-      },
-      wallFace: {
-        type: 'string',
-        enum: ['outer', 'center', 'inner'],
-        description:
-          'With wallIds: slab edge at the outer wall faces, the wall centerlines (default — the slab bears into the walls), or the inner faces.',
-      },
-      levelId: LEVEL_ID_PROPERTY,
-      thickness: { type: 'number', description: 'Slab thickness (> 0). Default 200 mm.' },
-      offset: {
-        type: 'number',
-        description:
-          'Top-of-slab offset from the level elevation. Default 0 (roof: put it on the level above).',
-      },
-      role: {
-        type: 'string',
-        enum: ['floor', 'roof', 'foundation'],
-        description: 'Slab role used in schedules and IFC. Default floor.',
-      },
-      material: { type: 'string', description: 'Material. Default concrete.' },
-    },
-    required: [],
-  },
+  params: z.object({
+    boundary: z
+      .array(z.array(z.number()))
+      .optional()
+      .describe('Closed plan polygon [[x, y], …] (≥ 3 vertices).'),
+    wallIds: z
+      .array(z.string())
+      .optional()
+      .describe('Alternative to boundary: wall ids forming a closed loop.'),
+    wallFace: z
+      .enum(['outer', 'center', 'inner'])
+      .optional()
+      .describe(
+        'With wallIds: slab edge at the outer wall faces, the wall centerlines (default — the slab bears into the walls), or the inner faces.',
+      ),
+    levelId: levelIdParam(),
+    thickness: z.number().optional().describe('Slab thickness (> 0). Default 200 mm.'),
+    offset: z
+      .number()
+      .optional()
+      .describe(
+        'Top-of-slab offset from the level elevation. Default 0 (roof: put it on the level above).',
+      ),
+    role: z
+      .enum(['floor', 'roof', 'foundation'])
+      .optional()
+      .describe('Slab role used in schedules and IFC. Default floor.'),
+    material: z.string().optional().describe('Material. Default concrete.'),
+  }),
   run: (
     doc,
     {
@@ -165,7 +150,7 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
             return index === 0 ? true : point[0] !== previous[0] || point[1] !== previous[1];
           })
         : null;
-    } else if (Array.isArray(wallIds)) {
+    } else if (wallIds !== undefined) {
       const walls = wallIds.map((id) => building.elements[id]);
       if (walls.every((wall): wall is WallElement => wall?.category === 'wall')) {
         if (new Set(walls.map((wall) => wall.levelId)).size > 1) {
@@ -211,18 +196,7 @@ export const addSlab: CommandDefinition<AddSlabParams> = {
       data: { elementId: slab.id },
     };
   },
-};
-
-interface AddColumnParams {
-  location?: Vec2;
-  atGridIntersections?: boolean;
-  shape?: 'rectangular' | 'circular';
-  width?: number;
-  depth?: number;
-  height?: number;
-  levelId?: string;
-  material?: string;
-}
+});
 
 /** Plan intersections of every pair of grid axes (segment–segment). */
 export function gridIntersections(building: BuildingModel): Vec2[] {
@@ -254,35 +228,27 @@ export function gridIntersections(building: BuildingModel): Vec2[] {
  * @affects creates 1 column, or one per grid intersection
  * @failure no location and no grid intersections / invalid size -> no-op
  */
-export const addColumn: CommandDefinition<AddColumnParams> = {
+export const addColumn = defineCommand({
   name: 'add_column',
   description:
     'Add a structural column standing on a level, at a plan location or (atGridIntersections: true) ' +
     'at every structural grid intersection. Rectangular width × depth, or circular with diameter = width.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      location: { type: 'array', items: { type: 'number' }, description: 'Column center [x, y].' },
-      atGridIntersections: {
-        type: 'boolean',
-        description: 'Place one column at every grid-axis intersection instead of at location.',
-      },
-      shape: {
-        type: 'string',
-        enum: ['rectangular', 'circular'],
-        description: 'Section shape. Default rectangular.',
-      },
-      width: {
-        type: 'number',
-        description: 'Section width (diameter if circular). Default 300 mm.',
-      },
-      depth: { type: 'number', description: 'Section depth (rectangular). Default = width.' },
-      height: { type: 'number', description: 'Column height. Default: the level height.' },
-      levelId: LEVEL_ID_PROPERTY,
-      material: { type: 'string', description: 'Material. Default concrete.' },
-    },
-    required: [],
-  },
+  params: z.object({
+    location: vec2('Column center [x, y].').optional(),
+    atGridIntersections: z
+      .boolean()
+      .optional()
+      .describe('Place one column at every grid-axis intersection instead of at location.'),
+    shape: z
+      .enum(['rectangular', 'circular'])
+      .optional()
+      .describe('Section shape. Default rectangular.'),
+    width: z.number().optional().describe('Section width (diameter if circular). Default 300 mm.'),
+    depth: z.number().optional().describe('Section depth (rectangular). Default = width.'),
+    height: z.number().optional().describe('Column height. Default: the level height.'),
+    levelId: levelIdParam(),
+    material: z.string().optional().describe('Material. Default concrete.'),
+  }),
   run: (doc, params): CommandResult => {
     const building = getBuilding(doc);
     const locations = params.atGridIntersections
@@ -336,17 +302,7 @@ export const addColumn: CommandDefinition<AddColumnParams> = {
       data: { elementIds: ids },
     };
   },
-};
-
-interface AddBeamParams {
-  start: Vec2;
-  end: Vec2;
-  width?: number;
-  depth?: number;
-  topOffset?: number;
-  levelId?: string;
-  material?: string;
-}
+});
 
 /**
  * @command add_beam
@@ -354,27 +310,23 @@ interface AddBeamParams {
  * @affects creates 1 beam (box on layer S-BEAM)
  * @failure zero length / size <= 0 -> no-op
  */
-export const addBeam: CommandDefinition<AddBeamParams> = {
+export const addBeam = defineCommand({
   name: 'add_beam',
   description:
     'Add a horizontal beam from start to end (plan [x, y]). Its top sits at the top of the level ' +
     '(elevation + level height) + topOffset — i.e. under the next floor slab by default.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      start: { type: 'array', items: { type: 'number' }, description: 'Beam axis start [x, y].' },
-      end: { type: 'array', items: { type: 'number' }, description: 'Beam axis end [x, y].' },
-      width: { type: 'number', description: 'Section width. Default 300 mm.' },
-      depth: { type: 'number', description: 'Section depth. Default 500 mm.' },
-      topOffset: {
-        type: 'number',
-        description: 'Offset of the beam top from the top of the level. Default 0.',
-      },
-      levelId: LEVEL_ID_PROPERTY,
-      material: { type: 'string', description: 'Material. Default concrete.' },
-    },
-    required: ['start', 'end'],
-  },
+  params: z.object({
+    start: vec2('Beam axis start [x, y].'),
+    end: vec2('Beam axis end [x, y].'),
+    width: z.number().optional().describe('Section width. Default 300 mm.'),
+    depth: z.number().optional().describe('Section depth. Default 500 mm.'),
+    topOffset: z
+      .number()
+      .optional()
+      .describe('Offset of the beam top from the top of the level. Default 0.'),
+    levelId: levelIdParam(),
+    material: z.string().optional().describe('Material. Default concrete.'),
+  }),
   run: (doc, { start, end, width, depth, topOffset = 0, levelId, material }): CommandResult => {
     if (!isVec2(start) || !isVec2(end) || lengthOf(start, end) <= 0) {
       return noChange(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
@@ -411,17 +363,7 @@ export const addBeam: CommandDefinition<AddBeamParams> = {
       data: { elementId: beam.id },
     };
   },
-};
-
-interface AddStairParams {
-  start: Vec2;
-  angle?: number;
-  width?: number;
-  riserCount?: number;
-  treadDepth?: number;
-  levelId?: string;
-  material?: string;
-}
+});
 
 /**
  * @command add_stair
@@ -429,33 +371,26 @@ interface AddStairParams {
  * @affects creates riserCount step solids on layer A-FLOR-STRS
  * @failure invalid start / riserCount < 2 / sizes <= 0 -> no-op
  */
-export const addStair: CommandDefinition<AddStairParams> = {
+export const addStair = defineCommand({
   name: 'add_stair',
   description:
     'Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm ' +
     '(rounded up), so risers are equal; tread default 280 mm. The summary reports the Blondel rule ' +
     '(2R + G, comfortable between 600 and 650 mm).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      start: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Plan point [x, y] at the middle of the first riser.',
-      },
-      angle: {
-        type: 'number',
-        description:
-          'Run direction in radians, counter-clockwise from +X. Default 0 (climbs toward +X).',
-      },
-      width: { type: 'number', description: 'Stair width. Default 1000 mm.' },
-      riserCount: { type: 'number', description: 'Number of risers (integer ≥ 2).' },
-      treadDepth: { type: 'number', description: 'Tread (going) depth. Default 280 mm.' },
-      levelId: LEVEL_ID_PROPERTY,
-      material: { type: 'string', description: 'Material. Default concrete.' },
-    },
-    required: ['start'],
-  },
+  params: z.object({
+    start: vec2('Plan point [x, y] at the middle of the first riser.'),
+    angle: z
+      .number()
+      .optional()
+      .describe(
+        'Run direction in radians, counter-clockwise from +X. Default 0 (climbs toward +X).',
+      ),
+    width: z.number().optional().describe('Stair width. Default 1000 mm.'),
+    riserCount: z.number().optional().describe('Number of risers (integer ≥ 2).'),
+    treadDepth: z.number().optional().describe('Tread (going) depth. Default 280 mm.'),
+    levelId: levelIdParam(),
+    material: z.string().optional().describe('Material. Default concrete.'),
+  }),
   run: (
     doc,
     { start, angle = 0, width, riserCount, treadDepth, levelId, material },
@@ -507,4 +442,4 @@ export const addStair: CommandDefinition<AddStairParams> = {
       data: { elementId: stair.id },
     };
   },
-};
+});

@@ -3,7 +3,8 @@
  * @layer core/commands/building
  */
 
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
 import type { BuildingLevel, BuildingModel, ProjectInfo } from '../../model/building';
 import {
   followLevelHeight,
@@ -19,45 +20,33 @@ import {
 import { regenerateBuilding } from './evaluate';
 import { openingFitIssues } from './walls';
 
-interface AddLevelParams {
-  name?: string;
-  elevation?: number;
-  height?: number;
-  makeActive?: boolean;
-}
-
 /**
  * @command add_level
  * @pure
  * @affects none (levels are not entities); summary + data carry the new level id
  * @failure non-finite elevation or height <= 0 -> no-op
  */
-export const addLevel: CommandDefinition<AddLevelParams> = {
+export const addLevel = defineCommand({
   name: 'add_level',
   description:
     'Add a building level (storey). Elevation is the finished-floor height; height is floor-to-floor. ' +
     'Defaults: elevation = top of the highest existing level (or 0), height = 3000 mm. ' +
     'Building elements (walls, slabs, columns…) are placed relative to their level.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Level name, e.g. "Ground floor", "Level 1".' },
-      elevation: {
-        type: 'number',
-        description:
-          'Finished-floor elevation in document units. Default: stacks on the top level.',
-      },
-      height: {
-        type: 'number',
-        description: 'Floor-to-floor height in document units (> 0). Default 3000 mm.',
-      },
-      makeActive: {
-        type: 'boolean',
-        description: 'Make it the active level for new elements. Default true.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    name: z.string().optional().describe('Level name, e.g. "Ground floor", "Level 1".'),
+    elevation: z
+      .number()
+      .optional()
+      .describe('Finished-floor elevation in document units. Default: stacks on the top level.'),
+    height: z
+      .number()
+      .optional()
+      .describe('Floor-to-floor height in document units (> 0). Default 3000 mm.'),
+    makeActive: z
+      .boolean()
+      .optional()
+      .describe('Make it the active level for new elements. Default true.'),
+  }),
   run: (doc, { name, elevation, height, makeActive = true }): CommandResult => {
     const building = getBuilding(doc);
     const top = building.levelOrder
@@ -95,14 +84,7 @@ export const addLevel: CommandDefinition<AddLevelParams> = {
       data: { levelId: id },
     };
   },
-};
-
-interface UpdateLevelParams {
-  levelId: string;
-  name?: string;
-  elevation?: number;
-  height?: number;
-}
+});
 
 /**
  * @command update_level
@@ -110,22 +92,18 @@ interface UpdateLevelParams {
  * @affects regenerates every element on the level (they move with it)
  * @failure unknown level / invalid numbers -> no-op
  */
-export const updateLevel: CommandDefinition<UpdateLevelParams> = {
+export const updateLevel = defineCommand({
   name: 'update_level',
   description:
     'Rename a level or change its elevation / floor-to-floor height. All walls, slabs, columns, ' +
     'beams, stairs, doors, windows and rooms on the level move and regenerate accordingly; walls and ' +
     'columns at full storey height and stairs climbing the storey follow a new height.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      levelId: { type: 'string', description: 'Level id, e.g. "level-2".' },
-      name: { type: 'string', description: 'New name.' },
-      elevation: { type: 'number', description: 'New finished-floor elevation (document units).' },
-      height: { type: 'number', description: 'New floor-to-floor height (> 0, document units).' },
-    },
-    required: ['levelId'],
-  },
+  params: z.object({
+    levelId: z.string().describe('Level id, e.g. "level-2".'),
+    name: z.string().optional().describe('New name.'),
+    elevation: z.number().optional().describe('New finished-floor elevation (document units).'),
+    height: z.number().optional().describe('New floor-to-floor height (> 0, document units).'),
+  }),
   run: (doc, { levelId, name, elevation, height }): CommandResult => {
     const building = getBuilding(doc);
     const level = building.levels[levelId];
@@ -166,7 +144,7 @@ export const updateLevel: CommandDefinition<UpdateLevelParams> = {
       affected: [levelId, ...elementEntityIdsOnLevel(document.building, levelId)],
     };
   },
-};
+});
 
 function elementEntityIdsOnLevel(building: BuildingModel | undefined, levelId: string): string[] {
   if (!building) return [];
@@ -175,33 +153,24 @@ function elementEntityIdsOnLevel(building: BuildingModel | undefined, levelId: s
     .flatMap((element) => element.entityIds);
 }
 
-interface DeleteLevelParams {
-  levelId: string;
-  deleteElements?: boolean;
-}
-
 /**
  * @command delete_level
  * @pure
  * @failure level holds elements and deleteElements is not true -> no-op
  */
-export const deleteLevel: CommandDefinition<DeleteLevelParams> = {
+export const deleteLevel = defineCommand({
   name: 'delete_level',
   annotations: { destructive: true },
   description:
     'Delete a level. Refuses if elements are hosted on it unless deleteElements is true, in which ' +
     'case its walls (with their doors/windows), slabs, columns, beams, stairs and rooms are deleted too.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      levelId: { type: 'string', description: 'Level id to delete.' },
-      deleteElements: {
-        type: 'boolean',
-        description: 'Also delete every element on the level. Default false.',
-      },
-    },
-    required: ['levelId'],
-  },
+  params: z.object({
+    levelId: z.string().describe('Level id to delete.'),
+    deleteElements: z
+      .boolean()
+      .optional()
+      .describe('Also delete every element on the level. Default false.'),
+  }),
   run: (doc, { levelId, deleteElements = false }): CommandResult => {
     const building = getBuilding(doc);
     if (!building.levels[levelId])
@@ -244,22 +213,14 @@ export const deleteLevel: CommandDefinition<DeleteLevelParams> = {
       affected: [levelId, ...onLevel, ...removedEntityIds],
     };
   },
-};
-
-interface SetActiveLevelParams {
-  levelId: string;
-}
+});
 
 /** @command set_active_level @pure @failure unknown level -> no-op */
-export const setActiveLevel: CommandDefinition<SetActiveLevelParams> = {
+export const setActiveLevel = defineCommand({
   name: 'set_active_level',
   annotations: { idempotent: true },
   description: 'Set the active level: new building elements go there when no levelId is given.',
-  paramsSchema: {
-    type: 'object',
-    properties: { levelId: { type: 'string', description: 'Level id, e.g. "level-1".' } },
-    required: ['levelId'],
-  },
+  params: z.object({ levelId: z.string().describe('Level id, e.g. "level-1".') }),
   run: (doc, { levelId }): CommandResult => {
     const building = getBuilding(doc);
     const level = building.levels[levelId];
@@ -273,9 +234,7 @@ export const setActiveLevel: CommandDefinition<SetActiveLevelParams> = {
       affected: [],
     };
   },
-};
-
-type SetProjectInfoParams = Partial<ProjectInfo>;
+});
 
 const PROJECT_FIELDS: ReadonlyArray<keyof ProjectInfo> = [
   'name',
@@ -288,25 +247,21 @@ const PROJECT_FIELDS: ReadonlyArray<keyof ProjectInfo> = [
 ];
 
 /** @command set_project_info @pure @failure no field given -> no-op */
-export const setProjectInfo: CommandDefinition<SetProjectInfoParams> = {
+export const setProjectInfo = defineCommand({
   name: 'set_project_info',
   annotations: { idempotent: true },
   description:
     'Set project metadata used by plan-sheet title blocks and IFC export: project name, client, ' +
     'site address, author, drawing number, revision, date. Omitted fields are kept.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Project name.' },
-      client: { type: 'string', description: 'Client / owner.' },
-      address: { type: 'string', description: 'Site address.' },
-      author: { type: 'string', description: 'Drawn by (company or person).' },
-      drawingNumber: { type: 'string', description: 'Drawing number, e.g. "A-101".' },
-      revision: { type: 'string', description: 'Revision, e.g. "B".' },
-      date: { type: 'string', description: 'Issue date, e.g. "2026-10-01".' },
-    },
-    required: [],
-  },
+  params: z.object({
+    name: z.string().optional().describe('Project name.'),
+    client: z.string().optional().describe('Client / owner.'),
+    address: z.string().optional().describe('Site address.'),
+    author: z.string().optional().describe('Drawn by (company or person).'),
+    drawingNumber: z.string().optional().describe('Drawing number, e.g. "A-101".'),
+    revision: z.string().optional().describe('Revision, e.g. "B".'),
+    date: z.string().optional().describe('Issue date, e.g. "2026-10-01".'),
+  }),
   run: (doc, params): CommandResult => {
     const building = getBuilding(doc);
     const changes: Partial<ProjectInfo> = {};
@@ -327,21 +282,21 @@ export const setProjectInfo: CommandDefinition<SetProjectInfoParams> = {
       affected: [],
     };
   },
-};
+});
 
 /**
  * @command describe_building
  * @pure read-only
  * @affects none; data = { project, levels[], elements[] }
  */
-export const describeBuilding: CommandDefinition<Record<string, never>> = {
+export const describeBuilding = defineCommand({
   name: 'describe_building',
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only: list the building model — project info, levels (id, name, elevation, height, element ' +
     'counts) and every element (id, category, mark, level, key dimensions). Use it to find element ids ' +
     'before editing walls, openings, slabs, etc.',
-  paramsSchema: { type: 'object', properties: {}, required: [] },
+  params: z.object({}),
   run: (doc): CommandResult => {
     const building = getBuilding(doc);
     const elements = building.elementOrder
@@ -370,4 +325,4 @@ export const describeBuilding: CommandDefinition<Record<string, never>> = {
       data: { project: building.project, units: doc.units, levels, elements },
     };
   },
-};
+});

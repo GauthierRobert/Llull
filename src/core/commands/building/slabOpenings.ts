@@ -5,7 +5,8 @@
 
 import type { Vec2 } from '../../model/types';
 import type { BuildingModel, SlabElement, StairElement } from '../../model/building';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
 import {
   isValidPolygon,
   pointInPolygon,
@@ -107,48 +108,33 @@ function slabAboveStair(
   );
 }
 
-interface AddSlabOpeningParams {
-  slabId?: string;
-  boundary?: Vec2[];
-  stairId?: string;
-  margin?: number;
-}
-
 /**
  * @command add_slab_opening
  * @pure
  * @affects re-evaluates the slab as a mesh with the void
  * @failure unknown slab / stair, opening outside the slab or overlapping another -> no-op
  */
-export const addSlabOpening: CommandDefinition<AddSlabOpeningParams> = {
+export const addSlabOpening = defineCommand({
   name: 'add_slab_opening',
   description:
     'Cut a void through a slab (stair well, lift or service shaft). Give a plan boundary polygon, or a ' +
     'stairId to cut its well (footprint + margin) in the floor slab of the level above — slabId is then ' +
     'found automatically. Openings are deducted from quantities and exported as IFC openings.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      slabId: {
-        type: 'string',
-        description: 'Slab element id, e.g. "slab-2". Optional with stairId.',
-      },
-      boundary: {
-        type: 'array',
-        items: { type: 'array', items: { type: 'number' } },
-        description: 'Opening polygon [[x, y], …], strictly inside the slab.',
-      },
-      stairId: {
-        type: 'string',
-        description: 'Alternative to boundary: cut the well of this stair.',
-      },
-      margin: {
-        type: 'number',
-        description: 'With stairId: clearance around the stair footprint. Default 100 mm.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    slabId: z
+      .string()
+      .optional()
+      .describe('Slab element id, e.g. "slab-2". Optional with stairId.'),
+    boundary: z
+      .array(z.array(z.number()))
+      .optional()
+      .describe('Opening polygon [[x, y], …], strictly inside the slab.'),
+    stairId: z.string().optional().describe('Alternative to boundary: cut the well of this stair.'),
+    margin: z
+      .number()
+      .optional()
+      .describe('With stairId: clearance around the stair footprint. Default 100 mm.'),
+  }),
   run: (doc, { slabId, boundary, stairId, margin }): CommandResult => {
     const building = getBuilding(doc);
     let outline: Vec2[] | null = null;
@@ -196,30 +182,21 @@ export const addSlabOpening: CommandDefinition<AddSlabOpeningParams> = {
       data: { slabId: slab.id, openingIndex: (updated.openings?.length ?? 1) - 1 },
     };
   },
-};
-
-interface DeleteSlabOpeningParams {
-  slabId: string;
-  index: number;
-}
+});
 
 /**
  * @command delete_slab_opening
  * @pure
  * @failure unknown slab / index out of range -> no-op
  */
-export const deleteSlabOpening: CommandDefinition<DeleteSlabOpeningParams> = {
+export const deleteSlabOpening = defineCommand({
   name: 'delete_slab_opening',
   annotations: { destructive: true },
   description: 'Fill (remove) opening number `index` (0-based) of a slab.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      slabId: { type: 'string', description: 'Slab element id.' },
-      index: { type: 'number', description: '0-based opening index (see describe_building).' },
-    },
-    required: ['slabId', 'index'],
-  },
+  params: z.object({
+    slabId: z.string().describe('Slab element id.'),
+    index: z.number().describe('0-based opening index (see describe_building).'),
+  }),
   run: (doc, { slabId, index }): CommandResult => {
     const building = getBuilding(doc);
     const slab = building.elements[slabId];
@@ -241,4 +218,4 @@ export const deleteSlabOpening: CommandDefinition<DeleteSlabOpeningParams> = {
       affected: elementAffected(document, [slabId]),
     };
   },
-};
+});

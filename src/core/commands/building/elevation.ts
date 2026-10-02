@@ -5,8 +5,8 @@
  */
 
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
-import type { BimCategory } from '../../model/building';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
 import { entityToTriangles, type Triangle } from '../export';
 import { fileSlug, getBuilding, isFiniteNumber, noChange, toMetres } from './model';
 import {
@@ -20,18 +20,19 @@ import {
   fitScale,
   scaleBar,
   titleBlock,
+  PAPER_SIZES,
   type PaperSize,
   type Viewport,
 } from './sheet';
 
 export type ElevationDirection = 'north' | 'south' | 'east' | 'west';
 
-export const ELEVATION_DIRECTIONS: ReadonlyArray<ElevationDirection> = [
+export const ELEVATION_DIRECTIONS = [
   'north',
   'south',
   'east',
   'west',
-];
+] as const satisfies ReadonlyArray<ElevationDirection>;
 
 /** Viewer side → screen axis u (left→right as seen by the viewer) and depth (grows toward viewer). */
 interface Projection {
@@ -456,22 +457,13 @@ export function buildElevationSheet(
   };
 }
 
-interface ExportElevationSheetParams {
-  direction?: ElevationDirection;
-  cutAt?: number;
-  exclude?: BimCategory[];
-  paper?: PaperSize;
-  scale?: number;
-  title?: string;
-}
-
 /**
  * @command export_elevation_sheet
  * @pure read-only
  * @affects none; data = { filename, svg, paper, scale, faces }
  * @failure bad direction / paper / scale / cutAt, nothing to draw -> no data
  */
-export const exportElevationSheet: CommandDefinition<ExportElevationSheetParams> = {
+export const exportElevationSheet = defineCommand({
   name: 'export_elevation_sheet',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -480,56 +472,33 @@ export const exportElevationSheet: CommandDefinition<ExportElevationSheetParams>
     'north), or a section when cutAt is given (the model nearer to the viewer than the cut plane is removed ' +
     'and cut outlines are drawn heavy). Shows level datums, grid bubbles, scale bar and the title block. ' +
     'Use exclude: ["panel"] to show the steel frame behind the cladding. data.svg holds the file text.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      direction: {
-        type: 'string',
-        enum: [...ELEVATION_DIRECTIONS],
-        description:
-          'Side the viewer stands on (north elevation = north façade seen from the north). Default south.',
-      },
-      cutAt: {
-        type: 'number',
-        description:
-          'Section plane position on the viewing axis (y for north / south, x for east / west).',
-      },
-      exclude: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Building categories to leave out, e.g. ["panel", "slab"].',
-      },
-      paper: {
-        type: 'string',
-        enum: Object.keys(PAPER_MM),
-        description: 'Paper size (landscape). Default A3.',
-      },
-      scale: {
-        type: 'number',
-        description: 'Scale denominator N for 1:N. Default: smallest standard scale that fits.',
-      },
-      title: { type: 'string', description: 'Drawing title. Default "<Direction> elevation".' },
-    },
-    required: [],
-  },
+  params: z.object({
+    direction: z
+      .enum(ELEVATION_DIRECTIONS)
+      .optional()
+      .describe(
+        'Side the viewer stands on (north elevation = north façade seen from the north). Default south.',
+      ),
+    cutAt: z
+      .number()
+      .optional()
+      .describe(
+        'Section plane position on the viewing axis (y for north / south, x for east / west).',
+      ),
+    exclude: z
+      .array(z.string())
+      .optional()
+      .describe('Building categories to leave out, e.g. ["panel", "slab"].'),
+    paper: z.enum(PAPER_SIZES).optional().describe('Paper size (landscape). Default A3.'),
+    scale: z
+      .number()
+      .optional()
+      .describe('Scale denominator N for 1:N. Default: smallest standard scale that fits.'),
+    title: z.string().optional().describe('Drawing title. Default "<Direction> elevation".'),
+  }),
   run: (doc, { direction = 'south', cutAt, exclude, paper, scale, title }): CommandResult => {
-    if (!ELEVATION_DIRECTIONS.includes(direction)) {
-      return noChange(
-        doc,
-        `export_elevation_sheet failed: direction must be one of ${ELEVATION_DIRECTIONS.join(', ')}.`,
-      );
-    }
-    if (paper !== undefined && !(paper in PAPER_MM)) {
-      return noChange(
-        doc,
-        `export_elevation_sheet failed: paper must be one of ${Object.keys(PAPER_MM).join(', ')}.`,
-      );
-    }
     if (cutAt !== undefined && !isFiniteNumber(cutAt)) {
       return noChange(doc, 'export_elevation_sheet failed: cutAt must be a finite number.');
-    }
-    if (exclude !== undefined && !Array.isArray(exclude)) {
-      return noChange(doc, 'export_elevation_sheet failed: exclude must be an array.');
     }
     const sheet = buildElevationSheet(doc, {
       direction,
@@ -552,4 +521,4 @@ export const exportElevationSheet: CommandDefinition<ExportElevationSheetParams>
       data: sheet,
     };
   },
-};
+});

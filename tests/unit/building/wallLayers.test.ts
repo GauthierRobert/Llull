@@ -69,7 +69,7 @@ describe('set_wall_layers', () => {
       { wallIds: ['wall-1'], layers: [{ material: 'x', thickness: 10, function: 'glue' }] },
       /function/,
     ],
-    [{ wallIds: 'wall-1', layers: BUILD_UP }, /must list existing walls/],
+    [{ wallIds: 'wall-1', layers: BUILD_UP }, /rejected: invalid params — wallIds/],
   ])('rejects %j', (params, message) => {
     const result = execute(wallDoc(), 'set_wall_layers', params);
     expect(result.affected).toEqual([]);

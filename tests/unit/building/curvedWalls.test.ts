@@ -71,7 +71,7 @@ describe('add_curved_wall', () => {
   });
 
   it.each([
-    [{ ...HALF, start: [0] }, /must be \[x, y\]/],
+    [{ ...HALF, start: [0] }, /add_curved_wall rejected: invalid params/],
     [{ ...HALF, through: [0, 0], end: [5000, 0], start: [-5000, 0] }, /collinear/],
     [{ ...HALF, thickness: 0 }, /must be > 0/],
     [{ ...HALF, thickness: 20000 }, /smaller than the diameter/],

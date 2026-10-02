@@ -118,7 +118,7 @@ describe('building_schedule', () => {
   it('rejects an unknown kind', () => {
     const doc = house();
     const result = execute(doc, 'building_schedule', { kind: 'roof' });
-    expect(result.summary).toMatch(/kind must be/);
+    expect(result.summary).toMatch(/rejected: invalid params — kind/);
     expect(result.data).toBeUndefined();
   });
 });

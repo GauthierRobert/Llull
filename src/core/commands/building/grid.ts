@@ -5,7 +5,9 @@
 
 import type { Vec2 } from '../../model/types';
 import type { BuildingModel, GridElement } from '../../model/building';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
+import { vec2 } from './params';
 import {
   fromMm,
   getBuilding,
@@ -64,32 +66,22 @@ export function addGrid(
   return withElement(building, element);
 }
 
-interface AddGridLineParams {
-  start: Vec2;
-  end: Vec2;
-  label?: string;
-}
-
 /**
  * @command add_grid_line
  * @pure
  * @affects creates the axis line + 2 bubbles + 2 labels
  * @failure zero length / duplicate label -> no-op
  */
-export const addGridLine: CommandDefinition<AddGridLineParams> = {
+export const addGridLine = defineCommand({
   name: 'add_grid_line',
   description:
     'Add one structural grid axis from start to end (plan [x, y]) with a labelled bubble at each end, ' +
     'on layer S-GRID. Label defaults to the next free number.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      start: { type: 'array', items: { type: 'number' }, description: 'Axis start [x, y].' },
-      end: { type: 'array', items: { type: 'number' }, description: 'Axis end [x, y].' },
-      label: { type: 'string', description: 'Bubble label, e.g. "A" or "3". Must be unique.' },
-    },
-    required: ['start', 'end'],
-  },
+  params: z.object({
+    start: vec2('Axis start [x, y].'),
+    end: vec2('Axis end [x, y].'),
+    label: z.string().optional().describe('Bubble label, e.g. "A" or "3". Must be unique.'),
+  }),
   run: (doc, { start, end, label }): CommandResult => {
     if (!isVec2(start) || !isVec2(end) || lengthOf(start, end) <= 0) {
       return noChange(doc, 'add_grid_line failed: start and end must be distinct [x, y] points.');
@@ -110,14 +102,7 @@ export const addGridLine: CommandDefinition<AddGridLineParams> = {
       data: { elementId: id },
     };
   },
-};
-
-interface AddGridSystemParams {
-  xSpacings: number[];
-  ySpacings: number[];
-  origin?: Vec2;
-  extension?: number;
-}
+});
 
 /**
  * @command add_grid_system
@@ -125,40 +110,28 @@ interface AddGridSystemParams {
  * @affects creates (xSpacings.length + 1) numbered axes and (ySpacings.length + 1) lettered axes
  * @failure empty spacing lists or spacing <= 0 -> no-op
  */
-export const addGridSystem: CommandDefinition<AddGridSystemParams> = {
+export const addGridSystem = defineCommand({
   name: 'add_grid_system',
   description:
     'Lay out a rectangular structural grid. Numbered axes 1, 2, 3… run parallel to Y and are spaced ' +
     'along X by xSpacings; lettered axes A, B, C… (I and O skipped) run parallel to X, spaced along Y ' +
     'by ySpacings. E.g. xSpacings [6000, 6000] gives axes 1–3 six metres apart.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      xSpacings: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Bay widths along X between consecutive numbered axes (each > 0).',
-      },
-      ySpacings: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Bay widths along Y between consecutive lettered axes (each > 0).',
-      },
-      origin: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Intersection of axis 1 and axis A [x, y]. Default [0, 0].',
-      },
-      extension: {
-        type: 'number',
-        description: 'How far axes overrun the outer grid lines (document units). Default 1500 mm.',
-      },
-    },
-    required: ['xSpacings', 'ySpacings'],
-  },
-  run: (doc, { xSpacings, ySpacings, origin = [0, 0], extension }): CommandResult => {
-    const validSpacings = (values: unknown): values is number[] =>
-      Array.isArray(values) && values.every((value) => isFiniteNumber(value) && value > 0);
+  params: z.object({
+    xSpacings: z
+      .array(z.number())
+      .describe('Bay widths along X between consecutive numbered axes (each > 0).'),
+    ySpacings: z
+      .array(z.number())
+      .describe('Bay widths along Y between consecutive lettered axes (each > 0).'),
+    origin: vec2('Intersection of axis 1 and axis A [x, y]. Default [0, 0].').optional(),
+    extension: z
+      .number()
+      .optional()
+      .describe('How far axes overrun the outer grid lines (document units). Default 1500 mm.'),
+  }),
+  run: (doc, { xSpacings, ySpacings, origin: originInput, extension }): CommandResult => {
+    const validSpacings = (values: readonly number[]): boolean =>
+      values.every((value) => isFiniteNumber(value) && value > 0);
     if (
       !validSpacings(xSpacings) ||
       !validSpacings(ySpacings) ||
@@ -169,11 +142,11 @@ export const addGridSystem: CommandDefinition<AddGridSystemParams> = {
         'add_grid_system failed: xSpacings / ySpacings must be lists of numbers > 0.',
       );
     }
-    if (!isVec2(origin)) return noChange(doc, 'add_grid_system failed: origin must be [x, y].');
     const overrun = extension ?? fromMm(doc, 1500);
     if (!isFiniteNumber(overrun) || overrun < 0) {
       return noChange(doc, 'add_grid_system failed: extension must be >= 0.');
     }
+    const origin: Vec2 = originInput ?? [0, 0];
     const xs = [origin[0]];
     for (const spacing of xSpacings) xs.push((xs[xs.length - 1] as number) + spacing);
     const ys = [origin[1]];
@@ -204,4 +177,4 @@ export const addGridSystem: CommandDefinition<AddGridSystemParams> = {
       data: { elementIds: createdIds, labels: created },
     };
   },
-};
+});

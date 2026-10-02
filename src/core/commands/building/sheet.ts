@@ -5,11 +5,20 @@
  */
 
 import type { CadDocument, Vec2 } from '../../model/types';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
 import { buildPlanDrawing, type PlanDrawing, type PlanPrimitive } from './plan';
 
 export type PaperSize = 'A4' | 'A3' | 'A2' | 'A1' | 'A0';
+
+export const PAPER_SIZES = [
+  'A4',
+  'A3',
+  'A2',
+  'A1',
+  'A0',
+] as const satisfies ReadonlyArray<PaperSize>;
 
 /** Landscape ISO 216 sizes, millimetres. */
 export const PAPER_MM: Readonly<Record<PaperSize, readonly [number, number]>> = {
@@ -340,20 +349,13 @@ export function buildPlanSheet(doc: CadDocument, options: SheetOptions): PlanShe
   };
 }
 
-interface ExportPlanSheetParams {
-  levelId?: string;
-  paper?: PaperSize;
-  scale?: number;
-  title?: string;
-}
-
 /**
  * @command export_plan_sheet
  * @pure read-only
  * @affects none; data = { filename, svg, paper, scale, levelId }
  * @failure unknown level / paper / invalid scale -> no data
  */
-export const exportPlanSheet: CommandDefinition<ExportPlanSheetParams> = {
+export const exportPlanSheet = defineCommand({
   name: 'export_plan_sheet',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -361,31 +363,18 @@ export const exportPlanSheet: CommandDefinition<ExportPlanSheetParams> = {
     'level plan at a true scale (1:50, 1:100…; auto-fitted when omitted) on ISO paper A4–A0 landscape, with ' +
     'wall poché, doors, windows, grids, room tags, dimensions in mm, north arrow, scale bar and a title block ' +
     'filled from set_project_info. data.svg holds the file text.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      levelId: { type: 'string', description: 'Level to draw. Default: active level.' },
-      paper: {
-        type: 'string',
-        enum: Object.keys(PAPER_MM),
-        description: 'Paper size (landscape). Default A3.',
-      },
-      scale: {
-        type: 'number',
-        description:
-          'Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits.',
-      },
-      title: { type: 'string', description: 'Drawing title. Default "<level> — Floor plan".' },
-    },
-    required: [],
-  },
+  params: z.object({
+    levelId: z.string().optional().describe('Level to draw. Default: active level.'),
+    paper: z.enum(PAPER_SIZES).optional().describe('Paper size (landscape). Default A3.'),
+    scale: z
+      .number()
+      .optional()
+      .describe(
+        'Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits.',
+      ),
+    title: z.string().optional().describe('Drawing title. Default "<level> — Floor plan".'),
+  }),
   run: (doc, { levelId, paper, scale, title }): CommandResult => {
-    if (paper !== undefined && !(paper in PAPER_MM)) {
-      return noChange(
-        doc,
-        `export_plan_sheet failed: paper must be one of ${Object.keys(PAPER_MM).join(', ')}.`,
-      );
-    }
     const sheet = buildPlanSheet(doc, {
       ...(levelId !== undefined ? { levelId } : {}),
       ...(paper !== undefined ? { paper } : {}),
@@ -405,4 +394,4 @@ export const exportPlanSheet: CommandDefinition<ExportPlanSheetParams> = {
       data: sheet,
     };
   },
-};
+});
