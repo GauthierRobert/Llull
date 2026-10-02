@@ -1,6 +1,6 @@
 # RULE: react (React 18 + TS + r3f + Zustand best practices)
 
-Applies to `ui/` ONLY. `core/` has no React (architecture L2). Components are presentation +
+Applies to `src/ui/` ONLY. `packages/*` have no React (architecture L2). Components are presentation +
 param-gathering; the document changes ONLY via `dispatch` → `execute` (PRIME DIRECTIVE).
 
 ## R1 — No business logic in components
@@ -52,4 +52,4 @@ toolbar is generated from `listCommands()` (architecture L5) — render accessib
 ## R11 — Testing (mirror workflow W3)
 Testing Library. Assert observable behavior (a command dispatched, an entity rendered, a
 `summary` shown) — NOT internal state or geometry math. Component tests cover panels &
-param-gathering, never the command math (that's unit-tested in `core`).
+param-gathering, never the command math (that's unit-tested in `packages/*`).

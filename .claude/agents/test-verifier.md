@@ -14,11 +14,15 @@ LOAD FIRST: `.claude/rules/workflow.md` (W3), `.claude/context/command-layer.md`
 
 ## What to test where
 
-- `tests/unit/` — command layer. This is where the gate lives:
-  `src/core/commands/** = 90% statements / 85% branches / 90% functions / 90% lines`.
-  Cover happy path + every failure branch (missing id, invalid input, no-op cases).
-- `tests/integration/` — `store.dispatch` end-to-end: command → store swap → undo/redo
-  snapshot behavior.
+- `tests/unit/` — command layer + plugins (`tests/unit/building/`). The gate:
+  `packages/core/src/commands/**` and `packages/domain-aec/src/** = 90% statements / 85%
+  branches / 90% functions / 90% lines`. Cover happy path + every failure branch (missing id,
+  schema-rejected params, invalid input, no-op cases).
+- `tests/unit/contract/` — schema derivation/conformance, tool-schema snapshot, context,
+  plugins, persistence v2, live sync. `tests/golden/` — id-normalized `build_project` snapshots +
+  replay equality; never blanket-update (`-u`) without confirming the change is intended.
+- `tests/integration/` — `store.dispatch` end-to-end: command → store swap → undo/redo,
+  live sync, offline outbox. `server/tests/` — `npm --prefix server test`.
 - Component tests (Testing Library) — panels & param-gathering only; NOT geometry math.
 
 ## Principles
@@ -33,9 +37,10 @@ LOAD FIRST: `.claude/rules/workflow.md` (W3), `.claude/context/command-layer.md`
 
 ## Procedure
 
-1. Run `npm run check`; if failing, read the actual output and diagnose precisely.
+1. Run `npm run check`; if failing, read the actual output and diagnose precisely
+   (constrained machine: `npx vitest run --maxWorkers=2 --minWorkers=1`).
 2. `npm run test:coverage`; open the report; add tests for each uncovered branch in
-   `core/commands`.
+   `packages/core/src/commands` / `packages/domain-aec/src`.
 3. Re-run until typecheck + lint + tests + coverage all pass.
 4. Report exactly what passed/failed with the command output. If something is skipped
    or xfail, say so explicitly.

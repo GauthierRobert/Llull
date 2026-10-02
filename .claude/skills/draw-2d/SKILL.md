@@ -18,32 +18,36 @@ across the existing agents; this skill is the playbook.
 ## The three pieces of any 2D feature
 
 ### 1. Model (if a new 2D kind is needed) — command-author
-Extend `Shape2DKind` + add the `*Entity` interface (Vec2 geometry in the entity's local
-plane; `position` places that plane in 3D) + add to the `Entity`/`EntityKind` union and
-the `is2D` helper. See model.md.
+Extend `Shape2DKind` + add the `*Entity` interface in `packages/core/src/model/types.ts`
+(Vec2 geometry in the entity's local plane; `position` places that plane in 3D) + add to the
+`Entity` union and `SHAPE2D_KINDS` (drives `is2D`). See model.md.
 
 ### 2. Drawing command(s) — command-author / add-command skill
-Each draw op is a pure `CommandDefinition`, snake_case, drafting-verb named:
-`draw_line`, `draw_polyline`, `draw_arc`, `draw_circle`, `draw_rectangle`,
-`add_dimension`. Same rules as any command: pure, registered, happy + failure tests.
+Each draw op is a pure `defineCommand`, snake_case, drafting-verb named, in
+`packages/core/src/commands/draw2d*.ts` / `modify2d*.ts` / `annotate.ts` (`draw_line`,
+`draw_polyline`, `draw_arc`, `draw_circle`, `draw_rectangle`, `draw_ellipse`, `draw_spline`,
+`add_dimension`, `offset_2d`, `trim`, …). Points: `vec2()` / `looseVec2()` schema helpers. Same
+rules as any command: pure, registered (+ `2d` toolset in `packages/mcp/src/toolsets.ts`),
+happy + failure tests.
 Registering it gives the UI tool and the MCP tool (drivable by Claude or any agent) at once.
 
 ### 3. Drafting interaction & rendering — viewport-engineer / viewport-feature skill
 - 2D drafting view = orthographic top-down camera over the SAME three.js scene; render
   2D entities as Line/Shape geometry; render every kind by `kind`.
 - Snapping (endpoint, midpoint, center, intersection, grid) and ortho/polar tracking:
-  compute snap candidates as PURE functions in `core`/`lib` (unit-tested); the component
-  only applies the chosen point and calls `dispatch`.
+  compute snap candidates as PURE functions (`src/ui/viewport/2d/snapping/`, unit-tested; move
+  to `packages/core/src/lib/` if a command needs them); the component only applies the chosen
+  point and calls `dispatch`.
 - Dimensions/annotations are entities too (`dimension` kind), created via a command.
 
 ## The 2D → 3D bridge (do not duplicate geometry)
-A closed `polyline`/profile is the input to `extrude_profile` (and later
-`revolve_profile`) to become a solid. Sketch once in 2D, build the solid from it. Never
+A closed 2D shape (circle, rectangle, closed polyline) is the input to `extrude_sketch`
+(raw point profiles: `extrude_profile`, `revolve_profile`) to become a solid. Sketch once in 2D, build the solid from it. Never
 re-encode the same shape separately for the 2D and 3D worlds.
 
 ## Done checklist
-- [ ] New 2D kinds added to `Shape2DKind`/`Entity`/`is2D`; viewport has a render branch
+- [ ] New 2D kinds added to `Shape2DKind`/`Entity`/`SHAPE2D_KINDS`; viewport has a render branch
 - [ ] Draw commands are pure, registered, snake_case, tested (happy + failure)
-- [ ] Snap/ortho math is pure + unit-tested in core/lib, applied (not computed) in ui
-- [ ] Closed profiles feed `extrude_profile` — no geometry duplicated across 2D/3D
+- [ ] Snap/ortho math is pure + unit-tested, applied (not computed) in components
+- [ ] Closed shapes feed `extrude_sketch` — no geometry duplicated across 2D/3D
 - [ ] Verified in the 2D drafting view (`verify-llull`); `npm run check` green

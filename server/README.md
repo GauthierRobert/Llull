@@ -2,7 +2,10 @@
 
 Optional Express backend. Provides:
 
-1. **MCP host** (`/mcp`) — exposes the full llull command registry to external agents (Claude or any MCP client) over the MCP Streamable HTTP transport. This is the only path for AI control of llull (architecture L6).
+1. **MCP host** (`/mcp`) — exposes the llull command registry to external agents (Claude or any MCP client) over the MCP Streamable HTTP transport. This is the only path for AI control of llull (architecture L6). Sessions start with the `core` toolset plus tool discovery (see below).
+2. **Shared live document** — one document for every MCP session and browser tab, with autosave, broadcast to the web app as a command log over `/live`.
+
+The server is not an npm workspace: it has its own `package.json` and imports the workspace packages through the same path aliases (`@core`, `@mcp`, `@aec`, `@kernel-*`, `@app`). `src/plugins.ts` installs the default domain plugins before anything else loads.
 
 ## Run
 
@@ -27,10 +30,14 @@ The server binds to `127.0.0.1:3001` by default (local tool; not reachable from 
 
 | Method | Path       | Description                                          |
 |--------|------------|------------------------------------------------------|
-| GET    | /health    | Liveness probe — returns `{ status: "ok" }`          |
+| GET    | /health    | Liveness probe — returns `{ status: "ok", kernel }` (`manifold`, `occt` or `null`) |
 | POST   | /mcp       | MCP Streamable HTTP — initialize + tools/list + tools/call |
-| GET    | /mcp       | MCP SSE stream for server-initiated notifications    |
-| DELETE | /mcp       | MCP session close (stateless v1: no-op, returns 200) |
+| GET    | /mcp       | MCP SSE stream for server-initiated notifications (`mcp-session-id` required) |
+| DELETE | /mcp       | Close the MCP session (`mcp-session-id` required); the shared document is untouched |
+| GET    | /live      | SSE command log of the shared document: `snapshot` `{ seq, stateHash, document }` on connect / undo / redo, `command` `{ seq, name, params, stateHash }` per mutation |
+| GET    | /live/snapshot | Current `{ seq, stateHash, document }` — resync after a seq gap or hash mismatch |
+| POST   | /command   | Run `{ name, params }` on the shared document (the web app's `dispatch`) |
+| POST   | /undo, /redo | Undo / redo on the shared document |
 | GET    | /export/stl | Download the live model as STL |
 | GET    | /export/code | Download the model as parametric code (`?language=cadquery\|build123d\|openscad\|freecad`) |
 | GET    | /export/step | Download an exact B-rep STEP file (needs the Python bridge; 503 otherwise) |
@@ -39,7 +46,7 @@ The server binds to `127.0.0.1:3001` by default (local tool; not reachable from 
 
 ### POST /mcp — MCP Streamable HTTP
 
-The MCP endpoint exposes every registered llull command as an MCP tool. Tool schemas are generated from `buildMcpTools()` (`core/mcp`), which delegates to `toToolSchemas()` from the command registry — they are always in sync.
+The MCP endpoint exposes registered llull commands as MCP tools, filtered by the session's enabled toolsets. Tool schemas are generated from `buildMcpTools()` (`packages/mcp/src/tools.ts`), which delegates to `toToolSchemas()` from the command registry — they are always in sync.
 
 **Authentication**
 
@@ -69,7 +76,7 @@ curl -X POST http://localhost:3001/mcp \
     }
   }'
 
-# 2. List available tools
+# 2. List available tools (send the `mcp-session-id` header returned by step 1 on every later request)
 curl -X POST http://localhost:3001/mcp \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer changeme" \
@@ -91,12 +98,8 @@ curl -X POST http://localhost:3001/mcp \
     "params": {
       "name": "add_box",
       "arguments": {
-        "width": 10,
-        "height": 5,
-        "depth": 3,
-        "x": 0,
-        "y": 0,
-        "z": 0
+        "size": [10, 5, 3],
+        "position": [0, 0, 0]
       }
     }
   }'
@@ -118,11 +121,11 @@ curl -X POST http://localhost:3001/mcp \
 }
 ```
 
-`isError` is `true` only for unknown tool names. A registered command that gracefully no-ops on bad params (e.g. missing entity id) is NOT an error — its summary is normal feedback.
+`isError` is `true` for unknown tool names and for tools of a disabled toolset. A registered command that gracefully no-ops on bad params (e.g. missing entity id, or params rejected by its schema with `<name> rejected: invalid params — <path>: …`) is NOT an error — its summary is normal feedback.
 
-**Working document (v1 session model)**
+**Working document (shared live document)**
 
-The server holds one module-level `CadDocument` initialized from `createEmptyDocument()`. Each successful `tools/call` threads the result document forward. This is a shared, single-session store — sufficient for v1 single-agent use. A future v2 can switch to `sessionIdGenerator` mode (stateful transport) to give each client its own document.
+Each `initialize` creates a session (UUID `mcp-session-id`, idle sessions evicted after `MCP_SESSION_TTL_MS`). All sessions read and write the SINGLE shared `CadDocument` in `src/liveDocument.ts` (restored from the autosave file on start). Every mutating `tools/call` is broadcast on `/live`, so other sessions and the web app see it immediately.
 
 ---
 
@@ -130,7 +133,7 @@ The server holds one module-level `CadDocument` initialized from `createEmptyDoc
 
 ## Tool discovery (`search_tools`, `enable_toolset`)
 
-By default a session lists only the `core` toolset plus two discovery tools (defined in `src/core/mcp/discovery.ts`; MCP-layer tools, not registry commands):
+By default a session lists only the `core` toolset plus two discovery tools (defined in `packages/mcp/src/discovery.ts`; MCP-layer tools, not registry commands):
 
 - `search_tools { query, limit? }` — keyword search over every tool (enabled or not); returns `data.results: [{ name, toolset, enabled, description }]`.
 - `enable_toolset { toolset }` — enables a toolset for the calling session only; the server then sends `notifications/tools/list_changed` (`capabilities.tools.listChanged: true`). An unknown name is an `isError` result listing the valid toolsets.
@@ -149,7 +152,7 @@ Calling a tool of a disabled toolset returns an error that names `enable_toolset
 2. `add_box` creates a 2×2×2 box and returns its entity id in `affected`.
 3. `draw_circle` creates a circle and returns its entity id.
 4. `extrude_sketch` receives the circle's id (parsed from step 3's result) and extrudes it into a 3-unit solid — proving that id chaining between sequential tool calls works correctly.
-5. The client closes cleanly; the server's working document now holds all three entities.
+5. The client closes cleanly; the shared live document now holds all three entities (and the web app shows them).
 
 ### How to run
 
@@ -176,23 +179,23 @@ Expected output (tool names and ids will vary):
 Connecting to llull MCP server at http://localhost:3001/mcp ...
 Connected.
 
-tools/list → 18 tool(s) registered:
-  - add_box
-  - extrude_profile
-  - move_entity
+tools/list → <n> tool(s) registered:
+  - search_tools
+  - enable_toolset
+  - describe_scene
   - ...
 
 Step 1: add_box
-  summary  : Added box box-<id> of size 2×2×2.
-  affected : box-<id>
+  summary  : Added box box-<step>.1 of size 2×2×2; ...
+  affected : box-<step>.1
 
 Step 2: draw_circle
-  summary  : Drew circle circ-<id> at center (0, 0) with radius 1.
-  affected : circ-<id>
+  summary  : Drew circle ... with radius 1.
+  affected : <circle id>
 
-Step 3: extrude_sketch (source: circ-<id>)
-  summary  : Extruded circ-<id> into extrusion ext-<id> with depth 3.
-  affected : ext-<id>
+Step 3: extrude_sketch (source: <circle id>)
+  summary  : Extruded <circle id> into extrusion ... with depth 3.
+  affected : <extrusion id>
 
 Done. Client closed cleanly.
 ```
@@ -201,7 +204,7 @@ Done. Client closed cleanly.
 
 - **"Failed to connect"** — the server is not running. Start it with `npm --prefix server run dev`.
 - **401 Unauthorized** — the server was started with `MCP_AUTH_TOKEN` but the script was not given a matching token. Pass `MCP_AUTH_TOKEN=<token>` before the run command.
-- **extrude_sketch no-op** — the circle `id` was not found in the server's working document. This can happen if the server was restarted between step 2 and step 3 (the working document resets on restart).
+- **extrude_sketch no-op** — the circle `id` was not found in the server's working document. This can happen if the document was cleared or replaced (e.g. `clear_document`, `load_document`, or a restart with autosave disabled) between step 2 and step 3.
 
 ---
 
@@ -231,7 +234,7 @@ Done. Client closed cleanly.
 | `LLULL_PYTHON_TIMEOUT_MS`  | no       | `120000`          | Per-request Python timeout |
 | `LLULL_EXCHANGE_DIR`       | no       | unset             | Directory for the exchange tools' `path` arguments; `export_step` also saves there |
 | `LLULL_ALLOW_CODE_EXECUTION` | no     | unset             | `1` enables `import_code`, which **runs arbitrary Python** with server privileges |
-| `LLULL_TOOLSETS`           | no       | `core`            | Comma-separated MCP toolsets a session starts with: `core` (always on: core commands + the `search_tools` / `enable_toolset` discovery tools), `2d`, `3d`, `measure`, `parametric`, `assembly`, `exchange`, `building`, or `all` (every tool, the pre-MG6.3 behavior). Unset = `core` only, so clients do not load ~230 schemas; an agent calls `search_tools` to find a tool and `enable_toolset` to load its toolset for that session (the server then sends `notifications/tools/list_changed`). Unknown names are ignored with a warning. Prompts that need a hidden toolset are hidden until it is enabled. Hidden tools stay usable as `build_project` steps and in the UI. See `src/core/mcp/toolsets.ts`, `src/core/mcp/discovery.ts` |
+| `LLULL_TOOLSETS`           | no       | `core`            | Comma-separated MCP toolsets a session starts with: `core` (always on: core commands + the `search_tools` / `enable_toolset` discovery tools), `2d`, `3d`, `measure`, `parametric`, `assembly`, `exchange`, `building`, or `all` (every tool, the pre-MG6.3 behavior). Unset = `core` only, so clients do not load ~230 schemas; an agent calls `search_tools` to find a tool and `enable_toolset` to load its toolset for that session (the server then sends `notifications/tools/list_changed`). Unknown names are ignored with a warning. Prompts that need a hidden toolset are hidden until it is enabled. Hidden tools stay usable as `build_project` steps and in the UI. See `packages/mcp/src/toolsets.ts`, `packages/mcp/src/discovery.ts` |
 
 ### REST mutation policy (`/command`, `/undo`, `/redo`)
 

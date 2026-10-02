@@ -6,7 +6,7 @@ These are obligations, not suggestions.
 
 ## AC1 — Discovery over documentation
 An agent should *find* a thing by name and path, not by reading prose. Clear names, one concern
-per file, re-export through `registry.ts`. If you reach for a paragraph to explain where
+per file, register through `registry.ts` (core) or the plugin's `commands` (domain). If you reach for a paragraph to explain where
 something is, fix the structure instead.
 
 ## AC2 — Types and tags, not narration
@@ -37,7 +37,7 @@ pollutes search results and wastes the context of every agent that reads after y
 edits. Snake_case for tool/command `name`; that string is the AI/MCP tool id.
 
 ## AC8 — Co-locate tests with the change
-The test is executable documentation of intent for the next agent. New `core/` logic ⇒ test in
+The test is executable documentation of intent for the next agent. New `packages/*` logic ⇒ test in
 the same change (workflow W1). Assert observed behavior, not internals (W3).
 
 ## AC9 — One source of truth; link, don't duplicate

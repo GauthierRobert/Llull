@@ -5,50 +5,46 @@ description: Add or extend llull's parametric modeling — named parameters/vari
 
 # Skill: parametric
 
-A full CAD stores HOW a model was built, not just final geometry. llull has an unfair
-advantage here: commands are pure `(doc, params) => doc`, so the ordered command list
-already IS a replayable feature tree (architecture L8). This skill promotes that into
-real parametric modeling. Delegate command work to `command-author`.
+A full CAD stores HOW a model was built, not just final geometry. Commands are pure
+`(doc, params, ctx) => doc`, so the recorded command list IS a replayable feature tree
+(architecture L8, "as built"). This skill extends it. Delegate command work to `command-author`.
 
 ## References
-- Model design: `.claude/context/model.md` (Parameter, Constraint, Feature, history)
+- Model: `.claude/context/model.md` (Parameter, Constraint, FeatureStep, partition)
+- Signatures: `.claude/context/command-layer.md` (History & regeneration, IDs)
 - Law: `.claude/rules/architecture.md` (L8 parametric, L9 kernel)
 
+## What exists (extend, don't rebuild)
+| Piece | Where (`packages/core/src/commands/`) |
+| ----- | ----- |
+| Feature history: `execute` appends `FeatureStep { id: 'step-<n>' }` per mutating command | `registry.ts` |
+| History edits: `replay_history`, `edit_step_params`, `reorder_step`, `set_step_suppressed`, `insert_step`, `delete_step` (`metaHistory`) | `history.ts`, `history_carry.ts` |
+| Step-scoped ids `<prefix>-<n>.<k>` — replay re-mints identical ids (remap kept only for legacy, pre-step-scoped ids) | `@lib/id`, `regenerate.ts` |
+| Replay prefix cache (`ctx.replayCache`): unchanged prefixes reused; edit step k ⇒ re-run k..n | `replayCache.ts` |
+| Parameters + `=expr` step params (`set_parameter`, `delete_parameter`) | `parameters.ts`, `expression.ts` |
+| Parameter → step dependencies: regenerate only when a step reads a changed parameter | `dependents.ts` |
+| Configurations (design tables), recipes | `configurations.ts`, `recipes.ts` |
+| Constraints + pure solver (`add_constraint`, `solve_constraints`, …) | `constraints.ts`, `constraintSolver.ts` |
+| Constructive vs evaluated split | `@core/model/partition` |
+
 ## The core distinction (decide before coding)
-- **Constructive geometry** = the editable definition: sketches + features + parameters
-  + constraints. This is the source of truth — store it.
-- **Evaluated geometry** = the resulting meshes/B-rep you render and export. Treat it as
-  a DERIVED cache produced by replaying `history`. Don't hand-edit it.
+- **Constructive** = the editable definition: feature history, parameters, constraints, plugin
+  definitions (e.g. `building`). Source of truth — stored.
+- **Evaluated** = `entities` + `order` (meshes/B-rep you render and export). Derived; never
+  hand-edit it. Plugin-generated geometry is read-only (derivation guards) and omitted from v2 files.
 
-## Three pieces
-
-### 1. Parameters — command-author
-Named variables (`Parameter { name, value, expression?, unit? }`) in the document.
-Commands read params instead of hardcoding numbers. Add `set_parameter` (changing a
-value re-evaluates dependent features) and expose parameters as readable/writable over
-MCP — this is the killer agent demo: "set wall_thickness = 200" → model updates.
-
-### 2. Constraints + solver — command-author + core/lib
-Geometric (coincident, parallel, perpendicular, tangent, concentric, equal, horizontal,
-vertical) and dimensional (distance, angle, radius — driving dimensions). Constraints
-reference entities by id. The SOLVER is a PURE function in `core`/`lib` (unit-tested):
-`(geometry, constraints) => positioned geometry`. No solver code in components or commands' side effects.
-
-### 3. Feature history / timeline — store + commands
-Promote the undo snapshot stack into a named, ordered `Feature[]` history. Support
-insert / reorder / edit-params / suppress a feature, then RE-EVALUATE downstream by
-replaying. Because commands are pure, replay is deterministic and safe.
-
-## Keep it incremental (don't break the contract)
-- Commands stay pure and keep returning `CommandResult`. v1 can be "direct mode"
-  (history = undo snapshots, no params/constraints); promote per roadmap without
-  rewriting callers.
-- `entities` becomes a derived cache once `history` is the source of truth — change that
-  in the store/evaluator, not in every command.
+## Rules for new parametric work
+- A new document-input command (edits a table, not geometry) ⇒ `annotations: { metaHistory: true }`
+  and, if geometry depends on it, regenerate via `replayHistory` / `regenerateParameterDependents`.
+- Regeneration must be deterministic: no `Date.now()` / `uniqueId()` in ids, kernel only from
+  `ctx.kernel`; `requiresKernel` steps make replay refuse rather than drop geometry.
+- Keep `affected` order deterministic. Keep the `CommandResult` contract unchanged.
+- Prove it: a test that edits a parameter/step and asserts the regenerated doc, plus a golden
+  plan (`tests/golden/plans.ts`) whose `replay_history` reproduces the document.
 
 ## Done checklist
-- [ ] Parameters/constraints/features live in the document (model.md shapes); not ad hoc
-- [ ] Solver is pure, in core/lib, unit-tested; constraints reference entity ids
-- [ ] Editing a parameter/feature re-evaluates downstream deterministically (replay)
-- [ ] `set_parameter` (and friends) exposed as MCP/AI tools via the registry
-- [ ] Command purity + the coverage gate still hold; `npm run check` green
+- [ ] Data lives in the document (model.md shapes); not ad hoc
+- [ ] Solver/evaluation is pure, unit-tested; constraints reference entity ids
+- [ ] Editing a parameter/step re-evaluates only what depends on it, deterministically
+- [ ] Exposed as MCP/AI tools via the registry (`defineCommand`)
+- [ ] Purity, golden corpus and the coverage gate hold; `npm run check` green
