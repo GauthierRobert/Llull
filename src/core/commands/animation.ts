@@ -12,7 +12,8 @@ import type {
   CadDocument,
   Vec3,
 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { nextId } from '../../lib/id';
 
 // ---------------------------------------------------------------------------
@@ -47,15 +48,6 @@ function withAnimation(doc: CadDocument, anim: Animation): CadDocument {
 // animate_spin
 // ---------------------------------------------------------------------------
 
-interface AnimateSpinParams {
-  targetId: string;
-  speed: number;
-  axis?: number[];
-  channel?: string;
-  pivot?: number[];
-  trigger?: string;
-}
-
 /**
  * @command animate_spin
  * @pure
@@ -64,7 +56,7 @@ interface AnimateSpinParams {
  * @invariant targetId must exist in doc.entities or doc.groups
  * @failure missing targetId -> no-op, affected:[]
  */
-export const animateSpin: CommandDefinition<AnimateSpinParams> = {
+export const animateSpin = defineCommand({
   name: 'animate_spin',
   description:
     'Attach a constant-velocity spin animation to an entity or group. ' +
@@ -73,48 +65,45 @@ export const animateSpin: CommandDefinition<AnimateSpinParams> = {
     'axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. ' +
     'pivot is the world-space rotation pivot point; when omitted, the player defaults to the target entity/group position. ' +
     "trigger 'auto' runs the animation under the global Play button; 'click' toggles it when the user clicks the part in the viewport.",
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      targetId: {
-        type: 'string',
-        description: 'Id of the entity or group to animate. Must exist in the document.',
-      },
-      speed: {
-        type: 'number',
-        description:
-          'Constant velocity: rad/s for the rotation channel (e.g. 6.283 ≈ 1 rev/s), or document units/s for the position channel.',
-      },
-      axis: {
-        type: 'array',
-        description:
-          'World-space direction vector [x, y, z] the spin acts along. ' +
+  params: z.object({
+    targetId: z
+      .string()
+      .describe('Id of the entity or group to animate. Must exist in the document.'),
+    speed: z
+      .number()
+      .describe(
+        'Constant velocity: rad/s for the rotation channel (e.g. 6.283 ≈ 1 rev/s), or document units/s for the position channel.',
+      ),
+    axis: z
+      .array(z.number())
+      .optional()
+      .describe(
+        'World-space direction vector [x, y, z] the spin acts along. ' +
           'For rotation this is the spin axle; for position this is the translation direction. ' +
           'Need not be unit-length. Defaults to [0, 1, 0] (Y axis).',
-        items: { type: 'number' },
-      },
-      channel: {
-        type: 'string',
-        description:
-          "Transform channel to drive: 'rotation' (default) spins the part; 'position' translates it at constant speed.",
-      },
-      pivot: {
-        type: 'array',
-        description:
-          'World-space pivot point [x, y, z] for the rotation axis. ' +
+      ),
+    channel: z
+      .string()
+      .optional()
+      .describe(
+        "Transform channel to drive: 'rotation' (default) spins the part; 'position' translates it at constant speed.",
+      ),
+    pivot: z
+      .array(z.number())
+      .optional()
+      .describe(
+        'World-space pivot point [x, y, z] for the rotation axis. ' +
           'Only meaningful for the rotation channel. ' +
           'When omitted the player uses the target entity/group position as the pivot.',
-        items: { type: 'number' },
-      },
-      trigger: {
-        type: 'string',
-        description:
-          "When to run the animation: 'auto' (default) starts under the global Play button; " +
+      ),
+    trigger: z
+      .string()
+      .optional()
+      .describe(
+        "When to run the animation: 'auto' (default) starts under the global Play button; " +
           "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
-      },
-    },
-    required: ['targetId', 'speed'],
-  },
+      ),
+  }),
   run: (doc, { targetId, speed, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) {
@@ -153,21 +142,11 @@ export const animateSpin: CommandDefinition<AnimateSpinParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // animate_oscillate
 // ---------------------------------------------------------------------------
-
-interface AnimateOscillateParams {
-  targetId: string;
-  amplitude: number;
-  frequency: number;
-  axis?: number[];
-  channel?: string;
-  pivot?: number[];
-  trigger?: string;
-}
 
 /**
  * @command animate_oscillate
@@ -177,7 +156,7 @@ interface AnimateOscillateParams {
  * @invariant targetId must exist; amplitude > 0; frequency > 0
  * @failure missing targetId, amplitude <= 0, or frequency <= 0 -> no-op, affected:[]
  */
-export const animateOscillate: CommandDefinition<AnimateOscillateParams> = {
+export const animateOscillate = defineCommand({
   name: 'animate_oscillate',
   description:
     'Attach a sinusoidal oscillation animation to an entity or group. ' +
@@ -187,55 +166,52 @@ export const animateOscillate: CommandDefinition<AnimateOscillateParams> = {
     'axis is the world-space direction vector ([0,1,0] = Y axis); it need not be unit-length — the viewport normalizes it. ' +
     'pivot is the world-space rotation pivot; when omitted the player uses the target position. ' +
     "trigger 'auto' runs under the global Play button; 'click' toggles when the user clicks the part.",
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      targetId: {
-        type: 'string',
-        description: 'Id of the entity or group to animate. Must exist in the document.',
-      },
-      amplitude: {
-        type: 'number',
-        description:
-          'Peak displacement of the oscillation. For the rotation channel this is radians; ' +
+  params: z.object({
+    targetId: z
+      .string()
+      .describe('Id of the entity or group to animate. Must exist in the document.'),
+    amplitude: z
+      .number()
+      .describe(
+        'Peak displacement of the oscillation. For the rotation channel this is radians; ' +
           'for the position channel this is document units. Must be greater than 0.',
-      },
-      frequency: {
-        type: 'number',
-        description:
-          'Number of complete oscillation cycles per second (Hz). Must be greater than 0. ' +
+      ),
+    frequency: z
+      .number()
+      .describe(
+        'Number of complete oscillation cycles per second (Hz). Must be greater than 0. ' +
           'Example: 0.5 = one full back-and-forth every 2 seconds; 2 = two cycles per second.',
-      },
-      axis: {
-        type: 'array',
-        description:
-          'World-space direction vector [x, y, z] the oscillation acts along. ' +
+      ),
+    axis: z
+      .array(z.number())
+      .optional()
+      .describe(
+        'World-space direction vector [x, y, z] the oscillation acts along. ' +
           'For rotation this is the axle; for position this is the translation direction. ' +
           'Need not be unit-length. Defaults to [0, 1, 0] (Y axis).',
-        items: { type: 'number' },
-      },
-      channel: {
-        type: 'string',
-        description:
-          "Transform channel to drive: 'rotation' (default) rocks the part; 'position' slides it back and forth.",
-      },
-      pivot: {
-        type: 'array',
-        description:
-          'World-space pivot point [x, y, z] for the rotation axis. ' +
+      ),
+    channel: z
+      .string()
+      .optional()
+      .describe(
+        "Transform channel to drive: 'rotation' (default) rocks the part; 'position' slides it back and forth.",
+      ),
+    pivot: z
+      .array(z.number())
+      .optional()
+      .describe(
+        'World-space pivot point [x, y, z] for the rotation axis. ' +
           'Only meaningful for the rotation channel. ' +
           'When omitted the player uses the target entity/group position as the pivot.',
-        items: { type: 'number' },
-      },
-      trigger: {
-        type: 'string',
-        description:
-          "When to run the animation: 'auto' (default) starts under the global Play button; " +
+      ),
+    trigger: z
+      .string()
+      .optional()
+      .describe(
+        "When to run the animation: 'auto' (default) starts under the global Play button; " +
           "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
-      },
-    },
-    required: ['targetId', 'amplitude', 'frequency'],
-  },
+      ),
+  }),
   run: (doc, { targetId, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) {
@@ -290,16 +266,11 @@ export const animateOscillate: CommandDefinition<AnimateOscillateParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // stop_animation
 // ---------------------------------------------------------------------------
-
-interface StopAnimationParams {
-  animationId?: string;
-  targetId?: string;
-}
 
 /**
  * @command stop_animation
@@ -309,7 +280,7 @@ interface StopAnimationParams {
  * @invariant if animationId given, removes that one; if targetId given, removes all matching that target; if neither, clears ALL
  * @failure animationId given but not found -> no-op with explanatory summary
  */
-export const stopAnimation: CommandDefinition<StopAnimationParams> = {
+export const stopAnimation = defineCommand({
   name: 'stop_animation',
   annotations: { idempotent: true },
   description:
@@ -318,25 +289,23 @@ export const stopAnimation: CommandDefinition<StopAnimationParams> = {
     'If targetId is provided (and animationId is not), all animations whose targetId matches are removed. ' +
     'If neither is provided, ALL animations in the document are cleared. ' +
     'affected is always [] because animations are not entities.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      animationId: {
-        type: 'string',
-        description:
-          'Id of a specific animation to remove (e.g. "anim-abc123-4"). ' +
+  params: z.object({
+    animationId: z
+      .string()
+      .optional()
+      .describe(
+        'Id of a specific animation to remove (e.g. "anim-abc123-4"). ' +
           'Takes precedence over targetId when both are given.',
-      },
-      targetId: {
-        type: 'string',
-        description:
-          'Entity or group id whose animations should all be removed. ' +
+      ),
+    targetId: z
+      .string()
+      .optional()
+      .describe(
+        'Entity or group id whose animations should all be removed. ' +
           'All animations with this targetId are deleted in one call. ' +
           'Ignored when animationId is also provided.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, { animationId, targetId }): CommandResult => {
     const existing = doc.animations;
 
@@ -394,4 +363,4 @@ export const stopAnimation: CommandDefinition<StopAnimationParams> = {
       affected: [],
     };
   },
-};
+});

@@ -287,7 +287,7 @@ describe('export_code', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(result.data).toBeUndefined();
-    expect(result.summary).toContain('unknown language "fortran"');
+    expect(result.summary).toContain('export_code rejected: invalid params');
   });
 
   it('exports an empty document without error', () => {
@@ -528,9 +528,13 @@ describe('apply_code_trace', () => {
     }
 
     it('rejects a non-object trace', () => {
-      expectAbort('nope', 'trace must be an object');
-      expectAbort(null, 'trace must be an object');
-      expectAbort([], 'trace must be an object');
+      for (const trace of ['nope', null, []]) {
+        const doc = createEmptyDocument();
+        const result = execute(doc, 'apply_code_trace', { trace });
+        expect(result.document).toBe(doc);
+        expect(result.affected).toEqual([]);
+        expect(result.summary).toContain('apply_code_trace rejected: invalid params');
+      }
     });
 
     it('rejects a trace without parameters/features arrays', () => {

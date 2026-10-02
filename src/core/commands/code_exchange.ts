@@ -6,7 +6,8 @@
  * @layer core/commands
  */
 
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { getCommand } from './registry';
 import { buildFeatureProgram } from '../codegen/featureProgram';
 import { emitPython } from '../codegen/python';
@@ -19,19 +20,12 @@ import { emitFreeCad } from '../codegen/freecad';
 
 type CodeLanguage = 'cadquery' | 'build123d' | 'openscad' | 'freecad';
 
-const LANGUAGES: readonly CodeLanguage[] = ['cadquery', 'build123d', 'openscad', 'freecad'];
-
 const FILE_EXTENSIONS: Readonly<Record<CodeLanguage, string>> = {
   cadquery: 'py',
   build123d: 'py',
   openscad: 'scad',
   freecad: 'FCMacro',
 };
-
-interface ExportCodeParams {
-  language: CodeLanguage;
-  name?: string;
-}
 
 /**
  * @command export_code
@@ -42,7 +36,7 @@ interface ExportCodeParams {
  *   from the feature history ('history', parametric) or the current geometry ('snapshot')
  * @failure unknown language -> no-op with summary, affected:[]
  */
-export const exportCode: CommandDefinition<ExportCodeParams> = {
+export const exportCode = defineCommand({
   name: 'export_code',
   description:
     'Export the model as parametric source code: CadQuery or build123d (Python), OpenSCAD, or a FreeCAD ' +
@@ -50,30 +44,17 @@ export const exportCode: CommandDefinition<ExportCodeParams> = {
     'feature (primitive, boolean, move, delete, rename) appears in feature-history order, so the code ' +
     'states exact dimensions and build order. CadQuery/build123d output can be edited and re-imported ' +
     'with import_code. Read-only: returns data.text (plus fileName, language, source, counts).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      language: {
-        type: 'string',
-        description: 'Target: "cadquery" | "build123d" | "openscad" | "freecad".',
-        enum: LANGUAGES,
-      },
-      name: {
-        type: 'string',
-        description: 'Base file name without extension (sanitized). Default "model".',
-      },
-    },
-    required: ['language'],
-  },
+  params: z.object({
+    language: z
+      .enum(['cadquery', 'build123d', 'openscad', 'freecad'])
+      .describe('Target: "cadquery" | "build123d" | "openscad" | "freecad".'),
+    name: z
+      .string()
+      .optional()
+      .describe('Base file name without extension (sanitized). Default "model".'),
+  }),
   annotations: { readOnly: true, idempotent: true },
   run: (doc, { language, name }): CommandResult => {
-    if (!LANGUAGES.includes(language)) {
-      return {
-        document: doc,
-        summary: `export_code: unknown language "${String(language)}"; use one of ${LANGUAGES.join(', ')}.`,
-        affected: [],
-      };
-    }
     const program = buildFeatureProgram(doc, getCommand);
     const text =
       language === 'openscad'
@@ -107,4 +88,4 @@ export const exportCode: CommandDefinition<ExportCodeParams> = {
       },
     };
   },
-};
+});

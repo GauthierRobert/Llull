@@ -6,7 +6,8 @@
 
 import type { CadDocument, Entity } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { nextId } from '../../lib/id';
 import { MAX_IMPORT_BODIES, MAX_IMPORT_TRIANGLES } from './limits';
 
@@ -15,10 +16,6 @@ interface MeshBodyParams {
   indices?: number[];
   name?: string;
   color?: string;
-}
-
-interface ImportMeshParams {
-  bodies: MeshBodyParams[];
 }
 
 const DEFAULT_MESH_COLOR = '#9aa5b1';
@@ -69,28 +66,23 @@ function fail(doc: CadDocument, reason: string): CommandResult {
  * @invariant stored mesh is a world-space triangle soup: indices = 0..n-1, position = [0,0,0]
  * @failure empty bodies / malformed positions or indices / over limits -> no-op, affected:[]
  */
-export const importMesh: CommandDefinition<ImportMeshParams> = {
+export const importMesh = defineCommand({
   name: 'import_mesh',
   description:
     'Create mesh solids from world-space triangle data — the landing point for STEP import and for ' +
     'code-imported shapes that have no analytic llull primitive. Each body becomes one mesh entity ' +
     '(optionally named and coloured). Meshes render, measure and export but have no editable dimensions.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      bodies: {
-        type: 'array',
-        description:
-          'Bodies to create. Each: { positions: [x,y,z, ...] world-space numbers, indices?: [i0,i1,i2, ...] ' +
+  params: z.object({
+    bodies: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe(
+        'Bodies to create. Each: { positions: [x,y,z, ...] world-space numbers, indices?: [i0,i1,i2, ...] ' +
           '(omit for a triangle soup of 9 numbers per triangle), name?: string, color?: "#rrggbb" }.',
-        items: { type: 'object' },
-      },
-    },
-    required: ['bodies'],
-  },
-  run: (doc, { bodies }): CommandResult => {
-    if (!Array.isArray(bodies) || bodies.length === 0)
-      return fail(doc, 'bodies must be a non-empty array');
+      ),
+  }),
+  run: (doc, params): CommandResult => {
+    const bodies = params.bodies as unknown as MeshBodyParams[];
+    if (bodies.length === 0) return fail(doc, 'bodies must be a non-empty array');
     if (bodies.length > MAX_IMPORT_BODIES) {
       return fail(doc, `${bodies.length} bodies exceeds MAX_IMPORT_BODIES (${MAX_IMPORT_BODIES})`);
     }
@@ -130,4 +122,4 @@ export const importMesh: CommandDefinition<ImportMeshParams> = {
       affected,
     };
   },
-};
+});

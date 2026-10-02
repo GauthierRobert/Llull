@@ -10,7 +10,8 @@
  */
 
 import type { CadDocument, Entity, EntityKind } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { entityBounds } from './scene';
 import type { Bounds } from './scene';
 
@@ -93,50 +94,13 @@ function overlapsBbox(
   return overlapsAabb(entityBounds(e), bboxMin, bboxMax);
 }
 
-/** Validate a 3-element finite-number tuple. Returns null on success, an error string on failure. */
-function validateVec3(v: unknown, label: string): string | null {
-  if (!Array.isArray(v) || v.length !== 3) return `${label} must be a 3-element array [x,y,z].`;
-  for (let i = 0; i < 3; i++) {
-    const n = v[i] as unknown;
-    if (typeof n !== 'number' || !isFinite(n)) return `${label}[${i}] must be a finite number.`;
-  }
-  return null;
-}
+const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
 
-// ---------------------------------------------------------------------------
-// NearPoint filter shape
-// ---------------------------------------------------------------------------
-
-interface NearPointFilter {
-  point: readonly [number, number, number];
-  radius: number;
-}
+const vec3Exact = (description: string): typeof POINT_3D => POINT_3D.describe(description);
 
 // ---------------------------------------------------------------------------
 // find_entities
 // ---------------------------------------------------------------------------
-
-interface FindEntitiesParams {
-  kind?: EntityKind;
-  layerId?: string;
-  name?: string;
-  nameExact?: boolean;
-  tag?: string;
-  bboxMin?: readonly [number, number, number];
-  bboxMax?: readonly [number, number, number];
-  /** Spatial: return entities whose bbox centroid is within `radius` of `point`. */
-  nearPoint?: NearPointFilter;
-  /** Spatial: return entities whose bbox is FULLY inside this AABB [[minX,minY,minZ],[maxX,maxY,maxZ]]. */
-  insideBBox?: readonly [readonly [number, number, number], readonly [number, number, number]];
-  /** Spatial: return entities whose bbox INTERSECTS this AABB [[minX,minY,minZ],[maxX,maxY,maxZ]]. */
-  overlapsBBox?: readonly [readonly [number, number, number], readonly [number, number, number]];
-  /** Spatial: return entities whose bbox overlaps the bbox of the entity with this id (excluding itself). */
-  touchingId?: string;
-  /** Fuzzy: case-insensitive substring match on entity `name`. */
-  nameFuzzy?: string;
-  /** Fuzzy: case-insensitive substring match on any tag in entity `tags`. */
-  tagFuzzy?: string;
-}
 
 /**
  * Resolve the touching-id filter: compute the bbox of the reference entity and
@@ -160,7 +124,7 @@ function resolveTouchingBounds(doc: CadDocument, touchingId: string): Bounds | n
  * @failure insideBBox/overlapsBBox min > max on any axis -> no-op, affected:[]
  * @failure touchingId missing from document -> no-op, affected:[]
  */
-export const findEntities: CommandDefinition<FindEntitiesParams> = {
+export const findEntities = defineCommand({
   name: 'find_entities',
   annotations: { readOnly: true },
   description:
@@ -169,123 +133,112 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
     'overlapsBBox (AABB intersects), touchingId (bbox touches another entity), nameFuzzy (case-insensitive ' +
     'substring on name), tagFuzzy (case-insensitive substring on any tag). All supplied filters are AND-ed. ' +
     'Returns matched entity descriptors (id, kind, layerId, name, tags) in result.data. Does NOT modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      kind: {
-        type: 'string',
-        description:
-          'Filter by entity kind. One of: "box", "cylinder", "sphere", "extrusion", "mesh", ' +
+  params: z.object({
+    kind: z
+      .enum([
+        'box',
+        'cylinder',
+        'sphere',
+        'extrusion',
+        'mesh',
+        'cone',
+        'torus',
+        'wedge',
+        'pyramid',
+        'line',
+        'polyline',
+        'arc',
+        'circle',
+        'rectangle',
+        'point',
+        'ellipse',
+        'spline',
+      ])
+      .optional()
+      .describe(
+        'Filter by entity kind. One of: "box", "cylinder", "sphere", "extrusion", "mesh", ' +
           '"cone", "torus", "wedge", "pyramid", "line", "polyline", "arc", "circle", "rectangle", ' +
           '"point", "ellipse", "spline". Omit to match all kinds.',
-        enum: [
-          'box',
-          'cylinder',
-          'sphere',
-          'extrusion',
-          'mesh',
-          'cone',
-          'torus',
-          'wedge',
-          'pyramid',
-          'line',
-          'polyline',
-          'arc',
-          'circle',
-          'rectangle',
-          'point',
-          'ellipse',
-          'spline',
-        ],
-      },
-      layerId: {
-        type: 'string',
-        description:
-          'Filter by layer id. Only entities assigned to this layer are returned. Omit to match all layers.',
-      },
-      name: {
-        type: 'string',
-        description:
-          'Filter by entity name. By default performs a case-insensitive substring match. ' +
+      ),
+    layerId: z
+      .string()
+      .optional()
+      .describe(
+        'Filter by layer id. Only entities assigned to this layer are returned. Omit to match all layers.',
+      ),
+    name: z
+      .string()
+      .optional()
+      .describe(
+        'Filter by entity name. By default performs a case-insensitive substring match. ' +
           'Set nameExact:true for a case-sensitive exact match. Omit to match all names.',
-      },
-      nameExact: {
-        type: 'boolean',
-        description:
-          'When true, the name filter requires an exact case-sensitive match instead of a substring match. Default: false.',
-      },
-      tag: {
-        type: 'string',
-        description:
-          'Filter to entities that have this exact tag string in their tags array. Omit to match all entities regardless of tags.',
-      },
-      bboxMin: {
-        type: 'array',
-        description:
-          'World-space minimum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMax. ' +
-          'Only entities whose world-space AABB overlaps this box are returned.',
-        items: { type: 'number' },
-      },
-      bboxMax: {
-        type: 'array',
-        description:
-          'World-space maximum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMin. ' +
-          'Only entities whose world-space AABB overlaps this box are returned.',
-        items: { type: 'number' },
-      },
-      nearPoint: {
-        type: 'object',
-        description:
-          'Spatial filter: return only entities whose bbox centroid is within `radius` units (3D euclidean) of `point`. ' +
+      ),
+    nameExact: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, the name filter requires an exact case-sensitive match instead of a substring match. Default: false.',
+      ),
+    tag: z
+      .string()
+      .optional()
+      .describe(
+        'Filter to entities that have this exact tag string in their tags array. Omit to match all entities regardless of tags.',
+      ),
+    bboxMin: vec3Exact(
+      'World-space minimum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMax. ' +
+        'Only entities whose world-space AABB overlaps this box are returned.',
+    ).optional(),
+    bboxMax: vec3Exact(
+      'World-space maximum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMin. ' +
+        'Only entities whose world-space AABB overlaps this box are returned.',
+    ).optional(),
+    nearPoint: z
+      .object({
+        point: vec3Exact('World-space origin [x, y, z] of the proximity search.'),
+        radius: z.number().describe('Maximum distance from point to entity centroid. Must be > 0.'),
+      })
+      .optional()
+      .describe(
+        'Spatial filter: return only entities whose bbox centroid is within `radius` units (3D euclidean) of `point`. ' +
           'Provide as { "point": [x, y, z], "radius": number }. radius must be > 0.',
-        properties: {
-          point: {
-            type: 'array',
-            description: 'World-space origin [x, y, z] of the proximity search.',
-            items: { type: 'number' },
-          },
-          radius: {
-            type: 'number',
-            description: 'Maximum distance from point to entity centroid. Must be > 0.',
-          },
-        },
-        required: ['point', 'radius'],
-      },
-      insideBBox: {
-        type: 'array',
-        description:
-          'Spatial filter: return only entities whose world-space AABB is FULLY inside the given box. ' +
+      ),
+    insideBBox: z
+      .tuple([POINT_3D, POINT_3D])
+      .optional()
+      .describe(
+        'Spatial filter: return only entities whose world-space AABB is FULLY inside the given box. ' +
           'Provide as [[minX,minY,minZ],[maxX,maxY,maxZ]]. min must be <= max on every axis.',
-        items: { type: 'array', items: { type: 'number' } },
-      },
-      overlapsBBox: {
-        type: 'array',
-        description:
-          'Spatial filter: return only entities whose world-space AABB INTERSECTS the given box. ' +
+      ),
+    overlapsBBox: z
+      .tuple([POINT_3D, POINT_3D])
+      .optional()
+      .describe(
+        'Spatial filter: return only entities whose world-space AABB INTERSECTS the given box. ' +
           'Provide as [[minX,minY,minZ],[maxX,maxY,maxZ]]. min must be <= max on every axis.',
-        items: { type: 'array', items: { type: 'number' } },
-      },
-      touchingId: {
-        type: 'string',
-        description:
-          'Spatial filter: return entities whose world-space AABB overlaps the AABB of the entity with this id. ' +
+      ),
+    touchingId: z
+      .string()
+      .optional()
+      .describe(
+        'Spatial filter: return entities whose world-space AABB overlaps the AABB of the entity with this id. ' +
           'The reference entity itself is excluded from results. The id must exist in the document.',
-      },
-      nameFuzzy: {
-        type: 'string',
-        description:
-          'Fuzzy name filter: case-insensitive substring match on entity name. ' +
+      ),
+    nameFuzzy: z
+      .string()
+      .optional()
+      .describe(
+        'Fuzzy name filter: case-insensitive substring match on entity name. ' +
           'Matches any entity whose name contains this string. Omit to skip this filter.',
-      },
-      tagFuzzy: {
-        type: 'string',
-        description:
-          "Fuzzy tag filter: case-insensitive substring match on any tag in the entity's tags array. " +
+      ),
+    tagFuzzy: z
+      .string()
+      .optional()
+      .describe(
+        "Fuzzy tag filter: case-insensitive substring match on any tag in the entity's tags array. " +
           'Matches if ANY tag contains this substring. Omit to skip this filter.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, params): CommandResult => {
     const {
       kind,
@@ -316,15 +269,7 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
 
     // --- Validate nearPoint ---
     if (nearPoint !== undefined) {
-      const pointErr = validateVec3(nearPoint.point, 'nearPoint.point');
-      if (pointErr !== null) {
-        return { document: doc, summary: `find_entities: ${pointErr}`, affected: [] };
-      }
-      if (
-        typeof nearPoint.radius !== 'number' ||
-        !isFinite(nearPoint.radius) ||
-        nearPoint.radius <= 0
-      ) {
+      if (nearPoint.radius <= 0) {
         return {
           document: doc,
           summary: 'find_entities: nearPoint.radius must be a finite number > 0.',
@@ -335,21 +280,7 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
 
     // --- Validate insideBBox ---
     if (insideBBox !== undefined) {
-      if (!Array.isArray(insideBBox) || insideBBox.length !== 2) {
-        return {
-          document: doc,
-          summary: 'find_entities: insideBBox must be [[minX,minY,minZ],[maxX,maxY,maxZ]].',
-          affected: [],
-        };
-      }
-      const minErr = validateVec3(insideBBox[0], 'insideBBox[0]');
-      if (minErr !== null)
-        return { document: doc, summary: `find_entities: ${minErr}`, affected: [] };
-      const maxErr = validateVec3(insideBBox[1], 'insideBBox[1]');
-      if (maxErr !== null)
-        return { document: doc, summary: `find_entities: ${maxErr}`, affected: [] };
-      const qMin = insideBBox[0] as readonly [number, number, number];
-      const qMax = insideBBox[1] as readonly [number, number, number];
+      const [qMin, qMax] = insideBBox;
       if (qMin[0] > qMax[0] || qMin[1] > qMax[1] || qMin[2] > qMax[2]) {
         return {
           document: doc,
@@ -361,21 +292,7 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
 
     // --- Validate overlapsBBox ---
     if (overlapsBBox !== undefined) {
-      if (!Array.isArray(overlapsBBox) || overlapsBBox.length !== 2) {
-        return {
-          document: doc,
-          summary: 'find_entities: overlapsBBox must be [[minX,minY,minZ],[maxX,maxY,maxZ]].',
-          affected: [],
-        };
-      }
-      const minErr = validateVec3(overlapsBBox[0], 'overlapsBBox[0]');
-      if (minErr !== null)
-        return { document: doc, summary: `find_entities: ${minErr}`, affected: [] };
-      const maxErr = validateVec3(overlapsBBox[1], 'overlapsBBox[1]');
-      if (maxErr !== null)
-        return { document: doc, summary: `find_entities: ${maxErr}`, affected: [] };
-      const qMin = overlapsBBox[0] as readonly [number, number, number];
-      const qMax = overlapsBBox[1] as readonly [number, number, number];
+      const [qMin, qMax] = overlapsBBox;
       if (qMin[0] > qMax[0] || qMin[1] > qMax[1] || qMin[2] > qMax[2]) {
         return {
           document: doc,
@@ -399,19 +316,14 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
     }
 
     // --- Precompute typed spatial params ---
-    const npPoint =
-      nearPoint !== undefined ? (nearPoint.point as readonly [number, number, number]) : null;
+    const npPoint = nearPoint !== undefined ? nearPoint.point : null;
     const npRadiusSq = nearPoint !== undefined ? nearPoint.radius * nearPoint.radius : 0;
 
-    const insideMin =
-      insideBBox !== undefined ? (insideBBox[0] as readonly [number, number, number]) : null;
-    const insideMax =
-      insideBBox !== undefined ? (insideBBox[1] as readonly [number, number, number]) : null;
+    const insideMin = insideBBox !== undefined ? insideBBox[0] : null;
+    const insideMax = insideBBox !== undefined ? insideBBox[1] : null;
 
-    const overlapMin =
-      overlapsBBox !== undefined ? (overlapsBBox[0] as readonly [number, number, number]) : null;
-    const overlapMax =
-      overlapsBBox !== undefined ? (overlapsBBox[1] as readonly [number, number, number]) : null;
+    const overlapMin = overlapsBBox !== undefined ? overlapsBBox[0] : null;
+    const overlapMax = overlapsBBox !== undefined ? overlapsBBox[1] : null;
 
     const nameFuzzyLc = nameFuzzy !== undefined ? nameFuzzy.toLowerCase() : null;
     const tagFuzzyLc = tagFuzzy !== undefined ? tagFuzzy.toLowerCase() : null;
@@ -524,4 +436,4 @@ export const findEntities: CommandDefinition<FindEntitiesParams> = {
       data: result,
     };
   },
-};
+});

@@ -10,7 +10,8 @@
  */
 
 import type { CadDocument, Material } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,23 +26,6 @@ function isValidHexColor(s: string): boolean {
 // create_material
 // ---------------------------------------------------------------------------
 
-interface CreateMaterialParams {
-  /** Human-readable name; also the lookup key in doc.materials. Must be non-empty. */
-  name: string;
-  /**
-   * Density in (mass-unit) per (document-length-unit)³.
-   * For a document in mm: g/mm³ (steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124).
-   * Must be > 0 and finite. Used by mass_properties when a material is assigned.
-   */
-  density: number;
-  /** Diffuse/albedo color as a CSS hex string, e.g. "#b0b0b0". Must match /^#[0-9a-fA-F]{6}$/. */
-  color: string;
-  /** PBR metalness factor in [0, 1]. 0 = dielectric, 1 = metallic. */
-  metalness: number;
-  /** PBR roughness factor in [0, 1]. 0 = mirror-smooth, 1 = fully rough. */
-  roughness: number;
-}
-
 /**
  * @command create_material
  * @pure
@@ -51,7 +35,7 @@ interface CreateMaterialParams {
  * @failure blank name → no-op; density ≤ 0 or non-finite → no-op;
  *          metalness/roughness outside [0,1] → no-op; invalid hex color → no-op
  */
-export const createMaterial: CommandDefinition<CreateMaterialParams> = {
+export const createMaterial = defineCommand({
   name: 'create_material',
   description:
     'Define or replace a named material in the document material library. ' +
@@ -61,49 +45,45 @@ export const createMaterial: CommandDefinition<CreateMaterialParams> = {
     'Density units match the document unit system: for a mm document, density is in g/mm³ ' +
     '(steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124). ' +
     'Assign the material to entities with assign_material.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Human-readable material name used as the lookup key, e.g. "steel", "aluminium_6061". ' +
+  params: z.object({
+    name: z
+      .string()
+      .describe(
+        'Human-readable material name used as the lookup key, e.g. "steel", "aluminium_6061". ' +
           'Must be a non-empty string. Case-sensitive. Used with assign_material to reference this material.',
-      },
-      density: {
-        type: 'number',
-        description:
-          'Density in (mass-unit) per (document-length-unit)³. Must be > 0 and finite. ' +
+      ),
+    density: z
+      .number()
+      .describe(
+        'Density in (mass-unit) per (document-length-unit)³. Must be > 0 and finite. ' +
           'For a document in mm: g/mm³ — steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124, ' +
           'titanium ≈ 0.00445, copper ≈ 0.00893. ' +
           'This value is used by mass_properties when the material is assigned to an entity.',
-      },
-      color: {
-        type: 'string',
-        description:
-          'Diffuse/albedo color as a 6-digit CSS hex string, e.g. "#b0b0b0" for grey steel. ' +
+      ),
+    color: z
+      .string()
+      .describe(
+        'Diffuse/albedo color as a 6-digit CSS hex string, e.g. "#b0b0b0" for grey steel. ' +
           'Must match the pattern #rrggbb (exactly 6 hex digits after the #). ' +
           'Used by the 3D viewport PBR renderer (VNF4).',
-      },
-      metalness: {
-        type: 'number',
-        description:
-          'PBR metalness factor in [0, 1]. 0 = fully dielectric (plastic, wood, ceramic), ' +
+      ),
+    metalness: z
+      .number()
+      .describe(
+        'PBR metalness factor in [0, 1]. 0 = fully dielectric (plastic, wood, ceramic), ' +
           '1 = fully metallic (aluminium, steel, copper). Non-metallic coatings are typically 0.',
-      },
-      roughness: {
-        type: 'number',
-        description:
-          'PBR roughness factor in [0, 1]. 0 = mirror-smooth (polished metal), ' +
+      ),
+    roughness: z
+      .number()
+      .describe(
+        'PBR roughness factor in [0, 1]. 0 = mirror-smooth (polished metal), ' +
           '1 = fully diffuse/matte (rough concrete, unfinished wood). ' +
           'Brushed aluminium ≈ 0.3, matte plastic ≈ 0.7.',
-      },
-    },
-    required: ['name', 'density', 'color', 'metalness', 'roughness'],
-  },
+      ),
+  }),
   annotations: { idempotent: true },
   run: (doc, { name, density, color, metalness, roughness }): CommandResult => {
-    if (typeof name !== 'string' || name.trim() === '') {
+    if (name.trim() === '') {
       return {
         document: doc,
         summary: 'create_material failed: name must be a non-empty string.',
@@ -111,7 +91,7 @@ export const createMaterial: CommandDefinition<CreateMaterialParams> = {
       };
     }
 
-    if (typeof density !== 'number' || !isFinite(density) || density <= 0) {
+    if (density <= 0) {
       return {
         document: doc,
         summary: `create_material '${name}' failed: density must be a finite number > 0, got ${String(density)}.`,
@@ -119,7 +99,7 @@ export const createMaterial: CommandDefinition<CreateMaterialParams> = {
       };
     }
 
-    if (typeof metalness !== 'number' || !isFinite(metalness) || metalness < 0 || metalness > 1) {
+    if (metalness < 0 || metalness > 1) {
       return {
         document: doc,
         summary: `create_material '${name}' failed: metalness must be in [0, 1], got ${String(metalness)}.`,
@@ -127,7 +107,7 @@ export const createMaterial: CommandDefinition<CreateMaterialParams> = {
       };
     }
 
-    if (typeof roughness !== 'number' || !isFinite(roughness) || roughness < 0 || roughness > 1) {
+    if (roughness < 0 || roughness > 1) {
       return {
         document: doc,
         summary: `create_material '${name}' failed: roughness must be in [0, 1], got ${String(roughness)}.`,
@@ -135,7 +115,7 @@ export const createMaterial: CommandDefinition<CreateMaterialParams> = {
       };
     }
 
-    if (typeof color !== 'string' || !isValidHexColor(color)) {
+    if (!isValidHexColor(color)) {
       return {
         document: doc,
         summary: `create_material '${name}' failed: color must be a 6-digit hex string like "#b0b0b0", got "${String(color)}".`,
@@ -156,25 +136,11 @@ export const createMaterial: CommandDefinition<CreateMaterialParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // assign_material
 // ---------------------------------------------------------------------------
-
-interface AssignMaterialParams {
-  /**
-   * Name of the material to assign; must exist in doc.materials
-   * (created with create_material).
-   */
-  materialName: string;
-  /**
-   * One or more entity ids to assign the material to.
-   * At least one id must be provided. Unknown ids are reported in the summary
-   * but do not block assignment to the valid ones.
-   */
-  entityIds: string[];
-}
 
 /**
  * @command assign_material
@@ -184,7 +150,7 @@ interface AssignMaterialParams {
  * @invariant material must exist in doc.materials; unknown entity ids → skip + note in summary
  * @failure unknown material name → no-op, affected:[]; empty entityIds → no-op
  */
-export const assignMaterial: CommandDefinition<AssignMaterialParams> = {
+export const assignMaterial = defineCommand({
   name: 'assign_material',
   description:
     'Assign a named material to one or more entities. ' +
@@ -193,29 +159,24 @@ export const assignMaterial: CommandDefinition<AssignMaterialParams> = {
     '(mass = volume × material.density), overriding the caller-supplied density param. ' +
     'Multiple entity ids can be assigned in a single call; unknown ids are skipped with a note. ' +
     'Assigning a material is a replayable document edit recorded in featureHistory.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      materialName: {
-        type: 'string',
-        description:
-          'Name of the material to assign. Must exactly match a material created with create_material ' +
+  params: z.object({
+    materialName: z
+      .string()
+      .describe(
+        'Name of the material to assign. Must exactly match a material created with create_material ' +
           '(case-sensitive). Example: "steel", "aluminium_6061".',
-      },
-      entityIds: {
-        type: 'array',
-        description:
-          'List of entity ids to assign the material to. Must contain at least one id. ' +
+      ),
+    entityIds: z
+      .array(z.string())
+      .describe(
+        'List of entity ids to assign the material to. Must contain at least one id. ' +
           'Unknown ids are skipped and reported in the summary; valid ids are updated. ' +
           'To assign to a single entity, pass a one-element array, e.g. ["e-abc123"].',
-        items: { type: 'string' },
-      },
-    },
-    required: ['materialName', 'entityIds'],
-  },
+      ),
+  }),
   annotations: { idempotent: true },
   run: (doc, { materialName, entityIds }): CommandResult => {
-    if (typeof materialName !== 'string' || materialName.trim() === '') {
+    if (materialName.trim() === '') {
       return {
         document: doc,
         summary: 'assign_material failed: materialName must be a non-empty string.',
@@ -236,7 +197,7 @@ export const assignMaterial: CommandDefinition<AssignMaterialParams> = {
       };
     }
 
-    if (!Array.isArray(entityIds) || entityIds.length === 0) {
+    if (entityIds.length === 0) {
       return {
         document: doc,
         summary: 'assign_material failed: entityIds must be a non-empty array of entity ids.',
@@ -284,4 +245,4 @@ export const assignMaterial: CommandDefinition<AssignMaterialParams> = {
       affected: assigned,
     };
   },
-};
+});

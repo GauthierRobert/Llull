@@ -21,7 +21,8 @@
  */
 
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { revolutionPolygons } from '../geometry/revolution';
 import { computeSceneSnapshot } from './scene';
 import type { Bounds } from './scene';
@@ -1115,12 +1116,6 @@ function renderDocument(
 // Command definition
 // ---------------------------------------------------------------------------
 
-interface RenderViewParams {
-  view?: string;
-  width?: number;
-  height?: number;
-}
-
 /**
  * @command render_view
  * @pure
@@ -1129,7 +1124,7 @@ interface RenderViewParams {
  * @invariant data.svg is a self-contained <svg> string; document === input doc (referential equality)
  * @failure unknown view name -> fallback to 'iso'; width/height clamped to [64, 2000]
  */
-export const renderView: CommandDefinition<RenderViewParams> = {
+export const renderView = defineCommand({
   name: 'render_view',
   annotations: { readOnly: true },
   description:
@@ -1142,32 +1137,28 @@ export const renderView: CommandDefinition<RenderViewParams> = {
     'Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. ' +
     'The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. ' +
     'Does NOT modify the document; `affected` is always [].',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      view: {
-        type: 'string',
-        description:
-          'Camera direction. One of: "iso" (isometric — default, good for orienting in 3D), ' +
+  params: z.object({
+    view: z
+      .enum(['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'])
+      .optional()
+      .describe(
+        'Camera direction. One of: "iso" (isometric — default, good for orienting in 3D), ' +
           '"top" (looking down the +Z axis), "bottom" (looking up the -Z axis), ' +
           '"front" (looking along the +Y axis), "back" (looking along the -Y axis), ' +
           '"left" (looking along the +X axis), "right" (looking along the -X axis). ' +
           'Omit for the default "iso" view.',
-        enum: ['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'],
-      },
-      width: {
-        type: 'number',
-        description: 'Output image width in pixels. Clamped to [64, 2000]. Default: 800.',
-      },
-      height: {
-        type: 'number',
-        description: 'Output image height in pixels. Clamped to [64, 2000]. Default: 600.',
-      },
-    },
-    required: [],
-  },
+      ),
+    width: z
+      .number()
+      .optional()
+      .describe('Output image width in pixels. Clamped to [64, 2000]. Default: 800.'),
+    height: z
+      .number()
+      .optional()
+      .describe('Output image height in pixels. Clamped to [64, 2000]. Default: 600.'),
+  }),
   run: (doc, params): CommandResult => {
-    const rawParams = params as RenderViewParams;
+    const rawParams = params;
 
     // Resolve view
     const rawView = rawParams.view ?? 'iso';
@@ -1186,4 +1177,4 @@ export const renderView: CommandDefinition<RenderViewParams> = {
       data,
     };
   },
-};
+});

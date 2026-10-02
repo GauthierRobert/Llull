@@ -10,7 +10,8 @@
 
 import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
 import { is3D } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { applyEulerXYZ } from './render';
 import { expandInstance } from './assemblies';
 import { revolutionTriangles } from '../geometry/revolution';
@@ -609,25 +610,6 @@ export interface ExportStlData {
 // Command definition
 // ---------------------------------------------------------------------------
 
-interface ExportStlParams {
-  /**
-   * Output format. 'ascii' (default) produces a text STL string in data.stl.
-   * 'binary' produces a base64-encoded binary STL in data.stlBase64.
-   */
-  format?: 'ascii' | 'binary';
-  /**
-   * Ids of entities to export. Omit (or pass an empty array) to export ALL
-   * exportable (3D solid) entities in the document.
-   */
-  entityIds?: string[];
-  /**
-   * Solid name embedded in the STL header. Defaults to 'llull'.
-   * For ASCII STL: appears in the 'solid <name>' … 'endsolid <name>' wrapper.
-   * For binary STL: embedded in the 80-byte ASCII header.
-   */
-  name?: string;
-}
-
 /**
  * @command export_stl
  * @pure
@@ -640,7 +622,7 @@ interface ExportStlParams {
  *          empty selection or all-2D document → valid empty solid, triangleCount:0;
  *          never throws for user error
  */
-export const exportStl: CommandDefinition<ExportStlParams> = {
+export const exportStl = defineCommand({
   name: 'export_stl',
   annotations: { readOnly: true },
   description:
@@ -658,41 +640,37 @@ export const exportStl: CommandDefinition<ExportStlParams> = {
     'format: "ascii" (default, human-readable) or "binary" (more compact, required by some importers). ' +
     'name: optional solid name embedded in the STL header (default "llull"). ' +
     'Does NOT modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      format: {
-        type: 'string',
-        description:
-          'STL output format. "ascii" (default): returns data.stl as a human-readable ASCII STL string. ' +
+  params: z.object({
+    format: z
+      .enum(['ascii', 'binary'])
+      .optional()
+      .describe(
+        'STL output format. "ascii" (default): returns data.stl as a human-readable ASCII STL string. ' +
           '"binary": returns data.stlBase64 as a base64-encoded binary STL blob ' +
           '(84-byte header + 50 bytes per triangle). Most slicers accept both; ' +
           'binary is more compact for large meshes.',
-        enum: ['ascii', 'binary'],
-      },
-      entityIds: {
-        type: 'array',
-        description:
-          'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
+      ),
+    entityIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
           '3D solid entities in the document. 2D-only entities in the list are silently skipped. ' +
           'Unknown ids are also silently skipped with a note in summary.',
-        items: { type: 'string' },
-      },
-      name: {
-        type: 'string',
-        description:
-          'Solid name to embed in the STL header (ASCII: "solid <name>"…"endsolid <name>"; ' +
+      ),
+    name: z
+      .string()
+      .optional()
+      .describe(
+        'Solid name to embed in the STL header (ASCII: "solid <name>"…"endsolid <name>"; ' +
           'binary: first bytes of the 80-byte header). Default: "llull". ' +
           'Use a meaningful name to help downstream tools identify the mesh.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, params): CommandResult => {
-    const fmt: 'ascii' | 'binary' =
-      (params as ExportStlParams).format === 'binary' ? 'binary' : 'ascii';
-    const solidName = (params as ExportStlParams).name ?? 'llull';
-    const requestedIds = (params as ExportStlParams).entityIds;
+    const fmt: 'ascii' | 'binary' = params.format === 'binary' ? 'binary' : 'ascii';
+    const solidName = params.name ?? 'llull';
+    const requestedIds = params.entityIds;
 
     // Determine which entity ids to process
     let idsToProcess: string[];
@@ -747,4 +725,4 @@ export const exportStl: CommandDefinition<ExportStlParams> = {
       return { document: doc, summary, affected: [], data };
     }
   },
-};
+});

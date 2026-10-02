@@ -24,7 +24,8 @@ import type {
   InstanceEntity,
   Vec3,
 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
 
 // ---------------------------------------------------------------------------
@@ -804,14 +805,14 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is a SceneSnapshot; document === input doc
  */
-export const describeScene: CommandDefinition<Record<string, never>> = {
+export const describeScene = defineCommand({
   name: 'describe_scene',
   annotations: { readOnly: true },
   description:
     'Return a structured, read-only snapshot of the document (entity ids, kinds, world bounds, ' +
     'layers, groups, selection) so an agent can orient before editing. Does not modify the document. ' +
     'The snapshot is returned in the result `data` field.',
-  paramsSchema: { type: 'object', properties: {}, required: [] },
+  params: z.object({}),
   run: (doc): CommandResult => {
     const snapshot = computeSceneSnapshot(doc);
     return {
@@ -821,4 +822,4 @@ export const describeScene: CommandDefinition<Record<string, never>> = {
       data: snapshot,
     };
   },
-};
+});

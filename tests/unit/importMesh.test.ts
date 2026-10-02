@@ -87,8 +87,13 @@ describe('import_mesh', () => {
     }
 
     it('rejects missing, non-array and empty bodies', () => {
-      expectNoOp(undefined, 'bodies must be a non-empty array');
-      expectNoOp('x', 'bodies must be a non-empty array');
+      for (const bodies of [undefined, 'x']) {
+        const doc = createEmptyDocument();
+        const result = importMesh(doc, bodies);
+        expect(result.document).toBe(doc);
+        expect(result.affected).toEqual([]);
+        expect(result.summary).toContain('import_mesh rejected: invalid params');
+      }
       expectNoOp([], 'bodies must be a non-empty array');
     });
 

@@ -27,7 +27,8 @@ import type {
   Material,
   Recipe,
 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { buildingErrors } from './building/validate';
 import { regenerateBuilding } from './building/evaluate';
 import { isRecord } from '../../lib/isRecord';
@@ -798,30 +799,22 @@ export function deserializeDocument(json: string): CadDocument {
 // load_document command
 // ---------------------------------------------------------------------------
 
-interface LoadDocumentParams {
-  json: string;
-}
-
-export const loadDocument: CommandDefinition<LoadDocumentParams> = {
+export const loadDocument = defineCommand({
   name: 'load_document',
   description:
     'Replace the current document with one parsed from a serialized JSON string ' +
     'produced by serializeDocument (envelope format: llull-document v1). ' +
     'On parse or validation failure the document is left unchanged.',
   annotations: { metaHistory: true, idempotent: true },
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      json: {
-        type: 'string',
-        description:
-          'A JSON string produced by serializeDocument — the full llull-document v1 envelope ' +
+  params: z.object({
+    json: z
+      .string()
+      .describe(
+        'A JSON string produced by serializeDocument — the full llull-document v1 envelope ' +
           '({ format: "llull-document", version: 1, document: { ... } }). ' +
           'Must contain a valid CadDocument with entities, order, layers, layerOrder, selection, and camera.',
-      },
-    },
-    required: ['json'],
-  },
+      ),
+  }),
   run: (doc, { json }): CommandResult => {
     let parsed: CadDocument;
     try {
@@ -842,4 +835,4 @@ export const loadDocument: CommandDefinition<LoadDocumentParams> = {
       affected: parsed.order,
     };
   },
-};
+});
