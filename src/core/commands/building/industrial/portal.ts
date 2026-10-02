@@ -3,7 +3,7 @@
  * @layer core/commands/building/industrial
  */
 
-import type { CadDocument, Vec2, Vec3 } from '../../../model/types';
+import type { CadDocument, Vec2 } from '../../../model/types';
 import type { BuildingModel, SlabElement } from '../../../model/building';
 import type { CommandResult } from '../../types';
 import { defineCommand, z } from '../../schema';
@@ -31,13 +31,13 @@ import {
   MAX_GENERATED_MEMBERS,
   withoutFootings,
 } from './members';
-import { panelFrame } from './evaluate';
+import { buildHallGeometry, type MemberSpec, type PortalProfiles } from './portalGeometry';
+import { portalFrameParams } from './portalParams';
+import { hallMemberSpecs } from './portalMembers';
+import { claddingPanels, facing } from './portalCladding';
 import { appendBasePlates, columnsWithoutPlates } from './plates';
 import { appendConnections, findMomentJoints } from './connections';
 import { addGrid, gridLabels, nextFreeLabel } from '../grid';
-
-type MemberSpecs = Parameters<typeof appendMembers>[2];
-type MemberSpec = MemberSpecs[number];
 
 /** Steel mass of members created by a generator, kg. */
 function steelMass(doc: CadDocument, building: BuildingModel, ids: ReadonlyArray<string>): number {
@@ -204,24 +204,6 @@ export const addCraneRunway = defineCommand({
   },
 });
 
-/** One roof slope of a span: from its low end at a column line up to its high end. */
-interface Slope {
-  readonly side: -1 | 1;
-  readonly lowX: number;
-  readonly lowZ: number;
-  readonly highX: number;
-  readonly highZ: number;
-}
-
-/** Outward-facing panel corners: reversed when the Newell normal points against `outward`. */
-function facing(corners: Vec3[], outward: Vec3): Vec3[] {
-  const frame = panelFrame(corners);
-  if (!frame) return corners;
-  const dot =
-    frame.normal[0] * outward[0] + frame.normal[1] * outward[1] + frame.normal[2] * outward[2];
-  return dot >= 0 ? corners : [...corners].reverse();
-}
-
 /**
  * @command add_portal_frame_building
  * @pure
@@ -236,73 +218,7 @@ export const addPortalFrameBuilding = defineCommand({
     'end bays (roof and walls), pad footings under every column, roof / wall / gable cladding, a ground ' +
     'slab and optionally an overhead crane runway on brackets. All sizes in document units, roofPitch in ' +
     'degrees. Defaults: 24 m span, 48 m long, 6 m bays, 7 m eaves, 6° roof, HEA400 columns, IPE450 rafters.',
-  params: z.object({
-    origin: z.array(z.number()).optional().describe('Corner (gridline A1) [x, y]. Default [0, 0].'),
-    span: z.number().optional().describe('Clear span between column axes (X). Default 24000 mm.'),
-    spans: z
-      .array(z.number())
-      .optional()
-      .describe(
-        'Multi-span hall: widths of side-by-side spans along X (internal columns on shared lines, ' +
-          'valley between roofs). Overrides span.',
-      ),
-    length: z.number().optional().describe('Hall length (Y). Default 48000 mm.'),
-    baySpacing: z
-      .number()
-      .optional()
-      .describe('Target frame spacing; adjusted to divide the length. Default 6000 mm.'),
-    eaveHeight: z.number().optional().describe('Column height to the eaves. Default 7000 mm.'),
-    roofPitch: z.number().optional().describe('Roof slope in degrees. Default 6.'),
-    roofType: z
-      .enum(['duopitch', 'monopitch'])
-      .optional()
-      .describe(
-        "Roof shape: 'duopitch' (default: ridge mid-span, eaveHeight at both column lines) or 'monopitch' " +
-          '(one rafter per span rising at roofPitch from the low eaves at the left (x = origin, height eaveHeight) ' +
-          'to the high eaves on the right; the columns get different heights, with several spans the slope ' +
-          'continues across the internal column lines; no apex connection, two eaves connections per frame; wind ' +
-          'with EN 1991-1-4 Tab. 7.3a monopitch coefficients).',
-      ),
-    columnProfile: z.string().optional().describe('Default HEA400.'),
-    rafterProfile: z.string().optional().describe('Default IPE450.'),
-    purlinProfile: z.string().optional().describe('Default C200x75x2.5.'),
-    railProfile: z
-      .string()
-      .optional()
-      .describe('Side rails. Default C200x75x2.5 (passes check_purlins at qp 0.6 on 6 m bays).'),
-    braceProfile: z.string().optional().describe('Bracing. Default CHS76.1x3.6.'),
-    gablePostProfile: z.string().optional().describe('Gable wind posts. Default HEA200.'),
-    purlinSpacing: z.number().optional().describe('Along the slope. Default 1800 mm.'),
-    railSpacing: z.number().optional().describe('Vertical. Default 1800 mm.'),
-    footings: z.boolean().optional().describe('Pad footings under columns. Default true.'),
-    connections: z
-      .boolean()
-      .optional()
-      .describe('Bolted end-plate moment connections (haunched eaves, apex). Default true.'),
-    basePlates: z
-      .boolean()
-      .optional()
-      .describe('Base plates with 4 M24 anchor bolts under every column. Default true.'),
-    columnBase: z
-      .enum(['pinned', 'fixed'])
-      .optional()
-      .describe(
-        "Column base fixity: 'pinned' (default) or 'fixed' (rotation restrained in the frame analysis: " +
-          'stiffer sway, base moments in the reactions and footing / base plate M+N checks; requires basePlates; ' +
-          'size the plates with design_portal_frames).',
-      ),
-    cladding: z.boolean().optional().describe('Roof, side and gable cladding. Default true.'),
-    floorSlab: z.boolean().optional().describe('Ground-bearing slab. Default true.'),
-    crane: z
-      .object({
-        capacity: z.number().optional().describe('Tonnes. Default 10.'),
-        railHeight: z.number().describe('Top of runway beam (must be below the eaves).'),
-        profile: z.string().optional().describe('Runway section. Default HEB300.'),
-      })
-      .optional()
-      .describe('Optional crane runway on both sides: { capacity (t), railHeight, profile }.'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
-  }),
+  params: portalFrameParams,
   run: (doc, params): CommandResult => {
     const mm = (value: number): number => fromMm(doc, value);
     const origin = params.origin ?? [0, 0];
@@ -381,7 +297,7 @@ export const addPortalFrameBuilding = defineCommand({
         `add_portal_frame_building failed: unknown profile(s) ${missing.map(([key]) => names[key as keyof typeof names]).join(', ')} (see list_steel_profiles).`,
       );
     }
-    const p = profiles as Record<keyof typeof names, SteelProfile>;
+    const p = profiles as PortalProfiles;
     if (
       params.crane &&
       !(
@@ -415,165 +331,20 @@ export const addPortalFrameBuilding = defineCommand({
       );
     }
     const spanWidths = params.spans ?? [span];
-    const columnLines = spanWidths.reduce<number[]>(
-      (lines, width) => [...lines, (lines[lines.length - 1] as number) + width],
-      [origin[0]],
-    );
-    const spanBounds = spanWidths.map((_, index): readonly [number, number] => [
-      columnLines[index] as number,
-      columnLines[index + 1] as number,
-    ]);
-    const x0 = columnLines[0] as number;
-    const x1 = columnLines[columnLines.length - 1] as number;
-    const totalWidth = x1 - x0;
-    const ys = Array.from({ length: bays + 1 }, (_, index) => origin[1] + index * bay);
-    const rise = Math.tan(pitch);
-    const monopitch = roofType === 'monopitch';
-    /** Roof-line height above x: monopitch rises from the low eaves at x0, duopitch peaks mid-span. */
-    const roofLine = (x: number): number => {
-      if (monopitch) return eave + (x - x0) * rise;
-      const [a, b] =
-        spanBounds.find(([from, to]) => x >= from && x <= to) ??
-        (x < x0
-          ? (spanBounds[0] as readonly [number, number])
-          : (spanBounds[spanBounds.length - 1] as readonly [number, number]));
-      return eave + Math.min(x - a, b - x) * rise;
-    };
-    /** Column height at a column line (the eaves). */
-    const columnTop = (x: number): number => (monopitch ? roofLine(x) : eave);
-    /** Roof slopes of a span, each from its low end (at a column line) up to its high end. */
-    const slopesOf = (bounds: readonly [number, number]): Slope[] => {
-      const [a, b] = bounds;
-      if (monopitch) {
-        return [{ side: -1, lowX: a, lowZ: roofLine(a), highX: b, highZ: roofLine(b) }];
-      }
-      const middle = (a + b) / 2;
-      const peak = eave + ((b - a) / 2) * rise;
-      return [
-        { side: -1, lowX: a, lowZ: eave, highX: middle, highZ: peak },
-        { side: 1, lowX: b, lowZ: eave, highX: middle, highZ: peak },
-      ];
-    };
-    const ridge = Math.max(
-      ...spanBounds.flatMap((bounds) => slopesOf(bounds).map((slope) => slope.highZ)),
-    );
-    const y0 = ys[0] as number;
-    const yEnd = ys[ys.length - 1] as number;
-    const h = (profile: SteelProfile): number => mm(profile.h);
-    const specs: MemberSpec[] = [];
-
-    // Portal frames: columns on every column line, the rafters of every roof slope per span.
-    for (const y of ys) {
-      for (const x of columnLines) {
-        specs.push({
-          role: 'column',
-          profile: p.column.name,
-          start: [x, y, 0],
-          end: [x, y, columnTop(x)],
-        });
-      }
-      for (const bounds of spanBounds) {
-        for (const slope of slopesOf(bounds)) {
-          specs.push({
-            role: 'rafter',
-            profile: p.rafter.name,
-            start: [slope.lowX, y, slope.lowZ],
-            end: [slope.highX, y, slope.highZ],
-          });
-        }
-      }
-    }
-    // Gable wind posts at both ends (≈ 6 m centres per span), up to the rafter underside.
-    for (const [a, b] of spanBounds) {
-      const posts = Math.max(0, Math.ceil((b - a) / mm(6000)) - 1);
-      for (const y of [y0, yEnd]) {
-        for (let index = 1; index <= posts; index++) {
-          const x = a + ((b - a) * index) / (posts + 1);
-          const roofZ = roofLine(x) - h(p.rafter) / 2 / Math.cos(pitch);
-          // Wind posts span out of the gable plane: strong axis along Y.
-          specs.push({
-            role: 'column',
-            profile: p.gable.name,
-            start: [x, y, 0],
-            end: [x, y, roofZ],
-            roll: Math.PI / 2,
-          });
-        }
-      }
-    }
-    // Purlins on every slope of every span, one per bay.
-    const lift = h(p.rafter) / 2 + h(p.purlin) / 2;
-    for (const bounds of spanBounds) {
-      for (const { side, lowX, lowZ, highX } of slopesOf(bounds)) {
-        const slopeLength = Math.abs(highX - lowX) / Math.cos(pitch);
-        const purlinCount = Math.max(1, Math.ceil(slopeLength / purlinSpacing));
-        for (let index = 0; index <= purlinCount; index++) {
-          const t = (index * slopeLength) / purlinCount;
-          const x = lowX - side * t * Math.cos(pitch) + side * lift * Math.sin(pitch);
-          const z = lowZ + t * Math.sin(pitch) + lift * Math.cos(pitch);
-          for (let j = 0; j < bays; j++) {
-            specs.push({
-              role: 'purlin',
-              profile: p.purlin.name,
-              start: [x, ys[j] as number, z],
-              end: [x, ys[j + 1] as number, z],
-              roll: side === -1 ? pitch : -pitch,
-            });
-          }
-        }
-      }
-    }
-    // Side rails, outboard of the outer columns, up to the eaves of their own column line.
-    const railOffset = h(p.column) / 2 + h(p.rail) / 2;
-    const railSides = [
-      [x0 - railOffset, Math.PI / 2, columnTop(x0)],
-      [x1 + railOffset, -Math.PI / 2, columnTop(x1)],
-    ] as const;
-    const railTop = Math.max(...railSides.map(([, , top]) => top));
-    for (let z = railSpacing; z < railTop - railSpacing / 3; z += railSpacing) {
-      for (const [x, roll, top] of railSides) {
-        if (z >= top - railSpacing / 3) continue;
-        for (let j = 0; j < bays; j++) {
-          specs.push({
-            role: 'rail',
-            profile: p.rail.name,
-            start: [x, ys[j] as number, z],
-            end: [x, ys[j + 1] as number, z],
-            roll,
-          });
-        }
-      }
-    }
-    // X-bracing in the end bays: every roof slope and both outer walls.
-    const endBays = bays >= 3 ? [0, bays - 1] : [0];
-    for (const j of endBays) {
-      const [ya, yb] = [ys[j] as number, ys[j + 1] as number];
-      for (const bounds of spanBounds) {
-        for (const { lowX, lowZ, highX, highZ } of slopesOf(bounds)) {
-          specs.push(
-            {
-              role: 'brace',
-              profile: p.brace.name,
-              start: [lowX, ya, lowZ],
-              end: [highX, yb, highZ],
-            },
-            {
-              role: 'brace',
-              profile: p.brace.name,
-              start: [lowX, yb, lowZ],
-              end: [highX, ya, highZ],
-            },
-          );
-        }
-      }
-      for (const fromX of [x0, x1]) {
-        const top = columnTop(fromX);
-        specs.push(
-          { role: 'brace', profile: p.brace.name, start: [fromX, ya, 0], end: [fromX, yb, top] },
-          { role: 'brace', profile: p.brace.name, start: [fromX, yb, 0], end: [fromX, ya, top] },
-        );
-      }
-    }
+    const geometry = buildHallGeometry({
+      originX: origin[0],
+      originY: origin[1],
+      spanWidths,
+      bays,
+      bay,
+      pitch,
+      eave,
+      monopitch: roofType === 'monopitch',
+      mm,
+    });
+    const { columnLines, spanBounds, x0, x1, totalWidth, ys, y0, yEnd, ridge, monopitch, h } =
+      geometry;
+    const specs = hallMemberSpecs({ geometry, profiles: p, purlinSpacing, railSpacing });
     const ids: string[] = [];
     // Structural grid: column lines (letters) along the hall, frame lines (numbers) across it.
     let building = resolution.building;
@@ -692,65 +463,7 @@ export const addPortalFrameBuilding = defineCommand({
       ids.push(slab.id);
     }
     if (params.cladding !== false) {
-      const wallX0 = x0 - railOffset - h(p.rail) / 2;
-      const wallX1 = x1 + railOffset + h(p.rail) / 2;
-      const roofLift = h(p.rafter) / 2 + h(p.purlin);
-      const roofZ = (x: number): number => roofLine(x) + roofLift / Math.cos(pitch);
-      const edge = mm(200);
-      const [ya, yb] = [y0 - edge, yEnd + edge];
-      const panels: Array<{ corners: Vec3[]; role: 'roof' | 'wall'; outward: Vec3 }> = [];
-      const profileLine: Vec2[] = [];
-      spanBounds.forEach(([a, b], index) => {
-        const left = index === 0 ? wallX0 : a;
-        const right = index === spanBounds.length - 1 ? wallX1 : b;
-        const breaks = monopitch ? [left, right] : [left, (a + b) / 2, right];
-        profileLine.push(...breaks.slice(0, -1).map((x): Vec2 => [x, roofZ(x)]));
-        if (index === spanBounds.length - 1) profileLine.push([right, roofZ(right)]);
-        breaks.slice(1).forEach((to, panel) => {
-          const from = breaks[panel] as number;
-          const rising = monopitch ? roofZ(to) >= roofZ(from) : panel === 0;
-          panels.push({
-            role: 'roof',
-            outward: [rising ? -Math.sin(pitch) : Math.sin(pitch), 0, Math.cos(pitch)],
-            corners: [
-              [from, ya, roofZ(from)],
-              [from, yb, roofZ(from)],
-              [to, yb, roofZ(to)],
-              [to, ya, roofZ(to)],
-            ],
-          });
-        });
-      });
-      for (const [x, outward] of [
-        [wallX0, -1],
-        [wallX1, 1],
-      ] as const) {
-        panels.push({
-          role: 'wall',
-          outward: [outward, 0, 0],
-          corners: [
-            [x, ya, 0],
-            [x, yb, 0],
-            [x, yb, roofZ(x)],
-            [x, ya, roofZ(x)],
-          ],
-        });
-      }
-      for (const [y, outward] of [
-        [ya, -1],
-        [yb, 1],
-      ] as const) {
-        panels.push({
-          role: 'wall',
-          outward: [0, outward, 0],
-          corners: [
-            [wallX0, y, 0],
-            [wallX1, y, 0],
-            ...[...profileLine].reverse().map(([x, z]): Vec3 => [x, y, z]),
-          ],
-        });
-      }
-      for (const panel of panels) {
+      for (const panel of claddingPanels(geometry, p)) {
         const added = appendPanel(doc, building, levelId, {
           role: panel.role,
           corners: facing(panel.corners, panel.outward),

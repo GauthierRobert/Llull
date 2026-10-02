@@ -1,8 +1,6 @@
 [
   "server/src/mcp.ts",
   "server/src/renderViewEnrich.ts",
-  "src/core/commands/building/industrial/portal.ts",
-  "src/core/commands/building/industrial/purlinCheck.ts",
   "src/core/commands/constraints.ts",
   "src/core/commands/draw2d.ts",
   "src/core/commands/export.ts",
