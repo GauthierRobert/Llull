@@ -147,7 +147,8 @@ app.get('/live/snapshot', restLimiter, (_req: Request, res: Response) => {
 /**
  * POST /command — apply a named command to the shared live document.
  *
- * Request body: { name: string, params?: unknown }
+ * Request body: { name: string, params?: unknown, commandId?: string }
+ *   commandId makes retries idempotent: a repeated id returns the first result without re-applying.
  *
  * Response 200: { summary, affected, isError, data?, canUndo, canRedo }
  *   - summary   — human/AI readable description of what happened.
@@ -167,12 +168,20 @@ app.post('/command', restLimiter, mutationGuard, (req: Request, res: Response) =
     res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
     return;
   }
-  const { name, params } = body as { name: unknown; params?: unknown };
+  const { name, params, commandId } = body as {
+    name: unknown;
+    params?: unknown;
+    commandId?: unknown;
+  };
   if (typeof name !== 'string' || name.length === 0) {
     res.status(400).json({ error: '"name" must be a non-empty string.' });
     return;
   }
-  const result = applyCommand(name, params ?? {});
+  if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
+    res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
+    return;
+  }
+  const result = applyCommand(name, params ?? {}, commandId);
   res.status(200).json(result);
 });
 

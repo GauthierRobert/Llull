@@ -16,6 +16,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { createAutosaver } from './autosave';
 import type { Response } from 'express';
 import { createEmptyDocument } from '@core/model/types';
@@ -98,6 +99,9 @@ let _liveDoc: CadDocument = loadAutosave();
 /** Number of changes applied to the live document since process start (the log position). */
 let _seq = 0;
 
+/** Random per process: `_seq` restarts at 0 on restart, so clients compare `(epoch, seq)`. */
+const _epoch: string = randomUUID();
+
 /** Return the current shared document. */
 export function getLiveDoc(): CadDocument {
   return _liveDoc;
@@ -105,7 +109,7 @@ export function getLiveDoc(): CadDocument {
 
 /** The current document with its log position — `GET /live/snapshot` and the SSE `snapshot` event. */
 export function getLiveSnapshot(): LiveSnapshotEvent {
-  return { seq: _seq, stateHash: documentHash(_liveDoc), document: _liveDoc };
+  return { epoch: _epoch, seq: _seq, stateHash: documentHash(_liveDoc), document: _liveDoc };
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +174,7 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     return;
   }
   const event: LiveCommandEvent = {
+    epoch: _epoch,
     seq: _seq,
     name: command.name,
     params: command.params,

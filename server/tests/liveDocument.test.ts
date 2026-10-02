@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
 import {
   getLiveDoc,
+  getLiveSnapshot,
   setLiveDoc,
   subscribeLive,
   _resetLiveDoc,
@@ -218,5 +219,20 @@ describe('subscribeLive', () => {
     const custom = createEmptyDocument();
     _resetLiveDoc(custom);
     expect(getLiveDoc()).toBe(custom);
+  });
+});
+
+describe('epoch', () => {
+  it('snapshots and command events carry the same per-process epoch', () => {
+    const snapshot = getLiveSnapshot();
+    expect(snapshot.epoch.length).toBeGreaterThan(0);
+
+    const res = makeFakeRes();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    subscribeLive(res as any);
+    setLiveDoc(createEmptyDocument(), { name: 'noop', params: {} });
+    const commandFrame = parseSseFrame(res.written[res.written.length - 1] ?? '');
+    expect(commandFrame.event).toBe('command');
+    expect(commandFrame.data['epoch']).toBe(snapshot.epoch);
   });
 });

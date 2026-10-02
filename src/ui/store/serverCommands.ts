@@ -84,11 +84,19 @@ async function postJson(path: string, body: unknown): Promise<ServerCommandRespo
 /**
  * POST /command — send a named command with params to the server.
  * The updated document arrives via the /live SSE stream, not in this response.
+ * `commandId` makes the request idempotent server-side (a repeated id is not re-applied).
  *
  * @throws ServerCommandError on network failure or non-ok HTTP status.
  */
-export async function postCommand(name: string, params: unknown): Promise<ServerCommandResponse> {
-  return postJson('/command', { name, params });
+export async function postCommand(
+  name: string,
+  params: unknown,
+  commandId?: string,
+): Promise<ServerCommandResponse> {
+  return postJson(
+    '/command',
+    commandId === undefined ? { name, params } : { name, params, commandId },
+  );
 }
 
 /**

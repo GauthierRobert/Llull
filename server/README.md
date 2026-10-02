@@ -34,10 +34,10 @@ The server binds to `127.0.0.1:3001` by default (local tool; not reachable from 
 | POST   | /mcp       | MCP Streamable HTTP — initialize + tools/list + tools/call |
 | GET    | /mcp       | MCP SSE stream for server-initiated notifications (`mcp-session-id` required) |
 | DELETE | /mcp       | Close the MCP session (`mcp-session-id` required); the shared document is untouched |
-| GET    | /live      | SSE command log of the shared document: `snapshot` `{ seq, stateHash, document }` on connect / undo / redo, `command` `{ seq, name, params, stateHash }` per mutation |
-| GET    | /live/snapshot | Current `{ seq, stateHash, document }` — resync after a seq gap or hash mismatch |
-| POST   | /command   | Run `{ name, params }` on the shared document (the web app's `dispatch`) |
-| POST   | /undo, /redo | Undo / redo on the shared document |
+| GET    | /live      | SSE command log of the shared document: `snapshot` `{ epoch, seq, stateHash, document }` on connect / undo / redo, `command` `{ epoch, seq, name, params, stateHash }` per mutation; `epoch` is a random id per server process (`seq` restarts at 0 on restart, so clients compare `(epoch, seq)`: same epoch and `seq <=` known = already applied; different epoch = resync) |
+| GET    | /live/snapshot | Current `{ epoch, seq, stateHash, document }` — resync after a seq gap or hash mismatch |
+| POST   | /command   | Run `{ name, params, commandId? }` on the shared document (the web app's `dispatch`). A repeated `commandId` returns the first result without re-applying (bounded LRU of 1000), so network retries are safe |
+| POST   | /undo, /redo | Undo / redo on the shared document (the step counter `nextStepNumber` never rewinds, so undone ids are not re-minted) |
 | GET    | /export/stl | Download the live model as STL |
 | GET    | /export/code | Download the model as parametric code (`?language=cadquery\|build123d\|openscad\|freecad`) |
 | GET    | /export/step | Download an exact B-rep STEP file (needs the Python bridge; 503 otherwise) |
