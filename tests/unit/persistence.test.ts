@@ -93,7 +93,7 @@ describe('serializeDocument / deserializeDocument', () => {
     const json = serializeDocument(doc);
     const parsed = JSON.parse(json) as Record<string, unknown>;
     expect(parsed['format']).toBe('llull-document');
-    expect(parsed['version']).toBe(1);
+    expect(parsed['version']).toBe(2);
     expect(parsed['document']).toBeDefined();
   });
 
@@ -120,7 +120,7 @@ describe('serializeDocument / deserializeDocument', () => {
   });
 
   it('throws on wrong version', () => {
-    const bad = JSON.stringify({ format: 'llull-document', version: 2, document: {} });
+    const bad = JSON.stringify({ format: 'llull-document', version: 3, document: {} });
     expect(() => deserializeDocument(bad)).toThrow(/version/i);
   });
 

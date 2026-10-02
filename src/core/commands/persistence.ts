@@ -32,6 +32,7 @@ import { defineCommand, z } from './schema';
 import { buildingErrors } from './building/validate';
 import { regenerateBuilding } from './building/evaluate';
 import { isRecord } from '../../lib/isRecord';
+import { derivedEntityIds } from '../model/partition';
 
 // ---------------------------------------------------------------------------
 // Envelope types
@@ -39,7 +40,7 @@ import { isRecord } from '../../lib/isRecord';
 
 interface DocumentEnvelope {
   format: 'llull-document';
-  version: 1;
+  version: 2;
   document: CadDocument;
 }
 
@@ -47,26 +48,102 @@ interface DocumentEnvelope {
 // Current schema version — bump whenever a breaking field is added.
 // Migration steps in `migrate()` handle older documents.
 // ---------------------------------------------------------------------------
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
+
+/**
+ * Versions `deserializeDocument` reads. v1 → v2 (MG3/MG4): step-scoped ids (`nextStepNumber`)
+ * and building-generated entities omitted from the file (regenerated on load). v1 files load
+ * unchanged — their legacy ids stay valid; new steps use the step counter from 1.
+ */
+const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2]);
 
 // ---------------------------------------------------------------------------
 // Serialization
 // ---------------------------------------------------------------------------
 
+export interface SerializeOptions {
+  /**
+   * Keep evaluated geometry that the definition regenerates (building-element entities).
+   * Default false: files store the definition only (MG4.2). Hashing and diffing pass true.
+   */
+  readonly includeDerived?: boolean;
+}
+
 /**
  * Serialize a CadDocument to a stable JSON string.
  *
- * Wraps the document in an envelope `{ format: 'llull-document', version: 1, document }`
- * so future schema migrations can be detected. The output is deterministic (standard
- * JSON.stringify with no replacer); entity ordering follows `doc.order`.
+ * Wraps the document in an envelope `{ format: 'llull-document', version: 2, document }`.
+ * The output is deterministic (standard JSON.stringify, no replacer). `order` and `selection`
+ * are kept whole; entities derived from the building model are omitted unless `includeDerived`.
  */
-export function serializeDocument(doc: CadDocument): string {
+export function serializeDocument(doc: CadDocument, options: SerializeOptions = {}): string {
   const envelope: DocumentEnvelope = {
     format: 'llull-document',
     version: CURRENT_SCHEMA_VERSION,
-    document: doc,
+    document: options.includeDerived === true ? doc : withoutDerivedEntities(doc),
   };
   return JSON.stringify(envelope);
+}
+
+function withoutDerivedEntities(doc: CadDocument): CadDocument {
+  const derived = derivedEntityIds(doc);
+  if (derived.size === 0) return doc;
+  const entities: CadDocument['entities'] = {};
+  for (const [id, entity] of Object.entries(doc.entities)) {
+    if (!derived.has(id)) entities[id] = entity;
+  }
+  return { ...doc, entities };
+}
+
+const STEP_SCOPED_ID = /-(\d+)\.\d+$/;
+const STEP_ID = /^step-(\d+)$/;
+
+/**
+ * `nextStepNumber` is at least one past every step number used by a step or entity id, so a file
+ * whose counter is missing or stale can never make a new step re-mint an existing id.
+ */
+function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unknown> {
+  let highest = 0;
+  const steps = Array.isArray(raw['featureHistory'])
+    ? (raw['featureHistory'] as FeatureStep[])
+    : [];
+  for (const step of steps) highest = Math.max(highest, Number(STEP_ID.exec(step.id)?.[1] ?? 0));
+  for (const id of Object.keys(isRecord(raw['entities']) ? raw['entities'] : {})) {
+    highest = Math.max(highest, Number(STEP_SCOPED_ID.exec(id)?.[1] ?? 0));
+  }
+  const stored = typeof raw['nextStepNumber'] === 'number' ? raw['nextStepNumber'] : 1;
+  const next = Math.max(stored, highest + 1);
+  return next === 1 && raw['nextStepNumber'] === undefined ? raw : { ...raw, nextStepNumber: next };
+}
+
+/**
+ * Re-derive building geometry omitted by `serializeDocument` and restore the saved draw order
+ * (regeneration appends; saved positions win, new ids follow).
+ */
+function restoreDerivedEntities(raw: Record<string, unknown>): Record<string, unknown> {
+  const building = raw['building'];
+  if (building === undefined || buildingErrors(building).length > 0) return raw;
+  const savedOrder = Array.isArray(raw['order']) ? (raw['order'] as string[]) : [];
+  const base = raw as unknown as CadDocument;
+  const regenerated = regenerateBuilding(
+    { ...base, order: savedOrder.filter((id) => id in base.entities), selection: [] },
+    base.building as NonNullable<CadDocument['building']>,
+  );
+  const present = savedOrder.filter((id) => id in regenerated.entities);
+  const placed = new Set(present);
+  const order = [...present, ...regenerated.order.filter((id) => !placed.has(id))];
+  const selection = Array.isArray(raw['selection'])
+    ? (raw['selection'] as string[]).filter((id) => id in regenerated.entities)
+    : [];
+  return {
+    ...raw,
+    entities: regenerated.entities,
+    order,
+    selection,
+    building: regenerated.building,
+    layers: regenerated.layers,
+    layerOrder: regenerated.layerOrder,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -767,9 +844,9 @@ export function deserializeDocument(json: string): CadDocument {
     );
   }
 
-  if (parsed['version'] !== CURRENT_SCHEMA_VERSION) {
+  if (!READABLE_VERSIONS.has(parsed['version'])) {
     throw new Error(
-      `load_document: unsupported version ${String(parsed['version'])} — expected ${CURRENT_SCHEMA_VERSION}.`,
+      `load_document: unsupported version ${String(parsed['version'])} — expected 1 or ${CURRENT_SCHEMA_VERSION}.`,
     );
   }
 
@@ -782,7 +859,9 @@ export function deserializeDocument(json: string): CadDocument {
   }
 
   // Apply migration (fills in back-compat defaults for optional fields).
-  const migratedDoc = migrate(rawDoc, parsed['version'] as number);
+  const migratedDoc = withSafeStepCounter(
+    restoreDerivedEntities(migrate(rawDoc, parsed['version'] as number)),
+  );
 
   // Deep value validation on the migrated document.
   const valueErrors = validateDocumentValues(migratedDoc);
@@ -803,24 +882,23 @@ export const loadDocument = defineCommand({
   name: 'load_document',
   description:
     'Replace the current document with one parsed from a serialized JSON string ' +
-    'produced by serializeDocument (envelope format: llull-document v1). ' +
+    'produced by serializeDocument (envelope format: llull-document v2; v1 is still read). ' +
     'On parse or validation failure the document is left unchanged.',
   annotations: { metaHistory: true, idempotent: true },
   params: z.object({
     json: z
       .string()
       .describe(
-        'A JSON string produced by serializeDocument — the full llull-document v1 envelope ' +
-          '({ format: "llull-document", version: 1, document: { ... } }). ' +
+        'A JSON string produced by serializeDocument — the full llull-document envelope ' +
+          '({ format: "llull-document", version: 2, document: { ... } }; version 1 is also read). ' +
           'Must contain a valid CadDocument with entities, order, layers, layerOrder, selection, and camera.',
       ),
   }),
   run: (doc, { json }): CommandResult => {
     let parsed: CadDocument;
     try {
-      const raw = deserializeDocument(json);
-      // Re-evaluate the building so generated geometry always matches its constructive model.
-      parsed = raw.building ? regenerateBuilding(raw, raw.building) : raw;
+      // deserializeDocument re-evaluates the building, so generated geometry matches its model.
+      parsed = deserializeDocument(json);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { document: doc, summary: message, affected: [] };

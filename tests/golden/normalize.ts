@@ -76,7 +76,7 @@ export function normalizeJson(parsed: unknown): unknown {
 }
 
 export function normalize(doc: CadDocument): unknown {
-  return normalizeJson(JSON.parse(serializeDocument(doc)));
+  return normalizeJson(JSON.parse(serializeDocument(doc, { includeDerived: true })));
 }
 
 /** Entities + draw order only — the part that must survive `replay_history`. */

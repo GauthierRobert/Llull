@@ -36,7 +36,7 @@ export type LiveApplyResult =
 
 /** Hash of everything clients must agree on (selection excluded). */
 export function documentHash(doc: CadDocument): string {
-  return hashText(serializeDocument({ ...doc, selection: [] }));
+  return hashText(serializeDocument({ ...doc, selection: [] }, { includeDerived: true }));
 }
 
 /** Apply one broadcast command to the client's copy of the server document at `baseSeq`. */

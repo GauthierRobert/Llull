@@ -236,7 +236,7 @@ describe('readMcpResource() — cad://document', () => {
     const content = readMcpResource(doc, 'cad://document');
     const parsed = JSON.parse(content!.text) as Record<string, unknown>;
     expect(parsed['format']).toBe('llull-document');
-    expect(parsed['version']).toBe(1);
+    expect(parsed['version']).toBe(2);
     expect(parsed['document']).toBeDefined();
   });
 
