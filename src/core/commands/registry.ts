@@ -194,7 +194,21 @@ function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknow
         };
       }
       if (def.paramsValidator) {
-        const checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
+        let checked: ReturnType<typeof def.paramsValidator.safeParse>;
+        try {
+          checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
+        } catch (error) {
+          console.warn(
+            `[llull] command '${def.name}' params validation threw:`,
+            error instanceof Error ? (error.stack ?? error.message) : error,
+          );
+          const reason = error instanceof Error ? error.message : String(error);
+          return {
+            document: doc,
+            summary: `${def.name} rejected: invalid params — ${reason}`,
+            affected: [],
+          };
+        }
         if (!checked.success) {
           return {
             document: doc,

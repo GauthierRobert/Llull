@@ -9,10 +9,12 @@
 
 import type { CadDocument, Entity, EntityGroup, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
-import { defineCommand, z, looseVec3 as vec3 } from './schema';
+import type { CommandResult } from './types';
+import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
 import { nextId } from '../../lib/id';
 import { rotatedEntityBounds } from './scene';
+
+const ORIGIN: Vec3 = [0, 0, 0];
 
 /**
  * Validate an optional rotation param.
@@ -134,14 +136,6 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
   };
 }
 
-interface AddBoxParams {
-  size: Vec3;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
-
 /**
  * @command add_box
  * @pure
@@ -153,7 +147,7 @@ interface AddBoxParams {
  * @failure unknown anchor value -> falls back to default anchor 'center', no throw
  */
 
-export const addBox: CommandDefinition<AddBoxParams> = {
+export const addBox = defineCommand({
   name: 'add_box',
   description:
     'Create a rectangular box solid. Right-handed world frame, +Z up. ' +
@@ -161,51 +155,37 @@ export const addBox: CommandDefinition<AddBoxParams> = {
     'anchor controls which point on the entity the position refers to: ' +
     '"center" (default) = geometric center; "min" = min-XYZ corner; "base-center" = center of bottom face (mid X/Y, min Z). ' +
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      size: {
-        type: 'array',
-        description: '[width, height, depth] in document units. All three components must be > 0.',
-        items: { type: 'number' },
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space location of the anchor point [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      anchor: {
-        type: 'string',
-        description:
+  params: z.object({
+    size: looseVec3('[width, height, depth] in document units. All three components must be > 0.'),
+    position: looseVec3(
+      'World-space location of the anchor point [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+    ).optional(),
+    anchor: tolerant(
+      z
+        .enum(['center', 'min', 'base-center'])
+        .describe(
           'Which point on the box the position refers to. ' +
-          '"center" (default): geometric center. ' +
-          '"min": min-XYZ corner of the AABB. ' +
-          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-          'Unknown values fall back to "center". ' +
-          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        enum: ['center', 'min', 'base-center'],
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+            '"center" (default): geometric center. ' +
+            '"min": min-XYZ corner of the AABB. ' +
+            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+            'Unknown values fall back to "center". ' +
+            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        ),
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
-      },
-    },
-    required: ['size'],
-  },
-  run: (
-    doc,
-    { size, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
-  ): CommandResult => {
+      ),
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .optional(),
+  }),
+  run: (doc, { size, position = ORIGIN, rotation, color = '#6b8f9c', anchor }): CommandResult => {
     const [w, h, d] = size;
     if (
       !Number.isFinite(w) ||
@@ -242,15 +222,7 @@ export const addBox: CommandDefinition<AddBoxParams> = {
       affected: [id],
     };
   },
-};
-
-interface ExtrudeParams {
-  profile: ReadonlyArray<readonly [number, number]>;
-  depth: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-}
+});
 
 /**
  * @command extrude_profile
@@ -261,51 +233,37 @@ interface ExtrudeParams {
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
  */
 
-export const extrude: CommandDefinition<ExtrudeParams> = {
+export const extrude = defineCommand({
   name: 'extrude_profile',
   description:
     'Extrude a closed 2D polygon profile along +Z into a solid. Right-handed world frame, +Z up. ' +
     'position is the origin of the profile plane [x, y, z] in document units; the solid spans ' +
     'from position.z to position.z + depth. depth must be > 0.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      profile: {
-        type: 'array',
-        description:
-          'Array of [x, y] points forming a closed loop in the XY plane of the profile. ' +
-          'At least 3 points are needed for a valid solid.',
-      },
-      depth: {
-        type: 'number',
-        description: 'Extrusion depth in document units along +Z from position. Must be > 0.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space origin of the profile plane [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+  params: z.object({
+    profile: untypedArray(
+      'Array of [x, y] points forming a closed loop in the XY plane of the profile. ' +
+        'At least 3 points are needed for a valid solid.',
+    ),
+    depth: z
+      .number()
+      .describe('Extrusion depth in document units along +Z from position. Must be > 0.'),
+    position: looseVec3(
+      'World-space origin of the profile plane [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#c8553d".',
-      },
-    },
-    required: ['profile', 'depth'],
-  },
-  run: (
-    doc,
-    { profile, depth, position = [0, 0, 0], rotation, color = '#c8553d' },
-  ): CommandResult => {
+      ),
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#c8553d".')
+      .optional(),
+  }),
+  run: (doc, { profile, depth, position = ORIGIN, rotation, color = '#c8553d' }): CommandResult => {
     if (!Array.isArray(profile) || profile.length < 3) {
       return {
         document: doc,
@@ -339,14 +297,14 @@ export const extrude: CommandDefinition<ExtrudeParams> = {
       affected: [id],
     };
   },
-};
+});
 
 export const move = defineCommand({
   name: 'move_entity',
   description: 'Translate an entity by a delta vector.',
   params: z.object({
     id: z.string().describe('Target entity id'),
-    delta: vec3('Translation [dx,dy,dz]'),
+    delta: looseVec3('Translation [dx,dy,dz]'),
   }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
@@ -369,15 +327,6 @@ export const move = defineCommand({
   },
 });
 
-interface AddCylinderParams {
-  radius: number;
-  height: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
-
 /**
  * @command add_cylinder
  * @pure
@@ -392,7 +341,7 @@ interface AddCylinderParams {
  * frame is +Z up, so entityBounds uses ±height/2 on the Y axis. Default anchor is 'center'.
  */
 
-export const addCylinder: CommandDefinition<AddCylinderParams> = {
+export const addCylinder = defineCommand({
   name: 'add_cylinder',
   description:
     'Create a cylinder solid. Right-handed world frame, +Z up. ' +
@@ -402,53 +351,42 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
     '"min" = min-XYZ corner of the AABB; ' +
     '"base-center" = center of the bottom face (mid X/Y, min Z of AABB). ' +
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      radius: {
-        type: 'number',
-        description: 'Radius of the cylinder cross-section in document units. Must be > 0.',
-      },
-      height: {
-        type: 'number',
-        description: 'Total height of the cylinder in document units. Must be > 0.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space location of the anchor point [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      anchor: {
-        type: 'string',
-        description:
+  params: z.object({
+    radius: z
+      .number()
+      .describe('Radius of the cylinder cross-section in document units. Must be > 0.'),
+    height: z.number().describe('Total height of the cylinder in document units. Must be > 0.'),
+    position: looseVec3(
+      'World-space location of the anchor point [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+    ).optional(),
+    anchor: tolerant(
+      z
+        .enum(['center', 'min', 'base-center'])
+        .describe(
           'Which point on the cylinder the position refers to. ' +
-          '"center" (default): geometric center. ' +
-          '"min": min-XYZ corner of the AABB. ' +
-          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-          'Unknown values fall back to "center". ' +
-          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        enum: ['center', 'min', 'base-center'],
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+            '"center" (default): geometric center. ' +
+            '"min": min-XYZ corner of the AABB. ' +
+            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+            'Unknown values fall back to "center". ' +
+            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        ),
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
-      },
-    },
-    required: ['radius', 'height'],
-  },
+      ),
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .optional(),
+  }),
   run: (
     doc,
-    { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+    { radius, height, position = ORIGIN, rotation, color = '#6b8f9c', anchor },
   ): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
       return {
@@ -491,15 +429,7 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
       affected: [id],
     };
   },
-};
-
-interface AddSphereParams {
-  radius: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
+});
 
 /**
  * @command add_sphere
@@ -512,7 +442,7 @@ interface AddSphereParams {
  * @failure unknown anchor value -> falls back to default anchor 'center', no throw
  */
 
-export const addSphere: CommandDefinition<AddSphereParams> = {
+export const addSphere = defineCommand({
   name: 'add_sphere',
   description:
     'Create a sphere solid. Right-handed world frame, +Z up. ' +
@@ -521,50 +451,37 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
     '"center" (default) = geometric center; "min" = min-XYZ corner of the AABB; ' +
     '"base-center" = center of the bottom face (mid X/Y, min Z). ' +
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      radius: {
-        type: 'number',
-        description: 'Radius of the sphere in document units. Must be > 0.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space location of the anchor point [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      anchor: {
-        type: 'string',
-        description:
+  params: z.object({
+    radius: z.number().describe('Radius of the sphere in document units. Must be > 0.'),
+    position: looseVec3(
+      'World-space location of the anchor point [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+    ).optional(),
+    anchor: tolerant(
+      z
+        .enum(['center', 'min', 'base-center'])
+        .describe(
           'Which point on the sphere the position refers to. ' +
-          '"center" (default): geometric center. ' +
-          '"min": min-XYZ corner of the AABB. ' +
-          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-          'Unknown values fall back to "center". ' +
-          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        enum: ['center', 'min', 'base-center'],
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+            '"center" (default): geometric center. ' +
+            '"min": min-XYZ corner of the AABB. ' +
+            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+            'Unknown values fall back to "center". ' +
+            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        ),
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
           'Stored for uniformity; geometrically moot for a sphere. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
-      },
-    },
-    required: ['radius'],
-  },
-  run: (
-    doc,
-    { radius, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
-  ): CommandResult => {
+      ),
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .optional(),
+  }),
+  run: (doc, { radius, position = ORIGIN, rotation, color = '#6b8f9c', anchor }): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
       return {
         document: doc,
@@ -593,16 +510,7 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
       affected: [id],
     };
   },
-};
-
-interface AddConeParams {
-  radius: number;
-  height: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
+});
 
 /**
  * @command add_cone
@@ -618,7 +526,7 @@ interface AddConeParams {
  * the AABB spans [pos-radius..pos+radius, pos-radius..pos+radius, pos.z..pos.z+height].
  */
 
-export const addCone: CommandDefinition<AddConeParams> = {
+export const addCone = defineCommand({
   name: 'add_cone',
   description:
     'Create a cone solid. Right-handed world frame, +Z up. ' +
@@ -628,54 +536,44 @@ export const addCone: CommandDefinition<AddConeParams> = {
     '"center" = geometric center of the AABB; ' +
     '"min" = min-XYZ corner of the AABB. ' +
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      radius: {
-        type: 'number',
-        description: 'Radius of the circular base in document units. Must be > 0.',
-      },
-      height: {
-        type: 'number',
-        description:
-          'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space location of the anchor point [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      anchor: {
-        type: 'string',
-        description:
+  params: z.object({
+    radius: z.number().describe('Radius of the circular base in document units. Must be > 0.'),
+    height: z
+      .number()
+      .describe(
+        'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
+      ),
+    position: looseVec3(
+      'World-space location of the anchor point [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+    ).optional(),
+    anchor: tolerant(
+      z
+        .enum(['center', 'min', 'base-center'])
+        .describe(
           'Which point on the cone the position refers to. ' +
-          '"base-center" (default): center of the circular base; apex at position+[0,0,height]. ' +
-          '"center": geometric center of the AABB (mid X/Y/Z). ' +
-          '"min": min-XYZ corner of the AABB. ' +
-          'Unknown values fall back to "base-center". ' +
-          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        enum: ['center', 'min', 'base-center'],
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+            '"base-center" (default): center of the circular base; apex at position+[0,0,height]. ' +
+            '"center": geometric center of the AABB (mid X/Y/Z). ' +
+            '"min": min-XYZ corner of the AABB. ' +
+            'Unknown values fall back to "base-center". ' +
+            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        ),
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
-      },
-    },
-    required: ['radius', 'height'],
-  },
+      ),
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .optional(),
+  }),
   run: (
     doc,
-    { radius, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+    { radius, height, position = ORIGIN, rotation, color = '#6b8f9c', anchor },
   ): CommandResult => {
     if (!Number.isFinite(radius) || radius <= 0) {
       return {
@@ -722,16 +620,7 @@ export const addCone: CommandDefinition<AddConeParams> = {
       affected: [id],
     };
   },
-};
-
-interface AddTorusParams {
-  ringRadius: number;
-  tubeRadius: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
+});
 
 /**
  * @command add_torus
@@ -747,7 +636,7 @@ interface AddTorusParams {
  * AABB: ±(ringRadius+tubeRadius) in X/Y; ±tubeRadius in Z.
  */
 
-export const addTorus: CommandDefinition<AddTorusParams> = {
+export const addTorus = defineCommand({
   name: 'add_torus',
   description:
     'Create a torus (donut) solid. Right-handed world frame, +Z up. ' +
@@ -758,56 +647,49 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
     '"center" (default) = geometric center of the torus; "min" = min-XYZ corner of the AABB; ' +
     '"base-center" = center of the bottom face (mid X/Y, min Z). ' +
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      ringRadius: {
-        type: 'number',
-        description:
-          'Distance from the torus center to the center of the tube (major radius) in document units. Must be > 0.',
-      },
-      tubeRadius: {
-        type: 'number',
-        description:
-          'Radius of the circular tube cross-section (minor radius) in document units. Must be > 0. ' +
+  params: z.object({
+    ringRadius: z
+      .number()
+      .describe(
+        'Distance from the torus center to the center of the tube (major radius) in document units. Must be > 0.',
+      ),
+    tubeRadius: z
+      .number()
+      .describe(
+        'Radius of the circular tube cross-section (minor radius) in document units. Must be > 0. ' +
           'Should be less than ringRadius for a non-self-intersecting torus.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space location of the anchor point [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. The ring lies in the XY plane. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      anchor: {
-        type: 'string',
-        description:
+      ),
+    position: looseVec3(
+      'World-space location of the anchor point [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. The ring lies in the XY plane. Defaults to [0, 0, 0].',
+    ).optional(),
+    anchor: tolerant(
+      z
+        .enum(['center', 'min', 'base-center'])
+        .describe(
           'Which point on the torus the position refers to. ' +
-          '"center" (default): geometric center. ' +
-          '"min": min-XYZ corner of the AABB. ' +
-          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-          'Unknown values fall back to "center". ' +
-          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        enum: ['center', 'min', 'base-center'],
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+            '"center" (default): geometric center. ' +
+            '"min": min-XYZ corner of the AABB. ' +
+            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+            'Unknown values fall back to "center". ' +
+            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        ),
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
-      },
-    },
-    required: ['ringRadius', 'tubeRadius'],
-  },
+      ),
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .optional(),
+  }),
   run: (
     doc,
-    { ringRadius, tubeRadius, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+    { ringRadius, tubeRadius, position = ORIGIN, rotation, color = '#6b8f9c', anchor },
   ): CommandResult => {
     if (!Number.isFinite(ringRadius) || ringRadius <= 0) {
       return {
@@ -851,15 +733,7 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
       affected: [id],
     };
   },
-};
-
-interface AddWedgeParams {
-  size: Vec3;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
+});
 
 /**
  * @command add_wedge
@@ -875,7 +749,7 @@ interface AddWedgeParams {
  * AABB: [position..position+size] in all axes.
  */
 
-export const addWedge: CommandDefinition<AddWedgeParams> = {
+export const addWedge = defineCommand({
   name: 'add_wedge',
   description:
     'Create a wedge solid — a right-triangular prism (ramp shape). Right-handed world frame, +Z up. ' +
@@ -887,53 +761,40 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
     '"center" = geometric center of the AABB; ' +
     '"base-center" = center of the bottom face (mid X/Y, min Z). ' +
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      size: {
-        type: 'array',
-        description:
-          '[width, height, depth] in document units. width=X extent; height=full height at front face; ' +
-          'depth=Z extent (ramp direction). All must be > 0.',
-        items: { type: 'number' },
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space location of the anchor point [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      anchor: {
-        type: 'string',
-        description:
+  params: z.object({
+    size: looseVec3(
+      '[width, height, depth] in document units. width=X extent; height=full height at front face; ' +
+        'depth=Z extent (ramp direction). All must be > 0.',
+    ),
+    position: looseVec3(
+      'World-space location of the anchor point [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+    ).optional(),
+    anchor: tolerant(
+      z
+        .enum(['center', 'min', 'base-center'])
+        .describe(
           'Which point on the wedge the position refers to. ' +
-          '"min" (default): lower-front-left corner of the bounding box (min-XYZ). ' +
-          '"center": geometric center of the AABB. ' +
-          '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-          'Unknown values fall back to "min". ' +
-          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        enum: ['center', 'min', 'base-center'],
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+            '"min" (default): lower-front-left corner of the bounding box (min-XYZ). ' +
+            '"center": geometric center of the AABB. ' +
+            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+            'Unknown values fall back to "min". ' +
+            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        ),
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
-      },
-    },
-    required: ['size'],
-  },
-  run: (
-    doc,
-    { size, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
-  ): CommandResult => {
+      ),
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .optional(),
+  }),
+  run: (doc, { size, position = ORIGIN, rotation, color = '#6b8f9c', anchor }): CommandResult => {
     const [w, h, d] = size;
     if (
       !Number.isFinite(w) ||
@@ -970,17 +831,7 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
       affected: [id],
     };
   },
-};
-
-interface AddPyramidParams {
-  baseWidth: number;
-  baseDepth: number;
-  height: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
+});
 
 /**
  * @command add_pyramid
@@ -996,7 +847,7 @@ interface AddPyramidParams {
  * AABB from base-center: ±baseWidth/2 in X; ±baseDepth/2 in Y; 0..height in Z.
  */
 
-export const addPyramid: CommandDefinition<AddPyramidParams> = {
+export const addPyramid = defineCommand({
   name: 'add_pyramid',
   description:
     'Create a pyramid solid with a rectangular base and a single apex. Right-handed world frame, +Z up. ' +
@@ -1007,58 +858,49 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
     '"center" = geometric center of the AABB; ' +
     '"min" = min-XYZ corner of the AABB. ' +
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      baseWidth: {
-        type: 'number',
-        description: 'Full width of the rectangular base along X in document units. Must be > 0.',
-      },
-      baseDepth: {
-        type: 'number',
-        description: 'Full depth of the rectangular base along Y in document units. Must be > 0.',
-      },
-      height: {
-        type: 'number',
-        description:
-          'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space location of the anchor point [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      anchor: {
-        type: 'string',
-        description:
+  params: z.object({
+    baseWidth: z
+      .number()
+      .describe('Full width of the rectangular base along X in document units. Must be > 0.'),
+    baseDepth: z
+      .number()
+      .describe('Full depth of the rectangular base along Y in document units. Must be > 0.'),
+    height: z
+      .number()
+      .describe(
+        'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
+      ),
+    position: looseVec3(
+      'World-space location of the anchor point [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+    ).optional(),
+    anchor: tolerant(
+      z
+        .enum(['center', 'min', 'base-center'])
+        .describe(
           'Which point on the pyramid the position refers to. ' +
-          '"base-center" (default): center of the rectangular base; apex at position+[0,0,height]. ' +
-          '"center": geometric center of the AABB (mid X/Y/Z). ' +
-          '"min": min-XYZ corner of the AABB. ' +
-          'Unknown values fall back to "base-center". ' +
-          'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        enum: ['center', 'min', 'base-center'],
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+            '"base-center" (default): center of the rectangular base; apex at position+[0,0,height]. ' +
+            '"center": geometric center of the AABB (mid X/Y/Z). ' +
+            '"min": min-XYZ corner of the AABB. ' +
+            'Unknown values fall back to "base-center". ' +
+            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+        ),
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
-      },
-    },
-    required: ['baseWidth', 'baseDepth', 'height'],
-  },
+      ),
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .optional(),
+  }),
   run: (
     doc,
-    { baseWidth, baseDepth, height, position = [0, 0, 0], rotation, color = '#6b8f9c', anchor },
+    { baseWidth, baseDepth, height, position = ORIGIN, rotation, color = '#6b8f9c', anchor },
   ): CommandResult => {
     if (!Number.isFinite(baseWidth) || baseWidth <= 0) {
       return {
@@ -1111,7 +953,7 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
       affected: [id],
     };
   },
-};
+});
 
 /**
  * @command delete_entity

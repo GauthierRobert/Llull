@@ -15,7 +15,7 @@
  */
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
@@ -94,13 +94,6 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 // array_along_path
 // ---------------------------------------------------------------------------
 
-interface ArrayAlongPathParams {
-  sourceId: string;
-  path: Vec3[];
-  count: number;
-  mode?: 'place' | 'instance';
-}
-
 /**
  * @command array_along_path
  * @pure
@@ -109,7 +102,7 @@ interface ArrayAlongPathParams {
  * @invariant count >= 1; path.length >= 2; source entity must exist
  * @failure count < 1 -> no-op; path < 2 points -> no-op; missing sourceId -> no-op
  */
-export const arrayAlongPath: CommandDefinition<ArrayAlongPathParams> = {
+export const arrayAlongPath = defineCommand({
   name: 'array_along_path',
   description:
     'Duplicate sourceId at evenly-spaced positions along the polyline defined by path (array of [x,y,z] points). ' +
@@ -117,32 +110,22 @@ export const arrayAlongPath: CommandDefinition<ArrayAlongPathParams> = {
     'mode="place" (default): creates independent copies. ' +
     'mode="instance": future — currently treated as "place". ' +
     'The source entity is not removed. Returns affected: ids of all newly created entities.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      sourceId: {
-        type: 'string',
-        description: 'Id of the entity to duplicate along the path.',
-      },
-      path: {
-        type: 'array',
-        description:
-          'Polyline path as an array of [x,y,z] points. Minimum 2 points. ' +
+  params: z.object({
+    sourceId: z.string().describe('Id of the entity to duplicate along the path.'),
+    path: z
+      .array(z.array(z.any()))
+      .describe(
+        'Polyline path as an array of [x,y,z] points. Minimum 2 points. ' +
           'Copies are placed at evenly-spaced arc-length positions from the first to the last point.',
-        items: { type: 'array' },
-      },
-      count: {
-        type: 'number',
-        description: 'Number of copies to place. Must be >= 1.',
-      },
-      mode: {
-        type: 'string',
-        description:
-          '"place" (default): independent copies. "instance": treated as place in the current version.',
-      },
-    },
-    required: ['sourceId', 'path', 'count'],
-  },
+      ),
+    count: z.number().describe('Number of copies to place. Must be >= 1.'),
+    mode: z
+      .string()
+      .optional()
+      .describe(
+        '"place" (default): independent copies. "instance": treated as place in the current version.',
+      ),
+  }),
   run: (doc, { sourceId, path, count, mode = 'place' }): CommandResult => {
     void mode; // reserved for future instance mode; currently always places copies
 
@@ -221,7 +204,7 @@ export const arrayAlongPath: CommandDefinition<ArrayAlongPathParams> = {
       affected: createdIds,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // distribute_on_arc

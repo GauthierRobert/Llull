@@ -13,7 +13,8 @@
 
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z, looseVec3 } from './schema';
 import { nextId } from '../../lib/id';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
 
@@ -258,6 +259,8 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
 // instantiate_template command
 // ---------------------------------------------------------------------------
 
+const ORIGIN: Vec3 = [0, 0, 0];
+
 const VALID_TEMPLATES: readonly TemplateName[] = [
   'bolt_hole_pattern',
   'flange',
@@ -272,14 +275,7 @@ const VALID_TEMPLATES: readonly TemplateName[] = [
  * @invariant affected[i] is stable across replay (Q4 id-stable replay)
  * @failure unknown template -> no-op; invalid per-template params -> no-op, affected:[]
  */
-export interface InstantiateTemplateParams {
-  template: TemplateName;
-  params: Record<string, unknown>;
-  position?: Vec3;
-  color?: string;
-}
-
-export const instantiateTemplate: CommandDefinition<InstantiateTemplateParams> = {
+export const instantiateTemplate = defineCommand({
   name: 'instantiate_template',
   description:
     'Create a common parametric CAD part in a single call. ' +
@@ -289,40 +285,32 @@ export const instantiateTemplate: CommandDefinition<InstantiateTemplateParams> =
     '"bolt_hole_pattern" — N equally-spaced circles on a bolt circle (params: count, boltCircleRadius, holeRadius); ' +
     '"flange" — outer circle + bore circle + bolt-hole ring (params: outerRadius, boreRadius, boltCount, boltCircleRadius, holeRadius); ' +
     '"rectangular_plate_with_holes" — rectangle plate + grid of circles (params: width, height, holeRows, holeCols, holeRadius, marginX, marginY).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      template: {
-        type: 'string',
-        description:
-          'Which template to instantiate. Must be one of: ' +
+  params: z.object({
+    template: z
+      .enum(VALID_TEMPLATES)
+      .describe(
+        'Which template to instantiate. Must be one of: ' +
           '"bolt_hole_pattern", "flange", "rectangular_plate_with_holes".',
-        enum: VALID_TEMPLATES,
-      },
-      params: {
-        type: 'object',
-        description:
-          'Template-specific dimension parameters as a JSON object. ' +
+      ),
+    params: z
+      .looseObject({})
+      .describe(
+        'Template-specific dimension parameters as a JSON object. ' +
           'bolt_hole_pattern: { count: number, boltCircleRadius: number, holeRadius: number }. ' +
           'flange: { outerRadius, boreRadius, boltCount, boltCircleRadius, holeRadius }. ' +
           'rectangular_plate_with_holes: { width, height, holeRows, holeCols, holeRadius, marginX, marginY }.',
-        properties: {},
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space [x, y, z] position of the work-plane origin for the template. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description:
-          'Hex color string for all created entities, e.g. "#4a90d9". Defaults to "#4a90d9".',
-      },
-    },
-    required: ['template', 'params'],
-  },
-  run: (doc, { template, params, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+      ),
+    position: looseVec3(
+      'World-space [x, y, z] position of the work-plane origin for the template. Defaults to [0, 0, 0].',
+    ).optional(),
+    color: z
+      .string()
+      .optional()
+      .describe(
+        'Hex color string for all created entities, e.g. "#4a90d9". Defaults to "#4a90d9".',
+      ),
+  }),
+  run: (doc, { template, params, position = ORIGIN, color = '#4a90d9' }): CommandResult => {
     // Validate template name
     if (!VALID_TEMPLATES.includes(template as TemplateName)) {
       return {
@@ -370,4 +358,4 @@ export const instantiateTemplate: CommandDefinition<InstantiateTemplateParams> =
       affected,
     };
   },
-};
+});

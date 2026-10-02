@@ -3,7 +3,7 @@
  * @layer core/commands/building
  */
 
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { getBuilding, isFiniteNumber, noChange } from './model';
 import {
@@ -111,42 +111,28 @@ function validRates(rates: unknown): rates is Record<string, number> {
   );
 }
 
-interface SetCostRatesParams {
-  rates: Record<string, number>;
-  currency?: string;
-  replace?: boolean;
-}
-
 /**
  * @command set_cost_rates
  * @pure
  * @failure rates not a map of numbers >= 0 -> no-op
  */
-export const setCostRates: CommandDefinition<SetCostRatesParams> = {
+export const setCostRates = defineCommand({
   name: 'set_cost_rates',
   description:
     'Store unit rates (price per unit) in the project for estimate_cost. Keys are takeoff keys ' +
     '"<category>.<material>.<unit>" (e.g. "wall.concrete.m3": 180, "door.timber.ea": 450) or wildcards ' +
     '"wall.*.m2", "slab-roof.*.m3" (slab groups: slab-floor, slab-roof, slab-foundation) or "*.concrete.m3". Price ONE unit per category to avoid double counting.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      rates: {
-        type: 'object',
-        description: 'Map of rate key → price per unit (>= 0).',
-        properties: {},
-      },
-      currency: {
-        type: 'string',
-        description: 'ISO currency code, e.g. "EUR". Default kept / "EUR".',
-      },
-      replace: {
-        type: 'boolean',
-        description: 'Replace all stored rates instead of merging. Default false.',
-      },
-    },
-    required: ['rates'],
-  },
+  params: z.object({
+    rates: z.looseObject({}).describe('Map of rate key → price per unit (>= 0).'),
+    currency: z
+      .string()
+      .optional()
+      .describe('ISO currency code, e.g. "EUR". Default kept / "EUR".'),
+    replace: z
+      .boolean()
+      .optional()
+      .describe('Replace all stored rates instead of merging. Default false.'),
+  }),
   run: (doc, { rates, currency, replace = false }): CommandResult => {
     if (!validRates(rates) || Object.keys(rates).length === 0) {
       return noChange(
@@ -163,12 +149,7 @@ export const setCostRates: CommandDefinition<SetCostRatesParams> = {
       affected: [],
     };
   },
-};
-
-interface EstimateCostParams {
-  rates?: Record<string, number>;
-  currency?: string;
-}
+});
 
 /**
  * @command estimate_cost
@@ -176,28 +157,23 @@ interface EstimateCostParams {
  * @affects none; data = { currency, lines: CostLine[], total, unpriced, csv }
  * @failure invalid rates -> no data
  */
-export const estimateCost: CommandDefinition<EstimateCostParams> = {
+export const estimateCost = defineCommand({
   name: 'estimate_cost',
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only priced bill of quantities: multiplies each quantity_takeoff line by its unit rate ' +
     '(stored rates from set_cost_rates, overridden by the rates param) and totals the estimate. Lines ' +
     'without a rate are listed as unpriced.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      rates: {
-        type: 'object',
-        description: 'Optional extra / overriding rates, same keys as set_cost_rates.',
-        properties: {},
-      },
-      currency: {
-        type: 'string',
-        description: 'Currency label. Default: the stored currency or EUR.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    rates: z
+      .looseObject({})
+      .optional()
+      .describe('Optional extra / overriding rates, same keys as set_cost_rates.'),
+    currency: z
+      .string()
+      .optional()
+      .describe('Currency label. Default: the stored currency or EUR.'),
+  }),
   run: (doc, { rates, currency }): CommandResult => {
     if (rates !== undefined && !validRates(rates)) {
       return noChange(doc, 'estimate_cost failed: rates must be a map of key → number >= 0.');
@@ -238,4 +214,4 @@ export const estimateCost: CommandDefinition<EstimateCostParams> = {
       data: { currency: resolvedCurrency, ...priced, csv },
     };
   },
-};
+});
