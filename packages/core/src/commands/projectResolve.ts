@@ -220,6 +220,15 @@ export function resolveExprInParam(
 }
 
 /**
+ * History meta-commands whose `params` become ANOTHER step's params: they receive the recordable
+ * form (parameter `=expr` kept) so the stored step stays parametric instead of frozen numbers.
+ */
+export const STEP_PARAM_COMMANDS: ReadonlySet<string> = new Set([
+  'insert_step',
+  'edit_step_params',
+]);
+
+/**
  * Params to RECORD in featureHistory for an inner step: `$alias` refs stay resolved (ids), but an
  * `=expr` whose identifiers are all document parameters is kept verbatim so replay re-evaluates it
  * (architecture L8). Expressions using loop variables (`$i`, `$as`) are recorded as their value.

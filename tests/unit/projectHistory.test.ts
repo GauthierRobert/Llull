@@ -188,3 +188,20 @@ describe('executeRecorded', () => {
     ]);
   });
 });
+
+describe('build_project + insert_step', () => {
+  it('keeps the inserted step params (does not overwrite them with insert_step params)', () => {
+    const result = execute(createEmptyDocument(), 'build_project', {
+      actions: [
+        { command: 'set_parameter', params: { name: 'w', expression: '10' } },
+        {
+          command: 'insert_step',
+          params: { name: 'add_box', params: { size: ['=w', '=w', '=w'] } },
+        },
+      ],
+    });
+    expect(result.document.featureHistory.map((step) => step.params)).toEqual([
+      { size: ['=w', '=w', '=w'] },
+    ]);
+  });
+});

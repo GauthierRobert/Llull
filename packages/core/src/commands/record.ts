@@ -12,8 +12,9 @@ import type { CommandResult } from './types';
 import { execute } from './registry';
 
 /**
- * @invariant when `execute` appended exactly one step, its `params` become `recordedParams`;
- *   otherwise (query, no-op, meta-history command) the result is returned untouched.
+ * @invariant when `execute` appended exactly one step FOR `command`, its `params` become
+ *   `recordedParams`; otherwise (query, no-op, meta-history command such as insert_step, which
+ *   appends a step for another command) the result is returned untouched.
  */
 export function executeRecorded(
   doc: CadDocument,
@@ -24,7 +25,9 @@ export function executeRecorded(
   const result = execute(doc, command, params);
   const history = result.document.featureHistory;
   const appended = history.length === doc.featureHistory.length + 1 ? history.at(-1) : undefined;
-  if (appended === undefined) return result;
+  // Only the step this command recorded for itself: a history meta-command (insert_step) appends
+  // a step for ANOTHER command, whose params must stay as given.
+  if (appended === undefined || appended.name !== command) return result;
   return {
     ...result,
     document: {

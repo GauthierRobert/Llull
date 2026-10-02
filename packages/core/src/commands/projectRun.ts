@@ -17,6 +17,7 @@ import {
   resolveForEachValues,
   resolveExprInParam,
   recordableParams,
+  STEP_PARAM_COMMANDS,
 } from './projectResolve';
 
 /**
@@ -59,11 +60,12 @@ export function runInnerStep(
     return { doc: current, affected: [], aborted: onError === 'abort' };
   }
 
+  const recorded = recordableParams(params, resolved.value, current.parameters);
   const result = executeRecorded(
     current,
     command,
-    resolved.value,
-    recordableParams(params, resolved.value, current.parameters),
+    STEP_PARAM_COMMANDS.has(command) ? recorded : resolved.value,
+    recorded,
   );
   const ok = result.affected.length > 0 || result.document !== current;
   steps.push({
@@ -365,11 +367,12 @@ export function runProject(
       }
       continue;
     }
+    const recorded = recordableParams(raw.params ?? {}, resolved.value, current.parameters);
     const result = executeRecorded(
       current,
       raw.command,
-      resolved.value,
-      recordableParams(raw.params ?? {}, resolved.value, current.parameters),
+      STEP_PARAM_COMMANDS.has(raw.command) ? recorded : resolved.value,
+      recorded,
     );
     // A graceful no-op (no change + nothing affected) is a soft failure for a plan step.
     const ok = result.affected.length > 0 || result.document !== current;
