@@ -9,7 +9,8 @@
  */
 
 import type { CadDocument, Parameter } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { evaluateExpression, extractReferences } from './expression';
 
 // ---------------------------------------------------------------------------
@@ -122,11 +123,6 @@ export function reEvaluateAll(
 // set_parameter
 // ---------------------------------------------------------------------------
 
-interface SetParameterParams {
-  name: string;
-  expression: string;
-}
-
 /**
  * @command set_parameter
  * @pure
@@ -135,7 +131,7 @@ interface SetParameterParams {
  * @invariant all parameter names remain valid after the operation
  * @failure invalid expression → parameter stored with error field, dependents re-evaluated; never throws
  */
-export const setParameter: CommandDefinition<SetParameterParams> = {
+export const setParameter = defineCommand({
   name: 'set_parameter',
   // metaHistory: parameters are first-class document state (the recipe's INPUTS),
   // not geometry-recipe steps (architecture L8). They are excluded from
@@ -151,37 +147,33 @@ export const setParameter: CommandDefinition<SetParameterParams> = {
     'in topological order. An invalid expression is stored with an error message ' +
     'rather than rejecting the call. Parameter names must be non-empty strings ' +
     'containing only letters, digits, and underscores.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Parameter name used as its identifier and in expressions that reference it. ' +
+  params: z.object({
+    name: z
+      .string()
+      .describe(
+        'Parameter name used as its identifier and in expressions that reference it. ' +
           'Must be non-empty and contain only letters (a-z, A-Z), digits, and underscores. ' +
           'Example: "width", "wall_thickness", "radius2".',
-      },
-      expression: {
-        type: 'string',
-        description:
-          'Numeric expression defining the parameter value. ' +
+      ),
+    expression: z
+      .string()
+      .describe(
+        'Numeric expression defining the parameter value. ' +
           'May be a plain number ("10", "3.14") or a formula referencing other ' +
           'parameter names ("width * 2", "base_height + offset", "(a + b) / 2"). ' +
           'Supports +, -, *, /, parentheses, unary minus, and decimal numbers.',
-      },
-    },
-    required: ['name', 'expression'],
-  },
+      ),
+  }),
   run: (doc, { name, expression }): CommandResult => {
     // Validate name: must be a valid identifier.
-    if (typeof name !== 'string' || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
       return {
         document: doc,
         summary: `set_parameter failed: name '${String(name)}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
         affected: [],
       };
     }
-    if (typeof expression !== 'string' || expression.trim() === '') {
+    if (expression.trim() === '') {
       return {
         document: doc,
         summary: `set_parameter failed: expression must be a non-empty string.`,
@@ -225,15 +217,11 @@ export const setParameter: CommandDefinition<SetParameterParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // delete_parameter
 // ---------------------------------------------------------------------------
-
-interface DeleteParameterParams {
-  name: string;
-}
 
 /**
  * @command delete_parameter
@@ -243,7 +231,7 @@ interface DeleteParameterParams {
  * @invariant dependent parameters remain in the document with error set
  * @failure name does not exist → no-op with descriptive summary
  */
-export const deleteParameter: CommandDefinition<DeleteParameterParams> = {
+export const deleteParameter = defineCommand({
   name: 'delete_parameter',
   // metaHistory: see set_parameter — the parameter table is document state, not a
   // replayable geometry-recipe step.
@@ -254,21 +242,17 @@ export const deleteParameter: CommandDefinition<DeleteParameterParams> = {
     'reference this name are re-evaluated and will have their error field set to ' +
     '"unknown parameter: <name>" until they are updated. ' +
     'If the parameter does not exist, the document is left unchanged.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Name of the parameter to delete. ' +
+  params: z.object({
+    name: z
+      .string()
+      .describe(
+        'Name of the parameter to delete. ' +
           'Must match an existing parameter name exactly (case-sensitive). ' +
           'Example: "width", "wall_thickness".',
-      },
-    },
-    required: ['name'],
-  },
+      ),
+  }),
   run: (doc, { name }): CommandResult => {
-    if (typeof name !== 'string' || !(name in doc.parameters)) {
+    if (!(name in doc.parameters)) {
       return {
         document: doc,
         summary: `delete_parameter: parameter '${String(name)}' does not exist — no change made.`,
@@ -302,4 +286,4 @@ export const deleteParameter: CommandDefinition<DeleteParameterParams> = {
       affected: [],
     };
   },
-};
+});

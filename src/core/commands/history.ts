@@ -17,6 +17,7 @@ import { createEmptyDocument } from '../model/types';
 import { createEmptyBuilding } from '../model/building';
 import { currentContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { nextId } from '../../lib/id';
 import { orphanState } from './history_carry';
 import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
@@ -152,10 +153,6 @@ export function replayHistory(
 // replay_history
 // ---------------------------------------------------------------------------
 
-interface ReplayHistoryParams {
-  _?: never;
-}
-
 /**
  * @command replay_history
  * @pure
@@ -164,17 +161,13 @@ interface ReplayHistoryParams {
  * @invariant featureHistory is preserved unchanged; entities are re-evaluated
  * @failure empty history -> returns doc unchanged, affected:[]
  */
-export const replayHistory_cmd: CommandDefinition<ReplayHistoryParams> = {
+export const replayHistory_cmd = defineCommand({
   name: 'replay_history',
   description:
     'Recompute the document from scratch by replaying all non-suppressed steps in ' +
     'featureHistory in order. Use after manually editing the history list or to ' +
     'verify the document is consistent with its feature recipe.',
-  paramsSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-  },
+  params: z.object({}),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, _params): CommandResult => {
     if (doc.featureHistory.length === 0) {
@@ -197,16 +190,11 @@ export const replayHistory_cmd: CommandDefinition<ReplayHistoryParams> = {
       affected: regenerated.order,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // set_step_suppressed
 // ---------------------------------------------------------------------------
-
-interface SetStepSuppressedParams {
-  stepId: string;
-  suppressed: boolean;
-}
 
 /**
  * @command set_step_suppressed
@@ -216,27 +204,20 @@ interface SetStepSuppressedParams {
  * @invariant featureHistory length is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-export const setStepSuppressed: CommandDefinition<SetStepSuppressedParams> = {
+export const setStepSuppressed = defineCommand({
   name: 'set_step_suppressed',
   description:
     'Toggle the suppressed flag of a feature history step by its stepId. ' +
     'A suppressed step is skipped during replay, effectively hiding its contribution ' +
     'without deleting it. The document is regenerated after the flag is changed.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      stepId: {
-        type: 'string',
-        description:
-          'Id of the FeatureStep to suppress or un-suppress (from doc.featureHistory[*].id).',
-      },
-      suppressed: {
-        type: 'boolean',
-        description: 'true to suppress (skip during replay), false to restore.',
-      },
-    },
-    required: ['stepId', 'suppressed'],
-  },
+  params: z.object({
+    stepId: z
+      .string()
+      .describe(
+        'Id of the FeatureStep to suppress or un-suppress (from doc.featureHistory[*].id).',
+      ),
+    suppressed: z.boolean().describe('true to suppress (skip during replay), false to restore.'),
+  }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { stepId, suppressed }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
@@ -261,7 +242,7 @@ export const setStepSuppressed: CommandDefinition<SetStepSuppressedParams> = {
       affected: regenerated.order,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // edit_step_params
@@ -334,11 +315,6 @@ export const editStepParams: CommandDefinition<EditStepParamsParams> = {
 // reorder_step
 // ---------------------------------------------------------------------------
 
-interface ReorderStepParams {
-  stepId: string;
-  newIndex: number;
-}
-
 /**
  * @command reorder_step
  * @pure
@@ -347,27 +323,20 @@ interface ReorderStepParams {
  * @invariant featureHistory length is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-export const reorderStep: CommandDefinition<ReorderStepParams> = {
+export const reorderStep = defineCommand({
   name: 'reorder_step',
   description:
     'Move a feature history step to a new position (0-based index) in the featureHistory ' +
     'list, then regenerate the document. Use to change the order in which operations are applied.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      stepId: {
-        type: 'string',
-        description: 'Id of the FeatureStep to move (from doc.featureHistory[*].id).',
-      },
-      newIndex: {
-        type: 'number',
-        description:
-          'Zero-based target index in featureHistory. Clamped to [0, history.length-1]. ' +
+  params: z.object({
+    stepId: z.string().describe('Id of the FeatureStep to move (from doc.featureHistory[*].id).'),
+    newIndex: z
+      .number()
+      .describe(
+        'Zero-based target index in featureHistory. Clamped to [0, history.length-1]. ' +
           'Moving to the same index is a no-op.',
-      },
-    },
-    required: ['stepId', 'newIndex'],
-  },
+      ),
+  }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { stepId, newIndex }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
@@ -397,15 +366,11 @@ export const reorderStep: CommandDefinition<ReorderStepParams> = {
       affected: regenerated.order,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // delete_step
 // ---------------------------------------------------------------------------
-
-interface DeleteStepParams {
-  stepId: string;
-}
 
 /**
  * @command delete_step
@@ -415,22 +380,15 @@ interface DeleteStepParams {
  * @invariant featureHistory length decreases by 1
  * @failure unknown stepId -> no-op, affected:[]
  */
-export const deleteStep: CommandDefinition<DeleteStepParams> = {
+export const deleteStep = defineCommand({
   name: 'delete_step',
   description:
     'Permanently remove a feature history step by its stepId from featureHistory, ' +
     'then regenerate the document. Unlike set_step_suppressed, this cannot be undone ' +
     'through the history API (use undo/redo stack instead).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      stepId: {
-        type: 'string',
-        description: 'Id of the FeatureStep to delete (from doc.featureHistory[*].id).',
-      },
-    },
-    required: ['stepId'],
-  },
+  params: z.object({
+    stepId: z.string().describe('Id of the FeatureStep to delete (from doc.featureHistory[*].id).'),
+  }),
   annotations: { metaHistory: true, destructive: true },
   run: (doc, { stepId }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
@@ -450,7 +408,7 @@ export const deleteStep: CommandDefinition<DeleteStepParams> = {
       affected: regenerated.order,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // insert_step

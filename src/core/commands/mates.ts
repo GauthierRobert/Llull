@@ -13,7 +13,8 @@
  */
 
 import type { CadDocument, EntityKind, InstanceEntity, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { nextId } from '../../lib/id';
 import { expandInstance } from './assemblies';
 import { applyEulerXYZ } from '@lib/eulerRotation';
@@ -78,23 +79,6 @@ function resolveFrame(ref: MateRef, doc: CadDocument): [number, number] | null {
 // add_mate
 // ---------------------------------------------------------------------------
 
-/** Valid mate kinds. */
-type MateKind = 'coincident' | 'parallel' | 'distance';
-
-const VALID_MATE_KINDS: ReadonlySet<string> = new Set<MateKind>([
-  'coincident',
-  'parallel',
-  'distance',
-]);
-
-interface AddMateParams {
-  kind: string;
-  a: { instanceId: string; frame?: string };
-  b: { instanceId: string; frame?: string };
-  value?: number | string;
-  id?: string;
-}
-
 /**
  * @command add_mate
  * @pure
@@ -106,7 +90,7 @@ interface AddMateParams {
  * @failure unknown kind → no-op, affected:[]
  * @failure kind='distance' without value → no-op, affected:[]
  */
-export const addMate: CommandDefinition<AddMateParams> = {
+export const addMate = defineCommand({
   name: 'add_mate',
   description:
     'Add a mechanical mate (joint) between two InstanceEntity frames. ' +
@@ -121,114 +105,69 @@ export const addMate: CommandDefinition<AddMateParams> = {
     'value is required for kind="distance" and may be a number or a parameter expression string. ' +
     'Returns the new constraint id in affected[0]. ' +
     'Call solve_constraints afterward to move instances to satisfy the mate.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      kind: {
-        type: 'string',
-        description:
-          'Mate type. "coincident": two instance origins overlap in XY. ' +
+  params: z.object({
+    kind: z
+      .enum(['coincident', 'parallel', 'distance'])
+      .describe(
+        'Mate type. "coincident": two instance origins overlap in XY. ' +
           '"parallel": two instance axis frames are parallel in XY. ' +
           '"distance": the distance between two instance origins in XY equals value.',
-        enum: ['coincident', 'parallel', 'distance'],
-      },
-      a: {
-        type: 'object',
-        description:
-          'First instance frame reference. ' +
+      ),
+    a: z
+      .object({
+        instanceId: z.string().describe('Id of the first InstanceEntity.'),
+        frame: z
+          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
+          .optional()
+          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
+      })
+      .describe(
+        'First instance frame reference. ' +
           '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
           'instanceId must be an existing InstanceEntity in doc.entities. ' +
           'frame defaults to "origin" (the instance world position).',
-        properties: {
-          instanceId: { type: 'string', description: 'Id of the first InstanceEntity.' },
-          frame: {
-            type: 'string',
-            description: 'Frame selector: origin (default), axis-x, axis-y, or axis-z.',
-            enum: ['origin', 'axis-x', 'axis-y', 'axis-z'],
-          },
-        },
-        required: ['instanceId'],
-      },
-      b: {
-        type: 'object',
-        description:
-          'Second instance frame reference. Same shape as "a". ' +
+      ),
+    b: z
+      .object({
+        instanceId: z.string().describe('Id of the second InstanceEntity.'),
+        frame: z
+          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
+          .optional()
+          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
+      })
+      .describe(
+        'Second instance frame reference. Same shape as "a". ' +
           '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }.',
-        properties: {
-          instanceId: { type: 'string', description: 'Id of the second InstanceEntity.' },
-          frame: {
-            type: 'string',
-            description: 'Frame selector: origin (default), axis-x, axis-y, or axis-z.',
-            enum: ['origin', 'axis-x', 'axis-y', 'axis-z'],
-          },
-        },
-        required: ['instanceId'],
-      },
-      value: {
-        type: 'string',
-        description:
-          'Required for kind="distance". Target distance in document units. ' +
+      ),
+    value: z
+      .union([z.string(), z.number()])
+      .optional()
+      .describe(
+        'Required for kind="distance". Target distance in document units. ' +
           'May be a plain number ("10", "3.5") or a parameter expression string ("gap", "width / 2").',
-      },
-      id: {
-        type: 'string',
-        description:
-          'Optional explicit constraint id for the created mate. ' +
+      ),
+    id: z
+      .string()
+      .optional()
+      .describe(
+        'Optional explicit constraint id for the created mate. ' +
           'When omitted a unique id is generated. ' +
           'If the id already exists in the document the command is a no-op.',
-      },
-    },
-    required: ['kind', 'a', 'b'],
-  },
+      ),
+  }),
   run: (doc, { kind, a, b, value, id }): CommandResult => {
-    // Validate kind
-    if (typeof kind !== 'string' || !VALID_MATE_KINDS.has(kind)) {
-      return {
-        document: doc,
-        summary: `add_mate: unknown mate kind '${String(kind)}'. Allowed: coincident, parallel, distance.`,
-        affected: [],
-      };
-    }
-
     // Validate ref shapes
-    if (
-      typeof a !== 'object' ||
-      a === null ||
-      typeof a.instanceId !== 'string' ||
-      a.instanceId.length === 0
-    ) {
+    if (a.instanceId.length === 0) {
       return {
         document: doc,
         summary: `add_mate: a must be an object with a non-empty instanceId string.`,
         affected: [],
       };
     }
-    if (
-      typeof b !== 'object' ||
-      b === null ||
-      typeof b.instanceId !== 'string' ||
-      b.instanceId.length === 0
-    ) {
+    if (b.instanceId.length === 0) {
       return {
         document: doc,
         summary: `add_mate: b must be an object with a non-empty instanceId string.`,
-        affected: [],
-      };
-    }
-
-    // Validate frame values
-    const VALID_FRAMES = new Set(['origin', 'axis-x', 'axis-y', 'axis-z']);
-    if (a.frame !== undefined && !VALID_FRAMES.has(a.frame)) {
-      return {
-        document: doc,
-        summary: `add_mate: a.frame '${a.frame}' is not valid. Allowed: origin, axis-x, axis-y, axis-z.`,
-        affected: [],
-      };
-    }
-    if (b.frame !== undefined && !VALID_FRAMES.has(b.frame)) {
-      return {
-        document: doc,
-        summary: `add_mate: b.frame '${b.frame}' is not valid. Allowed: origin, axis-x, axis-y, axis-z.`,
         affected: [],
       };
     }
@@ -253,17 +192,10 @@ export const addMate: CommandDefinition<AddMateParams> = {
 
     // Validate value for distance
     if (kind === 'distance') {
-      if (value === undefined || value === null) {
+      if (value === undefined) {
         return {
           document: doc,
           summary: `add_mate: kind='distance' requires a 'value' field (number or expression string).`,
-          affected: [],
-        };
-      }
-      if (typeof value !== 'number' && typeof value !== 'string') {
-        return {
-          document: doc,
-          summary: `add_mate: value must be a number or string expression, got ${typeof value}.`,
           affected: [],
         };
       }
@@ -345,7 +277,7 @@ export const addMate: CommandDefinition<AddMateParams> = {
       affected: [constraintId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // bill_of_materials
@@ -383,7 +315,7 @@ interface BillOfMaterialsData {
  * @failure orphan instances (componentId not in doc.components) produce a warning row with
  *          componentName:'(missing)' and orphan:true; no throw
  */
-export const billOfMaterials: CommandDefinition<Record<string, never>> = {
+export const billOfMaterials = defineCommand({
   name: 'bill_of_materials',
   annotations: { readOnly: true, metaHistory: true },
   description:
@@ -395,11 +327,7 @@ export const billOfMaterials: CommandDefinition<Record<string, never>> = {
     'Returns the unchanged document, affected:[], and data: ' +
     '{ rows: BomRow[], totalInstances: number, distinctComponents: number }. ' +
     'A BomRow has: { componentId, componentName, count, perEntityKindCounts, orphan? }.',
-  paramsSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-  },
+  params: z.object({}),
   run: (doc, _params): CommandResult => {
     // Collect all instance entities
     const instances = Object.values(doc.entities).filter(
@@ -480,7 +408,7 @@ export const billOfMaterials: CommandDefinition<Record<string, never>> = {
       data: { rows, totalInstances, distinctComponents } satisfies BillOfMaterialsData,
     };
   },
-};
+});
 
 // Re-export resolveFrame for testing convenience
 export { resolveFrame };

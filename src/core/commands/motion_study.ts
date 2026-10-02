@@ -12,7 +12,8 @@
  */
 
 import type { CadDocument, DriveRelation, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { instanceBoundsFromDoc } from './scene';
 import type { Bounds } from './scene';
 
@@ -269,15 +270,6 @@ function detectInterferences(bounds: Record<string, Bounds>): [string, string][]
 // motion_study command
 // ---------------------------------------------------------------------------
 
-interface MotionStudyParams {
-  mode: string;
-  target: string;
-  start: number;
-  end: number;
-  steps?: number;
-  interferenceCheck?: boolean;
-}
-
 /**
  * @command motion_study
  * @pure
@@ -290,7 +282,7 @@ interface MotionStudyParams {
  * @failure start === end → friendly summary, empty steps
  * @failure steps < 2 after rounding/clamping → graceful no-op
  */
-export const motionStudy: CommandDefinition<MotionStudyParams> = {
+export const motionStudy = defineCommand({
   name: 'motion_study',
   annotations: { readOnly: true, metaHistory: true },
   description:
@@ -305,61 +297,49 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
     '{ steps: MotionStep[], interferences: InterferencePair[], ' +
     '  summary: { totalSteps: number, framesWithInterference: number } }. ' +
     'Failure cases (unknown target, start===end, steps<2) return an explanatory summary with empty data.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      mode: {
-        type: 'string',
-        description:
-          'Sweep mode. "joint": vary a specific joint value directly. ' +
+  params: z.object({
+    mode: z
+      .enum(['joint', 'parameter'])
+      .describe(
+        'Sweep mode. "joint": vary a specific joint value directly. ' +
           '"parameter": vary a named doc.parameters entry; downstream joints that reference it are re-evaluated.',
-        enum: ['joint', 'parameter'],
-      },
-      target: {
-        type: 'string',
-        description:
-          'What to sweep. For mode="joint": the joint id (must exist in doc.joints). ' +
+      ),
+    target: z
+      .string()
+      .describe(
+        'What to sweep. For mode="joint": the joint id (must exist in doc.joints). ' +
           'For mode="parameter": the parameter name (must exist in doc.parameters and resolve to a number).',
-      },
-      start: {
-        type: 'number',
-        description:
-          'Start value of the sweep range (inclusive). ' +
+      ),
+    start: z
+      .number()
+      .describe(
+        'Start value of the sweep range (inclusive). ' +
           "For revolute joints: radians. For prismatic joints: document units. For parameters: the parameter's unit.",
-      },
-      end: {
-        type: 'number',
-        description:
-          'End value of the sweep range (inclusive). ' +
+      ),
+    end: z
+      .number()
+      .describe(
+        'End value of the sweep range (inclusive). ' +
           "For revolute joints: radians. For prismatic joints: document units. For parameters: the parameter's unit.",
-      },
-      steps: {
-        type: 'number',
-        description:
-          'Number of samples across the range (default 24, minimum 2, maximum 360). ' +
+      ),
+    steps: z
+      .number()
+      .optional()
+      .describe(
+        'Number of samples across the range (default 24, minimum 2, maximum 360). ' +
           'Non-integers are rounded. Step k = start + (end - start) * k / (steps - 1).',
-      },
-      interferenceCheck: {
-        type: 'boolean',
-        description:
-          'When true, run a lightweight AABB overlap pass on every pair of InstanceEntity objects at each step. ' +
+      ),
+    interferenceCheck: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, run a lightweight AABB overlap pass on every pair of InstanceEntity objects at each step. ' +
           'Colliding pairs are recorded in the returned interferences array. Default: false.',
-      },
-    },
-    required: ['mode', 'target', 'start', 'end'],
-  },
+      ),
+  }),
   run: (doc, { mode, target, start, end, steps, interferenceCheck }): CommandResult => {
-    // Validate mode
-    if (mode !== 'joint' && mode !== 'parameter') {
-      return {
-        document: doc,
-        summary: `motion_study: unknown mode '${String(mode)}'. Use "joint" or "parameter".`,
-        affected: [],
-      };
-    }
-
     // Validate target
-    if (typeof target !== 'string' || target.length === 0) {
+    if (target.length === 0) {
       return {
         document: doc,
         summary: 'motion_study: "target" must be a non-empty string.',
@@ -368,14 +348,14 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
     }
 
     // Validate start / end
-    if (typeof start !== 'number' || !Number.isFinite(start)) {
+    if (!Number.isFinite(start)) {
       return {
         document: doc,
         summary: `motion_study: "start" must be a finite number, got ${String(start)}.`,
         affected: [],
       };
     }
-    if (typeof end !== 'number' || !Number.isFinite(end)) {
+    if (!Number.isFinite(end)) {
       return {
         document: doc,
         summary: `motion_study: "end" must be a finite number, got ${String(end)}.`,
@@ -552,4 +532,4 @@ export const motionStudy: CommandDefinition<MotionStudyParams> = {
       } satisfies MotionStudyData,
     };
   },
-};
+});

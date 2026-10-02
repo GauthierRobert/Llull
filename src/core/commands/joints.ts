@@ -26,12 +26,12 @@ import type {
   CadDocument,
   InstanceEntity,
   Joint,
-  JointKind,
   JointMateRef,
   DriveRelation,
   Vec3,
 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { nextId } from '../../lib/id';
 import { evaluateExpression } from './expression';
 
@@ -321,16 +321,6 @@ function evaluateMotionInternal(doc: CadDocument): EvaluatedMotion {
 // add_joint
 // ---------------------------------------------------------------------------
 
-const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>(['revolute', 'prismatic']);
-
-interface AddJointParams {
-  kind: string;
-  a: { instanceId: string; frame?: string };
-  b: { instanceId: string; frame?: string };
-  axis: string | [number, number, number];
-  id?: string;
-}
-
 /**
  * @command add_joint
  * @pure
@@ -340,7 +330,7 @@ interface AddJointParams {
  * @invariant axis must be 'x'|'y'|'z' or a [number,number,number] Vec3
  * @failure unknown instanceId / non-instance entity / invalid axis → no-op, affected:[]
  */
-export const addJoint: CommandDefinition<AddJointParams> = {
+export const addJoint = defineCommand({
   name: 'add_joint',
   description:
     'Add a kinematic joint between two InstanceEntity frames to model a mechanism. ' +
@@ -351,72 +341,54 @@ export const addJoint: CommandDefinition<AddJointParams> = {
     'Initial joint value (angle / displacement) defaults to 0. ' +
     'Use set_joint_value to drive the joint. Use evaluate_motion or bake_motion to apply motion to instances. ' +
     'Returns the new joint id in affected[0].',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      kind: {
-        type: 'string',
-        description:
-          'Joint type. "revolute": rotation about an axis (like a hinge or pin). ' +
+  params: z.object({
+    kind: z
+      .enum(['revolute', 'prismatic'])
+      .describe(
+        'Joint type. "revolute": rotation about an axis (like a hinge or pin). ' +
           '"prismatic": linear translation along an axis (like a slider or piston).',
-        enum: ['revolute', 'prismatic'],
-      },
-      a: {
-        type: 'object',
-        description:
-          'First instance frame reference (the fixed/anchor frame). ' +
+      ),
+    a: z
+      .object({
+        instanceId: z.string().describe('Id of the first InstanceEntity.'),
+        frame: z
+          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
+          .optional()
+          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
+      })
+      .describe(
+        'First instance frame reference (the fixed/anchor frame). ' +
           '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
           'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
-        properties: {
-          instanceId: { type: 'string', description: 'Id of the first InstanceEntity.' },
-          frame: {
-            type: 'string',
-            description: 'Frame selector: origin (default), axis-x, axis-y, or axis-z.',
-            enum: ['origin', 'axis-x', 'axis-y', 'axis-z'],
-          },
-        },
-        required: ['instanceId'],
-      },
-      b: {
-        type: 'object',
-        description:
-          'Second instance frame reference (the moving frame). ' +
+      ),
+    b: z
+      .object({
+        instanceId: z.string().describe('Id of the second InstanceEntity.'),
+        frame: z
+          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
+          .optional()
+          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
+      })
+      .describe(
+        'Second instance frame reference (the moving frame). ' +
           '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
           'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
-        properties: {
-          instanceId: { type: 'string', description: 'Id of the second InstanceEntity.' },
-          frame: {
-            type: 'string',
-            description: 'Frame selector: origin (default), axis-x, axis-y, or axis-z.',
-            enum: ['origin', 'axis-x', 'axis-y', 'axis-z'],
-          },
-        },
-        required: ['instanceId'],
-      },
-      axis: {
-        type: 'string',
-        description:
-          'Rotation or slide axis. Use "x", "y", or "z" for world-aligned axes, ' +
+      ),
+    axis: z
+      .union([z.string(), z.array(z.number())])
+      .describe(
+        'Rotation or slide axis. Use "x", "y", or "z" for world-aligned axes, ' +
           'or pass a [x,y,z] unit vector array for an arbitrary direction.',
-      },
-      id: {
-        type: 'string',
-        description:
-          'Optional explicit joint id. When omitted a unique id is generated. ' +
+      ),
+    id: z
+      .string()
+      .optional()
+      .describe(
+        'Optional explicit joint id. When omitted a unique id is generated. ' +
           'If the id already exists in doc.joints the command is a no-op.',
-      },
-    },
-    required: ['kind', 'a', 'b', 'axis'],
-  },
+      ),
+  }),
   run: (doc, { kind, a, b, axis, id }): CommandResult => {
-    if (!VALID_JOINT_KINDS.has(kind)) {
-      return {
-        document: doc,
-        summary: `add_joint: unknown kind '${String(kind)}'. Allowed: revolute, prismatic.`,
-        affected: [],
-      };
-    }
-
     if (!isValidMateRef(a)) {
       return {
         document: doc,
@@ -509,15 +481,11 @@ export const addJoint: CommandDefinition<AddJointParams> = {
       affected: [jointId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // delete_joint
 // ---------------------------------------------------------------------------
-
-interface DeleteJointParams {
-  id: string;
-}
 
 /**
  * @command delete_joint
@@ -527,27 +495,23 @@ interface DeleteJointParams {
  * @invariant jointOrder and joints remain consistent after deletion
  * @failure unknown joint id → no-op, affected:[]
  */
-export const deleteJoint: CommandDefinition<DeleteJointParams> = {
+export const deleteJoint = defineCommand({
   name: 'delete_joint',
   annotations: { destructive: true },
   description:
     'Remove a kinematic joint from the document by its id. ' +
     'Any DriveRelation whose "driver" or "driven" field references this joint id is also removed (cascade). ' +
     'If the joint id does not exist the document is left unchanged.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description:
-          'Id of the joint to remove. Must match an existing joint id exactly. ' +
+  params: z.object({
+    id: z
+      .string()
+      .describe(
+        'Id of the joint to remove. Must match an existing joint id exactly. ' +
           'Use evaluate_motion or describe_scene to list joint ids.',
-      },
-    },
-    required: ['id'],
-  },
+      ),
+  }),
   run: (doc, { id }): CommandResult => {
-    if (typeof id !== 'string' || !(id in doc.joints)) {
+    if (!(id in doc.joints)) {
       return {
         document: doc,
         summary: `delete_joint: joint '${String(id)}' does not exist — no change made.`,
@@ -590,16 +554,11 @@ export const deleteJoint: CommandDefinition<DeleteJointParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // set_joint_value
 // ---------------------------------------------------------------------------
-
-interface SetJointValueParams {
-  id: string;
-  value: number | string;
-}
 
 /**
  * @command set_joint_value
@@ -609,7 +568,7 @@ interface SetJointValueParams {
  * @invariant joint must exist in doc.joints
  * @failure unknown joint id → no-op, affected:[]
  */
-export const setJointValue: CommandDefinition<SetJointValueParams> = {
+export const setJointValue = defineCommand({
   name: 'set_joint_value',
   description:
     'Set the current value of a kinematic joint. ' +
@@ -618,36 +577,21 @@ export const setJointValue: CommandDefinition<SetJointValueParams> = {
     '"value" may be a plain number or a parameter expression string (e.g. "=spoke_angle * 2" or "gap / 3"). ' +
     'Expression strings are stored as-is and evaluated when evaluate_motion or bake_motion is called. ' +
     'Call evaluate_motion (query) or bake_motion (mutates doc) to apply the new value to instance transforms.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the joint to update. Must exist in doc.joints.',
-      },
-      value: {
-        type: 'string',
-        description:
-          'New joint value. For revolute: angle in radians. For prismatic: displacement in document units. ' +
+  params: z.object({
+    id: z.string().describe('Id of the joint to update. Must exist in doc.joints.'),
+    value: z
+      .union([z.string(), z.number()])
+      .describe(
+        'New joint value. For revolute: angle in radians. For prismatic: displacement in document units. ' +
           'May be a plain number ("1.5708") or a parameter expression string ("spoke_angle * 2"). ' +
           'Expression strings reference named parameters in doc.parameters.',
-      },
-    },
-    required: ['id', 'value'],
-  },
+      ),
+  }),
   run: (doc, { id, value }): CommandResult => {
-    if (typeof id !== 'string' || !(id in doc.joints)) {
+    if (!(id in doc.joints)) {
       return {
         document: doc,
         summary: `set_joint_value: joint '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
-    }
-
-    if (typeof value !== 'number' && typeof value !== 'string') {
-      return {
-        document: doc,
-        summary: `set_joint_value: value must be a number or expression string, got ${typeof value}.`,
         affected: [],
       };
     }
@@ -695,19 +639,11 @@ export const setJointValue: CommandDefinition<SetJointValueParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // add_drive_relation
 // ---------------------------------------------------------------------------
-
-interface AddDriveRelationParams {
-  driver: string;
-  driven: string;
-  ratio: number;
-  offset?: number;
-  id?: string;
-}
 
 /**
  * @command add_drive_relation
@@ -719,7 +655,7 @@ interface AddDriveRelationParams {
  * @invariant the resulting drive graph must be acyclic
  * @failure unknown joint id / self-coupling / cycle → no-op, affected:[]
  */
-export const addDriveRelation: CommandDefinition<AddDriveRelationParams> = {
+export const addDriveRelation = defineCommand({
   name: 'add_drive_relation',
   description:
     'Couple two kinematic joints: driven_value = driver_value * ratio + offset. ' +
@@ -731,45 +667,40 @@ export const addDriveRelation: CommandDefinition<AddDriveRelationParams> = {
     '"offset" is an optional additive phase or position offset (default 0). ' +
     'Cyclic couplings (A→B→A) are rejected with an explanatory summary. ' +
     'Returns the new drive relation id in affected[0].',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      driver: {
-        type: 'string',
-        description: 'Id of the driving joint (source of motion). Must exist in doc.joints.',
-      },
-      driven: {
-        type: 'string',
-        description: 'Id of the driven joint (receives motion). Must exist in doc.joints.',
-      },
-      ratio: {
-        type: 'number',
-        description:
-          'Coupling ratio: driven = driver * ratio + offset. ' +
+  params: z.object({
+    driver: z
+      .string()
+      .describe('Id of the driving joint (source of motion). Must exist in doc.joints.'),
+    driven: z
+      .string()
+      .describe('Id of the driven joint (receives motion). Must exist in doc.joints.'),
+    ratio: z
+      .number()
+      .describe(
+        'Coupling ratio: driven = driver * ratio + offset. ' +
           'Use 1.0 for a direct coupling, 2.0 for a 2:1 gear-up, -1.0 to reverse direction.',
-      },
-      offset: {
-        type: 'number',
-        description: 'Optional additive offset applied after ratio multiplication. Default: 0.',
-      },
-      id: {
-        type: 'string',
-        description:
-          'Optional explicit drive relation id. When omitted a unique id is generated. ' +
+      ),
+    offset: z
+      .number()
+      .optional()
+      .describe('Optional additive offset applied after ratio multiplication. Default: 0.'),
+    id: z
+      .string()
+      .optional()
+      .describe(
+        'Optional explicit drive relation id. When omitted a unique id is generated. ' +
           'If the id already exists in doc.driveRelations the command is a no-op.',
-      },
-    },
-    required: ['driver', 'driven', 'ratio'],
-  },
+      ),
+  }),
   run: (doc, { driver, driven, ratio, offset, id }): CommandResult => {
-    if (typeof driver !== 'string' || !(driver in doc.joints)) {
+    if (!(driver in doc.joints)) {
       return {
         document: doc,
         summary: `add_drive_relation: driver joint '${String(driver)}' does not exist in doc.joints.`,
         affected: [],
       };
     }
-    if (typeof driven !== 'string' || !(driven in doc.joints)) {
+    if (!(driven in doc.joints)) {
       return {
         document: doc,
         summary: `add_drive_relation: driven joint '${String(driven)}' does not exist in doc.joints.`,
@@ -783,7 +714,7 @@ export const addDriveRelation: CommandDefinition<AddDriveRelationParams> = {
         affected: [],
       };
     }
-    if (typeof ratio !== 'number' || !Number.isFinite(ratio)) {
+    if (!Number.isFinite(ratio)) {
       return {
         document: doc,
         summary: `add_drive_relation: ratio must be a finite number, got ${String(ratio)}.`,
@@ -833,15 +764,11 @@ export const addDriveRelation: CommandDefinition<AddDriveRelationParams> = {
       affected: [drId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // delete_drive_relation
 // ---------------------------------------------------------------------------
-
-interface DeleteDriveRelationParams {
-  id: string;
-}
 
 /**
  * @command delete_drive_relation
@@ -851,26 +778,22 @@ interface DeleteDriveRelationParams {
  * @invariant driveRelationOrder and driveRelations remain consistent after deletion
  * @failure unknown drive relation id → no-op, affected:[]
  */
-export const deleteDriveRelation: CommandDefinition<DeleteDriveRelationParams> = {
+export const deleteDriveRelation = defineCommand({
   name: 'delete_drive_relation',
   annotations: { destructive: true },
   description:
     'Remove a drive relation (joint coupling) from the document by its id. ' +
     'The joints themselves are not affected; only the coupling is removed. ' +
     'If the drive relation id does not exist the document is left unchanged.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description:
-          'Id of the drive relation to remove. Must match an existing entry in doc.driveRelations.',
-      },
-    },
-    required: ['id'],
-  },
+  params: z.object({
+    id: z
+      .string()
+      .describe(
+        'Id of the drive relation to remove. Must match an existing entry in doc.driveRelations.',
+      ),
+  }),
   run: (doc, { id }): CommandResult => {
-    if (typeof id !== 'string' || !(id in doc.driveRelations)) {
+    if (!(id in doc.driveRelations)) {
       return {
         document: doc,
         summary: `delete_drive_relation: drive relation '${String(id)}' does not exist — no change made.`,
@@ -894,7 +817,7 @@ export const deleteDriveRelation: CommandDefinition<DeleteDriveRelationParams> =
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // evaluate_motion (read-only query)
@@ -908,7 +831,7 @@ export const deleteDriveRelation: CommandDefinition<DeleteDriveRelationParams> =
  * @invariant document is returned unchanged; resolved joint values propagated in topo order
  * @failure no joints → empty data, friendly summary; unknown instanceIds → those joints skipped
  */
-export const evaluateMotion: CommandDefinition<Record<string, never>> = {
+export const evaluateMotion = defineCommand({
   name: 'evaluate_motion',
   annotations: { readOnly: true, metaHistory: true },
   description:
@@ -921,11 +844,7 @@ export const evaluateMotion: CommandDefinition<Record<string, never>> = {
     '  instancePositions: Record<instanceId, Vec3>, ' +
     '  instanceRotations: Record<instanceId, Vec3> }. ' +
     'Call bake_motion to permanently apply these transforms to the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-  },
+  params: z.object({}),
   run: (doc, _params): CommandResult => {
     if (Object.keys(doc.joints).length === 0) {
       return {
@@ -948,7 +867,7 @@ export const evaluateMotion: CommandDefinition<Record<string, never>> = {
       data: { resolvedJoints, instancePositions, instanceRotations },
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // bake_motion
@@ -962,7 +881,7 @@ export const evaluateMotion: CommandDefinition<Record<string, never>> = {
  * @invariant joint values and drive relations are unchanged; only instance transforms change
  * @failure no joints → no-op with friendly summary
  */
-export const bakeMotion: CommandDefinition<Record<string, never>> = {
+export const bakeMotion = defineCommand({
   name: 'bake_motion',
   description:
     'Apply all kinematic joints and drive relations to the document, permanently updating ' +
@@ -972,11 +891,7 @@ export const bakeMotion: CommandDefinition<Record<string, never>> = {
     "Revolute joint: rotates instance b around instance a's origin along the axis by the joint angle. " +
     "Prismatic joint: translates instance b along the axis from instance a's origin by the displacement. " +
     'Returns the updated document with affected[] listing all modified instance ids.',
-  paramsSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-  },
+  params: z.object({}),
   run: (doc, _params): CommandResult => {
     if (Object.keys(doc.joints).length === 0) {
       return {
@@ -1023,4 +938,4 @@ export const bakeMotion: CommandDefinition<Record<string, never>> = {
       affected: movedIds,
     };
   },
-};
+});
