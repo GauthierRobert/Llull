@@ -155,7 +155,7 @@ describe('cost estimate', () => {
     expect(doc.building!.currency).toBe('EUR');
     expect(execute(doc, 'set_cost_rates', { rates: {} }).document).toBe(doc);
     expect(execute(doc, 'set_cost_rates', { rates: { a: -1 } }).document).toBe(doc);
-    expect(execute(doc, 'estimate_cost', { rates: [] }).summary).toMatch(/failed/);
+    expect(execute(doc, 'estimate_cost', { rates: [] }).summary).toMatch(/rejected/);
   });
 
   it('rateFor and toCsv helpers', () => {

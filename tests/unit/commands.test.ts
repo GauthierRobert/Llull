@@ -8937,7 +8937,7 @@ describe('guardCommand contract', () => {
     const r = execute(doc, 'add_box', params);
     expect(r.document).toBe(doc);
     expect(r.affected).toEqual([]);
-    expect(r.summary).toBe('add_box failed: boom; document unchanged.');
+    expect(r.summary).toBe('add_box rejected: invalid params — boom');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('add_box'), expect.anything());
     warn.mockRestore();
   });

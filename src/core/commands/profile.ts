@@ -15,10 +15,12 @@
 
 import type { CadDocument, Entity, ExtrusionEntity, RevolutionEntity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
-import { defineCommand, z } from './schema';
+import type { CommandResult } from './types';
+import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
 import { nextId } from '../../lib/id';
 import { rotatedEntityBounds } from './scene';
+
+const ORIGIN: Vec3 = [0, 0, 0];
 
 /**
  * Validate an optional rotation param (shared convention with geometry.ts).
@@ -201,34 +203,6 @@ function resolveAxis(raw: unknown): Vec3 | null {
   return [(ax as number) / len, (ay as number) / len, (az as number) / len];
 }
 
-interface RevolveProfileParams {
-  /**
-   * Array of [x, y] points forming the generating cross-section. Must be a closed polygon
-   * (first point need not equal last — the command treats the polygon as implicitly closed).
-   * Minimum 3 points. x is the radial offset from the revolution axis; y is the axial offset.
-   */
-  profile: ReadonlyArray<readonly [number, number]>;
-  /**
-   * Revolution axis. One of 'x', 'y', 'z' (shorthand) or a [dx, dy, dz] unit-vector array.
-   * Default: 'z' (+Z, the natural axis for a Z-up document).
-   */
-  axis?: string | Vec3;
-  /** Sweep angle in radians. Default: 2π (full revolution). Must be > 0 and ≤ 2π. */
-  angle?: number;
-  /** Number of radial subdivisions for tessellation. Default: 32. Minimum: 3. */
-  segments?: number;
-  /** World-space position of the revolution-axis origin [x, y, z]. Default: [0, 0, 0]. */
-  position?: Vec3;
-  /** Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Default: [0, 0, 0]. */
-  rotation?: Vec3;
-  /** Optional layer id. Defaults to the document default layer. */
-  layerId?: string;
-  /** Hex color string, e.g. "#c8553d". Default: "#6b8f9c". */
-  color?: string;
-  /** Optional explicit entity id. If absent a unique id is generated. */
-  id?: string;
-}
-
 /**
  * @command revolve_profile
  * @pure
@@ -240,7 +214,7 @@ interface RevolveProfileParams {
  * @failure invalid axis (not 'x'/'y'/'z' and not a valid Vec3) -> no-op, affected:[]
  * @failure segments < 3 -> clamped to 3, no no-op
  */
-export const revolveProfile: CommandDefinition<RevolveProfileParams> = {
+export const revolveProfile = defineCommand({
   name: 'revolve_profile',
   description:
     'Create a surface of revolution by rotating a closed 2D polygon profile around an axis. ' +
@@ -252,61 +226,51 @@ export const revolveProfile: CommandDefinition<RevolveProfileParams> = {
     'angle is the sweep in radians (default 2π for a full revolution; must be > 0). ' +
     'segments is the number of radial subdivisions (default 32, minimum 3). ' +
     'Stores a parametric revolution entity; tessellated as triangles in render_view and export_stl.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      profile: {
-        type: 'array',
-        description:
-          'Closed polygon cross-section: array of [x, y] points. x = radial offset from the axis (≥ 0 for outward), ' +
-          'y = axial offset along the axis. Minimum 3 points. The polygon is implicitly closed — ' +
-          'do NOT repeat the first point at the end.',
-      },
-      axis: {
-        type: 'string',
-        description:
-          'Revolution axis. Use "x", "y", or "z" for the principal axes, or pass a [dx, dy, dz] array ' +
+  params: z.object({
+    profile: untypedArray(
+      'Closed polygon cross-section: array of [x, y] points. x = radial offset from the axis (≥ 0 for outward), ' +
+        'y = axial offset along the axis. Minimum 3 points. The polygon is implicitly closed — ' +
+        'do NOT repeat the first point at the end.',
+    ),
+    axis: z
+      .union([z.string(), z.array(z.number())])
+      .describe(
+        'Revolution axis. Use "x", "y", or "z" for the principal axes, or pass a [dx, dy, dz] array ' +
           'for an arbitrary direction (it will be normalised). Default: "z" (natural +Z-up axis).',
-      },
-      angle: {
-        type: 'number',
-        description:
-          'Sweep angle in radians. Must be > 0. Default: 2π (full 360° revolution). ' +
+      )
+      .optional(),
+    angle: z
+      .number()
+      .describe(
+        'Sweep angle in radians. Must be > 0. Default: 2π (full 360° revolution). ' +
           'Use π for a half-revolution, π/2 for a quarter, etc.',
-      },
-      segments: {
-        type: 'number',
-        description:
-          'Number of radial subdivisions for tessellation. Higher = smoother surface. Default: 32. Minimum: 3.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space origin of the revolution axis [x, y, z] in document units. Default: [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] applied after revolution. Default: [0, 0, 0]. ' +
+      )
+      .optional(),
+    segments: z
+      .number()
+      .describe(
+        'Number of radial subdivisions for tessellation. Higher = smoother surface. Default: 32. Minimum: 3.',
+      )
+      .optional(),
+    position: looseVec3(
+      'World-space origin of the revolution axis [x, y, z] in document units. Default: [0, 0, 0].',
+    ).optional(),
+    rotation: tolerant(
+      looseVec3(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] applied after revolution. Default: [0, 0, 0]. ' +
           'Malformed or non-length-3 values are ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      layerId: {
-        type: 'string',
-        description: 'Layer id to assign the entity to. Defaults to the document default layer.',
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Default: "#6b8f9c".',
-      },
-      id: {
-        type: 'string',
-        description: 'Optional explicit entity id. If omitted a unique id is generated.',
-      },
-    },
-    required: ['profile'],
-  },
+      ),
+    ).optional(),
+    layerId: z
+      .string()
+      .describe('Layer id to assign the entity to. Defaults to the document default layer.')
+      .optional(),
+    color: z.string().describe('Hex color string, e.g. "#c8553d". Default: "#6b8f9c".').optional(),
+    id: z
+      .string()
+      .describe('Optional explicit entity id. If omitted a unique id is generated.')
+      .optional(),
+  }),
   run: (
     doc,
     {
@@ -314,7 +278,7 @@ export const revolveProfile: CommandDefinition<RevolveProfileParams> = {
       axis: rawAxis,
       angle: rawAngle,
       segments: rawSegments,
-      position = [0, 0, 0],
+      position = ORIGIN,
       rotation,
       layerId,
       color = '#6b8f9c',
@@ -394,4 +358,4 @@ export const revolveProfile: CommandDefinition<RevolveProfileParams> = {
       affected: [id],
     };
   },
-};
+});
