@@ -16,23 +16,32 @@ LOAD FIRST: all of `.claude/rules/*` and `.claude/context/*`.
 Get the diff (`git diff` if initialized, else inspect changed files). Check, in order:
 
 ### Architecture (blocking)
-- [ ] No document mutation outside a command. Components/bridge/server only `dispatch`.
-- [ ] `core/` imports no react / DOM / window / fetch and never imports `ui/`.
+- [ ] No document mutation outside a command. Components/server only `dispatch` / `execute`.
+- [ ] `packages/*/src` import no react / DOM / window / fetch and never `src/ui`;
+      `packages/core` imports no other package (`@aec` / `@mcp` / `@kernel-*`) (L2, L10).
+- [ ] Commands read the kernel only from `ctx.kernel` (+ `requiresKernel`); no
+      `getGeometryKernel()` / `setGeometryKernel()` / concrete kernel in a command (L9).
+- [ ] Domain commands live in their plugin, not `packages/core` (L10).
 - [ ] Commands are pure: new doc returned, input untouched (purity test present).
 - [ ] New capability == a registered command (no surface-specific bypass).
-- [ ] AI/MCP tools come from `toToolSchemas()`, not hand-written schemas.
+- [ ] AI/MCP tools come from `toToolSchemas()`; params from a zod `params` via
+      `defineCommand` — no hand-written `paramsSchema` / `<X>Params` interface.
 
 ### Contract & conventions (blocking)
-- [ ] Tool `name` is snake_case; const is camelCase; `<Command>Params` interface.
+- [ ] Tool `name` is snake_case; const is camelCase; every param `.describe()`d.
 - [ ] `description`/param descriptions are self-sufficient for an agent with no code.
 - [ ] `summary` is specific (ids/counts), not vague.
-- [ ] No `any`; explicit return types on exports; no `console.log`; types model facts.
+- [ ] No `any`; explicit return types on exports; no `console.log`; types model facts;
+      no file over 500 code lines.
 - [ ] Structured doc-comment tags present on commands (C2).
 
 ### Tests & quality (blocking)
 - [ ] New command has happy + failure-path tests.
-- [ ] `npm run check` green; `core/commands/**` coverage gate satisfied (run it).
-- [ ] `toToolSchemas()` length == `listCommands()` length.
+- [ ] `npm run check` green; coverage gate on `packages/core/src/commands/**` +
+      `packages/domain-aec/src/**` satisfied (run it).
+- [ ] `toToolSchemas()` length == `listCommands()` length; schema snapshot / golden corpus
+      diffs are intended and explained.
+- [ ] New ids are step-scoped (`nextId`), never `uniqueId()` / `Date.now()` (replay determinism).
 
 ### Correctness (judgment)
 - Model invariants held (`model.md`): id↔order↔selection consistency, valid layerId,

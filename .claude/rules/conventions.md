@@ -40,46 +40,66 @@ If a comment restates the code, delete it. Reserve prose for the `docs/` folder
 - Exported command definition const: `camelCase` (`addBox`, `extrudeProfile`).
 - React components: `PascalCase`. Hooks: `useThing`. Types/interfaces: `PascalCase`,
   no `I` prefix.
-- Params interfaces: `<Command>Params` (`AddBoxParams`).
+- Params: one zod `z.object(...)` per command, inline in `defineCommand`; the TS type is
+  inferred (`z.output`). No hand-written `<Command>Params` interface.
 - Be literal and full-word. `selectedEntityIds` > `sel`. Tokens are cheap; ambiguity is not.
 
 ## C4 — Imports & paths
 
-Use path aliases, never deep relatives across layers:
-`@core/*` → `src/core/*`, `@ui/*` → `src/ui/*`, `@lib/*` → `src/lib/*`.
-(`tsconfig.json` paths + `vite.config.ts` alias must stay in sync.)
+Use path aliases, never deep relatives across packages/layers:
+
+| Alias | Path |
+| ----- | ---- |
+| `@core/*` | `packages/core/src/*` |
+| `@lib/*` | `packages/core/src/lib/*` |
+| `@mcp/*` | `packages/mcp/src/*` |
+| `@aec/*` | `packages/domain-aec/src/*` |
+| `@kernel-manifold/*` | `packages/kernel-manifold/src/*` |
+| `@kernel-occt/*` | `packages/kernel-occt/src/*` |
+| `@ui/*` | `src/ui/*` |
+| `@app/*` | `src/app/*` |
+
+Inside `packages/core/src` use relative imports (it imports no other package).
+(`tsconfig.json` paths + `vite.config.ts` alias + `server/` config must stay in sync.)
 
 ## C5 — Command shape (copy this skeleton)
 
 ```ts
-interface FooParams { id: string; amount: number; }
+import type { CommandResult } from './types';
+import { defineCommand, z, vec3 } from './schema';   // plugins: '@core/commands/schema'
 
-export const foo: CommandDefinition<FooParams> = {
+export const fooThing = defineCommand({
   name: 'foo_thing',
   description: 'One line, imperative, says what the op does to the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id:     { type: 'string', description: 'Target entity id' },
-      amount: { type: 'number', description: 'How much' },
-    },
-    required: ['id', 'amount'],
-  },
-  run: (doc, { id, amount }): CommandResult => {
+  annotations: { idempotent: true },                 // optional: readOnly / destructive /
+                                                     // idempotent / metaHistory / requiresKernel
+  params: z.object({
+    id: z.string().describe('Target entity id'),
+    amount: z.number().describe('How much, in document units; must be > 0'),
+    offset: vec3('Optional [x, y, z] offset. Defaults to [0, 0, 0].').optional(),
+  }),
+  run: (doc, { id, amount, offset = [0, 0, 0] }, ctx): CommandResult => {
     const target = doc.entities[id];
     if (!target) return { document: doc, summary: `No entity ${id}.`, affected: [] };
-    // build NEW doc; return { document, summary, affected }
+    // build NEW doc; ids via nextId(prefix) from @lib/id; kernel via ctx?.kernel
+    // return { document, summary, affected }
   },
-};
+});
 ```
 
+Schema helpers (`@core/commands/schema`): `vec2` / `vec3` (exact-length tuples),
+`looseVec2` / `looseVec3` (any number array at runtime; `run` checks length), `untypedArray`
+(no `items` advertised; `run` validates), `tolerant(schema)` (advertised, never rejected; `run`
+keeps its fallback). Every property needs `.describe(...)` — `defineCommand` throws without it.
+
 Rules for `run`:
-- Validate inputs; on bad input return the **unchanged doc** with an explanatory
-  `summary` and `affected: []` (graceful no-op, never throw for user error).
+- `execute` already rejected schema-invalid params (`<name> rejected: invalid params — <path>: …`).
+  Still validate semantics (ids exist, sizes > 0); on bad input return the **unchanged doc**
+  with an explanatory `summary` and `affected: []` (graceful no-op, never throw for user error).
 - `summary` is read by humans AND fed back to the AI — make it specific and factual
   (include ids, sizes, counts). It is the AI's feedback signal.
-- `paramsSchema` `description`s are what Claude/MCP agents see — write them for an
-  agent that cannot see the code.
+- `.describe()` texts become the MCP `paramsSchema` — write them for an agent that cannot
+  see the code. A change to them shows up in the tool-schema snapshot test; review the diff.
 
 ## C6 — Formatting (Prettier-enforced, do not fight it)
 
@@ -88,7 +108,11 @@ Run `npm run format`. Never hand-format.
 
 ## C7 — File organization
 
-- One concern per file. Group commands by domain (`geometry.ts`, later `boolean.ts`,
-  `transform.ts`). Re-export through `registry.ts`.
+- One concern per file. Group commands by domain (`geometry.ts`, `boolean.ts`,
+  `transform.ts`); split a domain by concern when it grows (`geometryBasic.ts`,
+  `geometryRound.ts`, …). Core commands register in `registry.ts`; domain commands in their
+  plugin's `commands` list (`packages/domain-aec/src/index.ts` → `plugin.ts`).
+- Max **500 code lines** per file (blank/comment lines excluded) — ESLint `max-lines` error on
+  `src/**`, `packages/*/src/**`, `server/src/**`, no allowlist. Split by concern; never disable it.
 - No `console.log` in committed code (eslint warns; `console.warn`/`error` allowed).
   A PostToolUse hook reminds you.

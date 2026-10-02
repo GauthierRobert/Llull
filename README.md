@@ -33,18 +33,20 @@ and pipe runs, clash detection, steel tonnage / cut lists, and elevation / secti
 | UI             | React 18 + TypeScript + Vite             | Lightweight, best-in-class 3D ecosystem |
 | 3D viewport    | three.js + @react-three/fiber + drei     | Mature, declarative Three.js |
 | State          | Zustand                                  | One store, no boilerplate, easy to drive externally |
-| Tests          | Vitest + Testing Library                 | Fast, Vite-native |
+| Schemas        | zod                                      | One schema per command: TS type, MCP JSON Schema and runtime validation |
+| Geometry kernel| Manifold (default) / OpenCascade.js      | Booleans and fillets behind one interface |
+| Tests          | Vitest + Testing Library + Playwright    | Fast, Vite-native |
 | Lint / format  | ESLint + Prettier                        | Consistent, enforced in CI |
 | Backend (opt.) | Node + Express                           | Only for hosting the MCP endpoint |
 
 ## Architecture in one picture
 
 ```
-Document Model (Zustand store)  ← entities, layers, selection, camera
+Document (recipe + evaluated)   ← feature history, parameters, entities, layers, ...
         ▲
-Command Layer (pure functions)  ← add_box, extrude_profile, move_entity, ...
+Command Layer (pure functions)  ← add_box, extrude_sketch, move_entity, ... + plugins
         ▲                  ▲
-   React UI           MCP Server (Claude / any MCP agent)
+   React UI  ◄── /live ──  MCP Server (Claude / any MCP agent)
 ```
 
 Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before writing code. It
@@ -53,9 +55,9 @@ explains the command-layer pattern that the entire project depends on.
 ## Getting started
 
 ```bash
-npm install
+npm install          # installs the root app and every packages/* workspace
 npm run dev          # start the app at http://localhost:5173
-npm run check        # typecheck + lint + test (run before every commit)
+npm run check        # typecheck + lint + format check + test (run before every commit)
 npm run test:e2e     # Playwright end-to-end tests in Chromium (starts the dev server)
 ```
 
@@ -98,16 +100,19 @@ their history order. Edited CadQuery/build123d code comes back through the MCP t
 ## Project layout
 
 ```
+packages/                # npm workspaces — framework-agnostic, no React / DOM / fetch
+  core/src/              # model, command layer (the heart of the app), execution context,
+                         #   persistence, geometry kernel interface, plugin host, lib helpers
+  mcp/src/               # MCP tools, toolsets, discovery, live-sync protocol
+  domain-aec/src/        # building (BIM) and industrial plugins
+  kernel-manifold/src/   # Manifold geometry kernel (default)
+  kernel-occt/src/       # OpenCascade geometry kernel
 src/
-  core/         # framework-agnostic brain — no React imports allowed here
-    model/      # document types + factory
-    commands/   # the command layer (the heart of the app)
-    mcp/        # MCP tool definitions (generated from the registry)
-  ui/           # React: viewport, panels, store binding
-  lib/          # tiny shared utilities
-server/         # Express MCP host (optional)
-tests/          # unit + integration
-docs/           # architecture, conventions, contributing, roadmap
+  app/                   # composition root: installs the default plugins
+  ui/                    # React: viewport, panels, store
+server/                  # Express MCP host (optional)
+tests/                   # unit, contract, golden corpus, integration, component, e2e
+docs/                    # architecture, contributing, roadmap, domain guides
 ```
 
 ## The golden rule

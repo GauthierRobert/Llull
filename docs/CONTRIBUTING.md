@@ -4,7 +4,8 @@
 
 1. Branch from `main`: `feat/<short-name>` or `fix/<short-name>`.
 2. Write the command/feature **with a test** in the same change.
-3. Run `npm run check` (typecheck + lint + test). It must pass.
+3. Run `npm run check` (typecheck + lint + format check + test). It must pass. If you
+   touched `server/` or the MCP layer, also run `npm --prefix server test`.
 4. Open a PR. Keep it small and focused.
 
 ## Conventions
@@ -12,11 +13,14 @@
 ### Code
 
 - **TypeScript strict mode is on.** No `any`. Use `unknown` + narrowing.
-- **`core/` is framework-agnostic.** No `import ... from 'react'` in `core/`.
-  No `fetch`, `window`, or `document` either — those live in `ui/` or behind an
-  injected interface.
+- **`packages/*` are framework-agnostic.** No `import ... from 'react'`, no `fetch`,
+  `window`, or `document` — those live in `src/ui/`, `server/`, or behind an injected
+  interface. `packages/core` imports no other package; domains are plugins.
 - **Commands are pure.** Return a new document; never mutate the argument.
   There is a test that enforces this (`is pure` in `commands.test.ts`).
+- **One schema per command.** Declare commands with `defineCommand` and a zod `params`
+  object; never hand-write a `paramsSchema` or a separate params interface.
+- **Small files.** At most 500 lines of code per file (ESLint `max-lines`); split by concern.
 - **Files are kebab or camel per folder convention already present.** Match the
   neighbours.
 
@@ -40,8 +44,10 @@ docs(architecture): clarify dependency direction
 
 ### Tests
 
-- Co-locate intent: command tests in `tests/unit`, store/flow tests in
-  `tests/integration`.
+- Co-locate intent: command tests in `tests/unit` (plugins: `tests/unit/building`),
+  contract tests in `tests/unit/contract`, store/flow tests in `tests/integration`.
+- The golden corpus (`tests/golden`) snapshots whole documents built by `build_project`
+  plans. Update a snapshot only for an intended behaviour change, and say so in the PR.
 - Prefer behavioural assertions (what the user/AI observes) over implementation
   details.
 - Ids are deterministic per document (step-scoped `<prefix>-<step>.<k>`); no reset is needed.

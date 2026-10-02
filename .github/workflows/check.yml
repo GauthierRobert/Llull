@@ -34,7 +34,7 @@ jobs:
       - name: Run check (typecheck + lint + tests)
         run: npm run check
 
-      # Coverage gate: 90/85/90/90 on src/core/commands/**
+      # Coverage gate: 90/85/90/90 on packages/core/src/commands/** and packages/domain-aec/src/**
       - name: Run coverage (90/85/90/90 gate)
         run: npm run test:coverage
 
