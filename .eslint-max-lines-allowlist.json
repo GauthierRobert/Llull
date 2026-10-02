@@ -16,17 +16,6 @@
   "src/core/commands/building/industrial/runwayCheck.ts",
   "src/core/commands/building/plan.ts",
   "src/core/commands/building/quantities.ts",
-  "src/core/commands/constraints.ts",
-  "src/core/commands/draw2d.ts",
-  "src/core/commands/export.ts",
-  "src/core/commands/geometry.ts",
-  "src/core/commands/joints.ts",
-  "src/core/commands/measure.ts",
-  "src/core/commands/modify2d.ts",
-  "src/core/commands/persistence.ts",
-  "src/core/commands/project.ts",
-  "src/core/commands/render.ts",
-  "src/core/commands/scene.ts",
   "src/ui/panels/building/elementTools.ts",
   "src/ui/viewport/2d/snapping.ts"
 ]

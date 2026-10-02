@@ -1,0 +1,328 @@
+import type { CadDocument, Joint, JointMateRef, DriveRelation, Vec3 } from '../model/types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
+import { nextId } from '../../lib/id';
+import { resolveJointValue, isValidAxis, isValidMateRef } from './jointsKinematics';
+// ---------------------------------------------------------------------------
+// add_joint
+// ---------------------------------------------------------------------------
+
+/**
+ * @command add_joint
+ * @pure
+ * @layer core/commands
+ * @affects appends 1 entry to doc.joints and doc.jointOrder
+ * @invariant both a.instanceId and b.instanceId must exist as InstanceEntity in doc.entities
+ * @invariant axis must be 'x'|'y'|'z' or a [number,number,number] Vec3
+ * @failure unknown instanceId / non-instance entity / invalid axis → no-op, affected:[]
+ */
+export const addJoint = defineCommand({
+  name: 'add_joint',
+  description:
+    'Add a kinematic joint between two InstanceEntity frames to model a mechanism. ' +
+    'A "revolute" joint allows rotation of instance b around the given axis through instance a\'s origin. ' +
+    'A "prismatic" joint allows translation of instance b along the given axis from instance a\'s origin. ' +
+    '"a" and "b" are MateRef objects: { instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
+    '"axis" is the rotation/slide axis: use "x", "y", or "z" for world axes, or a [x,y,z] unit vector. ' +
+    'Initial joint value (angle / displacement) defaults to 0. ' +
+    'Use set_joint_value to drive the joint. Use evaluate_motion or bake_motion to apply motion to instances. ' +
+    'Returns the new joint id in affected[0].',
+  params: z.object({
+    kind: z
+      .enum(['revolute', 'prismatic'])
+      .describe(
+        'Joint type. "revolute": rotation about an axis (like a hinge or pin). ' +
+          '"prismatic": linear translation along an axis (like a slider or piston).',
+      ),
+    a: z
+      .object({
+        instanceId: z.string().describe('Id of the first InstanceEntity.'),
+        frame: z
+          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
+          .optional()
+          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
+      })
+      .describe(
+        'First instance frame reference (the fixed/anchor frame). ' +
+          '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
+          'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
+      ),
+    b: z
+      .object({
+        instanceId: z.string().describe('Id of the second InstanceEntity.'),
+        frame: z
+          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
+          .optional()
+          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
+      })
+      .describe(
+        'Second instance frame reference (the moving frame). ' +
+          '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
+          'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
+      ),
+    axis: z
+      .union([z.string(), z.array(z.number())])
+      .describe(
+        'Rotation or slide axis. Use "x", "y", or "z" for world-aligned axes, ' +
+          'or pass a [x,y,z] unit vector array for an arbitrary direction.',
+      ),
+    id: z
+      .string()
+      .optional()
+      .describe(
+        'Optional explicit joint id. When omitted a unique id is generated. ' +
+          'If the id already exists in doc.joints the command is a no-op.',
+      ),
+  }),
+  run: (doc, { kind, a, b, axis, id }): CommandResult => {
+    if (!isValidMateRef(a)) {
+      return {
+        document: doc,
+        summary: 'add_joint: "a" must be an object with a non-empty instanceId string.',
+        affected: [],
+      };
+    }
+    if (!isValidMateRef(b)) {
+      return {
+        document: doc,
+        summary: 'add_joint: "b" must be an object with a non-empty instanceId string.',
+        affected: [],
+      };
+    }
+
+    if (!isValidAxis(axis)) {
+      return {
+        document: doc,
+        summary: `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`,
+        affected: [],
+      };
+    }
+
+    const entityA = doc.entities[a.instanceId];
+    if (!entityA || entityA.kind !== 'instance') {
+      return {
+        document: doc,
+        summary: `add_joint: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
+        affected: [],
+      };
+    }
+    const entityB = doc.entities[b.instanceId];
+    if (!entityB || entityB.kind !== 'instance') {
+      return {
+        document: doc,
+        summary: `add_joint: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
+        affected: [],
+      };
+    }
+
+    const jointId = typeof id === 'string' && id.length > 0 ? id : nextId('joint');
+    if (jointId in doc.joints) {
+      return {
+        document: doc,
+        summary: `add_joint: joint id '${jointId}' already exists — no change made.`,
+        affected: [],
+      };
+    }
+
+    type FrameValue = 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
+    const mateRefA: JointMateRef =
+      a.frame !== undefined
+        ? { instanceId: a.instanceId, frame: a.frame as FrameValue }
+        : { instanceId: a.instanceId };
+    const mateRefB: JointMateRef =
+      b.frame !== undefined
+        ? { instanceId: b.instanceId, frame: b.frame as FrameValue }
+        : { instanceId: b.instanceId };
+
+    const newJoint: Joint =
+      kind === 'revolute'
+        ? {
+            id: jointId,
+            kind: 'revolute',
+            a: mateRefA,
+            b: mateRefB,
+            axis: axis as 'x' | 'y' | 'z' | Vec3,
+            angle: 0,
+          }
+        : {
+            id: jointId,
+            kind: 'prismatic',
+            a: mateRefA,
+            b: mateRefB,
+            axis: axis as 'x' | 'y' | 'z' | Vec3,
+            displacement: 0,
+          };
+
+    const newDoc: CadDocument = {
+      ...doc,
+      joints: { ...doc.joints, [jointId]: newJoint },
+      jointOrder: [...doc.jointOrder, jointId],
+    };
+
+    return {
+      document: newDoc,
+      summary:
+        `add_joint: added '${kind}' joint '${jointId}' between instance '${a.instanceId}' (a) ` +
+        `and instance '${b.instanceId}' (b), axis=${JSON.stringify(axis)}.`,
+      affected: [jointId],
+    };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// delete_joint
+// ---------------------------------------------------------------------------
+
+/**
+ * @command delete_joint
+ * @pure
+ * @layer core/commands
+ * @affects removes 1 joint from doc.joints and doc.jointOrder; cascade-removes dependent DriveRelations
+ * @invariant jointOrder and joints remain consistent after deletion
+ * @failure unknown joint id → no-op, affected:[]
+ */
+export const deleteJoint = defineCommand({
+  name: 'delete_joint',
+  annotations: { destructive: true },
+  description:
+    'Remove a kinematic joint from the document by its id. ' +
+    'Any DriveRelation whose "driver" or "driven" field references this joint id is also removed (cascade). ' +
+    'If the joint id does not exist the document is left unchanged.',
+  params: z.object({
+    id: z
+      .string()
+      .describe(
+        'Id of the joint to remove. Must match an existing joint id exactly. ' +
+          'Use evaluate_motion or describe_scene to list joint ids.',
+      ),
+  }),
+  run: (doc, { id }): CommandResult => {
+    if (!(id in doc.joints)) {
+      return {
+        document: doc,
+        summary: `delete_joint: joint '${String(id)}' does not exist — no change made.`,
+        affected: [],
+      };
+    }
+
+    const joint = doc.joints[id]!;
+
+    // Cascade: collect drive relations that reference this joint
+    const removedDrIds: string[] = [];
+    const newDriveRelations: Record<string, DriveRelation> = {};
+    for (const [drId, dr] of Object.entries(doc.driveRelations)) {
+      if (dr.driver === id || dr.driven === id) {
+        removedDrIds.push(drId);
+      } else {
+        newDriveRelations[drId] = dr;
+      }
+    }
+
+    const newJoints = { ...doc.joints };
+    delete newJoints[id];
+
+    const newDoc: CadDocument = {
+      ...doc,
+      joints: newJoints,
+      jointOrder: doc.jointOrder.filter((jid) => jid !== id),
+      driveRelations: newDriveRelations,
+      driveRelationOrder: doc.driveRelationOrder.filter((drid) => !removedDrIds.includes(drid)),
+    };
+
+    const cascadeSummary =
+      removedDrIds.length > 0
+        ? ` Also removed ${removedDrIds.length} drive relation(s): ${removedDrIds.join(', ')}.`
+        : '';
+
+    return {
+      document: newDoc,
+      summary: `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`,
+      affected: [],
+    };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// set_joint_value
+// ---------------------------------------------------------------------------
+
+/**
+ * @command set_joint_value
+ * @pure
+ * @layer core/commands
+ * @affects updates angle (revolute) or displacement (prismatic) on the specified joint
+ * @invariant joint must exist in doc.joints
+ * @failure unknown joint id → no-op, affected:[]
+ */
+export const setJointValue = defineCommand({
+  name: 'set_joint_value',
+  description:
+    'Set the current value of a kinematic joint. ' +
+    'For revolute joints, "value" is the rotation angle in radians. ' +
+    'For prismatic joints, "value" is the displacement in document units. ' +
+    '"value" may be a plain number or a parameter expression string (e.g. "=spoke_angle * 2" or "gap / 3"). ' +
+    'Expression strings are stored as-is and evaluated when evaluate_motion or bake_motion is called. ' +
+    'Call evaluate_motion (query) or bake_motion (mutates doc) to apply the new value to instance transforms.',
+  params: z.object({
+    id: z.string().describe('Id of the joint to update. Must exist in doc.joints.'),
+    value: z
+      .union([z.string(), z.number()])
+      .describe(
+        'New joint value. For revolute: angle in radians. For prismatic: displacement in document units. ' +
+          'May be a plain number ("1.5708") or a parameter expression string ("spoke_angle * 2"). ' +
+          'Expression strings reference named parameters in doc.parameters.',
+      ),
+  }),
+  run: (doc, { id, value }): CommandResult => {
+    if (!(id in doc.joints)) {
+      return {
+        document: doc,
+        summary: `set_joint_value: joint '${String(id)}' does not exist — no change made.`,
+        affected: [],
+      };
+    }
+
+    const existing = doc.joints[id]!;
+    let updatedJoint: Joint;
+
+    if (existing.kind === 'revolute') {
+      const resolved = resolveJointValue(value, doc);
+      updatedJoint = {
+        ...existing,
+        angle: typeof resolved === 'number' ? resolved : existing.angle,
+      };
+      // Store expression if it's a string (for round-trip); the numeric field stores the last resolved value.
+      if (typeof value === 'string') {
+        updatedJoint = { ...updatedJoint, angle: resolved ?? existing.angle };
+      }
+    } else {
+      const resolved = resolveJointValue(value, doc);
+      updatedJoint = {
+        ...existing,
+        displacement: typeof resolved === 'number' ? resolved : existing.displacement,
+      };
+      if (typeof value === 'string') {
+        updatedJoint = { ...updatedJoint, displacement: resolved ?? existing.displacement };
+      }
+    }
+
+    const newDoc: CadDocument = {
+      ...doc,
+      joints: { ...doc.joints, [id]: updatedJoint },
+    };
+
+    const fieldName = existing.kind === 'revolute' ? 'angle' : 'displacement';
+    const storedValue =
+      existing.kind === 'revolute'
+        ? (updatedJoint as typeof existing).angle
+        : (updatedJoint as Extract<Joint, { kind: 'prismatic' }>).displacement;
+
+    return {
+      document: newDoc,
+      summary:
+        `set_joint_value: joint '${id}' (${existing.kind}) ${fieldName} set to ${storedValue}` +
+        (typeof value === 'string' ? ` (expression: "${value}").` : '.'),
+      affected: [id],
+    };
+  },
+});
