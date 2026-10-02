@@ -12,7 +12,9 @@ import type { CadDocument, Entity, EntityGroup } from '../model/types';
 import { is3D } from '../model/types';
 import type { MeshSolidEntity } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { getGeometryKernel, type BooleanOp } from '../geometry/kernel';
+import type { BooleanOp } from '../geometry/kernel';
+import type { ExecutionContext } from './context';
+import { currentContext } from './context';
 import { nextId } from '../../lib/id';
 
 // ---------------------------------------------------------------------------
@@ -109,6 +111,7 @@ function runBoolean(
   op: BooleanOp,
   a: string,
   b: string,
+  ctx: ExecutionContext | undefined,
 ): CommandResult {
   const noOp = validateOperands(doc, opName, a, b);
   if (noOp) return noOp;
@@ -116,11 +119,11 @@ function runBoolean(
   const entA = doc.entities[a] as Entity;
   const entB = doc.entities[b] as Entity;
 
-  const k = getGeometryKernel();
+  const k = (ctx ?? currentContext()).kernel;
   if (!k) {
     return {
       document: doc,
-      summary: `${opName}: geometry kernel not available. Inject a kernel via setGeometryKernel() before calling boolean commands.`,
+      summary: `${opName}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
       affected: [],
     };
   }
@@ -171,6 +174,7 @@ interface BooleanUnionParams {
  */
 export const booleanUnion: CommandDefinition<BooleanUnionParams> = {
   name: 'boolean_union',
+  annotations: { requiresKernel: true },
   description:
     'Merge two 3D solid entities into a single mesh entity using a CSG union operation. ' +
     'Both operand entities are consumed (removed) and replaced by the union mesh. ' +
@@ -184,7 +188,7 @@ export const booleanUnion: CommandDefinition<BooleanUnionParams> = {
     },
     required: ['a', 'b'],
   },
-  run: (doc, { a, b }): CommandResult => runBoolean(doc, 'boolean_union', 'union', a, b),
+  run: (doc, { a, b }, ctx): CommandResult => runBoolean(doc, 'boolean_union', 'union', a, b, ctx),
 };
 
 // ---------------------------------------------------------------------------
@@ -205,6 +209,7 @@ interface BooleanSubtractParams {
  */
 export const booleanSubtract: CommandDefinition<BooleanSubtractParams> = {
   name: 'boolean_subtract',
+  annotations: { requiresKernel: true },
   description:
     'Subtract the volume of 3D solid b from 3D solid a, producing a mesh entity. ' +
     'Order matters: result = a minus b. ' +
@@ -219,7 +224,8 @@ export const booleanSubtract: CommandDefinition<BooleanSubtractParams> = {
     },
     required: ['a', 'b'],
   },
-  run: (doc, { a, b }): CommandResult => runBoolean(doc, 'boolean_subtract', 'subtract', a, b),
+  run: (doc, { a, b }, ctx): CommandResult =>
+    runBoolean(doc, 'boolean_subtract', 'subtract', a, b, ctx),
 };
 
 // ---------------------------------------------------------------------------
@@ -240,6 +246,7 @@ interface BooleanIntersectParams {
  */
 export const booleanIntersect: CommandDefinition<BooleanIntersectParams> = {
   name: 'boolean_intersect',
+  annotations: { requiresKernel: true },
   description:
     'Compute the intersection of two 3D solid entities, producing a mesh entity that covers ' +
     'only the volume shared by both solids. ' +
@@ -254,5 +261,6 @@ export const booleanIntersect: CommandDefinition<BooleanIntersectParams> = {
     },
     required: ['a', 'b'],
   },
-  run: (doc, { a, b }): CommandResult => runBoolean(doc, 'boolean_intersect', 'intersect', a, b),
+  run: (doc, { a, b }, ctx): CommandResult =>
+    runBoolean(doc, 'boolean_intersect', 'intersect', a, b, ctx),
 };

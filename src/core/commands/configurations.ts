@@ -9,29 +9,10 @@
  */
 
 import type { CadDocument, Configuration, Parameter } from '../model/types';
+import { currentContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { reEvaluateAll } from './parameters';
 import { replayHistory } from './history';
-
-// ---------------------------------------------------------------------------
-// Late-bound registry reference (mirrors history.ts pattern to break cycle)
-// ---------------------------------------------------------------------------
-
-let _getCommand: ((name: string) => CommandDefinition<unknown> | undefined) | null = null;
-
-/**
- * Called once from registry.ts to wire up the getCommand reference.
- * Must be called before any activate_configuration `run` executes.
- */
-export function setConfigRegistryRef(
-  getCommandFn: (name: string) => CommandDefinition<unknown> | undefined,
-): void {
-  _getCommand = getCommandFn;
-}
-
-function resolveGetCommand(): (name: string) => CommandDefinition<unknown> | undefined {
-  return _getCommand ?? (() => undefined);
-}
 
 // ---------------------------------------------------------------------------
 // create_configuration
@@ -237,7 +218,12 @@ export const activateConfiguration: CommandDefinition<ActivateConfigurationParam
 
     // Replay featureHistory to regenerate entities with the new parameter values.
     const warnings: string[] = [];
-    const regenerated = replayHistory(baseDoc, doc.featureHistory, resolveGetCommand(), warnings);
+    const regenerated = replayHistory(
+      baseDoc,
+      doc.featureHistory,
+      currentContext().registry,
+      warnings,
+    );
 
     const entityCount = Object.keys(regenerated.entities).length;
 

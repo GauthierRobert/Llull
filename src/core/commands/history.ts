@@ -7,10 +7,7 @@
  * IMPORTANT: meta-commands must NOT themselves append a FeatureStep; they carry
  * `annotations.metaHistory: true` so `execute()` skips the append hook for them.
  *
- * Circular dependency note: history.ts needs getCommand() from registry.ts, but
- * registry.ts imports history.ts. We break the cycle with a late-bound injector:
- * `setRegistryRef()` is called once from registry.ts after it constructs its map.
- * All `run` implementations call `_getCommand` via the injected reference.
+ * Replays resolve commands through the active `ExecutionContext.registry` (MG1.2).
  *
  * @layer core/commands
  */
@@ -18,30 +15,11 @@
 import type { CadDocument, FeatureStep } from '../model/types';
 import { createEmptyDocument } from '../model/types';
 import { createEmptyBuilding } from '../model/building';
+import { currentContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { nextId } from '../../lib/id';
 import { orphanState } from './history_carry';
 import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
-
-// ---------------------------------------------------------------------------
-// Late-bound registry reference (breaks circular dep)
-// ---------------------------------------------------------------------------
-
-/** Injected by registry.ts after the command map is built. */
-let _getCommand: ((name: string) => CommandDefinition<unknown> | undefined) | null = null;
-
-/**
- * Called once from registry.ts to wire up the getCommand reference.
- * Must be called before any history command `run` executes.
- */
-export function setRegistryRef(
-  getCommandFn: (name: string) => CommandDefinition<unknown> | undefined,
-): void {
-  _getCommand = getCommandFn;
-}
-
-// HistoryAnnotations / HistoryCommandDefinition are no longer needed:
-// `metaHistory` is now part of CommandAnnotations in types.ts.
 
 // ---------------------------------------------------------------------------
 // Internal replay helper
@@ -72,6 +50,8 @@ export interface ReplayStepEvent {
  * before each step runs. Unresolved expressions are reported in `resolveWarnings`.
  *
  * @pure — returns a new CadDocument; never mutates `base`.
+ * @failure a live step needs the geometry kernel (`requiresKernel`) and none is available ->
+ *   returns `base` unchanged (+ a warning) instead of regenerating without that step's geometry
  */
 export function replayHistory(
   base: CadDocument,
@@ -80,6 +60,16 @@ export function replayHistory(
   resolveWarnings?: string[],
   onStep?: (event: ReplayStepEvent) => void,
 ): CadDocument {
+  const context = currentContext();
+  const kernelStep = history.find(
+    (step) => !step.suppressed && getCommandFn(step.name)?.annotations?.requiresKernel === true,
+  );
+  if (kernelStep !== undefined && context.kernel === null) {
+    resolveWarnings?.push(
+      `replay refused: step '${kernelStep.name}' needs the geometry kernel, which is not available yet; document kept as-is.`,
+    );
+    return base;
+  }
   // Start from empty geometry but preserve document-level settings.
   let doc: CadDocument = {
     ...createEmptyDocument(),
@@ -125,7 +115,7 @@ export function replayHistory(
       }
       // 2. Rewrite stale entity-id references using the accumulated idMap.
       const remapped = remapIds(resolved, idMap);
-      const result = cmd.run(doc, remapped);
+      const result = cmd.run(doc, remapped, context);
       const before = doc;
       // Accept the new geometry but keep OUR featureHistory intact.
       doc = { ...result.document, featureHistory: history };
@@ -156,11 +146,6 @@ export function replayHistory(
   }
 
   return doc;
-}
-
-/** Resolve the injected getCommand or return undefined (prevents null deref). */
-function resolveGetCommand(): (name: string) => CommandDefinition<unknown> | undefined {
-  return _getCommand ?? (() => undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +185,7 @@ export const replayHistory_cmd: CommandDefinition<ReplayHistoryParams> = {
       };
     }
     const warnings: string[] = [];
-    const regenerated = replayHistory(doc, doc.featureHistory, resolveGetCommand(), warnings);
+    const regenerated = replayHistory(doc, doc.featureHistory, currentContext().registry, warnings);
     const count = Object.keys(regenerated.entities).length;
     const warnSuffix =
       warnings.length > 0
@@ -268,7 +253,7 @@ export const setStepSuppressed: CommandDefinition<SetStepSuppressedParams> = {
       updatedStep,
       ...doc.featureHistory.slice(idx + 1),
     ];
-    const regenerated = replayHistory(doc, newHistory, resolveGetCommand());
+    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
       document: regenerated,
@@ -335,7 +320,7 @@ export const editStepParams: CommandDefinition<EditStepParamsParams> = {
       updatedStep,
       ...doc.featureHistory.slice(idx + 1),
     ];
-    const regenerated = replayHistory(doc, newHistory, resolveGetCommand());
+    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
       document: regenerated,
@@ -404,7 +389,7 @@ export const reorderStep: CommandDefinition<ReorderStepParams> = {
     const step = doc.featureHistory[idx]!;
     const without = [...doc.featureHistory.slice(0, idx), ...doc.featureHistory.slice(idx + 1)];
     const newHistory = [...without.slice(0, clamped), step, ...without.slice(clamped)];
-    const regenerated = replayHistory(doc, newHistory, resolveGetCommand());
+    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
       document: regenerated,
@@ -457,7 +442,7 @@ export const deleteStep: CommandDefinition<DeleteStepParams> = {
       };
     }
     const newHistory = doc.featureHistory.filter((s) => s.id !== stepId);
-    const regenerated = replayHistory(doc, newHistory, resolveGetCommand());
+    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
       document: regenerated,
@@ -553,7 +538,7 @@ export const insertStep: CommandDefinition<InsertStepParams> = {
       ];
     }
 
-    const regenerated = replayHistory(doc, newHistory, resolveGetCommand());
+    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
       document: regenerated,

@@ -10,7 +10,8 @@
 
 import type { CadDocument, FeatureStep } from '../model/types';
 import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
-import { nextId } from '../../lib/id';
+import type { ExecutionContext } from './context';
+import { currentContext, runInContext } from './context';
 import {
   addBox,
   addCylinder,
@@ -52,10 +53,10 @@ import { makeTubeBetween } from './composite';
 import { addText, addDimension } from './annotate';
 import { filletEdge, chamferEdge } from './modify3d';
 import { instantiateTemplate } from './templates';
-import { historyCommands, setRegistryRef } from './history';
-import { createConfiguration, activateConfiguration, setConfigRegistryRef } from './configurations';
+import { historyCommands } from './history';
+import { createConfiguration, activateConfiguration } from './configurations';
 import { createMaterial, assignMaterial } from './materials';
-import { saveRecipe, instantiateRecipe, setRecipeRegistryRef } from './recipes';
+import { saveRecipe, instantiateRecipe } from './recipes';
 import { explodePolyline, offset2D, trim, extend, fillet2D, chamfer2D } from './modify2d';
 import {
   addLayer,
@@ -173,7 +174,7 @@ function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknow
   return {
     ...def,
     paramsSchema: describePositionContract(def.paramsSchema),
-    run: (doc, params): CommandResult => {
+    run: (doc, params, ctx): CommandResult => {
       const safeParams = padPlanarPosition(
         typeof params === 'object' && params !== null ? params : {},
       );
@@ -186,7 +187,7 @@ function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknow
       }
       let result: CommandResult;
       try {
-        result = def.run(doc, safeParams);
+        result = def.run(doc, safeParams, ctx ?? currentContext());
       } catch (error) {
         console.warn(
           `[llull] command '${def.name}' threw:`,
@@ -348,12 +349,6 @@ const definitions: ReadonlyArray<CommandDefinition<unknown>> = rawDefinitions.ma
 
 const byName = new Map<string, CommandDefinition<unknown>>(definitions.map((d) => [d.name, d]));
 
-// Wire up the late-bound references so history.ts, configurations.ts, and recipes.ts
-// can call getCommand without a circular import at module load time.
-setRegistryRef((name) => byName.get(name));
-setConfigRegistryRef((name) => byName.get(name));
-setRecipeRegistryRef((name) => byName.get(name));
-
 export function listCommands(): ReadonlyArray<CommandDefinition<unknown>> {
   return definitions;
 }
@@ -380,12 +375,24 @@ export function getCommand(name: string): CommandDefinition<unknown> | undefined
  *   (i.e. the command actually mutated the document), a FeatureStep is
  *   appended to the new document's featureHistory.
  */
-export function execute(doc: CadDocument, commandName: string, params: unknown): CommandResult {
+export function execute(
+  doc: CadDocument,
+  commandName: string,
+  params: unknown,
+  ctx: ExecutionContext = currentContext(),
+): CommandResult {
   const def = byName.get(commandName);
   if (!def) {
     return { document: doc, summary: `Unknown command: ${commandName}`, affected: [] };
   }
-  const result = def.run(doc, params);
+  if (def.annotations?.requiresKernel === true && ctx.kernel === null) {
+    return {
+      document: doc,
+      summary: `${commandName}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
+      affected: [],
+    };
+  }
+  const result = runInContext(ctx, () => def.run(doc, params, ctx));
 
   // Skip history append for read-only queries and history meta-commands.
   const ann = def.annotations;
@@ -401,7 +408,7 @@ export function execute(doc: CadDocument, commandName: string, params: unknown):
   }
 
   const step: FeatureStep = {
-    id: nextId('step'),
+    id: ctx.ids.next('step'),
     name: commandName,
     params,
     suppressed: false,

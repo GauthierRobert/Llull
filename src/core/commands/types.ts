@@ -13,6 +13,7 @@
  */
 
 import type { CadDocument } from '../model/types';
+import type { ExecutionContext } from './context';
 
 export interface CommandResult {
   /** The next document state. */
@@ -36,7 +37,11 @@ export interface CommandResult {
   data?: unknown;
 }
 
-export type Command<P> = (doc: CadDocument, params: P) => CommandResult;
+/**
+ * @invariant `ctx` is always supplied when invoked through `execute`/`replayHistory`; it is
+ * optional only so direct `def.run(doc, params)` calls (tests, composed helpers) still type-check.
+ */
+export type Command<P> = (doc: CadDocument, params: P, ctx?: ExecutionContext) => CommandResult;
 
 /**
  * Safety annotations for a command. Emitted verbatim as MCP tool `annotations`.
@@ -73,6 +78,12 @@ export interface CommandAnnotations {
    * MCP tool schemas.
    */
   readonly metaHistory?: boolean;
+  /**
+   * When true: the command needs `ExecutionContext.kernel`. `execute` no-ops it with an explicit
+   * "kernel not ready" summary when none is available, and `replayHistory` refuses to regenerate
+   * a history containing it (rather than silently dropping its geometry). Not emitted to MCP.
+   */
+  readonly requiresKernel?: boolean;
 }
 
 /**

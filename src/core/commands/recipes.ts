@@ -9,30 +9,10 @@
  */
 
 import type { CadDocument, FeatureStep, Recipe } from '../model/types';
+import { currentContext, runInContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
 import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
-
-// ---------------------------------------------------------------------------
-// Late-bound registry reference (mirrors history.ts / configurations.ts pattern)
-// ---------------------------------------------------------------------------
-
-/** Injected by registry.ts after the command map is built. */
-let _getCommand: ((name: string) => CommandDefinition<unknown> | undefined) | null = null;
-
-/**
- * Called once from registry.ts to wire up the getCommand reference.
- * Must be called before any `instantiate_recipe` run executes.
- */
-export function setRecipeRegistryRef(
-  getCommandFn: (name: string) => CommandDefinition<unknown> | undefined,
-): void {
-  _getCommand = getCommandFn;
-}
-
-function resolveGetCommand(): (name: string) => CommandDefinition<unknown> | undefined {
-  return _getCommand ?? (() => undefined);
-}
 
 // ---------------------------------------------------------------------------
 // Internal replay helper — additive instantiation
@@ -89,7 +69,7 @@ function replayRecipeAdditive(
       const remapped = remapIds(resolved, idMap);
 
       // 3. Run the step; the command assigns fresh ids via nextId internally.
-      const result = cmd.run(doc, remapped);
+      const result = cmd.run(doc, remapped, currentContext());
       doc = result.document;
 
       // 4. Accumulate genuinely new entity ids (created by this pass), deduped.
@@ -242,25 +222,20 @@ export const instantiateRecipe: CommandDefinition<InstantiateRecipeParams> = {
   },
   // Normal constructive command — execute() appends a FeatureStep automatically.
   // No metaHistory, no readOnly, not idempotent (each call creates new entities).
-  run: (doc, params): CommandResult => {
-    if (recipeDepth >= MAX_PROJECT_DEPTH) {
+  run: (doc, params, ctx): CommandResult => {
+    const context = ctx ?? currentContext();
+    if (context.recipeDepth >= MAX_PROJECT_DEPTH) {
       return {
         document: doc,
         summary: `instantiate_recipe failed: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,
         affected: [],
       };
     }
-    recipeDepth++;
-    try {
-      return instantiateRecipeOnce(doc, params.name);
-    } finally {
-      recipeDepth--;
-    }
+    return runInContext({ ...context, recipeDepth: context.recipeDepth + 1 }, () =>
+      instantiateRecipeOnce(doc, params.name),
+    );
   },
 };
-
-/** Current instantiate_recipe nesting depth (a recipe may contain instantiate_recipe steps). */
-let recipeDepth = 0;
 
 function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
   if (typeof name !== 'string' || name.trim() === '') {
@@ -297,7 +272,7 @@ function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
   const { doc: newDoc, allAffected } = replayRecipeAdditive(
     doc,
     recipe.steps,
-    resolveGetCommand(),
+    currentContext().registry,
     warnings,
   );
 

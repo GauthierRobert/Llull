@@ -14,7 +14,7 @@
 import type { CadDocument, Entity, EntityGroup, MeshSolidEntity } from '../model/types';
 import { is3D } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { getGeometryKernel } from '../geometry/kernel';
+import { currentContext } from './context';
 import { nextId } from '../../lib/id';
 
 // ---------------------------------------------------------------------------
@@ -96,6 +96,7 @@ interface FilletEdgeParams {
  */
 export const filletEdge: CommandDefinition<FilletEdgeParams> = {
   name: 'fillet_edge',
+  annotations: { requiresKernel: true },
   description:
     'Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. ' +
     'The source entity is consumed and replaced by the filleted mesh result. ' +
@@ -126,7 +127,7 @@ export const filletEdge: CommandDefinition<FilletEdgeParams> = {
     },
     required: ['id', 'radius'],
   },
-  run: (doc, { id, edgeIndices = [], radius }): CommandResult => {
+  run: (doc, { id, edgeIndices = [], radius }, ctx): CommandResult => {
     if (radius <= 0) {
       return {
         document: doc,
@@ -139,11 +140,11 @@ export const filletEdge: CommandDefinition<FilletEdgeParams> = {
     if ('summary' in validation) return validation;
     const { entity } = validation;
 
-    const k = getGeometryKernel();
+    const k = (ctx ?? currentContext()).kernel;
     if (!k) {
       return {
         document: doc,
-        summary: `fillet_edge: geometry kernel not available. Inject a kernel via setGeometryKernel() before calling fillet_edge.`,
+        summary: `fillet_edge: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
         affected: [],
       };
     }
@@ -208,6 +209,7 @@ interface ChamferEdgeParams {
  */
 export const chamferEdge: CommandDefinition<ChamferEdgeParams> = {
   name: 'chamfer_edge',
+  annotations: { requiresKernel: true },
   description:
     'Bevel (chamfer) the edges of a 3D solid entity and replace it with a new mesh entity. ' +
     'The source entity is consumed and replaced by the chamfered mesh result. ' +
@@ -238,7 +240,7 @@ export const chamferEdge: CommandDefinition<ChamferEdgeParams> = {
     },
     required: ['id', 'distance'],
   },
-  run: (doc, { id, edgeIndices = [], distance }): CommandResult => {
+  run: (doc, { id, edgeIndices = [], distance }, ctx): CommandResult => {
     if (distance <= 0) {
       return {
         document: doc,
@@ -251,11 +253,11 @@ export const chamferEdge: CommandDefinition<ChamferEdgeParams> = {
     if ('summary' in validation) return validation;
     const { entity } = validation;
 
-    const k = getGeometryKernel();
+    const k = (ctx ?? currentContext()).kernel;
     if (!k) {
       return {
         document: doc,
-        summary: `chamfer_edge: geometry kernel not available. Inject a kernel via setGeometryKernel() before calling chamfer_edge.`,
+        summary: `chamfer_edge: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
         affected: [],
       };
     }

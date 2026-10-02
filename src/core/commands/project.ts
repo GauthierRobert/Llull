@@ -28,6 +28,7 @@
 import type { CadDocument } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
 import { getCommand } from './registry';
+import { currentContext, runInContext } from './context';
 import { executeRecorded } from './record';
 import { computeSceneSnapshot, type SceneSnapshot } from './scene';
 import { evaluateExpression, extractReferences } from './expression';
@@ -401,9 +402,6 @@ function runInnerStep(
 // build_project command
 // ---------------------------------------------------------------------------
 
-/** Current build_project nesting depth (synchronous; build_project may call itself as a step). */
-let projectDepth = 0;
-
 /** Upper-bound count of executed commands a plan expands to (repeat/for_each multiply). */
 function estimateSteps(actions: ActionItem[], doc: CadDocument): number {
   let total = 0;
@@ -470,20 +468,18 @@ export const buildProject: CommandDefinition<BuildProjectParams> = {
   // Each inner step is recorded in featureHistory by `execute`; recording the plan itself too
   // would replay every step twice.
   annotations: { metaHistory: true },
-  run: (doc, params): CommandResult => {
-    if (projectDepth >= MAX_PROJECT_DEPTH) {
+  run: (doc, params, ctx): CommandResult => {
+    const context = ctx ?? currentContext();
+    if (context.projectDepth >= MAX_PROJECT_DEPTH) {
       return noop(
         doc,
         { ok: false, validated: params.validate === true, stepCount: 0, steps: [], failedAt: null },
         `build_project: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,
       );
     }
-    projectDepth++;
-    try {
-      return runProject(doc, params);
-    } finally {
-      projectDepth--;
-    }
+    return runInContext({ ...context, projectDepth: context.projectDepth + 1 }, () =>
+      runProject(doc, params),
+    );
   },
 };
 
