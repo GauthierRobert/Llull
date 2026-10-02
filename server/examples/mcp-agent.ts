@@ -7,7 +7,7 @@
  *
  * What it does:
  *   1. Connects to the llull MCP server as an MCP Client.
- *   2. Calls tools/list and prints every registered tool name.
+ *   2. Calls tools/list (core + discovery tools by default), then enable_toolset for 2d + 3d.
  *   3. Builds a small scene in sequence:
  *        add_box        → 2×2×2 box at origin
  *        draw_circle    → circle with radius 1 at center [0,0]
@@ -131,6 +131,11 @@ async function main(): Promise<void> {
   const { tools } = await client.listTools();
   console.log(`tools/list → ${tools.length} tool(s) registered:`);
   tools.forEach((t) => console.log(`  - ${t.name}`));
+
+  // Default exposure is the core toolset (+ search_tools / enable_toolset); load what the demo needs.
+  for (const toolset of ['3d', '2d']) {
+    await client.callTool({ name: 'enable_toolset', arguments: { toolset } });
+  }
 
   // --- Step 1: add_box ---
   const boxRaw = await client.callTool({

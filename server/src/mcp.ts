@@ -53,6 +53,8 @@ import {
   getMcpPrompt,
   buildExchangeToolDefinitions,
   applyExchangeToolCall,
+  buildDiscoveryToolDefinitions,
+  applyDiscoveryToolCall,
   isPromptEnabled,
   isToolEnabled,
   parseToolsets,
@@ -547,12 +549,14 @@ function r2Public(n: number): number {
 function buildMcpServer(
   getDoc: () => CadDocument,
   exchange: ExchangeOptions,
-  enabledToolsets: ReadonlySet<ToolsetName>,
+  configuredToolsets: ReadonlySet<ToolsetName>,
 ): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
-    { capabilities: { tools: {}, resources: {}, prompts: {} } },
+    { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} } },
   );
+  // Per-session toolsets: the configured set, grown by the enable_toolset discovery tool.
+  const enabledToolsets = new Set<ToolsetName>(configuredToolsets);
 
   // tools/list — return the full registry as MCP tool definitions,
   // with render_view augmented to advertise the server-side enrichment params,
@@ -659,7 +663,10 @@ function buildMcpServer(
       };
     });
 
-    const exchangeTools = buildExchangeToolDefinitions().map((t) => ({
+    const exchangeTools = [
+      ...buildExchangeToolDefinitions(),
+      ...buildDiscoveryToolDefinitions(),
+    ].map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema,
@@ -680,8 +687,18 @@ function buildMcpServer(
     if (disabledToolset !== undefined) {
       return makeErrorResult(
         `Tool ${name} is disabled on this server: enable its toolset "${disabledToolset}" in ` +
-          'LLULL_TOOLSETS, or call it as a build_project step.',
+          'LLULL_TOOLSETS, call enable_toolset to load it for this session (search_tools finds ' +
+          'tools by keyword), or call it as a build_project step.',
       );
+    }
+
+    // Discovery meta-tools — search_tools / enable_toolset (core toolset, always enabled).
+    const discovery = applyDiscoveryToolCall(name, args, enabledToolsets);
+    if (discovery !== null) {
+      if (discovery.toolsListChanged) {
+        server.sendToolListChanged().catch(() => {});
+      }
+      return discovery.result as unknown as CallToolResult;
     }
 
     // -----------------------------------------------------------------------
@@ -868,7 +885,7 @@ function allocateSession(
 // Router factory
 // ---------------------------------------------------------------------------
 
-/** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = all). Warns on unknown names. */
+/** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = core only, `all` = everything). Warns on unknown names. */
 export function toolsetsFromEnv(
   raw: string | undefined = process.env['LLULL_TOOLSETS'],
 ): ReadonlySet<ToolsetName> {

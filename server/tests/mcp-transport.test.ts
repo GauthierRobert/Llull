@@ -32,7 +32,7 @@ import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { listCommands } from '@core/commands/registry';
 import * as registry from '@core/commands/registry';
-import { buildExchangeToolDefinitions } from '@core/mcp';
+import { buildDiscoveryToolDefinitions, buildExchangeToolDefinitions } from '@core/mcp';
 
 // ---------------------------------------------------------------------------
 // SSE parsing helpers
@@ -205,7 +205,10 @@ describe('MCP tools/list', () => {
     const tools = await mcpListTools(sessionId);
     // The transport appends the exchange tools (export_step, import_step, import_code) on top
     // of the core registry tools.
-    const expectedCount = listCommands().length + buildExchangeToolDefinitions().length;
+    const expectedCount =
+      listCommands().length +
+      buildExchangeToolDefinitions().length +
+      buildDiscoveryToolDefinitions().length;
     expect(tools.length).toBe(expectedCount);
   });
 
@@ -215,7 +218,10 @@ describe('MCP tools/list', () => {
 
     const tools = await mcpListTools(sessionId);
     const registeredNames = listCommands().map((c) => c.name);
-    const exchangeNames = buildExchangeToolDefinitions().map((t) => t.name);
+    const exchangeNames = [
+      ...buildExchangeToolDefinitions(),
+      ...buildDiscoveryToolDefinitions(),
+    ].map((t) => t.name);
     const expectedNames = [...registeredNames, ...exchangeNames];
     const toolNames = tools.map((t) => t.name);
     expect(toolNames).toEqual(expectedNames);

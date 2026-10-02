@@ -3,6 +3,7 @@ import { listCommands } from '@core/commands/registry';
 import {
   TOOLSETS,
   TOOLSET_NAMES,
+  buildDiscoveryToolDefinitions,
   buildExchangeToolDefinitions,
   isPromptEnabled,
   isToolEnabled,
@@ -14,6 +15,7 @@ import {
 const allToolNames = [
   ...listCommands().map((command) => command.name),
   ...buildExchangeToolDefinitions().map((tool) => tool.name),
+  ...buildDiscoveryToolDefinitions().map((tool) => tool.name),
 ];
 
 describe('TOOLSETS', () => {
@@ -33,9 +35,15 @@ describe('TOOLSETS', () => {
 });
 
 describe('parseToolsets()', () => {
-  it('enables every toolset when unset, empty or "all"', () => {
-    for (const raw of [undefined, '', ' , ', 'core,ALL']) {
+  it('enables every toolset for "all"', () => {
+    for (const raw of ['all', 'core,ALL']) {
       expect([...parseToolsets(raw).enabled].sort()).toEqual([...TOOLSET_NAMES].sort());
+    }
+  });
+
+  it('enables only core when unset or empty', () => {
+    for (const raw of [undefined, '', ' , ']) {
+      expect([...parseToolsets(raw).enabled]).toEqual(['core']);
     }
   });
 
@@ -89,7 +97,7 @@ describe('isPromptEnabled()', () => {
   });
 
   it('every prompt is enabled when all toolsets are', () => {
-    const all = parseToolsets(undefined).enabled;
+    const all = parseToolsets('all').enabled;
     for (const prompt of listMcpPrompts()) expect(isPromptEnabled(prompt.name, all)).toBe(true);
   });
 });

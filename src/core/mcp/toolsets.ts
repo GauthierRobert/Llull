@@ -29,6 +29,8 @@ export type ToolsetName = (typeof TOOLSET_NAMES)[number];
 /** Tool names per toolset. `building` is derived from the building command module. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   core: [
+    'search_tools',
+    'enable_toolset',
     'describe_scene',
     'find_entities',
     'build_project',
@@ -182,7 +184,8 @@ function isToolsetName(value: string): value is ToolsetName {
 
 /**
  * Parse a comma-separated toolset list (the `LLULL_TOOLSETS` value).
- * @invariant unset / empty / `all` -> every toolset
+ * @invariant unset / empty -> `core` only (agents load the rest via search_tools / enable_toolset)
+ * @invariant `all` -> every toolset
  * @failure unknown names -> listed in `unknown`, otherwise ignored
  */
 export function parseToolsets(raw: string | undefined): ParsedToolsets {
@@ -191,7 +194,7 @@ export function parseToolsets(raw: string | undefined): ParsedToolsets {
     .map((part) => part.trim().toLowerCase())
     .filter((part) => part.length > 0);
   const unknown = requested.filter((name) => name !== 'all' && !isToolsetName(name));
-  if (requested.length === 0 || requested.includes('all')) {
+  if (requested.includes('all')) {
     return { enabled: new Set(TOOLSET_NAMES), unknown };
   }
   const enabled = new Set<ToolsetName>(['core', ...requested.filter(isToolsetName)]);

@@ -47,6 +47,15 @@ export {
   exportStepFile,
 } from './exchangeTools';
 
+export type { ToolSearchResult, DiscoveryOutcome } from './discovery';
+export {
+  buildDiscoveryToolDefinitions,
+  applyDiscoveryToolCall,
+  searchTools,
+  SEARCH_TOOLS_DEFAULT_LIMIT,
+  SEARCH_TOOLS_MAX_LIMIT,
+} from './discovery';
+
 export type { ToolsetName, ParsedToolsets } from './toolsets';
 export {
   TOOLSET_NAMES,

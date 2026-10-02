@@ -21,5 +21,7 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
+    // Tests that drive tools/list or tools/call across every toolset need them all exposed.
+    env: { LLULL_TOOLSETS: 'all' },
   },
 });
