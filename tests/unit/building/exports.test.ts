@@ -187,7 +187,9 @@ describe('export_plan_sheet', () => {
       .data as PlanSheet;
     expect(sheet.svg).toContain('width="841mm"');
     expect(sheet.svg).toContain('Plan &lt;RDC&gt;');
-    expect(execute(doc, 'export_plan_sheet', { paper: 'B5' }).summary).toMatch(/paper must be/);
+    expect(execute(doc, 'export_plan_sheet', { paper: 'B5' }).summary).toMatch(
+      /rejected: invalid params — paper/,
+    );
     expect(execute(doc, 'export_plan_sheet', { scale: 0 }).summary).toMatch(/invalid scale/);
     expect(execute(createEmptyDocument(), 'export_plan_sheet', {}).data).toBeUndefined();
   });

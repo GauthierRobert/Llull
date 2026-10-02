@@ -5,7 +5,8 @@
 
 import type { CadDocument, DocumentUnit, Entity, Vec2 } from '../../model/types';
 import { is2D } from '../../model/types';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
 import { hatchSegments } from '../../../lib/hatch';
 import { triangulatePolygon } from '../../../lib/triangulate';
 import { fileSlug, fromMm, getBuilding, noChange } from './model';
@@ -531,18 +532,13 @@ export function buildDxf(
   };
 }
 
-interface ExportDxfParams {
-  levelId?: string;
-  includeDrafting?: boolean;
-}
-
 /**
  * @command export_dxf
  * @pure read-only
  * @affects none; data = { filename, dxf, entityCount, layers }
  * @failure unknown level / nothing to export -> no data
  */
-export const exportDxf: CommandDefinition<ExportDxfParams> = {
+export const exportDxf = defineCommand({
   name: 'export_dxf',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -550,18 +546,15 @@ export const exportDxf: CommandDefinition<ExportDxfParams> = {
     'level floor plan: wall poché cut at 1.2 m, door swings, windows, columns, beams (dashed), stairs, ' +
     'room tags, grid bubbles and overall / grid dimensions on AIA layers (A-WALL, A-DOOR, A-GLAZ, S-GRID…), ' +
     'plus the document’s own 2D drafting. data.dxf holds the file text.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      levelId: { type: 'string', description: 'Level to plot. Default: the active level.' },
-      includeDrafting: {
-        type: 'boolean',
-        description:
-          'Also export non-building 2D entities (lines, polylines, circles, text…). Default true.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    levelId: z.string().optional().describe('Level to plot. Default: the active level.'),
+    includeDrafting: z
+      .boolean()
+      .optional()
+      .describe(
+        'Also export non-building 2D entities (lines, polylines, circles, text…). Default true.',
+      ),
+  }),
   run: (doc, { levelId, includeDrafting }): CommandResult => {
     const result = buildDxf(doc, {
       ...(levelId !== undefined ? { levelId } : {}),
@@ -578,4 +571,4 @@ export const exportDxf: CommandDefinition<ExportDxfParams> = {
       data: result,
     };
   },
-};
+});

@@ -10,7 +10,9 @@ import type {
   OpeningElement,
   WallElement,
 } from '../../model/building';
-import type { CommandDefinition, CommandResult, ParamSpec } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
+import { vec2 } from './params';
 import { projectOntoSegment } from '../../../lib/polygon';
 import {
   fromMm,
@@ -28,18 +30,6 @@ import { arcOffsetOf, curvedWallExtent, curvedWallLength } from './curvedWallGeo
 import { openingFitError } from './walls';
 
 type OpeningKind = 'door' | 'window';
-
-interface AddOpeningParams {
-  wallId: string;
-  offset?: number;
-  at?: Vec2;
-  width?: number;
-  height?: number;
-  sillHeight?: number;
-  swing?: 'left' | 'right';
-  material?: string;
-  mark?: string;
-}
 
 const DEFAULTS_MM: Readonly<
   Record<OpeningKind, { width: number; height: number; sill: number; material: string }>
@@ -137,45 +127,57 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
   };
 }
 
-function openingSchema(kind: OpeningKind): Record<string, ParamSpec> {
-  const defaults = DEFAULTS_MM[kind];
-  const properties: Record<string, ParamSpec> = {
-    wallId: {
-      type: 'string',
-      description: 'Host wall element id: a straight ("wall-1") or curved ("curvedWall-1") wall.',
-    },
-    offset: {
-      type: 'number',
-      description:
-        'Distance along the wall from its start to the opening CENTER. Default: wall midpoint.',
-    },
-    at: {
-      type: 'array',
-      items: { type: 'number' },
-      description: 'Alternative to offset: a plan point [x, y] projected onto the wall.',
-    },
-    width: { type: 'number', description: `Opening width. Default ${defaults.width} mm.` },
-    height: { type: 'number', description: `Opening height. Default ${defaults.height} mm.` },
-    sillHeight: {
-      type: 'number',
-      description: `Height of the opening bottom above the wall base. Default ${defaults.sill} mm.`,
-    },
-    material: { type: 'string', description: `Material. Default ${defaults.material}.` },
-    mark: {
-      type: 'string',
-      description: `Schedule mark. Default next ${kind === 'door' ? 'D' : 'WN'}n.`,
-    },
-  };
-  if (kind === 'door') {
-    properties['swing'] = {
-      type: 'string',
-      enum: ['left', 'right'],
-      description:
-        'Hinge side looking from wall start to end. The door opens toward the wall’s left side. Default left.',
-    };
-  }
-  return properties;
+interface OpeningShape {
+  wallId: z.ZodString;
+  offset: z.ZodOptional<z.ZodNumber>;
+  at: z.ZodOptional<ReturnType<typeof vec2>>;
+  width: z.ZodOptional<z.ZodNumber>;
+  height: z.ZodOptional<z.ZodNumber>;
+  sillHeight: z.ZodOptional<z.ZodNumber>;
+  material: z.ZodOptional<z.ZodString>;
+  mark: z.ZodOptional<z.ZodString>;
 }
+
+function openingShape(kind: OpeningKind): OpeningShape {
+  const defaults = DEFAULTS_MM[kind];
+  return {
+    wallId: z
+      .string()
+      .describe('Host wall element id: a straight ("wall-1") or curved ("curvedWall-1") wall.'),
+    offset: z
+      .number()
+      .optional()
+      .describe(
+        'Distance along the wall from its start to the opening CENTER. Default: wall midpoint.',
+      ),
+    at: vec2('Alternative to offset: a plan point [x, y] projected onto the wall.').optional(),
+    width: z.number().optional().describe(`Opening width. Default ${defaults.width} mm.`),
+    height: z.number().optional().describe(`Opening height. Default ${defaults.height} mm.`),
+    sillHeight: z
+      .number()
+      .optional()
+      .describe(`Height of the opening bottom above the wall base. Default ${defaults.sill} mm.`),
+    material: z.string().optional().describe(`Material. Default ${defaults.material}.`),
+    mark: z
+      .string()
+      .optional()
+      .describe(`Schedule mark. Default next ${kind === 'door' ? 'D' : 'WN'}n.`),
+  };
+}
+
+const doorParams = z.object({
+  ...openingShape('door'),
+  swing: z
+    .enum(['left', 'right'])
+    .optional()
+    .describe(
+      'Hinge side looking from wall start to end. The door opens toward the wall’s left side. Default left.',
+    ),
+});
+
+const windowParams = z.object(openingShape('window'));
+
+type AddOpeningParams = z.output<typeof doorParams>;
 
 /**
  * @command add_door
@@ -183,14 +185,14 @@ function openingSchema(kind: OpeningKind): Record<string, ParamSpec> {
  * @affects creates the door (leaf + plan swing) and re-cuts the host wall
  * @failure unknown wall / does not fit / overlaps another opening -> no-op
  */
-export const addDoor: CommandDefinition<AddOpeningParams> = {
+export const addDoor = defineCommand({
   name: 'add_door',
   description:
     'Insert a door into a wall: cuts the wall, adds the door leaf (3D) and its swing arc (plan). ' +
     'Refused if it does not fit in the wall or overlaps another opening.',
-  paramsSchema: { type: 'object', properties: openingSchema('door'), required: ['wallId'] },
+  params: doorParams,
   run: (doc, params): CommandResult => addOpening(doc, 'door', params),
-};
+});
 
 /**
  * @command add_window
@@ -198,25 +200,14 @@ export const addDoor: CommandDefinition<AddOpeningParams> = {
  * @affects creates the window glazing and re-cuts the host wall
  * @failure unknown wall / does not fit / overlaps another opening -> no-op
  */
-export const addWindow: CommandDefinition<AddOpeningParams> = {
+export const addWindow = defineCommand({
   name: 'add_window',
   description:
     'Insert a window into a wall: cuts the wall between sill and head and adds the glazing. ' +
     'Refused if it does not fit in the wall or overlaps another opening.',
-  paramsSchema: { type: 'object', properties: openingSchema('window'), required: ['wallId'] },
+  params: windowParams,
   run: (doc, params): CommandResult => addOpening(doc, 'window', params),
-};
-
-interface UpdateOpeningParams {
-  openingId: string;
-  offset?: number;
-  width?: number;
-  height?: number;
-  sillHeight?: number;
-  swing?: 'left' | 'right';
-  material?: string;
-  mark?: string;
-}
+});
 
 /**
  * @command update_opening
@@ -224,25 +215,21 @@ interface UpdateOpeningParams {
  * @affects regenerates the opening and its host wall
  * @failure unknown opening / invalid values / would not fit -> no-op
  */
-export const updateOpening: CommandDefinition<UpdateOpeningParams> = {
+export const updateOpening = defineCommand({
   name: 'update_opening',
   description:
     'Edit a door or window: slide it along its wall (offset), resize it, change sill height, swing, ' +
     'material or mark. The host wall is re-cut.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      openingId: { type: 'string', description: 'Door/window element id, e.g. "door-1".' },
-      offset: { type: 'number', description: 'New center distance from the wall start.' },
-      width: { type: 'number', description: 'New width (> 0).' },
-      height: { type: 'number', description: 'New height (> 0).' },
-      sillHeight: { type: 'number', description: 'New sill height (>= 0).' },
-      swing: { type: 'string', enum: ['left', 'right'], description: 'Door hinge side.' },
-      material: { type: 'string', description: 'New material.' },
-      mark: { type: 'string', description: 'New schedule mark.' },
-    },
-    required: ['openingId'],
-  },
+  params: z.object({
+    openingId: z.string().describe('Door/window element id, e.g. "door-1".'),
+    offset: z.number().optional().describe('New center distance from the wall start.'),
+    width: z.number().optional().describe('New width (> 0).'),
+    height: z.number().optional().describe('New height (> 0).'),
+    sillHeight: z.number().optional().describe('New sill height (>= 0).'),
+    swing: z.enum(['left', 'right']).optional().describe('Door hinge side.'),
+    material: z.string().optional().describe('New material.'),
+    mark: z.string().optional().describe('New schedule mark.'),
+  }),
   run: (
     doc,
     { openingId, offset, width, height, sillHeight, swing, material, mark },
@@ -262,7 +249,7 @@ export const updateOpening: CommandDefinition<UpdateOpeningParams> = {
       width: width ?? opening.width,
       height: height ?? opening.height,
       sillHeight: sillHeight ?? opening.sillHeight,
-      swing: swing === 'left' || swing === 'right' ? swing : opening.swing,
+      swing: swing ?? opening.swing,
       material: material?.trim() || opening.material,
       mark: mark?.trim() || opening.mark,
     };
@@ -291,4 +278,4 @@ export const updateOpening: CommandDefinition<UpdateOpeningParams> = {
       affected: elementAffected(document, [openingId, wall.id]),
     };
   },
-};
+});

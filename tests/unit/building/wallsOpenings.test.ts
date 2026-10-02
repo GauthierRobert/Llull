@@ -233,7 +233,7 @@ describe('update_wall', () => {
     );
     expect(execute(doc, 'update_wall', { wallId: 'x' }).summary).toMatch(/no wall/);
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', start: [1] }).summary).toMatch(
-      /\[x, y\]/,
+      /rejected: invalid params — start/,
     );
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', thickness: 0 }).summary).toMatch(/> 0/);
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', levelId: 'zz' }).summary).toMatch(

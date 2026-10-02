@@ -24,7 +24,8 @@ import type {
   SlabElement,
   WallElement,
 } from '../../model/building';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
 import { toCounterClockwise } from '../../../lib/polygon';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
 import { openingsOf, wallExtent, wallFrame, type WallExtent } from './evaluate';
@@ -949,17 +950,13 @@ export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
   return { filename: `${name}.ifc`, ifc, entityCount: writer.count, productCount };
 }
 
-interface ExportIfcParams {
-  timestamp?: string;
-}
-
 /**
  * @command export_ifc
  * @pure read-only
  * @affects none; data = { filename, ifc, entityCount, productCount }
  * @failure no levels -> no data
  */
-export const exportIfc: CommandDefinition<ExportIfcParams> = {
+export const exportIfc = defineCommand({
   name: 'export_ifc',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -967,17 +964,14 @@ export const exportIfc: CommandDefinition<ExportIfcParams> = {
     'Navisworks…: project / site / building / storeys, walls with real openings (IfcOpeningElement) filled by ' +
     'doors and windows, slabs (floor / roof / base slab), columns, beams, stairs, spaces and materials. ' +
     'GlobalIds are stable across exports. data.ifc holds the file text.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      timestamp: {
-        type: 'string',
-        description:
-          'ISO 8601 timestamp written in the file header. Default: project date or 1970-01-01T00:00:00.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    timestamp: z
+      .string()
+      .optional()
+      .describe(
+        'ISO 8601 timestamp written in the file header. Default: project date or 1970-01-01T00:00:00.',
+      ),
+  }),
   run: (doc, { timestamp }): CommandResult => {
     const building = getBuilding(doc);
     if (building.levelOrder.length === 0) {
@@ -997,4 +991,4 @@ export const exportIfc: CommandDefinition<ExportIfcParams> = {
       data: result,
     };
   },
-};
+});

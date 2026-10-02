@@ -4,7 +4,9 @@
  */
 
 import type { CadDocument, Vec2 } from '../../model/types';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
+import { vec2 } from './params';
 import { elementAffected, fromMm, getBuilding, isVec2, noChange } from './model';
 import { addLevel, setProjectInfo } from './levels';
 import { addGridSystem } from './grid';
@@ -30,8 +32,8 @@ function steps(
   created: Record<string, string[]>,
 ): Step[] {
   const mm = (value: number): number => fromMm(doc, value);
-  const at = (x: number, y: number): Vec2 => [origin[0] + mm(x), origin[1] + mm(y)];
-  const rectangle = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
+  const at = (x: number, y: number): [number, number] => [origin[0] + mm(x), origin[1] + mm(y)];
+  const rectangle = (x0: number, y0: number, x1: number, y1: number): [number, number][] => [
     at(x0, y0),
     at(x1, y0),
     at(x1, y1),
@@ -214,44 +216,24 @@ function steps(
   ];
 }
 
-interface AddBuildingTemplateParams {
-  template: BuildingTemplate;
-  origin?: Vec2;
-}
-
 /**
  * @command add_building_template
  * @pure
  * @affects creates a complete multi-level building (all-or-nothing)
  * @failure unknown template / any step fails -> no-op with the failing step's summary
  */
-export const addBuildingTemplate: CommandDefinition<AddBuildingTemplateParams> = {
+export const addBuildingTemplate = defineCommand({
   name: 'add_building_template',
   description:
     'Create a complete starter building to edit or learn from: "house" (two-storey 10 × 8 m house: grid, ' +
     'masonry walls, partition, doors, windows, slabs, stair, rooms, roof) or "office" (three-storey ' +
     '22.5 × 12.5 m concrete frame: grid, columns at intersections, beams, façade openings, slabs, stair, ' +
     'rooms, roof). The camera is framed on the result. All-or-nothing: the document is unchanged if any step fails.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      template: {
-        type: 'string',
-        enum: ['house', 'office'],
-        description: 'Which starter building.',
-      },
-      origin: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Plan origin [x, y]. Default [0, 0].',
-      },
-    },
-    required: ['template'],
-  },
+  params: z.object({
+    template: z.enum(['house', 'office']).describe('Which starter building.'),
+    origin: vec2('Plan origin [x, y]. Default [0, 0].').optional(),
+  }),
   run: (doc, { template, origin = [0, 0] }): CommandResult => {
-    if (template !== 'house' && template !== 'office') {
-      return noChange(doc, 'add_building_template failed: template must be "house" or "office".');
-    }
     if (!isVec2(origin))
       return noChange(doc, 'add_building_template failed: origin must be [x, y].');
     let current = doc;
@@ -287,4 +269,4 @@ export const addBuildingTemplate: CommandDefinition<AddBuildingTemplateParams> =
       data: { elementIds: newElements },
     };
   },
-};
+});

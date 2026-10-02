@@ -4,6 +4,7 @@
  */
 
 import type { CommandDefinition, CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
 import { getBuilding, isFiniteNumber, noChange } from './model';
 import {
   buildSchedule,
@@ -20,7 +21,7 @@ const UNIT_LABEL = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' } as const
  * @pure read-only
  * @affects none; data = { lines: TakeoffLine[], csv }
  */
-export const quantityTakeoff: CommandDefinition<Record<string, never>> = {
+export const quantityTakeoff = defineCommand({
   name: 'quantity_takeoff',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -28,7 +29,7 @@ export const quantityTakeoff: CommandDefinition<Record<string, never>> = {
     'slab area / volume, column and beam volume, stair volume, door and window counts and areas, room ' +
     'floor area — grouped by category and material. Each line has a key like "wall.concrete.m3" used by ' +
     'estimate_cost. data.csv is spreadsheet-ready.',
-  paramsSchema: { type: 'object', properties: {}, required: [] },
+  params: z.object({}),
   run: (doc): CommandResult => {
     const lines = computeTakeoff(doc);
     if (lines.length === 0) {
@@ -55,9 +56,9 @@ export const quantityTakeoff: CommandDefinition<Record<string, never>> = {
       data: { lines, csv },
     };
   },
-};
+});
 
-const SCHEDULE_KINDS: ReadonlyArray<ScheduleKind> = [
+const SCHEDULE_KINDS = [
   'wall',
   'door',
   'window',
@@ -74,11 +75,7 @@ const SCHEDULE_KINDS: ReadonlyArray<ScheduleKind> = [
   'tray',
   'plate',
   'connection',
-];
-
-interface BuildingScheduleParams {
-  kind: ScheduleKind;
-}
+] as const satisfies ReadonlyArray<ScheduleKind>;
 
 /**
  * @command building_schedule
@@ -86,31 +83,15 @@ interface BuildingScheduleParams {
  * @affects none; data = { kind, columns, rows, csv }
  * @failure unknown kind -> no data
  */
-export const buildingSchedule: CommandDefinition<BuildingScheduleParams> = {
+export const buildingSchedule = defineCommand({
   name: 'building_schedule',
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, ' +
     'slab, column, beam, stair, member (steel cut list), footing, panel, equipment or pipe — one row per element with mark, level, dimensions, material and ' +
     'quantities. data.csv is spreadsheet-ready.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      kind: {
-        type: 'string',
-        enum: [...SCHEDULE_KINDS],
-        description: 'Which schedule to produce.',
-      },
-    },
-    required: ['kind'],
-  },
+  params: z.object({ kind: z.enum(SCHEDULE_KINDS).describe('Which schedule to produce.') }),
   run: (doc, { kind }): CommandResult => {
-    if (!SCHEDULE_KINDS.includes(kind)) {
-      return noChange(
-        doc,
-        `building_schedule failed: kind must be one of ${SCHEDULE_KINDS.join(', ')}.`,
-      );
-    }
     const schedule = buildSchedule(doc, kind);
     return {
       document: doc,
@@ -119,7 +100,7 @@ export const buildingSchedule: CommandDefinition<BuildingScheduleParams> = {
       data: { ...schedule, csv: toCsv(schedule.columns, schedule.rows) },
     };
   },
-};
+});
 
 function validRates(rates: unknown): rates is Record<string, number> {
   return (

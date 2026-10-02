@@ -4,17 +4,18 @@
  */
 
 import type { WallElement, WallLayer, WallLayerFunction } from '../../model/building';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
 import { elementAffected, getBuilding, isFiniteNumber, noChange, withElement } from './model';
 import { regenerateBuilding } from './evaluate';
 
-export const WALL_LAYER_FUNCTIONS: ReadonlyArray<WallLayerFunction> = [
+export const WALL_LAYER_FUNCTIONS = [
   'structure',
   'insulation',
   'membrane',
   'air',
   'finish',
-];
+] as const satisfies ReadonlyArray<WallLayerFunction>;
 
 /** @failure malformed layer list -> reason string */
 export function parseWallLayers(value: unknown): WallLayer[] | string {
@@ -61,18 +62,13 @@ export function layerBoundaries(wall: WallElement): number[] {
   return offsets;
 }
 
-interface SetWallLayersParams {
-  wallIds: string[];
-  layers: WallLayer[] | null;
-}
-
 /**
  * @command set_wall_layers
  * @pure
  * @affects the walls' build-up, thickness and structural material
  * @failure unknown wall / malformed layers -> no-op
  */
-export const setWallLayers: CommandDefinition<SetWallLayersParams> = {
+export const setWallLayers = defineCommand({
   name: 'set_wall_layers',
   description:
     'Give walls a build-up (wall type), like Revit / ArchiCAD composite walls: layers listed from the ' +
@@ -80,37 +76,25 @@ export const setWallLayers: CommandDefinition<SetWallLayersParams> = {
     'left-hand face, each { material, thickness, function: structure | insulation | membrane | air | ' +
     'finish }. Wall thickness becomes the sum; quantities are reported per layer material; plans show ' +
     'the layer lines; IFC gets a material layer set. layers: null removes the build-up.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      wallIds: { type: 'array', items: { type: 'string' }, description: 'Wall ids.' },
-      layers: {
-        type: 'array',
-        description:
-          'Build-up, e.g. [{material:"brick",thickness:100,function:"finish"}, …], or null.',
-        items: {
-          type: 'object',
-          properties: {
-            material: { type: 'string', description: 'Layer material.' },
-            thickness: { type: 'number', description: 'Layer thickness (> 0).' },
-            function: {
-              type: 'string',
-              enum: [...WALL_LAYER_FUNCTIONS],
-              description: 'Default structure.',
-            },
-          },
-          required: ['material', 'thickness'],
-        },
-      },
-    },
-    required: ['wallIds', 'layers'],
-  },
+  params: z.object({
+    wallIds: z.array(z.string()).describe('Wall ids.'),
+    layers: z
+      .array(
+        z.object({
+          material: z.string().describe('Layer material.'),
+          thickness: z.number().describe('Layer thickness (> 0).'),
+          function: z.enum(WALL_LAYER_FUNCTIONS).optional().describe('Default structure.'),
+        }),
+      )
+      .nullable()
+      .describe('Build-up, e.g. [{material:"brick",thickness:100,function:"finish"}, …], or null.'),
+  }),
   run: (doc, { wallIds, layers }): CommandResult => {
     const building = getBuilding(doc);
-    const walls = (Array.isArray(wallIds) ? wallIds : [])
+    const walls = wallIds
       .map((id) => building.elements[id])
       .filter((element): element is WallElement => element?.category === 'wall');
-    if (walls.length === 0 || walls.length !== (wallIds as unknown[]).length) {
+    if (walls.length === 0 || walls.length !== wallIds.length) {
       return noChange(doc, 'set_wall_layers failed: wallIds must list existing walls.');
     }
     if (layers === null) {
@@ -150,4 +134,4 @@ export const setWallLayers: CommandDefinition<SetWallLayersParams> = {
       ),
     };
   },
-};
+});

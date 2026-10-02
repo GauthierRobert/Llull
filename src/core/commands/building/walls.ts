@@ -5,7 +5,9 @@
 
 import type { CadDocument, Vec2 } from '../../model/types';
 import type { BuildingModel, OpeningElement, WallElement } from '../../model/building';
-import type { CommandDefinition, CommandResult } from '../types';
+import type { CommandResult } from '../types';
+import { defineCommand, z } from '../schema';
+import { vec2 } from './params';
 import {
   fromMm,
   getBuilding,
@@ -54,13 +56,31 @@ export function openingFitError(
   return null;
 }
 
-interface WallOptions {
-  thickness?: number;
-  height?: number;
-  levelId?: string;
-  baseOffset?: number;
-  material?: string;
-}
+const WALL_OPTION_SHAPE = {
+  thickness: z
+    .number()
+    .optional()
+    .describe('Wall thickness (document units, > 0). Default 200 mm.'),
+  height: z
+    .number()
+    .optional()
+    .describe('Wall height above its base (document units, > 0). Default: the level height.'),
+  levelId: z
+    .string()
+    .optional()
+    .describe(
+      'Level to place the wall on. Default: active level (a "Level 0" is created if none).',
+    ),
+  baseOffset: z.number().optional().describe('Base offset above the level elevation. Default 0.'),
+  material: z
+    .string()
+    .optional()
+    .describe(
+      'Material name used by quantities/cost: concrete (default), masonry, brick, block, timber, steel, gypsum…',
+    ),
+};
+
+type WallOptions = z.output<z.ZodObject<typeof WALL_OPTION_SHAPE>>;
 
 type WallBuild =
   | { readonly ok: true; readonly building: BuildingModel; readonly wallIds: string[] }
@@ -130,54 +150,23 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
   };
 }
 
-const WALL_OPTION_PROPERTIES = {
-  thickness: {
-    type: 'number',
-    description: 'Wall thickness (document units, > 0). Default 200 mm.',
-  },
-  height: {
-    type: 'number',
-    description: 'Wall height above its base (document units, > 0). Default: the level height.',
-  },
-  levelId: {
-    type: 'string',
-    description:
-      'Level to place the wall on. Default: active level (a "Level 0" is created if none).',
-  },
-  baseOffset: { type: 'number', description: 'Base offset above the level elevation. Default 0.' },
-  material: {
-    type: 'string',
-    description:
-      'Material name used by quantities/cost: concrete (default), masonry, brick, block, timber, steel, gypsum…',
-  },
-} as const;
-
-interface AddWallParams extends WallOptions {
-  start: Vec2;
-  end: Vec2;
-}
-
 /**
  * @command add_wall
  * @pure
  * @affects creates 1 wall element (evaluated into box pieces on layer A-WALL)
  * @failure zero length / thickness <= 0 / unknown level -> no-op
  */
-export const addWall: CommandDefinition<AddWallParams> = {
+export const addWall = defineCommand({
   name: 'add_wall',
   description:
     'Add a straight wall along its plan centerline from start to end ([x, y], document units) on a ' +
     'building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and ' +
     'windows are then hosted with add_door / add_window.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      start: { type: 'array', items: { type: 'number' }, description: 'Centerline start [x, y].' },
-      end: { type: 'array', items: { type: 'number' }, description: 'Centerline end [x, y].' },
-      ...WALL_OPTION_PROPERTIES,
-    },
-    required: ['start', 'end'],
-  },
+  params: z.object({
+    start: vec2('Centerline start [x, y].'),
+    end: vec2('Centerline end [x, y].'),
+    ...WALL_OPTION_SHAPE,
+  }),
   run: (doc, { start, end, ...options }): CommandResult => {
     if (!isVec2(start) || !isVec2(end)) {
       return noChange(doc, 'add_wall failed: start and end must be [x, y] points.');
@@ -185,12 +174,7 @@ export const addWall: CommandDefinition<AddWallParams> = {
     const build = buildWalls(doc, [[start, end]], options);
     return build.ok ? wallResult(doc, build) : noChange(doc, `add_wall failed: ${build.reason}.`);
   },
-};
-
-interface DrawWallsParams extends WallOptions {
-  points: Vec2[];
-  closed?: boolean;
-}
+});
 
 /**
  * @command draw_walls
@@ -198,27 +182,19 @@ interface DrawWallsParams extends WallOptions {
  * @affects creates (points.length - 1) walls, +1 when closed
  * @failure < 2 points / zero-length segment -> no-op
  */
-export const drawWalls: CommandDefinition<DrawWallsParams> = {
+export const drawWalls = defineCommand({
   name: 'draw_walls',
   description:
     'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing ' +
     'wall (e.g. a building perimeter). Same options as add_wall.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      points: {
-        type: 'array',
-        items: { type: 'array', items: { type: 'number' } },
-        description: 'Centerline vertices [[x, y], …], at least 2.',
-      },
-      closed: {
-        type: 'boolean',
-        description: 'Close the loop back to the first point. Default false.',
-      },
-      ...WALL_OPTION_PROPERTIES,
-    },
-    required: ['points'],
-  },
+  params: z.object({
+    points: z.array(z.array(z.number())).describe('Centerline vertices [[x, y], …], at least 2.'),
+    closed: z
+      .boolean()
+      .optional()
+      .describe('Close the loop back to the first point. Default false.'),
+    ...WALL_OPTION_SHAPE,
+  }),
   run: (doc, { points, closed = false, ...options }): CommandResult => {
     if (!isVec2List(points, 2) || (closed && points.length < 3)) {
       return noChange(
@@ -234,18 +210,7 @@ export const drawWalls: CommandDefinition<DrawWallsParams> = {
     const build = buildWalls(doc, segments, options);
     return build.ok ? wallResult(doc, build) : noChange(doc, `draw_walls failed: ${build.reason}.`);
   },
-};
-
-interface UpdateWallParams {
-  wallId: string;
-  start?: Vec2;
-  end?: Vec2;
-  thickness?: number;
-  height?: number;
-  baseOffset?: number;
-  material?: string;
-  levelId?: string;
-}
+});
 
 /**
  * @command update_wall
@@ -253,29 +218,21 @@ interface UpdateWallParams {
  * @affects regenerates the wall, its openings and the walls joined to it
  * @failure unknown wall / invalid values / hosted opening would no longer fit -> no-op
  */
-export const updateWall: CommandDefinition<UpdateWallParams> = {
+export const updateWall = defineCommand({
   name: 'update_wall',
   description:
     'Edit a wall parametrically: move its endpoints, change thickness, height, base offset, material ' +
     'or level. Hosted doors/windows stay attached (refused if one would no longer fit).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      wallId: { type: 'string', description: 'Wall element id, e.g. "wall-2".' },
-      start: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'New centerline start [x, y].',
-      },
-      end: { type: 'array', items: { type: 'number' }, description: 'New centerline end [x, y].' },
-      thickness: { type: 'number', description: 'New thickness (> 0).' },
-      height: { type: 'number', description: 'New height (> 0).' },
-      baseOffset: { type: 'number', description: 'New base offset above the level.' },
-      material: { type: 'string', description: 'New material name.' },
-      levelId: { type: 'string', description: 'Move the wall to another level.' },
-    },
-    required: ['wallId'],
-  },
+  params: z.object({
+    wallId: z.string().describe('Wall element id, e.g. "wall-2".'),
+    start: vec2('New centerline start [x, y].').optional(),
+    end: vec2('New centerline end [x, y].').optional(),
+    thickness: z.number().optional().describe('New thickness (> 0).'),
+    height: z.number().optional().describe('New height (> 0).'),
+    baseOffset: z.number().optional().describe('New base offset above the level.'),
+    material: z.string().optional().describe('New material name.'),
+    levelId: z.string().optional().describe('Move the wall to another level.'),
+  }),
   run: (
     doc,
     { wallId, start, end, thickness, height, baseOffset, material, levelId },
@@ -337,7 +294,7 @@ export const updateWall: CommandDefinition<UpdateWallParams> = {
       affected: elementAffected(document, [wallId]),
     };
   },
-};
+});
 
 /**
  * Every hosted opening on `levelIds` that no longer fits its wall's built extent / height.
