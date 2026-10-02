@@ -13,8 +13,7 @@ import type {
   WallElement,
 } from '../../model/building';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { vec2 } from './params';
+import { defineCommand, z, vec2 } from '../schema';
 import { distance, isValidPolygon, offsetPolygon, polygonArea } from '../../../lib/polygon';
 import {
   fromMm,

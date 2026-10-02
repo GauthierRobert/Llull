@@ -6,8 +6,7 @@
 
 import type { Entity, EntityGroup, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z } from './schema';
-import { vec3 } from './vec';
+import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../../lib/id';
 
 // ---------------------------------------------------------------------------

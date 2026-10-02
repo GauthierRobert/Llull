@@ -16,8 +16,7 @@
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { defineCommand, z } from './schema';
-import { vec3 } from './vec';
+import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { DEFAULT_LAYER_ID } from '../model/types';

@@ -6,8 +6,7 @@
 import type { Vec2 } from '../../model/types';
 import type { BuildingModel, GridElement } from '../../model/building';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { vec2 } from './params';
+import { defineCommand, z, vec2 } from '../schema';
 import {
   fromMm,
   getBuilding,

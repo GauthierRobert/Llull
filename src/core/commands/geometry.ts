@@ -10,8 +10,7 @@
 import type { CadDocument, Entity, EntityGroup, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
-import { defineCommand, z } from './schema';
-import { vec3 } from './vec';
+import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../../lib/id';
 import { rotatedEntityBounds } from './scene';
 

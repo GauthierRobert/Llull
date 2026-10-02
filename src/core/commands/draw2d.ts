@@ -16,8 +16,7 @@
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z } from './schema';
-import { vec2, vec3 } from './vec';
+import { defineCommand, z, looseVec2 as vec2, looseVec3 as vec3 } from './schema';
 import { nextId } from '../../lib/id';
 import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from './limits';
 import { sampleInvolute } from './gears';

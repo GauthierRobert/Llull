@@ -8,7 +8,7 @@
  */
 
 import { z } from 'zod';
-import type { CadDocument } from '../model/types';
+import type { CadDocument, Vec2, Vec3 } from '../model/types';
 import type { ExecutionContext } from './context';
 import type {
   CommandAnnotations,
@@ -38,10 +38,13 @@ function unwrap(schema: z.ZodType): Unwrapped {
   for (;;) {
     const def = current.def as { type: string; innerType?: z.ZodType };
     if (
-      (def.type === 'optional' || def.type === 'default' || def.type === 'nullable') &&
+      (def.type === 'optional' ||
+        def.type === 'default' ||
+        def.type === 'nullable' ||
+        def.type === 'catch') &&
       def.innerType
     ) {
-      optional = optional || def.type !== 'nullable';
+      optional = optional || def.type === 'optional' || def.type === 'default';
       current = def.innerType;
       description ??= current.description;
       continue;
@@ -101,6 +104,10 @@ function paramType(core: z.ZodType): ParamType {
 
 function itemSchema(core: z.ZodType): z.ZodType | undefined {
   const def = core.def as { type: string; element?: z.ZodType; items?: readonly z.ZodType[] };
+  // `untypedArray()` (element `any`) declares no `items` to agents.
+  if (def.type === 'array' && (def.element?.def as { type?: string } | undefined)?.type === 'any') {
+    return undefined;
+  }
   if (def.type === 'array') return def.element;
   if (def.type === 'tuple') return def.items?.[0];
   return undefined;
@@ -212,4 +219,31 @@ export function vec3(
   description: string,
 ): z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null> {
   return z.tuple([z.number(), z.number(), z.number()]).describe(description);
+}
+
+/**
+ * `[x, y]`-typed vector that accepts any number array at runtime — for commands whose `run`
+ * validates or tolerates the length itself (e.g. 3-element points passed to 2D commands).
+ */
+export function looseVec2(description: string): z.ZodType<Vec2> {
+  return z.array(z.number()).describe(description) as unknown as z.ZodType<Vec2>;
+}
+
+/** `[x, y, z]`-typed vector that accepts any number array at runtime (see `looseVec2`). */
+export function looseVec3(description: string): z.ZodType<Vec3> {
+  return z.array(z.number()).describe(description) as unknown as z.ZodType<Vec3>;
+}
+
+/** Array whose elements the agent-facing schema leaves undeclared (no `items`); `run` validates. */
+export function untypedArray(description: string): z.ZodArray<z.ZodAny> {
+  return z.array(z.any()).describe(description);
+}
+
+/**
+ * Advertise `schema` to agents but never reject at runtime: `run` receives the raw value and keeps
+ * its own fallback (e.g. a malformed rotation falls back to [0, 0, 0]). Use only where the command
+ * already tolerated bad input before the zod migration.
+ */
+export function tolerant<T extends z.ZodType>(schema: T): z.ZodCatch<T> {
+  return schema.catch(undefined as never);
 }

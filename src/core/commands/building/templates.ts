@@ -5,8 +5,7 @@
 
 import type { CadDocument, Vec2 } from '../../model/types';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { vec2 } from './params';
+import { defineCommand, z, vec2 } from '../schema';
 import { elementAffected, fromMm, getBuilding, isVec2, noChange } from './model';
 import { addLevel, setProjectInfo } from './levels';
 import { addGridSystem } from './grid';

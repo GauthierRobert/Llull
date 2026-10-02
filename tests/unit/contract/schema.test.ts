@@ -5,7 +5,18 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { defineCommand, formatIssues, toParamsSchema, vec2, vec3, z } from '@core/commands/schema';
+import {
+  defineCommand,
+  formatIssues,
+  looseVec2,
+  looseVec3,
+  tolerant,
+  toParamsSchema,
+  untypedArray,
+  vec2,
+  vec3,
+  z,
+} from '@core/commands/schema';
 
 describe('toParamsSchema', () => {
   it('maps primitives, optionality, enums, tuples, arrays and nested objects', () => {
@@ -97,6 +108,28 @@ describe('toParamsSchema', () => {
 
   it('requires a description on every top-level property', () => {
     expect(() => toParamsSchema(z.object({ bare: z.number() }))).toThrow(/bare/);
+  });
+});
+
+describe('schema helpers', () => {
+  it('untypedArray emits no items; tolerant never rejects but keeps the advertised spec', () => {
+    const params = z.object({
+      path: untypedArray('Path'),
+      rotation: tolerant(vec3('Rotation').optional()),
+      loose: looseVec2('Loose 2D'),
+      loose3: looseVec3('Loose 3D'),
+    });
+    const schema = toParamsSchema(params);
+    expect(schema.properties['path']).toEqual({ type: 'array', description: 'Path' });
+    expect(schema.properties['rotation']).toEqual({
+      type: 'array',
+      description: 'Rotation',
+      items: { type: 'number' },
+    });
+    expect(schema.required).toEqual(['path', 'loose', 'loose3']);
+    expect(
+      params.safeParse({ path: [1, 'x'], rotation: 'bad', loose: [1, 2, 3], loose3: [1] }).success,
+    ).toBe(true);
   });
 });
 
