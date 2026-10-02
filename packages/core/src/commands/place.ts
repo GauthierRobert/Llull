@@ -371,7 +371,7 @@ export const distribute = defineCommand({
  * @pure
  * @layer core/commands
  * @affects moves movingId so its min face along axis meets baseId's max face
- * @invariant +Z up convention (W5A); default axis is 'z'
+ * @invariant +Z up convention; default axis is 'z'
  * @failure missing id -> no-op, affected:[]
  */
 export const stackOn = defineCommand({

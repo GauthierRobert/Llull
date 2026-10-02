@@ -45,7 +45,7 @@ interface UseMaterialPropsInput {
   /** Base envMapIntensity for the material. */
   envMapIntensity?: number;
   /**
-   * Optional PBR overrides from an assigned document material (VNF4).
+   * Optional PBR overrides from an assigned document material.
    * When provided, replaces color/roughness/metalness for the shaded display mode.
    * Wireframe and x-ray modes ignore these to preserve their visual intent.
    */

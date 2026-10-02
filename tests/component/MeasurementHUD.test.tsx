@@ -1,5 +1,5 @@
 /**
- * Component tests for <MeasurementHUD /> (M2 — measurement HUD overlay).
+ * Component tests for <MeasurementHUD /> (measurement HUD overlay).
  *
  * Asserts observable behavior (workflow W3, react R11):
  *   - HUD is absent when lastMeasure is null.

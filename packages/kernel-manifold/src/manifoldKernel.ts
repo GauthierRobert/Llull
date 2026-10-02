@@ -290,7 +290,8 @@ function manifoldToMeshData(solid: ManifoldShape): MeshData | null {
 
 /**
  * Initialize the Manifold WASM module and return a synchronous GeometryKernel.
- * Call once at app startup; inject the result via `setGeometryKernel(kernel)`.
+ * Call once at startup; install it as the process default (`setGeometryKernel`) or pass it
+ * as an `ExecutionContext.kernel`.
  */
 export async function createManifoldKernel(): Promise<GeometryKernel> {
   const mod = await getManifoldModule();
@@ -350,12 +351,12 @@ export async function createManifoldKernel(): Promise<GeometryKernel> {
       return null;
     },
 
-    // Manifold cannot do chamferEdges robustly — graceful no-op; OCC kernel handles it.
+    // Manifold cannot do chamferEdges robustly — graceful no-op (OCC returns null too).
     chamferEdges(_shape: MeshData, _edgeIndices: number[], _distance: number): MeshData | null {
       return null;
     },
 
-    // Manifold cannot do shellSolid robustly — graceful no-op; OCC kernel handles it.
+    // Manifold cannot do shellSolid robustly — graceful no-op (OCC returns null too).
     shellSolid(_shape: MeshData, _thickness: number): MeshData | null {
       return null;
     },

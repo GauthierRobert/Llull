@@ -1,5 +1,5 @@
 /**
- * Plugin contract (MG6.2): a domain (building, industrial, …) extends the CAD core by contributing
+ * Plugin contract: a domain (building, industrial, …) extends the CAD core by contributing
  * commands, an MCP toolset, derivation guards and a deriver — without the core importing it.
  *
  * @layer core/plugins

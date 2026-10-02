@@ -1,11 +1,11 @@
 /**
- * Live sync protocol (MG5.1): the server broadcasts the command log, not document diffs.
+ * Live sync protocol: the server broadcasts the command log, not document diffs.
  * Every client applies each command with the same `execute` and checks the resulting state hash;
  * a gap or mismatch falls back to a full snapshot.
  *
  * @layer core/mcp
  * @pure
- * @invariant deterministic replay needs step-scoped ids (MG3) and the same kernel on both ends (MG1.4)
+ * @invariant deterministic replay needs step-scoped ids and the same kernel on both ends
  * @invariant `selection` is per-client view state and is excluded from the state hash
  */
 

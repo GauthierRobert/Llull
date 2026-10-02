@@ -7,11 +7,11 @@
  * Presets: Front / Top / Right / Isometric.
  * Fit: Fit All (all entities) / Fit Selection (selected entities only).
  *
- * CRITICAL (P1 carry-forward): under frameloop="demand", any programmatic
+ * CRITICAL: under frameloop="demand", any programmatic
  * camera/target change MUST call both invalidate() AND controls.update()
  * to ensure the scene repaints. Without invalidate() the demand loop never
  * fires; without controls.update() the OrbitControls internal state is stale
- * (the U2 RenderOriginSyncer's useFrame relies on these invalidation sources).
+ * (the RenderOriginSyncer's useFrame relies on these invalidation sources).
  *
  * This component is purely presentational. It reads from the store and
  * never mutates the document (PRIME DIRECTIVE).
@@ -155,7 +155,7 @@ export function ViewPresetsInner({
       camera.lookAt(renderTarget);
       orbit.target.copy(renderTarget);
 
-      // P1: must call both update() and invalidate() under frameloop="demand".
+      // Must call both update() and invalidate() under frameloop="demand".
       // update() syncs OrbitControls internal spherical state; invalidate()
       // queues the next render frame (RenderOriginSyncer depends on this too).
       orbit.update();

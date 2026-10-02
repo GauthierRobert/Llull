@@ -53,7 +53,7 @@ describe('draw_involute', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Math cross-check with PG1 (shared helper proves one source of truth)
+  // Math cross-check with add_spur_gear (shared helper proves one source of truth)
   // ---------------------------------------------------------------------------
 
   it('endpoint radius matches gear outerRadius — proves shared sampleInvolute helper', () => {
@@ -70,7 +70,7 @@ describe('draw_involute', () => {
     //   baseR * sqrt(1 + tMax²) = outerRadius  →  tMax = sqrt((outerRadius/baseR)² − 1)
     const tMax = Math.sqrt((outerRadius / baseR) ** 2 - 1);
 
-    // Sample the same curve PG1 uses internally.
+    // Sample the same curve add_spur_gear uses internally.
     const pts = sampleInvolute(baseR, 0, tMax, 14);
     const last = pts[pts.length - 1]!;
     const actualR = Math.sqrt(last[0] ** 2 + last[1] ** 2);

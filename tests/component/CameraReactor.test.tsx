@@ -1,5 +1,5 @@
 /**
- * Component tests for the CameraReactor behavior (W5B-viewport).
+ * Component tests for the CameraReactor behavior.
  *
  * The CameraReactor is mounted inside the r3f Canvas and cannot be tested with
  * WebGL in jsdom. We instead verify the OBSERVABLE behavior at the store level:

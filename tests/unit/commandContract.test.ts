@@ -1,5 +1,5 @@
 /**
- * Unit tests for the W1 command-contract extension:
+ * Unit tests for the command-contract extension:
  *   - `CommandResult.data` (query channel) round-trips through `shapeToolCallContent`
  *     (the single shaping implementation) and through `applyMcpToolCall` (thin wrapper).
  *   - `ParamSpec` supports `enum`, nested `object` properties, and array-of-objects
@@ -7,7 +7,7 @@
  *     map `paramsSchema` through unchanged).
  *
  * The registry is mocked here so we can exercise the `data` passthrough without a
- * real query command (the first one, measure_*, lands with M1).
+ * real query command.
  *
  * shapeToolCallContent is the authoritative shaping function — applyMcpToolCall
  * delegates to it.  Both are tested here; the shaper tests do NOT touch the

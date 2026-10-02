@@ -1,5 +1,5 @@
 /**
- * Building and industrial plugins (MG6.2): the AEC domain extends the CAD core through the plugin
+ * Building and industrial plugins: the AEC domain extends the CAD core through the plugin
  * contract — commands, the `building` MCP toolset, the derivation guard and the document extension
  * that validates the building model and re-derives its geometry on load.
  *

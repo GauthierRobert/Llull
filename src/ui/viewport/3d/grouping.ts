@@ -34,7 +34,7 @@ export interface InstanceBatch {
    */
   entities: Entity[];
   /**
-   * Optional PBR material override for this batch (VNF4).
+   * Optional PBR material override for this batch.
    * When set, the InstanceBatchMesh uses these values for its base
    * roughness/metalness, and for instance colors in shaded mode.
    * All entities in a batch share the same materialId (it is part of the key).
@@ -108,7 +108,7 @@ export function isBatchable(entity: Entity): boolean {
  *   skip per-entity rendering for any entity claimed here.
  * - Entities within each batch are sorted by id (ascending, lexicographic)
  *   so that instanceId → entityId mapping is deterministic across re-renders.
- * - `materials` is used to resolve per-batch PBR overrides (VNF4). Entities
+ * - `materials` is used to resolve per-batch PBR overrides. Entities
  *   with different materialIds have different batch keys so they never merge.
  *
  * @pure — no mutation, no side effects.

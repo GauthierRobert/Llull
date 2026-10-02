@@ -10,7 +10,7 @@
  * Dismissable via a close button that calls `clearLastMeasure()`.
  *
  * Presentation ONLY — never mutates the document (PRIME DIRECTIVE).
- * Styled with CSS variables from the design system (V3).
+ * Styled with CSS variables from the design system.
  */
 
 import React from 'react';

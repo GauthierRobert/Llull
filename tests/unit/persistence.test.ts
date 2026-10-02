@@ -270,9 +270,8 @@ describe('load_document command', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — Validation branches: entity kind-specific guards
-// These tests target the switch/case branches in validateEntityValue that were
-// previously uncovered: text (line 232), default (line 235).
+// Validation branches: entity kind-specific guards
+// These tests target the text and default switch/case branches in validateEntityValue.
 // ---------------------------------------------------------------------------
 
 describe('deserializeDocument — entity kind-specific validation', () => {
@@ -650,7 +649,7 @@ describe('deserializeDocument — entity kind-specific validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — Material validation branches
+// Material validation branches
 // ---------------------------------------------------------------------------
 
 describe('deserializeDocument — material validation', () => {
@@ -747,7 +746,7 @@ describe('deserializeDocument — material validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — Parameter validation branches
+// Parameter validation branches
 // ---------------------------------------------------------------------------
 
 describe('deserializeDocument — parameter validation', () => {
@@ -799,7 +798,7 @@ describe('deserializeDocument — parameter validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — Migration: older documents missing optional fields get correct defaults
+// Migration: older documents missing optional fields get correct defaults
 // ---------------------------------------------------------------------------
 
 describe('deserializeDocument — migration / back-compat defaults', () => {
@@ -894,7 +893,7 @@ describe('deserializeDocument — migration / back-compat defaults', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — add_box guard branches: NaN / Infinity / unresolved-expression-string
+// add_box guard branches: NaN / Infinity / unresolved-expression-string
 // ---------------------------------------------------------------------------
 
 describe('add_box — dimension guard branches', () => {
@@ -923,7 +922,7 @@ describe('add_box — dimension guard branches', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — geometry.ts line 599: delete_entity on doc where groups is undefined
+// delete_entity on doc where groups is undefined
 // ---------------------------------------------------------------------------
 
 describe('delete_entity — doc.groups null-safety', () => {

@@ -1,4 +1,4 @@
-/** MG6.2 plugin contract: domains extend the core through installPlugin, not imports. */
+/** Plugin contract: domains extend the core through installPlugin, not imports. */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute, getCommand, listCommands } from '@core/commands/registry';

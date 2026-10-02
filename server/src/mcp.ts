@@ -20,11 +20,11 @@
  * - DELETE terminates the session transport via `onsessionclosed`; the shared document
  *   is untouched.
  *
- * UI<->MCP sync (KI1-followup resolved):
+ * UI<->MCP sync:
  *   The shared document is the single source of truth for all MCP sessions.
- *   After every mutating `tools/call`, `setLiveDoc(result.document)` stores the new
- *   state and broadcasts it over the GET /live SSE endpoint, which the browser
- *   EventSource subscribes to for live updates.
+ *   Every mutating `tools/call` goes through `commandBus.applyCommand`, which stores the
+ *   new state via `setLiveDoc` and broadcasts the command over the GET /live SSE endpoint
+ *   that the browser EventSource subscribes to.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -291,9 +291,9 @@ function buildMcpServer(
  * the pair is registered in `sessions`.
  *
  * Document access: all sessions share the single live document from `liveDocument.ts`.
- * `getLiveDoc` / `setLiveDoc` are passed as the accessor pair so `buildMcpServer`
- * is unchanged and testable in isolation. Mutations are broadcast to SSE subscribers
- * inside `setLiveDoc`.
+ * `getLiveDoc` is passed as the read accessor so `buildMcpServer` is testable in
+ * isolation. Mutations go through `commandBus.applyCommand`, which broadcasts to SSE
+ * subscribers via `setLiveDoc`.
  *
  * Cleanup paths (belt-and-suspenders):
  * - `onsessionclosed` fires on explicit HTTP DELETE → removes from `sessions`.

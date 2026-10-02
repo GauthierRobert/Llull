@@ -104,10 +104,10 @@ export interface ExtrusionEntity extends BaseEntity {
 }
 
 /**
- * A boolean-operation result stored as an arbitrary triangle mesh.
+ * An arbitrary triangle mesh (boolean / fillet / chamfer result, imported mesh, generated geometry).
  * `mesh` holds world-space geometry; `position` is [0,0,0] (mesh is already in world space).
- * Created exclusively by the boolean commands (`boolean_union`, `boolean_subtract`, `boolean_intersect`).
- * A4-ui is responsible for adding the viewport render branch for this kind.
+ * Created by `boolean_*`, `fillet_edge`, `chamfer_edge`, `import_mesh` and plugin-generated geometry.
+ * Rendered by src/ui/viewport/3d/entities/MeshSolidMesh.tsx.
  */
 export interface MeshSolidEntity extends BaseEntity {
   readonly kind: 'mesh';
@@ -301,7 +301,7 @@ export interface EllipseEntity extends BaseEntity {
  * Requires at least 2 points.
  * When `closed` is true, the curve loops back from the last point to the first.
  *
- * Convention for renderers (VS1): tessellate as a Catmull-Rom spline with
+ * Convention for renderers: tessellate as a Catmull-Rom spline with
  * centripetal parameterization. The control points ARE the through-points;
  * no separate control polygon is stored. For closed splines, treat the point
  * array as periodic (wrap the first/last points).
@@ -890,7 +890,7 @@ export interface CadDocument {
   featureHistory: FeatureStep[];
   /**
    * Number of the next feature-history step (`step-<n>`); never reused, so step-scoped entity
-   * ids (`<prefix>-<n>.<k>`) stay unique and replay re-mints identical ids (MG3).
+   * ids (`<prefix>-<n>.<k>`) stay unique and replay re-mints identical ids.
    * Absent on documents that never recorded a step — read as 1.
    */
   nextStepNumber?: number;
@@ -971,8 +971,7 @@ export interface CadDocument {
  * A physical + visual material definition.
  *
  * `density` drives mass computation in `mass_properties` (mass = volume × density).
- * `color`, `metalness`, `roughness` are PBR visual properties (rendered by the viewport
- * when the VNF4 render branch is implemented; stored here for completeness).
+ * `color`, `metalness`, `roughness` are PBR visual properties used by the viewport renderer.
  *
  * Density units match the document unit system: the value is in mass-per-(document-unit)³
  * so that mass = volume × density works directly (e.g. for a mm document: g/mm³).
@@ -990,7 +989,7 @@ export interface Material {
   density: number;
   /**
    * Diffuse/albedo color as a CSS hex string, e.g. "#b0b0b0".
-   * Used by the VNF4 viewport PBR renderer. Must match /^#[0-9a-fA-F]{6}$/.
+   * Used by the viewport PBR renderer. Must match /^#[0-9a-fA-F]{6}$/.
    */
   color: string;
   /**

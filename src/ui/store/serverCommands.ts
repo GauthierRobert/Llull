@@ -111,7 +111,7 @@ export async function postRedo(): Promise<ServerCommandResponse> {
   return postJson('/redo', {});
 }
 
-/** GET /live/snapshot — the server document with its log position (MG5.1 resync). */
+/** GET /live/snapshot — the server document with its log position (resync). */
 export async function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
   let response: Response;
   try {

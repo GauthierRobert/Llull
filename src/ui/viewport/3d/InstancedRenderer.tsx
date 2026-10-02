@@ -21,7 +21,7 @@
  * Non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid) are NOT
  * rendered here — they remain in the per-entity mesh path in Entities.tsx.
  *
- * ## Performance contract (R9 / P2)
+ * ## Performance contract (R9)
  * - Geometry and material are created ONCE per batch via useMemo and disposed on unmount.
  * - Instance matrices and colors are written in a useEffect keyed on the batch entity
  *   list — NOT inside useFrame. After update, `instanceMatrix.needsUpdate = true` and
@@ -98,7 +98,7 @@ const WHITE = new THREE.Color(1, 1, 1);
  * Returns MeshStandardMaterial constructor args matching the display mode.
  * Mirrors the logic in useMaterialProps.ts for consistency.
  *
- * `batchMaterial` carries optional PBR overrides from an assigned document material (VNF4).
+ * `batchMaterial` carries optional PBR overrides from an assigned document material.
  * The overrides are applied in shaded mode only — wireframe and x-ray ignore them.
  */
 export function makeMaterialArgs(
@@ -186,7 +186,7 @@ function InstanceBatchMesh({
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   // --- Material ---
-  // Uses batch.pbrMaterial (VNF4) for roughness/metalness in shaded mode.
+  // Uses batch.pbrMaterial for roughness/metalness in shaded mode.
   const material = useMemo(() => {
     const mat = new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, batch.pbrMaterial));
     return mat;

@@ -37,7 +37,7 @@ export function localDispatch(name: string, params: unknown): CommandResult {
   return result;
 }
 
-/** Wrap a document as a live snapshot event (MG5.1 protocol). USE IN TESTS ONLY. */
+/** Wrap a document as a live snapshot event (live-sync protocol). USE IN TESTS ONLY. */
 export function liveSnapshot(document: CadDocument, seq = 0): LiveSnapshotEvent {
   return { seq, stateHash: documentHash(document), document };
 }

@@ -51,7 +51,7 @@ export const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>([
  *                     Always positive. Independent of `defaultAnchor` — always center-relative,
  *                     so callers pass e.g. `height/2`, not the full height.
  * @param defaultAnchor  The anchor that the stored `position` natively represents
- *                       (each command's pre-W4B convention, e.g. box='center', cone='base-center').
+ *                       (each command's native convention, e.g. box='center', cone='base-center').
  * @param requestedAnchor  The anchor the CALLER named; unknown values fall back to `defaultAnchor`.
  * @param inputPosition    The world-space position the caller wants the named anchor to land at.
  * @returns The stored `position` to persist on the entity.

@@ -1,5 +1,5 @@
 /**
- * Component tests for the `kind:'revolution'` 3D viewport render branch (VN2).
+ * Component tests for the `kind:'revolution'` 3D viewport render branch.
  *
  * We cannot run WebGL in jsdom, so we verify observable behavior via the store:
  *   1. `revolve_profile` produces an entity with `kind:'revolution'` in the document.

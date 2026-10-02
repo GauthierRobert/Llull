@@ -18,7 +18,7 @@ export const counterIdSource: IdSource = {
 
 /**
  * Ids for one feature-history step: `<prefix>-<stepKey>.<n>` (n = mint order within the step).
- * Replaying the step with the same key re-mints the same ids (MG3: no id remapping needed).
+ * Replaying the step with the same key re-mints the same ids (no id remapping needed).
  */
 export function stepIdSource(stepKey: string): IdSource {
   let minted = 0;

@@ -23,7 +23,7 @@ interface MeshSolidMeshProps {
   entity: MeshSolidEntity;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
-  /** Optional PBR material override from an assigned document material (VNF4). */
+  /** Optional PBR material override from an assigned document material. */
   pbrMaterial?: { color: string; metalness: number; roughness: number };
 }
 

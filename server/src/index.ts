@@ -89,7 +89,7 @@ app.get('/health', (_req: Request, res: Response) => {
  * Contract:
  *   - On connect: immediately emits a `snapshot` event with the current document.
  *   - On every mutating command: emits a `command` event (the log entry); after undo/redo or a
- *     bulk replacement: a `snapshot` event (MG5.1, see `@core/mcp/liveSync`).
+ *     bulk replacement: a `snapshot` event (see `@core/mcp/liveSync`).
  *   - Keepalive: sends `:keepalive\n\n` every ~25 s to prevent proxy timeouts.
  *   - On client disconnect: cleans up the subscription and the keepalive timer.
  *

@@ -1,5 +1,5 @@
 /**
- * MG1 execution context: kernel, ids and registry come from the context passed to `execute`
+ * Execution context: kernel, ids and registry come from the context passed to `execute`
  * (or inherited by nested executes), never from a module singleton.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

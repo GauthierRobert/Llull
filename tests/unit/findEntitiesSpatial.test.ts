@@ -1,5 +1,5 @@
 /**
- * Spatial + fuzzy filter tests for `find_entities` (EN3).
+ * Spatial + fuzzy filter tests for `find_entities`.
  *
  * Covers: nearPoint, insideBBox, overlapsBBox, touchingId, nameFuzzy, tagFuzzy
  * and their failure/validation paths.
@@ -426,7 +426,7 @@ describe('find_entities — spatial & fuzzy filters (EN3)', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Purity (EN3 requirement: `is pure` test must hold)
+  // Purity (`is pure` test must hold)
   // -----------------------------------------------------------------------
 
   it('find_entities is pure with spatial filters — document not mutated', () => {

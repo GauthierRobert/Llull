@@ -6,7 +6,7 @@
  *
  * Each builder returns an ordered array of entities. The command adds them all to the
  * document and returns `affected` in the same deterministic order so that
- * `replay_history` (Q4 id-stable replay) can positionally zip the ids.
+ * `replay_history` (id-stable replay) can positionally zip the ids.
  *
  * @layer core/commands
  */
@@ -272,7 +272,7 @@ const VALID_TEMPLATES: readonly TemplateName[] = [
  * @pure
  * @layer core/commands
  * @affects creates N entities (plate + holes, or circles in pattern) in deterministic order
- * @invariant affected[i] is stable across replay (Q4 id-stable replay)
+ * @invariant affected[i] is stable across replay (id-stable replay)
  * @failure unknown template -> no-op; invalid per-template params -> no-op, affected:[]
  */
 export const instantiateTemplate = defineCommand({

@@ -147,7 +147,7 @@ export function TransformGizmo({
   // Ref to the <group> sibling that TransformControls attaches to.
   // Typed as THREE.Group | null so React gives us a MutableRefObject (current
   // is writable). The group IS rendered into the scene — parent != null after
-  // mount — so controls.attach(targetRef.current) succeeds without error (W5C).
+  // mount — so controls.attach(targetRef.current) succeeds without error.
   const targetRef = useRef<THREE.Group | null>(null);
 
   // Pre-drag baseline — captured in the dragging-changed → true handler so
@@ -354,7 +354,7 @@ export function TransformGizmo({
           controls.attach(object instanceof THREE.Object3D ? object : object.current)
         Because targetRef.current is a proper scene node (parent != null),
         the "attached object must be part of the scene graph" error never fires
-        and the demand frameloop quiesces when idle (W5C / W5G).
+        and the demand frameloop quiesces when idle.
       */}
       <group
         ref={targetRef}

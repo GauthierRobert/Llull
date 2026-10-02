@@ -389,9 +389,8 @@ describe('distribute_along_path', () => {
   });
 
   it('closed belt path: placement positions are deterministic from inputs (pure command)', () => {
-    // Pins the determinism contract called out in the assemblies.ts follow-up note:
-    // expandInstance was minting fresh ids per memo recompute. distribute_along_path
-    // must NOT introduce a similar non-deterministic POSITION source — ids are time-
+    // Pins the determinism contract: distribute_along_path
+    // must NOT introduce a non-deterministic POSITION source — ids are time-
     // tagged for global uniqueness but positions must depend only on params.
     const run = (): ReadonlyArray<readonly [number, number, number]> => {
       const init = buildDocWithComponent();

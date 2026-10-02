@@ -11,8 +11,7 @@
  * - This module is TRANSPORT / STATE GLUE only. No command or geometry logic.
  * - `setLiveDoc` stores the document produced by `execute` and fires the SSE fan-out.
  *   It never creates or validates entities.
- * - Sync is now implemented: single shared doc, broadcast over GET /live.
- *   (Replaces the former TODO(KI1-followup) per-session isolation approach.)
+ * - Sync: one shared doc for every session, broadcast over GET /live.
  */
 
 import fs from 'fs';
@@ -96,7 +95,7 @@ export function closeAllSubscribers(): void {
 /** The single live document shared across all MCP sessions and the browser UI. */
 let _liveDoc: CadDocument = loadAutosave();
 
-/** Number of changes applied to the live document since process start (MG5.1 log position). */
+/** Number of changes applied to the live document since process start (the log position). */
 let _seq = 0;
 
 /** Return the current shared document. */
@@ -154,7 +153,7 @@ export interface LiveCommand {
 }
 
 /**
- * Replace the shared document and broadcast the change to all SSE subscribers (MG5.1).
+ * Replace the shared document and broadcast the change to all SSE subscribers.
  *
  * With `command`: emits a `command` event `{ seq, name, params, stateHash }` — clients re-run the
  * same command through `execute` and verify `stateHash`. Without it (undo/redo/reset/bulk

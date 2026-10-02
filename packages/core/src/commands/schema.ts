@@ -1,5 +1,5 @@
 /**
- * One schema per command (MG2): a zod object is the single source of the params TS type,
+ * One schema per command: a zod object is the single source of the params TS type,
  * the agent-facing `paramsSchema` (MCP JSON Schema) and runtime validation in `execute`.
  *
  * @layer core/commands

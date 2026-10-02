@@ -1,5 +1,5 @@
 /**
- * Kernel memoization (MG4.4): identical operand definitions never hit the WASM kernel twice,
+ * Kernel memoization: identical operand definitions never hit the WASM kernel twice,
  * so regenerating an unchanged boolean/fillet during replay is free.
  *
  * @layer core/geometry

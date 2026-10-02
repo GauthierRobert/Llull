@@ -4,7 +4,7 @@
  * State machine for interactive 2D modify tools.
  *
  * Collects entity-picks and numeric inputs, then calls store.dispatch with
- * the matching S2 command:
+ * the matching 2D modify command:
  *
  *   explode  → pick polyline → dispatch('explode_polyline', {id})
  *   offset   → pick entity  → pick side point → set distance (input) → dispatch('offset_2d', {id, distance})

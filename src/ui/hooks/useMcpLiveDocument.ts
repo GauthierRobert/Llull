@@ -1,7 +1,7 @@
 /**
  * @layer ui/hooks
  *
- * useMcpLiveDocument — subscribes to the server-side SSE command log (MG5.1).
+ * useMcpLiveDocument — subscribes to the server-side SSE command log.
  *
  * Opens `GET <SERVER_BASE>/live` as an EventSource (SERVER_BASE from @ui/serverConfig).
  *

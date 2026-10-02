@@ -1,5 +1,5 @@
 /**
- * Component tests for VT1 — TextEntity render branches (3D TextMesh + 2D TextRenderer2D).
+ * Component tests for the TextEntity render branches (3D TextMesh + 2D TextRenderer2D).
  *
  * Since jsdom cannot run WebGL (no Canvas / THREE.WebGLRenderer), we test the
  * observable behavior through the store:

@@ -166,7 +166,7 @@ function corruptionReason(entity: unknown): string | null {
 
 /**
  * @pure
- * @failure params fail `paramsValidator` (MG2 zod schema) -> no-op naming the failing path
+ * @failure params fail `paramsValidator` (zod schema) -> no-op naming the failing path
  * @failure run throws (warned with stack), id-like params equal an Object.prototype key
  * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
  * components or a non-Vec3 position -> no-op, affected:[]
@@ -365,7 +365,7 @@ const rawDefinitions = [
   deleteEntities,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
-/** Core commands, then every installed plugin's commands in installation order (MG6.2). */
+/** Core commands, then every installed plugin's commands in installation order. */
 const definitions: CommandDefinition<unknown>[] = rawDefinitions.map(guardCommand);
 
 const byName = new Map<string, CommandDefinition<unknown>>(definitions.map((d) => [d.name, d]));
@@ -407,7 +407,7 @@ export function getCommand(name: string): CommandDefinition<unknown> | undefined
  * - Otherwise, when the returned document reference differs from the input
  *   (i.e. the command actually mutated the document), a FeatureStep is
  *   appended to the new document's featureHistory.
- * - Step-scoped ids (MG3): a recorded command runs as step `step-<n>` (n = doc.nextStepNumber)
+ * - Step-scoped ids: a recorded command runs as step `step-<n>` (n = doc.nextStepNumber)
  *   and mints `<prefix>-<n>.<k>`; replaying that step re-mints the same ids. An execute nested
  *   inside a running step joins it (same id source, no extra step).
  */

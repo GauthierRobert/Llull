@@ -46,7 +46,7 @@ interface DocumentEnvelope {
 const CURRENT_SCHEMA_VERSION = 2;
 
 /**
- * Versions `deserializeDocument` reads. v1 → v2 (MG3/MG4): step-scoped ids (`nextStepNumber`)
+ * Versions `deserializeDocument` reads. v1 → v2: step-scoped ids (`nextStepNumber`)
  * and building-generated entities omitted from the file (regenerated on load). v1 files load
  * unchanged — their legacy ids stay valid; new steps use the step counter from 1.
  */
@@ -59,7 +59,7 @@ const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2]);
 export interface SerializeOptions {
   /**
    * Keep evaluated geometry that the definition regenerates (building-element entities).
-   * Default false: files store the definition only (MG4.2). Hashing and diffing pass true.
+   * Default false: files store the definition only. Hashing and diffing pass true.
    */
   readonly includeDerived?: boolean;
 }
@@ -111,7 +111,7 @@ function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unkno
   return next === 1 && raw['nextStepNumber'] === undefined ? raw : { ...raw, nextStepNumber: next };
 }
 
-/** Re-derive geometry the file omitted, via every installed plugin's document extension (MG4.2/MG6.2). */
+/** Re-derive geometry the file omitted, via every installed plugin's document extension. */
 function restoreDerivedEntities(raw: Record<string, unknown>): Record<string, unknown> {
   return documentExtensions().reduce((current, extension) => extension.restore(current), raw);
 }
@@ -171,22 +171,19 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     ? (raw['materials'] as Record<string, Material>)
     : {};
 
-  // Groups (added after initial release)
+  // Optional collections below: absent in older files -> empty default.
   const groups: Record<string, unknown> = isRecord(raw['groups'])
     ? (raw['groups'] as Record<string, unknown>)
     : {};
 
-  // Recipes (added in AI6)
   const recipes: Record<string, Recipe> = isRecord(raw['recipes'])
     ? (raw['recipes'] as Record<string, Recipe>)
     : {};
 
-  // Components (added in NF1 — assembly support)
   const components: Record<string, Component> = isRecord(raw['components'])
     ? (raw['components'] as Record<string, Component>)
     : {};
 
-  // Constraints (added in Q2 — first-class constraint solver)
   const constraints: Record<string, Constraint> = isRecord(raw['constraints'])
     ? (raw['constraints'] as Record<string, Constraint>)
     : {};
@@ -195,7 +192,6 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     ? (raw['constraintOrder'] as string[])
     : [];
 
-  // Joints (added in KN1 — kinematic joints)
   const joints: Record<string, Joint> = isRecord(raw['joints'])
     ? (raw['joints'] as Record<string, Joint>)
     : {};
@@ -204,7 +200,6 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
     ? (raw['jointOrder'] as string[])
     : [];
 
-  // DriveRelations (added in KN1 — drive relations)
   const driveRelations: Record<string, DriveRelation> = isRecord(raw['driveRelations'])
     ? (raw['driveRelations'] as Record<string, DriveRelation>)
     : {};

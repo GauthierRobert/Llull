@@ -18,7 +18,7 @@ import { instanceBoundsFromDoc } from './scene';
 import type { Bounds } from './scene';
 
 // ---------------------------------------------------------------------------
-// Re-implementation of the KN1 motion evaluation helpers
+// Motion evaluation helpers
 // (duplicated here to avoid exporting them from joints.ts and to remain
 //  self-contained; the logic is identical to evaluateMotionInternal)
 // ---------------------------------------------------------------------------

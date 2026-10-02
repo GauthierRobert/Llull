@@ -1,7 +1,7 @@
 /**
  * Procedural gear commands.
  *
- * PG1: add_spur_gear — parametric involute spur gear computed in pure core math.
+ * add_spur_gear — parametric involute spur gear computed in pure core math.
  * Produces one `extrusion` entity; no new EntityKind, no kernel call, no DOM.
  *
  * @module

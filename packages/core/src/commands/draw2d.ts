@@ -8,7 +8,7 @@
  * Spline convention: Catmull-Rom interpolating spline with centripetal
  * parameterization. `points` are through-points; the curve passes through
  * each one. For closed splines the point array is treated as periodic.
- * Tessellation is delegated to the viewport renderer (VS1).
+ * Tessellation is delegated to the viewport renderer.
  *
  * @layer core/commands
  */

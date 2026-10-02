@@ -114,7 +114,7 @@ export const listSteelProfiles = defineCommand({
     'equal angles L, with depth h, width b, web / flange thickness (mm), mass (kg/m), area (mm²) and paint ' +
     'perimeter (mm). Optionally filter by family.',
   params: z.object({
-    // tolerant: lower-case / padded family names are normalised in run, as before MG2.
+    // tolerant: lower-case / padded family names are normalised in run.
     family: tolerant(
       z
         .enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L'])

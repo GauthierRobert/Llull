@@ -3,8 +3,8 @@
  *
  * The 3D perspective viewport.
  *
- * FRAME-TIME BUDGET (W5H)
- * ───────────────────────
+ * FRAME-TIME BUDGET
+ * ─────────────────
  * Target: ≤ 16 ms median frame time on a 500-entity document on a mid-range
  * laptop (Intel UHD / Apple M1-class GPU, 1080p, Chrome).
  *
@@ -288,7 +288,7 @@ function RenderOriginSyncer(): null {
     // it extends EventDispatcher (the store's `controls` type) and exposes `target`.
     // COUPLING: ViewPresets.applyPreset() must call invalidate() + controls.update()
     // before returning so that this useFrame fires on the next demand frame and the
-    // rebase check runs against the new target position (P1 carry-forward).
+    // rebase check runs against the new target position.
     const orbitTarget = (controls as OrbitControlsImpl).target;
     if (!orbitTarget) return;
 

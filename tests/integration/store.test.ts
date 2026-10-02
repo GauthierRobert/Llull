@@ -517,7 +517,7 @@ function okResponse(): { ok: true; json: () => Promise<ServerCommandResponse> } 
   return { ok: true, json: () => Promise.resolve(DEFAULT_RESPONSE) };
 }
 
-/** Simulated server (MG5): POST /command applies via execute; GET /live/snapshot returns state. */
+/** Simulated server: POST /command applies via execute; GET /live/snapshot returns state. */
 function simulatedServer(failFirst?: number): {
   fetch: ReturnType<typeof vi.fn>;
   commands: () => string[];

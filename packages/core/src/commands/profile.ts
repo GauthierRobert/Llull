@@ -63,7 +63,7 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
  *
  * Profile derivation per kind:
  *   circle      → 32-segment regular polygon centred at entity.center
- *   rectangle   → 4 corners from lower-left origin (respects B1 convention)
+ *   rectangle   → 4 corners from the lower-left origin (RectangleEntity convention)
  *   polyline    → its points when closed === true; no-op when open
  *   line / arc / open polyline / point / 3D solid → graceful no-op
  */
@@ -126,7 +126,7 @@ export const extrudeSketch = defineCommand({
       profile = pts;
     } else if (source.kind === 'rectangle') {
       const { width, height } = source;
-      // lower-left origin (B1 convention); corners in CCW order
+      // lower-left origin (RectangleEntity convention); corners in CCW order
       profile = [
         [0, 0],
         [width, 0],

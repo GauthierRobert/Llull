@@ -744,7 +744,7 @@ describe('set_parameter', () => {
   it('deserializing a pre-Q1 document without parameters key yields parameters: {}', async () => {
     const { deserializeDocument } = await import('@core/commands/persistence');
     const doc = createEmptyDocument();
-    // Manually build an envelope that lacks the parameters field (pre-Q1 format).
+    // Manually build an envelope that lacks the parameters field (older format).
     const envelope = {
       format: 'llull-document',
       version: 1,
@@ -2085,7 +2085,7 @@ describe('render_view', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // add_text (T1)
+  // add_text
   // ---------------------------------------------------------------------------
 
   it('add_text — happy path: creates text entity with correct fields', () => {
@@ -2205,7 +2205,7 @@ describe('render_view', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // KN1 — kinematic joints + drive relations
+  // Kinematic joints + drive relations
   // ---------------------------------------------------------------------------
 
   /**
@@ -2662,7 +2662,7 @@ describe('render_view', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // KN2 — motion_study
+  // motion_study
   // ---------------------------------------------------------------------------
 
   it('motion_study — joint sweep: instanceRotations change monotonically and doc is unchanged', () => {
@@ -3301,7 +3301,7 @@ describe('add_dimension', () => {
     expect(danglingIssues).toHaveLength(0);
   });
 
-  // ── Feature history (Q3) ──────────────────────────────────────────────────
+  // ── Feature history ──────────────────────────────────────────────────
 
   it('featureHistory — fresh document has empty featureHistory', () => {
     const doc = createEmptyDocument();
@@ -3686,7 +3686,7 @@ describe('add_dimension', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI3 — Constructive vs evaluated geometry: =expr resolution in replay
+// Constructive vs evaluated geometry: =expr resolution in replay
 // ---------------------------------------------------------------------------
 
 import { resolveStepParams, buildParamEnv } from '@core/commands/regenerate';
@@ -3881,7 +3881,7 @@ describe('KI3 — =expr param resolution in replay_history', () => {
     // Must not throw; must surface the warning in summary.
     expect(result.summary).toContain('Unresolved');
     expect(result.summary).toContain('nonexistent');
-    // With the KI6 add_box guard in place, the unresolved =expr string is caught by add_box
+    // The add_box guard catches the unresolved =expr string
     // (non-finite/non-numeric size → graceful no-op). The contract under test here is the
     // REPLAY level: it completes without throwing and reports the failure.
     expect(result.document).toBeDefined();
@@ -4585,7 +4585,7 @@ describe('KI3 — =expr param resolution in replay_history', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Q4 — Stable entity ids across replayHistory (id-remapping)
+// Stable entity ids across replayHistory (id-remapping)
 // ---------------------------------------------------------------------------
 
 describe('Q4 — replayHistory id-remapping', () => {
@@ -4888,7 +4888,7 @@ describe('instantiate_template (templates.ts generators)', () => {
     const result1 = execute(createEmptyDocument(), 'instantiate_template', callParams);
     const result2 = execute(createEmptyDocument(), 'instantiate_template', callParams);
     // Ids are globally unique (timestamp + monotonic counter), so they differ between
-    // calls — but the affected ORDER is deterministic (Q4 relies on this for replay
+    // calls — but the affected ORDER is deterministic (replay relies on this
     // zipping). Assert the created entities appear in the same geometric sequence.
     expect(result1.affected).toHaveLength(result2.affected.length);
     const centers1 = result1.affected.map(
@@ -5787,7 +5787,7 @@ describe('export_stl', () => {
 });
 
 // ---------------------------------------------------------------------------
-// W4A — rotation param at creation + W4C — AABB in summaries
+// Rotation param at creation + AABB in summaries
 // ---------------------------------------------------------------------------
 
 describe('W4A/W4C — rotation at creation and AABB summaries', () => {
@@ -6071,7 +6071,7 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 });
 
 // ---------------------------------------------------------------------------
-// W4B — unified placement anchor ('center' | 'min' | 'base-center')
+// Unified placement anchor ('center' | 'min' | 'base-center')
 // Each add_* command keeps its CURRENT default placement when `anchor` is
 // omitted (back-compat lock); an explicit anchor places the corresponding
 // point of the world AABB at the supplied `position`.

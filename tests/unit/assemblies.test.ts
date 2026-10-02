@@ -2,7 +2,7 @@
  * Assembly command tests: create_component, insert_instance, explode_instance,
  * scale_entity on instances, instance bounds from describe_scene.
  *
- * Also covers the B1 regression: rotated-entity summaries use the world AABB
+ * Also covers a regression: rotated-entity summaries use the world AABB
  * (rotatedEntityBounds), so a π/4 box reports expanded extents.
  */
 import { describe, it, expect } from 'vitest';
@@ -15,7 +15,7 @@ import type { Component } from '@core/model/types';
 
 describe('assemblies', () => {
   // ---------------------------------------------------------------------------
-  // B1 regression — rotated-entity summary AABB is expanded vs. unrotated
+  // Regression — rotated-entity summary AABB is expanded vs. unrotated
   // ---------------------------------------------------------------------------
 
   it('add_box summary AABB is expanded when rotation is applied (B1 regression)', () => {

@@ -1,5 +1,5 @@
 /**
- * Component tests for VT2 — DimensionRenderer2D render branch.
+ * Component tests for the DimensionRenderer2D render branch.
  *
  * Since jsdom cannot run WebGL, we test the observable behavior through the
  * store and the shapes of dimension entities produced by add_dimension +
