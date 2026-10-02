@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act, fireEvent } from '@testing-library/react';
-import { useStore } from '@ui/store';
+import { useStore, useToolStore } from '@ui/store';
 import { useDrawTool } from '@ui/viewport/2d/useDrawTool';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { createEmptyDocument } from '@core/model/types';
@@ -42,8 +42,7 @@ describe('draw tool move', () => {
     expect(dispatch).not.toHaveBeenCalled();
     act(() => result.current.handleClick([4, -1]));
     expect(dispatch.mock.calls).toEqual([
-      ['move_entity', { id: 'a', delta: [3, -2, 0] }],
-      ['move_entity', { id: 'b', delta: [3, -2, 0] }],
+      ['move_entities', { ids: ['a', 'b'], delta: [3, -2, 0] }],
     ]);
     expect(result.current.collectedPoints).toHaveLength(0);
   });
@@ -72,5 +71,31 @@ describe('draw tool move', () => {
       fireEvent.keyDown(window, { key: 'Escape' });
     });
     expect(result.current.activeTool).toBe('none');
+  });
+
+  it('switching tools drops points in progress', () => {
+    const { result } = renderHook(() => useDrawTool());
+    act(() => result.current.setActiveTool('polyline'));
+    act(() => result.current.handleClick([0, 0]));
+    act(() => useToolStore.getState().setDrawTool('line'));
+    expect(result.current.collectedPoints).toHaveLength(0);
+  });
+
+  it('Enter and Esc typed into a text field are left to the field', () => {
+    const dispatch = vi.fn();
+    useStore.setState({ dispatch });
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const { result } = renderHook(() => useDrawTool());
+    act(() => result.current.setActiveTool('polyline'));
+    act(() => result.current.handleClick([0, 0]));
+    act(() => result.current.handleClick([1, 0]));
+    act(() => {
+      fireEvent.keyDown(input, { key: 'Enter' });
+      fireEvent.keyDown(input, { key: 'Escape' });
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(result.current.collectedPoints).toHaveLength(2);
+    input.remove();
   });
 });

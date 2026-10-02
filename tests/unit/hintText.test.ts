@@ -5,6 +5,7 @@ import type { HintContext } from '@ui/components/hintText';
 const base: HintContext = {
   viewMode: '3d',
   drawTool: 'none',
+  modifyTool: 'none',
   gizmoMode: 'translate',
   selectionCount: 0,
   entityCount: 3,
@@ -37,5 +38,9 @@ describe('hintText', () => {
     expect(hintText({ ...base, viewMode: '2d', drawTool: 'move', selectionCount: 2 })).toMatch(
       /base point/,
     );
+  });
+
+  it('defers to the modify palette prompt while a modify tool is armed', () => {
+    expect(hintText({ ...base, viewMode: '2d', modifyTool: 'fillet' })).toMatch(/^Fillet: follow/);
   });
 });

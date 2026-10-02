@@ -10,9 +10,18 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { rotatedEntityBounds } from '@core/commands/scene';
 import type { IconName } from '@ui/components/Icon';
 
+export type SolidCommand =
+  | 'add_box'
+  | 'add_cylinder'
+  | 'add_sphere'
+  | 'add_cone'
+  | 'add_torus'
+  | 'add_wedge'
+  | 'add_pyramid';
+
 export interface SolidPreset {
   /** Registry command name. */
-  command: string;
+  command: SolidCommand;
   label: string;
   icon: IconName;
   /** Default dimension params; position + anchor are added by solidCommandParams. */
@@ -97,9 +106,19 @@ function ringSlots(ring: number): Array<[number, number]> {
 /**
  * Base-center drop point for a new primitive: the free grid slot nearest the origin (so it lands
  * in view), resting on the ground plane (z = 0). Falls back to just past the scene's +X edge.
+ * `reserved` drop points (creations not yet in the document) count as occupied.
  */
-export function nextPlacement(document: CadDocument): Vec3 {
-  const occupied = footprints(document);
+export function nextPlacement(document: CadDocument, reserved: readonly Vec3[] = []): Vec3 {
+  const half = DEFAULT_HALF_WIDTH;
+  const occupied = [
+    ...footprints(document),
+    ...reserved.map(([x, y]) => ({
+      minX: x - half,
+      maxX: x + half,
+      minY: y - half,
+      maxY: y + half,
+    })),
+  ];
   for (let ring = 0; ring <= MAX_SLOT_RINGS; ring++) {
     for (const [i, j] of ringSlots(ring)) {
       const x = i * SLOT_PITCH;

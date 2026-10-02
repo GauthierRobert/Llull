@@ -1,5 +1,5 @@
 /**
- * @layer ui/hooks
+ * @layer ui/actions
  *
  * Actions on the current selection, shared by the main toolbar, keyboard shortcuts and the
  * properties panel. Each one only gathers params and dispatches commands (PRIME DIRECTIVE).
@@ -9,7 +9,6 @@ import type { Vec3 } from '@core/model/types';
 import { buildingElementOf } from '@core/commands/building';
 import { rotatedEntityBounds } from '@core/commands/scene';
 import { useStore } from '@ui/store';
-import { PLACEMENT_GAP } from '@ui/components/toolbar/solidPresets';
 
 /**
  * Delete the selection in as few commands as possible. Generated building geometry is deleted
@@ -18,23 +17,30 @@ import { PLACEMENT_GAP } from '@ui/components/toolbar/solidPresets';
  */
 export function deleteSelection(): void {
   const state = useStore.getState();
-  const selection = state.document.selection;
-  if (selection.length === 0) return;
-  const elementIds = new Set<string>();
-  const entityIds: string[] = [];
-  for (const id of selection) {
-    const elementId = buildingElementOf(state.document, id);
-    if (elementId === null) entityIds.push(id);
-    else elementIds.add(elementId);
-  }
-  if (elementIds.size > 0) {
-    state.dispatch('delete_building_element', { elementIds: [...elementIds] });
-  }
+  if (state.document.selection.length === 0) return;
+  const { elementIds, entityIds } = partitionSelection();
+  if (elementIds.length > 0) state.dispatch('delete_building_element', { elementIds });
   if (entityIds.length > 0) state.dispatch('delete_entities', { ids: entityIds });
 }
 
+/** Gap (document units) between a duplicated selection and its originals. */
+const DUPLICATE_GAP = 1.5;
+
+/** Selection ids split into building elements (owning generated geometry) and plain entities. */
+function partitionSelection(): { elementIds: string[]; entityIds: string[] } {
+  const { document } = useStore.getState();
+  const elementIds = new Set<string>();
+  const entityIds: string[] = [];
+  for (const id of document.selection) {
+    const elementId = buildingElementOf(document, id);
+    if (elementId === null) entityIds.push(id);
+    else elementIds.add(elementId);
+  }
+  return { elementIds: [...elementIds], entityIds };
+}
+
 /** X offset that places copies of the selection clear of the originals. */
-export function duplicateOffset(): Vec3 {
+function duplicateOffset(): Vec3 {
   const { document } = useStore.getState();
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
@@ -46,7 +52,7 @@ export function duplicateOffset(): Vec3 {
     maxX = Math.max(maxX, bounds.max[0]);
   }
   const width = Number.isFinite(maxX - minX) ? maxX - minX : 0;
-  return [width + PLACEMENT_GAP, 0, 0];
+  return [width + DUPLICATE_GAP, 0, 0];
 }
 
 /**
@@ -65,10 +71,16 @@ export function duplicateSelection(): void {
 }
 
 /**
- * Translate every selected entity by `delta`.
- * @affects dispatches move_entity once per selected id; no-op on empty selection
+ * Translate the selection by `delta` in one undo step per kind: plain entities via move_entities,
+ * generated building geometry via its element (plan move — skipped when delta has a Z component).
+ * @affects dispatches move_entities and/or move_building_element; no-op on empty selection
  */
 export function moveSelection(delta: Vec3): void {
   const state = useStore.getState();
-  for (const id of state.document.selection) state.dispatch('move_entity', { id, delta });
+  if (state.document.selection.length === 0) return;
+  const { elementIds, entityIds } = partitionSelection();
+  if (elementIds.length > 0 && delta[2] === 0) {
+    state.dispatch('move_building_element', { elementIds, delta: [delta[0], delta[1]] });
+  }
+  if (entityIds.length > 0) state.dispatch('move_entities', { ids: entityIds, delta });
 }

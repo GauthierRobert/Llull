@@ -198,4 +198,12 @@ describe('PropertiesPanel — editing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(useStore.getState().document.entities[id]).toBeUndefined();
   });
+
+  it('offers rotation for solids only', () => {
+    const line = localDispatch('draw_line', { start: [0, 0], end: [1, 0] }).affected[0]!;
+    useStore.getState().select([line]);
+    render(<PropertiesPanel />);
+    expect(screen.queryByLabelText('Rotation Z')).toBeNull();
+    expect(screen.getByLabelText('Position X')).toBeDefined();
+  });
 });

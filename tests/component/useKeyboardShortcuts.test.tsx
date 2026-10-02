@@ -106,10 +106,11 @@ describe('useKeyboardShortcuts', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it('Escape leaves the selection alone while a 2D tool is armed (the tool consumes it)', () => {
-    useToolStore.setState({ viewMode: '2d', drawTool: 'line' });
+  it('Escape leaves the selection alone when an armed tool already consumed it', () => {
     render(<Harness />);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    event.preventDefault();
+    window.dispatchEvent(event);
     expect(clearSelection).not.toHaveBeenCalled();
   });
 
@@ -122,15 +123,13 @@ describe('useKeyboardShortcuts', () => {
     ]);
   });
 
-  it('arrow keys nudge the selection by 1, Shift by 10', () => {
+  it('arrow keys nudge the whole selection in one command, by 1 or 10 with Shift, and repeat', () => {
     render(<Harness />);
     fireEvent.keyDown(window, { key: 'ArrowLeft' });
-    fireEvent.keyDown(window, { key: 'ArrowUp', shiftKey: true });
+    fireEvent.keyDown(window, { key: 'ArrowUp', shiftKey: true, repeat: true });
     expect(dispatch.mock.calls).toEqual([
-      ['move_entity', { id: 'a', delta: [-1, 0, 0] }],
-      ['move_entity', { id: 'b', delta: [-1, 0, 0] }],
-      ['move_entity', { id: 'a', delta: [0, 10, 0] }],
-      ['move_entity', { id: 'b', delta: [0, 10, 0] }],
+      ['move_entities', { ids: ['a', 'b'], delta: [-1, 0, 0] }],
+      ['move_entities', { ids: ['a', 'b'], delta: [0, 10, 0] }],
     ]);
   });
 
@@ -167,5 +166,19 @@ describe('useKeyboardShortcuts', () => {
     render(<Harness />);
     fireEvent.keyDown(window, { key: '?' });
     expect(useToolStore.getState().shortcutsOpen).toBe(true);
+  });
+
+  it('arrow nudge routes generated building geometry through its element', () => {
+    const walled = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [1000, 0],
+    }).document;
+    useStore.setState({ document: { ...walled, selection: ['wall-1:body-0', 'a'] } });
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(dispatch.mock.calls).toEqual([
+      ['move_building_element', { elementIds: ['wall-1'], delta: [1, 0] }],
+      ['move_entities', { ids: ['a'], delta: [1, 0, 0] }],
+    ]);
   });
 });

@@ -23,21 +23,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Vec2 } from '@core/model/types';
 import type { LineEntity, PolylineEntity } from '@core/model/types';
-import { useStore } from '@ui/store';
+import { useStore, useToolStore } from '@ui/store';
+import type { ModifyToolKind } from '@ui/store';
+import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import { nearestVertex, offsetSideSign } from './modifyHelpers';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type ModifyToolKind =
-  | 'none'
-  | 'offset'
-  | 'fillet'
-  | 'chamfer'
-  | 'trim'
-  | 'extend'
-  | 'explode';
 
 /** Describes what the user should do next for the active modify tool. */
 export type ModifyToolPhase =
@@ -121,7 +114,8 @@ export function useModifyTool(): UseModifyToolResult {
   const dispatch = useStore((s) => s.dispatch);
   const entities = useStore((s) => s.document.entities);
 
-  const [activeTool, setActiveToolState] = useState<ModifyToolKind>('none');
+  const activeTool = useToolStore((s) => s.modifyTool);
+  const setModifyTool = useToolStore((s) => s.setModifyTool);
   const [phase, setPhase] = useState<ModifyToolPhase>('idle');
   const [pickedEntityId, setPickedEntityId] = useState<string | null>(null);
   const [pickedBoundaryId, setPickedBoundaryId] = useState<string | null>(null);
@@ -131,10 +125,6 @@ export function useModifyTool(): UseModifyToolResult {
   // Ref to store the pick point for the offset side-sign computation.
   // Not state: it is a transient intermediate consumed only by commitValue.
   const offsetPickPointRef = useRef<Vec2 | null>(null);
-
-  // Stable ref to the current activeTool so cancel() can read it synchronously
-  // without being stale when resetProgress and cancel both batch in one keydown handler.
-  const activeToolRef = useRef<ModifyToolKind>('none');
 
   const resetProgress = useCallback(() => {
     const s = initialState();
@@ -148,21 +138,17 @@ export function useModifyTool(): UseModifyToolResult {
 
   const setActiveTool = useCallback(
     (tool: ModifyToolKind) => {
-      setActiveToolState(tool);
-      activeToolRef.current = tool;
+      setModifyTool(tool);
       resetProgress();
       setPhase(tool === 'none' ? 'idle' : 'pick-entity');
     },
-    [resetProgress],
+    [resetProgress, setModifyTool],
   );
 
   const cancel = useCallback(() => {
     resetProgress();
-    // Re-enter pick-entity phase if a tool is still active.
-    // Use the ref (not the stale phase snapshot) so that when resetProgress and
-    // cancel both fire in the same React batch, we still see the correct activeTool
-    // value rather than the just-cleared 'idle' produced by resetProgress.
-    setPhase(activeToolRef.current === 'none' ? 'idle' : 'pick-entity');
+    // Re-enter pick-entity phase if a tool is still active (read synchronously from the store).
+    setPhase(useToolStore.getState().modifyTool === 'none' ? 'idle' : 'pick-entity');
   }, [resetProgress]);
 
   const commitValue = useCallback(() => {
@@ -283,19 +269,19 @@ export function useModifyTool(): UseModifyToolResult {
     [activeTool, dispatch, phase, pickedEntityId, resetProgress],
   );
 
-  // Keyboard: Esc cancels; Enter commits (value phase); O/F/K/T/X/E activate tools.
+  // Keyboard: Esc cancels the pick in progress, then disarms; Enter commits (value phase);
+  // O/F/K/T/X/E activate tools. Keys typed into fields or dialogs are never consumed.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      // Do not steal keys from text inputs.
-      const target = e.target as HTMLElement;
-      const isInput =
-        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-
+      if (isEditingKeyEvent(e)) return;
       if (e.key === 'Escape') {
-        cancel();
+        if (activeTool === 'none') return;
+        e.preventDefault();
+        if (phase === 'pick-entity') setActiveTool('none');
+        else cancel();
       } else if (e.key === 'Enter' && phase === 'enter-value') {
         commitValue();
-      } else if (!isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         const tool = KEY_TO_TOOL[e.key.toLowerCase()];
         if (tool !== undefined) {
           e.preventDefault();
@@ -303,18 +289,15 @@ export function useModifyTool(): UseModifyToolResult {
         }
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Capture phase: runs before the global shortcut handler, which skips consumed (prevented) keys.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [activeTool, cancel, commitValue, phase, setActiveTool]);
-
-  // Keep activeToolRef in sync for use in cancel().
-  useEffect(() => {
-    activeToolRef.current = activeTool;
-  }, [activeTool]);
 
   return {
     activeTool,
-    phase,
+    // A tool disarmed from outside (e.g. arming a draw tool) leaves no phase behind.
+    phase: activeTool === 'none' ? 'idle' : phase,
     pickedEntityId,
     pickedBoundaryId,
     pickedVertexIndex,

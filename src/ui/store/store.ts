@@ -302,7 +302,6 @@ type StoreSet = (
 ) => void;
 type StoreGet = () => CadStoreState;
 
-/** Run a command locally via `execute` (offline mode). Pushes history only if the doc changed. */
 /** Selection after a command: its affected ids when requested and non-empty, else unchanged. */
 function selectionAfter(
   current: EntityId[],
@@ -314,17 +313,24 @@ function selectionAfter(
 
 /**
  * Server path: the affected entities may arrive over SSE after this response, so the selection is
- * taken as-is (snapshot hydration later filters any id that never materialised).
+ * taken as-is (snapshot hydration later filters any id that never materialised). If the user
+ * changed the selection while the request was in flight, their newer selection wins.
  */
 function selectAffectedIn(
   doc: CadDocument,
+  selectionAtDispatch: readonly EntityId[],
   affected: readonly EntityId[],
   options: DispatchOptions | undefined,
 ): CadDocument {
+  const unchanged =
+    doc.selection.length === selectionAtDispatch.length &&
+    doc.selection.every((id, index) => id === selectionAtDispatch[index]);
+  if (!unchanged) return doc;
   const selection = selectionAfter(doc.selection, affected, options);
   return selection === doc.selection ? doc : { ...doc, selection };
 }
 
+/** Run a command locally via `execute` (offline mode). Pushes history only if the doc changed. */
 function runLocally(
   set: StoreSet,
   get: StoreGet,
@@ -455,10 +461,16 @@ export const useStore = create<CadStoreState>()((set, get) => ({
       return;
     }
     // Fire-and-forget — the document update comes from the /live SSE stream.
+    const selectionAtDispatch = get().document.selection;
     void postCommand(name, params)
       .then((response) => {
         set((state) => ({
-          document: selectAffectedIn(state.document, response.affected, options),
+          document: selectAffectedIn(
+            state.document,
+            selectionAtDispatch,
+            response.affected,
+            options,
+          ),
           lastSummary: response.summary,
           canUndo: response.canUndo,
           canRedo: response.canRedo,

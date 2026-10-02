@@ -5,11 +5,12 @@
  * the armed tool and the selection, so each state has one tested message.
  */
 
-import type { DrawToolKind, GizmoMode, ViewMode } from '@ui/store';
+import type { DrawToolKind, GizmoMode, ModifyToolKind, ViewMode } from '@ui/store';
 
 export interface HintContext {
   viewMode: ViewMode;
   drawTool: DrawToolKind;
+  modifyTool: ModifyToolKind;
   gizmoMode: GizmoMode;
   selectionCount: number;
   entityCount: number;
@@ -34,7 +35,12 @@ const GIZMO_HINTS: Readonly<Record<GizmoMode, string>> = {
 
 /** One-line guidance for the current state; Esc semantics are always included when relevant. */
 export function hintText(context: HintContext): string {
-  const { viewMode, drawTool, gizmoMode, selectionCount, entityCount } = context;
+  const { viewMode, drawTool, modifyTool, gizmoMode, selectionCount, entityCount } = context;
+
+  if (viewMode === '2d' && modifyTool !== 'none') {
+    const label = modifyTool.charAt(0).toUpperCase() + modifyTool.slice(1);
+    return `${label}: follow the prompt above · Esc cancels · Esc again returns to Select.`;
+  }
 
   if (viewMode === '2d' && drawTool === 'move') {
     return selectionCount === 0

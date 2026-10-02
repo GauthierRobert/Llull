@@ -29,4 +29,10 @@ export { useLayoutStore } from './layoutStore';
 export type { LayoutStoreState, SidebarTab } from './layoutStore';
 
 export { useToolStore } from './toolStore';
-export type { ToolStoreState, ViewMode, DrawToolKind, GizmoMode } from './toolStore';
+export type {
+  ToolStoreState,
+  ViewMode,
+  DrawToolKind,
+  ModifyToolKind,
+  GizmoMode,
+} from './toolStore';

@@ -84,4 +84,26 @@ describe('dispatch selectAffected', () => {
     await flushPromises();
     expect(useStore.getState().document).toBe(before);
   });
+
+  it('keeps a selection the user changed while the request was in flight', async () => {
+    useStore.setState({ liveStatus: 'connected' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            summary: 'ok',
+            affected: ['box-9'],
+            isError: false,
+            canUndo: true,
+            canRedo: false,
+          }),
+      }),
+    );
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
+    useStore.setState({ document: { ...useStore.getState().document, selection: ['other'] } });
+    await flushPromises();
+    expect(useStore.getState().document.selection).toEqual(['other']);
+  });
 });

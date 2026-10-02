@@ -57,4 +57,12 @@ describe('solid presets', () => {
     expect(x).toBeGreaterThan(100);
     expect([y, z]).toEqual([0, 0]);
   });
+
+  it('treats reserved drop points as occupied', () => {
+    const doc = createEmptyDocument();
+    const first = nextPlacement(doc);
+    const second = nextPlacement(doc, [first]);
+    expect(second).not.toEqual(first);
+    expect(nextPlacement(doc, [first, second])).not.toEqual(second);
+  });
 });

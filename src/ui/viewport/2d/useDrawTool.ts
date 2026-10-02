@@ -19,7 +19,8 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { useStore, useToolStore } from '@ui/store';
 import type { DrawToolKind } from '@ui/store';
-import { moveSelection } from '@ui/hooks/selectionActions';
+import { moveSelection } from '@ui/actions/selectionActions';
+import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import {
   rectParamsFromCorners,
   circleRadiusFromPoints,
@@ -29,8 +30,6 @@ import {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type { DrawToolKind };
 
 export interface DrawToolState {
   /** The currently active tool. */
@@ -84,29 +83,44 @@ export function wallChainParams(
 // Hook
 // ---------------------------------------------------------------------------
 
+interface DrawProgress {
+  tool: DrawToolKind;
+  points: Vec2[];
+}
+
+const EMPTY_POINTS: Vec2[] = [];
+const EMPTY_PROGRESS: DrawProgress = { tool: 'none', points: EMPTY_POINTS };
+
 export function useDrawTool(): UseDrawToolResult {
   const dispatch = useStore((s) => s.dispatch);
   const activeTool = useToolStore((s) => s.drawTool);
   const setDrawTool = useToolStore((s) => s.setDrawTool);
-  const [collectedPoints, setCollectedPoints] = useState<Vec2[]>([]);
+  // Points belong to the tool that collected them; switching tools (toolbar, shortcut, palette)
+  // therefore drops them without an effect.
+  const [progress, setProgress] = useState<DrawProgress>(EMPTY_PROGRESS);
+  const collectedPoints = progress.tool === activeTool ? progress.points : EMPTY_POINTS;
   const inProgress = collectedPoints.length > 0;
-
-  // Reset collected points whenever the tool changes (toolbar, shortcut or palette).
-  useEffect(() => {
-    setCollectedPoints([]);
-  }, [activeTool]);
+  const setCollectedPoints = useCallback(
+    (next: Vec2[] | ((previous: Vec2[]) => Vec2[])) => {
+      setProgress((previous) => {
+        const current = previous.tool === activeTool ? previous.points : EMPTY_POINTS;
+        return { tool: activeTool, points: typeof next === 'function' ? next(current) : next };
+      });
+    },
+    [activeTool],
+  );
 
   const setActiveTool = useCallback(
     (tool: DrawToolKind) => {
       setDrawTool(tool);
       setCollectedPoints([]);
     },
-    [setDrawTool],
+    [setDrawTool, setCollectedPoints],
   );
 
   const cancel = useCallback(() => {
     setCollectedPoints([]);
-  }, []);
+  }, [setCollectedPoints]);
 
   const finishPolyline = useCallback(
     (closed = false) => {
@@ -121,7 +135,7 @@ export function useDrawTool(): UseDrawToolResult {
       }
       setCollectedPoints([]);
     },
-    [activeTool, collectedPoints, dispatch],
+    [activeTool, collectedPoints, dispatch, setCollectedPoints],
   );
 
   const finishSpline = useCallback(
@@ -133,7 +147,7 @@ export function useDrawTool(): UseDrawToolResult {
       dispatch('draw_spline', { points: collectedPoints, closed });
       setCollectedPoints([]);
     },
-    [collectedPoints, dispatch],
+    [collectedPoints, dispatch, setCollectedPoints],
   );
 
   const handleClick = useCallback(
@@ -245,23 +259,27 @@ export function useDrawTool(): UseDrawToolResult {
         }
       }
     },
-    [activeTool, collectedPoints, dispatch],
+    [activeTool, collectedPoints, dispatch, setCollectedPoints],
   );
 
   // Keyboard: Escape cancels; Enter finishes polyline or spline.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (isEditingKeyEvent(e)) return;
       if (e.key === 'Escape') {
         // First Esc drops the shape in progress; a second Esc returns to Select.
+        if (activeTool === 'none') return;
+        e.preventDefault();
         if (inProgress) cancel();
-        else if (activeTool !== 'none') setActiveTool('none');
+        else setActiveTool('none');
       } else if (e.key === 'Enter') {
         if (activeTool === 'polyline' || activeTool === 'wall') finishPolyline(false);
         else if (activeTool === 'spline') finishSpline(false);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Capture phase: runs before the global shortcut handler, which skips consumed (prevented) keys.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [activeTool, inProgress, cancel, finishPolyline, finishSpline, setActiveTool]);
 
   // Ctrl/Cmd+Z mid-operation removes the last collected point instead of undoing the document.
@@ -278,7 +296,7 @@ export function useDrawTool(): UseDrawToolResult {
     };
     window.addEventListener('keydown', onUndoKey, true);
     return () => window.removeEventListener('keydown', onUndoKey, true);
-  }, [inProgress]);
+  }, [inProgress, setCollectedPoints]);
 
   return {
     activeTool,

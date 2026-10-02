@@ -97,4 +97,15 @@ describe('2D picking', () => {
     expect(pickEntityId(doc, [20, 20], 0.1)).toBeNull();
     expect(nearestEntityId(doc, [20, 20], 0.1)).toBeNull();
   });
+
+  it('skips entities rejected by the pickability predicate', () => {
+    const [doc, id] = run(createEmptyDocument(), 'draw_rectangle', {
+      width: 4,
+      height: 4,
+      position: [0, 0, 0],
+    });
+    expect(pickEntityId(doc, [2, 2], 0.1)).toBe(id);
+    expect(pickEntityId(doc, [2, 2], 0.1, () => false)).toBeNull();
+    expect(nearestEntityId(doc, [0, 2], 0.1, () => false)).toBeNull();
+  });
 });

@@ -12,10 +12,10 @@ import { useStore, useToolStore } from '@ui/store';
 import type { DrawToolKind, GizmoMode } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import type { IconName } from '@ui/components/Icon';
-import { deleteSelection, duplicateSelection } from '@ui/hooks/selectionActions';
+import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { DRAW_TOOL_KEYS, GIZMO_KEYS } from '@ui/hooks/shortcuts';
 import { SOLID_PRESETS } from './solidPresets';
-import { createSolid } from './createSolid';
+import { createSolid } from '@ui/actions/createSolid';
 
 // ---------------------------------------------------------------------------
 // Button primitive
@@ -205,7 +205,7 @@ function SelectTransformGroup(): React.ReactElement {
               }
               shortcut={isMove ? DRAW_TOOL_KEYS.move : undefined}
               pressed={isMove && drawTool === 'move'}
-              disabled={!isMove || nothingSelected}
+              disabled={!isMove || (nothingSelected && drawTool !== 'move')}
               onClick={() => setDrawTool(drawTool === 'move' ? 'none' : 'move')}
             />
           );

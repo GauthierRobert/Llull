@@ -2,16 +2,16 @@
  * @layer ui/hooks
  *
  * Global shortcuts: Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo, Ctrl/Cmd+D duplicate,
- * Delete/Backspace delete selection, arrows nudge selection (Shift ×10), Escape clear selection
- * (unless a 2D tool is armed — the tool consumes Esc), `?` shortcut sheet, and the single-key
- * tool table in shortcuts.ts. Ignored while typing in form fields or inside dialogs.
+ * Delete/Backspace delete selection, arrows nudge selection (Shift ×10, repeats while held), Escape
+ * clear selection (unless an armed 2D tool consumed it via preventDefault), `?` shortcut sheet, and
+ * the single-key tool table in shortcuts.ts. Ignored while typing in form fields or inside dialogs.
  * All document changes go through the store.
  */
 
 import { useEffect } from 'react';
 import type { Vec3 } from '@core/model/types';
 import { useStore, useToolStore } from '@ui/store';
-import { deleteSelection, duplicateSelection, moveSelection } from './selectionActions';
+import { deleteSelection, duplicateSelection, moveSelection } from '@ui/actions/selectionActions';
 import { resolveShortcut } from './shortcuts';
 
 /** Nudge distance per arrow press, in document units (Shift multiplies by NUDGE_LARGE_FACTOR). */
@@ -31,13 +31,19 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 }
 
+/** True when a key event belongs to a text field or an open dialog, not to the canvas tools. */
+export function isEditingKeyEvent(e: KeyboardEvent): boolean {
+  const origin = e.composedPath()[0] ?? e.target;
+  if (isTypingTarget(origin)) return true;
+  return origin instanceof Element && origin.closest('[role="dialog"]') !== null;
+}
+
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
-      if (e.repeat || e.defaultPrevented) return;
-      const origin = e.composedPath()[0] ?? e.target;
-      if (isTypingTarget(origin)) return;
-      if (origin instanceof Element && origin.closest('[role="dialog"]')) return;
+      if (e.defaultPrevented || isEditingKeyEvent(e)) return;
+      // Holding an arrow nudges repeatedly; every other shortcut fires once per press.
+      if (e.repeat && !(e.key in ARROW_DIRECTIONS)) return;
       const state = useStore.getState();
       const tools = useToolStore.getState();
       const modifier = e.ctrlKey || e.metaKey;
@@ -60,7 +66,6 @@ export function useKeyboardShortcuts(): void {
         e.preventDefault();
         deleteSelection();
       } else if (e.key === 'Escape') {
-        if (tools.viewMode === '2d' && tools.drawTool !== 'none') return;
         state.clearSelection();
       } else if (e.key === '?') {
         tools.setShortcutsOpen(true);

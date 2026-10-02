@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
-import type { DrawToolKind } from './useDrawTool';
+import type { DrawToolKind } from '@ui/store';
 import {
   rectParamsFromCorners,
   circleRadiusFromPoints,

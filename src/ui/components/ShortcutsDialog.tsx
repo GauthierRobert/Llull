@@ -2,7 +2,8 @@
  * @layer ui/components
  *
  * Keyboard shortcut sheet — opened with `?` or the toolbar's Shortcuts button. Content comes from
- * SHORTCUT_GROUPS so it never drifts from the real key handling. Presentation only.
+ * SHORTCUT_GROUPS so it never drifts from the real key handling. Modal: focus is trapped while
+ * open and restored to the opener on close. Presentation only.
  */
 
 import React, { useEffect, useId, useRef } from 'react';
@@ -16,8 +17,12 @@ export function ShortcutsDialog(): React.ReactElement | null {
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const titleId = useId();
 
+  // Focus the dialog on open and give focus back to whatever opened it on close.
   useEffect(() => {
-    if (open) closeRef.current?.focus();
+    if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    return () => opener?.focus();
   }, [open]);
 
   if (!open) return null;
@@ -40,6 +45,10 @@ export function ShortcutsDialog(): React.ReactElement | null {
           if (e.key === 'Escape') {
             e.preventDefault();
             close();
+          } else if (e.key === 'Tab') {
+            // The close button is the only focusable control: keep focus trapped on it.
+            e.preventDefault();
+            closeRef.current?.focus();
           }
         }}
       >

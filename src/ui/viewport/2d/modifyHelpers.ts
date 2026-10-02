@@ -229,19 +229,21 @@ function chainDistSq(pick: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): 
 
 /**
  * Id of the entity nearest to `worldPick` within `tolerance` world units, or null.
+ * Entities rejected by `isPickable` (e.g. hidden ones) are ignored.
  * @pure
  */
 export function nearestEntityId(
   document: CadDocument,
   worldPick: Vec2,
   tolerance: number,
+  isPickable: (entity: Entity) => boolean = () => true,
 ): EntityId | null {
   const toleranceSq = tolerance * tolerance;
   let bestId: EntityId | null = null;
   let bestDist = Infinity;
   for (const id of document.order) {
     const entity = document.entities[id];
-    if (!entity) continue;
+    if (!entity || !isPickable(entity)) continue;
     const dSq = entityDistSq(entity, worldPick);
     if (dSq < toleranceSq && dSq < bestDist) {
       bestDist = dSq;
@@ -315,14 +317,15 @@ export function pickEntityId(
   document: CadDocument,
   worldPick: Vec2,
   tolerance: number,
+  isPickable: (entity: Entity) => boolean = () => true,
 ): EntityId | null {
-  const onOutline = nearestEntityId(document, worldPick, tolerance);
+  const onOutline = nearestEntityId(document, worldPick, tolerance, isPickable);
   if (onOutline !== null) return onOutline;
   let bestId: EntityId | null = null;
   let bestArea = Infinity;
   for (const id of document.order) {
     const entity = document.entities[id];
-    if (!entity) continue;
+    if (!entity || !isPickable(entity)) continue;
     const area = enclosingArea(entity, worldPick);
     if (area !== null && area < bestArea) {
       bestArea = area;

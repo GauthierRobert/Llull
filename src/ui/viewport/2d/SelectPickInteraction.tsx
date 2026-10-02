@@ -13,7 +13,8 @@ import { useCallback, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
-import { useStore } from '@ui/store';
+import type { Entity } from '@core/model/types';
+import { useStore, useViewportStore } from '@ui/store';
 import { pickEntityId } from './modifyHelpers';
 
 /** Pick radius in screen pixels. */
@@ -48,7 +49,14 @@ export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): Rea
       const [originX, originY] = state.renderOrigin;
       const worldPick: Vec2 = [e.point.x + originX, e.point.y + originY];
       const tolerance = PICK_RADIUS_PX / (zoom > 0 ? zoom : 1);
-      const id = pickEntityId(state.document, worldPick, tolerance);
+      const { hiddenLayerIds, hiddenEntityIds } = useViewportStore.getState();
+      const { layers } = state.document;
+      // Only what the 2D view draws is pickable (same filters as Entities2D).
+      const isVisible = (entity: Entity): boolean =>
+        layers[entity.layerId]?.visible !== false &&
+        !hiddenLayerIds.has(entity.layerId) &&
+        !hiddenEntityIds.has(entity.id);
+      const id = pickEntityId(state.document, worldPick, tolerance, isVisible);
       const additive = e.shiftKey || e.ctrlKey || e.metaKey;
       if (id === null) {
         if (!additive) state.clearSelection();

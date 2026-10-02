@@ -38,10 +38,11 @@ import { BuildingPlan2D } from './BuildingPlan2D';
 import { SnapIndicator } from './SnapIndicator';
 import { DrawInteraction } from './DrawInteraction';
 import { useDrawTool } from './useDrawTool';
-import type { DrawToolKind } from './useDrawTool';
+import type { DrawToolKind } from '@ui/store';
 import { ModifyTools } from './ModifyTools';
 import { useModifyTool } from './useModifyTool';
-import type { ModifyToolKind, ModifyToolPhase } from './useModifyTool';
+import type { ModifyToolKind } from '@ui/store';
+import type { ModifyToolPhase } from './useModifyTool';
 import { ModifyPickInteraction } from './ModifyPickInteraction';
 import { SelectPickInteraction } from './SelectPickInteraction';
 import { ScaleBar } from './ScaleBar';
@@ -437,14 +438,7 @@ function SceneContents2D({
 // ---------------------------------------------------------------------------
 
 export function Viewport2D(): React.ReactElement {
-  const {
-    activeTool,
-    collectedPoints,
-    setActiveTool: setDrawTool,
-    handleClick,
-    finishPolyline,
-    finishSpline,
-  } = useDrawTool();
+  const { activeTool, collectedPoints, handleClick, finishPolyline, finishSpline } = useDrawTool();
 
   const {
     activeTool: activeModifyTool,
@@ -461,16 +455,6 @@ export function Viewport2D(): React.ReactElement {
   // Camera zoom state — updated by ZoomReader inside the canvas, displayed by
   // ScaleBar outside it. Initial value matches the OrthographicCamera zoom prop.
   const [cameraZoom, setCameraZoom] = useState<number>(50);
-
-  // Mutual exclusion: arming a draw tool (toolbar or shortcut) clears any active modify tool.
-  useEffect(() => {
-    if (activeTool !== 'none') setModifyTool('none');
-  }, [activeTool, setModifyTool]);
-
-  // ...and arming a modify tool (palette or shortcut) disarms the draw tool.
-  useEffect(() => {
-    if (activeModifyTool !== 'none') setDrawTool('none');
-  }, [activeModifyTool, setDrawTool]);
 
   const onDoubleClick = useCallback(() => {
     if (activeTool === 'spline') finishSpline(false);

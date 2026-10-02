@@ -13,10 +13,18 @@ import { hintText } from './hintText';
 export function HintBar(): React.ReactElement {
   const viewMode = useToolStore((s) => s.viewMode);
   const drawTool = useToolStore((s) => s.drawTool);
+  const modifyTool = useToolStore((s) => s.modifyTool);
   const gizmoMode = useToolStore((s) => s.gizmoMode);
   const selectionCount = useStore((s) => s.document.selection.length);
   const entityCount = useStore((s) => s.document.order.length);
-  const text = hintText({ viewMode, drawTool, gizmoMode, selectionCount, entityCount });
+  const text = hintText({
+    viewMode,
+    drawTool,
+    modifyTool,
+    gizmoMode,
+    selectionCount,
+    entityCount,
+  });
   return (
     <div className="hint-bar" role="status" aria-live="polite" aria-label="Hint">
       <Icon name="info" size={14} />

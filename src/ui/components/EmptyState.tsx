@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { useStore, useToolStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
-import { createSolid } from '@ui/components/toolbar/createSolid';
+import { createSolid } from '@ui/actions/createSolid';
 
 export function EmptyState(): React.ReactElement | null {
   const entityCount = useStore((s) => s.document.order.length);

@@ -4,7 +4,7 @@
  * PropertiesPanel — the right-docked entity inspector.
  *
  * Shows the properties of the currently selected entity (kind, id, position,
- * color, and kind-specific dimensions). Name, position and rotation are editable:
+ * color, and kind-specific dimensions). Name, position and (3D only) rotation are editable:
  * a committed field (Enter or blur) dispatches set_entity_name / move_entity /
  * rotate_entity with the delta from the stored value. Duplicate and Delete act on
  * the selection. For 0 or multiple selections, shows a summary count.
@@ -15,7 +15,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import { deleteSelection, duplicateSelection } from '@ui/hooks/selectionActions';
+import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { useViewportStore } from '@ui/store';
 import { is2D } from '@core/model/types';
 import type { Entity } from '@core/model/types';
@@ -330,18 +330,21 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
             }
           />
         </PropRow>
-        <PropRow label="Rotation°">
-          <EditableAxisFields
-            values={rotationDegrees}
-            label="Rotation"
-            onAxisCommit={(axisIndex, degrees) =>
-              dispatch('rotate_entity', {
-                id: entity.id,
-                delta: axisDelta(entity.rotation, axisIndex, degrees / DEGREES_PER_RADIAN),
-              })
-            }
-          />
-        </PropRow>
+        {/* 2D shapes are drawn and picked unrotated, so rotation is a 3D-only edit. */}
+        {!is2D(entity) && (
+          <PropRow label="Rotation°">
+            <EditableAxisFields
+              values={rotationDegrees}
+              label="Rotation"
+              onAxisCommit={(axisIndex, degrees) =>
+                dispatch('rotate_entity', {
+                  id: entity.id,
+                  delta: axisDelta(entity.rotation, axisIndex, degrees / DEGREES_PER_RADIAN),
+                })
+              }
+            />
+          </PropRow>
+        )}
       </PanelSection>
 
       {hasDimensions(entity) && (

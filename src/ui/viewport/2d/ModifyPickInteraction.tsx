@@ -22,7 +22,8 @@ import type { Vec2 } from '@core/model/types';
 import type { PolylineEntity } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { nearestEntityId } from './modifyHelpers';
-import type { ModifyToolKind, ModifyToolPhase } from './useModifyTool';
+import type { ModifyToolKind } from '@ui/store';
+import type { ModifyToolPhase } from './useModifyTool';
 
 // ---------------------------------------------------------------------------
 // Props
