@@ -1,6 +1,4 @@
 [
-  "server/src/mcp.ts",
-  "server/src/renderViewEnrich.ts",
   "src/core/commands/building/industrial/portal.ts",
   "src/core/commands/building/industrial/purlinCheck.ts",
   "src/core/commands/constraints.ts",
@@ -13,7 +11,5 @@
   "src/core/commands/persistence.ts",
   "src/core/commands/project.ts",
   "src/core/commands/render.ts",
-  "src/core/commands/scene.ts",
-  "src/ui/panels/building/elementTools.ts",
-  "src/ui/viewport/2d/snapping.ts"
+  "src/core/commands/scene.ts"
 ]
