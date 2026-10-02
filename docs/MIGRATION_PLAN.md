@@ -1,6 +1,6 @@
 # Migration plan — from "accreted" llull to the target architecture
 
-Status: **proposed** (2026-10-02). Board tasks: `.claude/work/BOARD.md` → **WAVE 7 (MG\*)**.
+Status: **approved, in progress** (2026-10-02; D1–D5 approved). Board tasks: `.claude/work/BOARD.md` → **WAVE 7 (MG\*)**.
 Each phase leaves `main` green and shippable. No big-bang rewrite.
 
 ## What stays (non-negotiable)
