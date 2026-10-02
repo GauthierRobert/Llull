@@ -19,7 +19,7 @@ function addBox(
   return { doc: r.document, id: r.affected[0] as string };
 }
 
-describe('find_entities — spatial & fuzzy filters (EN3)', () => {
+describe('find_entities — spatial & fuzzy filters', () => {
   // -----------------------------------------------------------------------
   // nearPoint
   // -----------------------------------------------------------------------

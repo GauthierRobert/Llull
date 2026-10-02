@@ -77,7 +77,7 @@ describe('OcctKernel — static contract tests (always run)', () => {
 // This test runs at zero cost (no WASM) and confirms L9 wiring.
 // ---------------------------------------------------------------------------
 
-describe('GeometryKernel — interface conformance (Batch 14 extension)', () => {
+describe('GeometryKernel — interface conformance', () => {
   it('GeometryKernel type has booleanOp, filletEdges, chamferEdges, shellSolid', () => {
     // Build a minimal conforming stub. TypeScript will error at compile time if
     // any method is missing from the interface — that is the real assertion here.
@@ -145,7 +145,7 @@ describe('GeometryKernel — interface conformance (Batch 14 extension)', () => 
 // filletEdges behavior, and verify the module exports the kernel factory.
 // ---------------------------------------------------------------------------
 
-describe('meshDataToTopoDSShape — static / contract tests (Batch 15)', () => {
+describe('meshDataToTopoDSShape — static / contract tests', () => {
   it('filletEdges returns null for empty mesh input (guards zero-length check)', () => {
     // Build a stub kernel that mirrors the guard logic in filletEdges.
     const emptyMesh: MeshData = { positions: [], indices: [] };

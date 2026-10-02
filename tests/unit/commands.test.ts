@@ -3691,7 +3691,7 @@ describe('add_dimension', () => {
 
 import { resolveStepParams, buildParamEnv } from '@core/commands/regenerate';
 
-describe('KI3 — =expr param resolution in replay_history', () => {
+describe('=expr param resolution in replay_history', () => {
   // ── AC1: headline round-trip ─────────────────────────────────────────────
 
   it('AC1 round-trip: =expr param in a step reflects updated parameter after replay', () => {

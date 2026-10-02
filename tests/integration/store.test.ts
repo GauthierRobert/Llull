@@ -652,7 +652,7 @@ describe('CadStore — sync race fixes', () => {
   });
 });
 
-describe('CadStore — live command log (MG5.1)', () => {
+describe('CadStore — live command log', () => {
   beforeEach(() => {
     resetStore();
   });

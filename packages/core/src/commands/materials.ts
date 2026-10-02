@@ -65,7 +65,7 @@ export const createMaterial = defineCommand({
       .describe(
         'Diffuse/albedo color as a 6-digit CSS hex string, e.g. "#b0b0b0" for grey steel. ' +
           'Must match the pattern #rrggbb (exactly 6 hex digits after the #). ' +
-          'Used by the 3D viewport PBR renderer (VNF4).',
+          'Used by the 3D viewport PBR renderer.',
       ),
     metalness: z
       .number()

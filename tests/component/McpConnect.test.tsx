@@ -80,9 +80,9 @@ describe('McpConnect — structure', () => {
     expect(screen.getByText('60 tools')).toBeDefined();
   });
 
-  it('shows the "structuredContent (KI2)" capability badge', () => {
+  it('shows the "structuredContent" capability badge', () => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('structuredContent (KI2)')).toBeDefined();
+    expect(screen.getByText('structuredContent')).toBeDefined();
   });
 
   it('shows the "prompts (EN2)" capability badge', () => {
@@ -90,9 +90,9 @@ describe('McpConnect — structure', () => {
     expect(screen.getByText('prompts (EN2)')).toBeDefined();
   });
 
-  it('shows the "session isolation (KI1)" capability badge', () => {
+  it('shows the "session isolation" capability badge', () => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('session isolation (KI1)')).toBeDefined();
+    expect(screen.getByText('session isolation')).toBeDefined();
   });
 
   it('has a close button', () => {

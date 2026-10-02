@@ -48,7 +48,7 @@ describe('TransformGizmo pure delta helpers', () => {
 // Regression: scene-graph membership test
 // ---------------------------------------------------------------------------
 
-describe('TransformGizmo scene-graph attachment invariant (W5C regression)', () => {
+describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
   it('a detached Object3D has parent === null — confirming the original bug', () => {
     // The old implementation created a bare new THREE.Object3D() and passed it
     // as the `object` prop to TransformControls. Because it was never added to

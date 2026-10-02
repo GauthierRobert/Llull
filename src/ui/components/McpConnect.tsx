@@ -29,9 +29,9 @@ interface CapabilityBadge {
 
 const CAPABILITY_BADGES: readonly CapabilityBadge[] = [
   { label: '60 tools' },
-  { label: 'structuredContent (KI2)' },
+  { label: 'structuredContent' },
   { label: 'prompts (EN2)' },
-  { label: 'session isolation (KI1)' },
+  { label: 'session isolation' },
 ];
 
 interface AgentLoopStep {
