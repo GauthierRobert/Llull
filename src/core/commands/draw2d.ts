@@ -15,7 +15,9 @@
 
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
+import { vec2, vec3 } from './vec';
 import { nextId } from '../../lib/id';
 import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from './limits';
 import { sampleInvolute } from './gears';
@@ -33,13 +35,6 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 // draw_line
 // ---------------------------------------------------------------------------
 
-interface DrawLineParams {
-  start: Vec2;
-  end: Vec2;
-  position?: Vec3;
-  color?: string;
-}
-
 /**
  * @command draw_line
  * @pure
@@ -48,38 +43,23 @@ interface DrawLineParams {
  * @invariant start and end are 2-element [x,y] arrays
  * @failure invalid start/end -> no-op, affected:[]
  */
-export const drawLine: CommandDefinition<DrawLineParams> = {
+export const drawLine = defineCommand({
   name: 'draw_line',
   description:
     'Draw a straight line segment defined by start and end points in the local 2D work plane. ' +
     'position places the work-plane origin in 3D space (default [0,0,0]).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      start: {
-        type: 'array',
-        description: 'Start point [x, y] in local 2D work-plane coordinates.',
-        items: { type: 'number' },
-      },
-      end: {
-        type: 'array',
-        description: 'End point [x, y] in local 2D work-plane coordinates.',
-        items: { type: 'number' },
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
-      },
-    },
-    required: ['start', 'end'],
-  },
-  run: (doc, { start, end, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+  params: z.object({
+    start: vec2('Start point [x, y] in local 2D work-plane coordinates.'),
+    end: vec2('End point [x, y] in local 2D work-plane coordinates.'),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
+      .optional(),
+  }),
+  run: (doc, { start, end, position = [0, 0, 0] as const, color = '#4a90d9' }): CommandResult => {
     if (!Array.isArray(start) || start.length < 2 || !Array.isArray(end) || end.length < 2) {
       return {
         document: doc,
@@ -104,18 +84,11 @@ export const drawLine: CommandDefinition<DrawLineParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_polyline
 // ---------------------------------------------------------------------------
-
-interface DrawPolylineParams {
-  points: ReadonlyArray<Vec2>;
-  closed?: boolean;
-  position?: Vec3;
-  color?: string;
-}
 
 /**
  * @command draw_polyline
@@ -125,42 +98,35 @@ interface DrawPolylineParams {
  * @invariant points.length >= 2; each point is a 2-element [x,y] array
  * @failure fewer than 2 points -> no-op, affected:[]
  */
-export const drawPolyline: CommandDefinition<DrawPolylineParams> = {
+export const drawPolyline = defineCommand({
   name: 'draw_polyline',
   description:
     'Draw a connected sequence of line segments through an ordered list of 2D points in the local work plane. ' +
     'Requires at least 2 points. When closed=true the last point connects back to the first. ' +
     'A closed polyline can be fed to extrude_sketch to become a 3D solid.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      points: {
-        type: 'array',
-        description:
-          'Ordered list of [x, y] vertices in local 2D work-plane coordinates. Minimum 2 points required.',
-        items: { type: 'array', items: { type: 'number' } },
-      },
-      closed: {
-        type: 'boolean',
-        description:
-          'When true, the last point connects back to the first point, forming a closed loop. Defaults to false.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
-      },
-    },
-    required: ['points'],
-  },
+  params: z.object({
+    points: z
+      .array(z.array(z.number()))
+      .describe(
+        'Ordered list of [x, y] vertices in local 2D work-plane coordinates. Minimum 2 points required.',
+      ),
+    closed: z
+      .boolean()
+      .describe(
+        'When true, the last point connects back to the first point, forming a closed loop. Defaults to false.',
+      )
+      .optional(),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
+      .optional(),
+  }),
   run: (
     doc,
-    { points, closed = false, position = [0, 0, 0], color = '#4a90d9' },
+    { points, closed = false, position = [0, 0, 0] as const, color = '#4a90d9' },
   ): CommandResult => {
     if (!Array.isArray(points) || points.length < 2) {
       return {
@@ -189,20 +155,11 @@ export const drawPolyline: CommandDefinition<DrawPolylineParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_arc
 // ---------------------------------------------------------------------------
-
-interface DrawArcParams {
-  center: Vec2;
-  radius: number;
-  startAngle: number;
-  endAngle: number;
-  position?: Vec3;
-  color?: string;
-}
 
 /**
  * @command draw_arc
@@ -212,49 +169,35 @@ interface DrawArcParams {
  * @invariant radius > 0
  * @failure radius <= 0 -> no-op, affected:[]
  */
-export const drawArc: CommandDefinition<DrawArcParams> = {
+export const drawArc = defineCommand({
   name: 'draw_arc',
   description:
     'Draw a circular arc in the local 2D work plane, defined by center, radius, and start/end angles in radians. ' +
     'Angles are measured counter-clockwise from the +X axis. radius must be > 0.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      center: {
-        type: 'array',
-        description: 'Center point [x, y] of the arc in local 2D work-plane coordinates.',
-        items: { type: 'number' },
-      },
-      radius: {
-        type: 'number',
-        description: 'Arc radius. Must be greater than 0.',
-      },
-      startAngle: {
-        type: 'number',
-        description:
-          'Start angle in radians, measured counter-clockwise from the +X axis. E.g. 0 = rightmost point.',
-      },
-      endAngle: {
-        type: 'number',
-        description:
-          'End angle in radians, measured counter-clockwise from the +X axis. Arc sweeps from startAngle to endAngle counter-clockwise.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
-      },
-    },
-    required: ['center', 'radius', 'startAngle', 'endAngle'],
-  },
+  params: z.object({
+    center: vec2('Center point [x, y] of the arc in local 2D work-plane coordinates.'),
+    radius: z.number().describe('Arc radius. Must be greater than 0.'),
+    startAngle: z
+      .number()
+      .describe(
+        'Start angle in radians, measured counter-clockwise from the +X axis. E.g. 0 = rightmost point.',
+      ),
+    endAngle: z
+      .number()
+      .describe(
+        'End angle in radians, measured counter-clockwise from the +X axis. Arc sweeps from startAngle to endAngle counter-clockwise.',
+      ),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
+      .optional(),
+  }),
   run: (
     doc,
-    { center, radius, startAngle, endAngle, position = [0, 0, 0], color = '#4a90d9' },
+    { center, radius, startAngle, endAngle, position = [0, 0, 0] as const, color = '#4a90d9' },
   ): CommandResult => {
     if (radius <= 0) {
       return {
@@ -283,18 +226,11 @@ export const drawArc: CommandDefinition<DrawArcParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_circle
 // ---------------------------------------------------------------------------
-
-interface DrawCircleParams {
-  center: Vec2;
-  radius: number;
-  position?: Vec3;
-  color?: string;
-}
 
 /**
  * @command draw_circle
@@ -304,36 +240,25 @@ interface DrawCircleParams {
  * @invariant radius > 0
  * @failure radius <= 0 -> no-op, affected:[]
  */
-export const drawCircle: CommandDefinition<DrawCircleParams> = {
+export const drawCircle = defineCommand({
   name: 'draw_circle',
   description:
     'Draw a full circle in the local 2D work plane, defined by center and radius. radius must be > 0.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      center: {
-        type: 'array',
-        description: 'Center point [x, y] of the circle in local 2D work-plane coordinates.',
-        items: { type: 'number' },
-      },
-      radius: {
-        type: 'number',
-        description: 'Circle radius. Must be greater than 0.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
-      },
-    },
-    required: ['center', 'radius'],
-  },
-  run: (doc, { center, radius, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+  params: z.object({
+    center: vec2('Center point [x, y] of the circle in local 2D work-plane coordinates.'),
+    radius: z.number().describe('Circle radius. Must be greater than 0.'),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
+      .optional(),
+  }),
+  run: (
+    doc,
+    { center, radius, position = [0, 0, 0] as const, color = '#4a90d9' },
+  ): CommandResult => {
     if (radius <= 0) {
       return {
         document: doc,
@@ -359,18 +284,11 @@ export const drawCircle: CommandDefinition<DrawCircleParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_rectangle
 // ---------------------------------------------------------------------------
-
-interface DrawRectangleParams {
-  width: number;
-  height: number;
-  position?: Vec3;
-  color?: string;
-}
 
 /**
  * @command draw_rectangle
@@ -380,37 +298,31 @@ interface DrawRectangleParams {
  * @invariant width > 0 and height > 0
  * @failure width <= 0 or height <= 0 -> no-op, affected:[]
  */
-export const drawRectangle: CommandDefinition<DrawRectangleParams> = {
+export const drawRectangle = defineCommand({
   name: 'draw_rectangle',
   description:
     'Draw an axis-aligned rectangle in the local 2D work plane. ' +
     'The origin is at the lower-left corner; width extends along +X, height along +Y. ' +
     'position places the work-plane origin in 3D space. Both width and height must be > 0.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      width: {
-        type: 'number',
-        description: 'Width of the rectangle along the local X axis. Must be greater than 0.',
-      },
-      height: {
-        type: 'number',
-        description: 'Height of the rectangle along the local Y axis. Must be greater than 0.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin (lower-left corner). Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
-      },
-    },
-    required: ['width', 'height'],
-  },
-  run: (doc, { width, height, position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+  params: z.object({
+    width: z
+      .number()
+      .describe('Width of the rectangle along the local X axis. Must be greater than 0.'),
+    height: z
+      .number()
+      .describe('Height of the rectangle along the local Y axis. Must be greater than 0.'),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin (lower-left corner). Defaults to [0,0,0].',
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
+      .optional(),
+  }),
+  run: (
+    doc,
+    { width, height, position = [0, 0, 0] as const, color = '#4a90d9' },
+  ): CommandResult => {
     if (width <= 0 || height <= 0) {
       return {
         document: doc,
@@ -435,16 +347,11 @@ export const drawRectangle: CommandDefinition<DrawRectangleParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_point
 // ---------------------------------------------------------------------------
-
-interface DrawPointParams {
-  position?: Vec3;
-  color?: string;
-}
 
 /**
  * @command draw_point
@@ -453,27 +360,19 @@ interface DrawPointParams {
  * @affects creates 1 point entity
  * @invariant position is a 3-element [x,y,z] array (defaults to [0,0,0])
  */
-export const drawPoint: CommandDefinition<DrawPointParams> = {
+export const drawPoint = defineCommand({
   name: 'draw_point',
   description:
     'Place a point marker at the given 3D world position. ' +
     'The point entity has no local 2D geometry — its position is the point location.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      position: {
-        type: 'array',
-        description: 'World-space position [x, y, z] of the point. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
-      },
-    },
-    required: [],
-  },
-  run: (doc, { position = [0, 0, 0], color = '#4a90d9' }): CommandResult => {
+  params: z.object({
+    position: vec3('World-space position [x, y, z] of the point. Defaults to [0,0,0].').optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
+      .optional(),
+  }),
+  run: (doc, { position = [0, 0, 0] as const, color = '#4a90d9' }): CommandResult => {
     const id = nextId('pt');
     const entity: Entity = {
       id,
@@ -489,19 +388,11 @@ export const drawPoint: CommandDefinition<DrawPointParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_ellipse
 // ---------------------------------------------------------------------------
-
-interface DrawEllipseParams {
-  center: Vec2;
-  radiusX: number;
-  radiusY: number;
-  position?: Vec3;
-  color?: string;
-}
 
 /**
  * @command draw_ellipse
@@ -511,46 +402,31 @@ interface DrawEllipseParams {
  * @invariant radiusX > 0 and radiusY > 0
  * @failure radiusX <= 0 or radiusY <= 0 -> no-op, affected:[]
  */
-export const drawEllipse: CommandDefinition<DrawEllipseParams> = {
+export const drawEllipse = defineCommand({
   name: 'draw_ellipse',
   description:
     'Draw an axis-aligned ellipse in the local 2D work plane, defined by center and semi-axis radii. ' +
     'radiusX is the half-width along the local X axis; radiusY is the half-height along the local Y axis. ' +
     'Both must be > 0. position places the work-plane origin in 3D space (default [0,0,0]).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      center: {
-        type: 'array',
-        description: 'Center point [x, y] of the ellipse in local 2D work-plane coordinates.',
-        items: { type: 'number' },
-      },
-      radiusX: {
-        type: 'number',
-        description:
-          'Semi-axis length along the local X axis (half-width). Must be greater than 0.',
-      },
-      radiusY: {
-        type: 'number',
-        description:
-          'Semi-axis length along the local Y axis (half-height). Must be greater than 0.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
-      },
-    },
-    required: ['center', 'radiusX', 'radiusY'],
-  },
+  params: z.object({
+    center: vec2('Center point [x, y] of the ellipse in local 2D work-plane coordinates.'),
+    radiusX: z
+      .number()
+      .describe('Semi-axis length along the local X axis (half-width). Must be greater than 0.'),
+    radiusY: z
+      .number()
+      .describe('Semi-axis length along the local Y axis (half-height). Must be greater than 0.'),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
+      .optional(),
+  }),
   run: (
     doc,
-    { center, radiusX, radiusY, position = [0, 0, 0], color = '#4a90d9' },
+    { center, radiusX, radiusY, position = [0, 0, 0] as const, color = '#4a90d9' },
   ): CommandResult => {
     if (radiusX <= 0 || radiusY <= 0) {
       return {
@@ -578,18 +454,11 @@ export const drawEllipse: CommandDefinition<DrawEllipseParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_spline
 // ---------------------------------------------------------------------------
-
-interface DrawSplineParams {
-  points: ReadonlyArray<Vec2>;
-  closed?: boolean;
-  position?: Vec3;
-  color?: string;
-}
 
 /**
  * @command draw_spline
@@ -599,44 +468,37 @@ interface DrawSplineParams {
  * @invariant points.length >= 2; each point is a 2-element [x,y] array
  * @failure fewer than 2 points or more than MAX_SPLINE_CONTROL_POINTS -> no-op, affected:[]
  */
-export const drawSpline: CommandDefinition<DrawSplineParams> = {
+export const drawSpline = defineCommand({
   name: 'draw_spline',
   description:
     'Draw a Catmull-Rom interpolating spline through an ordered list of 2D through-points in the local work plane. ' +
     'The curve passes through every point (not a control polygon). Requires at least 2 points. ' +
     'When closed=true the spline loops back from the last point to the first. ' +
     'Centripetal Catmull-Rom parameterization is used; tessellation is performed by the renderer.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      points: {
-        type: 'array',
-        description:
-          'Ordered list of through-points in local 2D work-plane coordinates. ' +
+  params: z.object({
+    points: z
+      .array(z.array(z.number()))
+      .describe(
+        'Ordered list of through-points in local 2D work-plane coordinates. ' +
           'Each point is [x, y]. Minimum 2 points required.',
-        items: { type: 'array', items: { type: 'number' } },
-      },
-      closed: {
-        type: 'boolean',
-        description:
-          'When true, the spline loops back from the last point to the first, forming a closed curve. Defaults to false.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".',
-      },
-    },
-    required: ['points'],
-  },
+      ),
+    closed: z
+      .boolean()
+      .describe(
+        'When true, the spline loops back from the last point to the first, forming a closed curve. Defaults to false.',
+      )
+      .optional(),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+    ).optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
+      .optional(),
+  }),
   run: (
     doc,
-    { points, closed = false, position = [0, 0, 0], color = '#4a90d9' },
+    { points, closed = false, position = [0, 0, 0] as const, color = '#4a90d9' },
   ): CommandResult => {
     if (!Array.isArray(points) || points.length < 2) {
       return {
@@ -672,22 +534,11 @@ export const drawSpline: CommandDefinition<DrawSplineParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_involute
 // ---------------------------------------------------------------------------
-
-interface DrawInvoluteParams {
-  baseRadius: number;
-  startAngle?: number;
-  endAngle: number;
-  samples?: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  name?: string;
-}
 
 /** Format a number compactly for the summary string. */
 function fmtN(v: number): string {
@@ -702,7 +553,7 @@ function fmtN(v: number): string {
  * @invariant baseRadius > 0; samples >= 2; endAngle > startAngle; all numerics finite
  * @failure baseRadius <= 0, samples < 2, endAngle <= startAngle, or any non-finite numeric -> no-op, affected:[]
  */
-export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
+export const drawInvolute = defineCommand({
   name: 'draw_involute',
   description:
     'Draw an open 2D involute curve sampled as a polyline in the local work plane. ' +
@@ -714,56 +565,51 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
     'The curve is open (not closed) and can be fed to other commands or used standalone as a reference curve. ' +
     'position is [x,y,z] world-space placement of the work-plane origin (default [0,0,0]). ' +
     'rotation is extrinsic XYZ Euler angles in radians (default [0,0,0]).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      baseRadius: {
-        type: 'number',
-        description:
-          'Base circle radius of the involute. Must be > 0. ' +
+  params: z.object({
+    baseRadius: z
+      .number()
+      .describe(
+        'Base circle radius of the involute. Must be > 0. ' +
           'Controls the curvature: smaller baseRadius gives a more tightly wound curve.',
-      },
-      startAngle: {
-        type: 'number',
-        description:
-          'Involute parameter t at the start of the curve, in radians. Defaults to 0. ' +
+      ),
+    startAngle: z
+      .number()
+      .describe(
+        'Involute parameter t at the start of the curve, in radians. Defaults to 0. ' +
           'At t=0 the curve starts at (baseRadius, 0). Must be < endAngle.',
-      },
-      endAngle: {
-        type: 'number',
-        description:
-          'Involute parameter t at the end of the curve, in radians. Must be > startAngle. ' +
+      )
+      .optional(),
+    endAngle: z
+      .number()
+      .describe(
+        'Involute parameter t at the end of the curve, in radians. Must be > startAngle. ' +
           'The radial distance from origin at the endpoint is baseRadius*sqrt(1 + endAngle²).',
-      },
-      samples: {
-        type: 'number',
-        description:
-          'Number of points sampled along the curve (inclusive of both endpoints). ' +
+      ),
+    samples: z
+      .number()
+      .describe(
+        'Number of points sampled along the curve (inclusive of both endpoints). ' +
           'Minimum 2. Default 24. Higher values give a smoother polyline.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#4a90d9". Defaults to "#4a90d9".',
-      },
-      name: {
-        type: 'string',
-        description: 'Optional display name for the entity (shown in the scene tree).',
-      },
-    },
-    required: ['baseRadius', 'endAngle'],
-  },
+      )
+      .optional(),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+    ).optional(),
+    rotation: z
+      .array(z.number())
+      .describe(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].',
+      )
+      .optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#4a90d9". Defaults to "#4a90d9".')
+      .optional(),
+    name: z
+      .string()
+      .describe('Optional display name for the entity (shown in the scene tree).')
+      .optional(),
+  }),
   run: (
     doc,
     {
@@ -771,7 +617,7 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
       startAngle = 0,
       endAngle,
       samples = 24,
-      position = [0, 0, 0],
+      position = [0, 0, 0] as const,
       rotation = [0, 0, 0],
       color = '#4a90d9',
       name,
@@ -888,7 +734,7 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // draw_belt_around
@@ -898,15 +744,6 @@ export const drawInvolute: CommandDefinition<DrawInvoluteParams> = {
 interface PulleySpec {
   center: [number, number];
   radius: number;
-}
-
-interface DrawBeltAroundParams {
-  pulleys: PulleySpec[];
-  arcSamples?: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  name?: string;
 }
 
 /**
@@ -978,7 +815,7 @@ function sampleArc(
  * @invariant pulleys.length >= 2; each radius > 0; no coincident centers; no pulley inside another
  * @failure pulleys < 2, non-positive radius, non-finite inputs, coincident centers, pulley-inside-pulley -> no-op, affected:[]
  */
-export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
+export const drawBeltAround = defineCommand({
   name: 'draw_belt_around',
   description:
     'Compute the closed centerline of a belt or chain wrapping ≥2 circular pulleys/sprockets ' +
@@ -993,63 +830,57 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
     'Fails gracefully (no-op) when: fewer than 2 pulleys, non-positive or non-finite radius, ' +
     'non-finite center coordinates, coincident centers, or any pulley is contained inside another ' +
     '(no external tangent exists).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      pulleys: {
-        type: 'array',
-        description:
-          'Ordered list of pulleys the belt wraps around. Each entry is an object ' +
+  params: z.object({
+    pulleys: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe(
+        'Ordered list of pulleys the belt wraps around. Each entry is an object ' +
           '{ center: [x, y], radius: number } where center is a 2D point in the work plane ' +
           'and radius is a finite positive number. ' +
           'The belt wraps them in the given order and closes back to the first. Minimum 2 pulleys.',
-        items: { type: 'object' },
-      },
-      arcSamples: {
-        type: 'number',
-        description:
-          'Integer number of chord segments used to approximate each pulley wrap arc. ' +
+      ),
+    arcSamples: z
+      .number()
+      .describe(
+        'Integer number of chord segments used to approximate each pulley wrap arc. ' +
           'Must be >= 2. Default 12. Higher values give smoother arcs.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in radians [rx, ry, rz] for the work plane. Defaults to [0,0,0].',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#4a90d9". Defaults to "#4a90d9".',
-      },
-      name: {
-        type: 'string',
-        description: 'Optional display name for the entity (shown in the scene tree).',
-      },
-    },
-    required: ['pulleys'],
-  },
+      )
+      .optional(),
+    position: vec3(
+      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
+    ).optional(),
+    rotation: z
+      .array(z.number())
+      .describe(
+        'Extrinsic XYZ Euler angles in radians [rx, ry, rz] for the work plane. Defaults to [0,0,0].',
+      )
+      .optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#4a90d9". Defaults to "#4a90d9".')
+      .optional(),
+    name: z
+      .string()
+      .describe('Optional display name for the entity (shown in the scene tree).')
+      .optional(),
+  }),
   run: (
     doc,
     {
-      pulleys,
+      pulleys: pulleyInput,
       arcSamples = 12,
-      position = [0, 0, 0],
+      position = [0, 0, 0] as const,
       rotation = [0, 0, 0],
       color = '#4a90d9',
       name,
     },
   ): CommandResult => {
     // --- Validate pulleys array ---
-    if (!Array.isArray(pulleys) || pulleys.length < 2) {
+    const pulleys = pulleyInput as unknown as PulleySpec[];
+    if (pulleys.length < 2) {
       return {
         document: doc,
-        summary: `draw_belt_around: requires at least 2 pulleys (got ${Array.isArray(pulleys) ? pulleys.length : 0}).`,
+        summary: `draw_belt_around: requires at least 2 pulleys (got ${pulleys.length}).`,
         affected: [],
       };
     }
@@ -1258,4 +1089,4 @@ export const drawBeltAround: CommandDefinition<DrawBeltAroundParams> = {
       affected: [id],
     };
   },
-};
+});

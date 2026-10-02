@@ -6,18 +6,15 @@
  */
 
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
+import { vec3 } from './vec';
 import { nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 
 // ---------------------------------------------------------------------------
 // rotate_entity
 // ---------------------------------------------------------------------------
-
-interface RotateEntityParams {
-  id: string;
-  delta: Vec3;
-}
 
 /**
  * @command rotate_entity
@@ -26,23 +23,16 @@ interface RotateEntityParams {
  * @invariant rotation is the existing Euler angles plus the delta (radians)
  * @failure missing id -> no-op, affected:[]
  */
-export const rotateEntity: CommandDefinition<RotateEntityParams> = {
+export const rotateEntity = defineCommand({
   name: 'rotate_entity',
   description:
     'Add Euler-angle deltas (radians) to an entity rotation. Modifies only the rotation field; position and geometry are unchanged.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'string', description: 'Id of the entity to rotate.' },
-      delta: {
-        type: 'array',
-        description:
-          'Euler-angle increments [dRx, dRy, dRz] in radians to add to the current rotation.',
-        items: { type: 'number' },
-      },
-    },
-    required: ['id', 'delta'],
-  },
+  params: z.object({
+    id: z.string().describe('Id of the entity to rotate.'),
+    delta: vec3(
+      'Euler-angle increments [dRx, dRy, dRz] in radians to add to the current rotation.',
+    ),
+  }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
@@ -62,16 +52,11 @@ export const rotateEntity: CommandDefinition<RotateEntityParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // scale_entity
 // ---------------------------------------------------------------------------
-
-interface ScaleEntityParams {
-  id: string;
-  factor: number;
-}
 
 /**
  * @command scale_entity
@@ -80,22 +65,18 @@ interface ScaleEntityParams {
  * @invariant factor > 0; box→size, cylinder→radius&height, sphere→radius, extrusion→profile&depth
  * @failure missing id or factor <= 0 -> no-op, affected:[]
  */
-export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
+export const scaleEntity = defineCommand({
   name: 'scale_entity',
   description:
     'Uniformly scale an entity by a positive factor. Scales geometry in-place for all kinds — 3D: box size, cylinder radius & height, sphere radius, extrusion profile & depth; 2D: line/polyline points, arc/circle/ellipse radii, rectangle width & height, spline points (about the local origin). Position is unchanged.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'string', description: 'Id of the entity to scale.' },
-      factor: {
-        type: 'number',
-        description:
-          'Uniform scale factor. Must be greater than 0. A value of 2 doubles the size; 0.5 halves it.',
-      },
-    },
-    required: ['id', 'factor'],
-  },
+  params: z.object({
+    id: z.string().describe('Id of the entity to scale.'),
+    factor: z
+      .number()
+      .describe(
+        'Uniform scale factor. Must be greater than 0. A value of 2 doubles the size; 0.5 halves it.',
+      ),
+  }),
   run: (doc, { id, factor }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
@@ -304,18 +285,13 @@ export const scaleEntity: CommandDefinition<ScaleEntityParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // mirror_entity
 // ---------------------------------------------------------------------------
 
 type MirrorAxis = 'x' | 'y' | 'z';
-
-interface MirrorEntityParams {
-  id: string;
-  axis: string;
-}
 
 const VALID_AXES: ReadonlySet<string> = new Set<MirrorAxis>(['x', 'y', 'z']);
 
@@ -326,22 +302,18 @@ const VALID_AXES: ReadonlySet<string> = new Set<MirrorAxis>(['x', 'y', 'z']);
  * @invariant axis must be 'x', 'y', or 'z'; only position is changed
  * @failure missing id or invalid axis -> no-op, affected:[]
  */
-export const mirrorEntity: CommandDefinition<MirrorEntityParams> = {
+export const mirrorEntity = defineCommand({
   name: 'mirror_entity',
   description:
     "Mirror an entity across the origin along a world axis by negating that axis component of its position. axis must be 'x', 'y', or 'z'.",
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'string', description: 'Id of the entity to mirror.' },
-      axis: {
-        type: 'string',
-        description:
-          "World axis to mirror across: 'x' negates the X position component, 'y' negates Y, 'z' negates Z.",
-      },
-    },
-    required: ['id', 'axis'],
-  },
+  params: z.object({
+    id: z.string().describe('Id of the entity to mirror.'),
+    axis: z
+      .string()
+      .describe(
+        "World axis to mirror across: 'x' negates the X position component, 'y' negates Y, 'z' negates Z.",
+      ),
+  }),
   run: (doc, { id, axis }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
@@ -366,7 +338,7 @@ export const mirrorEntity: CommandDefinition<MirrorEntityParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // Shared helper — clone entity with a new id and new position
@@ -391,12 +363,6 @@ function withEntities(doc: CadDocument, copies: Entity[]): CadDocument {
 // array_linear
 // ---------------------------------------------------------------------------
 
-interface ArrayLinearParams {
-  id: string;
-  count: number;
-  offset: Vec3;
-}
-
 /**
  * @command array_linear
  * @pure
@@ -404,30 +370,22 @@ interface ArrayLinearParams {
  * @invariant count >= 2; offset must be finite; each copy k gets position = original.position + k*offset
  * @failure missing id, count < 2, or non-finite offset -> no-op, affected:[]
  */
-export const arrayLinear: CommandDefinition<ArrayLinearParams> = {
+export const arrayLinear = defineCommand({
   name: 'array_linear',
   description:
     'Duplicate an entity into a linear pattern. Creates count-1 new copies spaced by offset ' +
     '(a world-space vector [dx,dy,dz]). The original stays at instance 0; copy k is placed at ' +
     'original.position + k*offset (k = 1..count-1). count must be an integer >= 2.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'string', description: 'Id of the entity to array.' },
-      count: {
-        type: 'number',
-        description: 'Total number of instances including the original. Must be an integer >= 2.',
-      },
-      offset: {
-        type: 'array',
-        description:
-          'World-space translation vector [dx, dy, dz] between consecutive instances. ' +
-          'All components must be finite numbers.',
-        items: { type: 'number' },
-      },
-    },
-    required: ['id', 'count', 'offset'],
-  },
+  params: z.object({
+    id: z.string().describe('Id of the entity to array.'),
+    count: z
+      .number()
+      .describe('Total number of instances including the original. Must be an integer >= 2.'),
+    offset: vec3(
+      'World-space translation vector [dx, dy, dz] between consecutive instances. ' +
+        'All components must be finite numbers.',
+    ),
+  }),
   run: (doc, { id, count, offset }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
@@ -464,18 +422,11 @@ export const arrayLinear: CommandDefinition<ArrayLinearParams> = {
       affected: newIds,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // array_polar
 // ---------------------------------------------------------------------------
-
-interface ArrayPolarParams {
-  id: string;
-  count: number;
-  center: Vec3;
-  angle?: number;
-}
 
 /**
  * @command array_polar
@@ -484,7 +435,7 @@ interface ArrayPolarParams {
  * @invariant count >= 2; copies are distributed over total sweep angle (default 2*PI full circle)
  * @failure missing id or count < 2 -> no-op, affected:[]
  */
-export const arrayPolar: CommandDefinition<ArrayPolarParams> = {
+export const arrayPolar = defineCommand({
   name: 'array_polar',
   description:
     'Duplicate an entity into a polar (circular) pattern around the Z axis through center. ' +
@@ -493,30 +444,23 @@ export const arrayPolar: CommandDefinition<ArrayPolarParams> = {
     'angle defaults to 2*PI (full circle). Each copy also has rotation[2] incremented by the same ' +
     'step so the part faces outward consistently. Z position and other rotation components are unchanged. ' +
     'count must be >= 2.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'string', description: 'Id of the entity to array.' },
-      count: {
-        type: 'number',
-        description: 'Total number of instances including the original. Must be an integer >= 2.',
-      },
-      center: {
-        type: 'array',
-        description:
-          'World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). ' +
-          'Only cx and cy are used for the rotation; cz is ignored.',
-        items: { type: 'number' },
-      },
-      angle: {
-        type: 'number',
-        description:
-          'Total sweep angle in radians over which instances are distributed. ' +
+  params: z.object({
+    id: z.string().describe('Id of the entity to array.'),
+    count: z
+      .number()
+      .describe('Total number of instances including the original. Must be an integer >= 2.'),
+    center: vec3(
+      'World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). ' +
+        'Only cx and cy are used for the rotation; cz is ignored.',
+    ),
+    angle: z
+      .number()
+      .describe(
+        'Total sweep angle in radians over which instances are distributed. ' +
           'Defaults to 2*PI (full 360-degree circle). A partial angle (e.g. PI) fans the instances over that arc.',
-      },
-    },
-    required: ['id', 'count', 'center'],
-  },
+      )
+      .optional(),
+  }),
   run: (doc, { id, count, center, angle = 2 * Math.PI }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
@@ -564,4 +508,4 @@ export const arrayPolar: CommandDefinition<ArrayPolarParams> = {
       affected: newIds,
     };
   },
-};
+});

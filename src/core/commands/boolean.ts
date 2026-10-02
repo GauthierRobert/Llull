@@ -11,7 +11,8 @@
 import type { CadDocument, Entity, EntityGroup } from '../model/types';
 import { is3D } from '../model/types';
 import type { MeshSolidEntity } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import type { BooleanOp } from '../geometry/kernel';
 import type { ExecutionContext } from './context';
 import { currentContext } from './context';
@@ -160,11 +161,6 @@ function runBoolean(
 // boolean_union
 // ---------------------------------------------------------------------------
 
-interface BooleanUnionParams {
-  a: string;
-  b: string;
-}
-
 /**
  * @command boolean_union
  * @pure
@@ -172,7 +168,7 @@ interface BooleanUnionParams {
  * @invariant both a and b must be 3D solids; geometry kernel must be injected
  * @failure missing id, 2D operand, same id, kernel absent, or kernel failure -> no-op, affected:[]
  */
-export const booleanUnion: CommandDefinition<BooleanUnionParams> = {
+export const booleanUnion = defineCommand({
   name: 'boolean_union',
   annotations: { requiresKernel: true },
   description:
@@ -180,25 +176,16 @@ export const booleanUnion: CommandDefinition<BooleanUnionParams> = {
     'Both operand entities are consumed (removed) and replaced by the union mesh. ' +
     'Requires a geometry kernel to be injected (available after app initialization). ' +
     'Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      a: { type: 'string', description: 'Id of the first 3D solid operand.' },
-      b: { type: 'string', description: 'Id of the second 3D solid operand.' },
-    },
-    required: ['a', 'b'],
-  },
+  params: z.object({
+    a: z.string().describe('Id of the first 3D solid operand.'),
+    b: z.string().describe('Id of the second 3D solid operand.'),
+  }),
   run: (doc, { a, b }, ctx): CommandResult => runBoolean(doc, 'boolean_union', 'union', a, b, ctx),
-};
+});
 
 // ---------------------------------------------------------------------------
 // boolean_subtract
 // ---------------------------------------------------------------------------
-
-interface BooleanSubtractParams {
-  a: string;
-  b: string;
-}
 
 /**
  * @command boolean_subtract
@@ -207,7 +194,7 @@ interface BooleanSubtractParams {
  * @invariant both a and b must be 3D solids; result = a − b (order matters)
  * @failure missing id, 2D operand, same id, kernel absent, or kernel failure -> no-op, affected:[]
  */
-export const booleanSubtract: CommandDefinition<BooleanSubtractParams> = {
+export const booleanSubtract = defineCommand({
   name: 'boolean_subtract',
   annotations: { requiresKernel: true },
   description:
@@ -216,26 +203,17 @@ export const booleanSubtract: CommandDefinition<BooleanSubtractParams> = {
     'Both operand entities are consumed (removed) and replaced by the result mesh. ' +
     'Requires a geometry kernel to be injected. ' +
     'Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      a: { type: 'string', description: 'Id of the base 3D solid (the solid to subtract from).' },
-      b: { type: 'string', description: 'Id of the tool 3D solid (the solid to subtract with).' },
-    },
-    required: ['a', 'b'],
-  },
+  params: z.object({
+    a: z.string().describe('Id of the base 3D solid (the solid to subtract from).'),
+    b: z.string().describe('Id of the tool 3D solid (the solid to subtract with).'),
+  }),
   run: (doc, { a, b }, ctx): CommandResult =>
     runBoolean(doc, 'boolean_subtract', 'subtract', a, b, ctx),
-};
+});
 
 // ---------------------------------------------------------------------------
 // boolean_intersect
 // ---------------------------------------------------------------------------
-
-interface BooleanIntersectParams {
-  a: string;
-  b: string;
-}
 
 /**
  * @command boolean_intersect
@@ -244,7 +222,7 @@ interface BooleanIntersectParams {
  * @invariant both a and b must be 3D solids; kernel must be injected
  * @failure missing id, 2D operand, same id, kernel absent, or kernel failure -> no-op, affected:[]
  */
-export const booleanIntersect: CommandDefinition<BooleanIntersectParams> = {
+export const booleanIntersect = defineCommand({
   name: 'boolean_intersect',
   annotations: { requiresKernel: true },
   description:
@@ -253,14 +231,10 @@ export const booleanIntersect: CommandDefinition<BooleanIntersectParams> = {
     'Both operand entities are consumed (removed) and replaced by the intersection mesh. ' +
     'Requires a geometry kernel to be injected. ' +
     'Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      a: { type: 'string', description: 'Id of the first 3D solid operand.' },
-      b: { type: 'string', description: 'Id of the second 3D solid operand.' },
-    },
-    required: ['a', 'b'],
-  },
+  params: z.object({
+    a: z.string().describe('Id of the first 3D solid operand.'),
+    b: z.string().describe('Id of the second 3D solid operand.'),
+  }),
   run: (doc, { a, b }, ctx): CommandResult =>
     runBoolean(doc, 'boolean_intersect', 'intersect', a, b, ctx),
-};
+});

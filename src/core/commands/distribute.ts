@@ -27,7 +27,8 @@
  */
 
 import type { CadDocument, InstanceEntity, Vec2, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
@@ -172,37 +173,6 @@ function samplePath(points: ReadonlyArray<Vec2>, closed: boolean, s: number): Pa
 // distribute_along_path
 // ---------------------------------------------------------------------------
 
-interface DistributeAlongPathParams {
-  /** Id of an existing 2D path entity (polyline or spline) to distribute instances along. */
-  pathId: string;
-  /** Id of an existing Component (from create_component) whose instances will be placed. */
-  componentId: string;
-  /** Number of instances to create. Must be a positive integer. */
-  count: number;
-  /**
-   * When true (default), each instance is rotated so its local +X axis aligns with the
-   * path tangent at its placement point (Z-axis rotation only, in radians: rotation[2] = atan2(ty, tx)).
-   * When false, all instances have rotation [0, 0, 0] (no tangent rotation applied).
-   */
-  tangentAlign?: boolean;
-  /**
-   * Distance along the path from the start where the first instance (index 0) is placed.
-   * For closed paths this shifts the whole pattern around the loop; endOffset is ignored.
-   * Default: 0. Must be finite and non-negative.
-   */
-  startOffset?: number;
-  /**
-   * Distance back from the end of the path where the last instance (index count-1) is placed.
-   * Ignored on closed paths. Default: 0. Must be finite and non-negative.
-   */
-  endOffset?: number;
-  /**
-   * Optional name prefix for created instances. Instances are named "<name>_0", "<name>_1", etc.
-   * Defaults to the component's name when omitted.
-   */
-  name?: string;
-}
-
 /**
  * @command distribute_along_path
  * @pure
@@ -219,7 +189,7 @@ interface DistributeAlongPathParams {
  * @failure startOffset or endOffset non-finite or negative -> no-op, affected:[]
  * @failure offsets exceed path length (usable <= 0) -> no-op, affected:[]
  */
-export const distributeAlongPath: CommandDefinition<DistributeAlongPathParams> = {
+export const distributeAlongPath = defineCommand({
   name: 'distribute_along_path',
   description:
     'Place count instances of an existing Component at evenly-spaced positions along a 2D path entity (polyline or spline). ' +
@@ -230,51 +200,46 @@ export const distributeAlongPath: CommandDefinition<DistributeAlongPathParams> =
     'startOffset and endOffset (default 0) trim the usable length from both ends; ignored/adapted for closed paths. ' +
     'name (optional) sets a prefix for instance names: "link_0", "link_1", … defaults to the component name. ' +
     'Returns affected: ids of all newly created instance entities in placement order.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      pathId: {
-        type: 'string',
-        description:
-          'Id of an existing polyline or spline entity to distribute instances along. Must have >= 2 points.',
-      },
-      componentId: {
-        type: 'string',
-        description:
-          'Id of an existing Component in doc.components. Obtain one via create_component.',
-      },
-      count: {
-        type: 'number',
-        description: 'Number of instances to create. Must be a positive integer (>= 1).',
-      },
-      tangentAlign: {
-        type: 'boolean',
-        description:
-          'When true (default), each instance is rotated so its local +X axis aligns with the path tangent ' +
+  params: z.object({
+    pathId: z
+      .string()
+      .describe(
+        'Id of an existing polyline or spline entity to distribute instances along. Must have >= 2 points.',
+      ),
+    componentId: z
+      .string()
+      .describe('Id of an existing Component in doc.components. Obtain one via create_component.'),
+    count: z.number().describe('Number of instances to create. Must be a positive integer (>= 1).'),
+    tangentAlign: z
+      .boolean()
+      .describe(
+        'When true (default), each instance is rotated so its local +X axis aligns with the path tangent ' +
           '(rotation[2] = atan2(ty, tx)). When false, all instances have rotation [0, 0, 0].',
-      },
-      startOffset: {
-        type: 'number',
-        description:
-          'Distance along the path from its start where instance 0 is placed. ' +
+      )
+      .optional(),
+    startOffset: z
+      .number()
+      .describe(
+        'Distance along the path from its start where instance 0 is placed. ' +
           'For closed paths this shifts the whole pattern around the loop; endOffset is ignored. ' +
           'Default: 0. Must be finite and non-negative.',
-      },
-      endOffset: {
-        type: 'number',
-        description:
-          'Distance back from the path end where the last instance is placed. ' +
+      )
+      .optional(),
+    endOffset: z
+      .number()
+      .describe(
+        'Distance back from the path end where the last instance is placed. ' +
           'Ignored on closed paths. Default: 0. Must be finite and non-negative.',
-      },
-      name: {
-        type: 'string',
-        description:
-          'Optional name prefix for created instances. Instances are named "<name>_0", "<name>_1", etc. ' +
+      )
+      .optional(),
+    name: z
+      .string()
+      .describe(
+        'Optional name prefix for created instances. Instances are named "<name>_0", "<name>_1", etc. ' +
           'Defaults to the component name when omitted.',
-      },
-    },
-    required: ['pathId', 'componentId', 'count'],
-  },
+      )
+      .optional(),
+  }),
   run: (
     doc,
     { pathId, componentId, count, tangentAlign = true, startOffset = 0, endOffset = 0, name },
@@ -465,4 +430,4 @@ export const distributeAlongPath: CommandDefinition<DistributeAlongPathParams> =
       affected: createdIds,
     };
   },
-};
+});

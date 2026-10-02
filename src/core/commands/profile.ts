@@ -16,6 +16,7 @@
 import type { CadDocument, Entity, ExtrusionEntity, RevolutionEntity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { nextId } from '../../lib/id';
 import { rotatedEntityBounds } from './scene';
 
@@ -52,15 +53,6 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 // extrude_sketch
 // ---------------------------------------------------------------------------
 
-interface ExtrudeSketchParams {
-  /** Id of the existing closed 2D shape entity to extrude (circle, rectangle, or closed polyline). */
-  id: string;
-  /** Extrusion depth in world units along Z. Must be > 0. */
-  depth: number;
-  /** Optional extrinsic XYZ Euler angles in RADIANS. Defaults to [0,0,0]. Malformed values are ignored. */
-  rotation?: Vec3;
-}
-
 /**
  * @command extrude_sketch
  * @pure
@@ -73,36 +65,32 @@ interface ExtrudeSketchParams {
  *   polyline    → its points when closed === true; no-op when open
  *   line / arc / open polyline / point / 3D solid → graceful no-op
  */
-export const extrudeSketch: CommandDefinition<ExtrudeSketchParams> = {
+export const extrudeSketch = defineCommand({
   name: 'extrude_sketch',
   description:
     'Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. ' +
     'Right-handed world frame, +Z up. The solid is placed at the source entity position and extends depth ' +
     'units along +Z. Keeps the source entity in the document. depth must be > 0.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description:
-          'Id of the closed 2D shape entity to extrude. Must be a circle, rectangle, or polyline with closed=true.',
-      },
-      depth: {
-        type: 'number',
-        description:
-          'Extrusion depth in document units along +Z from the source entity position. Must be > 0.',
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the resulting extrusion solid. ' +
+  params: z.object({
+    id: z
+      .string()
+      .describe(
+        'Id of the closed 2D shape entity to extrude. Must be a circle, rectangle, or polyline with closed=true.',
+      ),
+    depth: z
+      .number()
+      .describe(
+        'Extrusion depth in document units along +Z from the source entity position. Must be > 0.',
+      ),
+    rotation: z
+      .array(z.number())
+      .describe(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the resulting extrusion solid. ' +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-    },
-    required: ['id', 'depth'],
-  },
+      )
+      .optional(),
+  }),
   run: (doc, { id, depth, rotation }): CommandResult => {
     // --- guard: depth ---
     if (typeof depth !== 'number' || depth <= 0) {
@@ -189,7 +177,7 @@ export const extrudeSketch: CommandDefinition<ExtrudeSketchParams> = {
       affected: [extId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // revolve_profile

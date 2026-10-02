@@ -9,7 +9,9 @@
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
+import { vec3 } from './vec';
 import { nextId } from '../../lib/id';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './scene';
@@ -285,19 +287,8 @@ export function buildSpurGearProfile(
  * @invariant when baseRadius >= rootRadius (typically teeth < 17), undercut occurs;
  *            the involute start is clamped to rootRadius (approximate — not geometrically exact undercut)
  */
-interface AddSpurGearParams {
-  module: number;
-  teeth: number;
-  pressureAngle?: number;
-  faceWidth: number;
-  bore?: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  name?: string;
-}
 
-export const addSpurGear: CommandDefinition<AddSpurGearParams> = {
+export const addSpurGear = defineCommand({
   name: 'add_spur_gear',
   description:
     'Create a parametric involute spur gear solid (extrusion). ' +
@@ -309,64 +300,59 @@ export const addSpurGear: CommandDefinition<AddSpurGearParams> = {
     'bore is a central hole radius; if > 0 it is currently ignored (kernel hole not yet wired) and noted in the summary. ' +
     'position is [x, y, z] of the gear center; rotation is extrinsic XYZ Euler angles in radians. ' +
     'Right-handed frame, +Z up.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      module: {
-        type: 'number',
-        description:
-          'Gear module (metric). Controls tooth scale: pitchDiameter = module * teeth. Must be > 0. ' +
+  params: z.object({
+    module: z
+      .number()
+      .describe(
+        'Gear module (metric). Controls tooth scale: pitchDiameter = module * teeth. Must be > 0. ' +
           'Common values: 1 (small), 2 (medium), 4 (large).',
-      },
-      teeth: {
-        type: 'number',
-        description:
-          'Number of teeth. Must be an integer >= 3. ' +
+      ),
+    teeth: z
+      .number()
+      .describe(
+        'Number of teeth. Must be an integer >= 3. ' +
           'Below ~17 teeth undercut occurs; the profile is approximated by clamping the involute to the root circle.',
-      },
-      pressureAngle: {
-        type: 'number',
-        description:
-          'Pressure angle in RADIANS. Must be in (0, π/2). ' +
+      ),
+    pressureAngle: z
+      .number()
+      .describe(
+        'Pressure angle in RADIANS. Must be in (0, π/2). ' +
           'Standard value: 0.3491 rad (20°). Omit to use the 20° default.',
-      },
-      faceWidth: {
-        type: 'number',
-        description:
-          'Gear face width (thickness along Z) in document units. Must be > 0. ' +
+      )
+      .optional(),
+    faceWidth: z
+      .number()
+      .describe(
+        'Gear face width (thickness along Z) in document units. Must be > 0. ' +
           'Typical: 8–12× module for spur gears.',
-      },
-      bore: {
-        type: 'number',
-        description:
-          'Central bore hole radius in document units. >= 0. Default 0 (solid hub). ' +
+      ),
+    bore: z
+      .number()
+      .describe(
+        'Central bore hole radius in document units. >= 0. Default 0 (solid hub). ' +
           'Currently ignored if > 0 (kernel hole not yet wired); a note appears in the summary.',
-      },
-      position: {
-        type: 'array',
-        description:
-          'World-space center of the gear [x, y, z] in document units. ' +
-          'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-        items: { type: 'number' },
-      },
-      rotation: {
-        type: 'array',
-        description:
-          'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Defaults to [0, 0, 0]. ' +
+      )
+      .optional(),
+    position: vec3(
+      'World-space center of the gear [x, y, z] in document units. ' +
+        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+    ).optional(),
+    rotation: z
+      .array(z.number())
+      .describe(
+        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-        items: { type: 'number' },
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#7a9cbb". Defaults to "#7a9cbb".',
-      },
-      name: {
-        type: 'string',
-        description: 'Optional display name for the entity (shown in the scene tree).',
-      },
-    },
-    required: ['module', 'teeth', 'faceWidth'],
-  },
+      )
+      .optional(),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#7a9cbb". Defaults to "#7a9cbb".')
+      .optional(),
+    name: z
+      .string()
+      .describe('Optional display name for the entity (shown in the scene tree).')
+      .optional(),
+  }),
   run: (
     doc,
     {
@@ -375,7 +361,7 @@ export const addSpurGear: CommandDefinition<AddSpurGearParams> = {
       pressureAngle = Math.PI / 9,
       faceWidth,
       bore = 0,
-      position = [0, 0, 0],
+      position = [0, 0, 0] as const,
       rotation,
       color = '#7a9cbb',
       name,
@@ -477,7 +463,7 @@ export const addSpurGear: CommandDefinition<AddSpurGearParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // Local helpers (mirrors of geometry.ts — kept here to avoid cross-file dep on internals)

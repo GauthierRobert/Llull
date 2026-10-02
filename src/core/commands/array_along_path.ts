@@ -16,6 +16,8 @@
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { defineCommand, z } from './schema';
+import { vec3 } from './vec';
 import { nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { DEFAULT_LAYER_ID } from '../model/types';
@@ -226,16 +228,6 @@ export const arrayAlongPath: CommandDefinition<ArrayAlongPathParams> = {
 // distribute_on_arc
 // ---------------------------------------------------------------------------
 
-interface DistributeOnArcParams {
-  sourceId: string;
-  center: Vec3;
-  normal: Vec3;
-  radius: number;
-  startAngle: number;
-  endAngle: number;
-  count: number;
-}
-
 /**
  * @command distribute_on_arc
  * @pure
@@ -244,7 +236,7 @@ interface DistributeOnArcParams {
  * @invariant count >= 1; radius > 0; source entity must exist
  * @failure count < 1 -> no-op; radius <= 0 -> no-op; missing sourceId -> no-op
  */
-export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
+export const distributeOnArc = defineCommand({
   name: 'distribute_on_arc',
   description:
     'Duplicate sourceId at evenly-spaced angular positions along a circular arc. ' +
@@ -254,43 +246,19 @@ export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
     'count is the number of copies (must be >= 1). ' +
     'Each copy is rotated so that its local +X axis points radially outward from the center. ' +
     'The source entity is not removed. Returns affected: ids of all newly created entities.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      sourceId: {
-        type: 'string',
-        description: 'Id of the entity to distribute around the arc.',
-      },
-      center: {
-        type: 'array',
-        description: 'World-space [x,y,z] center of the arc.',
-        items: { type: 'number' },
-      },
-      normal: {
-        type: 'array',
-        description: 'Unit normal of the arc plane, e.g. [0,0,1] for arcs in the XY plane.',
-        items: { type: 'number' },
-      },
-      radius: {
-        type: 'number',
-        description: 'Radius of the arc. Must be > 0.',
-      },
-      startAngle: {
-        type: 'number',
-        description:
-          "Start angle of the arc sweep in radians (measured from the plane's local +X axis).",
-      },
-      endAngle: {
-        type: 'number',
-        description: 'End angle of the arc sweep in radians.',
-      },
-      count: {
-        type: 'number',
-        description: 'Number of copies to place. Must be >= 1.',
-      },
-    },
-    required: ['sourceId', 'center', 'normal', 'radius', 'startAngle', 'endAngle', 'count'],
-  },
+  params: z.object({
+    sourceId: z.string().describe('Id of the entity to distribute around the arc.'),
+    center: vec3('World-space [x,y,z] center of the arc.'),
+    normal: vec3('Unit normal of the arc plane, e.g. [0,0,1] for arcs in the XY plane.'),
+    radius: z.number().describe('Radius of the arc. Must be > 0.'),
+    startAngle: z
+      .number()
+      .describe(
+        "Start angle of the arc sweep in radians (measured from the plane's local +X axis).",
+      ),
+    endAngle: z.number().describe('End angle of the arc sweep in radians.'),
+    count: z.number().describe('Number of copies to place. Must be >= 1.'),
+  }),
   run: (doc, { sourceId, center, normal, radius, startAngle, endAngle, count }): CommandResult => {
     const source = doc.entities[sourceId];
     if (!source) {
@@ -389,7 +357,7 @@ export const distributeOnArc: CommandDefinition<DistributeOnArcParams> = {
       affected: createdIds,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // Rotation helpers for distribute_on_arc

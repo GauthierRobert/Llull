@@ -16,7 +16,8 @@
  */
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { entityBounds } from './scene';
 
 // ---------------------------------------------------------------------------
@@ -52,12 +53,6 @@ type AlignEdge =
   | 'center-y'
   | 'center-z';
 
-interface AlignParams {
-  targetIds: string[];
-  edge: AlignEdge;
-  referenceId: string;
-}
-
 /**
  * @command align
  * @pure
@@ -66,7 +61,7 @@ interface AlignParams {
  * @invariant all targetIds and referenceId must exist; reference entity is not moved
  * @failure missing id -> no-op, affected:[]
  */
-export const align: CommandDefinition<AlignParams> = {
+export const align = defineCommand({
   name: 'align',
   description:
     'Move every entity in targetIds so that its bounding-box edge (or center) along the ' +
@@ -74,27 +69,20 @@ export const align: CommandDefinition<AlignParams> = {
     'edge values: "min-x", "min-y", "min-z", "max-x", "max-y", "max-z", ' +
     '"center-x", "center-y", "center-z". ' +
     'The reference entity is not moved. Returns affected: targetIds.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      targetIds: {
-        type: 'array',
-        description: 'Ids of entities to move. Must all exist in the document.',
-        items: { type: 'string' },
-      },
-      edge: {
-        type: 'string',
-        description:
-          'Which bounding-box face or center to align along: ' +
+  params: z.object({
+    targetIds: z
+      .array(z.string())
+      .describe('Ids of entities to move. Must all exist in the document.'),
+    edge: z
+      .string()
+      .describe(
+        'Which bounding-box face or center to align along: ' +
           '"min-x"|"min-y"|"min-z"|"max-x"|"max-y"|"max-z"|"center-x"|"center-y"|"center-z".',
-      },
-      referenceId: {
-        type: 'string',
-        description: 'Id of the entity whose bounding-box edge is the alignment target. Not moved.',
-      },
-    },
-    required: ['targetIds', 'edge', 'referenceId'],
-  },
+      ),
+    referenceId: z
+      .string()
+      .describe('Id of the entity whose bounding-box edge is the alignment target. Not moved.'),
+  }),
   run: (doc, { targetIds, edge, referenceId }): CommandResult => {
     if (!Array.isArray(targetIds) || targetIds.length === 0) {
       return {
@@ -219,20 +207,11 @@ export const align: CommandDefinition<AlignParams> = {
       affected: movedIds,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // distribute
 // ---------------------------------------------------------------------------
-
-type DistributeAxis = 'x' | 'y' | 'z';
-type DistributeMode = 'equal-spacing' | 'equal-gap';
-
-interface DistributeParams {
-  targetIds: string[];
-  axis: DistributeAxis;
-  mode?: DistributeMode;
-}
 
 /**
  * @command distribute
@@ -242,7 +221,7 @@ interface DistributeParams {
  * @invariant targetIds.length >= 2; first and last entity are anchors (not moved)
  * @failure < 2 targetIds -> no-op; missing id -> no-op
  */
-export const distribute: CommandDefinition<DistributeParams> = {
+export const distribute = defineCommand({
   name: 'distribute',
   description:
     'Distribute 2 or more entities evenly along a single axis. ' +
@@ -251,27 +230,19 @@ export const distribute: CommandDefinition<DistributeParams> = {
     'The first and last entity (by their current position along the axis) are the anchors ' +
     'and are not moved; all entities in between are repositioned. ' +
     'Returns affected: the ids of the entities that actually moved.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      targetIds: {
-        type: 'array',
-        description: 'Ids of entities to distribute. Must contain at least 2 existing entity ids.',
-        items: { type: 'string' },
-      },
-      axis: {
-        type: 'string',
-        description: 'Axis along which to distribute: "x", "y", or "z".',
-      },
-      mode: {
-        type: 'string',
-        description:
-          '"equal-spacing" (default): equal center-to-center distance. ' +
+  params: z.object({
+    targetIds: z
+      .array(z.string())
+      .describe('Ids of entities to distribute. Must contain at least 2 existing entity ids.'),
+    axis: z.string().describe('Axis along which to distribute: "x", "y", or "z".'),
+    mode: z
+      .string()
+      .describe(
+        '"equal-spacing" (default): equal center-to-center distance. ' +
           '"equal-gap": equal gap between entity bounding boxes.',
-      },
-    },
-    required: ['targetIds', 'axis'],
-  },
+      )
+      .optional(),
+  }),
   run: (doc, { targetIds, axis, mode = 'equal-spacing' }): CommandResult => {
     if (!Array.isArray(targetIds) || targetIds.length < 2) {
       return {
@@ -389,19 +360,11 @@ export const distribute: CommandDefinition<DistributeParams> = {
       affected: movedIds,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // stack_on
 // ---------------------------------------------------------------------------
-
-type StackAxis = 'x' | 'y' | 'z';
-
-interface StackOnParams {
-  movingId: string;
-  baseId: string;
-  axis?: StackAxis;
-}
 
 /**
  * @command stack_on
@@ -411,30 +374,20 @@ interface StackOnParams {
  * @invariant +Z up convention (W5A); default axis is 'z'
  * @failure missing id -> no-op, affected:[]
  */
-export const stackOn: CommandDefinition<StackOnParams> = {
+export const stackOn = defineCommand({
   name: 'stack_on',
   description:
     'Translate movingId so that its bounding-box minimum face along axis exactly meets the ' +
     'bounding-box maximum face of baseId. Default axis is "z" (+Z up, W5A convention). ' +
     'Use this to stack objects on top of each other without overlapping.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      movingId: {
-        type: 'string',
-        description: 'Id of the entity to move.',
-      },
-      baseId: {
-        type: 'string',
-        description: 'Id of the entity acting as the base (not moved).',
-      },
-      axis: {
-        type: 'string',
-        description: 'Axis along which to stack: "x", "y", or "z" (default "z", +Z up).',
-      },
-    },
-    required: ['movingId', 'baseId'],
-  },
+  params: z.object({
+    movingId: z.string().describe('Id of the entity to move.'),
+    baseId: z.string().describe('Id of the entity acting as the base (not moved).'),
+    axis: z
+      .string()
+      .describe('Axis along which to stack: "x", "y", or "z" (default "z", +Z up).')
+      .optional(),
+  }),
   run: (doc, { movingId, baseId, axis = 'z' }): CommandResult => {
     const movingEntity = doc.entities[movingId];
     if (!movingEntity) {
@@ -492,4 +445,4 @@ export const stackOn: CommandDefinition<StackOnParams> = {
       affected: [movingId],
     };
   },
-};
+});

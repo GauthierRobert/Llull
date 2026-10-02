@@ -5,12 +5,9 @@
  */
 
 import type { EntityGroup } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { MAX_BATCH_IDS } from './limits';
-
-interface DeleteEntitiesParams {
-  ids: string[];
-}
 
 /**
  * @command delete_entities
@@ -21,7 +18,7 @@ interface DeleteEntitiesParams {
  * @invariant all remaining group memberIds exist in entities; missing/duplicate ids are skipped
  * @failure ids not a non-empty string array, > MAX_BATCH_IDS ids, or none exist -> no-op, affected:[]
  */
-export const deleteEntities: CommandDefinition<DeleteEntitiesParams> = {
+export const deleteEntities = defineCommand({
   name: 'delete_entities',
   annotations: { destructive: true },
   description:
@@ -29,17 +26,13 @@ export const deleteEntities: CommandDefinition<DeleteEntitiesParams> = {
     'applied to each id: entities are also removed from groups, and groups left with fewer than ' +
     '2 members are dissolved. Ids that do not exist are skipped and listed in the summary; ' +
     'if none exist nothing changes.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      ids: {
-        type: 'array',
-        description: `Entity ids to delete (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`,
-        items: { type: 'string' },
-      },
-    },
-    required: ['ids'],
-  },
+  params: z.object({
+    ids: z
+      .array(z.string())
+      .describe(
+        `Entity ids to delete (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`,
+      ),
+  }),
   run: (doc, { ids }): CommandResult => {
     if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== 'string')) {
       return {
@@ -97,4 +90,4 @@ export const deleteEntities: CommandDefinition<DeleteEntitiesParams> = {
       affected: existing,
     };
   },
-};
+});

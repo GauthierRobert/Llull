@@ -10,6 +10,8 @@
 import type { CadDocument, Entity, EntityGroup, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandDefinition, CommandResult } from './types';
+import { defineCommand, z } from './schema';
+import { vec3 } from './vec';
 import { nextId } from '../../lib/id';
 import { rotatedEntityBounds } from './scene';
 
@@ -133,6 +135,14 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
   };
 }
 
+interface AddBoxParams {
+  size: Vec3;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+  anchor?: PlacementAnchor;
+}
+
 /**
  * @command add_box
  * @pure
@@ -143,13 +153,6 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
  * @failure unknown anchor value -> falls back to default anchor 'center', no throw
  */
-interface AddBoxParams {
-  size: Vec3;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
 
 export const addBox: CommandDefinition<AddBoxParams> = {
   name: 'add_box',
@@ -242,6 +245,14 @@ export const addBox: CommandDefinition<AddBoxParams> = {
   },
 };
 
+interface ExtrudeParams {
+  profile: ReadonlyArray<readonly [number, number]>;
+  depth: number;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+}
+
 /**
  * @command extrude_profile
  * @pure
@@ -250,13 +261,6 @@ export const addBox: CommandDefinition<AddBoxParams> = {
  * @invariant depth > 0; profile must be a non-empty array of [x,y] points
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
  */
-interface ExtrudeParams {
-  profile: ReadonlyArray<readonly [number, number]>;
-  depth: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-}
 
 export const extrude: CommandDefinition<ExtrudeParams> = {
   name: 'extrude_profile',
@@ -338,22 +342,13 @@ export const extrude: CommandDefinition<ExtrudeParams> = {
   },
 };
 
-interface MoveParams {
-  id: string;
-  delta: Vec3;
-}
-
-export const move: CommandDefinition<MoveParams> = {
+export const move = defineCommand({
   name: 'move_entity',
   description: 'Translate an entity by a delta vector.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'string', description: 'Target entity id' },
-      delta: { type: 'array', description: 'Translation [dx,dy,dz]', items: { type: 'number' } },
-    },
-    required: ['id', 'delta'],
-  },
+  params: z.object({
+    id: z.string().describe('Target entity id'),
+    delta: vec3('Translation [dx,dy,dz]'),
+  }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
@@ -373,7 +368,16 @@ export const move: CommandDefinition<MoveParams> = {
       affected: [id],
     };
   },
-};
+});
+
+interface AddCylinderParams {
+  radius: number;
+  height: number;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+  anchor?: PlacementAnchor;
+}
 
 /**
  * @command add_cylinder
@@ -388,14 +392,6 @@ export const move: CommandDefinition<MoveParams> = {
  * NOTE: the viewport renders via three.js CylinderGeometry (Y-axis centered). The document
  * frame is +Z up, so entityBounds uses ±height/2 on the Y axis. Default anchor is 'center'.
  */
-interface AddCylinderParams {
-  radius: number;
-  height: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
 
 export const addCylinder: CommandDefinition<AddCylinderParams> = {
   name: 'add_cylinder',
@@ -498,6 +494,14 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
   },
 };
 
+interface AddSphereParams {
+  radius: number;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+  anchor?: PlacementAnchor;
+}
+
 /**
  * @command add_sphere
  * @pure
@@ -508,13 +512,6 @@ export const addCylinder: CommandDefinition<AddCylinderParams> = {
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
  * @failure unknown anchor value -> falls back to default anchor 'center', no throw
  */
-interface AddSphereParams {
-  radius: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
 
 export const addSphere: CommandDefinition<AddSphereParams> = {
   name: 'add_sphere',
@@ -599,6 +596,15 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
   },
 };
 
+interface AddConeParams {
+  radius: number;
+  height: number;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+  anchor?: PlacementAnchor;
+}
+
 /**
  * @command add_cone
  * @pure
@@ -612,14 +618,6 @@ export const addSphere: CommandDefinition<AddSphereParams> = {
  * Default anchor is 'base-center': the stored position is the center of the circular base;
  * the AABB spans [pos-radius..pos+radius, pos-radius..pos+radius, pos.z..pos.z+height].
  */
-interface AddConeParams {
-  radius: number;
-  height: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
 
 export const addCone: CommandDefinition<AddConeParams> = {
   name: 'add_cone',
@@ -727,6 +725,15 @@ export const addCone: CommandDefinition<AddConeParams> = {
   },
 };
 
+interface AddTorusParams {
+  ringRadius: number;
+  tubeRadius: number;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+  anchor?: PlacementAnchor;
+}
+
 /**
  * @command add_torus
  * @pure
@@ -740,14 +747,6 @@ export const addCone: CommandDefinition<AddConeParams> = {
  * Default anchor is 'center': the stored position is the geometric center of the torus.
  * AABB: ±(ringRadius+tubeRadius) in X/Y; ±tubeRadius in Z.
  */
-interface AddTorusParams {
-  ringRadius: number;
-  tubeRadius: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
 
 export const addTorus: CommandDefinition<AddTorusParams> = {
   name: 'add_torus',
@@ -855,6 +854,14 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
   },
 };
 
+interface AddWedgeParams {
+  size: Vec3;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+  anchor?: PlacementAnchor;
+}
+
 /**
  * @command add_wedge
  * @pure
@@ -868,13 +875,6 @@ export const addTorus: CommandDefinition<AddTorusParams> = {
  * Default anchor is 'min': the stored position is the lower-front-left (min-XYZ) corner.
  * AABB: [position..position+size] in all axes.
  */
-interface AddWedgeParams {
-  size: Vec3;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
 
 export const addWedge: CommandDefinition<AddWedgeParams> = {
   name: 'add_wedge',
@@ -973,6 +973,16 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
   },
 };
 
+interface AddPyramidParams {
+  baseWidth: number;
+  baseDepth: number;
+  height: number;
+  position?: Vec3;
+  rotation?: Vec3;
+  color?: string;
+  anchor?: PlacementAnchor;
+}
+
 /**
  * @command add_pyramid
  * @pure
@@ -986,15 +996,6 @@ export const addWedge: CommandDefinition<AddWedgeParams> = {
  * Default anchor is 'base-center': the stored position is the center of the rectangular base.
  * AABB from base-center: ±baseWidth/2 in X; ±baseDepth/2 in Y; 0..height in Z.
  */
-interface AddPyramidParams {
-  baseWidth: number;
-  baseDepth: number;
-  height: number;
-  position?: Vec3;
-  rotation?: Vec3;
-  color?: string;
-  anchor?: PlacementAnchor;
-}
 
 export const addPyramid: CommandDefinition<AddPyramidParams> = {
   name: 'add_pyramid',
@@ -1113,10 +1114,6 @@ export const addPyramid: CommandDefinition<AddPyramidParams> = {
   },
 };
 
-interface DeleteParams {
-  id: string;
-}
-
 /**
  * @command delete_entity
  * @pure
@@ -1126,17 +1123,15 @@ interface DeleteParams {
  * @invariant all remaining group memberIds exist in entities
  * @failure missing id -> no-op, affected:[]
  */
-export const deleteEntity: CommandDefinition<DeleteParams> = {
+export const deleteEntity = defineCommand({
   name: 'delete_entity',
   annotations: { destructive: true },
   description:
     'Permanently remove an entity from the document, including from any groups it belongs to. ' +
     'Groups that drop below 2 members are dissolved automatically.',
-  paramsSchema: {
-    type: 'object',
-    properties: { id: { type: 'string', description: 'Target entity id to delete.' } },
-    required: ['id'],
-  },
+  params: z.object({
+    id: z.string().describe('Target entity id to delete.'),
+  }),
   run: (doc, { id }): CommandResult => {
     if (!doc.entities[id]) {
       return { document: doc, summary: `No entity ${id} to delete.`, affected: [] };
@@ -1176,4 +1171,4 @@ export const deleteEntity: CommandDefinition<DeleteParams> = {
       affected: [id],
     };
   },
-};
+});

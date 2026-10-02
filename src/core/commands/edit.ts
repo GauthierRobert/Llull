@@ -5,7 +5,9 @@
  */
 
 import type { Entity, EntityGroup, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
+import { vec3 } from './vec';
 import { nextId } from '../../lib/id';
 
 // ---------------------------------------------------------------------------
@@ -24,11 +26,6 @@ function cloneEntity(source: Entity, newId: string, position: Vec3): Entity {
 // duplicate_entity
 // ---------------------------------------------------------------------------
 
-interface DuplicateEntityParams {
-  id: string;
-  offset?: Vec3;
-}
-
 /**
  * @command duplicate_entity
  * @pure
@@ -37,25 +34,18 @@ interface DuplicateEntityParams {
  * @invariant new entity has a distinct id; original entity is unchanged
  * @failure missing id -> no-op, affected:[]
  */
-export const duplicateEntity: CommandDefinition<DuplicateEntityParams> = {
+export const duplicateEntity = defineCommand({
   name: 'duplicate_entity',
   description:
     'Clone an existing entity to a new id, placing the copy at original.position + offset. ' +
     'Returns the new entity id in affected. Original is untouched.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'string', description: 'Id of the entity to duplicate.' },
-      offset: {
-        type: 'array',
-        description:
-          'Optional [dx, dy, dz] offset applied to the copy position. Defaults to [0, 0, 0] (exact overlap).',
-        items: { type: 'number' },
-      },
-    },
-    required: ['id'],
-  },
-  run: (doc, { id, offset = [0, 0, 0] }): CommandResult => {
+  params: z.object({
+    id: z.string().describe('Id of the entity to duplicate.'),
+    offset: vec3(
+      'Optional [dx, dy, dz] offset applied to the copy position. Defaults to [0, 0, 0] (exact overlap).',
+    ).optional(),
+  }),
+  run: (doc, { id, offset = [0, 0, 0] as const }): CommandResult => {
     const source = doc.entities[id];
     if (!source) {
       return { document: doc, summary: `No entity ${id} to duplicate.`, affected: [] };
@@ -79,16 +69,11 @@ export const duplicateEntity: CommandDefinition<DuplicateEntityParams> = {
       affected: [newId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // group_entities
 // ---------------------------------------------------------------------------
-
-interface GroupEntitiesParams {
-  ids: string[];
-  name?: string;
-}
 
 /**
  * @command group_entities
@@ -98,28 +83,24 @@ interface GroupEntitiesParams {
  * @invariant requires >= 2 valid (existing) member ids
  * @failure < 2 valid members -> no-op, affected:[]
  */
-export const groupEntities: CommandDefinition<GroupEntitiesParams> = {
+export const groupEntities = defineCommand({
   name: 'group_entities',
   description:
     'Create a named group containing >= 2 existing entities. ' +
     'The group id is returned in affected. Entities are not moved or changed.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      ids: {
-        type: 'array',
-        description:
-          'Array of entity ids to include in the group. Must contain >= 2 ids that exist in the document.',
-        items: { type: 'string' },
-      },
-      name: {
-        type: 'string',
-        description:
-          'Optional human-readable label for the group, e.g. "Wheel assembly". Defaults to "Group".',
-      },
-    },
-    required: ['ids'],
-  },
+  params: z.object({
+    ids: z
+      .array(z.string())
+      .describe(
+        'Array of entity ids to include in the group. Must contain >= 2 ids that exist in the document.',
+      ),
+    name: z
+      .string()
+      .describe(
+        'Optional human-readable label for the group, e.g. "Wheel assembly". Defaults to "Group".',
+      )
+      .optional(),
+  }),
   run: (doc, { ids, name = 'Group' }): CommandResult => {
     const existingGroups = doc.groups ?? {};
     const validIds = ids.filter((id) => id in doc.entities);
@@ -144,15 +125,11 @@ export const groupEntities: CommandDefinition<GroupEntitiesParams> = {
       affected: [groupId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // ungroup_entities
 // ---------------------------------------------------------------------------
-
-interface UngroupEntitiesParams {
-  groupId: string;
-}
 
 /**
  * @command ungroup_entities
@@ -162,21 +139,14 @@ interface UngroupEntitiesParams {
  * @invariant member entities remain in doc.entities unchanged
  * @failure missing groupId -> no-op, affected:[]
  */
-export const ungroupEntities: CommandDefinition<UngroupEntitiesParams> = {
+export const ungroupEntities = defineCommand({
   name: 'ungroup_entities',
   description:
     'Dissolve a group, removing it from the document. Member entities are NOT deleted; ' +
     'they remain in the document. Returns the freed member ids in affected.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      groupId: {
-        type: 'string',
-        description: 'Id of the group to dissolve. Must exist in doc.groups.',
-      },
-    },
-    required: ['groupId'],
-  },
+  params: z.object({
+    groupId: z.string().describe('Id of the group to dissolve. Must exist in doc.groups.'),
+  }),
   run: (doc, { groupId }): CommandResult => {
     const existingGroups = doc.groups ?? {};
     const group = existingGroups[groupId];
@@ -198,17 +168,11 @@ export const ungroupEntities: CommandDefinition<UngroupEntitiesParams> = {
       affected: [...group.memberIds],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // set_entity_name
 // ---------------------------------------------------------------------------
-
-interface SetEntityNameParams {
-  id: string;
-  name?: string;
-  tags?: readonly string[];
-}
 
 /**
  * @command set_entity_name
@@ -218,7 +182,7 @@ interface SetEntityNameParams {
  * @invariant entity geometry and position are not changed
  * @failure missing id -> no-op, affected:[]
  */
-export const setEntityName: CommandDefinition<SetEntityNameParams> = {
+export const setEntityName = defineCommand({
   name: 'set_entity_name',
   annotations: { idempotent: true },
   description:
@@ -227,26 +191,23 @@ export const setEntityName: CommandDefinition<SetEntityNameParams> = {
     'Pass name:"" to clear the name, or tags:[] to clear all tags. ' +
     'Enables AI/MCP plans to reference entities by meaning instead of generated ids, ' +
     'and allows `find_entities` to filter by name or tag.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'string', description: 'Id of the entity to label.' },
-      name: {
-        type: 'string',
-        description:
-          'New display name for the entity, e.g. "Left wall". ' +
+  params: z.object({
+    id: z.string().describe('Id of the entity to label.'),
+    name: z
+      .string()
+      .describe(
+        'New display name for the entity, e.g. "Left wall". ' +
           'Omit to leave the existing name unchanged; pass an empty string to clear it.',
-      },
-      tags: {
-        type: 'array',
-        description:
-          'Array of semantic tag strings to assign, e.g. ["structural","visible"]. ' +
+      )
+      .optional(),
+    tags: z
+      .array(z.string())
+      .describe(
+        'Array of semantic tag strings to assign, e.g. ["structural","visible"]. ' +
           'Omit to leave existing tags unchanged. Pass [] to clear all tags.',
-        items: { type: 'string' },
-      },
-    },
-    required: ['id'],
-  },
+      )
+      .optional(),
+  }),
   run: (doc, { id, name, tags }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
@@ -278,7 +239,7 @@ export const setEntityName: CommandDefinition<SetEntityNameParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // Re-export for barrel convenience
 export const editCommands = [duplicateEntity, groupEntities, ungroupEntities, setEntityName];

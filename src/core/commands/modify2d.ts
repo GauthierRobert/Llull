@@ -23,7 +23,8 @@
  */
 
 import type { CadDocument, Entity, Vec2, Vec3, LineEntity, PolylineEntity } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { nextId } from '../../lib/id';
 
 // ---------------------------------------------------------------------------
@@ -144,10 +145,6 @@ function withoutEntity(doc: CadDocument, id: string): CadDocument {
 // explode_polyline
 // ---------------------------------------------------------------------------
 
-interface ExplodePolylineParams {
-  id: string;
-}
-
 /**
  * @command explode_polyline
  * @pure
@@ -156,22 +153,15 @@ interface ExplodePolylineParams {
  * @invariant source entity must be kind:'polyline' with >= 2 points
  * @failure missing id / wrong kind / < 2 points -> no-op, affected:[]
  */
-export const explodePolyline: CommandDefinition<ExplodePolylineParams> = {
+export const explodePolyline = defineCommand({
   name: 'explode_polyline',
   description:
     'Explode a polyline entity into individual line segments. Each consecutive pair of vertices becomes a separate line entity. ' +
     'If the polyline is closed, a final segment is added from the last point back to the first. ' +
     'The original polyline is removed. No-op if the entity is not a polyline or has fewer than 2 points.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the polyline entity to explode.',
-      },
-    },
-    required: ['id'],
-  },
+  params: z.object({
+    id: z.string().describe('Id of the polyline entity to explode.'),
+  }),
   run: (doc, { id }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
@@ -227,16 +217,11 @@ export const explodePolyline: CommandDefinition<ExplodePolylineParams> = {
       affected: createdIds,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // offset_2d
 // ---------------------------------------------------------------------------
-
-interface Offset2DParams {
-  id: string;
-  distance: number;
-}
 
 /**
  * @command offset_2d
@@ -252,7 +237,7 @@ interface Offset2DParams {
  *   Circle: positive → larger concentric circle; negative → smaller (clamped to radius > 0).
  *   Rectangle: positive → expands all sides outward; negative → shrinks (clamped so each side > 0).
  */
-export const offset2D: CommandDefinition<Offset2DParams> = {
+export const offset2D = defineCommand({
   name: 'offset_2d',
   description:
     'Create a parallel-offset copy of a 2D shape at the given distance. ' +
@@ -262,21 +247,14 @@ export const offset2D: CommandDefinition<Offset2DParams> = {
     'rectangle (all sides expand/shrink: positive=outward, negative=inward). ' +
     'The original entity is unchanged; a new entity is added. ' +
     'No-op for unsupported kinds or if the resulting shape would be degenerate (e.g. negative circle radius).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the source entity to offset.',
-      },
-      distance: {
-        type: 'number',
-        description:
-          'Offset distance in work-plane units. Positive = left of direction (line/polyline) or outward (circle/rectangle). Negative reverses the direction.',
-      },
-    },
-    required: ['id', 'distance'],
-  },
+  params: z.object({
+    id: z.string().describe('Id of the source entity to offset.'),
+    distance: z
+      .number()
+      .describe(
+        'Offset distance in work-plane units. Positive = left of direction (line/polyline) or outward (circle/rectangle). Negative reverses the direction.',
+      ),
+  }),
   run: (doc, { id, distance }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
@@ -437,16 +415,11 @@ export const offset2D: CommandDefinition<Offset2DParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // trim
 // ---------------------------------------------------------------------------
-
-interface TrimParams {
-  id: string;
-  boundaryId: string;
-}
 
 /**
  * @command trim
@@ -462,7 +435,7 @@ interface TrimParams {
  *   In other words, the "short" side of the line is trimmed off.
  *   Only trims at intersections within the segment bounds (t ∈ [0,1]).
  */
-export const trim: CommandDefinition<TrimParams> = {
+export const trim = defineCommand({
   name: 'trim',
   description:
     'Shorten a line entity so it ends exactly at its intersection with a boundary line. ' +
@@ -470,20 +443,10 @@ export const trim: CommandDefinition<TrimParams> = {
     'The endpoint of id that is closer to the intersection is moved to the intersection point ' +
     '(the shorter side is trimmed; the longer side is preserved). ' +
     'No-op if either entity is not a line, they do not intersect within segment bounds, or if the entities are the same.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the line entity to trim.',
-      },
-      boundaryId: {
-        type: 'string',
-        description: 'Id of the line entity that acts as the trim boundary.',
-      },
-    },
-    required: ['id', 'boundaryId'],
-  },
+  params: z.object({
+    id: z.string().describe('Id of the line entity to trim.'),
+    boundaryId: z.string().describe('Id of the line entity that acts as the trim boundary.'),
+  }),
   run: (doc, { id, boundaryId }): CommandResult => {
     if (id === boundaryId) {
       return {
@@ -574,16 +537,11 @@ export const trim: CommandDefinition<TrimParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // extend
 // ---------------------------------------------------------------------------
-
-interface ExtendParams {
-  id: string;
-  boundaryId: string;
-}
 
 /**
  * @command extend
@@ -598,7 +556,7 @@ interface ExtendParams {
  *   through `boundaryId`. The endpoint of `id` that is closer to the intersection
  *   is extended to meet it. No-op if lines are parallel.
  */
-export const extend: CommandDefinition<ExtendParams> = {
+export const extend = defineCommand({
   name: 'extend',
   description:
     'Lengthen a line entity so one of its endpoints meets the infinite extension of a boundary line. ' +
@@ -606,20 +564,10 @@ export const extend: CommandDefinition<ExtendParams> = {
     'The endpoint of id that is closer to the intersection with the boundary (extended if necessary) ' +
     'is moved to that intersection point. ' +
     'No-op if lines are parallel, entities are missing or not lines, or id === boundaryId.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the line entity to extend.',
-      },
-      boundaryId: {
-        type: 'string',
-        description: 'Id of the line entity that acts as the extend boundary.',
-      },
-    },
-    required: ['id', 'boundaryId'],
-  },
+  params: z.object({
+    id: z.string().describe('Id of the line entity to extend.'),
+    boundaryId: z.string().describe('Id of the line entity that acts as the extend boundary.'),
+  }),
   run: (doc, { id, boundaryId }): CommandResult => {
     if (id === boundaryId) {
       return {
@@ -700,17 +648,11 @@ export const extend: CommandDefinition<ExtendParams> = {
       affected: [id],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // fillet_2d
 // ---------------------------------------------------------------------------
-
-interface Fillet2DParams {
-  id: string;
-  radius: number;
-  vertexIndex: number;
-}
 
 /**
  * @command fillet_2d
@@ -726,7 +668,7 @@ interface Fillet2DParams {
  * are trimmed to these tangent points; the arc is inserted as a separate ArcEntity.
  * The polyline is updated with the new trimmed points (vertex replaced by the two tangent points).
  */
-export const fillet2D: CommandDefinition<Fillet2DParams> = {
+export const fillet2D = defineCommand({
   name: 'fillet_2d',
   description:
     'Round a single vertex of a polyline with a tangent arc of the given radius. ' +
@@ -735,27 +677,17 @@ export const fillet2D: CommandDefinition<Fillet2DParams> = {
     'vertexIndex is 0-based; for an open polyline valid range is 1 to N-2 (interior vertices only); ' +
     'for a closed polyline any vertex 0 to N-1 is valid. ' +
     'No-op if radius is too large for the adjacent segment lengths, or if the entity is not a polyline.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the polyline entity to fillet.',
-      },
-      radius: {
-        type: 'number',
-        description: 'Fillet radius. Must be > 0.',
-      },
-      vertexIndex: {
-        type: 'number',
-        description:
-          '0-based index of the polyline vertex to fillet. ' +
+  params: z.object({
+    id: z.string().describe('Id of the polyline entity to fillet.'),
+    radius: z.number().describe('Fillet radius. Must be > 0.'),
+    vertexIndex: z
+      .number()
+      .describe(
+        '0-based index of the polyline vertex to fillet. ' +
           'For open polylines: valid range is 1 to N-2 (interior vertices). ' +
           'For closed polylines: valid range is 0 to N-1.',
-      },
-    },
-    required: ['id', 'radius', 'vertexIndex'],
-  },
+      ),
+  }),
   run: (doc, { id, radius, vertexIndex }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
@@ -970,17 +902,11 @@ export const fillet2D: CommandDefinition<Fillet2DParams> = {
       affected: [id, arcId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // chamfer_2d
 // ---------------------------------------------------------------------------
-
-interface Chamfer2DParams {
-  id: string;
-  distance: number;
-  vertexIndex: number;
-}
 
 /**
  * @command chamfer_2d
@@ -995,7 +921,7 @@ interface Chamfer2DParams {
  * vertex along each adjacent segment. The polyline is updated with the bevel endpoints
  * (vertex replaced by the two trim points); the bevel is inserted as a separate LineEntity.
  */
-export const chamfer2D: CommandDefinition<Chamfer2DParams> = {
+export const chamfer2D = defineCommand({
   name: 'chamfer_2d',
   description:
     'Bevel a single vertex of a polyline with a straight chamfer at the given distance. ' +
@@ -1005,28 +931,21 @@ export const chamfer2D: CommandDefinition<Chamfer2DParams> = {
     'vertexIndex is 0-based; for an open polyline valid range is 1 to N-2 (interior vertices only); ' +
     'for a closed polyline any vertex 0 to N-1 is valid. ' +
     'No-op if distance is too large for the adjacent segment lengths.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the polyline entity to chamfer.',
-      },
-      distance: {
-        type: 'number',
-        description:
-          'Chamfer setback distance from the vertex along each adjacent segment. Must be > 0.',
-      },
-      vertexIndex: {
-        type: 'number',
-        description:
-          '0-based index of the polyline vertex to chamfer. ' +
+  params: z.object({
+    id: z.string().describe('Id of the polyline entity to chamfer.'),
+    distance: z
+      .number()
+      .describe(
+        'Chamfer setback distance from the vertex along each adjacent segment. Must be > 0.',
+      ),
+    vertexIndex: z
+      .number()
+      .describe(
+        '0-based index of the polyline vertex to chamfer. ' +
           'For open polylines: valid range is 1 to N-2. ' +
           'For closed polylines: valid range is 0 to N-1.',
-      },
-    },
-    required: ['id', 'distance', 'vertexIndex'],
-  },
+      ),
+  }),
   run: (doc, { id, distance, vertexIndex }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
@@ -1153,4 +1072,4 @@ export const chamfer2D: CommandDefinition<Chamfer2DParams> = {
       affected: [id, bevelId],
     };
   },
-};
+});

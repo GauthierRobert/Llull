@@ -7,7 +7,9 @@
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
+import { vec3 } from './vec';
 import { nextId } from '../../lib/id';
 
 // ---------------------------------------------------------------------------
@@ -156,14 +158,8 @@ function withEntity(doc: CadDocument, entity: Entity): CadDocument {
  * @invariant radius > 0; ||p2 - p1|| > 1e-9; rotation encodes dir p1→p2 in intrinsic XYZ Euler
  * @failure radius <= 0 or degenerate p1===p2 or non-array inputs → no-op, affected:[]
  */
-interface MakeTubeBetweenParams {
-  p1: Vec3;
-  p2: Vec3;
-  radius: number;
-  color?: string;
-}
 
-export const makeTubeBetween: CommandDefinition<MakeTubeBetweenParams> = {
+export const makeTubeBetween = defineCommand({
   name: 'make_tube_between',
   description:
     'Create a cylinder (tube) that spans exactly from world point p1 to world point p2. ' +
@@ -172,32 +168,19 @@ export const makeTubeBetween: CommandDefinition<MakeTubeBetweenParams> = {
     'p1 and p2 are [x, y, z] world coordinates. radius is the tube cross-section radius (> 0). ' +
     'The returned entity id is the only affected id. ' +
     'Fails gracefully (no-op) when radius <= 0 or p1 equals p2 (degenerate tube).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      p1: {
-        type: 'array',
-        description:
-          'Start point of the tube in world space [x, y, z]. The cylinder base center is placed here.',
-        items: { type: 'number' },
-      },
-      p2: {
-        type: 'array',
-        description:
-          'End point of the tube in world space [x, y, z]. The cylinder top center is placed here.',
-        items: { type: 'number' },
-      },
-      radius: {
-        type: 'number',
-        description: 'Cross-section radius of the tube. Must be greater than 0.',
-      },
-      color: {
-        type: 'string',
-        description: 'Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".',
-      },
-    },
-    required: ['p1', 'p2', 'radius'],
-  },
+  params: z.object({
+    p1: vec3(
+      'Start point of the tube in world space [x, y, z]. The cylinder base center is placed here.',
+    ),
+    p2: vec3(
+      'End point of the tube in world space [x, y, z]. The cylinder top center is placed here.',
+    ),
+    radius: z.number().describe('Cross-section radius of the tube. Must be greater than 0.'),
+    color: z
+      .string()
+      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .optional(),
+  }),
   run: (doc, { p1, p2, radius, color = '#6b8f9c' }): CommandResult => {
     // --- Validate inputs ---
     if (
@@ -282,4 +265,4 @@ export const makeTubeBetween: CommandDefinition<MakeTubeBetweenParams> = {
       affected: [id],
     };
   },
-};
+});

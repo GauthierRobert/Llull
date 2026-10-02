@@ -13,7 +13,8 @@
 
 import type { CadDocument, Entity, EntityGroup, MeshSolidEntity } from '../model/types';
 import { is3D } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { currentContext } from './context';
 import { nextId } from '../../lib/id';
 
@@ -80,12 +81,6 @@ function validateSolidTarget(
 // fillet_edge
 // ---------------------------------------------------------------------------
 
-interface FilletEdgeParams {
-  id: string;
-  edgeIndices?: number[];
-  radius: number;
-}
-
 /**
  * @command fillet_edge
  * @pure
@@ -94,7 +89,7 @@ interface FilletEdgeParams {
  * @invariant target must be a 3D solid; radius > 0; geometry kernel must be injected
  * @failure missing id, 2D kind, radius ≤ 0, kernel absent, or kernel null → no-op, affected:[]
  */
-export const filletEdge: CommandDefinition<FilletEdgeParams> = {
+export const filletEdge = defineCommand({
   name: 'fillet_edge',
   annotations: { requiresKernel: true },
   description:
@@ -105,28 +100,20 @@ export const filletEdge: CommandDefinition<FilletEdgeParams> = {
     'Requires a geometry kernel that supports filletEdges (available with ?kernel=occt). ' +
     'With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the 3D solid entity to fillet. Must exist and be a 3D solid kind.',
-      },
-      edgeIndices: {
-        type: 'array',
-        items: { type: 'number' },
-        description:
-          '0-based indices of the edges to fillet. Pass [] or omit to fillet ALL edges. ' +
+  params: z.object({
+    id: z
+      .string()
+      .describe('Id of the 3D solid entity to fillet. Must exist and be a 3D solid kind.'),
+    edgeIndices: z
+      .array(z.number())
+      .describe(
+        '0-based indices of the edges to fillet. Pass [] or omit to fillet ALL edges. ' +
           'Edge numbering is kernel-defined (OCC enumerates edges in topology traversal order). ' +
           'Ignored by kernels that do not support partial-edge selection.',
-      },
-      radius: {
-        type: 'number',
-        description: 'Fillet radius in document units. Must be > 0.',
-      },
-    },
-    required: ['id', 'radius'],
-  },
+      )
+      .optional(),
+    radius: z.number().describe('Fillet radius in document units. Must be > 0.'),
+  }),
   run: (doc, { id, edgeIndices = [], radius }, ctx): CommandResult => {
     if (radius <= 0) {
       return {
@@ -187,17 +174,11 @@ export const filletEdge: CommandDefinition<FilletEdgeParams> = {
       affected: [newId],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // chamfer_edge
 // ---------------------------------------------------------------------------
-
-interface ChamferEdgeParams {
-  id: string;
-  edgeIndices?: number[];
-  distance: number;
-}
 
 /**
  * @command chamfer_edge
@@ -207,7 +188,7 @@ interface ChamferEdgeParams {
  * @invariant target must be a 3D solid; distance > 0; geometry kernel must be injected
  * @failure missing id, 2D kind, distance ≤ 0, kernel absent, or kernel null → no-op, affected:[]
  */
-export const chamferEdge: CommandDefinition<ChamferEdgeParams> = {
+export const chamferEdge = defineCommand({
   name: 'chamfer_edge',
   annotations: { requiresKernel: true },
   description:
@@ -219,27 +200,19 @@ export const chamferEdge: CommandDefinition<ChamferEdgeParams> = {
     'Both the default Manifold kernel and the current OCC kernel gracefully no-op ' +
     '(chamferEdges OCC spike is pending a separate batch). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Id of the 3D solid entity to chamfer. Must exist and be a 3D solid kind.',
-      },
-      edgeIndices: {
-        type: 'array',
-        items: { type: 'number' },
-        description:
-          '0-based indices of the edges to chamfer. Pass [] or omit to chamfer ALL edges. ' +
+  params: z.object({
+    id: z
+      .string()
+      .describe('Id of the 3D solid entity to chamfer. Must exist and be a 3D solid kind.'),
+    edgeIndices: z
+      .array(z.number())
+      .describe(
+        '0-based indices of the edges to chamfer. Pass [] or omit to chamfer ALL edges. ' +
           'Edge numbering is kernel-defined (OCC enumerates edges in topology traversal order).',
-      },
-      distance: {
-        type: 'number',
-        description: 'Chamfer distance in document units. Must be > 0.',
-      },
-    },
-    required: ['id', 'distance'],
-  },
+      )
+      .optional(),
+    distance: z.number().describe('Chamfer distance in document units. Must be > 0.'),
+  }),
   run: (doc, { id, edgeIndices = [], distance }, ctx): CommandResult => {
     if (distance <= 0) {
       return {
@@ -300,4 +273,4 @@ export const chamferEdge: CommandDefinition<ChamferEdgeParams> = {
       affected: [newId],
     };
   },
-};
+});
