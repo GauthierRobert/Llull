@@ -13,11 +13,13 @@ export default defineConfig({
     alias: {
       '@core': resolve(__dirname, '../src/core'),
       '@lib': resolve(__dirname, '../src/lib'),
+      '@app': resolve(__dirname, '../src/app'),
     },
   },
   test: {
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    setupFiles: ['./tests/setup.ts'],
   },
 });

@@ -29,10 +29,9 @@ import type {
 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { buildingErrors } from './building/validate';
-import { regenerateBuilding } from './building/evaluate';
 import { isRecord } from '../../lib/isRecord';
 import { derivedEntityIds } from '../model/partition';
+import { documentExtensions } from '../plugins/host';
 
 // ---------------------------------------------------------------------------
 // Envelope types
@@ -116,34 +115,9 @@ function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unkno
   return next === 1 && raw['nextStepNumber'] === undefined ? raw : { ...raw, nextStepNumber: next };
 }
 
-/**
- * Re-derive building geometry omitted by `serializeDocument` and restore the saved draw order
- * (regeneration appends; saved positions win, new ids follow).
- */
+/** Re-derive geometry the file omitted, via every installed plugin's document extension (MG4.2/MG6.2). */
 function restoreDerivedEntities(raw: Record<string, unknown>): Record<string, unknown> {
-  const building = raw['building'];
-  if (building === undefined || buildingErrors(building).length > 0) return raw;
-  const savedOrder = Array.isArray(raw['order']) ? (raw['order'] as string[]) : [];
-  const base = raw as unknown as CadDocument;
-  const regenerated = regenerateBuilding(
-    { ...base, order: savedOrder.filter((id) => id in base.entities), selection: [] },
-    base.building as NonNullable<CadDocument['building']>,
-  );
-  const present = savedOrder.filter((id) => id in regenerated.entities);
-  const placed = new Set(present);
-  const order = [...present, ...regenerated.order.filter((id) => !placed.has(id))];
-  const selection = Array.isArray(raw['selection'])
-    ? (raw['selection'] as string[]).filter((id) => id in regenerated.entities)
-    : [];
-  return {
-    ...raw,
-    entities: regenerated.entities,
-    order,
-    selection,
-    building: regenerated.building,
-    layers: regenerated.layers,
-    layerOrder: regenerated.layerOrder,
-  };
+  return documentExtensions().reduce((current, extension) => extension.restore(current), raw);
 }
 
 // ---------------------------------------------------------------------------
@@ -672,7 +646,7 @@ function validateDocumentValues(v: Record<string, unknown>): string[] {
   }
 
   // Building model (optional field — validated when present)
-  if (v['building'] !== undefined) errors.push(...buildingErrors(v['building']));
+  for (const extension of documentExtensions()) errors.push(...extension.validate(v));
 
   // DriveRelations (optional field — only validate if present)
   if (isRecord(v['driveRelations'])) {

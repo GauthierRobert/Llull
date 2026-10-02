@@ -25,7 +25,8 @@
     "paths": {
       "@core/*": ["./src/core/*"],
       "@ui/*": ["./src/ui/*"],
-      "@lib/*": ["./src/lib/*"]
+      "@lib/*": ["./src/lib/*"],
+      "@app/*": ["./src/app/*"]
     }
   },
   "include": ["src", "tests"]

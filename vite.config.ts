@@ -42,6 +42,7 @@ export default defineConfig(({ command }) => ({
       '@core': resolve(__dirname, 'src/core'),
       '@ui': resolve(__dirname, 'src/ui'),
       '@lib': resolve(__dirname, 'src/lib'),
+      '@app': resolve(__dirname, 'src/app'),
     },
   },
   test: {

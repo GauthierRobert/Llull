@@ -1,5 +1,5 @@
 /**
- * Building (AEC / BIM) command set, appended to the registry.
+ * Building (AEC / BIM) and industrial command sets, installed as plugins (see plugin.ts).
  * @layer core/commands/building
  */
 
@@ -50,6 +50,7 @@ import { exportAnchorPlan } from './industrial/anchorPlan';
 import { runwayCheck } from './industrial/runwayCheck';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
+/** AEC / BIM commands (levels, walls, openings, slabs, sheets, IFC, takeoff). */
 export const buildingCommands = [
   addLevel,
   updateLevel,
@@ -84,6 +85,12 @@ export const buildingCommands = [
   exportElevationSheet,
   exportIfc,
   addBuildingTemplate,
+  addCurvedWall,
+  setWallLayers,
+] as ReadonlyArray<CommandDefinition<unknown>>;
+
+/** Industrial-steel commands (portal frames, members, checks, fabrication). */
+export const industrialCommands = [
   listSteelProfiles,
   addSteelMember,
   updateSteelMember,
@@ -93,8 +100,6 @@ export const buildingCommands = [
   addPipeRun,
   addCableTray,
   addBasePlates,
-  addCurvedWall,
-  setWallLayers,
   addMomentConnections,
   checkPortalFrames,
   designPortalFrames,

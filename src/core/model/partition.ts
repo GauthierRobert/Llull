@@ -8,6 +8,7 @@
  */
 
 import type { CadDocument } from './types';
+import { documentExtensions } from '../plugins/host';
 
 /** Keys holding evaluated geometry (the render/export cache). */
 export const EVALUATED_KEYS = ['entities', 'order'] as const;
@@ -34,13 +35,12 @@ export function withEvaluated(
 }
 
 /**
- * Entity ids regenerated from the definition by a pure evaluator (today: building elements via
- * `regenerateBuilding`). Persistence may omit these and re-derive them on load (MG4.2).
+ * Entity ids regenerated from the definition by an installed plugin's pure deriver (today: the
+ * building plugin via `regenerateBuilding`). Persistence omits these and re-derives them on load.
  */
 export function derivedEntityIds(doc: CadDocument): Set<string> {
   const ids = new Set<string>();
-  for (const element of Object.values(doc.building?.elements ?? {})) {
-    for (const id of element.entityIds) ids.add(id);
-  }
+  for (const extension of documentExtensions())
+    for (const id of extension.derivedEntityIds(doc)) ids.add(id);
   return ids;
 }

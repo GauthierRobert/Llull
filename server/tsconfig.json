@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "node",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "outDir": "dist",
     "strict": true,
     "noUnusedLocals": true,
@@ -16,10 +18,27 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@core/*": ["../src/core/*"],
-      "@lib/*": ["../src/lib/*"]
+      "@core/*": [
+        "../src/core/*"
+      ],
+      "@lib/*": [
+        "../src/lib/*"
+      ],
+      "@app/*": [
+        "../src/app/*"
+      ]
     }
   },
-  "include": ["src", "examples", "tests", "../src/core", "../src/lib"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "examples",
+    "tests",
+    "../src/core",
+    "../src/lib",
+    "../src/app"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

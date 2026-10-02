@@ -20,6 +20,7 @@
  * MCP_AUTH_TOKEN, LLULL_REQUIRE_TOKEN_FOR_REST, LLULL_ALLOWED_HOSTS, LLULL_ALLOW_UNAUTHENTICATED, LLULL_REST_RATE_LIMIT_*; see server/README.md.
  */
 
+import './plugins'; // must stay first: installs domain plugins before liveDocument loads
 import './loadEnv';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';

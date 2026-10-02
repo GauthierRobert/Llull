@@ -102,10 +102,8 @@ import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
 import { deleteEntities } from './deleteMany';
-import { buildingCommands } from './building';
-import { buildingDerivationGuard } from './building/derivationGuard';
-import type { DerivationGuard } from './derivation';
 import { derivationViolation } from './derivation';
+import { onPluginInstalled, pluginGuards } from '../plugins/host';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
   if (typeof value === 'number') return !Number.isFinite(value);
@@ -175,9 +173,6 @@ function corruptionReason(entity: unknown): string | null {
  * @invariant non-object params are coerced to {} so field destructuring cannot throw;
  * a 2-number `position` is padded to [x, y, 0]; free-text params are never rejected
  */
-/** Read-only rules for geometry derived from definition elements (MG4.5). */
-const DERIVATION_GUARDS: ReadonlyArray<DerivationGuard> = [buildingDerivationGuard];
-
 function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknown> {
   return {
     ...def,
@@ -232,7 +227,7 @@ function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknow
           affected: [],
         };
       }
-      const violation = derivationViolation(DERIVATION_GUARDS, def.name, doc, result.document);
+      const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);
       if (violation !== null) {
         return { document: doc, summary: violation, affected: [] };
       }
@@ -368,12 +363,24 @@ const rawDefinitions = [
   drawBeltAround,
   distributeAlongPath,
   deleteEntities,
-  ...buildingCommands,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
-const definitions: ReadonlyArray<CommandDefinition<unknown>> = rawDefinitions.map(guardCommand);
+/** Core commands, then every installed plugin's commands in installation order (MG6.2). */
+const definitions: CommandDefinition<unknown>[] = rawDefinitions.map(guardCommand);
 
 const byName = new Map<string, CommandDefinition<unknown>>(definitions.map((d) => [d.name, d]));
+
+onPluginInstalled((plugin) => {
+  const clash = plugin.commands.find((command) => byName.has(command.name));
+  if (clash) {
+    throw new Error(`plugin '${plugin.name}': command '${clash.name}' is already registered`);
+  }
+  for (const command of plugin.commands) {
+    const guarded = guardCommand(command);
+    definitions.push(guarded);
+    byName.set(guarded.name, guarded);
+  }
+});
 
 export function listCommands(): ReadonlyArray<CommandDefinition<unknown>> {
   return definitions;

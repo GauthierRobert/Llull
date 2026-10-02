@@ -11,6 +11,7 @@ import '@fontsource/geist-mono/latin-400.css';
 import '@fontsource/geist-mono/latin-500.css';
 import '@fontsource/geist-mono/latin-600.css';
 import '@ui/styles/index.css';
+import { installDefaultPlugins } from '@app/plugins';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@core/geometry/manifoldKernel';
 import { parseKernelChoice } from '@core/geometry/kernelChoice';
@@ -47,6 +48,8 @@ if (useOcct) {
     .then(setGeometryKernel)
     .catch((e: unknown) => console.error('Manifold kernel init failed', e));
 }
+
+installDefaultPlugins();
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found.');

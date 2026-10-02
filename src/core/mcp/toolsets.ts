@@ -11,7 +11,7 @@
  * @pure
  */
 
-import { buildingCommands } from '@core/commands/building';
+import { pluginToolNames } from '@core/plugins/host';
 
 export const TOOLSET_NAMES = [
   'core',
@@ -163,7 +163,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'import_step',
     'import_code',
   ],
-  building: buildingCommands.map((command) => command.name),
+  /** Contributed by the installed building + industrial plugins (MG6.2). */
+  get building(): readonly string[] {
+    return pluginToolNames('building');
+  },
 };
 
 export interface ParsedToolsets {
