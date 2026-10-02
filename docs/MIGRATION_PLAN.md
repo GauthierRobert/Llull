@@ -246,3 +246,19 @@ re-evaluates only dependent steps (measured vs MG0.4 baseline).
   inserted step (configurations replayed to an empty model); the building uid became deterministic
   with step ids and now uses `uniqueId()`; `list_steel_profiles` lower-case family names kept working
   via `tolerant()`; server typecheck (CI) was red on the base and is green now.
+
+## Final review (cad-reviewer) — all findings fixed
+
+- **Blocking, sync:** outbox entries are acked by client `commandId` (not position) and local
+  undo/redo are refused during a flush; offline ids are remapped onto the server's `affected` ids
+  during the flush, so a replayed edit never lands on an entity another client created meanwhile.
+- **Should-fix:** idempotent `POST /command` (`commandId` LRU); ordered resync (server `epoch`,
+  stale snapshots/events ignored, one in-flight fetch); step counter stays monotonic across undo/redo;
+  history operations, `set_parameter` and `instantiate_recipe` refuse explicitly without a kernel
+  (recipe steps included); the replay cache never memoizes a step that mints a unique id;
+  `set_parameter` dependents see through recipes and constraint expressions.
+- **Nits:** duplicate command names inside one plugin refused; contract test that schemas never
+  use `.default()` / `.transform()` (run receives raw params); context-restore-on-throw tests.
+  Not changed: the 64-bit replay-cache key hash (collision risk negligible) and cold first replay
+  after a new step (performance only).
+
