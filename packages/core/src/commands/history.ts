@@ -7,7 +7,7 @@
  * IMPORTANT: meta-commands must NOT themselves append a FeatureStep; they carry
  * `annotations.metaHistory: true` so `execute()` skips the append hook for them.
  *
- * Replays resolve commands through the active `ExecutionContext.registry` (MG1.2).
+ * Replays resolve commands through the active `ExecutionContext.registry`.
  *
  * @layer core/commands
  */
@@ -117,10 +117,10 @@ export function replayHistory(
 
   // idMap tracks old entity id (from when the step was first recorded) → new id
   // (assigned during this replay). Subsequent steps' params are rewritten via
-  // remapIds. Step-scoped ids (MG3) replay identically, so this only maps legacy (pre-v2) ids.
+  // remapIds. Step-scoped ids replay identically, so this only maps legacy (pre-v2) ids.
   let idMap = new Map<string, string>();
   const cache = context.replayCache;
-  // MG4.3: states are keyed by everything that determines them, so an unchanged prefix of an
+  // States are keyed by everything that determines them, so an unchanged prefix of an
   // edited history (or of a parameter change) is served from the cache instead of re-run.
   let stateKey = cache ? hashText(JSON.stringify({ ...doc, featureHistory: [] })) : '';
 

@@ -1,5 +1,5 @@
 /**
- * MG0.2 schema conformance: params synthesized from each command's own `paramsSchema`
+ * Schema conformance: params synthesized from each command's own `paramsSchema`
  * (required props, first enum value, sample numbers/strings, ids of a seeded entity) must
  * never make `run` throw. A throw here means the schema advertises a shape the command
  * cannot consume — schema/params drift that agents would hit.

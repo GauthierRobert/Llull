@@ -1,5 +1,5 @@
 /**
- * Unit tests for EN1 — MCP tool annotations.
+ * Unit tests for MCP tool annotations.
  *
  * Covers:
  *   1. CommandDefinition.annotations fields are present on the right commands.

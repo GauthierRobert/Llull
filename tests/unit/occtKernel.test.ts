@@ -4,19 +4,17 @@
  * Live WASM tests (BRepAlgoAPI_Fuse, BRepFilletAPI_MakeFillet) require the
  * 63 MB opencascade.js binary and a Node.js environment with WASM support.
  * They are marked `describe.skip` because Vitest runs in jsdom where WASM of
- * this size cannot be loaded. Correctness is manually verified; measurements
- * are recorded in docs/decisions/KI4-occt-spike.md.
+ * this size cannot be loaded. Live coverage: server/tests/kernelChoice.test.ts;
+ * measurements are recorded in docs/decisions/KI4-occt-spike.md.
  *
- * The `describe.skipIf(!isNodeEnv)` gate from the KI4 spike was tautological:
- * `process.versions.node` exists in jsdom too (Vitest runs in Node.js), so the
- * condition never fired. Replaced with unconditional `describe.skip` so CI does
- * not silently run (and try to load) the 63 MB WASM binary.
+ * @invariant unconditional `describe.skip`, not `skipIf(!isNodeEnv)`: `process.versions.node`
+ *   exists in jsdom too, so a Node check would load the 63 MB WASM binary in CI.
  *
  * Always-run tests verify:
  *   - Entity structure contracts (used by kernel internals).
  *   - GeometryKernel interface conformance (TypeScript compile-time gate).
- *   - New Batch-14 methods: filletEdges / chamferEdges / shellSolid exist on the interface.
- *   - New Batch-15 KI4-followup: meshDataToTopoDSShape helper exists (static check).
+ *   - filletEdges / chamferEdges / shellSolid exist on the interface.
+ *   - meshDataToTopoDSShape helper exists (static check).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -24,7 +22,7 @@ import type { BoxEntity } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 
 // ---------------------------------------------------------------------------
-// Test entities — two 2×2×2 boxes (matching the spike script).
+// Test entities — two 2×2×2 boxes (as in docs/decisions/KI4-occt-spike.md).
 // ---------------------------------------------------------------------------
 
 const BOX_A: BoxEntity = {
@@ -67,7 +65,7 @@ describe('OcctKernel — static contract tests (always run)', () => {
 
   it('documents skip reason: WASM binary is 63MB — not viable in jsdom CI', () => {
     // The opencascade.js WASM is 63 MB. Loading it in Vitest/jsdom would require
-    // a Node-env vitest config. Until then, live tests are manually verified.
+    // a Node-env vitest config; live coverage is server/tests/kernelChoice.test.ts.
     // See docs/decisions/KI4-occt-spike.md for recorded measurements.
     expect('skip reason documented').toBeTruthy();
   });
@@ -204,8 +202,7 @@ describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)',
   });
 
   it('filletEdges on a closed box mesh uses sewing path and returns a fillet result', async () => {
-    // Batch 15: filletEdges now uses meshDataToTopoDSShape (BRepBuilderAPI_Sewing)
-    // instead of AABB-rebuild. This mesh is a closed manifold box — sewing
+    // filletEdges uses meshDataToTopoDSShape (BRepBuilderAPI_Sewing). This mesh is a closed manifold box — sewing
     // should produce a solid and the fillet should succeed.
     const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
@@ -255,7 +252,7 @@ describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)',
     };
     const result = kernel.filletEdges(boxMesh, [], 0.2);
     expect(result).not.toBeNull();
-    // Fillet of a box adds significant geometry — spike measured 628 triangles.
+    // Fillet of a box adds significant geometry — measured 628 triangles.
     expect(result!.indices.length / 3).toBeGreaterThan(12);
   });
 

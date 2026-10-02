@@ -8,7 +8,7 @@
  * no tool schema is ever hand-written here.
  *
  * NOTE: This file defines minimal local types only — it does NOT depend
- * on any MCP SDK package (transport wiring is a G2 concern, not G1).
+ * on any MCP SDK package (transport wiring lives in server/).
  *
  * @pure No side effects beyond reading the registry.
  */

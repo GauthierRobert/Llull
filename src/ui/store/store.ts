@@ -142,7 +142,7 @@ export interface CadStoreState {
   localRedoStack: CadDocument[];
 
   /**
-   * Offline outbox (MG5.2): the local mutating commands, in order, that turned the last server
+   * Offline outbox: the local mutating commands, in order, that turned the last server
    * state into the current local document. Replayed to the server on reconnect.
    */
   localOutbox: OutboxCommand[];
@@ -150,7 +150,7 @@ export interface CadStoreState {
   /** Outbox entries undone offline (most recently undone last); re-queued by local redo. */
   localRedoOutbox: OutboxCommand[];
 
-  /** Client copy of the server document (server selection) at log position `liveSeq` (MG5.1). */
+  /** Client copy of the server document (server selection) at log position `liveSeq`. */
   liveBase: CadDocument;
 
   /** Log position of `liveBase`; -1 before the first snapshot. */
@@ -229,7 +229,7 @@ export interface CadStoreState {
    * exist in the incoming document — so click-highlights survive a server push.
    *
    * Used for: initial connect, undo/redo, resync after a log gap or hash mismatch.
-   * Ignored while offline edits are still being replayed to the server (MG5.2).
+   * Ignored while offline edits are still being replayed to the server.
    *
    * @pure  This is display sync, NOT a document mutation routed through execute().
    *        Allowed by the PRIME DIRECTIVE because it does not originate a CAD command.
@@ -237,7 +237,7 @@ export interface CadStoreState {
   hydrateLiveDocument(snapshot: LiveSnapshotEvent): void;
 
   /**
-   * Apply one broadcast command (MG5.1) by re-running it through `execute` on `liveBase` and
+   * Apply one broadcast command by re-running it through `execute` on `liveBase` and
    * verifying the server's state hash. Unchanged entities keep their object references.
    *
    * @returns false on a log gap or hash mismatch — the caller then fetches a snapshot.
@@ -399,7 +399,7 @@ function withLocalSelection(doc: CadDocument, selection: readonly EntityId[]): C
 }
 
 /**
- * Offline -> online reconcile (MG5.2): replay the outbox to the server as ordinary commands, in
+ * Offline -> online reconcile: replay the outbox to the server as ordinary commands, in
  * order (the server rebases them onto whatever happened meanwhile), then adopt the server
  * snapshot. Commands queued during the flush are sent too. Retries with backoff on failure.
  */

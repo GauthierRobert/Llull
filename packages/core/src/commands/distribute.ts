@@ -16,7 +16,7 @@
  * arc-length computation and tangent sampling. The resulting placement is an approximation
  * of the true Catmull-Rom curve — acceptable for chain-link spacing where the link pitch
  * is small relative to the curve radius. True Catmull-Rom tessellation is delegated to
- * the viewport (VS1 convention) and is not available in the command layer.
+ * the viewport and is not available in the command layer.
  *
  * Closed path: startOffset rotates the whole pattern around the loop. endOffset is ignored.
  * Open path: instances span [startOffset, totalLength − endOffset].

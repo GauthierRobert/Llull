@@ -1,5 +1,5 @@
 /**
- * Replay prefix cache (MG4.3): the document state after each replayed step, keyed by a hash of
+ * Replay prefix cache: the document state after each replayed step, keyed by a hash of
  * everything that determines it (initial state + every step's name, id and resolved params up to
  * that point). Editing step k or a parameter used only from step k on re-runs steps k..n only.
  *

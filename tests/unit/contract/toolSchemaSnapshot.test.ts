@@ -1,5 +1,5 @@
 /**
- * MG2.4 agent-facing schema snapshot. `toToolSchemas()` is exactly what MCP agents read;
+ * Agent-facing schema snapshot. `toToolSchemas()` is exactly what MCP agents read;
  * any change to a name, description, param shape or annotation must show up as a reviewed
  * snapshot diff (`npx vitest -u` to accept an intended change).
  */

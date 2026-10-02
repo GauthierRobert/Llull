@@ -1,4 +1,4 @@
-/** MG4.5 derivation guards: derived geometry is read-only; edit its source. */
+/** Derivation guards: derived geometry is read-only; edit its source. */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';

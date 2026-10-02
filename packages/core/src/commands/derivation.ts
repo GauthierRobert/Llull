@@ -1,5 +1,5 @@
 /**
- * Derivation guards (MG4.5): evaluated geometry that a definition element generated is read-only;
+ * Derivation guards: evaluated geometry that a definition element generated is read-only;
  * edit the source instead. Each guard inspects a command's before/after documents.
  *
  * @layer core/commands

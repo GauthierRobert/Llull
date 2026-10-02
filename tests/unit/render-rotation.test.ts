@@ -1,17 +1,15 @@
 /**
  * Tests that render_view honors entity.rotation for 3D solid kinds.
  *
- * Bug context: tessellate<Kind> functions in render.ts previously built vertices
- * using only entity.position, ignoring entity.rotation. The live three.js viewport
- * applied rotation correctly via <mesh rotation={...}/>, so the SVG renderer was
- * broken for any rotated entity.
+ * Regression guard: tessellate<Kind> in render.ts must apply entity.rotation, matching
+ * the live three.js viewport's <mesh rotation={...}/>.
  *
  * Rotation convention confirmed from src/ui/viewport/3d/entities/*Mesh.tsx:
  *   <mesh rotation={[rotation[0], rotation[1], rotation[2]]}>
  * three.js Euler default order is 'XYZ': column-vector composition M = Rx·Ry·Rz,
  * meaning Rz acts on the vector first, then Ry, then Rx (verified in three.js
  * Matrix4.makeRotationFromEuler where M[0][2] = sin(y), matching Rx·Ry·Rz·ẑ).
- * The render.ts fix applies the same Rx·Ry·Rz matrix about entity.position.
+ * render.ts applies the same Rx·Ry·Rz matrix about entity.position.
  *
  * @layer tests/unit
  */

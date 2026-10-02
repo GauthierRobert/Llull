@@ -165,7 +165,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'import_step',
     'import_code',
   ],
-  /** Contributed by the installed building + industrial plugins (MG6.2). */
+  /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {
     return pluginToolNames('building');
   },

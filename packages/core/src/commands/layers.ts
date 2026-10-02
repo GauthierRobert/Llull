@@ -8,8 +8,7 @@
  *   locked layer is allowed (the entity simply becomes harder to edit once there).
  *   Commands that mutate layers themselves (rename, visibility, lock, delete) do NOT
  *   require the layer to be unlocked — layer-level operations are always permitted.
- *   Broader enforcement (blocking geometry edits to entities on locked layers) is a
- *   cross-cutting concern left for a follow-up.
+ *   Geometry edits to entities on locked layers are NOT blocked.
  *
  * @layer core/commands
  */

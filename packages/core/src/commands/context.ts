@@ -37,7 +37,7 @@ export interface ExecutionContext {
    */
   readonly stepKey?: string;
   /**
-   * Replay prefix cache (MG4.3); null disables it. Results depend on the kernel, so the default
+   * Replay prefix cache; null disables it. Results depend on the kernel, so the default
    * context keeps one cache per installed kernel.
    */
   readonly replayCache: ReplayCache | null;
@@ -45,7 +45,7 @@ export interface ExecutionContext {
 
 let activeContext: ExecutionContext | null = null;
 
-/** One memoized wrapper per installed kernel, so the cache survives across executes (MG4.4). */
+/** One memoized wrapper per installed kernel, so the cache survives across executes. */
 const memoizedKernels = new WeakMap<GeometryKernel, GeometryKernel>();
 
 function memoized(kernel: GeometryKernel | null): GeometryKernel | null {

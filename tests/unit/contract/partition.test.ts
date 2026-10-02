@@ -1,4 +1,4 @@
-/** MG4.1 constructive/evaluated partition of the document. */
+/** Constructive/evaluated partition of the document. */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';

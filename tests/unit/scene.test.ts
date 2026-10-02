@@ -392,7 +392,7 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
 });
 
 // ---------------------------------------------------------------------------
-// instanceBoundsFromDoc — NF1 assembly bounds
+// instanceBoundsFromDoc — assembly bounds
 // ---------------------------------------------------------------------------
 
 describe('instanceBoundsFromDoc — instance world AABB', () => {

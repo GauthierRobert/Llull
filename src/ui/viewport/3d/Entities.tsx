@@ -9,7 +9,7 @@
  * Click wiring: plain click → select([id]); Shift/Ctrl/Meta click → toggleSelection(id).
  * The `onSelect` callback is threaded from the store down to each mesh via EntityRenderer.
  *
- * ## Instanced rendering (P2)
+ * ## Instanced rendering
  * Entities whose kind is batchable (box / cylinder / sphere) are grouped by
  * `groupEntitiesForInstancing` and rendered as InstancedMesh batches via
  * `<InstancedRenderer>`. This collapses N identical-geometry entities into 1
@@ -115,7 +115,7 @@ function InstanceEntityRenderer({
   );
 }
 
-/** PBR material override passed to entity mesh components (VNF4). */
+/** PBR material override passed to entity mesh components. */
 interface PbrMaterial {
   color: string;
   metalness: number;
@@ -180,7 +180,7 @@ function EntityRenderer({
         />
       );
     default:
-      // 2D shape kinds (line/arc/circle/…) are drawn by the 2D viewport (Lane 3 / D1),
+      // 2D shape kinds (line/arc/circle/…) are drawn by the 2D viewport (Viewport2D),
       // not in the 3D scene. Keeping a tolerant default lets the Entity union grow
       // without breaking this branch (architecture L7).
       return null;
@@ -249,7 +249,7 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
   );
 
   // --- Group batchable entities into InstancedMesh batches ---
-  // Pass the materials map so batches can carry per-batch PBR overrides (VNF4).
+  // Pass the materials map so batches can carry per-batch PBR overrides.
   const batches = useMemo(
     () => groupEntitiesForInstancing(batchableEntities, materials),
     [batchableEntities, materials],

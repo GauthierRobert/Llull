@@ -11,7 +11,7 @@
  * - anchorX derived from entity.anchor; default 'left'. anchorY always 'middle'.
  * - Selection tint: color switches to selection blue when selected.
  * - drei <Text> manages its own SDF geometry and disposal — no manual cleanup needed.
- * - Must be rendered inside the -renderOrigin group in Viewport2D.tsx (U4 convention).
+ * - Must be rendered inside the -renderOrigin group in Viewport2D.tsx.
  */
 
 import { Text } from '@react-three/drei';

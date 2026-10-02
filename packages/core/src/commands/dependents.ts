@@ -1,5 +1,5 @@
 /**
- * Parameter → feature dependencies (MG4.3): which history steps read which parameters, and
+ * Parameter → feature dependencies: which history steps read which parameters, and
  * regeneration of only what a parameter change affects.
  *
  * @layer core/commands

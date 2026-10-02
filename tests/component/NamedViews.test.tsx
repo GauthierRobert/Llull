@@ -1,5 +1,5 @@
 /**
- * Component / store tests for EN9 — named camera views.
+ * Component / store tests for named camera views.
  *
  * Covers:
  *   1. namedViewStore actions:

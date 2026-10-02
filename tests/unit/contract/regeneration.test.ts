@@ -1,4 +1,4 @@
-/** MG4.3 incremental regeneration: parameter edits regenerate dependents; replay reuses prefixes. */
+/** Incremental regeneration: parameter edits regenerate dependents; replay reuses prefixes. */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { BoxEntity, CadDocument } from '@core/model/types';

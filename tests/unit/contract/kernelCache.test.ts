@@ -1,4 +1,4 @@
-/** MG4.4 kernel memoization: identical operands hit the wrapped kernel once. */
+/** Kernel memoization: identical operands hit the wrapped kernel once. */
 import { describe, it, expect } from 'vitest';
 import type { BoxEntity } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';

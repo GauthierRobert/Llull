@@ -1,5 +1,5 @@
 /**
- * Constructive vs evaluated partition of a `CadDocument` (architecture L8, MG4.1).
+ * Constructive vs evaluated partition of a `CadDocument` (architecture L8).
  *
  * @layer core/model
  * @invariant `withEvaluated(definitionOf(d), evaluatedOf(d))` deep-equals `d`

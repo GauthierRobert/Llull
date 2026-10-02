@@ -1,5 +1,5 @@
 /**
- * Component / store tests for EN8 — 3D viewport enrichments.
+ * Component / store tests for the 3D viewport enrichments.
  *
  * Covers:
  *   1. viewportStore actions: setDisplayMode, setClipPlane, toggleClipPlane,

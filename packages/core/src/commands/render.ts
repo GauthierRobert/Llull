@@ -106,9 +106,9 @@ function tessellateEntity(e: Entity): PreDepthPolygon[] {
     case 'spline':
       return tessellate2DSpline(e);
     case 'text':
-      return []; // render deferred to VT1 (viewport-engineer)
+      return []; // not drawn in render_view SVG; the viewport renders text
     case 'dimension':
-      return []; // render deferred to VT2 (viewport-engineer)
+      return []; // not drawn in render_view SVG; the viewport renders dimensions
     case 'instance':
       return []; // expanded form not yet tessellated; use explode_instance to export
     default: {

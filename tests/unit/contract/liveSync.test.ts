@@ -1,4 +1,4 @@
-/** MG5.1 live sync: command log + state hash; gap/mismatch fall back to a snapshot. */
+/** Live sync: command log + state hash; gap/mismatch fall back to a snapshot. */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';

@@ -11,8 +11,7 @@
  * `expandInstance` bakes an instance into world-space entities for `explode_instance`.
  * Scene bounds (`scene.ts` `instanceBoundsFromDoc`) apply the SAME transform order
  * (scale → rotate-about-origin → translate) to each child's local-AABB corners — keep
- * the two in sync. The render tessellator does NOT yet expand instances (explode to
- * export); that is a tracked follow-up.
+ * the two in sync. The render tessellator does NOT expand instances (explode to export).
  *
  * @layer core/commands
  */

@@ -24,7 +24,7 @@ export interface CommandResult {
   /**
    * Ids of entities created or affected — lets the caller select/highlight them.
    * @invariant Ordering MUST be deterministic for the same (doc-shape, params): the
-   * feature-history replay (Q4) positionally zips a step's recorded `affected` (old ids)
+   * feature-history replay positionally zips a step's recorded `affected` (old ids)
    * with the replay's `affected` (new ids) to remap downstream id references. A command
    * that creates multiple entities must list them in a stable order across runs.
    */
@@ -103,7 +103,7 @@ export interface CommandDefinition<P> {
   readonly paramsSchema: ParamsSchema;
   /**
    * Runtime validator derived from the same zod schema as `paramsSchema` (set by
-   * `defineCommand`, MG2). `execute` no-ops with the failing path when params don't match.
+   * `defineCommand`). `execute` no-ops with the failing path when params don't match.
    */
   readonly paramsValidator?: ZodType;
   readonly run: Command<P>;

@@ -4,9 +4,10 @@
  * @layer core/geometry
  *
  * This file defines the INTERFACE only. No WASM, no three.js, no async.
- * The concrete kernel (Manifold, OpenCascade, etc.) is injected by the app
- * at startup via `setGeometryKernel`. Commands call `getGeometryKernel()` and
- * gracefully no-op when it returns null (headless / kernel not yet loaded).
+ * The app / MCP server installs the process-default kernel (Manifold, OpenCascade)
+ * via `setGeometryKernel`; `defaultContext()` reads it. Commands read the kernel
+ * from their `ExecutionContext` (`ctx.kernel`) and gracefully no-op when it is
+ * null (headless / kernel not yet loaded).
  *
  * Dependency inversion: `core/commands` depends on this interface, never on a
  * concrete kernel implementation (architecture L9, SOLID S5).
@@ -40,11 +41,11 @@ export type BooleanOp = 'union' | 'subtract' | 'intersect';
  * Returns `null` when the operation cannot be performed (unsupported entity
  * kind, degenerate geometry, kernel error). Commands treat null as a no-op.
  *
- * Extended in Batch 14 / KI4-productionize with three B-rep ops:
- *   - `filletEdges`  — OCC implements; Manifold graceful no-op.
- *   - `chamferEdges` — OCC stub (needs separate spike); Manifold graceful no-op.
- *   - `shellSolid`   — OCC stub (needs separate spike); Manifold graceful no-op.
- * Commands K1/K2/K3 (future Lane-1 batch) will call these via this interface.
+ * B-rep ops:
+ *   - `filletEdges`  — OCC implements; Manifold returns null.
+ *   - `chamferEdges` — OCC and Manifold both return null (not implemented).
+ *   - `shellSolid`   — OCC and Manifold both return null (not implemented).
+ * Callers: `fillet_edge` / `chamfer_edge` (core/commands/modify3d.ts); no command calls `shellSolid`.
  */
 export interface GeometryKernel {
   /**
@@ -71,7 +72,7 @@ export interface GeometryKernel {
   /**
    * Chamfer (bevel) the specified edges of a solid entity.
    * Returns the tessellated result mesh, or null when the kernel cannot perform
-   * the operation. Manifold returns null (graceful no-op). OCC spike pending.
+   * the operation. Both bundled kernels currently return null (not implemented).
    *
    * @param shape        - world-space input mesh
    * @param edgeIndices  - 0-based indices of the edges to chamfer; empty = all edges
@@ -82,7 +83,7 @@ export interface GeometryKernel {
   /**
    * Shell (hollow) a closed solid entity by removing one face and offsetting walls inward.
    * Returns the tessellated shell mesh, or null when the kernel cannot perform
-   * the operation. Manifold returns null (graceful no-op). OCC spike pending.
+   * the operation. Both bundled kernels currently return null (not implemented).
    *
    * @param shape     - world-space input mesh representing a closed solid
    * @param thickness - wall thickness in document units; must be > 0
@@ -101,8 +102,8 @@ export interface GeometryKernel {
 }
 
 // ---------------------------------------------------------------------------
-// Injection point — module-level singleton; set once at app startup (A4-ui).
-// Commands read via getGeometryKernel(); they must handle null gracefully.
+// Process-default kernel — module-level singleton, set at app / server startup.
+// Read only by `defaultContext()`; commands use `ctx.kernel` and must handle null.
 // ---------------------------------------------------------------------------
 
 let _kernel: GeometryKernel | null = null;

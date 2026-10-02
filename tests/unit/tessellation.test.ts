@@ -93,7 +93,7 @@ describe('tessellation — earClipTriangulate', () => {
   it('Item D — 1400-point non-convex star-like profile produces a plausible mesh', () => {
     // Synthesize a ~1400-point non-convex closed profile (a deeply lobed star,
     // matching the order of magnitude of a 42-tooth gear). Generated inline —
-    // NOT imported from gears.ts so this test stays decoupled from PG1 math.
+    // NOT imported from gears.ts so this test stays decoupled from the gear math.
     const teeth = 42;
     const samplesPerTooth = 34; // ~1428 total points
     const pts: Array<readonly [number, number]> = [];

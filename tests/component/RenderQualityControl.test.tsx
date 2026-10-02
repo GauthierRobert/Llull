@@ -1,5 +1,5 @@
 /**
- * Component tests for the Quality selector in ViewportControls (W5H).
+ * Component tests for the Quality selector in ViewportControls.
  *
  * Asserts observable behavior:
  *   - The "Quality" label and select element render.

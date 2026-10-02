@@ -1,5 +1,5 @@
 /**
- * MG2 defineCommand / toParamsSchema: one zod schema drives the agent-facing schema and
+ * defineCommand / toParamsSchema: one zod schema drives the agent-facing schema and
  * runtime validation in `execute`.
  */
 import { describe, it, expect } from 'vitest';

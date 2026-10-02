@@ -5,7 +5,7 @@
  *
  * STATUS: OPT-IN. Inject via `?kernel=occt` URL param (see main.tsx) or `LLULL_KERNEL=occt` on the server.
  * Manifold remains the default kernel. OCC is injected only when the URL flag
- * is set (dev/power-user toggle). See docs/decisions/KI4-occt-spike.md.
+ * is set (dev/power-user toggle). Measurements and API notes: docs/decisions/KI4-occt-spike.md.
  *
  * ---------------------------------------------------------------------------
  * MEASUREMENTS (captured Node.js v22, Windows 11, AMD Ryzen, 2026-05-26)
@@ -20,9 +20,9 @@
  *   Bbox correctness: union bbox [-1,-1,-1]→[2,1,1] matches expected 3×2×2 envelope
  *
  * ---------------------------------------------------------------------------
- * MESH→BREP APPROACH (Batch 15, KI4-followup)
+ * MESH→BREP APPROACH
  * ---------------------------------------------------------------------------
- * `filletEdges` now uses `meshDataToTopoDSShape` (Approach 2: BRepBuilderAPI_Sewing).
+ * `filletEdges` uses `meshDataToTopoDSShape` (BRepBuilderAPI_Sewing).
  * Per-triangle faces are built via BRepBuilderAPI_MakePolygon (closed triangle wire)
  * → BRepBuilderAPI_MakeFace_15 (planar face from wire), then sewn together into a
  * shell and promoted to a solid via BRepBuilderAPI_MakeSolid.
@@ -39,24 +39,23 @@
  *     curved surfaces (sphere faces, cylinder caps) become flat approximations.
  *     The fillet operates on this approximate topology — the result is geometrically
  *     close but not exact for non-polyhedral inputs.
- *   - API availability verified by the same "all OCC APIs are callable despite
- *     the 'unsupported' badge" rule established in KI4 Batch 13 spike.
+ *   - All OCC APIs used here are callable despite the opencascade.js 'unsupported' badge.
  *     Verified live under Node (LLULL_KERNEL=occt, server/tests/kernelChoice.test.ts): this
  *     opencascade.js build (OCC 7.4) needs `MakePolygon_1` / `MakeSolid_1` constructors and a
  *     null `Handle_Message_ProgressIndicator` for `Sewing.Perform`.
  *
- * Operand types now correctly handled by filletEdges:
- *   - box entity     → exact B-rep via BRepPrimAPI_MakeBox_2 (unchanged, always worked)
+ * Operand types handled by filletEdges:
+ *   - box entity     → exact B-rep via BRepPrimAPI_MakeBox_2
  *   - arbitrary mesh → sewing approach above; solid produced when mesh is manifold
  *
- * Operand types still not handled (return null gracefully):
- *   - cylinder/sphere/extrusion entities → entityToOccShape still returns null for
+ * Operand types not handled (return null gracefully):
+ *   - cylinder/sphere/extrusion entities → entityToOccShape returns null for
  *     these; the mesh path handles their MeshData representations instead.
  *   - Open / non-manifold MeshData → sewing produces open shell → MakeSolid fails → null.
  *
  * ---------------------------------------------------------------------------
- * TODO: chamferEdges spike — BRepFilletAPI_MakeChamfer, needs separate batch.
- * TODO: shellSolid spike — BRepOffsetAPI_MakeThickSolid, needs separate batch.
+ * NOT IMPLEMENTED (return null): `chamferEdges` (BRepFilletAPI_MakeChamfer candidate),
+ * `shellSolid` (BRepOffsetAPI_MakeThickSolid candidate).
  * ---------------------------------------------------------------------------
  */
 
@@ -65,7 +64,7 @@ import type { Entity } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // Minimal type-narrowing interface for the OCC WASM API.
-// Only models the subset the spike exercises. `any` is isolated to the one
+// Only models the subset this kernel uses. `any` is isolated to the one
 // boundary cast at init — identical pattern to manifoldKernel.ts.
 // ---------------------------------------------------------------------------
 
@@ -198,8 +197,8 @@ let _modulePromise: Promise<OccApi> | null = null;
  *
  * Note: In a browser, the 63 MB WASM must be served as a static asset.
  * In Vite, add the WASM file to `publicDir` or use `vite-plugin-wasm`.
- * In Node.js (server/tests), pass the WASM as `wasmBinary` — see spike
- * test for the pattern.
+ * In Node.js (server/tests), pass the WASM as `wasmBinary` — see
+ * server/src/occtNode.ts for the pattern.
  */
 async function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
   if (_modulePromise) return _modulePromise;
@@ -416,7 +415,7 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
 
 // ---------------------------------------------------------------------------
 // Entity → OCC TopoDS_Shape conversion.
-// Supports box, cylinder, sphere. Others: stubbed with null.
+// Supports box only; every other kind returns null.
 // ---------------------------------------------------------------------------
 
 function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
@@ -438,8 +437,7 @@ function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
     case 'sphere':
     case 'extrusion':
     case 'mesh':
-      // These kinds could be implemented for a full port.
-      // Stubbed for the spike — not needed to prove the interface boundary.
+      // Not converted to B-rep; callers fall back to the MeshData path or no-op.
       return null;
 
     default:
@@ -463,8 +461,8 @@ function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
  *     MeshData operand; rebuilds the OCC shape from it when the input is a prior
  *     boolean result (mesh-only path). For entity-based fillet, pass MeshData
  *     derived from a box/cylinder entity using `entityToOccShape`.
- *   - `chamferEdges` — TODO: BRepFilletAPI_MakeChamfer spike pending.
- *   - `shellSolid`   — TODO: BRepOffsetAPI_MakeThickSolid spike pending.
+ *   - `chamferEdges` — not implemented; returns null.
+ *   - `shellSolid`   — not implemented; returns null.
  */
 export async function createOcctKernel(options: OcctKernelOptions = {}): Promise<GeometryKernel> {
   const api = await getOccModule(options);
@@ -505,7 +503,7 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
       } catch {
         return null;
       } finally {
-        // Free all WASM heap objects to prevent memory leaks (nit fixed: KI4 review).
+        // Free all WASM heap objects to prevent memory leaks.
         try {
           shapeA?.delete();
         } catch {
@@ -534,9 +532,7 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
      *
      * The `shape` operand is a MeshData (kernel-agnostic). We rebuild an OCC
      * TopoDS_Shape from it via `meshDataToTopoDSShape` (BRepBuilderAPI_Sewing —
-     * per-triangle planar faces sewn into a shell, promoted to a solid). This
-     * replaces the previous AABB-rebuild approach (which only produced correct
-     * results for axis-aligned box solids).
+     * per-triangle planar faces sewn into a shell, promoted to a solid).
      *
      * If `meshDataToTopoDSShape` returns null (non-manifold mesh, degenerate
      * triangles, or sewing failure), `filletEdges` returns null as a graceful
@@ -610,15 +606,12 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
       }
     },
 
-    // TODO: chamferEdges — BRepFilletAPI_MakeChamfer spike needed (separate batch).
-    // Returns null (graceful no-op) until implemented; matches the GeometryKernel
-    // contract (callers treat null as "kernel can't do this op" and no-op).
+    // Not implemented: returns null, which callers treat as "kernel can't do this op" (no-op).
     chamferEdges(_shape: MeshData, _edgeIndices: number[], _distance: number): MeshData | null {
       return null;
     },
 
-    // TODO: shellSolid — BRepOffsetAPI_MakeThickSolid spike needed (separate batch).
-    // Returns null (graceful no-op) until implemented; matches the GeometryKernel contract.
+    // Not implemented: returns null (graceful no-op per the GeometryKernel contract).
     shellSolid(_shape: MeshData, _thickness: number): MeshData | null {
       return null;
     },

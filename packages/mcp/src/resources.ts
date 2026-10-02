@@ -7,7 +7,7 @@
  * MCP agent without the agent having to call any mutating tool first.
  *
  * Resource URIs:
- *   cad://document  — full serialized CadDocument (llull-document v1 envelope)
+ *   cad://document  — full serialized CadDocument (llull-document envelope, current version)
  *   cad://scene     — structured SceneSnapshot (entity ids/kinds/bounds/layers/groups/selection)
  *   cad://selection — currently selected entity ids + their kind/position summaries
  *
