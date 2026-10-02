@@ -1,6 +1,6 @@
 # Migration plan — from "accreted" llull to the target architecture
 
-Status: **approved, in progress** (2026-10-02; D1–D5 approved). Board tasks: `.claude/work/BOARD.md` → **WAVE 7 (MG\*)**.
+Status: **done** (2026-10-02; D1–D5 approved). See **As built** at the end for deviations. Board tasks: `.claude/work/BOARD.md` → **WAVE 7 (MG\*)**.
 Each phase leaves `main` green and shippable. No big-bang rewrite.
 
 ## What stays (non-negotiable)
@@ -192,14 +192,52 @@ re-evaluates only dependent steps (measured vs MG0.4 baseline).
   mechanical, reviewed by `cad-reviewer`.
 - **Agent-facing schema text regresses during MG2.** Mitigation: MG2.4 snapshot test.
 
-## Baseline (recorded at MG0.4)
+## Baseline vs result
 
-| Metric | Baseline | Target |
-|--------|----------|--------|
-| Files > 500 code lines (blank/comment lines excluded) | 30 | 0 |
-| Module-level mutable state in `core/` | kernel, id counter, 3 registry refs | 0 (outside `defaultContext`) |
-| Hand-written `paramsSchema` | all | 0 |
-| Largest golden doc size (`industrial_portal_crane`, 1 step) | 600 808 B | −50 % (generated geometry not stored) |
-| `boolean_subtract` golden doc | 1 998 B | no `MeshData` in file |
-| `replay_history`, largest plan | 15.1 ms (portal), 6.6 ms (house) | ≤ downstream closure only |
-| Sync mechanisms | 3 | 1 |
+| Metric | Baseline (MG0.4) | Result |
+|--------|------------------|--------|
+| Files > 500 code lines | 30 | 0 (`max-lines` enforced everywhere, no allowlist) |
+| Module-level mutable state in `core` | kernel, id counter, 3 registry refs, 2 nesting counters | installed default kernel, id counter + scoped source, active context (all read through `ExecutionContext`) |
+| Hand-written `paramsSchema` | 176 | 0 (every command uses `defineCommand` + zod) |
+| `industrial_portal_crane` saved file | 600 808 B | 82 004 B (−86 %; building geometry re-derived on load) |
+| `replay_history`, portal plan | 15.1 ms | 7.2 ms (warm replay cache) |
+| `replay_history`, house template (1 step) | 6.6 ms | 8.4 ms (cache hashing overhead on a 1-step history) |
+| Sync mechanisms | 3 (SSE patches, uiBridge, client-wins push) | 1 (command log + snapshot resync; offline outbox replays commands) |
+| Test suite | 3 429 app / 251 server | 3 702 app / 259 server, golden corpus 35 plans × 2 |
+
+## As built (deviations from the plan, with reasons)
+
+- **MG1 (context).** Implemented as an explicit `ctx` third `run` argument **plus** a scoped active
+  context (`runInContext`), so deep helpers (`nextId`) and nested `execute` calls inherit it without
+  threading `ctx` through ~60 call sites. The kernel is memoized per installed kernel (MG4.4).
+- **MG1.4.** OCC moved to `packages/kernel-occt` and loads in Node (`LLULL_KERNEL=occt`); three OCC
+  bindings behind `fillet_edge` were broken and fixed. Browser `?kernel=occt` not re-verified live.
+- **MG2.** zod v4 (D1). Some commands keep runtime leniency via `tolerant()` / `looseVec*` /
+  `untypedArray()` where tests and agents relied on it; the agent-facing schema is byte-identical
+  to before (snapshot-guarded). `guardCommand`'s generic checks (prototype-key ids, planar padding,
+  NaN) stay as a registry-wide safety net. The MG0.2 conformance test is kept (cheap, still useful).
+- **MG3.2 (v1 → v2).** v1 files are read unchanged instead of having their ids rewritten: a rewrite
+  cannot be made exact without re-running kernel operations. Legacy ids stay valid, the positional
+  id remap remains only for pre-v2 steps, and `nextStepNumber` is derived safely on load.
+- **MG4.1.** The definition/evaluated split is a typed partition of the flat document
+  (`definitionOf` / `evaluatedOf`), not a nested structure — same guarantees, no churn across
+  ~1 000 `doc.entities` call sites.
+- **MG4.2.** Files omit the geometry that is large and purely derivable (building-generated
+  entities, the 600 KB case). Boolean/fillet meshes stay in files (≈2 KB in the corpus) because
+  re-deriving them at load needs the kernel; they are memoized instead (MG4.4).
+- **MG4.3.** Incremental regeneration is a replay **prefix cache** keyed by every input of each step,
+  plus `set_parameter` regenerating when a live step reads a changed parameter. No explicit
+  `reads` DAG is stored: the cache gives the same "re-run from the first affected step" effect
+  without a second dependency model to keep consistent.
+- **MG5.4 (history-based undo) — not adopted.** Undo stays snapshot-based on the server (the single
+  owner); the client keeps snapshots only while offline, aligned with its command outbox. Replaying
+  history cannot undo the non-step changes (`set_parameter`, `load_document`, `apply_code_trace`),
+  and with structural sharing plus the replay cache, snapshots are already cheap.
+- **MG6.1.** One `packages/domain-aec` instead of separate building/industrial packages: the two
+  import each other (building evaluation generates industrial members). It still installs two
+  plugins. `render` stays in `packages/core` because the export commands depend on it. The web app
+  stays at the repo root (it is the workspace root); `server/` is not a workspace member.
+- **Found and fixed along the way:** `build_project` + `insert_step` stored the wrong params for the
+  inserted step (configurations replayed to an empty model); the building uid became deterministic
+  with step ids and now uses `uniqueId()`; `list_steel_profiles` lower-case family names kept working
+  via `tolerant()`; server typecheck (CI) was red on the base and is green now.
