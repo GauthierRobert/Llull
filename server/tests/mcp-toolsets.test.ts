@@ -7,17 +7,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { buildMcpRouter, toolsetsFromEnv } from '../src/mcp';
-import { inMemoryBridge } from '../src/uiBridge';
 import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { TOOLSET_NAMES } from '@core/mcp';
 
 const app = express();
 app.use(express.json());
-app.use(
-  '/mcp',
-  buildMcpRouter(inMemoryBridge, { port: null, allowCodeExecution: false }, toolsetsFromEnv('3d')),
-);
+app.use('/mcp', buildMcpRouter({ port: null, allowCodeExecution: false }, toolsetsFromEnv('3d')));
 
 function parseSseResult(text: string, rpcId: number): unknown {
   for (const line of text.split('\n')) {
@@ -63,7 +59,6 @@ describe('MCP toolsets', () => {
     const names = tools.map((tool) => tool.name);
     expect(names).toContain('add_box');
     expect(names).toContain('describe_scene');
-    expect(names).toContain('snapshot_in_from_ui');
     expect(names).not.toContain('draw_line');
     expect(names).not.toContain('add_wall');
     expect(names).not.toContain('import_step');

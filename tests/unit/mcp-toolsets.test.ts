@@ -3,7 +3,6 @@ import { listCommands } from '@core/commands/registry';
 import {
   TOOLSETS,
   TOOLSET_NAMES,
-  buildBridgeToolDefinitions,
   buildExchangeToolDefinitions,
   isPromptEnabled,
   isToolEnabled,
@@ -14,7 +13,6 @@ import {
 
 const allToolNames = [
   ...listCommands().map((command) => command.name),
-  ...buildBridgeToolDefinitions().map((tool) => tool.name),
   ...buildExchangeToolDefinitions().map((tool) => tool.name),
 ];
 

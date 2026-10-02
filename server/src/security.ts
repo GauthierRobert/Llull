@@ -107,7 +107,7 @@ export function hostAllowlist(): RequestHandler {
 }
 
 /**
- * Guard for the browser routes (/command, /undo, /redo, /ui-bridge mutations).
+ * Guard for the browser mutation routes (/command, /undo, /redo).
  *
  * The Origin allowlist is CSRF protection ONLY (it stops other websites driving a browser);
  * `Origin` is trivially forged by curl, so it is never treated as authentication for remote peers.

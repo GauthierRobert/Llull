@@ -6,7 +6,7 @@
  * Filtering is a VIEW of the registry: commands stay registered and callable through
  * `execute()` (build_project steps, UI) whatever the MCP toolsets.
  *
- * @invariant every registered command + bridge/exchange tool belongs to exactly one toolset
+ * @invariant every registered command + exchange tool belongs to exactly one toolset
  * @invariant `core` is always enabled
  * @pure
  */
@@ -63,8 +63,6 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'set_camera',
     'look_at',
     'fit_view',
-    'snapshot_in_from_ui',
-    'snapshot_out_to_ui',
   ],
   '2d': [
     'draw_line',

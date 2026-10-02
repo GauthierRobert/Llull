@@ -27,8 +27,6 @@ import { buildMcpRouter } from './mcp';
 import { exchangeOptionsFromEnv } from './pythonExchange';
 import { getActiveKernelName, installGeometryKernel } from './geometryKernel';
 import { exportStepFile } from '@core/mcp';
-import { buildUiBridgeRouter } from './uiBridgeRouter';
-import { inMemoryBridge } from './uiBridge';
 import {
   subscribeLive,
   getLiveSnapshot,
@@ -317,13 +315,9 @@ app.get('/export/step', restLimiter, (req: Request, res: Response) => {
     });
 });
 
-// UI↔MCP live-sync bridge routes — guarded by the same bearer auth as /mcp.
-// See server/src/uiBridgeRouter.ts for the implementation.
-app.use('/ui-bridge', buildUiBridgeRouter());
-
 // MCP endpoint — Streamable HTTP, guarded by bearer auth + rate limiting.
 // See server/src/mcp.ts for the implementation.
-app.use('/mcp', buildMcpRouter(inMemoryBridge, exchange));
+app.use('/mcp', buildMcpRouter(exchange));
 
 app.use(jsonErrorHandler);
 

@@ -379,30 +379,30 @@ Wave 3 scope to keep the wave shippable.
 - `[DONE]` **MG1.1** `ExecutionContext { kernel, ids, registry }`; `execute(doc, name, params, ctx = defaultContext())`; `run(doc, params, ctx?)`. _Lane 1. deps: MG0.1._
 - `[DONE]` **MG1.2** Delete `setRegistryRef` / `setConfigRegistryRef` / `setRecipeRegistryRef` — use `ctx.registry`. _Lane 1. deps: MG1.1._
 - `[DONE]` **MG1.3** Kernel via `ctx.kernel` in boolean/modify3d/tessellation; `getGeometryKernel()` only inside `defaultContext()`. _Lane 1. deps: MG1.1._
-- `[TODO]` **MG1.4** Kernel parity: move `ui/geometry/occtKernel.ts` → `core/geometry/`; server honours `LLULL_KERNEL`; test fillet via MCP == via store. _Lane 4 + Lane 2. deps: MG1.3. D3 resolved: yes._
+- `[DONE]` **MG1.4** Kernel parity: move `ui/geometry/occtKernel.ts` → `core/geometry/`; server honours `LLULL_KERNEL`; test fillet via MCP == via store. _Lane 4 + Lane 2. deps: MG1.3. D3 resolved: yes._
 - `[DONE]` **MG1.5** `requiresKernel` annotation; explicit "kernel loading" summary; replay waits for readiness. _Lane 1. deps: MG1.3._
 
 ## MG2 — One schema per command (Lane 1; parallel to MG1)
-- `[TODO]` **MG2.1** `defineCommand({ params: <schema> })` deriving `paramsSchema` + params type. _Lane 1. deps: MG0.2. D1 resolved: zod v4._
-- `[TODO]` **MG2.2** Validate params in `execute`; move generic `guardCommand` checks into schema helpers (`vec3`, `entityId`, `position`). _Lane 1. deps: MG2.1._
-- `[TODO]` **MG2.3** Migrate per domain file (one PR each, `building/**` last); delete hand-written `<X>Params` + `paramsSchema`. _Lane 1. deps: MG2.2._
+- `[DONE]` **MG2.1** `defineCommand({ params: <schema> })` deriving `paramsSchema` + params type. _Lane 1. deps: MG0.2. D1 resolved: zod v4._
+- `[DONE]` **MG2.2** Validate params in `execute`; move generic `guardCommand` checks into schema helpers (`vec3`, `entityId`, `position`). _Lane 1. deps: MG2.1._
+- `[DONE]` **MG2.3** Migrate per domain file (one PR each, `building/**` last); delete hand-written `<X>Params` + `paramsSchema`. _Lane 1. deps: MG2.2._
 - `[DONE]` **MG2.4** `toToolSchemas()` snapshot test. _Lane 5. deps: —._
 
 ## MG3 — Deterministic ids (Lane 1)
-- `[TODO]` **MG3.1** Step-scoped ids `<stepId>.<n>` via `ctx.ids`; replay reuses recorded step ids; `remapIds` + `affected` zip become dead code. _Lane 1. deps: MG1.1._
-- `[TODO]` **MG3.2** Persistence v2: `migrate()` upgrades v1 docs (legacy replay once → rewrite ids). _Lane 1. deps: MG3.1. D4 resolved: yes._
+- `[DONE]` **MG3.1** Step-scoped ids `<stepId>.<n>` via `ctx.ids`; replay reuses recorded step ids; `remapIds` + `affected` zip become dead code. _Lane 1. deps: MG1.1._
+- `[DONE]` **MG3.2** Persistence v2: `migrate()` upgrades v1 docs (legacy replay once → rewrite ids). _Lane 1. deps: MG3.1. D4 resolved: yes._
 - `[TODO]` **MG3.3** Remove `__resetIdCounter` from tests. _Lane 5. deps: MG3.1._
 
 ## MG4 — Recipe-first document (Lane 1 + Lane 2 for accessor call sites)
-- `[TODO]` **MG4.1** Accessors first (`entitiesOf`, `definitionOf`), then split `CadDocument` into `definition` / `evaluated`. _Lane 1 + Lane 2. deps: MG3.2._
-- `[TODO]` **MG4.2** Mesh results become cache (`source: { stepId }`); persistence v3 writes definition only. _Lane 1. deps: MG4.1._
-- `[TODO]` **MG4.3** Step dependency DAG (`reads`); param/step edits re-evaluate downstream closure only. _Lane 1. deps: MG4.1._
-- `[TODO]` **MG4.4** Kernel memoization keyed by operand-definition hash. _Lane 1. deps: MG1.3, MG4.2._
-- `[TODO]` **MG4.5** Generic "generated entity is read-only, edit its source" rule replaces the building-specific `guardCommand` branch. _Lane 1. deps: MG4.2._
+- `[DONE]` **MG4.1** Accessors first (`entitiesOf`, `definitionOf`), then split `CadDocument` into `definition` / `evaluated`. _Lane 1 + Lane 2. deps: MG3.2._
+- `[DONE]` **MG4.2** Mesh results become cache (`source: { stepId }`); persistence v3 writes definition only. _Lane 1. deps: MG4.1._
+- `[DONE]` **MG4.3** Step dependency DAG (`reads`); param/step edits re-evaluate downstream closure only. _Lane 1. deps: MG4.1._
+- `[DONE]` **MG4.4** Kernel memoization keyed by operand-definition hash. _Lane 1. deps: MG1.3, MG4.2._
+- `[DONE]` **MG4.5** Generic "generated entity is read-only, edit its source" rule replaces the building-specific `guardCommand` branch. _Lane 1. deps: MG4.2._
 
 ## MG5 — One sync path (Lane 4 + Lane 2)
-- `[TODO]` **MG5.1** `/live` broadcasts `{ seq, stepId, name, params, stateHash }`; clients apply via `execute`; snapshot on gap/hash mismatch; retire `docPatch.ts`. _Lane 4 + Lane 2. deps: MG1.4, MG3.1._
-- `[TODO]` **MG5.2** Offline outbox of commands replaces "client wins" `load_document` push. _Lane 2. deps: MG5.1._
+- `[DONE]` **MG5.1** `/live` broadcasts `{ seq, stepId, name, params, stateHash }`; clients apply via `execute`; snapshot on gap/hash mismatch; retire `docPatch.ts`. _Lane 4 + Lane 2. deps: MG1.4, MG3.1._
+- `[DONE]` **MG5.2** Offline outbox of commands replaces "client wins" `load_document` push. _Lane 2. deps: MG5.1._
 - `[TODO]` **MG5.3** Retire `uiBridge` (`snapshot_in_from_ui` / `snapshot_out_to_ui`) after one deprecation release. _Lane 4. deps: MG5.1._
 - `[TODO]` **MG5.4** History-based undo replaces server + client snapshot stacks. _Lane 4 + Lane 2. deps: MG4.3, MG5.1._
 

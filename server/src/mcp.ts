@@ -51,8 +51,6 @@ import {
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
-  buildBridgeToolDefinitions,
-  applyBridgeToolCall,
   buildExchangeToolDefinitions,
   applyExchangeToolCall,
   isPromptEnabled,
@@ -60,9 +58,9 @@ import {
   parseToolsets,
   toolsetOf,
 } from '@core/mcp';
-import type { ToolsetName, UiBridge } from '@core/mcp';
+import type { ToolsetName } from '@core/mcp';
 import type { CadDocument } from '@core/model/types';
-import { getLiveDoc, setLiveDoc } from './liveDocument';
+import { getLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
 import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
 import { hasValidBearer } from './security';
@@ -544,16 +542,10 @@ function r2Public(n: number): number {
  * Mutations route through `commandBus.applyCommand` so every tools/call shares
  * the same undo/redo history as REST /command calls from the browser UI.
  *
- * Each session maintains its own working document for bridge operations:
- *   snapshot_in_from_ui replaces the session working doc from the UI bridge.
- *   snapshot_out_to_ui  stages the session working doc to the UI bridge.
- *
  * @param getDoc - returns the current shared document (used for resources/read)
- * @param bridge - the injected UiBridge for UI↔session sync tools
  */
 function buildMcpServer(
   getDoc: () => CadDocument,
-  bridge: UiBridge,
   exchange: ExchangeOptions,
   enabledToolsets: ReadonlySet<ToolsetName>,
 ): Server {
@@ -562,13 +554,8 @@ function buildMcpServer(
     { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
-  // Session-level working document for bridge operations.
-  // Starts as the shared live doc; snapshot_in_from_ui can replace it.
-  let sessionDoc: CadDocument = getDoc();
-
   // tools/list — return the full registry as MCP tool definitions,
   // with render_view augmented to advertise the server-side enrichment params,
-  // plus the two UI bridge tools appended.
   server.setRequestHandler(ListToolsRequestSchema, () => {
     const tools = buildMcpTools().map((t) => {
       if (t.name === 'render_view') {
@@ -672,18 +659,6 @@ function buildMcpServer(
       };
     });
 
-    // Append the two bridge tools (not in the core registry — bridge-level only).
-    const bridgeTools = buildBridgeToolDefinitions().map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema as {
-        type: 'object';
-        properties?: Record<string, object>;
-        required?: string[];
-      },
-      annotations: t.annotations,
-    }));
-
     const exchangeTools = buildExchangeToolDefinitions().map((t) => ({
       name: t.name,
       description: t.description,
@@ -691,9 +666,7 @@ function buildMcpServer(
       ...(t.annotations ? { annotations: t.annotations } : {}),
     }));
     return {
-      tools: [...tools, ...bridgeTools, ...exchangeTools].filter((t) =>
-        isToolEnabled(t.name, enabledToolsets),
-      ),
+      tools: [...tools, ...exchangeTools].filter((t) => isToolEnabled(t.name, enabledToolsets)),
     };
   });
 
@@ -712,25 +685,6 @@ function buildMcpServer(
     }
 
     // -----------------------------------------------------------------------
-    // Bridge tool intercept — snapshot_in_from_ui / snapshot_out_to_ui
-    // -----------------------------------------------------------------------
-    // These tools operate on the per-session working document (sessionDoc) and
-    // are NOT routed through the shared command bus — they are bridge-level only.
-    const bridgeResult = await applyBridgeToolCall(sessionDoc, name, bridge);
-    if (bridgeResult !== null) {
-      // snapshot_in_from_ui: update sessionDoc with the UI doc (and also the
-      // shared live doc so other sessions and the SSE stream see the new state).
-      if (name === 'snapshot_in_from_ui' && bridgeResult.document !== sessionDoc) {
-        sessionDoc = bridgeResult.document;
-        setLiveDoc(sessionDoc);
-      }
-      // snapshot_out_to_ui does not change sessionDoc (it only stages a copy).
-      // Double cast: BridgeToolResult lacks the SDK's index signature — same
-      // pattern as shapeToolCallContent casts throughout this file.
-      return bridgeResult as unknown as CallToolResult;
-    }
-
-    // -----------------------------------------------------------------------
     // Exchange tool intercept — export_step / import_step / import_code
     // -----------------------------------------------------------------------
     // Python-kernel I/O lives behind the injected port; document changes still
@@ -742,7 +696,6 @@ function buildMcpServer(
       allowCodeExecution: exchange.allowCodeExecution,
     });
     if (exchangeResult !== null) {
-      sessionDoc = getLiveDoc();
       return exchangeResult as unknown as CallToolResult;
     }
 
@@ -768,11 +721,6 @@ function buildMcpServer(
     // history/broadcast (result.data !== undefined, same logic as the UI store).
     const coreArgs = name === 'render_view' ? stripEnrichParams(args ?? {}) : (args ?? {});
     const busResult = applyCommand(name, coreArgs);
-
-    // Keep sessionDoc in sync with the shared live doc after mutations.
-    if (busResult.affected.length > 0) {
-      sessionDoc = getLiveDoc();
-    }
 
     // Vision loop: rasterize data.svg → PNG image block (if present).
     // Failure is silent (buildImageBlock returns null) so a broken SVG never 500s
@@ -882,7 +830,6 @@ function buildMcpServer(
  *   preventing unbounded Map growth from clients that never send DELETE.
  */
 function allocateSession(
-  bridge: UiBridge,
   exchange: ExchangeOptions,
   enabledToolsets: ReadonlySet<ToolsetName>,
 ): {
@@ -910,9 +857,9 @@ function allocateSession(
     if (transport.sessionId) sessions.delete(transport.sessionId);
   };
 
-  // Wire the shared live document read accessor and the UI bridge.
+  // Wire the shared live document read accessor.
   // Mutations route through commandBus.applyCommand (not setLiveDoc directly).
-  const server = buildMcpServer(getLiveDoc, bridge, exchange, enabledToolsets);
+  const server = buildMcpServer(getLiveDoc, exchange, enabledToolsets);
 
   return { transport, server };
 }
@@ -936,7 +883,7 @@ export function toolsetsFromEnv(
  * Build and return the Express Router that mounts the MCP endpoint.
  *
  * Mount in `index.ts` with:
- *   `app.use('/mcp', buildMcpRouter(bridge));`
+ *   `app.use('/mcp', buildMcpRouter());`
  *
  * Exposed routes:
  *   POST   /mcp  — MCP Streamable HTTP (initialize + tools/list + tools/call)
@@ -950,12 +897,10 @@ export function toolsetsFromEnv(
  *   4. GET/DELETE without `mcp-session-id` header → 400 (header required).
  *   5. Any request with an unknown session id → 404.
  *
- * @param bridge - the UI↔MCP bridge injected at server startup.
  * @param exchange - STEP/code exchange port (defaults to the environment-configured Python bridge).
  * @param enabledToolsets - toolsets exposed by tools/list + tools/call (defaults to `LLULL_TOOLSETS`).
  */
 export function buildMcpRouter(
-  bridge: UiBridge,
   exchange: ExchangeOptions = exchangeOptionsFromEnv(),
   enabledToolsets: ReadonlySet<ToolsetName> = toolsetsFromEnv(),
 ): Router {
@@ -1012,7 +957,7 @@ export function buildMcpRouter(
       if (handled) return;
 
       // No session id → this is an `initialize` request; allocate a new session.
-      const { transport, server } = allocateSession(bridge, exchange, enabledToolsets);
+      const { transport, server } = allocateSession(exchange, enabledToolsets);
 
       try {
         await server.connect(transport as Transport);

@@ -204,7 +204,7 @@ Done. Client closed cleanly.
 | `MCP_RATE_LIMIT_WINDOW_MS` | no       | `60000`           | Rate limit window in milliseconds (default: 1 minute)    |
 | `HOST`                     | no       | `127.0.0.1`       | Bind address. Use `0.0.0.0` only with `MCP_AUTH_TOKEN` set |
 | `LLULL_ALLOWED_ORIGINS`    | no       | `http://localhost:5173,http://localhost:5174,http://localhost:3000` | Comma-separated browser origins for CORS and the REST mutation guard. Disallowed origins get no CORS headers |
-| `LLULL_REQUIRE_TOKEN_FOR_REST` | no   | unset             | `true` + `MCP_AUTH_TOKEN`: `/command`, `/undo`, `/redo`, `/ui-bridge` mutations always need the bearer token. Build the web app with `VITE_LLULL_API_TOKEN` set to the same token so the UI sends it |
+| `LLULL_REQUIRE_TOKEN_FOR_REST` | no   | unset             | `true` + `MCP_AUTH_TOKEN`: `/command`, `/undo`, `/redo` mutations always need the bearer token. Build the web app with `VITE_LLULL_API_TOKEN` set to the same token so the UI sends it |
 | `LLULL_ALLOWED_HOSTS`      | no       | unset             | Comma-separated extra `Host` header values (`name` = any port, `name:port` = exact). `localhost`, `127.0.0.1`, `[::1]` are always allowed (DNS-rebinding defence). If `HOST` is non-loopback and this is unset, any Host is accepted |
 | `LLULL_ALLOW_UNAUTHENTICATED` | no    | unset             | `true` lets the server start on a non-loopback `HOST` without `MCP_AUTH_TOKEN`. Default: it refuses to start |
 | `LLULL_REST_RATE_LIMIT_MAX` | no      | `600`             | Max requests per window per IP on `/command`, `/undo`, `/redo`, `/export/stl` |
