@@ -25,6 +25,7 @@ import {
 import {
   baseReactions,
   WIND_CASES,
+  WIND_PRESSURE_CASES,
   type BaseReaction,
   type FrameLoads,
   type LoadCase,
@@ -149,11 +150,17 @@ export function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
   return forces !== undefined && (forces.vertical !== 0 || forces.horizontal !== 0);
 }
 
+/**
+ * Wind cases of the foundation combinations: the four suction cases plus the windward roof-pressure
+ * cases of steep / flat roofs (absent cases contribute nothing in `combine`).
+ */
+const FOUNDATION_WIND_CASES = [...WIND_CASES, ...WIND_PRESSURE_CASES];
+
 /** SLS characteristic combinations for soil bearing. */
 function serviceCombinations(wind: boolean, crane: boolean): Combination[] {
   const list: Combination[] = [{ name: 'G+S', factors: { G: 1, S: 1 } }];
   if (wind) {
-    for (const { loadCase, label } of WIND_CASES) {
+    for (const { loadCase, label } of FOUNDATION_WIND_CASES) {
       list.push(
         { name: `G+S+0.6${label}`, factors: { G: 1, S: 1, [loadCase]: 0.6 } },
         { name: `G+${label}`, factors: { G: 1, [loadCase]: 1 } },
@@ -182,7 +189,7 @@ export function ultimateCombinations(
   if (favourable) {
     list.push({ name: '1.0G+1.5S', factors: { G: g, S: 1.5 } });
     if (wind) {
-      for (const { loadCase, label } of WIND_CASES) {
+      for (const { loadCase, label } of FOUNDATION_WIND_CASES) {
         list.push({ name: `1.0G+1.5${label}`, factors: { G: g, [loadCase]: 1.5 } });
       }
     }
@@ -198,7 +205,7 @@ export function ultimateCombinations(
   }
   list.push({ name: '1.35G+1.5S', factors: { G: g, S: 1.5 } });
   if (wind) {
-    for (const { loadCase, label } of WIND_CASES) {
+    for (const { loadCase, label } of FOUNDATION_WIND_CASES) {
       list.push({ name: `1.35G+1.5${label}+0.75S`, factors: { G: g, [loadCase]: 1.5, S: 0.75 } });
     }
   }
@@ -446,7 +453,7 @@ export function footingRows(
   if (wind) {
     const uplift: Candidate[] = [];
     const resisting = 0.9 * weights;
-    const equCombinations: Combination[] = WIND_CASES.map(({ loadCase, label }) => ({
+    const equCombinations: Combination[] = FOUNDATION_WIND_CASES.map(({ loadCase, label }) => ({
       name: `0.9G+1.5${label}`,
       factors: { G: 0.9, [loadCase]: 1.5 },
     }));
