@@ -10,13 +10,16 @@
  * - NO entity is built here (PRIME DIRECTIVE). Dispatch only.
  * - Snap is applied by the caller via useSnap; this hook receives
  *   already-snapped world coords.
- * - Esc cancels the current in-progress shape; the tool stays active.
+ * - Esc cancels the current in-progress shape; Esc with nothing in progress returns to Select.
+ * - 'move' translates the current selection by (second click - first click) via move_entity.
  * - The hook is purely React state + callbacks — no three.js here.
  */
 
 import { useState, useCallback, useEffect } from 'react';
 import type { Vec2 } from '@core/model/types';
-import { useStore } from '@ui/store';
+import { useStore, useToolStore } from '@ui/store';
+import type { DrawToolKind } from '@ui/store';
+import { moveSelection } from '@ui/hooks/selectionActions';
 import {
   rectParamsFromCorners,
   circleRadiusFromPoints,
@@ -27,16 +30,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export type DrawToolKind =
-  | 'none'
-  | 'line'
-  | 'polyline'
-  | 'wall'
-  | 'circle'
-  | 'rectangle'
-  | 'point'
-  | 'ellipse'
-  | 'spline';
+export type { DrawToolKind };
 
 export interface DrawToolState {
   /** The currently active tool. */
@@ -92,14 +86,23 @@ export function wallChainParams(
 
 export function useDrawTool(): UseDrawToolResult {
   const dispatch = useStore((s) => s.dispatch);
-  const [activeTool, setActiveToolState] = useState<DrawToolKind>('none');
+  const activeTool = useToolStore((s) => s.drawTool);
+  const setDrawTool = useToolStore((s) => s.setDrawTool);
   const [collectedPoints, setCollectedPoints] = useState<Vec2[]>([]);
+  const inProgress = collectedPoints.length > 0;
 
-  // Reset collected points whenever the tool changes.
-  const setActiveTool = useCallback((tool: DrawToolKind) => {
-    setActiveToolState(tool);
+  // Reset collected points whenever the tool changes (toolbar, shortcut or palette).
+  useEffect(() => {
     setCollectedPoints([]);
-  }, []);
+  }, [activeTool]);
+
+  const setActiveTool = useCallback(
+    (tool: DrawToolKind) => {
+      setDrawTool(tool);
+      setCollectedPoints([]);
+    },
+    [setDrawTool],
+  );
 
   const cancel = useCallback(() => {
     setCollectedPoints([]);
@@ -138,6 +141,18 @@ export function useDrawTool(): UseDrawToolResult {
       switch (activeTool) {
         case 'none':
           break;
+
+        case 'move': {
+          if (useStore.getState().document.selection.length === 0) break;
+          if (collectedPoints.length === 0) {
+            setCollectedPoints([point]);
+            break;
+          }
+          const base = collectedPoints[0]!;
+          moveSelection([point[0] - base[0], point[1] - base[1], 0]);
+          setCollectedPoints([]);
+          break;
+        }
 
         case 'point': {
           dispatch('draw_point', { position: [point[0], point[1], 0] });
@@ -237,7 +252,9 @@ export function useDrawTool(): UseDrawToolResult {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
-        cancel();
+        // First Esc drops the shape in progress; a second Esc returns to Select.
+        if (inProgress) cancel();
+        else if (activeTool !== 'none') setActiveTool('none');
       } else if (e.key === 'Enter') {
         if (activeTool === 'polyline' || activeTool === 'wall') finishPolyline(false);
         else if (activeTool === 'spline') finishSpline(false);
@@ -245,13 +262,12 @@ export function useDrawTool(): UseDrawToolResult {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeTool, cancel, finishPolyline, finishSpline]);
+  }, [activeTool, inProgress, cancel, finishPolyline, finishSpline, setActiveTool]);
 
   // Ctrl/Cmd+Z mid-operation removes the last collected point instead of undoing the document.
   // Capture phase + stopPropagation so the global undo shortcut never sees it.
-  const hasCollectedPoints = collectedPoints.length > 0;
   useEffect(() => {
-    if (!hasCollectedPoints) return;
+    if (!inProgress) return;
     const onUndoKey = (e: KeyboardEvent): void => {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
       const target = e.composedPath()[0];
@@ -262,7 +278,7 @@ export function useDrawTool(): UseDrawToolResult {
     };
     window.addEventListener('keydown', onUndoKey, true);
     return () => window.removeEventListener('keydown', onUndoKey, true);
-  }, [hasCollectedPoints]);
+  }, [inProgress]);
 
   return {
     activeTool,

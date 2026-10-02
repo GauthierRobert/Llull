@@ -30,8 +30,7 @@
  *
  * Mode state
  * ──────────
- * `mode` is owned by the parent (Viewport3D) so the overlay toggle and the
- * in-Canvas gizmo share the same value without prop-drilling through the Canvas.
+ * `mode` comes from useToolStore via Viewport3D (main toolbar Move/Rotate/Scale + G/R/S keys).
  *
  * 3D Snapping (translate mode only)
  * ──────────────────────────────────
@@ -62,6 +61,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
+import type { GizmoMode } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import type { Entity } from '@core/model/types';
 import { toRenderPosition } from './floatingOrigin';
@@ -80,8 +80,6 @@ type DraggingDispatcher = {
 // ---------------------------------------------------------------------------
 // Gizmo mode type (exported so Viewport3D can share it)
 // ---------------------------------------------------------------------------
-
-export type GizmoMode = 'translate' | 'rotate' | 'scale';
 
 // ---------------------------------------------------------------------------
 // Snap constants
@@ -371,44 +369,5 @@ export function TransformGizmo({
         <SnapIndicator3D position={indicatorPos} snapType={indicatorType} />
       )}
     </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// GizmoModeToggle — small overlay rendered outside the Canvas
-// ---------------------------------------------------------------------------
-
-interface ModeToggleProps {
-  mode: GizmoMode;
-  onMode: (m: GizmoMode) => void;
-}
-
-const MODES: ReadonlyArray<{
-  readonly id: GizmoMode;
-  readonly label: string;
-  readonly key: string;
-}> = [
-  { id: 'translate', label: 'Move', key: 'G' },
-  { id: 'rotate', label: 'Rotate', key: 'R' },
-  { id: 'scale', label: 'Scale', key: 'S' },
-];
-
-export function GizmoModeToggle({ mode, onMode }: ModeToggleProps): React.ReactElement {
-  return (
-    <div className="vp-gizmo-toggle" role="group" aria-label="Transform mode">
-      {MODES.map(({ id, label, key }) => (
-        <button
-          key={id}
-          type="button"
-          className={`vp-btn${mode === id ? ' vp-btn--selected' : ''}`}
-          aria-pressed={mode === id}
-          aria-label={`${label} (${key})`}
-          onClick={() => onMode(id)}
-        >
-          {label}
-          <kbd className="vp-kbd">{key}</kbd>
-        </button>
-      ))}
-    </div>
   );
 }

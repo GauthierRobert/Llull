@@ -210,7 +210,7 @@ export function DrawPreview({
     let geo: THREE.BufferGeometry | null = null;
     let useDash = false;
 
-    if (activeTool === 'line') {
+    if (activeTool === 'line' || activeTool === 'move') {
       if (collectedPoints.length === 1) {
         geo = buildLineGeo(collectedPoints[0]!, cursor);
       }

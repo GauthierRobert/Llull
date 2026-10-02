@@ -5,7 +5,7 @@
  */
 
 export { useStore } from './store';
-export type { CadStoreState, LastMeasure } from './store';
+export type { CadStoreState, LastMeasure, DispatchOptions } from './store';
 
 export { useThemeStore } from './themeStore';
 export type { ThemeStoreState, Theme } from './themeStore';
@@ -27,3 +27,6 @@ export type { NamedViewStoreState, NamedView, NamedViewCamera } from './namedVie
 
 export { useLayoutStore } from './layoutStore';
 export type { LayoutStoreState, SidebarTab } from './layoutStore';
+
+export { useToolStore } from './toolStore';
+export type { ToolStoreState, ViewMode, DrawToolKind, GizmoMode } from './toolStore';

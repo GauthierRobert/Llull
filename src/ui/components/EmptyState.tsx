@@ -1,44 +1,31 @@
 /**
  * @layer ui/components
  *
- * EmptyState — a centered HTML overlay shown when the document has no entities.
- *
- * Behavior:
- *   - Subscribes to `document.order.length` via a narrow Zustand selector (R3).
- *   - Renders only when the entity count is 0; auto-hides once any entity exists.
- *   - Dismissable with a close button; dismissed state is local React state (not
- *     document state — this is pure presentation, PRIME DIRECTIVE).
- *   - Mounted by App.tsx inside `.app-viewport` as an HTML overlay (NOT inside
- *     the three.js canvas).
- *
- * Viewer mode: this is a read-only mirror of the MCP-driven document. The copy
- * reflects that Claude drives the model, the human watches it render.
- *
- * Presentation ONLY. No document mutations.
+ * EmptyState — a centered "start here" card over the viewport while the document has no entities.
+ * Offers one-click starts (add a box, draw a rectangle) and explains how to move things and how to
+ * let an MCP agent build the model. Auto-hides once any entity exists; dismissal is local state.
+ * Actions only dispatch through the shared toolbar helpers (PRIME DIRECTIVE).
  */
 
 import React, { useState } from 'react';
-import { useStore } from '@ui/store';
+import { useStore, useToolStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
+import { createSolid } from '@ui/components/toolbar/createSolid';
 
 export function EmptyState(): React.ReactElement | null {
   const entityCount = useStore((s) => s.document.order.length);
+  const setDrawTool = useToolStore((s) => s.setDrawTool);
+  const drawToolArmed = useToolStore((s) => s.drawTool !== 'none');
   const [dismissed, setDismissed] = useState(false);
 
-  // Auto-show again if all entities are deleted after dismissal.
-  if (entityCount > 0 || dismissed) return null;
+  // Hidden while a 2D tool is armed so the card never covers the drawing area.
+  if (entityCount > 0 || dismissed || drawToolArmed) return null;
+
+  const boxPreset = SOLID_PRESETS[0];
 
   return (
-    <div
-      className="empty-state"
-      role="status"
-      aria-label="Waiting for MCP agent"
-      aria-live="polite"
-    >
+    <div className="empty-state" role="region" aria-label="Get started">
       <div className="empty-state__card">
         <button
           type="button"
@@ -51,38 +38,63 @@ export function EmptyState(): React.ReactElement | null {
         </button>
 
         <div className="empty-state__mark" aria-hidden="true">
-          <Icon name="sparkle" size={22} />
+          <Icon name="cube" size={22} />
         </div>
 
-        <h2 className="empty-state__heading">Waiting for your MCP agent</h2>
+        <h2 className="empty-state__heading">Start your model</h2>
         <p className="empty-state__subheading">
-          Ask Claude to build something and it appears here.
+          Everything you can create is in the toolbar above. Try one:
         </p>
 
-        <ul className="empty-state__tips" aria-label="Viewer tips">
+        <div className="empty-state__actions">
+          {boxPreset !== undefined && (
+            <button
+              type="button"
+              className="empty-state__action"
+              onClick={() => createSolid(boxPreset)}
+            >
+              <Icon name="cube" size={18} />
+              <span className="empty-state__action-title">Add a 3D box</span>
+              <span className="empty-state__action-sub">then drag its arrows to move it</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="empty-state__action"
+            onClick={() => setDrawTool('rectangle')}
+          >
+            <Icon name="drawRectangle" size={18} />
+            <span className="empty-state__action-title">Draw a 2D rectangle</span>
+            <span className="empty-state__action-sub">click two corners on the grid</span>
+          </button>
+        </div>
+
+        <ul className="empty-state__tips" aria-label="Tips">
+          <li className="empty-state__tip">
+            <span className="empty-state__tip-icon" aria-hidden="true">
+              <Icon name="transformMove" size={14} />
+            </span>
+            <span className="empty-state__tip-text">
+              <strong>Move things:</strong> click an object, then drag the gizmo arrows (3D) or
+              press <kbd className="kbd">M</kbd> (2D). Arrow keys nudge, the Properties panel takes
+              exact coordinates.
+            </span>
+          </li>
           <li className="empty-state__tip">
             <span className="empty-state__tip-icon" aria-hidden="true">
               <Icon name="plug" size={14} />
             </span>
             <span className="empty-state__tip-text">
-              Claude drives this canvas over MCP — describe a model and watch it render.
+              <strong>Or let AI build it:</strong> use <em>Connect agent</em> (top right) and ask
+              Claude to model something.
             </span>
           </li>
           <li className="empty-state__tip">
             <span className="empty-state__tip-icon" aria-hidden="true">
-              <Icon name="cursor" size={14} />
+              <Icon name="keyboard" size={14} />
             </span>
             <span className="empty-state__tip-text">
-              Click any entity to inspect its properties in the panel on the right.
-            </span>
-          </li>
-          <li className="empty-state__tip">
-            <span className="empty-state__tip-icon" aria-hidden="true">
-              <Icon name="cube" size={14} />
-            </span>
-            <span className="empty-state__tip-text">
-              Switch between <strong>2D</strong> and <strong>3D</strong> with the toggle at the top
-              of the viewport.
+              Press <kbd className="kbd">?</kbd> for every keyboard shortcut.
             </span>
           </li>
         </ul>

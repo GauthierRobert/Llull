@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { useStore } from '@ui/store';
+import { useStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { execute } from '@core/commands/registry';
@@ -23,6 +23,12 @@ describe('useKeyboardShortcuts', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    useToolStore.setState({
+      viewMode: '3d',
+      drawTool: 'none',
+      gizmoMode: 'translate',
+      shortcutsOpen: false,
+    });
     useStore.setState({
       document: { ...createEmptyDocument(), selection: ['a', 'b'] },
       undo,
@@ -98,5 +104,68 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(input, { key: 'Delete' });
     expect(undo).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('Escape leaves the selection alone while a 2D tool is armed (the tool consumes it)', () => {
+    useToolStore.setState({ viewMode: '2d', drawTool: 'line' });
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(clearSelection).not.toHaveBeenCalled();
+  });
+
+  it('Ctrl+D duplicates every selected entity', () => {
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'd', ctrlKey: true });
+    expect(dispatch.mock.calls.map((call) => call[0])).toEqual([
+      'duplicate_entity',
+      'duplicate_entity',
+    ]);
+  });
+
+  it('arrow keys nudge the selection by 1, Shift by 10', () => {
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    fireEvent.keyDown(window, { key: 'ArrowUp', shiftKey: true });
+    expect(dispatch.mock.calls).toEqual([
+      ['move_entity', { id: 'a', delta: [-1, 0, 0] }],
+      ['move_entity', { id: 'b', delta: [-1, 0, 0] }],
+      ['move_entity', { id: 'a', delta: [0, 10, 0] }],
+      ['move_entity', { id: 'b', delta: [0, 10, 0] }],
+    ]);
+  });
+
+  it('arrow keys do nothing without a selection', () => {
+    useStore.setState({ document: createEmptyDocument() });
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    fireEvent.keyDown(window, { key: 'Delete' });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('tool keys arm draw tools, set the gizmo and switch views', () => {
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'r' });
+    expect(useToolStore.getState().gizmoMode).toBe('rotate');
+    fireEvent.keyDown(window, { key: 'l' });
+    expect(useToolStore.getState()).toMatchObject({ drawTool: 'line', viewMode: '2d' });
+    fireEvent.keyDown(window, { key: 'r' });
+    expect(useToolStore.getState().drawTool).toBe('rectangle');
+    fireEvent.keyDown(window, { key: '3' });
+    expect(useToolStore.getState()).toMatchObject({ drawTool: 'none', viewMode: '3d' });
+    fireEvent.keyDown(window, { key: 'q' });
+    expect(useToolStore.getState().viewMode).toBe('3d');
+  });
+
+  it('tool keys are ignored with Ctrl/Alt held', () => {
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: 'l', altKey: true });
+    fireEvent.keyDown(window, { key: 'l', ctrlKey: true });
+    expect(useToolStore.getState().drawTool).toBe('none');
+  });
+
+  it('? opens the shortcut sheet', () => {
+    render(<Harness />);
+    fireEvent.keyDown(window, { key: '?' });
+    expect(useToolStore.getState().shortcutsOpen).toBe(true);
   });
 });

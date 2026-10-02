@@ -30,7 +30,7 @@
  * - An <Entities> group that renders every entity in the document.
  * - <TransformGizmo> appears when exactly one entity is selected and lets the
  *   user translate/rotate/scale by dispatching the matching command on drag end.
- *   <GizmoModeToggle> is an overlay outside the Canvas sharing the same mode.
+ *   Its mode comes from useToolStore (main toolbar Move/Rotate/Scale + G/R/S shortcuts).
  * - Floating-origin rendering: entities + gizmo are wrapped in a group offset by
  *   -renderOrigin so that float32 vertex positions stay small regardless of true
  *   world coordinates (avoids jitter for geometry far from world origin).
@@ -66,11 +66,11 @@ import {
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
-import { useViewportStore } from '@ui/store';
+import { useToolStore, useViewportStore } from '@ui/store';
 import { Entities } from './Entities';
-import { TransformGizmo, GizmoModeToggle } from './TransformGizmo';
+import { TransformGizmo } from './TransformGizmo';
 import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
-import type { GizmoMode } from './TransformGizmo';
+import type { GizmoMode } from '@ui/store';
 import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
 import { NamedViewsInner } from './NamedViews';
 import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
@@ -533,11 +533,7 @@ function SceneContents({
 
 export function Viewport3D(): React.ReactElement {
   const clearSelection = useStore((s) => s.clearSelection);
-  const selection = useStore((s) => s.document.selection);
-
-  // Gizmo mode — owned here so the overlay toggle and the in-Canvas gizmo
-  // share the same value without lifting state through the Canvas boundary.
-  const [gizmoMode, setGizmoMode] = useState<GizmoMode>('translate');
+  const gizmoMode = useToolStore((s) => s.gizmoMode);
 
   // Disable OrbitControls while the gizmo is being dragged.
   const [orbitEnabled, setOrbitEnabled] = useState(true);
@@ -549,21 +545,6 @@ export function Viewport3D(): React.ReactElement {
   const handlePointerMissed = useCallback((): void => {
     clearSelection();
   }, [clearSelection]);
-
-  // Keyboard shortcuts: g=translate, r=rotate, s=scale
-  // Managed here (outside Canvas) so they work regardless of canvas focus.
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent): void {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'g') setGizmoMode('translate');
-      else if (e.key === 'r') setGizmoMode('rotate');
-      else if (e.key === 's') setGizmoMode('scale');
-    }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
-
-  const showModeToggle = selection.length === 1;
 
   return (
     <div className="viewport-3d-wrapper">
@@ -588,9 +569,6 @@ export function Viewport3D(): React.ReactElement {
           />
         </Suspense>
       </Canvas>
-
-      {/* Mode toggle overlay — only visible when a single entity is selected */}
-      {showModeToggle && <GizmoModeToggle mode={gizmoMode} onMode={setGizmoMode} />}
 
       {/* View presets, fit and named views (top-right) */}
       <ViewPresetsOverlay />
