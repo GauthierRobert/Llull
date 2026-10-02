@@ -11,7 +11,8 @@
  */
 
 import type { Entity, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, vec3, z } from './schema';
 import { entityBounds } from './scene';
 import type { Bounds } from './scene';
 import { formatLength } from './units';
@@ -44,17 +45,6 @@ function mergeBoundsLocal(a: Bounds, b: Bounds): Bounds {
 // 1. measure_distance
 // ---------------------------------------------------------------------------
 
-interface MeasureDistanceParams {
-  /** First point as [x,y,z]. Use instead of entityId1 for point↔point or point↔entity measurement. */
-  point1?: readonly [number, number, number];
-  /** Second point as [x,y,z]. Use instead of entityId2 for point↔point or entity↔point measurement. */
-  point2?: readonly [number, number, number];
-  /** Id of the first entity. Use centroid of its bounding box when point1 is not provided. */
-  entityId1?: string;
-  /** Id of the second entity. Use centroid of its bounding box when point2 is not provided. */
-  entityId2?: string;
-}
-
 interface MeasureDistanceData {
   distance: number;
   unit: string;
@@ -68,7 +58,7 @@ interface MeasureDistanceData {
  * @invariant data is { distance: number, unit: string }
  * @failure missing entity id or neither point nor entity provided -> no-op, affected:[], no data
  */
-export const measureDistance: CommandDefinition<MeasureDistanceParams> = {
+export const measureDistance = defineCommand({
   name: 'measure_distance',
   annotations: { readOnly: true },
   description:
@@ -76,34 +66,28 @@ export const measureDistance: CommandDefinition<MeasureDistanceParams> = {
     'point [x,y,z] (point1/point2) or an entity id (entityId1/entityId2, centroid used). ' +
     'Mix point and entity freely (e.g. point1 + entityId2). ' +
     'Returns data: { distance, unit } and a factual summary. Does not modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      point1: {
-        type: 'array',
-        description: 'First world-space point [x, y, z]. Omit to use entityId1 centroid instead.',
-        items: { type: 'number' },
-      },
-      point2: {
-        type: 'array',
-        description: 'Second world-space point [x, y, z]. Omit to use entityId2 centroid instead.',
-        items: { type: 'number' },
-      },
-      entityId1: {
-        type: 'string',
-        description:
-          'Id of the first entity. Its bounding-box centroid is used as the first location ' +
+  params: z.object({
+    point1: vec3(
+      'First world-space point [x, y, z]. Omit to use entityId1 centroid instead.',
+    ).optional(),
+    point2: vec3(
+      'Second world-space point [x, y, z]. Omit to use entityId2 centroid instead.',
+    ).optional(),
+    entityId1: z
+      .string()
+      .optional()
+      .describe(
+        'Id of the first entity. Its bounding-box centroid is used as the first location ' +
           'when point1 is not provided.',
-      },
-      entityId2: {
-        type: 'string',
-        description:
-          'Id of the second entity. Its bounding-box centroid is used as the second location ' +
+      ),
+    entityId2: z
+      .string()
+      .optional()
+      .describe(
+        'Id of the second entity. Its bounding-box centroid is used as the second location ' +
           'when point2 is not provided.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, { point1, point2, entityId1, entityId2 }): CommandResult => {
     // Resolve location A
     let locA: Vec3 | undefined;
@@ -156,27 +140,13 @@ export const measureDistance: CommandDefinition<MeasureDistanceParams> = {
       data,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // 2. measure_angle
 // ---------------------------------------------------------------------------
 
-interface MeasureAngleParams {
-  /**
-   * Three world-space points [vertex, arm1, arm2]. The angle is at vertex, between
-   * the ray vertex→arm1 and the ray vertex→arm2.
-   */
-  points?: readonly [
-    readonly [number, number, number],
-    readonly [number, number, number],
-    readonly [number, number, number],
-  ];
-  /** Id of first line entity. The angle between this line and lineId2 is measured. */
-  lineId1?: string;
-  /** Id of second line entity. */
-  lineId2?: string;
-}
+const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
 
 interface MeasureAngleData {
   degrees: number;
@@ -191,7 +161,7 @@ interface MeasureAngleData {
  * @invariant data is { degrees: number, radians: number }
  * @failure degenerate vectors (zero-length) or missing entity ids -> no-op, affected:[], no data
  */
-export const measureAngle: CommandDefinition<MeasureAngleParams> = {
+export const measureAngle = defineCommand({
   name: 'measure_angle',
   annotations: { readOnly: true },
   description:
@@ -199,39 +169,26 @@ export const measureAngle: CommandDefinition<MeasureAngleParams> = {
     'where the first point is the vertex and the angle is between the two rays vertex→arm1 and vertex→arm2; or ' +
     '(b) two line entity ids (lineId1, lineId2) to measure the angle between their direction vectors. ' +
     'Returns data: { degrees, radians }. Does not modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      points: {
-        type: 'array',
-        description:
-          'Three world-space points [[vx,vy,vz],[a1x,a1y,a1z],[a2x,a2y,a2z]]. ' +
+  params: z.object({
+    points: z
+      .tuple([POINT_3D, POINT_3D, POINT_3D])
+      .optional()
+      .describe(
+        'Three world-space points [[vx,vy,vz],[a1x,a1y,a1z],[a2x,a2y,a2z]]. ' +
           'First is the vertex; angle is measured between rays vertex→point[1] and vertex→point[2].',
-        items: { type: 'array', items: { type: 'number' } },
-      },
-      lineId1: {
-        type: 'string',
-        description:
-          "Id of the first 'line' entity. Used together with lineId2 to measure the angle between two lines.",
-      },
-      lineId2: {
-        type: 'string',
-        description: "Id of the second 'line' entity.",
-      },
-    },
-    required: [],
-  },
+      ),
+    lineId1: z
+      .string()
+      .optional()
+      .describe(
+        "Id of the first 'line' entity. Used together with lineId2 to measure the angle between two lines.",
+      ),
+    lineId2: z.string().optional().describe("Id of the second 'line' entity."),
+  }),
   run: (doc, { points, lineId1, lineId2 }): CommandResult => {
     let vA: Vec3, vB: Vec3;
 
     if (points) {
-      if (points.length < 3) {
-        return {
-          document: doc,
-          summary: 'measure_angle: points must be an array of exactly 3 [x,y,z] points.',
-          affected: [],
-        };
-      }
       const [vertex, arm1, arm2] = points;
       vA = [arm1[0] - vertex[0], arm1[1] - vertex[1], arm1[2] - vertex[2]];
       vB = [arm2[0] - vertex[0], arm2[1] - vertex[1], arm2[2] - vertex[2]];
@@ -298,21 +255,11 @@ export const measureAngle: CommandDefinition<MeasureAngleParams> = {
       data,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // 3. measure_area
 // ---------------------------------------------------------------------------
-
-interface MeasureAreaParams {
-  /** Id of a closed 2D shape entity (polyline with closed:true, rectangle, circle). */
-  entityId?: string;
-  /**
-   * Explicit polygon points [[x,y], ...] in the local 2D plane. Must have >= 3 points.
-   * The polygon is treated as closed (last point connects to first).
-   */
-  points?: ReadonlyArray<readonly [number, number]>;
-}
 
 interface MeasureAreaData {
   area: number;
@@ -339,7 +286,7 @@ function polygonArea(pts: ReadonlyArray<readonly [number, number]>): number {
  * @invariant data is { area: number, unit: string } where unit is derived (e.g. "mm²")
  * @failure open profile, non-2D entity, < 3 points, or missing id -> no-op, affected:[], no data
  */
-export const measureArea: CommandDefinition<MeasureAreaParams> = {
+export const measureArea = defineCommand({
   name: 'measure_area',
   annotations: { readOnly: true },
   description:
@@ -347,24 +294,21 @@ export const measureArea: CommandDefinition<MeasureAreaParams> = {
     'polyline, rectangle, or circle entity; or (b) an explicit polygon as points ([[x,y],...], >= 3 points). ' +
     'Returns data: { area, unit } where unit is the squared document unit (e.g. "mm²"). ' +
     'Open polylines are rejected with an explanatory message. Does not modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      entityId: {
-        type: 'string',
-        description:
-          "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', or 'circle'.",
-      },
-      points: {
-        type: 'array',
-        description:
-          'Explicit polygon vertices [[x,y],...] in the local 2D plane. Must have at least 3 points. ' +
+  params: z.object({
+    entityId: z
+      .string()
+      .optional()
+      .describe(
+        "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', or 'circle'.",
+      ),
+    points: z
+      .array(z.tuple([z.number(), z.number()]))
+      .optional()
+      .describe(
+        'Explicit polygon vertices [[x,y],...] in the local 2D plane. Must have at least 3 points. ' +
           'The polygon is implicitly closed (last → first).',
-        items: { type: 'array', items: { type: 'number' } },
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, { entityId, points }): CommandResult => {
     const areaUnit = `${doc.units}²`;
 
@@ -445,16 +389,11 @@ export const measureArea: CommandDefinition<MeasureAreaParams> = {
       data,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // 4. measure_perimeter
 // ---------------------------------------------------------------------------
-
-interface MeasurePerimeterParams {
-  /** Id of a 2D shape entity: line, polyline, rectangle, circle, arc. */
-  entityId: string;
-}
 
 interface MeasurePerimeterData {
   perimeter: number;
@@ -469,7 +408,7 @@ interface MeasurePerimeterData {
  * @invariant data is { perimeter: number, unit: string }
  * @failure non-2D entity or missing id -> no-op, affected:[], no data
  */
-export const measurePerimeter: CommandDefinition<MeasurePerimeterParams> = {
+export const measurePerimeter = defineCommand({
   name: 'measure_perimeter',
   annotations: { readOnly: true },
   description:
@@ -477,17 +416,13 @@ export const measurePerimeter: CommandDefinition<MeasurePerimeterParams> = {
     "'polyline' (sum of segment lengths; closed polyline adds last→first segment), " +
     "'rectangle' (2*(width+height)), 'circle' (circumference 2πr), 'arc' (arc length r*|angle|). " +
     'Returns data: { perimeter, unit }. Does not modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      entityId: {
-        type: 'string',
-        description:
-          "Id of the 2D shape entity to measure. Supported kinds: 'line', 'polyline', 'rectangle', 'circle', 'arc'.",
-      },
-    },
-    required: ['entityId'],
-  },
+  params: z.object({
+    entityId: z
+      .string()
+      .describe(
+        "Id of the 2D shape entity to measure. Supported kinds: 'line', 'polyline', 'rectangle', 'circle', 'arc'.",
+      ),
+  }),
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) {
@@ -556,24 +491,11 @@ export const measurePerimeter: CommandDefinition<MeasurePerimeterParams> = {
       data,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // 5. measure_bounding_box
 // ---------------------------------------------------------------------------
-
-interface MeasureBoundingBoxParams {
-  /**
-   * Id of a single entity. Omit to use selection or whole document.
-   * When present, entityId takes precedence over useSelection.
-   */
-  entityId?: string;
-  /**
-   * When true (and entityId is not provided), compute the combined AABB of the
-   * current document selection. Falls back to the whole document when selection is empty.
-   */
-  useSelection?: boolean;
-}
 
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -589,7 +511,7 @@ interface MeasureBoundingBoxData {
  * @invariant data is { min: Vec3, max: Vec3, size: Vec3 }
  * @failure missing entity id, empty document -> no-op, affected:[], no data
  */
-export const measureBoundingBox: CommandDefinition<MeasureBoundingBoxParams> = {
+export const measureBoundingBox = defineCommand({
   name: 'measure_bounding_box',
   annotations: { readOnly: true },
   description:
@@ -599,23 +521,21 @@ export const measureBoundingBox: CommandDefinition<MeasureBoundingBoxParams> = {
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
     'Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d] }. Does not modify the document. ' +
     'Note: entity rotation is NOT applied to bounds (axis-aligned approximation).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      entityId: {
-        type: 'string',
-        description:
-          'Id of the entity whose bounding box to compute. Takes precedence over useSelection.',
-      },
-      useSelection: {
-        type: 'boolean',
-        description:
-          'When true and entityId is not provided, compute the AABB of the current selection. ' +
+  params: z.object({
+    entityId: z
+      .string()
+      .optional()
+      .describe(
+        'Id of the entity whose bounding box to compute. Takes precedence over useSelection.',
+      ),
+    useSelection: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true and entityId is not provided, compute the AABB of the current selection. ' +
           'Falls back to the whole document if the selection is empty.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, { entityId, useSelection }): CommandResult => {
     let bounds: Bounds | null = null;
 
@@ -664,16 +584,11 @@ export const measureBoundingBox: CommandDefinition<MeasureBoundingBoxParams> = {
       data,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // 6. measure_volume
 // ---------------------------------------------------------------------------
-
-interface MeasureVolumeParams {
-  /** Id of a 3D solid entity (box, cylinder, sphere, extrusion, mesh). */
-  entityId: string;
-}
 
 interface MeasureVolumeData {
   volume: number;
@@ -721,7 +636,7 @@ function meshVolume(positions: ReadonlyArray<number>, indices: ReadonlyArray<num
  * @invariant data is { volume: number, unit: string } where unit is derived (e.g. "mm³")
  * @failure non-solid entity or missing id -> no-op, affected:[], no data
  */
-export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
+export const measureVolume = defineCommand({
   name: 'measure_volume',
   annotations: { readOnly: true },
   description:
@@ -735,18 +650,14 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
     'falls back to bounding-box approximation if the profile crosses the revolution axis). ' +
     'Returns data: { volume, unit } where unit is the cubed document unit (e.g. "mm³"). ' +
     '2D shape entities are rejected. Does not modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      entityId: {
-        type: 'string',
-        description:
-          "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', " +
+  params: z.object({
+    entityId: z
+      .string()
+      .describe(
+        "Id of the 3D solid entity to measure. Supported kinds: 'box', 'cylinder', 'sphere', " +
           "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
-      },
-    },
-    required: ['entityId'],
-  },
+      ),
+  }),
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) {
@@ -864,23 +775,11 @@ export const measureVolume: CommandDefinition<MeasureVolumeParams> = {
       data,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // 7. mass_properties
 // ---------------------------------------------------------------------------
-
-interface MassPropertiesParams {
-  /** Id of a 3D solid entity. */
-  entityId: string;
-  /**
-   * Material density in g/mm³ (grams per cubic millimetre).
-   * The document unit is assumed to be mm for the volume basis; adjust density
-   * accordingly when the document uses other units.
-   * @example 0.00785 for steel, 0.0027 for aluminium
-   */
-  density: number;
-}
 
 interface MassPropertiesData {
   volume: number;
@@ -903,7 +802,7 @@ interface MassPropertiesData {
  *   2. Otherwise the caller-supplied `density` param is used (back-compat).
  * Unit assumption: density is in g/(document-unit)³ so that mass = volume × density in grams.
  */
-export const massProperties: CommandDefinition<MassPropertiesParams> = {
+export const massProperties = defineCommand({
   name: 'mass_properties',
   annotations: { readOnly: true },
   description:
@@ -916,29 +815,25 @@ export const massProperties: CommandDefinition<MassPropertiesParams> = {
     'The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. ' +
     'Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). ' +
     'Does not modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      entityId: {
-        type: 'string',
-        description:
-          "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', " +
+  params: z.object({
+    entityId: z
+      .string()
+      .describe(
+        "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', " +
           "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
-      },
-      density: {
-        type: 'number',
-        description:
-          'Fallback material density in g/(document-unit)³. Must be > 0. ' +
+      ),
+    density: z
+      .number()
+      .describe(
+        'Fallback material density in g/(document-unit)³. Must be > 0. ' +
           'Used only when the entity has no material assigned via assign_material. ' +
           'Examples for a mm document: steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124.',
-      },
-    },
-    required: ['entityId', 'density'],
-  },
+      ),
+  }),
   run: (doc, { entityId, density }): CommandResult => {
     // Validate the fallback density param even if it may not be used — caller must
     // supply a valid number so the API stays consistent.
-    if (typeof density !== 'number' || density <= 0) {
+    if (density <= 0) {
       return {
         document: doc,
         summary: `mass_properties: density must be > 0, got ${String(density)}.`,
@@ -984,4 +879,4 @@ export const massProperties: CommandDefinition<MassPropertiesParams> = {
       data,
     };
   },
-};
+});

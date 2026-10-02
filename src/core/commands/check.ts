@@ -14,7 +14,8 @@
  */
 
 import type { CadDocument, Entity } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { entityBounds } from './scene';
 
 // ---------------------------------------------------------------------------
@@ -48,10 +49,6 @@ export interface CheckResult {
 // ---------------------------------------------------------------------------
 // Check parameters
 // ---------------------------------------------------------------------------
-
-interface CheckModelParams {
-  farThreshold?: number;
-}
 
 // ---------------------------------------------------------------------------
 // Individual check functions — each returns Issue[] for its concern
@@ -477,7 +474,7 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
  * @invariant data satisfies CheckResult; document === input doc (same reference)
  * @failure never throws; always returns a valid CheckResult in data
  */
-export const checkModel: CommandDefinition<CheckModelParams> = {
+export const checkModel = defineCommand({
   name: 'check_model',
   annotations: { readOnly: true },
   description:
@@ -491,20 +488,17 @@ export const checkModel: CommandDefinition<CheckModelParams> = {
     'empty_layer (layer with no entities), orphaned_group_member (group references missing entity id), ' +
     'dangling_dimension_ref (dimension entity references a missing entity id), ' +
     'parameter_error (a named parameter has an evaluation error).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      farThreshold: {
-        type: 'number',
-        description:
-          'Distance from world origin beyond which an entity bounding-box center is flagged ' +
+  params: z.object({
+    farThreshold: z
+      .number()
+      .optional()
+      .describe(
+        'Distance from world origin beyond which an entity bounding-box center is flagged ' +
           'as a far_from_origin warning. Units match the document units. Default: 1000000.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, params): CommandResult => {
-    const farThreshold = (params as CheckModelParams).farThreshold ?? 1e6;
+    const farThreshold = params.farThreshold ?? 1e6;
     const result = runModelChecks(doc, farThreshold);
 
     const errorCount = result.issues.filter((i) => i.severity === 'error').length;
@@ -523,4 +517,4 @@ export const checkModel: CommandDefinition<CheckModelParams> = {
       data: result,
     };
   },
-};
+});

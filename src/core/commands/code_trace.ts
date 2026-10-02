@@ -8,7 +8,8 @@
 
 import type { CadDocument } from '../model/types';
 import { createEmptyDocument } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { execute } from './registry';
 import { executeRecorded } from './record';
 import { buildParamEnv } from './regenerate';
@@ -31,11 +32,6 @@ interface TraceFeature {
 interface CodeTrace {
   parameters: TraceParameter[];
   features: TraceFeature[];
-}
-
-interface ApplyCodeTraceParams {
-  trace: CodeTrace;
-  mode?: 'replace' | 'append';
 }
 
 /** Commands the generated runtime records. A trace can never reach any other command. */
@@ -224,37 +220,27 @@ function abort(doc: CadDocument, reason: string): CommandResult {
  *   `=expr` so set_parameter + replay_history regenerates the model
  * @failure malformed trace, disallowed command, unknown ref or a failing feature -> full rollback
  */
-export const applyCodeTrace: CommandDefinition<ApplyCodeTraceParams> = {
+export const applyCodeTrace = defineCommand({
   name: 'apply_code_trace',
   description:
     'Rebuild the model from a feature trace (LLULL_TRACE) recorded by running llull-generated CadQuery or ' +
     'build123d code — normally called for you by the import_code tool. Parameters are set first, then each ' +
     'traced feature runs as its llull command, keeping parameter expressions in the feature history. ' +
     'mode "replace" (default) swaps the current solids/parameters/history for the trace; "append" adds to them.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      trace: {
-        type: 'object',
-        description:
-          'The trace: { parameters: [{ name, expression }], features: [{ command, params, ref?, name? }] }. ' +
+  params: z.object({
+    trace: z
+      .record(z.string(), z.unknown())
+      .describe(
+        'The trace: { parameters: [{ name, expression }], features: [{ command, params, ref?, name? }] }. ' +
           'Numbers in params may be { value, expression? } terms; solids are referenced as { ref: "f3" }.',
-      },
-      mode: {
-        type: 'string',
-        description: '"replace" (default) or "append".',
-        enum: ['replace', 'append'],
-      },
-    },
-    required: ['trace'],
-  },
+      ),
+    mode: z.enum(['replace', 'append']).optional().describe('"replace" (default) or "append".'),
+  }),
   annotations: { metaHistory: true, destructive: true },
-  run: (doc, { trace, mode = 'replace' }): CommandResult => {
-    if (mode !== 'replace' && mode !== 'append') {
-      return abort(doc, `mode must be "replace" or "append" (got "${String(mode)}")`);
-    }
-    const invalid = validateTrace(trace);
+  run: (doc, { trace: rawTrace, mode = 'replace' }): CommandResult => {
+    const invalid = validateTrace(rawTrace);
     if (invalid !== null) return abort(doc, invalid);
+    const trace = rawTrace as unknown as CodeTrace;
 
     const start = mode === 'append' ? doc : replaceBase(doc);
     let current = start;
@@ -303,4 +289,4 @@ export const applyCodeTrace: CommandDefinition<ApplyCodeTraceParams> = {
       affected: live,
     };
   },
-};
+});

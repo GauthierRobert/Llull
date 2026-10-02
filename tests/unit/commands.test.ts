@@ -1844,12 +1844,13 @@ describe('render_view', () => {
     expect(smallData.svg).toContain('height="64"');
   });
 
-  it('unknown view name falls back to iso without throwing', () => {
+  it('unknown view name is rejected as a no-op without throwing', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'render_view', { view: 'diagonal' });
-    const data = result.data as { view: string; svg: string };
-    expect(data.view).toBe('iso');
-    expect(data.svg).toContain('<svg');
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+    expect(result.data).toBeUndefined();
+    expect(result.summary).toContain('render_view rejected: invalid params');
   });
 
   it('is pure — the input document is returned unchanged (referential equality)', () => {

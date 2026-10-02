@@ -14,13 +14,10 @@
 
 import type { CadDocument } from '../model/types';
 import { createEmptyDocument } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 
-interface ClearDocumentParams {
-  keepLayers?: boolean;
-}
-
-export const clearDocument: CommandDefinition<ClearDocumentParams> = {
+export const clearDocument = defineCommand({
   name: 'clear_document',
   description:
     'Reset the working document to an empty state, removing all entities, groups, ' +
@@ -29,21 +26,18 @@ export const clearDocument: CommandDefinition<ClearDocumentParams> = {
     'Set keepLayers=true to also preserve layers and the active layer scheme; ' +
     'by default layers are reset to a single default "Layer 0".',
   annotations: { destructive: true },
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      keepLayers: {
-        type: 'boolean',
-        description:
-          'When true, the document layers and layerOrder are preserved unchanged. ' +
+  params: z.object({
+    keepLayers: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, the document layers and layerOrder are preserved unchanged. ' +
           'Useful for serial iterations that share a layer scheme. ' +
           'Default: false — layers are reset to a single default "Layer 0".',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, params): CommandResult => {
-    const keepLayers = (params as ClearDocumentParams).keepLayers === true;
+    const keepLayers = params.keepLayers === true;
 
     const entityCount = Object.keys(doc.entities).length;
     const layerCount = Object.keys(doc.layers).length;
@@ -116,4 +110,4 @@ export const clearDocument: CommandDefinition<ClearDocumentParams> = {
       affected: [],
     };
   },
-};
+});

@@ -26,7 +26,7 @@ describe('apply_code_trace validation', () => {
       mode: 'merge',
     });
     expect(result.document).toBe(doc);
-    expect(result.summary).toMatch(/mode must be "replace" or "append"/);
+    expect(result.summary).toMatch(/apply_code_trace rejected: invalid params — mode/);
   });
 
   it('rejects duplicate refs and non-string names', () => {

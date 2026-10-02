@@ -26,7 +26,8 @@
  */
 
 import type { CameraState, Vec3 } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, vec3, z } from './schema';
 import { computeSceneSnapshot } from './scene';
 
 // ---------------------------------------------------------------------------
@@ -55,13 +56,6 @@ const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
 // set_camera
 // ---------------------------------------------------------------------------
 
-interface SetCameraParams {
-  target?: [number, number, number];
-  azimuth?: number;
-  polar?: number;
-  distance?: number;
-}
-
 /**
  * @command set_camera
  * @pure
@@ -70,7 +64,7 @@ interface SetCameraParams {
  * @invariant distance, if provided, must be > 0
  * @failure distance <= 0 → no-op with explanatory summary
  */
-export const setCamera: CommandDefinition<SetCameraParams> = {
+export const setCamera = defineCommand({
   name: 'set_camera',
   description:
     'Set one or more camera fields (target, azimuth, polar, distance). ' +
@@ -81,38 +75,31 @@ export const setCamera: CommandDefinition<SetCameraParams> = {
     'distance is the radius of the orbit sphere; must be > 0. ' +
     'Does NOT add to feature history.',
   annotations: { metaHistory: true, idempotent: true },
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      target: {
-        type: 'array',
-        description: 'World-space orbit target [x, y, z]. Omit to keep current target.',
-        items: { type: 'number' },
-      },
-      azimuth: {
-        type: 'number',
-        description:
-          'Horizontal orbit angle in radians measured in the XY plane from +Y toward +X. ' +
+  params: z.object({
+    target: vec3('World-space orbit target [x, y, z]. Omit to keep current target.').optional(),
+    azimuth: z
+      .number()
+      .optional()
+      .describe(
+        'Horizontal orbit angle in radians measured in the XY plane from +Y toward +X. ' +
           'Eye offset from target is (sin a, cos a) in XY: 0 = eye at +Y (back view), π = eye at -Y ' +
           '(front view), π/2 = eye at +X (right view). Omit to keep current value.',
-      },
-      polar: {
-        type: 'number',
-        description:
-          'Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. ' +
+      ),
+    polar: z
+      .number()
+      .optional()
+      .describe(
+        'Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. ' +
           'Clamped to (0.01, π−0.01) to avoid gimbal lock. Omit to keep current value.',
-      },
-      distance: {
-        type: 'number',
-        description:
-          'Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.',
-      },
-    },
-    required: [],
-  },
-  run: (doc, params): CommandResult => {
-    const p = (params ?? {}) as SetCameraParams;
-
+      ),
+    distance: z
+      .number()
+      .optional()
+      .describe(
+        'Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.',
+      ),
+  }),
+  run: (doc, p): CommandResult => {
     if (p.distance !== undefined && p.distance <= 0) {
       return {
         document: doc,
@@ -150,17 +137,11 @@ export const setCamera: CommandDefinition<SetCameraParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // look_at
 // ---------------------------------------------------------------------------
-
-interface LookAtParams {
-  target: [number, number, number];
-  azimuth?: number;
-  polar?: number;
-}
 
 /**
  * @command look_at
@@ -170,7 +151,7 @@ interface LookAtParams {
  * @invariant distance is preserved; only target (and optionally azimuth/polar) change
  * @failure no params or bad target → no-op
  */
-export const lookAt: CommandDefinition<LookAtParams> = {
+export const lookAt = defineCommand({
   name: 'look_at',
   description:
     'Orbit the camera to look at a specific world-space point without changing the orbit distance. ' +
@@ -179,37 +160,25 @@ export const lookAt: CommandDefinition<LookAtParams> = {
     'distance is preserved. Use set_camera to change distance explicitly. ' +
     'Does NOT add to feature history.',
   annotations: { metaHistory: true, idempotent: true },
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      target: {
-        type: 'array',
-        description: 'World-space point [x, y, z] to set as the orbit centre.',
-        items: { type: 'number' },
-      },
-      azimuth: {
-        type: 'number',
-        description:
-          'Optional horizontal orbit angle in radians (measured from +Y toward +X in the XY plane). ' +
+  params: z.object({
+    target: vec3('World-space point [x, y, z] to set as the orbit centre.'),
+    azimuth: z
+      .number()
+      .optional()
+      .describe(
+        'Optional horizontal orbit angle in radians (measured from +Y toward +X in the XY plane). ' +
           'Omit to keep the current azimuth.',
-      },
-      polar: {
-        type: 'number',
-        description:
-          'Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level). ' +
+      ),
+    polar: z
+      .number()
+      .optional()
+      .describe(
+        'Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level). ' +
           'Omit to keep the current polar angle.',
-      },
-    },
-    required: ['target'],
-  },
-  run: (doc, params): CommandResult => {
-    const p = (params ?? {}) as LookAtParams;
-
-    if (
-      !Array.isArray(p.target) ||
-      p.target.length !== 3 ||
-      p.target.some((v) => typeof v !== 'number' || !isFinite(v))
-    ) {
+      ),
+  }),
+  run: (doc, p): CommandResult => {
+    if ((p.target as Vec3).some((v) => !isFinite(v))) {
       return {
         document: doc,
         summary: `look_at: target must be a finite [x,y,z] array. Camera unchanged.`,
@@ -231,18 +200,13 @@ export const lookAt: CommandDefinition<LookAtParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // fit_view
 // ---------------------------------------------------------------------------
 
 type FitDirection = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'current';
-
-interface FitViewParams {
-  direction?: FitDirection;
-  padding?: number;
-}
 
 /**
  * @command fit_view
@@ -252,7 +216,7 @@ interface FitViewParams {
  * @invariant target = scene-bounds centre; distance = boundsRadius / sin(fov/2) * padding
  * @failure empty doc → falls back to sensible default framing; unknown direction → no-op
  */
-export const fitView: CommandDefinition<FitViewParams> = {
+export const fitView = defineCommand({
   name: 'fit_view',
   description:
     'Frame the entire document in the camera so all entities are visible. ' +
@@ -264,39 +228,25 @@ export const fitView: CommandDefinition<FitViewParams> = {
     'When the document is empty a default view is applied with an explanatory summary. ' +
     'Does NOT add to feature history.',
   annotations: { metaHistory: true, idempotent: true },
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      direction: {
-        type: 'string',
-        description:
-          'Viewing direction preset. One of: front, back, left, right, top, bottom, iso, current. ' +
+  params: z.object({
+    direction: z
+      .enum(['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current'])
+      .optional()
+      .describe(
+        'Viewing direction preset. One of: front, back, left, right, top, bottom, iso, current. ' +
           'Defaults to "iso". "current" keeps the existing azimuth and polar; only target and distance change.',
-        enum: ['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current'],
-      },
-      padding: {
-        type: 'number',
-        description:
-          'Scale factor applied to the computed distance so geometry is not edge-clipped. ' +
+      ),
+    padding: z
+      .number()
+      .optional()
+      .describe(
+        'Scale factor applied to the computed distance so geometry is not edge-clipped. ' +
           'Default 1.2. Values < 1 crop the view; > 2 shows it very small. Must be > 0.',
-      },
-    },
-    required: [],
-  },
-  run: (doc, params): CommandResult => {
-    const p = (params ?? {}) as FitViewParams;
+      ),
+  }),
+  run: (doc, p): CommandResult => {
     const direction: FitDirection = p.direction ?? 'iso';
     const padding: number = p.padding ?? 1.2;
-
-    if (
-      !['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current'].includes(direction)
-    ) {
-      return {
-        document: doc,
-        summary: `fit_view: unknown direction "${direction}". Valid values: front, back, left, right, top, bottom, iso, current. Camera unchanged.`,
-        affected: [],
-      };
-    }
 
     if (padding <= 0) {
       return {
@@ -353,4 +303,4 @@ export const fitView: CommandDefinition<FitViewParams> = {
       affected: [],
     };
   },
-};
+});

@@ -11,7 +11,8 @@
 
 import type { CadDocument, Vec3 } from '../model/types';
 import { is3D } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 import { entityToTriangles } from './export';
 import type { Triangle } from './export';
 
@@ -160,13 +161,6 @@ export interface ExportObjData {
 // export_obj command
 // ---------------------------------------------------------------------------
 
-interface ExportObjParams {
-  /** Ids of entities to export. Omit (or pass []) to export all 3D entities. */
-  entityIds?: string[];
-  /** Units label for the OBJ comment header. Defaults to doc.units. */
-  units?: string;
-}
-
 /**
  * @command export_obj
  * @pure
@@ -177,7 +171,7 @@ interface ExportObjParams {
  * @failure 2D-only or unknown entities silently skipped; empty → triangleCount:0
  * @failure never throws for user error
  */
-export const exportObj: CommandDefinition<ExportObjParams> = {
+export const exportObj = defineCommand({
   name: 'export_obj',
   annotations: { readOnly: true },
   description:
@@ -189,27 +183,24 @@ export const exportObj: CommandDefinition<ExportObjParams> = {
     'entityIds: omit to export all 3D entities; provide an array to export a subset. ' +
     'units: optional units label embedded in the OBJ comment (defaults to doc units). ' +
     'Does NOT modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      entityIds: {
-        type: 'array',
-        description:
-          'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
+  params: z.object({
+    entityIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
           '3D solid entities in the document. 2D and unknown ids are silently skipped.',
-        items: { type: 'string' },
-      },
-      units: {
-        type: 'string',
-        description:
-          'Units label to embed in the OBJ comment header (e.g. "mm", "cm", "in"). ' +
+      ),
+    units: z
+      .string()
+      .optional()
+      .describe(
+        'Units label to embed in the OBJ comment header (e.g. "mm", "cm", "in"). ' +
           'Defaults to the document units setting. Informational only — OBJ has no unit standard.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, params): CommandResult => {
-    const { entityIds, units } = params as ExportObjParams;
+    const { entityIds, units } = params;
     const unitLabel = units ?? (doc as CadDocument & { units?: string }).units ?? 'mm';
 
     const { tris, skipped2D, unknownIds } = collectTriangles(doc, entityIds);
@@ -229,7 +220,7 @@ export const exportObj: CommandDefinition<ExportObjParams> = {
     const data: ExportObjData = { format: 'obj', text, triangleCount };
     return { document: doc, summary: parts.join(' '), affected: [], data };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // glTF 2.0 serialisation
@@ -448,17 +439,6 @@ export interface ExportGltfData {
 // export_gltf command
 // ---------------------------------------------------------------------------
 
-interface ExportGltfParams {
-  /** Ids of entities to export. Omit (or pass []) to export all 3D entities. */
-  entityIds?: string[];
-  /**
-   * When true, produce a self-contained GLB binary container (base64-encoded in
-   * data.base64).  When false (default), produce a glTF 2.0 JSON text in data.text
-   * with the BIN buffer inlined as a data: URI in buffers[0].uri.
-   */
-  binary?: boolean;
-}
-
 /**
  * @command export_gltf
  * @pure
@@ -469,7 +449,7 @@ interface ExportGltfParams {
  * @failure 2D-only or unknown entities silently skipped; empty → triangleCount:0
  * @failure never throws for user error
  */
-export const exportGltf: CommandDefinition<ExportGltfParams> = {
+export const exportGltf = defineCommand({
   name: 'export_gltf',
   annotations: { readOnly: true },
   description:
@@ -486,30 +466,27 @@ export const exportGltf: CommandDefinition<ExportGltfParams> = {
     'entityIds: omit to export all 3D entities; provide an array to export a subset. ' +
     'binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. ' +
     'Does NOT modify the document.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      entityIds: {
-        type: 'array',
-        description:
-          'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
+  params: z.object({
+    entityIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
           '3D solid entities in the document. 2D and unknown ids are silently skipped.',
-        items: { type: 'string' },
-      },
-      binary: {
-        type: 'boolean',
-        description:
-          'Output format selector. false (default): data.text contains a glTF 2.0 JSON string ' +
+      ),
+    binary: z
+      .boolean()
+      .optional()
+      .describe(
+        'Output format selector. false (default): data.text contains a glTF 2.0 JSON string ' +
           'with the binary buffer inlined as a data: URI. ' +
           'true: data.base64 contains a base64-encoded GLB binary container ' +
           '(12-byte header + JSON chunk + BIN chunk per glTF 2.0 spec). ' +
           'Most web viewers accept JSON glTF; most desktop importers accept GLB.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, params): CommandResult => {
-    const { entityIds, binary = false } = params as ExportGltfParams;
+    const { entityIds, binary = false } = params;
 
     const { tris, skipped2D, unknownIds } = collectTriangles(doc, entityIds);
     const triangleCount = tris.length;
@@ -544,4 +521,4 @@ export const exportGltf: CommandDefinition<ExportGltfParams> = {
       return { document: doc, summary: parts.join(' '), affected: [], data };
     }
   },
-};
+});
