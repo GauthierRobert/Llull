@@ -1,0 +1,172 @@
+{
+  "format": "llull-document",
+  "version": 1,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "box",
+        "size": [
+          1,
+          1,
+          1
+        ],
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      }
+    },
+    "order": [
+      "#1"
+    ],
+    "layers": {
+      "#3": {
+        "id": "#3",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      },
+      "#2": {
+        "id": "#2",
+        "name": "Walls",
+        "visible": true,
+        "locked": true,
+        "color": "#ff0000"
+      },
+      "#4": {
+        "id": "#4",
+        "name": "Windows",
+        "visible": false,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#3",
+      "#2",
+      "#4"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#5",
+        "name": "add_layer",
+        "params": {
+          "name": "Walls",
+          "color": "#ff0000"
+        },
+        "suppressed": false,
+        "affected": [
+          "#2"
+        ]
+      },
+      {
+        "id": "#6",
+        "name": "add_layer",
+        "params": {
+          "name": "Doors"
+        },
+        "suppressed": false,
+        "affected": [
+          "#4"
+        ]
+      },
+      {
+        "id": "#7",
+        "name": "add_box",
+        "params": {
+          "size": [
+            1,
+            1,
+            1
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#1"
+        ]
+      },
+      {
+        "id": "#8",
+        "name": "set_entity_layer",
+        "params": {
+          "entityId": "#1",
+          "layerId": "#2"
+        },
+        "suppressed": false,
+        "affected": [
+          "#1"
+        ]
+      },
+      {
+        "id": "#9",
+        "name": "rename_layer",
+        "params": {
+          "id": "#4",
+          "name": "Windows"
+        },
+        "suppressed": false,
+        "affected": [
+          "#4"
+        ]
+      },
+      {
+        "id": "#10",
+        "name": "set_layer_visibility",
+        "params": {
+          "id": "#4",
+          "visible": false
+        },
+        "suppressed": false,
+        "affected": [
+          "#4"
+        ]
+      },
+      {
+        "id": "#11",
+        "name": "set_layer_lock",
+        "params": {
+          "id": "#2",
+          "locked": true
+        },
+        "suppressed": false,
+        "affected": [
+          "#2"
+        ]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": []
+  }
+}

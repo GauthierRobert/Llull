@@ -370,23 +370,23 @@ Wave 3 scope to keep the wave shippable.
 **Premise:** keep the one-registry/two-callers core; fix what accreted around it — injected execution context (T1), one schema per command (T2), recipe-first document (T3), one sync path (T4), small core + domain plugins (T5). Every task keeps `main` green and the MG0 golden corpus byte-identical unless the task says otherwise. **Feature freeze (D5):** no new domain commands until MG4 is `[DONE]`.
 
 ## MG0 — Guardrails (Lane 5 + Lane 1)
-- `[TODO]` **MG0.1** Golden replay corpus `tests/golden/` (~30 `build_project` plans → serialized doc snapshots; replay reproduces). _Lane 5. deps: —._
-- `[TODO]` **MG0.2** Schema conformance test: minimal valid params from each `paramsSchema` never hits the `guardCommand` catch path. _Lane 5. deps: —._
-- `[TODO]` **MG0.3** ESLint `max-lines: 500` as error + allowlist of the current 49 offenders (list may only shrink). _Lane 5. deps: —._
-- `[TODO]` **MG0.4** Perf/size baseline (replay time, doc JSON size) recorded in `docs/MIGRATION_PLAN.md`. _Lane 5. deps: MG0.1._
+- `[DONE]` **MG0.1** Golden replay corpus `tests/golden/` (~30 `build_project` plans → serialized doc snapshots; replay reproduces). _Lane 5. deps: —._
+- `[DONE]` **MG0.2** Schema conformance test: minimal valid params from each `paramsSchema` never hits the `guardCommand` catch path. _Lane 5. deps: —._
+- `[DONE]` **MG0.3** ESLint `max-lines: 500` as error + allowlist of the current 49 offenders (list may only shrink). _Lane 5. deps: —._
+- `[DONE]` **MG0.4** Perf/size baseline (replay time, doc JSON size) recorded in `docs/MIGRATION_PLAN.md`. _Lane 5. deps: MG0.1._
 
 ## MG1 — Execution context (Lane 1; MG1.4 Lane 4 + Lane 2)
-- `[TODO]` **MG1.1** `ExecutionContext { kernel, ids, registry }`; `execute(doc, name, params, ctx = defaultContext())`; `run(doc, params, ctx?)`. _Lane 1. deps: MG0.1._
-- `[TODO]` **MG1.2** Delete `setRegistryRef` / `setConfigRegistryRef` / `setRecipeRegistryRef` — use `ctx.registry`. _Lane 1. deps: MG1.1._
-- `[TODO]` **MG1.3** Kernel via `ctx.kernel` in boolean/modify3d/tessellation; `getGeometryKernel()` only inside `defaultContext()`. _Lane 1. deps: MG1.1._
+- `[DONE]` **MG1.1** `ExecutionContext { kernel, ids, registry }`; `execute(doc, name, params, ctx = defaultContext())`; `run(doc, params, ctx?)`. _Lane 1. deps: MG0.1._
+- `[DONE]` **MG1.2** Delete `setRegistryRef` / `setConfigRegistryRef` / `setRecipeRegistryRef` — use `ctx.registry`. _Lane 1. deps: MG1.1._
+- `[DONE]` **MG1.3** Kernel via `ctx.kernel` in boolean/modify3d/tessellation; `getGeometryKernel()` only inside `defaultContext()`. _Lane 1. deps: MG1.1._
 - `[TODO]` **MG1.4** Kernel parity: move `ui/geometry/occtKernel.ts` → `core/geometry/`; server honours `LLULL_KERNEL`; test fillet via MCP == via store. _Lane 4 + Lane 2. deps: MG1.3. D3 resolved: yes._
-- `[TODO]` **MG1.5** `requiresKernel` annotation; explicit "kernel loading" summary; replay waits for readiness. _Lane 1. deps: MG1.3._
+- `[DONE]` **MG1.5** `requiresKernel` annotation; explicit "kernel loading" summary; replay waits for readiness. _Lane 1. deps: MG1.3._
 
 ## MG2 — One schema per command (Lane 1; parallel to MG1)
 - `[TODO]` **MG2.1** `defineCommand({ params: <schema> })` deriving `paramsSchema` + params type. _Lane 1. deps: MG0.2. D1 resolved: zod v4._
 - `[TODO]` **MG2.2** Validate params in `execute`; move generic `guardCommand` checks into schema helpers (`vec3`, `entityId`, `position`). _Lane 1. deps: MG2.1._
 - `[TODO]` **MG2.3** Migrate per domain file (one PR each, `building/**` last); delete hand-written `<X>Params` + `paramsSchema`. _Lane 1. deps: MG2.2._
-- `[TODO]` **MG2.4** `toToolSchemas()` snapshot test. _Lane 5. deps: —._
+- `[DONE]` **MG2.4** `toToolSchemas()` snapshot test. _Lane 5. deps: —._
 
 ## MG3 — Deterministic ids (Lane 1)
 - `[TODO]` **MG3.1** Step-scoped ids `<stepId>.<n>` via `ctx.ids`; replay reuses recorded step ids; `remapIds` + `affected` zip become dead code. _Lane 1. deps: MG1.1._

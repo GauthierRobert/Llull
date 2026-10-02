@@ -1,0 +1,209 @@
+{
+  "format": "llull-document",
+  "version": 1,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "line",
+        "start": [
+          0,
+          0
+        ],
+        "end": [
+          10,
+          0
+        ],
+        "position": [
+          0,
+          -1.15232212,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#3": {
+        "id": "#3",
+        "kind": "line",
+        "start": [
+          0,
+          1
+        ],
+        "end": [
+          10,
+          4
+        ],
+        "position": [
+          0,
+          2.99134859,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      }
+    },
+    "order": [
+      "#1",
+      "#3"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#4",
+        "name": "draw_line",
+        "params": {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            10,
+            0
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#1"
+        ]
+      },
+      {
+        "id": "#5",
+        "name": "draw_line",
+        "params": {
+          "start": [
+            0,
+            1
+          ],
+          "end": [
+            10,
+            4
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#3"
+        ]
+      },
+      {
+        "id": "#6",
+        "name": "add_constraint",
+        "params": {
+          "constraint": {
+            "kind": "parallel",
+            "a": {
+              "entityId": "#1"
+            },
+            "b": {
+              "entityId": "#3"
+            }
+          }
+        },
+        "suppressed": false,
+        "affected": [
+          "#7"
+        ]
+      },
+      {
+        "id": "#8",
+        "name": "add_constraint",
+        "params": {
+          "constraint": {
+            "kind": "distance",
+            "a": {
+              "entityId": "#1"
+            },
+            "b": {
+              "entityId": "#3"
+            },
+            "value": 4
+          }
+        },
+        "suppressed": false,
+        "affected": [
+          "#9"
+        ]
+      },
+      {
+        "id": "#10",
+        "name": "solve_constraints",
+        "params": {},
+        "suppressed": false,
+        "affected": [
+          "#1",
+          "#3"
+        ]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {
+      "#7": {
+        "kind": "parallel",
+        "a": {
+          "entityId": "#1"
+        },
+        "b": {
+          "entityId": "#3"
+        },
+        "id": "#7"
+      },
+      "#9": {
+        "kind": "distance",
+        "a": {
+          "entityId": "#1"
+        },
+        "b": {
+          "entityId": "#3"
+        },
+        "value": 4,
+        "id": "#9"
+      }
+    },
+    "constraintOrder": [
+      "#7",
+      "#9"
+    ],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": []
+  }
+}

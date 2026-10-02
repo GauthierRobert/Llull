@@ -192,13 +192,14 @@ re-evaluates only dependent steps (measured vs MG0.4 baseline).
   mechanical, reviewed by `cad-reviewer`.
 - **Agent-facing schema text regresses during MG2.** Mitigation: MG2.4 snapshot test.
 
-## Baseline (fill in at MG0.4)
+## Baseline (recorded at MG0.4)
 
 | Metric | Baseline | Target |
 |--------|----------|--------|
-| Files > 500 lines | 49 | 0 |
+| Files > 500 code lines (blank/comment lines excluded) | 30 | 0 |
 | Module-level mutable state in `core/` | kernel, id counter, 3 registry refs | 0 (outside `defaultContext`) |
 | Hand-written `paramsSchema` | all | 0 |
-| Largest golden doc size | _tbd_ | −50 % (no `MeshData`) |
-| Param-edit regen time, largest plan | _tbd_ | ≤ downstream closure only |
+| Largest golden doc size (`industrial_portal_crane`, 1 step) | 600 808 B | −50 % (generated geometry not stored) |
+| `boolean_subtract` golden doc | 1 998 B | no `MeshData` in file |
+| `replay_history`, largest plan | 15.1 ms (portal), 6.6 ms (house) | ≤ downstream closure only |
 | Sync mechanisms | 3 | 1 |

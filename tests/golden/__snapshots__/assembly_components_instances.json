@@ -1,0 +1,211 @@
+{
+  "format": "llull-document",
+  "version": 1,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#3",
+        "color": "#c8553d"
+      },
+      "#4": {
+        "id": "#4",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [
+          5,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "layerId": "#3",
+        "color": "#c8553d"
+      },
+      "#5": {
+        "id": "#5",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [
+          10,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "layerId": "#3",
+        "color": "#c8553d"
+      }
+    },
+    "order": [
+      "#1",
+      "#4",
+      "#5"
+    ],
+    "layers": {
+      "#3": {
+        "id": "#3",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#3"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#6",
+        "name": "add_box",
+        "params": {
+          "size": [
+            1,
+            1,
+            1
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#7"
+        ]
+      },
+      {
+        "id": "#8",
+        "name": "create_component",
+        "params": {
+          "name": "Cube",
+          "entityIds": [
+            "#7"
+          ],
+          "componentId": "#2"
+        },
+        "suppressed": false,
+        "affected": [
+          "#1"
+        ]
+      },
+      {
+        "id": "#9",
+        "name": "insert_instance",
+        "params": {
+          "componentId": "#2",
+          "position": [
+            5,
+            0,
+            0
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#4"
+        ]
+      },
+      {
+        "id": "#10",
+        "name": "insert_instance",
+        "params": {
+          "componentId": "#2",
+          "position": [
+            10,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            1
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#5"
+        ]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {
+      "#2": {
+        "id": "#2",
+        "name": "Cube",
+        "entities": {
+          "#7": {
+            "id": "#7",
+            "kind": "box",
+            "size": [
+              1,
+              1,
+              1
+            ],
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "layerId": "#3",
+            "color": "#6b8f9c"
+          }
+        },
+        "order": [
+          "#7"
+        ]
+      }
+    },
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": []
+  }
+}

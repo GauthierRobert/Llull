@@ -1,0 +1,4951 @@
+{
+  "format": "llull-document",
+  "version": 1,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 1",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#3"
+        ],
+        "kind": "line",
+        "start": [
+          0,
+          -1500
+        ],
+        "end": [
+          0,
+          9500
+        ]
+      },
+      "#4": {
+        "id": "#4",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 1 bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#3"
+        ],
+        "kind": "circle",
+        "center": [
+          0,
+          -1900
+        ],
+        "radius": 400
+      },
+      "#5": {
+        "id": "#5",
+        "position": [
+          0,
+          -2060,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 1 label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#3"
+        ],
+        "kind": "text",
+        "content": "1",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#6": {
+        "id": "#6",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 1 bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#3"
+        ],
+        "kind": "circle",
+        "center": [
+          0,
+          9900
+        ],
+        "radius": 400
+      },
+      "#7": {
+        "id": "#7",
+        "position": [
+          0,
+          9740,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 1 label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#3"
+        ],
+        "kind": "text",
+        "content": "1",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#8": {
+        "id": "#8",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 2",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#9"
+        ],
+        "kind": "line",
+        "start": [
+          5000,
+          -1500
+        ],
+        "end": [
+          5000,
+          9500
+        ]
+      },
+      "#10": {
+        "id": "#10",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 2 bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#9"
+        ],
+        "kind": "circle",
+        "center": [
+          5000,
+          -1900
+        ],
+        "radius": 400
+      },
+      "#11": {
+        "id": "#11",
+        "position": [
+          5000,
+          -2060,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 2 label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#9"
+        ],
+        "kind": "text",
+        "content": "2",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#12": {
+        "id": "#12",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 2 bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#9"
+        ],
+        "kind": "circle",
+        "center": [
+          5000,
+          9900
+        ],
+        "radius": 400
+      },
+      "#13": {
+        "id": "#13",
+        "position": [
+          5000,
+          9740,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 2 label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#9"
+        ],
+        "kind": "text",
+        "content": "2",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#14": {
+        "id": "#14",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 3",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#15"
+        ],
+        "kind": "line",
+        "start": [
+          10000,
+          -1500
+        ],
+        "end": [
+          10000,
+          9500
+        ]
+      },
+      "#16": {
+        "id": "#16",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 3 bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#15"
+        ],
+        "kind": "circle",
+        "center": [
+          10000,
+          -1900
+        ],
+        "radius": 400
+      },
+      "#17": {
+        "id": "#17",
+        "position": [
+          10000,
+          -2060,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 3 label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#15"
+        ],
+        "kind": "text",
+        "content": "3",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#18": {
+        "id": "#18",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 3 bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#15"
+        ],
+        "kind": "circle",
+        "center": [
+          10000,
+          9900
+        ],
+        "radius": 400
+      },
+      "#19": {
+        "id": "#19",
+        "position": [
+          10000,
+          9740,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid 3 label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#15"
+        ],
+        "kind": "text",
+        "content": "3",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#20": {
+        "id": "#20",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid A",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#21"
+        ],
+        "kind": "line",
+        "start": [
+          -1500,
+          0
+        ],
+        "end": [
+          11500,
+          0
+        ]
+      },
+      "#22": {
+        "id": "#22",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid A bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#21"
+        ],
+        "kind": "circle",
+        "center": [
+          -1900,
+          0
+        ],
+        "radius": 400
+      },
+      "#23": {
+        "id": "#23",
+        "position": [
+          -1900,
+          -160,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid A label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#21"
+        ],
+        "kind": "text",
+        "content": "A",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#24": {
+        "id": "#24",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid A bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#21"
+        ],
+        "kind": "circle",
+        "center": [
+          11900,
+          0
+        ],
+        "radius": 400
+      },
+      "#25": {
+        "id": "#25",
+        "position": [
+          11900,
+          -160,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid A label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#21"
+        ],
+        "kind": "text",
+        "content": "A",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#26": {
+        "id": "#26",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid B",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#27"
+        ],
+        "kind": "line",
+        "start": [
+          -1500,
+          8000
+        ],
+        "end": [
+          11500,
+          8000
+        ]
+      },
+      "#28": {
+        "id": "#28",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid B bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#27"
+        ],
+        "kind": "circle",
+        "center": [
+          -1900,
+          8000
+        ],
+        "radius": 400
+      },
+      "#29": {
+        "id": "#29",
+        "position": [
+          -1900,
+          7840,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid B label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#27"
+        ],
+        "kind": "text",
+        "content": "B",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#30": {
+        "id": "#30",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid B bubble",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#27"
+        ],
+        "kind": "circle",
+        "center": [
+          11900,
+          8000
+        ],
+        "radius": 400
+      },
+      "#31": {
+        "id": "#31",
+        "position": [
+          11900,
+          7840,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#d04a4a",
+        "name": "Grid B label",
+        "tags": [
+          "bim",
+          "grid",
+          "element:#27"
+        ],
+        "kind": "text",
+        "content": "B",
+        "height": 360,
+        "anchor": "center"
+      },
+      "#32": {
+        "id": "#32",
+        "position": [
+          950,
+          0,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W1",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#34"
+        ],
+        "kind": "box",
+        "size": [
+          2200,
+          300,
+          2900
+        ]
+      },
+      "#35": {
+        "id": "#35",
+        "position": [
+          2500,
+          0,
+          2500
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W1",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#34"
+        ],
+        "kind": "box",
+        "size": [
+          900,
+          300,
+          800
+        ]
+      },
+      "#36": {
+        "id": "#36",
+        "position": [
+          4775,
+          0,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W1",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#34"
+        ],
+        "kind": "box",
+        "size": [
+          3650,
+          300,
+          2900
+        ]
+      },
+      "#37": {
+        "id": "#37",
+        "position": [
+          7500,
+          0,
+          450
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W1",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#34"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          900
+        ]
+      },
+      "#38": {
+        "id": "#38",
+        "position": [
+          7500,
+          0,
+          2500
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W1",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#34"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          800
+        ]
+      },
+      "#39": {
+        "id": "#39",
+        "position": [
+          9275,
+          0,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W1",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#34"
+        ],
+        "kind": "box",
+        "size": [
+          1750,
+          300,
+          2900
+        ]
+      },
+      "#40": {
+        "id": "#40",
+        "position": [
+          10000,
+          1725,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W2",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#41"
+        ],
+        "kind": "box",
+        "size": [
+          3150,
+          300,
+          2900
+        ]
+      },
+      "#42": {
+        "id": "#42",
+        "position": [
+          10000,
+          4000,
+          450
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W2",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#41"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          900
+        ]
+      },
+      "#43": {
+        "id": "#43",
+        "position": [
+          10000,
+          4000,
+          2500
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W2",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#41"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          800
+        ]
+      },
+      "#44": {
+        "id": "#44",
+        "position": [
+          10000,
+          6425,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W2",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#41"
+        ],
+        "kind": "box",
+        "size": [
+          3450,
+          300,
+          2900
+        ]
+      },
+      "#45": {
+        "id": "#45",
+        "position": [
+          9125,
+          8000,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W3",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#46"
+        ],
+        "kind": "box",
+        "size": [
+          1450,
+          300,
+          2900
+        ]
+      },
+      "#47": {
+        "id": "#47",
+        "position": [
+          7500,
+          8000,
+          450
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W3",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#46"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          900
+        ]
+      },
+      "#48": {
+        "id": "#48",
+        "position": [
+          7500,
+          8000,
+          2500
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W3",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#46"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          800
+        ]
+      },
+      "#49": {
+        "id": "#49",
+        "position": [
+          5000,
+          8000,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W3",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#46"
+        ],
+        "kind": "box",
+        "size": [
+          3200,
+          300,
+          2900
+        ]
+      },
+      "#50": {
+        "id": "#50",
+        "position": [
+          2500,
+          8000,
+          450
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W3",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#46"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          900
+        ]
+      },
+      "#51": {
+        "id": "#51",
+        "position": [
+          2500,
+          8000,
+          2500
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W3",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#46"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          800
+        ]
+      },
+      "#52": {
+        "id": "#52",
+        "position": [
+          725,
+          8000,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W3",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#46"
+        ],
+        "kind": "box",
+        "size": [
+          1750,
+          300,
+          2900
+        ]
+      },
+      "#53": {
+        "id": "#53",
+        "position": [
+          0,
+          6275,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W4",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#54"
+        ],
+        "kind": "box",
+        "size": [
+          3150,
+          300,
+          2900
+        ]
+      },
+      "#55": {
+        "id": "#55",
+        "position": [
+          0,
+          4000,
+          450
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W4",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#54"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          900
+        ]
+      },
+      "#56": {
+        "id": "#56",
+        "position": [
+          0,
+          4000,
+          2500
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W4",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#54"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          800
+        ]
+      },
+      "#57": {
+        "id": "#57",
+        "position": [
+          0,
+          1725,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W4",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#54"
+        ],
+        "kind": "box",
+        "size": [
+          3150,
+          300,
+          2900
+        ]
+      },
+      "#58": {
+        "id": "#58",
+        "position": [
+          5000,
+          1875,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#e6e2d8",
+        "name": "Wall W5",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#59"
+        ],
+        "kind": "box",
+        "size": [
+          3450,
+          100,
+          2900
+        ]
+      },
+      "#60": {
+        "id": "#60",
+        "position": [
+          5000,
+          4000,
+          2500
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#e6e2d8",
+        "name": "Wall W5",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#59"
+        ],
+        "kind": "box",
+        "size": [
+          800,
+          100,
+          800
+        ]
+      },
+      "#61": {
+        "id": "#61",
+        "position": [
+          5000,
+          6125,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#e6e2d8",
+        "name": "Wall W5",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#59"
+        ],
+        "kind": "box",
+        "size": [
+          3450,
+          100,
+          2900
+        ]
+      },
+      "#62": {
+        "id": "#62",
+        "position": [
+          2500,
+          0,
+          1050
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#63",
+        "color": "#c19a6b",
+        "name": "Door D1",
+        "tags": [
+          "bim",
+          "door",
+          "element:#64"
+        ],
+        "kind": "box",
+        "size": [
+          900,
+          40,
+          2100
+        ]
+      },
+      "#65": {
+        "id": "#65",
+        "position": [
+          0,
+          0,
+          10
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#63",
+        "color": "#8b5a2b",
+        "name": "Door D1 swing",
+        "tags": [
+          "bim",
+          "door",
+          "element:#64"
+        ],
+        "kind": "arc",
+        "center": [
+          2050,
+          150
+        ],
+        "radius": 900,
+        "startAngle": 0,
+        "endAngle": 1.57079633
+      },
+      "#66": {
+        "id": "#66",
+        "position": [
+          0,
+          0,
+          10
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#63",
+        "color": "#8b5a2b",
+        "name": "Door D1 leaf (plan)",
+        "tags": [
+          "bim",
+          "door",
+          "element:#64"
+        ],
+        "kind": "line",
+        "start": [
+          2050,
+          150
+        ],
+        "end": [
+          2050,
+          1050
+        ]
+      },
+      "#67": {
+        "id": "#67",
+        "position": [
+          5000,
+          4000,
+          1050
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#63",
+        "color": "#c19a6b",
+        "name": "Door D2",
+        "tags": [
+          "bim",
+          "door",
+          "element:#68"
+        ],
+        "kind": "box",
+        "size": [
+          800,
+          40,
+          2100
+        ]
+      },
+      "#69": {
+        "id": "#69",
+        "position": [
+          0,
+          0,
+          10
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#63",
+        "color": "#8b5a2b",
+        "name": "Door D2 swing",
+        "tags": [
+          "bim",
+          "door",
+          "element:#68"
+        ],
+        "kind": "arc",
+        "center": [
+          4950,
+          4400
+        ],
+        "radius": 800,
+        "startAngle": 3.14159265,
+        "endAngle": 4.71238898
+      },
+      "#70": {
+        "id": "#70",
+        "position": [
+          0,
+          0,
+          10
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#63",
+        "color": "#8b5a2b",
+        "name": "Door D2 leaf (plan)",
+        "tags": [
+          "bim",
+          "door",
+          "element:#68"
+        ],
+        "kind": "line",
+        "start": [
+          4950,
+          4400
+        ],
+        "end": [
+          4150,
+          4400
+        ]
+      },
+      "#71": {
+        "id": "#71",
+        "position": [
+          7500,
+          0,
+          1500
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN1",
+        "tags": [
+          "bim",
+          "window",
+          "element:#73"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          24,
+          1200
+        ]
+      },
+      "#74": {
+        "id": "#74",
+        "position": [
+          10000,
+          4000,
+          1500
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN2",
+        "tags": [
+          "bim",
+          "window",
+          "element:#75"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          24,
+          1200
+        ]
+      },
+      "#76": {
+        "id": "#76",
+        "position": [
+          7500,
+          8000,
+          1500
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN3",
+        "tags": [
+          "bim",
+          "window",
+          "element:#77"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          24,
+          1200
+        ]
+      },
+      "#78": {
+        "id": "#78",
+        "position": [
+          2500,
+          8000,
+          1500
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN4",
+        "tags": [
+          "bim",
+          "window",
+          "element:#79"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          24,
+          1200
+        ]
+      },
+      "#80": {
+        "id": "#80",
+        "position": [
+          0,
+          4000,
+          1500
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN5",
+        "tags": [
+          "bim",
+          "window",
+          "element:#81"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          24,
+          1200
+        ]
+      },
+      "#82": {
+        "id": "#82",
+        "position": [
+          0,
+          0,
+          -200
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#83",
+        "color": "#b4b2aa",
+        "name": "Slab SL1",
+        "tags": [
+          "bim",
+          "slab",
+          "element:#84"
+        ],
+        "kind": "extrusion",
+        "profile": [
+          [
+            0,
+            0
+          ],
+          [
+            10000,
+            0
+          ],
+          [
+            10000,
+            8000
+          ],
+          [
+            0,
+            8000
+          ]
+        ],
+        "depth": 200
+      },
+      "#85": {
+        "id": "#85",
+        "position": [
+          5525,
+          6900,
+          85.2941176
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 1",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          170.588235
+        ]
+      },
+      "#88": {
+        "id": "#88",
+        "position": [
+          5775,
+          6900,
+          170.588235
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 2",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          341.176471
+        ]
+      },
+      "#89": {
+        "id": "#89",
+        "position": [
+          6025,
+          6900,
+          255.882353
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 3",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          511.764706
+        ]
+      },
+      "#90": {
+        "id": "#90",
+        "position": [
+          6275,
+          6900,
+          341.176471
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 4",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          682.352941
+        ]
+      },
+      "#91": {
+        "id": "#91",
+        "position": [
+          6525,
+          6900,
+          426.470588
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 5",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          852.941176
+        ]
+      },
+      "#92": {
+        "id": "#92",
+        "position": [
+          6775,
+          6900,
+          511.764706
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 6",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          1023.52941
+        ]
+      },
+      "#93": {
+        "id": "#93",
+        "position": [
+          7025,
+          6900,
+          597.058824
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 7",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          1194.11765
+        ]
+      },
+      "#94": {
+        "id": "#94",
+        "position": [
+          7275,
+          6900,
+          682.352941
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 8",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          1364.70588
+        ]
+      },
+      "#95": {
+        "id": "#95",
+        "position": [
+          7525,
+          6900,
+          767.647059
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 9",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          1535.29412
+        ]
+      },
+      "#96": {
+        "id": "#96",
+        "position": [
+          7775,
+          6900,
+          852.941176
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 10",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          1705.88235
+        ]
+      },
+      "#97": {
+        "id": "#97",
+        "position": [
+          8025,
+          6900,
+          938.235294
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 11",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          1876.47059
+        ]
+      },
+      "#98": {
+        "id": "#98",
+        "position": [
+          8275,
+          6900,
+          1023.52941
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 12",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          2047.05882
+        ]
+      },
+      "#99": {
+        "id": "#99",
+        "position": [
+          8525,
+          6900,
+          1108.82353
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 13",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          2217.64706
+        ]
+      },
+      "#100": {
+        "id": "#100",
+        "position": [
+          8775,
+          6900,
+          1194.11765
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 14",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          2388.23529
+        ]
+      },
+      "#101": {
+        "id": "#101",
+        "position": [
+          9025,
+          6900,
+          1279.41176
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 15",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          2558.82353
+        ]
+      },
+      "#102": {
+        "id": "#102",
+        "position": [
+          9275,
+          6900,
+          1364.70588
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 16",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          2729.41176
+        ]
+      },
+      "#103": {
+        "id": "#103",
+        "position": [
+          9525,
+          6900,
+          1450
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#86",
+        "color": "#b4b2aa",
+        "name": "Stair ST1 step 17",
+        "tags": [
+          "bim",
+          "stair",
+          "element:#87"
+        ],
+        "kind": "box",
+        "size": [
+          250,
+          900,
+          2900
+        ]
+      },
+      "#104": {
+        "id": "#104",
+        "position": [
+          0,
+          0,
+          5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 001 Living room",
+        "tags": [
+          "bim",
+          "room",
+          "element:#106"
+        ],
+        "kind": "polyline",
+        "points": [
+          [
+            150,
+            150
+          ],
+          [
+            4950,
+            150
+          ],
+          [
+            4950,
+            7850
+          ],
+          [
+            150,
+            7850
+          ]
+        ],
+        "closed": true
+      },
+      "#107": {
+        "id": "#107",
+        "position": [
+          2550,
+          4200,
+          5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 001 name",
+        "tags": [
+          "bim",
+          "room",
+          "element:#106"
+        ],
+        "kind": "text",
+        "content": "Living room 001",
+        "height": 250,
+        "anchor": "center"
+      },
+      "#108": {
+        "id": "#108",
+        "position": [
+          2550,
+          3800,
+          5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 001 area",
+        "tags": [
+          "bim",
+          "room",
+          "element:#106"
+        ],
+        "kind": "text",
+        "content": "36.96 m²",
+        "height": 200,
+        "anchor": "center"
+      },
+      "#109": {
+        "id": "#109",
+        "position": [
+          0,
+          0,
+          5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 002 Kitchen",
+        "tags": [
+          "bim",
+          "room",
+          "element:#110"
+        ],
+        "kind": "polyline",
+        "points": [
+          [
+            5050,
+            150
+          ],
+          [
+            9850,
+            150
+          ],
+          [
+            9850,
+            7850
+          ],
+          [
+            5050,
+            7850
+          ]
+        ],
+        "closed": true
+      },
+      "#111": {
+        "id": "#111",
+        "position": [
+          7450,
+          4200,
+          5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 002 name",
+        "tags": [
+          "bim",
+          "room",
+          "element:#110"
+        ],
+        "kind": "text",
+        "content": "Kitchen 002",
+        "height": 250,
+        "anchor": "center"
+      },
+      "#112": {
+        "id": "#112",
+        "position": [
+          7450,
+          3800,
+          5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 002 area",
+        "tags": [
+          "bim",
+          "room",
+          "element:#110"
+        ],
+        "kind": "text",
+        "content": "36.96 m²",
+        "height": 200,
+        "anchor": "center"
+      },
+      "#113": {
+        "id": "#113",
+        "position": [
+          825,
+          0,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W6",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#114"
+        ],
+        "kind": "box",
+        "size": [
+          1950,
+          300,
+          2900
+        ]
+      },
+      "#115": {
+        "id": "#115",
+        "position": [
+          2500,
+          0,
+          3350
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W6",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#114"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          900
+        ]
+      },
+      "#116": {
+        "id": "#116",
+        "position": [
+          2500,
+          0,
+          5400
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W6",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#114"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          800
+        ]
+      },
+      "#117": {
+        "id": "#117",
+        "position": [
+          4900,
+          0,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W6",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#114"
+        ],
+        "kind": "box",
+        "size": [
+          3400,
+          300,
+          2900
+        ]
+      },
+      "#118": {
+        "id": "#118",
+        "position": [
+          7500,
+          0,
+          3350
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W6",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#114"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          900
+        ]
+      },
+      "#119": {
+        "id": "#119",
+        "position": [
+          7500,
+          0,
+          5400
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W6",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#114"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          800
+        ]
+      },
+      "#120": {
+        "id": "#120",
+        "position": [
+          9275,
+          0,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W6",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#114"
+        ],
+        "kind": "box",
+        "size": [
+          1750,
+          300,
+          2900
+        ]
+      },
+      "#121": {
+        "id": "#121",
+        "position": [
+          7500,
+          0,
+          4400
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN6",
+        "tags": [
+          "bim",
+          "window",
+          "element:#122"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          24,
+          1200
+        ]
+      },
+      "#123": {
+        "id": "#123",
+        "position": [
+          10000,
+          1725,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W7",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#124"
+        ],
+        "kind": "box",
+        "size": [
+          3150,
+          300,
+          2900
+        ]
+      },
+      "#125": {
+        "id": "#125",
+        "position": [
+          10000,
+          4000,
+          3350
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W7",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#124"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          900
+        ]
+      },
+      "#126": {
+        "id": "#126",
+        "position": [
+          10000,
+          4000,
+          5400
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W7",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#124"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          800
+        ]
+      },
+      "#127": {
+        "id": "#127",
+        "position": [
+          10000,
+          6425,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W7",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#124"
+        ],
+        "kind": "box",
+        "size": [
+          3450,
+          300,
+          2900
+        ]
+      },
+      "#128": {
+        "id": "#128",
+        "position": [
+          10000,
+          4000,
+          4400
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN7",
+        "tags": [
+          "bim",
+          "window",
+          "element:#129"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          24,
+          1200
+        ]
+      },
+      "#130": {
+        "id": "#130",
+        "position": [
+          9125,
+          8000,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W8",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#131"
+        ],
+        "kind": "box",
+        "size": [
+          1450,
+          300,
+          2900
+        ]
+      },
+      "#132": {
+        "id": "#132",
+        "position": [
+          7500,
+          8000,
+          3350
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W8",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#131"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          900
+        ]
+      },
+      "#133": {
+        "id": "#133",
+        "position": [
+          7500,
+          8000,
+          5400
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W8",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#131"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          800
+        ]
+      },
+      "#134": {
+        "id": "#134",
+        "position": [
+          5000,
+          8000,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W8",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#131"
+        ],
+        "kind": "box",
+        "size": [
+          3200,
+          300,
+          2900
+        ]
+      },
+      "#135": {
+        "id": "#135",
+        "position": [
+          2500,
+          8000,
+          3350
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W8",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#131"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          900
+        ]
+      },
+      "#136": {
+        "id": "#136",
+        "position": [
+          2500,
+          8000,
+          5400
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W8",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#131"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          300,
+          800
+        ]
+      },
+      "#137": {
+        "id": "#137",
+        "position": [
+          725,
+          8000,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W8",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#131"
+        ],
+        "kind": "box",
+        "size": [
+          1750,
+          300,
+          2900
+        ]
+      },
+      "#138": {
+        "id": "#138",
+        "position": [
+          7500,
+          8000,
+          4400
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN8",
+        "tags": [
+          "bim",
+          "window",
+          "element:#139"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          24,
+          1200
+        ]
+      },
+      "#140": {
+        "id": "#140",
+        "position": [
+          2500,
+          8000,
+          4400
+        ],
+        "rotation": [
+          0,
+          0,
+          3.14159265
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN9",
+        "tags": [
+          "bim",
+          "window",
+          "element:#141"
+        ],
+        "kind": "box",
+        "size": [
+          1800,
+          24,
+          1200
+        ]
+      },
+      "#142": {
+        "id": "#142",
+        "position": [
+          0,
+          6275,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W9",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#143"
+        ],
+        "kind": "box",
+        "size": [
+          3150,
+          300,
+          2900
+        ]
+      },
+      "#144": {
+        "id": "#144",
+        "position": [
+          0,
+          4000,
+          3350
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W9",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#143"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          900
+        ]
+      },
+      "#145": {
+        "id": "#145",
+        "position": [
+          0,
+          4000,
+          5400
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W9",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#143"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          300,
+          800
+        ]
+      },
+      "#146": {
+        "id": "#146",
+        "position": [
+          0,
+          1725,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#b0623a",
+        "name": "Wall W9",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#143"
+        ],
+        "kind": "box",
+        "size": [
+          3150,
+          300,
+          2900
+        ]
+      },
+      "#147": {
+        "id": "#147",
+        "position": [
+          0,
+          4000,
+          4400
+        ],
+        "rotation": [
+          0,
+          0,
+          -1.57079633
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN10",
+        "tags": [
+          "bim",
+          "window",
+          "element:#148"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          24,
+          1200
+        ]
+      },
+      "#149": {
+        "id": "#149",
+        "position": [
+          5000,
+          1875,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#e6e2d8",
+        "name": "Wall W10",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#150"
+        ],
+        "kind": "box",
+        "size": [
+          3450,
+          100,
+          2900
+        ]
+      },
+      "#151": {
+        "id": "#151",
+        "position": [
+          5000,
+          4000,
+          5400
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#e6e2d8",
+        "name": "Wall W10",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#150"
+        ],
+        "kind": "box",
+        "size": [
+          800,
+          100,
+          800
+        ]
+      },
+      "#152": {
+        "id": "#152",
+        "position": [
+          5000,
+          6125,
+          4350
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#33",
+        "color": "#e6e2d8",
+        "name": "Wall W10",
+        "tags": [
+          "bim",
+          "wall",
+          "element:#150"
+        ],
+        "kind": "box",
+        "size": [
+          3450,
+          100,
+          2900
+        ]
+      },
+      "#153": {
+        "id": "#153",
+        "position": [
+          5000,
+          4000,
+          3950
+        ],
+        "rotation": [
+          0,
+          0,
+          1.57079633
+        ],
+        "layerId": "#63",
+        "color": "#c19a6b",
+        "name": "Door D4",
+        "tags": [
+          "bim",
+          "door",
+          "element:#154"
+        ],
+        "kind": "box",
+        "size": [
+          800,
+          40,
+          2100
+        ]
+      },
+      "#155": {
+        "id": "#155",
+        "position": [
+          0,
+          0,
+          2910
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#63",
+        "color": "#8b5a2b",
+        "name": "Door D4 swing",
+        "tags": [
+          "bim",
+          "door",
+          "element:#154"
+        ],
+        "kind": "arc",
+        "center": [
+          4950,
+          4400
+        ],
+        "radius": 800,
+        "startAngle": 3.14159265,
+        "endAngle": 4.71238898
+      },
+      "#156": {
+        "id": "#156",
+        "position": [
+          0,
+          0,
+          2910
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#63",
+        "color": "#8b5a2b",
+        "name": "Door D4 leaf (plan)",
+        "tags": [
+          "bim",
+          "door",
+          "element:#154"
+        ],
+        "kind": "line",
+        "start": [
+          4950,
+          4400
+        ],
+        "end": [
+          4150,
+          4400
+        ]
+      },
+      "#157": {
+        "id": "#157",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#83",
+        "color": "#b4b2aa",
+        "name": "Slab SL2",
+        "tags": [
+          "bim",
+          "slab",
+          "element:#158"
+        ],
+        "kind": "mesh",
+        "mesh": {
+          "positions": [
+            0,
+            0,
+            2900,
+            10000,
+            0,
+            2900,
+            10000,
+            8000,
+            2900,
+            0,
+            8000,
+            2900,
+            5300,
+            7450,
+            2900,
+            9750,
+            7450,
+            2900,
+            9750,
+            6350,
+            2900,
+            5300,
+            6350,
+            2900,
+            0,
+            0,
+            2700,
+            10000,
+            0,
+            2700,
+            10000,
+            8000,
+            2700,
+            0,
+            8000,
+            2700,
+            5300,
+            7450,
+            2700,
+            9750,
+            7450,
+            2700,
+            9750,
+            6350,
+            2700,
+            5300,
+            6350,
+            2700
+          ],
+          "indices": [
+            3,
+            0,
+            1,
+            9,
+            8,
+            11,
+            1,
+            2,
+            5,
+            13,
+            10,
+            9,
+            1,
+            5,
+            6,
+            14,
+            13,
+            9,
+            1,
+            6,
+            7,
+            15,
+            14,
+            9,
+            3,
+            1,
+            7,
+            15,
+            9,
+            11,
+            3,
+            7,
+            4,
+            12,
+            15,
+            11,
+            3,
+            4,
+            5,
+            13,
+            12,
+            11,
+            5,
+            2,
+            3,
+            11,
+            10,
+            13,
+            8,
+            9,
+            1,
+            8,
+            1,
+            0,
+            9,
+            10,
+            2,
+            9,
+            2,
+            1,
+            10,
+            11,
+            3,
+            10,
+            3,
+            2,
+            11,
+            8,
+            0,
+            11,
+            0,
+            3,
+            12,
+            13,
+            5,
+            12,
+            5,
+            4,
+            13,
+            14,
+            6,
+            13,
+            6,
+            5,
+            14,
+            15,
+            7,
+            14,
+            7,
+            6,
+            15,
+            12,
+            4,
+            15,
+            4,
+            7
+          ]
+        }
+      },
+      "#159": {
+        "id": "#159",
+        "position": [
+          2500,
+          0,
+          4400
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#72",
+        "color": "#8ec9e8",
+        "name": "Window WN11",
+        "tags": [
+          "bim",
+          "window",
+          "element:#160"
+        ],
+        "kind": "box",
+        "size": [
+          1400,
+          24,
+          1200
+        ]
+      },
+      "#161": {
+        "id": "#161",
+        "position": [
+          0,
+          0,
+          2905
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 101 Bedroom",
+        "tags": [
+          "bim",
+          "room",
+          "element:#162"
+        ],
+        "kind": "polyline",
+        "points": [
+          [
+            150,
+            150
+          ],
+          [
+            4950,
+            150
+          ],
+          [
+            4950,
+            7850
+          ],
+          [
+            150,
+            7850
+          ]
+        ],
+        "closed": true
+      },
+      "#163": {
+        "id": "#163",
+        "position": [
+          2550,
+          4200,
+          2905
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 101 name",
+        "tags": [
+          "bim",
+          "room",
+          "element:#162"
+        ],
+        "kind": "text",
+        "content": "Bedroom 101",
+        "height": 250,
+        "anchor": "center"
+      },
+      "#164": {
+        "id": "#164",
+        "position": [
+          2550,
+          3800,
+          2905
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 101 area",
+        "tags": [
+          "bim",
+          "room",
+          "element:#162"
+        ],
+        "kind": "text",
+        "content": "36.96 m²",
+        "height": 200,
+        "anchor": "center"
+      },
+      "#165": {
+        "id": "#165",
+        "position": [
+          0,
+          0,
+          2905
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 102 Bedroom",
+        "tags": [
+          "bim",
+          "room",
+          "element:#166"
+        ],
+        "kind": "polyline",
+        "points": [
+          [
+            5050,
+            150
+          ],
+          [
+            9850,
+            150
+          ],
+          [
+            9850,
+            7850
+          ],
+          [
+            5050,
+            7850
+          ]
+        ],
+        "closed": true
+      },
+      "#167": {
+        "id": "#167",
+        "position": [
+          7450,
+          4200,
+          2905
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 102 name",
+        "tags": [
+          "bim",
+          "room",
+          "element:#166"
+        ],
+        "kind": "text",
+        "content": "Bedroom 102",
+        "height": 250,
+        "anchor": "center"
+      },
+      "#168": {
+        "id": "#168",
+        "position": [
+          7450,
+          3800,
+          2905
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#105",
+        "color": "#3c8d5a",
+        "name": "Room 102 area",
+        "tags": [
+          "bim",
+          "room",
+          "element:#166"
+        ],
+        "kind": "text",
+        "content": "36.96 m²",
+        "height": 200,
+        "anchor": "center"
+      },
+      "#169": {
+        "id": "#169",
+        "position": [
+          0,
+          0,
+          5800
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#83",
+        "color": "#b4b2aa",
+        "name": "Roof SL3",
+        "tags": [
+          "bim",
+          "slab",
+          "element:#170"
+        ],
+        "kind": "extrusion",
+        "profile": [
+          [
+            -300,
+            -300
+          ],
+          [
+            10300,
+            -300
+          ],
+          [
+            10300,
+            8300
+          ],
+          [
+            -300,
+            8300
+          ]
+        ],
+        "depth": 250
+      }
+    },
+    "order": [
+      "#1",
+      "#4",
+      "#5",
+      "#6",
+      "#7",
+      "#8",
+      "#10",
+      "#11",
+      "#12",
+      "#13",
+      "#14",
+      "#16",
+      "#17",
+      "#18",
+      "#19",
+      "#20",
+      "#22",
+      "#23",
+      "#24",
+      "#25",
+      "#26",
+      "#28",
+      "#29",
+      "#30",
+      "#31",
+      "#32",
+      "#35",
+      "#36",
+      "#37",
+      "#38",
+      "#39",
+      "#40",
+      "#42",
+      "#43",
+      "#44",
+      "#45",
+      "#47",
+      "#48",
+      "#49",
+      "#50",
+      "#51",
+      "#52",
+      "#53",
+      "#55",
+      "#56",
+      "#57",
+      "#58",
+      "#60",
+      "#61",
+      "#62",
+      "#65",
+      "#66",
+      "#67",
+      "#69",
+      "#70",
+      "#71",
+      "#74",
+      "#76",
+      "#78",
+      "#80",
+      "#82",
+      "#85",
+      "#88",
+      "#89",
+      "#90",
+      "#91",
+      "#92",
+      "#93",
+      "#94",
+      "#95",
+      "#96",
+      "#97",
+      "#98",
+      "#99",
+      "#100",
+      "#101",
+      "#102",
+      "#103",
+      "#104",
+      "#107",
+      "#108",
+      "#109",
+      "#111",
+      "#112",
+      "#113",
+      "#115",
+      "#116",
+      "#117",
+      "#118",
+      "#119",
+      "#120",
+      "#121",
+      "#123",
+      "#125",
+      "#126",
+      "#127",
+      "#128",
+      "#130",
+      "#132",
+      "#133",
+      "#134",
+      "#135",
+      "#136",
+      "#137",
+      "#138",
+      "#140",
+      "#142",
+      "#144",
+      "#145",
+      "#146",
+      "#147",
+      "#149",
+      "#151",
+      "#152",
+      "#153",
+      "#155",
+      "#156",
+      "#157",
+      "#159",
+      "#161",
+      "#163",
+      "#164",
+      "#165",
+      "#167",
+      "#168",
+      "#169"
+    ],
+    "layers": {
+      "#171": {
+        "id": "#171",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      },
+      "#2": {
+        "id": "#2",
+        "name": "S-GRID",
+        "visible": true,
+        "locked": false,
+        "color": "#d04a4a"
+      },
+      "#33": {
+        "id": "#33",
+        "name": "A-WALL",
+        "visible": true,
+        "locked": false,
+        "color": "#8a8a8a"
+      },
+      "#63": {
+        "id": "#63",
+        "name": "A-DOOR",
+        "visible": true,
+        "locked": false,
+        "color": "#8b5a2b"
+      },
+      "#72": {
+        "id": "#72",
+        "name": "A-GLAZ",
+        "visible": true,
+        "locked": false,
+        "color": "#4a90c2"
+      },
+      "#83": {
+        "id": "#83",
+        "name": "S-SLAB",
+        "visible": true,
+        "locked": false,
+        "color": "#9a9a90"
+      },
+      "#86": {
+        "id": "#86",
+        "name": "A-FLOR-STRS",
+        "visible": true,
+        "locked": false,
+        "color": "#a08060"
+      },
+      "#105": {
+        "id": "#105",
+        "name": "A-AREA",
+        "visible": true,
+        "locked": false,
+        "color": "#3c8d5a"
+      }
+    },
+    "layerOrder": [
+      "#171",
+      "#2",
+      "#33",
+      "#63",
+      "#72",
+      "#83",
+      "#86",
+      "#105"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        5000,
+        4000,
+        2925
+      ],
+      "azimuth": 2.35619449,
+      "polar": 0.785398163,
+      "distance": 24327.244
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#172",
+        "name": "add_building_template",
+        "params": {
+          "template": "house"
+        },
+        "suppressed": false,
+        "affected": [
+          "#3",
+          "#9",
+          "#15",
+          "#21",
+          "#27",
+          "#34",
+          "#41",
+          "#46",
+          "#54",
+          "#59",
+          "#64",
+          "#68",
+          "#73",
+          "#75",
+          "#77",
+          "#79",
+          "#81",
+          "#84",
+          "#87",
+          "#106",
+          "#110",
+          "#114",
+          "#122",
+          "#124",
+          "#129",
+          "#131",
+          "#139",
+          "#141",
+          "#143",
+          "#148",
+          "#150",
+          "#154",
+          "#158",
+          "#160",
+          "#162",
+          "#166",
+          "#170",
+          "#1",
+          "#4",
+          "#5",
+          "#6",
+          "#7",
+          "#8",
+          "#10",
+          "#11",
+          "#12",
+          "#13",
+          "#14",
+          "#16",
+          "#17",
+          "#18",
+          "#19",
+          "#20",
+          "#22",
+          "#23",
+          "#24",
+          "#25",
+          "#26",
+          "#28",
+          "#29",
+          "#30",
+          "#31",
+          "#32",
+          "#35",
+          "#36",
+          "#37",
+          "#38",
+          "#39",
+          "#40",
+          "#42",
+          "#43",
+          "#44",
+          "#45",
+          "#47",
+          "#48",
+          "#49",
+          "#50",
+          "#51",
+          "#52",
+          "#53",
+          "#55",
+          "#56",
+          "#57",
+          "#58",
+          "#60",
+          "#61",
+          "#62",
+          "#65",
+          "#66",
+          "#67",
+          "#69",
+          "#70",
+          "#71",
+          "#74",
+          "#76",
+          "#78",
+          "#80",
+          "#82",
+          "#85",
+          "#88",
+          "#89",
+          "#90",
+          "#91",
+          "#92",
+          "#93",
+          "#94",
+          "#95",
+          "#96",
+          "#97",
+          "#98",
+          "#99",
+          "#100",
+          "#101",
+          "#102",
+          "#103",
+          "#104",
+          "#107",
+          "#108",
+          "#109",
+          "#111",
+          "#112",
+          "#113",
+          "#115",
+          "#116",
+          "#117",
+          "#118",
+          "#119",
+          "#120",
+          "#121",
+          "#123",
+          "#125",
+          "#126",
+          "#127",
+          "#128",
+          "#130",
+          "#132",
+          "#133",
+          "#134",
+          "#135",
+          "#136",
+          "#137",
+          "#138",
+          "#140",
+          "#142",
+          "#144",
+          "#145",
+          "#146",
+          "#147",
+          "#149",
+          "#151",
+          "#152",
+          "#153",
+          "#155",
+          "#156",
+          "#157",
+          "#159",
+          "#161",
+          "#163",
+          "#164",
+          "#165",
+          "#167",
+          "#168",
+          "#169"
+        ]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "building": {
+      "project": {
+        "name": "Two-storey house",
+        "client": "",
+        "address": "",
+        "author": "",
+        "drawingNumber": "A-101",
+        "revision": "0",
+        "date": ""
+      },
+      "levels": {
+        "#173": {
+          "id": "#173",
+          "name": "Ground floor",
+          "elevation": 0,
+          "height": 2900
+        },
+        "#174": {
+          "id": "#174",
+          "name": "First floor",
+          "elevation": 2900,
+          "height": 2900
+        },
+        "#175": {
+          "id": "#175",
+          "name": "Roof",
+          "elevation": 5800,
+          "height": 1000
+        }
+      },
+      "levelOrder": [
+        "#173",
+        "#174",
+        "#175"
+      ],
+      "activeLevelId": "#173",
+      "elements": {
+        "#3": {
+          "id": "#3",
+          "category": "grid",
+          "mark": "1",
+          "entityIds": [
+            "#1",
+            "#4",
+            "#5",
+            "#6",
+            "#7"
+          ],
+          "start": [
+            0,
+            -1500
+          ],
+          "end": [
+            0,
+            9500
+          ]
+        },
+        "#9": {
+          "id": "#9",
+          "category": "grid",
+          "mark": "2",
+          "entityIds": [
+            "#8",
+            "#10",
+            "#11",
+            "#12",
+            "#13"
+          ],
+          "start": [
+            5000,
+            -1500
+          ],
+          "end": [
+            5000,
+            9500
+          ]
+        },
+        "#15": {
+          "id": "#15",
+          "category": "grid",
+          "mark": "3",
+          "entityIds": [
+            "#14",
+            "#16",
+            "#17",
+            "#18",
+            "#19"
+          ],
+          "start": [
+            10000,
+            -1500
+          ],
+          "end": [
+            10000,
+            9500
+          ]
+        },
+        "#21": {
+          "id": "#21",
+          "category": "grid",
+          "mark": "A",
+          "entityIds": [
+            "#20",
+            "#22",
+            "#23",
+            "#24",
+            "#25"
+          ],
+          "start": [
+            -1500,
+            0
+          ],
+          "end": [
+            11500,
+            0
+          ]
+        },
+        "#27": {
+          "id": "#27",
+          "category": "grid",
+          "mark": "B",
+          "entityIds": [
+            "#26",
+            "#28",
+            "#29",
+            "#30",
+            "#31"
+          ],
+          "start": [
+            -1500,
+            8000
+          ],
+          "end": [
+            11500,
+            8000
+          ]
+        },
+        "#34": {
+          "id": "#34",
+          "category": "wall",
+          "mark": "W1",
+          "entityIds": [
+            "#32",
+            "#35",
+            "#36",
+            "#37",
+            "#38",
+            "#39"
+          ],
+          "levelId": "#173",
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            10000,
+            0
+          ],
+          "thickness": 300,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "masonry"
+        },
+        "#41": {
+          "id": "#41",
+          "category": "wall",
+          "mark": "W2",
+          "entityIds": [
+            "#40",
+            "#42",
+            "#43",
+            "#44"
+          ],
+          "levelId": "#173",
+          "start": [
+            10000,
+            0
+          ],
+          "end": [
+            10000,
+            8000
+          ],
+          "thickness": 300,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "masonry"
+        },
+        "#46": {
+          "id": "#46",
+          "category": "wall",
+          "mark": "W3",
+          "entityIds": [
+            "#45",
+            "#47",
+            "#48",
+            "#49",
+            "#50",
+            "#51",
+            "#52"
+          ],
+          "levelId": "#173",
+          "start": [
+            10000,
+            8000
+          ],
+          "end": [
+            0,
+            8000
+          ],
+          "thickness": 300,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "masonry"
+        },
+        "#54": {
+          "id": "#54",
+          "category": "wall",
+          "mark": "W4",
+          "entityIds": [
+            "#53",
+            "#55",
+            "#56",
+            "#57"
+          ],
+          "levelId": "#173",
+          "start": [
+            0,
+            8000
+          ],
+          "end": [
+            0,
+            0
+          ],
+          "thickness": 300,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "masonry"
+        },
+        "#59": {
+          "id": "#59",
+          "category": "wall",
+          "mark": "W5",
+          "entityIds": [
+            "#58",
+            "#60",
+            "#61"
+          ],
+          "levelId": "#173",
+          "start": [
+            5000,
+            0
+          ],
+          "end": [
+            5000,
+            8000
+          ],
+          "thickness": 100,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "gypsum"
+        },
+        "#64": {
+          "id": "#64",
+          "category": "door",
+          "mark": "D1",
+          "entityIds": [
+            "#62",
+            "#65",
+            "#66"
+          ],
+          "hostId": "#34",
+          "offset": 2500,
+          "width": 900,
+          "height": 2100,
+          "sillHeight": 0,
+          "swing": "left",
+          "material": "timber"
+        },
+        "#68": {
+          "id": "#68",
+          "category": "door",
+          "mark": "D2",
+          "entityIds": [
+            "#67",
+            "#69",
+            "#70"
+          ],
+          "hostId": "#59",
+          "offset": 4000,
+          "width": 800,
+          "height": 2100,
+          "sillHeight": 0,
+          "swing": "right",
+          "material": "timber"
+        },
+        "#73": {
+          "id": "#73",
+          "category": "window",
+          "mark": "WN1",
+          "entityIds": [
+            "#71"
+          ],
+          "hostId": "#34",
+          "offset": 7500,
+          "width": 1800,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#75": {
+          "id": "#75",
+          "category": "window",
+          "mark": "WN2",
+          "entityIds": [
+            "#74"
+          ],
+          "hostId": "#41",
+          "offset": 4000,
+          "width": 1400,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#77": {
+          "id": "#77",
+          "category": "window",
+          "mark": "WN3",
+          "entityIds": [
+            "#76"
+          ],
+          "hostId": "#46",
+          "offset": 2500,
+          "width": 1800,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#79": {
+          "id": "#79",
+          "category": "window",
+          "mark": "WN4",
+          "entityIds": [
+            "#78"
+          ],
+          "hostId": "#46",
+          "offset": 7500,
+          "width": 1800,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#81": {
+          "id": "#81",
+          "category": "window",
+          "mark": "WN5",
+          "entityIds": [
+            "#80"
+          ],
+          "hostId": "#54",
+          "offset": 4000,
+          "width": 1400,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#84": {
+          "id": "#84",
+          "category": "slab",
+          "mark": "SL1",
+          "entityIds": [
+            "#82"
+          ],
+          "levelId": "#173",
+          "boundary": [
+            [
+              0,
+              0
+            ],
+            [
+              10000,
+              0
+            ],
+            [
+              10000,
+              8000
+            ],
+            [
+              0,
+              8000
+            ]
+          ],
+          "thickness": 200,
+          "offset": 0,
+          "role": "floor",
+          "material": "concrete"
+        },
+        "#87": {
+          "id": "#87",
+          "category": "stair",
+          "mark": "ST1",
+          "entityIds": [
+            "#85",
+            "#88",
+            "#89",
+            "#90",
+            "#91",
+            "#92",
+            "#93",
+            "#94",
+            "#95",
+            "#96",
+            "#97",
+            "#98",
+            "#99",
+            "#100",
+            "#101",
+            "#102",
+            "#103"
+          ],
+          "levelId": "#173",
+          "start": [
+            5400,
+            6900
+          ],
+          "angle": 0,
+          "width": 900,
+          "riserCount": 17,
+          "riserHeight": 170.588235,
+          "treadDepth": 250,
+          "material": "concrete"
+        },
+        "#106": {
+          "id": "#106",
+          "category": "room",
+          "mark": "001",
+          "entityIds": [
+            "#104",
+            "#107",
+            "#108"
+          ],
+          "levelId": "#173",
+          "name": "Living room",
+          "boundary": [
+            [
+              150,
+              150
+            ],
+            [
+              4950,
+              150
+            ],
+            [
+              4950,
+              7850
+            ],
+            [
+              150,
+              7850
+            ]
+          ]
+        },
+        "#110": {
+          "id": "#110",
+          "category": "room",
+          "mark": "002",
+          "entityIds": [
+            "#109",
+            "#111",
+            "#112"
+          ],
+          "levelId": "#173",
+          "name": "Kitchen",
+          "boundary": [
+            [
+              5050,
+              150
+            ],
+            [
+              9850,
+              150
+            ],
+            [
+              9850,
+              7850
+            ],
+            [
+              5050,
+              7850
+            ]
+          ]
+        },
+        "#114": {
+          "id": "#114",
+          "category": "wall",
+          "mark": "W6",
+          "entityIds": [
+            "#113",
+            "#115",
+            "#116",
+            "#117",
+            "#118",
+            "#119",
+            "#120"
+          ],
+          "levelId": "#174",
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            10000,
+            0
+          ],
+          "thickness": 300,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "masonry"
+        },
+        "#122": {
+          "id": "#122",
+          "category": "window",
+          "mark": "WN6",
+          "entityIds": [
+            "#121"
+          ],
+          "hostId": "#114",
+          "offset": 7500,
+          "width": 1800,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#124": {
+          "id": "#124",
+          "category": "wall",
+          "mark": "W7",
+          "entityIds": [
+            "#123",
+            "#125",
+            "#126",
+            "#127"
+          ],
+          "levelId": "#174",
+          "start": [
+            10000,
+            0
+          ],
+          "end": [
+            10000,
+            8000
+          ],
+          "thickness": 300,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "masonry"
+        },
+        "#129": {
+          "id": "#129",
+          "category": "window",
+          "mark": "WN7",
+          "entityIds": [
+            "#128"
+          ],
+          "hostId": "#124",
+          "offset": 4000,
+          "width": 1400,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#131": {
+          "id": "#131",
+          "category": "wall",
+          "mark": "W8",
+          "entityIds": [
+            "#130",
+            "#132",
+            "#133",
+            "#134",
+            "#135",
+            "#136",
+            "#137"
+          ],
+          "levelId": "#174",
+          "start": [
+            10000,
+            8000
+          ],
+          "end": [
+            0,
+            8000
+          ],
+          "thickness": 300,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "masonry"
+        },
+        "#139": {
+          "id": "#139",
+          "category": "window",
+          "mark": "WN8",
+          "entityIds": [
+            "#138"
+          ],
+          "hostId": "#131",
+          "offset": 2500,
+          "width": 1800,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#141": {
+          "id": "#141",
+          "category": "window",
+          "mark": "WN9",
+          "entityIds": [
+            "#140"
+          ],
+          "hostId": "#131",
+          "offset": 7500,
+          "width": 1800,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#143": {
+          "id": "#143",
+          "category": "wall",
+          "mark": "W9",
+          "entityIds": [
+            "#142",
+            "#144",
+            "#145",
+            "#146"
+          ],
+          "levelId": "#174",
+          "start": [
+            0,
+            8000
+          ],
+          "end": [
+            0,
+            0
+          ],
+          "thickness": 300,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "masonry"
+        },
+        "#148": {
+          "id": "#148",
+          "category": "window",
+          "mark": "WN10",
+          "entityIds": [
+            "#147"
+          ],
+          "hostId": "#143",
+          "offset": 4000,
+          "width": 1400,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#150": {
+          "id": "#150",
+          "category": "wall",
+          "mark": "W10",
+          "entityIds": [
+            "#149",
+            "#151",
+            "#152"
+          ],
+          "levelId": "#174",
+          "start": [
+            5000,
+            0
+          ],
+          "end": [
+            5000,
+            8000
+          ],
+          "thickness": 100,
+          "height": 2900,
+          "baseOffset": 0,
+          "material": "gypsum"
+        },
+        "#154": {
+          "id": "#154",
+          "category": "door",
+          "mark": "D4",
+          "entityIds": [
+            "#153",
+            "#155",
+            "#156"
+          ],
+          "hostId": "#150",
+          "offset": 4000,
+          "width": 800,
+          "height": 2100,
+          "sillHeight": 0,
+          "swing": "right",
+          "material": "timber"
+        },
+        "#158": {
+          "id": "#158",
+          "category": "slab",
+          "mark": "SL2",
+          "entityIds": [
+            "#157"
+          ],
+          "levelId": "#174",
+          "boundary": [
+            [
+              0,
+              0
+            ],
+            [
+              10000,
+              0
+            ],
+            [
+              10000,
+              8000
+            ],
+            [
+              0,
+              8000
+            ]
+          ],
+          "thickness": 200,
+          "offset": 0,
+          "role": "floor",
+          "material": "concrete",
+          "openings": [
+            [
+              [
+                5300,
+                6350
+              ],
+              [
+                9750,
+                6350
+              ],
+              [
+                9750,
+                7450
+              ],
+              [
+                5300,
+                7450
+              ]
+            ]
+          ]
+        },
+        "#160": {
+          "id": "#160",
+          "category": "window",
+          "mark": "WN11",
+          "entityIds": [
+            "#159"
+          ],
+          "hostId": "#114",
+          "offset": 2500,
+          "width": 1400,
+          "height": 1200,
+          "sillHeight": 900,
+          "swing": "left",
+          "material": "glass"
+        },
+        "#162": {
+          "id": "#162",
+          "category": "room",
+          "mark": "101",
+          "entityIds": [
+            "#161",
+            "#163",
+            "#164"
+          ],
+          "levelId": "#174",
+          "name": "Bedroom",
+          "boundary": [
+            [
+              150,
+              150
+            ],
+            [
+              4950,
+              150
+            ],
+            [
+              4950,
+              7850
+            ],
+            [
+              150,
+              7850
+            ]
+          ]
+        },
+        "#166": {
+          "id": "#166",
+          "category": "room",
+          "mark": "102",
+          "entityIds": [
+            "#165",
+            "#167",
+            "#168"
+          ],
+          "levelId": "#174",
+          "name": "Bedroom",
+          "boundary": [
+            [
+              5050,
+              150
+            ],
+            [
+              9850,
+              150
+            ],
+            [
+              9850,
+              7850
+            ],
+            [
+              5050,
+              7850
+            ]
+          ]
+        },
+        "#170": {
+          "id": "#170",
+          "category": "slab",
+          "mark": "SL3",
+          "entityIds": [
+            "#169"
+          ],
+          "levelId": "#175",
+          "boundary": [
+            [
+              -300,
+              -300
+            ],
+            [
+              10300,
+              -300
+            ],
+            [
+              10300,
+              8300
+            ],
+            [
+              -300,
+              8300
+            ]
+          ],
+          "thickness": 250,
+          "offset": 250,
+          "role": "roof",
+          "material": "concrete"
+        }
+      },
+      "elementOrder": [
+        "#3",
+        "#9",
+        "#15",
+        "#21",
+        "#27",
+        "#34",
+        "#41",
+        "#46",
+        "#54",
+        "#59",
+        "#64",
+        "#68",
+        "#73",
+        "#75",
+        "#77",
+        "#79",
+        "#81",
+        "#84",
+        "#87",
+        "#106",
+        "#110",
+        "#114",
+        "#122",
+        "#124",
+        "#129",
+        "#131",
+        "#139",
+        "#141",
+        "#143",
+        "#148",
+        "#150",
+        "#154",
+        "#158",
+        "#160",
+        "#162",
+        "#166",
+        "#170"
+      ],
+      "uid": "#176",
+      "counters": {
+        "level": 3,
+        "grid": 5,
+        "wall": 10,
+        "door": 4,
+        "window": 11,
+        "slab": 3,
+        "stair": 1,
+        "room": 4
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "format": "llull-document",
+  "version": 1,
+  "document": {
+    "entities": {},
+    "order": [],
+    "layers": {
+      "#1": {
+        "id": "#1",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#1"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {
+      "w": {
+        "name": "w",
+        "expression": "40",
+        "value": 40
+      }
+    },
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#2",
+        "name": "add_box",
+        "params": {
+          "name": "add_box",
+          "params": {
+            "size": [
+              "=w",
+              "=w",
+              "=w"
+            ]
+          }
+        },
+        "suppressed": false
+      }
+    ],
+    "configurations": {
+      "small": {
+        "name": "small",
+        "parameterValues": {
+          "w": "10"
+        }
+      },
+      "large": {
+        "name": "large",
+        "parameterValues": {
+          "w": "40"
+        }
+      }
+    },
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": []
+  }
+}
