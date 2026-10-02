@@ -1,6 +1,6 @@
 /**
  * footingDesign: footingModel.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 export const FCK = 25;

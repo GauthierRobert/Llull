@@ -1,6 +1,6 @@
 /**
  * Wind zone selection of one roof purlin (EN 1991-1-4 via windCoefficients).
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import { FLAT_ROOF_LIMIT, roofCoefficients } from './windCoefficients';

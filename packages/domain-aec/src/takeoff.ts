@@ -1,6 +1,6 @@
 /**
  * Quantity takeoff, schedules and cost estimate commands (read-only except set_cost_rates).
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CommandResult } from '@core/commands/types';

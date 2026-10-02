@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  *
  * MCP prompt definitions — pure, framework-agnostic.
  *
@@ -493,7 +493,7 @@ const TEMPLATE_MAP = new Map<string, PromptTemplate>(TEMPLATES.map((t) => [t.des
  * Return the list of all registered prompt template descriptors.
  *
  * @pure
- * @layer core/mcp
+ * @layer mcp
  */
 export function listMcpPrompts(): McpPromptDescriptor[] {
   return TEMPLATES.map((t) => t.descriptor);
@@ -506,7 +506,7 @@ export function listMcpPrompts(): McpPromptDescriptor[] {
  * should reply with an appropriate MCP error.
  *
  * @pure
- * @layer core/mcp
+ * @layer mcp
  * @failure unknown name -> null
  */
 export function getMcpPrompt(

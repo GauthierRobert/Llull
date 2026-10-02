@@ -1,6 +1,6 @@
 /**
  * Keeps evaluated building geometry consistent with the building model (architecture L4/L8).
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CadDocument, Entity } from '@core/model/types';

@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  *
  * CAD exchange tools — STEP import/export and parametric-code import over MCP.
  *
@@ -307,7 +307,7 @@ async function importCode(
 
 /**
  * Dispatch an exchange tool call; returns null for any other tool name.
- * @layer core/mcp
+ * @layer mcp
  * @failure missing Python, disabled execution, script/bridge errors → isError result, document unchanged
  */
 export async function applyExchangeToolCall(

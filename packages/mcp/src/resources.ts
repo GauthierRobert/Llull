@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  *
  * MCP resource builders — pure, framework-agnostic.
  *
@@ -65,7 +65,7 @@ export type CadResourceUri = (typeof CAD_RESOURCE_URIS)[keyof typeof CAD_RESOURC
  * Return the static list of resource descriptors.
  *
  * @pure — no document needed; just metadata.
- * @layer core/mcp
+ * @layer mcp
  */
 export function listMcpResources(): McpResourceDescriptor[] {
   return [
@@ -115,7 +115,7 @@ export function listMcpResources(): McpResourceDescriptor[] {
  * Read `cad://document` — full serialized CadDocument.
  *
  * @pure over doc
- * @layer core/mcp
+ * @layer mcp
  */
 export function readDocumentResource(doc: CadDocument): McpResourceContent {
   return {
@@ -129,7 +129,7 @@ export function readDocumentResource(doc: CadDocument): McpResourceContent {
  * Read `cad://scene` — structured SceneSnapshot.
  *
  * @pure over doc
- * @layer core/mcp
+ * @layer mcp
  */
 export function readSceneResource(doc: CadDocument): McpResourceContent {
   const snapshot = computeSceneSnapshot(doc);
@@ -144,7 +144,7 @@ export function readSceneResource(doc: CadDocument): McpResourceContent {
  * Read `cad://selection` — selected entity ids + kind/position summaries.
  *
  * @pure over doc
- * @layer core/mcp
+ * @layer mcp
  */
 export function readSelectionResource(doc: CadDocument): McpResourceContent {
   const selected = doc.selection.map((id) => {
@@ -165,7 +165,7 @@ export function readSelectionResource(doc: CadDocument): McpResourceContent {
  * Document-independent: the guide is static content, not derived from the doc.
  *
  * @pure
- * @layer core/mcp
+ * @layer mcp
  */
 export function readConventionsResource(): McpResourceContent {
   return {
@@ -182,7 +182,7 @@ export function readConventionsResource(): McpResourceContent {
  * (the transport should reply with an appropriate error).
  *
  * @pure over doc
- * @layer core/mcp
+ * @layer mcp
  * @failure unknown URI -> null
  */
 export function readMcpResource(doc: CadDocument, uri: string): McpResourceContent | null {

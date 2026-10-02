@@ -1,6 +1,6 @@
 /**
  * Wall build-ups (layered wall types): structure, insulation, membranes, finishes.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { WallElement, WallLayer, WallLayerFunction } from '@core/model/building';

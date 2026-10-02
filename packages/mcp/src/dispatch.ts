@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  *
  * Pure MCP content shaper and tool-call dispatcher.
  *
@@ -95,7 +95,7 @@ function codeText(data: unknown): string | null {
  *   4. When data is a non-null, non-array object: also set `structuredContent`.
  *
  * @pure — no execute, no document, no side effects.
- * @layer core/mcp
+ * @layer mcp
  *
  * @param result - The pre-computed fields from a CommandResult + isError flag.
  * @returns The shaped MCP payload (content blocks + optional structuredContent).
@@ -152,7 +152,7 @@ export function shapeToolCallContent(result: {
  * and calls `shapeToolCallContent` directly — ensuring execute() runs exactly once.
  *
  * @pure over doc — never mutates the input document.
- * @layer core/mcp
+ * @layer mcp
  * @affects depends on the underlying command
  * @failure unknown toolName -> isError true, affected:[], document === input doc
  */

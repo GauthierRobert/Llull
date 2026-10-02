@@ -1,6 +1,6 @@
 /**
  * foundationCheck: foundationRows.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { BasePlateElement, BuildingModel, FootingElement } from '@core/model/building';

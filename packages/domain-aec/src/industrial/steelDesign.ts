@@ -1,7 +1,7 @@
 /**
  * EN 1993 resistances used by the frame checks: material, bolts, cross-sections and members
  * (flexural buckling with the §6.3.3 interaction, method 2 simplified).
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  * @pure
  */
 

@@ -1,6 +1,6 @@
 /**
  * Process equipment (machines with maintenance clearances) and pipe runs.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { Vec3 } from '@core/model/types';

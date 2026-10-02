@@ -1,7 +1,7 @@
 /**
  * Portal frame analysis models: the 2D frames of a level (rafters in vertical planes y = const +
  * the columns under them) with their characteristic load cases.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  * @pure
  */
 

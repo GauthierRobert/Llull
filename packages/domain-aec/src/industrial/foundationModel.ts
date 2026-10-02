@@ -1,6 +1,6 @@
 /**
  * foundationCheck: foundationModel.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { LoadCase } from './frameModel';

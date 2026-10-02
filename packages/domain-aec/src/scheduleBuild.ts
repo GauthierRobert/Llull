@@ -1,6 +1,6 @@
 /**
  * quantities: scheduleBuild.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CadDocument } from '@core/model/types';

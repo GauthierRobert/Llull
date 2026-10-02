@@ -1,6 +1,6 @@
 /**
  * frameModel: frameModelSolve.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { BuildingModel } from '@core/model/building';

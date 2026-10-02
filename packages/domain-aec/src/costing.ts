@@ -1,6 +1,6 @@
 /**
  * quantities: costing.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { TakeoffLine } from './takeoffBasics';

@@ -1,6 +1,6 @@
 /**
  * Rooms, and generic edits on any building element (delete, move, copy to levels).
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { Vec2, Vec3 } from '@core/model/types';

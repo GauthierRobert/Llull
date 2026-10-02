@@ -1,7 +1,7 @@
 /**
  * Base plate under moment + axial force (EN 1993-1-8 §6.2.8, simplified): concrete bearing block with
  * fjd on the compression side, anchor bolts on the other, plate bending, and a catalogue sizing.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  * @pure
  */
 

@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  *
  * Tool-discovery meta-tools — `search_tools` and `enable_toolset`. They are MCP-layer tools, NOT
  * registry commands (the command contract / toolSchemas snapshot stay unchanged); both belong to

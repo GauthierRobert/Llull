@@ -1,7 +1,7 @@
 /**
  * Portal frame design: iterative up-sizing of frame sections and sizing of moment-connection bolt
  * groups against check_portal_frames.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type {

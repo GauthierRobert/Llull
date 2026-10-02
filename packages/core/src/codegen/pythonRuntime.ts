@@ -258,7 +258,7 @@ def _make_extrusion(profile, depth):
 
 
 def _make_revolution(profile, axis, angle):
-    # llull frames (src/core/geometry/revolution.ts): profile (radial r, axial a); sweep from +X.
+    # llull frames (packages/core/src/geometry/revolution.ts): profile (radial r, axial a); sweep from +X.
     if axis == "x":
         points, direction = [(a, r, 0) for r, a in profile], (1, 0, 0)
     elif axis == "y":

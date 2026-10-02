@@ -1,7 +1,7 @@
 /**
  * Foundation verification of portal-frame columns: pad footing soil bearing (Meyerhof effective
  * width), uplift (EQU), sliding, and base plate concrete bearing + anchor bolts.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 export type { FoundationRow, ClayLayer, Factors, Combination } from './foundationModel';

@@ -1,6 +1,6 @@
 /**
  * Curved wall geometry: arc through three points, plan band, evaluated mesh.
- * @layer core/commands/building
+ * @layer domain-aec
  * @pure
  */
 

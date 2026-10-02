@@ -1,6 +1,6 @@
 /**
  * plan: planModel.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';

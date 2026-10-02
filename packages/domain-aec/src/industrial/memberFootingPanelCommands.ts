@@ -1,6 +1,6 @@
 /**
  * members: memberFootingPanelCommands.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';

@@ -1,6 +1,6 @@
 /**
  * Structural validation of a loaded building model (persistence boundary).
- * @layer core/commands/building
+ * @layer domain-aec
  * @pure
  */
 

@@ -1,6 +1,6 @@
 /**
  * Clash detection between structure, equipment and pipes (oriented-box separating-axis test).
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';

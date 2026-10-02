@@ -1,7 +1,7 @@
 /**
  * Printable floor-plan sheet: SVG at a true architectural scale on ISO A paper, with title block,
  * north arrow, scale bar and dimensions. Print / save as PDF from any browser.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';

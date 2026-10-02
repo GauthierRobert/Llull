@@ -3,7 +3,7 @@
  * possibly agent-edited) CadQuery / build123d script, so code edits regenerate an editable model.
  *
  * @layer core/commands
- * @see export_code (code_exchange.ts), src/core/codegen/pythonRuntime.ts (the recorder)
+ * @see export_code (code_exchange.ts), packages/core/src/codegen/pythonRuntime.ts (the recorder)
  */
 
 import type { CadDocument } from '../model/types';

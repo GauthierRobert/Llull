@@ -1,6 +1,6 @@
 /**
  * purlinCheck: purlinCheckRun.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { CadDocument } from '@core/model/types';

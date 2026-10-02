@@ -1,6 +1,6 @@
 /**
  * Portal hall cladding panels (roof, side walls, gables) as outward-facing corner loops.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { Vec2, Vec3 } from '@core/model/types';

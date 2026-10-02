@@ -1,7 +1,7 @@
 /**
  * OpenCascade.js (OCC WASM) geometry kernel — opt-in production kernel.
  *
- * @layer core/geometry
+ * @layer kernel
  *
  * STATUS: OPT-IN. Inject via `?kernel=occt` URL param (see main.tsx) or `LLULL_KERNEL=occt` on the server.
  * Manifold remains the default kernel. OCC is injected only when the URL flag

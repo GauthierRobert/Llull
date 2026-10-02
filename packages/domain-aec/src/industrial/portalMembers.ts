@@ -1,6 +1,6 @@
 /**
  * Portal hall steel member layout: frames, gable posts, purlins, side rails, X-bracing.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { HallGeometry, MemberSpec, PortalProfiles } from './portalGeometry';

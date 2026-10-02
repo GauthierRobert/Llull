@@ -396,7 +396,7 @@ Wave 3 scope to keep the wave shippable.
 
 ## MG4 — Recipe-first document (Lane 1 + Lane 2 for accessor call sites)
 - `[DONE]` **MG4.1** Accessors first (`entitiesOf`, `definitionOf`), then split `CadDocument` into `definition` / `evaluated`. _Lane 1 + Lane 2. deps: MG3.2._
-- `[DONE]` **MG4.2** Mesh results become cache (`source: { stepId }`); persistence v3 writes definition only. _Lane 1. deps: MG4.1._
+- `[DONE]` **MG4.2** Mesh results become cache (`source: { stepId }`); persistence v3 writes definition only. _As built: v2 files omit plugin-derived (building) geometry; kernel meshes stay in files (small) and are memoized — see plan "As built"._ _Lane 1. deps: MG4.1._
 - `[DONE]` **MG4.3** Step dependency DAG (`reads`); param/step edits re-evaluate downstream closure only. _As built: replay prefix cache + set_parameter regeneration (see plan)._ _Lane 1. deps: MG4.1._
 - `[DONE]` **MG4.4** Kernel memoization keyed by operand-definition hash. _Lane 1. deps: MG1.3, MG4.2._
 - `[DONE]` **MG4.5** Generic "generated entity is read-only, edit its source" rule replaces the building-specific `guardCommand` branch. _Lane 1. deps: MG4.2._
@@ -409,10 +409,10 @@ Wave 3 scope to keep the wave shippable.
 
 ## MG6 — Packages & plugins (all lanes; start after MG1, finish last)
 - `[DONE]` **MG6.1** npm workspaces: `packages/{core,kernel-manifold,kernel-occt,mcp,render,domain-building,domain-industrial}`, `apps/{web,server}`. _deps: MG1.3. D2 resolved: yes._
-- `[DONE]` **MG6.2** `definePlugin({ name, toolset, commands, entityKinds?, guards? })`; `TOOLSETS` derived, hand lists deleted. _Lane 1 + Lane 4. deps: MG6.1._
+- `[DONE]` **MG6.2** `definePlugin({ name, toolset, commands, entityKinds?, guards? })`; `TOOLSETS` derived, hand lists deleted. _As built: `CadPlugin` + `installPlugin`; plugin toolsets derived, core command groups stay listed in toolsets.ts (core metadata)._ _Lane 1 + Lane 4. deps: MG6.1._
 - `[DONE]` **MG6.3** Default MCP exposure = `core` + `search_tools` / `enable_toolset`. _Lane 4. deps: MG6.2._
 - `[DONE]` **MG6.4** Burn down the MG0.3 `max-lines` allowlist to zero. _All lanes. deps: MG0.3._
-- `[TODO]` **MG6.5** Refresh `CLAUDE.md`, `.claude/rules/*`, lane ownership, `docs/ARCHITECTURE.md`; strip batch/process notes from source comments. _Lane 5. deps: MG4, MG5, MG6.2._
+- `[DONE]` **MG6.5** Refresh `CLAUDE.md`, `.claude/rules/*`, lane ownership, `docs/ARCHITECTURE.md`; strip batch/process notes from source comments. _Lane 5. deps: MG4, MG5, MG6.2._
 
 ---
 

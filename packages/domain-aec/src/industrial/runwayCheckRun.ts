@@ -1,6 +1,6 @@
 /**
  * runwayCheck: runwayCheckRun.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { SteelMemberElement } from '@core/model/building';

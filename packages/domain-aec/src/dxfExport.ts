@@ -1,6 +1,6 @@
 /**
  * dxf: dxfExport.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import { type CadDocument, type Vec2, is2D } from '@core/model/types';

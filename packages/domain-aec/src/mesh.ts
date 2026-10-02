@@ -1,7 +1,7 @@
 /**
  * Watertight prism meshes: a planar outline (with holes) swept straight between two placements.
  * Used for slabs with openings, steel members, pipes and cladding panels.
- * @layer core/commands/building
+ * @layer domain-aec
  * @pure
  */
 

@@ -1,6 +1,6 @@
 /**
  * foundationCheck: foundationCheckRun.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { FootingElement } from '@core/model/building';

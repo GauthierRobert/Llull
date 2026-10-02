@@ -1,7 +1,7 @@
 /**
  * Evaluates the constructive building model into ordinary document entities (architecture L8).
  *
- * @layer core/commands/building
+ * @layer domain-aec
  * @pure
  * @invariant evaluated entity ids are deterministic: `<elementId>:<part>`
  * @invariant no new entity kinds — walls/slabs/… become box / cylinder / extrusion / 2D shapes

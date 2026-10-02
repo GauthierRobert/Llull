@@ -1,6 +1,6 @@
 /**
  * Shared helpers for the building (AEC/BIM) commands.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CadDocument, DocumentUnit, Vec2 } from '@core/model/types';

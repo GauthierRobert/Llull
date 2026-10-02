@@ -1,6 +1,6 @@
 /**
  * ifc: ifcStep.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { Vec2 } from '@core/model/types';

@@ -1,6 +1,6 @@
 /**
  * Base plate design of fixed column bases: lightest catalogue plate + anchor bolts for M + N.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { BasePlateElement, BuildingModel } from '@core/model/building';

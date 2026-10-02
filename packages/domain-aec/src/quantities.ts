@@ -1,7 +1,7 @@
 /**
  * Pure quantity takeoff and schedules over the constructive building model.
  * All quantities are metric (m, m², m³, ea) regardless of document units.
- * @layer core/commands/building
+ * @layer domain-aec
  * @pure
  */
 

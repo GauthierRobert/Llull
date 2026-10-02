@@ -237,6 +237,11 @@ re-evaluates only dependent steps (measured vs MG0.4 baseline).
   import each other (building evaluation generates industrial members). It still installs two
   plugins. `render` stays in `packages/core` because the export commands depend on it. The web app
   stays at the repo root (it is the workspace root); `server/` is not a workspace member.
+- **MG6.2.** `CadPlugin { name, toolset, commands, guards?, document? }` installed through
+  `@core/plugins/host` (no `entityKinds`: plugins reuse core kinds). The `building` toolset is
+  derived from installed plugins; the core command groups (`core`, `2d`, `3d`, …) stay listed in
+  `packages/mcp/src/toolsets.ts` as core metadata. A plugin with a brand-new toolset name is
+  always exposed (fail-open) until that name is added to `TOOLSET_NAMES`.
 - **Found and fixed along the way:** `build_project` + `insert_step` stored the wrong params for the
   inserted step (configurations replayed to an empty model); the building uid became deterministic
   with step ids and now uses `uniqueId()`; `list_steel_profiles` lower-case family names kept working

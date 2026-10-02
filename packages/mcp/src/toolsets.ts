@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  *
  * MCP toolsets — named domain groups of tools. A host exposes a subset of the registry
  * (e.g. `core,3d,measure`) to keep `tools/list` small for clients that load every schema.

@@ -1,6 +1,6 @@
 /**
  * anchorPlan: anchorPlanExport.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { GridElement } from '@core/model/building';

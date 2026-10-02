@@ -1,6 +1,6 @@
 /**
  * Curved (arc) walls: centreline arc through start, a point on the arc and end.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CurvedWallElement } from '@core/model/building';

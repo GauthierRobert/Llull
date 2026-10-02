@@ -5,9 +5,10 @@
  *
  * TWO MODES (both route every change through `execute(doc, name, params)`, PRIME DIRECTIVE)
  * ─────────
- * ONLINE (server-authoritative): the server owns the document. `dispatch` POSTs /command and
- * the resulting document arrives over the /live SSE stream (`hydrateLiveDocument` /
- * `applyLivePatch`). Undo/redo are POST /undo and /redo; canUndo/canRedo come from responses.
+ * ONLINE (server-authoritative): the server owns the document. `dispatch` POSTs /command; the
+ * /live command log arrives as `command` events re-run on `liveBase` through `execute`
+ * (`applyLiveCommand`, hash-verified) or as `snapshot`s (`hydrateLiveDocument`). Undo/redo are
+ * POST /undo and /redo; canUndo/canRedo come from responses.
  *
  * LOCAL MODE (offline fallback, architecture L6): dispatch/undo/redo run locally (`execute` +
  * bounded snapshot stack, LOCAL_HISTORY_LIMIT) when ANY of:
@@ -20,14 +21,12 @@
  * never changes liveStatus: lastSummary reports "not applied — network error, retry". HTTP 4xx/5xx
  * never fall back either.
  *
- * RECONCILIATION (client wins). Every local mutation increments `localEditCounter`. On (re)connect
- * the local doc is pushed via POST /command `load_document`; syncState 'syncing'. On success the
- * unsynced flag clears only if the counter still equals the value captured at push start,
- * otherwise the push repeats. On failure syncState='failed' and the push retries with exponential
- * backoff while the client stays in local mode. Server patches/snapshots are never dropped while
- * connected: patches always apply; snapshots hydrate only when there are no unsynced edits.
- * A sync is recorded on the server as ONE `load_document` undo step that reverts ALL offline
- * edits at once.
+ * RECONCILIATION (outbox). Every local mutating command is queued in `localOutbox` (offline undo
+ * moves it to `localRedoOutbox`, redo back). On (re)connect the outbox is replayed to the server as
+ * ordinary commands, in order (the server rebases them onto its log; each keeps its own undo
+ * step), then the client adopts `GET /live/snapshot`; syncState is 'syncing' meanwhile. On failure
+ * syncState='failed' and the flush retries with exponential backoff while the client stays local.
+ * Live events received during a flush are superseded by the post-flush snapshot.
  *
  * Local-only state (never sent to the server, never part of CadDocument):
  *   - selection              — which entity ids the user has clicked
@@ -38,6 +37,8 @@
  *   - canUndo / canRedo      — enabled-state for undo/redo UI (server responses or local stacks)
  *   - hasUnsyncedLocalEdits / localEditCounter / syncState / sseEverConnected — sync bookkeeping
  *   - localUndoStack / localRedoStack — offline snapshot history
+ *   - localOutbox / localRedoOutbox — offline commands awaiting replay on the server
+ *   - liveBase / liveSeq — client copy of the server document at its log position
  */
 
 import { create } from 'zustand';

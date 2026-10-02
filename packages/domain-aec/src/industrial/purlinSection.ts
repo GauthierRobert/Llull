@@ -1,6 +1,6 @@
 /**
  * purlinCheck: purlinSection.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import { sectionProperties, type SteelProfile } from '../steel/profiles';

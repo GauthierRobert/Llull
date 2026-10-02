@@ -1,6 +1,6 @@
 /**
  * Steel connections: column base plates with anchor bolts.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { BasePlateElement, BuildingModel, SteelMemberElement } from '@core/model/building';

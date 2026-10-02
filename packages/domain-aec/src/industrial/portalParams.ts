@@ -1,6 +1,6 @@
 /**
  * Parameter schema of add_portal_frame_building.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import { z } from '@core/commands/schema';

@@ -1,6 +1,6 @@
 /**
  * Building levels (storeys), project info and building inspection.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CommandResult } from '@core/commands/types';

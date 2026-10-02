@@ -1,6 +1,6 @@
 /**
  * Structural grid axes (column lines) with labelled bubbles.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { Vec2 } from '@core/model/types';

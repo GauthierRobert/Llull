@@ -1,7 +1,7 @@
 /**
  * Purlin / side-rail design: iterative up-sizing of the secondary steel against check_purlins and
  * re-seating of the resized members on the rafters / columns.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';

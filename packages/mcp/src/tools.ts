@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  *
  * MCP tool definition builder — pure, framework-agnostic.
  *
@@ -66,7 +66,7 @@ export interface McpToolDefinition {
  * Generate one `McpToolDefinition` per registered command.
  *
  * @pure
- * @layer core/mcp
+ * @layer mcp
  * @invariant buildMcpTools().length === listCommands().length
  * @invariant buildMcpTools()[i].name === listCommands()[i].name for all i
  */

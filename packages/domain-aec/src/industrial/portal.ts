@@ -1,6 +1,6 @@
 /**
  * Pre-engineered steel hall generator (portal frames) and crane runways.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';

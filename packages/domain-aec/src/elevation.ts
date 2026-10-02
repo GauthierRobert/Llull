@@ -1,7 +1,7 @@
 /**
  * Elevations and sections projected from the 3D model: hidden-line SVG drawing sheets
  * (painter's algorithm over front-facing triangles, feature + silhouette edges, cut outlines).
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';

@@ -1,6 +1,6 @@
 /**
  * Steel members, pad footings and cladding panels.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 export {

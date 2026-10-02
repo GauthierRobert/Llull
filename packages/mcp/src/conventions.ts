@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  *
  * Agent modeling conventions guide — pure, framework-agnostic.
  *

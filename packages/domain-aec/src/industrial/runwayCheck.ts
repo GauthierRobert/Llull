@@ -1,7 +1,7 @@
 /**
  * Crane runway beam verification (preliminary): bending + shear under moving wheel loads, lateral
  * bending, lateral-torsional buckling, SLS deflections (EN 1993-6 §7.3) and fatigue (EN 1993-1-9).
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 export {

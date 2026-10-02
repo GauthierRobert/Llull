@@ -2,7 +2,7 @@
  * Steel section catalogue (European standard sections, dimensions in mm) and exact outlines.
  * Masses: catalogue values for hot-rolled I / U sections, computed (ρ = 7850 kg/m³, sharp corners)
  * for hollow sections, angles and cold-formed channels.
- * @layer core/commands/building/steel
+ * @layer domain-aec
  * @pure
  */
 

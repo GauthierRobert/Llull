@@ -3,7 +3,7 @@
  * dead, snow, wind and crane actions (global imperfections, Horne αcr and amplified moments),
  * EN 1993 member checks (cross-section, flexural buckling), moment connection bolt checks and
  * SLS deflections.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 export { connectionCheck } from './frameCheckSolve';

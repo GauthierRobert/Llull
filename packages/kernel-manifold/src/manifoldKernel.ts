@@ -1,7 +1,7 @@
 /**
  * Manifold-backed geometry kernel for boolean solid operations.
  *
- * @layer core/geometry (concrete adapter; injected by the app and the server — commands only
+ * @layer kernel (concrete adapter; injected by the app and the server — commands only
  *   see the GeometryKernel interface, architecture L9)
  *
  * Implements `GeometryKernel` using the manifold-3d WASM library.

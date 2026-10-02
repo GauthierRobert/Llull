@@ -103,7 +103,7 @@ app.get('/health', (_req: Request, res: Response) => {
  * The browser connects with:
  *   const es = new EventSource('http://localhost:3001/live');
  *   es.addEventListener('snapshot', (e) => { ... });
- *   es.addEventListener('patch', (e) => { ... });
+ *   es.addEventListener('command', (e) => { ... });
  *
  * No auth required (EventSource cannot send Authorization headers).
  */

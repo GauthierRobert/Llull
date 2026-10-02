@@ -1,7 +1,7 @@
 /**
  * Entity factory shared by the building evaluators: standard layers, material colours and the
  * common fields of every evaluated entity.
- * @layer core/commands/building
+ * @layer domain-aec
  * @pure
  */
 

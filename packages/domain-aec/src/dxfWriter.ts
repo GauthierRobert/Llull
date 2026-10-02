@@ -1,6 +1,6 @@
 /**
  * dxf: dxfWriter.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { DocumentUnit, Entity, Vec2 } from '@core/model/types';

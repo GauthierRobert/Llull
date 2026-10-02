@@ -3,7 +3,7 @@
  * contract — commands, the `building` MCP toolset, the derivation guard and the document extension
  * that validates the building model and re-derives its geometry on load.
  *
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CadDocument } from '@core/model/types';

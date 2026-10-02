@@ -1,6 +1,6 @@
 /**
  * Building (AEC / BIM) and industrial command sets, installed as plugins (see plugin.ts).
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { CommandDefinition } from '@core/commands/types';

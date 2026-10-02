@@ -1,5 +1,5 @@
 /**
- * @layer core/mcp
+ * @layer mcp
  * Barrel — re-exports the public surface of the MCP tool layer.
  *
  * Consumers (server/mcp transport, tests) import from '.'.

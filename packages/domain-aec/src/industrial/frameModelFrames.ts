@@ -1,6 +1,6 @@
 /**
  * frameModel: frameModelFrames.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';

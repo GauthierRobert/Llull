@@ -1,6 +1,6 @@
 /**
  * members: memberSupport.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 import type { Vec3 } from '@core/model/types';

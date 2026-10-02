@@ -1,6 +1,6 @@
 /**
  * Portal frame moment connections: bolted end plates at eaves (with haunch) and apex joints.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type {

@@ -1,7 +1,7 @@
 /**
  * DSTV NC1 export: one numerical-control file per steel piece (members, base plates, connection
  * end plates) for CNC saw / drill / profile-cutting lines. All lengths are millimetres.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type {

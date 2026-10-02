@@ -1,7 +1,7 @@
 /**
  * Wind bracing check of a steel hall: longitudinal wind on the gables → roof X-bracing → wall
  * X-bracing (tension-only diagonals), compression struts and gable wind posts.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 export { craneWallForce } from './bracingModel';

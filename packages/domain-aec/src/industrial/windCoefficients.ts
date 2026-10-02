@@ -5,7 +5,7 @@
  * windward zones F / G / H) and `pressure` (the alternative set, positive on the windward zones for
  * α ≥ 5° and the larger suction on the leeward zones). Where the standard gives a single value both
  * are equal. Sign convention: cpe < 0 is suction (uplift).
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  * @pure
  */
 

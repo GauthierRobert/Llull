@@ -1,6 +1,6 @@
 /**
  * purlinCheck: purlinModel.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  */
 
 import type { SteelMemberElement } from '@core/model/building';

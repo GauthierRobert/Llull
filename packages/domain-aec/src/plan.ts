@@ -2,7 +2,7 @@
  * Pure floor-plan drawing of one level: a horizontal cut (default 1.2 m above the floor) of the
  * building model, as neutral 2D primitives consumed by the DXF and SVG sheet writers.
  * Coordinates are model plan coordinates in document units.
- * @layer core/commands/building
+ * @layer domain-aec
  * @pure
  */
 

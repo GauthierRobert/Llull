@@ -1,7 +1,7 @@
 /**
  * Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes,
  * cable trays, base plates.
- * @layer core/commands/building/industrial
+ * @layer domain-aec
  * @pure
  */
 

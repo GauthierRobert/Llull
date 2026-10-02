@@ -1,6 +1,6 @@
 /**
  * DXF (AutoCAD R12 / AC1009 ASCII) export of a level plan plus the document's 2D drafting.
- * @layer core/commands/building
+ * @layer domain-aec
  */
 
 export { dxfLayerName, dxfText } from './dxfWriter';
