@@ -10,6 +10,7 @@ import type { CadDocument, FeatureStep, Parameter } from '../model/types';
 import { extractReferences } from './expression';
 import { replayHistory } from './history';
 import { currentContext } from './context';
+import { kernelRefusal } from './kernelRefusal';
 
 /** Parameter names referenced by `=expr` strings anywhere in `params`. */
 export function parametersReadBy(params: unknown, into = new Set<string>()): Set<string> {
@@ -36,11 +37,53 @@ export function changedParameters(
   return changed;
 }
 
-/** Live steps whose params read any of `names`. */
-export function stepsReading(history: readonly FeatureStep[], names: Set<string>): FeatureStep[] {
+/** Commands whose params hold bare (no `=`) dimensional expressions evaluated against parameters. */
+const CONSTRAINT_COMMANDS: ReadonlySet<string> = new Set(['add_constraint', 'update_constraint']);
+
+/** Identifiers in every bare string of `params` (conservative: an id may read as a name). */
+function bareExpressionRefs(params: unknown, into: Set<string>): void {
+  if (typeof params === 'string') {
+    for (const name of extractReferences(params.startsWith('=') ? params.slice(1) : params)) {
+      into.add(name);
+    }
+  } else if (Array.isArray(params)) {
+    for (const item of params) bareExpressionRefs(item, into);
+  } else if (params !== null && typeof params === 'object') {
+    for (const value of Object.values(params)) bareExpressionRefs(value, into);
+  }
+}
+
+/**
+ * Parameters a step reads: its own `=expr` params, the steps of an instantiated recipe, and the
+ * bare dimensional expressions of constraint steps.
+ */
+export function parametersReadByStep(
+  step: FeatureStep,
+  doc: Pick<CadDocument, 'recipes'>,
+  depth = 0,
+): Set<string> {
+  const names = parametersReadBy(step.params);
+  if (CONSTRAINT_COMMANDS.has(step.name)) bareExpressionRefs(step.params, names);
+  if (step.name === 'instantiate_recipe' && depth < 8) {
+    const recipeName = (step.params as { name?: unknown } | null)?.name;
+    const recipe = typeof recipeName === 'string' ? doc.recipes[recipeName] : undefined;
+    for (const inner of recipe?.steps ?? []) {
+      for (const name of parametersReadByStep(inner, doc, depth + 1)) names.add(name);
+    }
+  }
+  return names;
+}
+
+/** Live steps that read any of `names` (directly, via a recipe, or via a constraint). */
+export function stepsReading(
+  history: readonly FeatureStep[],
+  names: Set<string>,
+  doc: Pick<CadDocument, 'recipes'> = { recipes: {} },
+): FeatureStep[] {
   if (names.size === 0) return [];
   return history.filter(
-    (step) => !step.suppressed && [...parametersReadBy(step.params)].some((n) => names.has(n)),
+    (step) =>
+      !step.suppressed && [...parametersReadByStep(step, doc)].some((name) => names.has(name)),
   );
 }
 
@@ -49,16 +92,21 @@ export function stepsReading(history: readonly FeatureStep[], names: Set<string>
  * changed parameter. Unchanged history prefixes come from the replay cache, so only the steps
  * from the first dependent onward re-run.
  * @returns the regenerated document and the number of dependent steps (0 → `after` untouched)
+ * @failure dependents need the geometry kernel and none is available -> `refusal` set, `after`
+ *   returned unregenerated (the caller no-ops)
  */
 export function regenerateParameterDependents(
   before: CadDocument,
   after: CadDocument,
-): { document: CadDocument; dependentSteps: number } {
+): { document: CadDocument; dependentSteps: number; refusal?: string } {
   const dependents = stepsReading(
     after.featureHistory,
     changedParameters(before.parameters, after.parameters),
+    after,
   );
   if (dependents.length === 0) return { document: after, dependentSteps: 0 };
+  const refusal = kernelRefusal(after, after.featureHistory);
+  if (refusal !== null) return { document: after, dependentSteps: dependents.length, refusal };
   const regenerated = replayHistory(after, after.featureHistory, currentContext().registry);
   return { document: regenerated, dependentSteps: dependents.length };
 }

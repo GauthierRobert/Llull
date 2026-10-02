@@ -21,6 +21,7 @@ import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { stepIdSource, stepKeyOf } from '../lib/id';
 import { orphanState } from './history_carry';
+import { kernelRefusal } from './kernelRefusal';
 import { nextStateKey } from './replayCache';
 import { hashText } from '../lib/hash';
 import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
@@ -80,13 +81,9 @@ export function replayHistory(
   onStep?: (event: ReplayStepEvent) => void,
 ): CadDocument {
   const context = currentContext();
-  const kernelStep = history.find(
-    (step) => !step.suppressed && getCommandFn(step.name)?.annotations?.requiresKernel === true,
-  );
-  if (kernelStep !== undefined && context.kernel === null) {
-    resolveWarnings?.push(
-      `replay refused: step '${kernelStep.name}' needs the geometry kernel, which is not available yet; document kept as-is.`,
-    );
+  const refusal = kernelRefusal(base, history, getCommandFn);
+  if (refusal !== null) {
+    resolveWarnings?.push(`replay refused: ${refusal}`);
     return base;
   }
   // Start from empty geometry but preserve document-level settings.
@@ -137,12 +134,13 @@ export function replayHistory(
     // 2. Rewrite stale entity-id references using the accumulated idMap.
     const remapped = remapIds(resolved, idMap);
     const before = doc;
-    const key = cache ? nextStateKey(stateKey, step.id, step.name, remapped) : '';
+    let key = cache ? nextStateKey(stateKey, step.id, step.name, remapped) : '';
     const hit = cache?.get(key);
     if (hit !== undefined) {
       doc = { ...hit.doc, featureHistory: history };
       idMap = new Map(hit.idMap);
     } else {
+      const uidBefore = doc.building?.uid;
       try {
         const stepKey = stepKeyOf(step.id);
         const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
@@ -154,7 +152,14 @@ export function replayHistory(
       } catch {
         // A step that throws (e.g. referencing a now-deleted entity) is skipped.
       }
-      cache?.set(key, { doc, idMap: new Map(idMap) });
+      const mintedUid = uidBefore === undefined ? doc.building?.uid : undefined;
+      if (mintedUid === undefined) {
+        cache?.set(key, { doc, idMap: new Map(idMap) });
+      } else if (cache) {
+        // The step minted a globally unique id (uniqueId): never memoize it, and key every later
+        // state by that id so no other document is served this document's identity.
+        key = nextStateKey(key, 'minted-uid', mintedUid, null);
+      }
     }
     stateKey = key;
     onStep?.({
@@ -198,6 +203,10 @@ export const replayHistory_cmd = defineCommand({
       };
     }
     const warnings: string[] = [];
+    const refused = kernelRefusal(doc, doc.featureHistory);
+    if (refused !== null) {
+      return { document: doc, summary: `replay_history: ${refused}`, affected: [] };
+    }
     const regenerated = replayHistory(doc, doc.featureHistory, currentContext().registry, warnings);
     const count = Object.keys(regenerated.entities).length;
     const warnSuffix =
@@ -254,6 +263,10 @@ export const setStepSuppressed = defineCommand({
       updatedStep,
       ...doc.featureHistory.slice(idx + 1),
     ];
+    const refused = kernelRefusal(doc, newHistory);
+    if (refused !== null) {
+      return { document: doc, summary: `set_step_suppressed: ${refused}`, affected: [] };
+    }
     const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
@@ -311,6 +324,10 @@ export const editStepParams = defineCommand({
       updatedStep,
       ...doc.featureHistory.slice(idx + 1),
     ];
+    const refused = kernelRefusal(doc, newHistory);
+    if (refused !== null) {
+      return { document: doc, summary: `edit_step_params: ${refused}`, affected: [] };
+    }
     const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
@@ -368,6 +385,10 @@ export const reorderStep = defineCommand({
     const step = doc.featureHistory[idx]!;
     const without = [...doc.featureHistory.slice(0, idx), ...doc.featureHistory.slice(idx + 1)];
     const newHistory = [...without.slice(0, clamped), step, ...without.slice(clamped)];
+    const refused = kernelRefusal(doc, newHistory);
+    if (refused !== null) {
+      return { document: doc, summary: `reorder_step: ${refused}`, affected: [] };
+    }
     const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
@@ -410,6 +431,10 @@ export const deleteStep = defineCommand({
       };
     }
     const newHistory = doc.featureHistory.filter((s) => s.id !== stepId);
+    const refused = kernelRefusal(doc, newHistory);
+    if (refused !== null) {
+      return { document: doc, summary: `delete_step: ${refused}`, affected: [] };
+    }
     const regenerated = replayHistory(doc, newHistory, currentContext().registry);
     const count = Object.keys(regenerated.entities).length;
     return {
@@ -494,6 +519,12 @@ export const insertStep = defineCommand({
         newStep,
         ...doc.featureHistory.slice(insertIdx + 1),
       ];
+    }
+
+    const refused = kernelRefusal(doc, newHistory);
+
+    if (refused !== null) {
+      return { document: doc, summary: `insert_step: ${refused}`, affected: [] };
     }
 
     const regenerated = {

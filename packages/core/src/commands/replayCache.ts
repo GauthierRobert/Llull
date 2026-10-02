@@ -6,6 +6,8 @@
  * @layer core/commands
  * @pure semantically transparent: a hit returns exactly what re-running the prefix would produce
  *   (commands are pure, ids are step-scoped, the kernel is memoized and deterministic)
+ * @invariant a step that mints a globally unique id (`uniqueId`, e.g. the building uid) is never
+ *   memoized; replayHistory folds that id into the key of every later state
  */
 
 import type { CadDocument } from '../model/types';

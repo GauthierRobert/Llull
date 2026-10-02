@@ -371,7 +371,10 @@ const definitions: CommandDefinition<unknown>[] = rawDefinitions.map(guardComman
 const byName = new Map<string, CommandDefinition<unknown>>(definitions.map((d) => [d.name, d]));
 
 onPluginInstalled((plugin) => {
-  const clash = plugin.commands.find((command) => byName.has(command.name));
+  const names = plugin.commands.map((command) => command.name);
+  const clash = plugin.commands.find(
+    (command, index) => byName.has(command.name) || names.indexOf(command.name) !== index,
+  );
   if (clash) {
     throw new Error(`plugin '${plugin.name}': command '${clash.name}' is already registered`);
   }

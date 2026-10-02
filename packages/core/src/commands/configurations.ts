@@ -9,6 +9,7 @@
  */
 
 import type { CadDocument, Configuration, Parameter } from '../model/types';
+import { kernelRefusal } from './kernelRefusal';
 import { currentContext } from './context';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
@@ -190,6 +191,10 @@ export const activateConfiguration = defineCommand({
 
     // Replay featureHistory to regenerate entities with the new parameter values.
     const warnings: string[] = [];
+    const refused = kernelRefusal(baseDoc, doc.featureHistory);
+    if (refused !== null) {
+      return { document: doc, summary: `activate_configuration: ${refused}`, affected: [] };
+    }
     const regenerated = replayHistory(
       baseDoc,
       doc.featureHistory,

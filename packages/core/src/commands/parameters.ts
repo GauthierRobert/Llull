@@ -209,7 +209,10 @@ export const setParameter = defineCommand({
     const dependentCount = Object.values(evaluated).filter(
       (p) => p.name !== name && extractReferences(p.expression).has(name),
     ).length;
-    const { document, dependentSteps } = regenerateParameterDependents(doc, newDoc);
+    const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc);
+    if (refusal !== undefined) {
+      return { document: doc, summary: `set_parameter '${name}': ${refusal}`, affected: [] };
+    }
 
     return {
       document,

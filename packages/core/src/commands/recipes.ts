@@ -9,6 +9,7 @@
  */
 
 import type { CadDocument, FeatureStep, Recipe } from '../model/types';
+import { kernelRefusal } from './kernelRefusal';
 import { currentContext, runInContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
@@ -243,6 +244,11 @@ function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
       summary: `instantiate_recipe failed: recipe '${name}' not found.${hint}`,
       affected: [],
     };
+  }
+
+  const refused = kernelRefusal(doc, recipe.steps);
+  if (refused !== null) {
+    return { document: doc, summary: `instantiate_recipe: ${refused}`, affected: [] };
   }
 
   if (recipe.steps.length > MAX_PROJECT_STEPS) {
