@@ -365,7 +365,62 @@ Wave 3 scope to keep the wave shippable.
 
 ---
 
+# WAVE 7 — architecture migration (plan: `docs/MIGRATION_PLAN.md`)
+
+**Premise:** keep the one-registry/two-callers core; fix what accreted around it — injected execution context (T1), one schema per command (T2), recipe-first document (T3), one sync path (T4), small core + domain plugins (T5). Every task keeps `main` green and the MG0 golden corpus byte-identical unless the task says otherwise. **Feature freeze (D5):** no new domain commands until MG4 is `[DONE]`.
+
+## MG0 — Guardrails (Lane 5 + Lane 1)
+- `[TODO]` **MG0.1** Golden replay corpus `tests/golden/` (~30 `build_project` plans → serialized doc snapshots; replay reproduces). _Lane 5. deps: —._
+- `[TODO]` **MG0.2** Schema conformance test: minimal valid params from each `paramsSchema` never hits the `guardCommand` catch path. _Lane 5. deps: —._
+- `[TODO]` **MG0.3** ESLint `max-lines: 500` as error + allowlist of the current 49 offenders (list may only shrink). _Lane 5. deps: —._
+- `[TODO]` **MG0.4** Perf/size baseline (replay time, doc JSON size) recorded in `docs/MIGRATION_PLAN.md`. _Lane 5. deps: MG0.1._
+
+## MG1 — Execution context (Lane 1; MG1.4 Lane 4 + Lane 2)
+- `[TODO]` **MG1.1** `ExecutionContext { kernel, ids, registry }`; `execute(doc, name, params, ctx = defaultContext())`; `run(doc, params, ctx?)`. _Lane 1. deps: MG0.1._
+- `[TODO]` **MG1.2** Delete `setRegistryRef` / `setConfigRegistryRef` / `setRecipeRegistryRef` — use `ctx.registry`. _Lane 1. deps: MG1.1._
+- `[TODO]` **MG1.3** Kernel via `ctx.kernel` in boolean/modify3d/tessellation; `getGeometryKernel()` only inside `defaultContext()`. _Lane 1. deps: MG1.1._
+- `[BLOCKED]` **MG1.4** Kernel parity: move `ui/geometry/occtKernel.ts` → `core/geometry/`; server honours `LLULL_KERNEL`; test fillet via MCP == via store. _Lane 4 + Lane 2. deps: MG1.3. Blocked on D3._
+- `[TODO]` **MG1.5** `requiresKernel` annotation; explicit "kernel loading" summary; replay waits for readiness. _Lane 1. deps: MG1.3._
+
+## MG2 — One schema per command (Lane 1; parallel to MG1)
+- `[BLOCKED]` **MG2.1** `defineCommand({ params: <schema> })` deriving `paramsSchema` + params type. _Lane 1. deps: MG0.2. Blocked on D1._
+- `[TODO]` **MG2.2** Validate params in `execute`; move generic `guardCommand` checks into schema helpers (`vec3`, `entityId`, `position`). _Lane 1. deps: MG2.1._
+- `[TODO]` **MG2.3** Migrate per domain file (one PR each, `building/**` last); delete hand-written `<X>Params` + `paramsSchema`. _Lane 1. deps: MG2.2._
+- `[TODO]` **MG2.4** `toToolSchemas()` snapshot test. _Lane 5. deps: —._
+
+## MG3 — Deterministic ids (Lane 1)
+- `[TODO]` **MG3.1** Step-scoped ids `<stepId>.<n>` via `ctx.ids`; replay reuses recorded step ids; `remapIds` + `affected` zip become dead code. _Lane 1. deps: MG1.1._
+- `[BLOCKED]` **MG3.2** Persistence v2: `migrate()` upgrades v1 docs (legacy replay once → rewrite ids). _Lane 1. deps: MG3.1. Blocked on D4._
+- `[TODO]` **MG3.3** Remove `__resetIdCounter` from tests. _Lane 5. deps: MG3.1._
+
+## MG4 — Recipe-first document (Lane 1 + Lane 2 for accessor call sites)
+- `[TODO]` **MG4.1** Accessors first (`entitiesOf`, `definitionOf`), then split `CadDocument` into `definition` / `evaluated`. _Lane 1 + Lane 2. deps: MG3.2._
+- `[TODO]` **MG4.2** Mesh results become cache (`source: { stepId }`); persistence v3 writes definition only. _Lane 1. deps: MG4.1._
+- `[TODO]` **MG4.3** Step dependency DAG (`reads`); param/step edits re-evaluate downstream closure only. _Lane 1. deps: MG4.1._
+- `[TODO]` **MG4.4** Kernel memoization keyed by operand-definition hash. _Lane 1. deps: MG1.3, MG4.2._
+- `[TODO]` **MG4.5** Generic "generated entity is read-only, edit its source" rule replaces the building-specific `guardCommand` branch. _Lane 1. deps: MG4.2._
+
+## MG5 — One sync path (Lane 4 + Lane 2)
+- `[TODO]` **MG5.1** `/live` broadcasts `{ seq, stepId, name, params, stateHash }`; clients apply via `execute`; snapshot on gap/hash mismatch; retire `docPatch.ts`. _Lane 4 + Lane 2. deps: MG1.4, MG3.1._
+- `[TODO]` **MG5.2** Offline outbox of commands replaces "client wins" `load_document` push. _Lane 2. deps: MG5.1._
+- `[TODO]` **MG5.3** Retire `uiBridge` (`snapshot_in_from_ui` / `snapshot_out_to_ui`) after one deprecation release. _Lane 4. deps: MG5.1._
+- `[TODO]` **MG5.4** History-based undo replaces server + client snapshot stacks. _Lane 4 + Lane 2. deps: MG4.3, MG5.1._
+
+## MG6 — Packages & plugins (all lanes; start after MG1, finish last)
+- `[BLOCKED]` **MG6.1** npm workspaces: `packages/{core,kernel-manifold,kernel-occt,mcp,render,domain-building,domain-industrial}`, `apps/{web,server}`. _deps: MG1.3. Blocked on D2._
+- `[TODO]` **MG6.2** `definePlugin({ name, toolset, commands, entityKinds?, guards? })`; `TOOLSETS` derived, hand lists deleted. _Lane 1 + Lane 4. deps: MG6.1._
+- `[TODO]` **MG6.3** Default MCP exposure = `core` + `search_tools` / `enable_toolset`. _Lane 4. deps: MG6.2._
+- `[TODO]` **MG6.4** Burn down the MG0.3 `max-lines` allowlist to zero. _All lanes. deps: MG0.3._
+- `[TODO]` **MG6.5** Refresh `CLAUDE.md`, `.claude/rules/*`, lane ownership, `docs/ARCHITECTURE.md`; strip batch/process notes from source comments. _Lane 5. deps: MG4, MG5, MG6.2._
+
+---
+
 ## Decision log (resolve `[BLOCKED]` items here)
+- **OPEN — D1 schema library (MG2):** zod v4 (built-in `toJSONSchema`, already a transitive dep via `@modelcontextprotocol/sdk`) vs TypeBox. Recommendation zod. New dependency ⇒ needs explicit user approval (CLAUDE.md STACK).
+- **OPEN — D2 npm workspaces monorepo (MG6.1):** recommendation yes.
+- **OPEN — D3 OCC WASM on the server (MG1.4):** ~63 MB, slow cold start; needed for kernel parity between UI and MCP. Recommendation yes, behind `LLULL_KERNEL`.
+- **OPEN — D4 document format v1 → v2/v3 with auto-migration on load, no v1 writer (MG3.2, MG4.2):** recommendation yes.
+- **OPEN — D5 feature freeze on new domain commands during MG1–MG4:** recommendation yes.
 - **A4 boolean CSG library:** RESOLVED 2026-05-25 → **manifold-3d (Manifold)**. Robust watertight mesh booleans (WASM). Behind a `GeometryKernel` interface (L9) so OpenCascade.js can replace it later for exact B-rep/STEP. Mesh-based results stored as a new `mesh` solid kind.
 - **In-app AI bridge:** REMOVED 2026-05-25 (user decision: "only MCP will be used"). Deleted `src/core/ai/**`, the Express `/api/ai` proxy + `anthropicClient.ts`, the chat panel (`ChatPanel`/`useAiChat`/`chat.css`), and the `@anthropic-ai/sdk` dependency. AI control is now delivered solely through the MCP host (`/mcp`). Architecture rules updated: L1 is now "two callers" (UI + MCP). Tasks F1/F2/F3 → `[REMOVED]`.
 - **OPEN — kernel capability for K1/K2/K3 (fillet/chamfer/shell):** Manifold (current kernel) does mesh booleans well but has **no robust edge fillet/chamfer or shell**. These need either (a) an OpenCascade.js B-rep kernel swapped in behind the existing `GeometryKernel` interface (L9) — large WASM, slow init, but the "real CAD" path that also unlocks STEP export, or (b) mesh-approximation fillets (lower quality). Decide before scheduling K1/K2. Sweep/loft (K3) are achievable mesh-side. **Default recommendation: defer K1/K2 until an OCC kernel is justified; build N0–N3, sweep/loft, and the rest of Wave 2 first.**
