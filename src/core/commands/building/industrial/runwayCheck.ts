@@ -11,6 +11,7 @@ import { findProfile, sectionProperties } from '../steel/profiles';
 import { toCsv } from '../quantities';
 import {
   craneActions,
+  CRANE_FACTORS,
   craneCapacityOf,
   HOISTING_CLASSES,
   type CraneModel,
@@ -52,6 +53,8 @@ export interface RunwayCheckParams {
   craneSpan?: number;
   craneSelfWeight?: number;
   minHookApproach?: number;
+  travelSpeed?: number;
+  bufferStiffness?: number;
   levelId?: string;
 }
 
@@ -88,6 +91,35 @@ const RAIL_WEAR_INERTIA_FACTOR = 0.75; // simplified Ir reduction for 25 % head 
 /** Damage-equivalent factors λ for normal stresses (EN 1991-3 Tab. 2.12). */
 const CLASSES: Readonly<Record<CraneClass, number>> = { S2: 0.315, S3: 0.397, S4: 0.5 };
 
+/** EN 1991-3 §2.11.1 buffer factor φ7 for a buffer characteristic ξb ≤ 0.5. */
+const PHI7 = 1.25;
+/** v1 = 0.7 × long travel speed (EN 1991-3 §2.11.1). */
+const BUFFER_SPEED_RATIO = 0.7;
+/** EN 1991-3 Tab. A.1: partial factor of load group 7 (accidental-type buffer impact). */
+export const GAMMA_BUFFER = 1;
+/** EN 1991-3 Tab. A.1: partial factor of the test load (group 8). */
+const GAMMA_TEST = 1.1;
+/** Long travel speed (m/s, about 38 m/min) and buffer spring constant (kN/m) defaults. */
+export const DEFAULT_TRAVEL_SPEED = 0.63;
+export const DEFAULT_BUFFER_STIFFNESS = 1000;
+/** Static test load factor on Qh (EN 1991-3 §2.10). */
+const STATIC_TEST_FACTOR = 1.25;
+/** Dynamic test load factor on Qh (EN 1991-3 §2.10). */
+const DYNAMIC_TEST_FACTOR = 1.1;
+
+/**
+ * Total buffer force HB,1 = φ7 v1 √(mc SB) (N) of the crane at both end stops of a runway.
+ * mc = crane mass only (free hook); v1 = 0.7 × travelSpeed (m/s); stiffness in kN/m.
+ */
+export function bufferForce(
+  craneSelfWeightNewton: number,
+  travelSpeed: number,
+  stiffnessKnPerM: number,
+): number {
+  const mass = craneSelfWeightNewton / 9.81;
+  return PHI7 * BUFFER_SPEED_RATIO * travelSpeed * Math.sqrt(mass * stiffnessKnPerM * 1000);
+}
+
 /** Maximum moment (N·mm) of two wheel loads P at spacing a on a simply supported span L. */
 export function wheelMoment(load: number, spacing: number, span: number): number {
   return spacing < 0.586 * span
@@ -120,6 +152,7 @@ function checkBeam(
   craneClass: CraneClass,
   railSize: RailSize,
   girder: GirderType,
+  buffer: { readonly travelSpeed: number; readonly stiffness: number },
 ): RunwayCheckRow[] {
   const profile = findProfile(beam.profile);
   if (!profile || !(span > 0)) return [];
@@ -192,6 +225,28 @@ function checkBeam(
   const localLambda = CLASSES[craneClass] * LOCAL_LAMBDA_FACTOR;
   const localCategory = LOCAL_CATEGORIES[girder];
 
+  // Group 7 (§2.11.1): HB,1 shared by nr rails, accidental γ = 1.0, welded stop on the top flange,
+  // axial + bending at the beam centroid (eccentricity h/2 + rail height).
+  const bufferPerRail =
+    (GAMMA_BUFFER * bufferForce(actions.selfWeight, buffer.travelSpeed, buffer.stiffness)) /
+    CRANE_FACTORS.rails;
+  const stopResistance = profile.b * profile.tf * fy;
+  const eccentricity = profile.h / 2 + rail.height;
+  const bufferUtilisation =
+    bufferPerRail / resistance.axial + (bufferPerRail * eccentricity) / resistance.moment;
+
+  // Group 8 (§2.10): Qtest = max(φ6 · 1.1 Qh, 1.25 Qh), φ6 = 0.5 (1 + φ2), γ = 1.1.
+  const hoistLoad = capacity * 9810;
+  const phi6 = 0.5 * (1 + actions.phi2);
+  const testFactor = Math.max(phi6 * DYNAMIC_TEST_FACTOR, STATIC_TEST_FACTOR);
+  const approach = Math.min(Math.max(0, (model.minHookApproach ?? 1) * 1000), craneSpan);
+  const testRail =
+    0.4 * actions.selfWeight +
+    (0.2 * actions.selfWeight + testFactor * hoistLoad) * ((craneSpan - approach) / craneSpan);
+  const testDistributed = (((profile.massPerMetre + rail.mass) * 9.81) / 1000) * GAMMA_TEST;
+  const testMoment =
+    GAMMA_TEST * wheelMoment(testRail / 2, wheelBase, span) + (testDistributed * span ** 2) / 8;
+
   return [
     row(
       'strength',
@@ -207,6 +262,27 @@ function checkBeam(
       longitudinal,
       resistance.axial,
       'N',
+    ),
+    row(
+      'strength',
+      `buffer stop HB,1/nr (group 7, φ7 ${PHI7}, v1 ${round(BUFFER_SPEED_RATIO * buffer.travelSpeed, 3)} m/s, SB ${buffer.stiffness} kN/m, γ ${GAMMA_BUFFER}) vs top-flange weld transfer b tf fy`,
+      bufferPerRail,
+      stopResistance,
+      'N',
+    ),
+    row(
+      'strength',
+      `buffer end-bay N/Npl + N e/Mpl,y (group 7, e ${round(eccentricity, 0)} mm)`,
+      bufferUtilisation,
+      1,
+      '-',
+    ),
+    row(
+      'strength',
+      `test load My/Mpl,y (group 8, γ ${GAMMA_TEST}, Qtest ${round(testFactor, 3)} Qh, φ6 ${round(phi6, 3)})`,
+      testMoment / resistance.moment,
+      1,
+      '-',
     ),
     row(
       'ltb',
@@ -273,6 +349,9 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     '(5) local - EN 1993-6 §5.7.1: leff = 3.25 (Irf/tw)^(1/3), Irf = 0.75 Ir(rail, wear) + If (rail not rigidly ' +
     'fixed, Tab. 5.1 case b), beff = foot + hr + tf <= b, σoz = 1.35 P / (leff tw) <= fy/γM0; local fatigue with λ x 1.26 ' +
     '(2 cycles per passage), φfat 1.05, category 160 (girder rolled) / 71 (welded-full, full-penetration) / 36 (welded-fillet) / γMf 1.15. ' +
+    '(6) buffer forces, load group 7 (§2.11.1): HB,1 = φ7 v1 √(mc SB), φ7 = 1.25 (ξb ≤ 0.5), v1 = 0.7 travelSpeed, mc = crane mass (free hook), SB = bufferStiffness; ' +
+    'shared by the 2 rails, accidental γ = 1.0 (Tab. A.1); rows: stop force vs top-flange weld transfer (b tf fy, stop welded to the top flange) and end-bay axial + bending at the beam centroid (eccentricity h/2 + rail height). ' +
+    '(7) test load, group 8 (§2.10): Qtest = max(φ6 · 1.1, 1.25) Qh, φ6 = 0.5 (1 + φ2), γ = 1.1, bending row. ' +
     'Utilisation > 1 fails. Not covered: torsion, rail-wheel contact, continuity, ' +
     'connections - not a substitute for the engineer of record.',
   paramsSchema: {
@@ -314,6 +393,16 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
         description:
           'Minimum hook approach to the rail in m (>= 0); positions the trolley for the maximum wheel load. Default 1.0.',
       },
+      travelSpeed: {
+        type: 'number',
+        description:
+          'Crane long travel speed in m/s (> 0) for the buffer force HB,1 (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
+      },
+      bufferStiffness: {
+        type: 'number',
+        description:
+          'Buffer spring constant SB in kN/m (> 0) for HB,1 = φ7 v1 √(mc SB). Default 1000 kN/m.',
+      },
       craneClass: {
         type: 'string',
         enum: ['S2', 'S3', 'S4'],
@@ -345,6 +434,8 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
       craneSpan,
       craneSelfWeight,
       minHookApproach = 1,
+      travelSpeed = DEFAULT_TRAVEL_SPEED,
+      bufferStiffness = DEFAULT_BUFFER_STIFFNESS,
       craneClass = 'S3',
       railSize = 'A55',
       girder = 'rolled',
@@ -376,6 +467,8 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     for (const [name, value] of [
       ['craneSpan', craneSpan],
       ['craneSelfWeight', craneSelfWeight],
+      ['travelSpeed', travelSpeed],
+      ['bufferStiffness', bufferStiffness],
     ] as const) {
       if (value !== undefined && !(isFiniteNumber(value) && value > 0)) {
         return noChange(doc, `check_crane_runways failed: ${name} must be a number > 0.`);
@@ -452,6 +545,7 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
         craneClass,
         railSize,
         girder,
+        { travelSpeed, stiffness: bufferStiffness },
       );
       if (beamRows.length === 0) continue;
       beams += 1;

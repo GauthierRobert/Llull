@@ -14,6 +14,7 @@ import type { CadDocument } from '../../../model/types';
 import type { CommandDefinition, CommandResult } from '../../types';
 import { getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import { toCsv } from '../quantities';
+import { findProfile } from '../steel/profiles';
 import { polygonArea } from '../../../../lib/polygon';
 import {
   describeLoads,
@@ -24,11 +25,13 @@ import {
 import {
   baseReactions,
   WIND_CASES,
+  WIND_PRESSURE_CASES,
   type BaseReaction,
   type FrameLoads,
   type LoadCase,
 } from './frameModel';
-import { anchorBoltResistance } from './steelDesign';
+import { anchorBoltResistance, yieldStrength } from './steelDesign';
+import { BEARING_STRENGTH, checkPlateMN } from './basePlateMN';
 
 export interface FoundationRow {
   /** Column mark. */
@@ -81,9 +84,6 @@ const BACKFILL_UNIT_WEIGHT = 18; // kN/m³
 const FRICTION = 0.45;
 /** EN 1997-1 DA2 partial factor on sliding resistance. */
 const GAMMA_R_H = 1.1;
-const FCD = 25 / 1.5; // C25/30, N/mm²
-const CONCENTRATION_FACTOR = 1.5;
-const BEARING_STRENGTH = (2 / 3) * FCD * CONCENTRATION_FACTOR; // N/mm²
 const MAX_UTILISATION = 99;
 const MIN_EFFECTIVE_RATIO = 0.01;
 const TOLERANCE_METRES = 0.1;
@@ -99,16 +99,50 @@ const WATER_UNIT_WEIGHT = 9.81; // kN/m³
 const DEFAULT_CLAY_UNIT_WEIGHT = 19; // kN/m³
 const CONSOLIDATION_SUBLAYERS = 5;
 
-export function combine(reaction: BaseReaction, factors: Factors): { v: number; h: number } {
+/** Factored base reaction: vertical v and horizontal h in kN, base moment m in kN·m (CCW +). */
+export function combine(
+  reaction: BaseReaction,
+  factors: Factors,
+): { v: number; h: number; m: number } {
   let v = 0;
   let h = 0;
+  let m = 0;
   for (const [loadCase, factor] of Object.entries(factors) as [LoadCase, number][]) {
     const forces = reaction.cases[loadCase];
     if (!forces) continue;
     v += (factor * forces.vertical) / 1000;
     h += (factor * forces.horizontal) / 1000;
+    m += (factor * forces.moment) / 1e6;
   }
-  return { v, h };
+  return { v, h, m };
+}
+
+/**
+ * Moment (kN·m, magnitude) the column delivers to the footing about its base: the reaction moment
+ * m on the column acts on the footing reversed, the reaction h at the footing top (height `lever`)
+ * contributes h·lever, so M = |m − h·lever| (both add under wind from either side).
+ */
+export function footingMoment(m: number, h: number, lever: number): number {
+  return Math.abs(m - h * lever);
+}
+
+/** True when any case of the reaction carries a base moment (fixed base). */
+export function hasMoment(reaction: BaseReaction): boolean {
+  return Object.values(reaction.cases).some((forces) => forces.moment !== 0);
+}
+
+/** ULS (N kN compression +, M kN·m) pairs of a column base over every combination, for the base plate. */
+export function plateDemands(
+  reaction: BaseReaction,
+  wind: boolean,
+): Array<{ combination: string; normal: number; moment: number }> {
+  const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
+  return [false, true].flatMap((favourable) =>
+    ultimateCombinations(wind, crane, favourable).map((combination) => {
+      const { v, m } = combine(reaction, combination.factors);
+      return { combination: combination.name, normal: v, moment: Math.abs(m) };
+    }),
+  );
 }
 
 export function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
@@ -116,11 +150,17 @@ export function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
   return forces !== undefined && (forces.vertical !== 0 || forces.horizontal !== 0);
 }
 
+/**
+ * Wind cases of the foundation combinations: the four suction cases plus the windward roof-pressure
+ * cases of steep / flat roofs (absent cases contribute nothing in `combine`).
+ */
+const FOUNDATION_WIND_CASES = [...WIND_CASES, ...WIND_PRESSURE_CASES];
+
 /** SLS characteristic combinations for soil bearing. */
 function serviceCombinations(wind: boolean, crane: boolean): Combination[] {
   const list: Combination[] = [{ name: 'G+S', factors: { G: 1, S: 1 } }];
   if (wind) {
-    for (const { loadCase, label } of WIND_CASES) {
+    for (const { loadCase, label } of FOUNDATION_WIND_CASES) {
       list.push(
         { name: `G+S+0.6${label}`, factors: { G: 1, S: 1, [loadCase]: 0.6 } },
         { name: `G+${label}`, factors: { G: 1, [loadCase]: 1 } },
@@ -149,7 +189,7 @@ export function ultimateCombinations(
   if (favourable) {
     list.push({ name: '1.0G+1.5S', factors: { G: g, S: 1.5 } });
     if (wind) {
-      for (const { loadCase, label } of WIND_CASES) {
+      for (const { loadCase, label } of FOUNDATION_WIND_CASES) {
         list.push({ name: `1.0G+1.5${label}`, factors: { G: g, [loadCase]: 1.5 } });
       }
     }
@@ -165,7 +205,7 @@ export function ultimateCombinations(
   }
   list.push({ name: '1.35G+1.5S', factors: { G: g, S: 1.5 } });
   if (wind) {
-    for (const { loadCase, label } of WIND_CASES) {
+    for (const { loadCase, label } of FOUNDATION_WIND_CASES) {
       list.push({ name: `1.35G+1.5${label}+0.75S`, factors: { G: g, [loadCase]: 1.5, S: 0.75 } });
     }
   }
@@ -354,7 +394,8 @@ export function footingSettlementParts(
   return { elastic, consolidation, total: elastic + consolidation };
 }
 
-function footingRows(
+/** Footing check rows (bearing, uplift, overturning, sliding, settlement) of one column's pad. */
+export function footingRows(
   doc: CadDocument,
   reaction: BaseReaction,
   columnMark: string,
@@ -393,10 +434,10 @@ function footingRows(
 
   const bearing: Candidate[] = [];
   for (const combination of serviceCombinations(wind, crane)) {
-    const { v, h } = combine(reaction, combination.factors);
+    const { v, h, m } = combine(reaction, combination.factors);
     const total = v + weights;
     if (total <= 0) continue;
-    const eccentricity = (Math.abs(h) * lever) / total;
+    const eccentricity = footingMoment(m, h, lever) / total;
     const effective = Math.max(breadth - 2 * eccentricity, MIN_EFFECTIVE_RATIO * breadth);
     const pressure = total / (effective * depthLength);
     bearing.push({
@@ -412,7 +453,7 @@ function footingRows(
   if (wind) {
     const uplift: Candidate[] = [];
     const resisting = 0.9 * weights;
-    const equCombinations: Combination[] = WIND_CASES.map(({ loadCase, label }) => ({
+    const equCombinations: Combination[] = FOUNDATION_WIND_CASES.map(({ loadCase, label }) => ({
       name: `0.9G+1.5${label}`,
       factors: { G: 0.9, [loadCase]: 1.5 },
     }));
@@ -427,6 +468,40 @@ function footingRows(
     }
     const upliftWorst = worst(uplift);
     if (upliftWorst) rows.push(row('uplift EQU (0.9 Gstb vs 0.9G+1.5W)', upliftWorst, 'kN'));
+  }
+
+  if (hasMoment(reaction)) {
+    const overturning: Candidate[] = [];
+    const equ = ultimateCombinations(wind, crane, true).map((combination) => ({
+      ...combination,
+      factors: { ...combination.factors, G: 0.9 },
+    }));
+    for (const combination of equ) {
+      const { v, h, m } = combine(reaction, combination.factors);
+      const destabilising = footingMoment(m, h, lever);
+      const stabilising = Math.max(0, (v + 0.9 * weights) * (breadth / 2));
+      overturning.push({
+        value: destabilising,
+        limit: stabilising,
+        combination: combination.name.replace('1.0G', '0.9G'),
+        utilisation:
+          stabilising > 0
+            ? Math.min(destabilising / stabilising, MAX_UTILISATION)
+            : destabilising > 0
+              ? MAX_UTILISATION
+              : 0,
+      });
+    }
+    const overturningWorst = worst(overturning);
+    if (overturningWorst) {
+      rows.push(
+        row(
+          'overturning EQU (stabilising 0.9G·B/2 vs destabilising moment)',
+          overturningWorst,
+          'kNm',
+        ),
+      );
+    }
   }
 
   const sliding: Candidate[] = [];
@@ -472,6 +547,7 @@ function footingRows(
 
 function plateRows(
   doc: CadDocument,
+  building: BuildingModel,
   reaction: BaseReaction,
   columnMark: string,
   footingMark: string,
@@ -558,6 +634,38 @@ function plateRows(
   if (interactionWorst) {
     rows.push(row('anchor shear + tension (Fv/Fv,Rd + Ft/1.4Ft,Rd)', interactionWorst, '-'));
   }
+  const column = building.elements[plate.memberId];
+  const profile = column?.category === 'member' ? findProfile(column.profile) : undefined;
+  if (plate.fixity === 'fixed' && column?.category === 'member' && profile) {
+    const geometry = {
+      length: toMm(plate.length),
+      width: toMm(plate.width),
+      thickness: toMm(plate.thickness),
+      boltCount: plate.boltCount,
+      boltDiameter: toMm(plate.boltDiameter),
+      columnDepth: profile.h,
+    };
+    const fy = yieldStrength(plate.material);
+    const moments: Array<Candidate & { detail: string }> = plateDemands(reaction, wind).map(
+      (demand) => {
+        const verdict = checkPlateMN(geometry, demand.normal, demand.moment, fy);
+        return {
+          value: verdict.boltTension,
+          limit: verdict.boltLimit,
+          combination: demand.combination,
+          utilisation: verdict.utilisation,
+          detail: `N ${demand.normal.toFixed(0)} kN, M ${demand.moment.toFixed(0)} kNm: ${verdict.check}`,
+        };
+      },
+    );
+    const momentWorst = moments.reduce<(Candidate & { detail: string }) | null>(
+      (best, item) => (best === null || item.utilisation > best.utilisation ? item : best),
+      null,
+    );
+    if (momentWorst) {
+      rows.push(row(`base plate M+N (${momentWorst.detail})`, momentWorst, 'kN/bolt'));
+    }
+  }
   return rows;
 }
 
@@ -602,6 +710,49 @@ function differentialRows(
   return best ? [best] : [];
 }
 
+/** Weight (kN) of the ground slabs of a level (their friction is shared per column for tied frames). */
+export function groundSlabWeight(
+  doc: CadDocument,
+  building: BuildingModel,
+  levelId: string,
+): number {
+  return Object.values(building.elements).reduce(
+    (sum, element) =>
+      element.category === 'slab' && element.levelId === levelId
+        ? sum +
+          CONCRETE_UNIT_WEIGHT *
+            polygonArea(
+              element.boundary.map(([x, y]): [number, number] => [
+                toMetres(doc, x),
+                toMetres(doc, y),
+              ]),
+            ) *
+            toMetres(doc, element.thickness)
+        : sum,
+    0,
+  );
+}
+
+/** Horizontal force (kN) resisted by one pad: shared across the frame columns when `thrustTie`. */
+export function slidingHorizontalOf(
+  reactions: ReadonlyArray<BaseReaction>,
+  reaction: BaseReaction,
+  thrustTie: boolean,
+): (factors: Factors) => number {
+  const siblings = reactions.filter((other) => other.frame === reaction.frame);
+  return (factors) =>
+    thrustTie
+      ? siblings.reduce((sum, other) => sum + combine(other, factors).h, 0) / siblings.length
+      : combine(reaction, factors).h;
+}
+
+/** Tie / slab assumed by default when the level has a slab element. */
+export function defaultThrustTie(doc: CadDocument, levelId: string): boolean {
+  return Object.values(getBuilding(doc).elements).some(
+    (element) => element.category === 'slab' && element.levelId === levelId,
+  );
+}
+
 /**
  * Checks footings and base plates of the columns of a level.
  * @pure
@@ -624,24 +775,7 @@ export function checkFoundations(
   const reactions = baseReactions(doc, building, levelId, loads);
   const checkedFootings = new Set<string>();
   const tieDone = new Set<string>();
-  // Tied frames: the ground slab (cast around the columns) adds its friction, shared per column.
-  const slabWeight = thrustTie
-    ? Object.values(building.elements).reduce(
-        (sum, element) =>
-          element.category === 'slab' && element.levelId === levelId
-            ? sum +
-              CONCRETE_UNIT_WEIGHT *
-                polygonArea(
-                  element.boundary.map(([x, y]): [number, number] => [
-                    toMetres(doc, x),
-                    toMetres(doc, y),
-                  ]),
-                ) *
-                toMetres(doc, element.thickness)
-            : sum,
-        0,
-      )
-    : 0;
+  const slabWeight = thrustTie ? groundSlabWeight(doc, building, levelId) : 0;
   const settlements: Array<{
     frame: string;
     x: number;
@@ -654,10 +788,7 @@ export function checkFoundations(
     const column = building.elements[reaction.columnId];
     if (column?.category !== 'member') continue;
     const siblings = reactions.filter((other) => other.frame === reaction.frame);
-    const slidingHorizontal = (factors: Factors): number =>
-      thrustTie
-        ? siblings.reduce((sum, other) => sum + combine(other, factors).h, 0) / siblings.length
-        : combine(reaction, factors).h;
+    const slidingHorizontal = slidingHorizontalOf(reactions, reaction, thrustTie);
     const footing = findFooting(doc, building, levelId, column);
     const plate = findPlate(building, column.id);
     if (thrustTie && !tieDone.has(reaction.frame) && (footing || plate)) {
@@ -715,7 +846,9 @@ export function checkFoundations(
     }
     if (plate) {
       plates += 1;
-      rows.push(...plateRows(doc, reaction, column.mark, footing?.mark ?? '—', plate, wind));
+      rows.push(
+        ...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind),
+      );
     }
   }
   rows.push(...differentialRows(doc, settlements));
@@ -756,8 +889,12 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
     '1.35G + 1.5S / wind / crane combinations vs fjd = 2/3 × 1.5 × fcd (C25/30, fcd 16.7 N/mm²) over ' +
     'the whole plate area, anchor tension (uplift shared by all bolts vs 0.9 fub As / 1.25) and ' +
     'bolt shear + tension interaction (shear αbc fub As / 1.25 with αbc = 0.44 − 0.0003 fyb, threads ' +
-    'in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), always grade 8.8. Simplifications: pinned ' +
-    'bases (no moment), horizontal force taken at the plate level, bending in the smaller footing ' +
+    'in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), always grade 8.8. Fixed column bases (base plates ' +
+    "with fixity 'fixed', add_portal_frame_building columnBase) add the base moment: bearing eccentricity " +
+    'e = (M + H·lever) / (V + W), an overturning EQU row (stabilising 0.9G·B/2 vs destabilising moment) and a ' +
+    "'base plate M+N' row (concrete bearing block fjd, tension anchor bolts Ft = (M − N zc)/z, plate bending; " +
+    'EN 1993-1-8 §6.2.8 simplified; design_portal_frames sizes the plate). Simplifications: pinned ' +
+    'bases have no moment, horizontal force taken at the plate level, bending in the smaller footing ' +
     'side, no biaxial effects, no backfill reduction for the column, no friction in the anchor ' +
     'shear check, no footing reinforcement or punching (see design_footings). (5) Elastic settlement of each pad under SLS G+S, s = q B (1 − ν²) Is / Es (net pressure q − 18 kN/m³ × founding depth, i.e. footing + backfill weight replaces excavated soil; Is 0.88 rigid square, ν 0.3, Es = `soilModulus`, default 20 MPa) vs 25 mm, plus the worst differential settlement between adjacent columns of a frame vs L/500. With the optional `clayLayer` the primary consolidation of a clay layer below the footing (5 sublayers, groundwater at the founding level, γ′ = unitWeight − 9.81, σ′0 = 18 kN/m³ × founding depth + γ′ z, Δσ by 2:1 spreading, s = Σ Cc h/(1+e0) log10((σ′0+Δσ)/σ′0), Cr up to preconsolidationPressure and Cc beyond) is added to the elastic settlement (same 25 mm limit, row text gives both parts) and feeds the differential row. Returns one row per check ' +
     'and column (worst combination); utilisation > 1 fails. Not a substitute for a geotechnical ' +
@@ -848,11 +985,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
         'check_foundations failed: tieCapacity must be a number > 0 (kN) and thrustTie a boolean.',
       );
     }
-    const thrustTie =
-      params.thrustTie ??
-      Object.values(getBuilding(doc).elements).some(
-        (element) => element.category === 'slab' && element.levelId === levelId,
-      );
+    const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
     const { rows, footings, plates, unchecked } = checkFoundations(
       doc,
       levelId,
@@ -906,7 +1039,7 @@ export const foundationCheck: CommandDefinition<FoundationCheckParams> = {
           : '') +
         `max utilisation ${round(worstRow.utilisation)} (${worstRow.column} ${worstRow.check}, ${worstRow.combination}); ` +
         (failures.length === 0
-          ? 'all OK (pinned bases, no reinforcement check).'
+          ? 'all OK (no reinforcement check).'
           : `${failures.length} failure(s): ${failures
               .slice(0, 8)
               .map((row) => `${row.column} ${row.check} ${round(row.utilisation)}`)

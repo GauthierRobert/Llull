@@ -33,7 +33,7 @@ Building panel, _Check clashes_ lists them; click a row to select both elements.
 ## Structural check and design
 
 `check_portal_frames` (read-only) solves every portal frame of a level as a 2D frame (direct
-stiffness method, pinned bases, section properties from the profile outline — no root radii,
+stiffness method, pinned bases (or fixed with `columnBase: 'fixed'`), section properties from the profile outline — no root radii,
 ≈ 4–5 % conservative; haunches are not counted as stiffening) for every EN 1990 combination of:
 
 - **G** — roof dead load (`deadLoad`, kN/m²) on the tributary width + member self-weight + runway
@@ -90,6 +90,19 @@ bending at the base plate face (minimum steel, bar H12–H25 at 100–250 mm), o
 punching at 2d; footings that fail shear or punching are reported "increase thickness". The bars
 go to the footing schedule and the rebar mass to the takeoff. `check_foundations` adds elastic
 settlement (`soilModulus`, 25 mm) and differential settlement between frame columns (L/500).
+
+### Design workflow
+
+Run the design commands in order — each one sizes what the next one checks:
+
+1. `design_portal_frames` — frame sections, connection bolt groups, fixed base plates (M + N).
+2. `design_purlins` — purlin and side rail profiles.
+3. `design_footings` — pad plan size, thickness and reinforcement from the final base reactions.
+4. Verify with `check_portal_frames`, `check_bracing`, `check_purlins`, `check_foundations` and
+   `check_crane_runways` using the same loads.
+
+Crane halls are best built with `columnBase: 'fixed'`: rail-level sway (h/400) otherwise drives
+pinned frames to very heavy sections.
 
 ## Site and fabrication deliverables
 

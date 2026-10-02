@@ -11,6 +11,55 @@ import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
 import { toCsv } from '../quantities';
 import { findProfile, sectionProperties, type SteelProfile } from '../steel/profiles';
 import { bucklingReduction, E_STEEL, sectionResistance, yieldStrength } from './steelDesign';
+import { CRANE_FACTORS, craneActions, craneCapacityOf } from './frameModel';
+import {
+  bufferForce,
+  DEFAULT_BUFFER_STIFFNESS,
+  DEFAULT_TRAVEL_SPEED,
+  GAMMA_BUFFER,
+} from './runwayCheck';
+
+/** ULS factor on the crane drive force HL (permanent-type variable crane action, groups 1 and 5). */
+const GAMMA_CRANE = 1.35;
+/** Bridge span (mm) when only one runway line is found. */
+const DEFAULT_CRANE_SPAN = 20000;
+
+/** Crane longitudinal design force (kN) acting at rail level on the wall that carries one runway. */
+export interface CraneWallForce {
+  /** 1.35 · HL,i (group 1/5 drive force of one rail), kN. */
+  readonly driveGroup1: number;
+  /** γ · HB,1 / nr (group 7 buffer force of one rail, accidental γ = 1.0), kN. */
+  readonly bufferGroup7: number;
+  readonly design: number;
+  readonly governing: 'group 1' | 'group 7';
+}
+
+/**
+ * Longitudinal crane force per runway line: max(1.35 HL,i, γ HB,1/nr).
+ * @param spanMm bridge span between the rails
+ */
+export function craneWallForce(
+  capacityTonnes: number,
+  spanMm: number,
+  craneSelfWeight: number | undefined,
+  travelSpeed: number,
+  bufferStiffness: number,
+): CraneWallForce {
+  const actions = craneActions(capacityTonnes, spanMm, {
+    ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}),
+  });
+  const driveGroup1 = (GAMMA_CRANE * actions.group1.longitudinal) / 1000;
+  const bufferGroup7 =
+    (GAMMA_BUFFER * bufferForce(actions.selfWeight, travelSpeed, bufferStiffness)) /
+    CRANE_FACTORS.rails /
+    1000;
+  return {
+    driveGroup1,
+    bufferGroup7,
+    design: Math.max(driveGroup1, bufferGroup7),
+    governing: bufferGroup7 > driveGroup1 ? 'group 7' : 'group 1',
+  };
+}
 
 /** EN 1990 partial factor for variable (wind) actions. */
 const GAMMA_Q = 1.5;
@@ -54,6 +103,10 @@ interface CheckBracingParams {
   windPressure?: number;
   deadLoad?: number;
   snowLoad?: number;
+  craneCapacity?: number;
+  craneSelfWeight?: number;
+  travelSpeed?: number;
+  bufferStiffness?: number;
   levelId?: string;
 }
 
@@ -119,8 +172,19 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
     'walls: panel shear V = w·(W/2 − d) (w = bay force / W, d = distance of the panel edge from the ' +
     'nearest wall), so wall-side panels carry about half the bay force. Struts: wall = column, Lcr = ' +
     'column height; roof = rafter, Lcr = purlin gap along the rafter; plus the eaves purlin carrying ' +
-    'the truss reaction (bay force / 2) with Lcr = bay length (row flagged utilisation 99 if absent).' +
-    ' Rows are grouped (roof bracing, wall bracing per side, gable posts); utilisation > 1 ' +
+    'the truss reaction (bay force / 2) with Lcr = bay length (row flagged utilisation 99 if absent). ' +
+    'On multi-span halls the internal column lines carry no wall bracing, so the roof truss still spans ' +
+    'the full hall width and the reaction (bay force / 2) acts at the two OUTER wall lines only: the ' +
+    'eaves-strut force equals that of a single-span hall of the same gable area (it grows with the gable, ' +
+    'e.g. a monopitch gable is larger than a duopitch one), and a light eaves purlin such as the default ' +
+    'C200x75x2.5 over a 6 m bay (about 36 kN) can fail at qp above about 0.7 kN/m²: fit a heavier eaves ' +
+    'purlin (update_steel_member) rather than treating the force as an error.' +
+    ' Crane longitudinal path (runway beams, role crane, on a long wall): per runway line the force at rail level is max(1.35 HL,i = ' +
+    '1.35 φ5 K/nr of groups 1/5, HB,1/nr of group 7 with accidental γ = 1.0, HB,1 = 1.25 · 0.7 travelSpeed · √(mc SB), crane mass only) ' +
+    'and is added to the shear of the wall X-bracing panels on that side (shared equally by the braced bays of that wall; ' +
+    'assumes the existing wall X-bracing takes it, no separate crane bracing below the rail). Rows "crane longitudinal (group 1 / group 7)" ' +
+    'report the crane-only part; data.crane gives the horizontal force (along y) at the foundations of the braced-bay columns. ' +
+    'Rows are grouped (roof bracing, wall bracing per side, gable posts); utilisation > 1 ' +
     'fails. Not covered: frame action, uplift, self-weight, connections - a preliminary check.',
   paramsSchema: {
     type: 'object',
@@ -138,6 +202,24 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
         type: 'number',
         description: 'Roof snow load, kN/m², for the stabilising force only. Default 0.8.',
       },
+      craneCapacity: {
+        type: 'number',
+        description:
+          'Crane capacity in tonnes (> 0) for the crane longitudinal force. Default: read from the runway beam notes (add_crane_runway); no runway and no value = no crane force.',
+      },
+      craneSelfWeight: {
+        type: 'number',
+        description: 'Crane self-weight Gc in kN (> 0). Default 0.5 Q + 20 kN.',
+      },
+      travelSpeed: {
+        type: 'number',
+        description:
+          'Crane long travel speed in m/s (> 0) for the buffer force (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
+      },
+      bufferStiffness: {
+        type: 'number',
+        description: 'Buffer spring constant SB in kN/m (> 0). Default 1000.',
+      },
       levelId: { type: 'string', description: 'Level id. Default: the active level.' },
     },
     required: [],
@@ -147,6 +229,18 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
     const nonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
     if (!nonNegative(windPressure) || !nonNegative(deadLoad) || !nonNegative(snowLoad)) {
       return noChange(doc, 'check_bracing failed: windPressure, deadLoad, snowLoad must be >= 0.');
+    }
+    const { travelSpeed = DEFAULT_TRAVEL_SPEED, bufferStiffness = DEFAULT_BUFFER_STIFFNESS } =
+      params;
+    for (const [name, value] of [
+      ['craneCapacity', params.craneCapacity],
+      ['craneSelfWeight', params.craneSelfWeight],
+      ['travelSpeed', travelSpeed],
+      ['bufferStiffness', bufferStiffness],
+    ] as const) {
+      if (value !== undefined && !(isFiniteNumber(value) && value > 0)) {
+        return noChange(doc, `check_bracing failed: ${name} must be a number > 0.`);
+      }
     }
     const building = getBuilding(doc);
     const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
@@ -227,6 +321,39 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       [...panels.values()].filter((panel) => panel.bay === bay && !panel.roof).length;
     const bayForce = roofForce / bays.size;
 
+    // Crane longitudinal path: one runway line per carrying wall, force at rail level.
+    const runways = members.filter(({ member }) => member.role === 'crane');
+    const craneCapacity =
+      params.craneCapacity ??
+      runways.map(({ member }) => craneCapacityOf(member)).find((value) => value !== null) ??
+      null;
+    const runwayXs = runways.map(({ start }) => start[0]);
+    const craneSpan =
+      runwayXs.length > 0 && Math.max(...runwayXs) - Math.min(...runwayXs) > 1000
+        ? Math.max(...runwayXs) - Math.min(...runwayXs)
+        : DEFAULT_CRANE_SPAN;
+    const craneForce =
+      craneCapacity !== null && runways.length > 0
+        ? craneWallForce(
+            craneCapacity,
+            craneSpan,
+            params.craneSelfWeight,
+            travelSpeed,
+            bufferStiffness,
+          )
+        : null;
+    const craneSides = new Set(runways.map(({ start }) => (start[0] <= centre ? 'west' : 'east')));
+    const wallPanelsOnSide = (side: string): number =>
+      [...panels.values()].filter((panel) => panel.group === `wall bracing ${side}`).length;
+    const craneShareOf = (panel: Panel): number => {
+      const side = panel.group.endsWith('west') ? 'west' : 'east';
+      return craneForce !== null && !panel.roof && craneSides.has(side)
+        ? craneForce.design / wallPanelsOnSide(side)
+        : 0;
+    };
+    const craneFoundation: { side: string; braced: number; total: number; perColumn: number }[] =
+      [];
+
     // Roof strut = rafter braced laterally by purlins: largest purlin gap along the slope.
     const purlins = members.filter(({ member }) => member.role === 'purlin');
     const purlinGapAlong = (rafter: Located, bayStart: number, bayEnd: number): number => {
@@ -270,9 +397,10 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       const xLow = Math.min(start[0], end[0]);
       const xHigh = Math.max(start[0], end[0]);
       const hallWidth = x1 - x0;
+      const craneShare = craneShareOf(panel);
       const shear = panel.roof
         ? (bayForce * (hallWidth / 2 - Math.max(0, Math.min(xLow - x0, x1 - xHigh)))) / hallWidth
-        : bayForce / bayWallPanels(panel.bay);
+        : bayForce / bayWallPanels(panel.bay) + craneShare;
       const tension = (shear * length) / dy;
       const fy = yieldStrength(member.material);
       const npl = sectionResistance(profile, fy).axial / 1000;
@@ -290,6 +418,29 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
         utilisation: tension / npl,
         check: `tension-only ${member.profile}: V ${shear.toFixed(1)} kN / cos θ ${(dy / length).toFixed(2)} = ${tension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (bay ${panel.bay} mm)`,
       });
+      if (craneForce !== null && craneShare > 0) {
+        const craneTension = (craneShare * length) / dy;
+        const side = panel.group.endsWith('west') ? 'west' : 'east';
+        rows.push({
+          group: panel.group,
+          elementId: member.id,
+          elementIds: ids,
+          mark: member.mark,
+          kind: 'diagonal',
+          force: craneTension,
+          resistance: npl,
+          moment: 0,
+          momentResistance: 0,
+          utilisation: craneTension / npl,
+          check: `crane longitudinal (group 1 / group 7): ${craneForce.governing} governs, 1.35 HL ${craneForce.driveGroup1.toFixed(1)} kN vs HB (γ 1.0) ${craneForce.bufferGroup7.toFixed(1)} kN per runway, share ${craneShare.toFixed(1)} kN on bay ${panel.bay} mm, tension ${craneTension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (included in the wall bracing row above)`,
+        });
+        craneFoundation.push({
+          side,
+          braced: wallPanelsOnSide(side),
+          total: craneShare,
+          perColumn: craneShare / 2,
+        });
+      }
       // Compression strut: rafter (roof) / column (wall) at either end of the bay.
       const [bayStart, bayEnd] = [Math.min(start[1], end[1]), Math.max(start[1], end[1])];
       const strut = panel.roof
@@ -331,13 +482,17 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
       const atWall = panel.roof && (near(xLow, x0) || near(xHigh, x1));
       if (atWall) {
         const wallX = near(xLow, x0) ? x0 : x1;
+        // Eaves level of this wall (monopitch: the low and the high eaves differ).
+        const eavesZ = Math.min(
+          ...rafterEnds.filter((point) => near(point[0], wallX)).map((point) => point[2]),
+        );
         const eavesStrut = members.find(
           ({ member: candidate, start: s, end: e }) =>
             candidate.role === 'purlin' &&
             Math.abs(s[0] - wallX) < EAVES_X_TOLERANCE &&
             near(Math.min(s[1], e[1]), bayStart) &&
             near(Math.max(s[1], e[1]), bayEnd) &&
-            Math.abs(s[2] - Math.min(...rafterEnds.map((point) => point[2]))) < EAVES_Z_TOLERANCE,
+            Math.abs(s[2] - eavesZ) < EAVES_Z_TOLERANCE,
         );
         const reaction = bayForce / 2;
         const fyEaves = eavesStrut ? yieldStrength(eavesStrut.member.material) : 0;
@@ -356,7 +511,7 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
           momentResistance: 0,
           utilisation: eavesStrut ? reaction / eavesResistance : NO_MEMBER_UTILISATION,
           check: eavesStrut
-            ? `eaves strut ${eavesStrut.member.profile} compression ${reaction.toFixed(1)} kN (truss reaction) ≤ χ·Npl,Rd ${eavesResistance.toFixed(1)} kN (minor axis, Lcr ${dy.toFixed(0)} mm bay)`
+            ? `eaves strut ${eavesStrut.member.profile} compression ${reaction.toFixed(1)} kN (truss reaction at the outer wall line, independent of the number of spans) ≤ χ·Npl,Rd ${eavesResistance.toFixed(1)} kN (minor axis, Lcr ${dy.toFixed(0)} mm bay)`
             : `no eaves strut found at x ${round(wallX, 0)} mm in bay ${panel.bay} mm: truss reaction ${reaction.toFixed(1)} kN has no compression member`,
         });
       }
@@ -457,6 +612,16 @@ export const checkBracing: CommandDefinition<CheckBracingParams> = {
         roofForce,
         stabilityForce: stability,
         bracedBays: bays.size,
+        crane:
+          craneForce === null
+            ? null
+            : {
+                ...craneForce,
+                capacityTonnes: craneCapacity,
+                spanMm: craneSpan,
+                runwaySides: [...craneSides],
+                foundationHorizontalY: craneFoundation,
+              },
       },
     };
   },

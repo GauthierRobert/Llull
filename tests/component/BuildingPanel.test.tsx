@@ -225,6 +225,12 @@ describe('BuildingPanel', () => {
     expect(useStore.getState().document.selection.length).toBeGreaterThan(0);
     fireEvent.click(screen.getByTestId('frame-design'));
     fireEvent.click(screen.getByTestId('footing-design'));
+    fireEvent.click(screen.getByTestId('purlin-design'));
+    expect(dispatch).toHaveBeenCalledWith('design_purlins', {
+      roofDeadLoad: 0.5,
+      snowLoad: 1,
+      windPressure: 0.6,
+    });
     expect(dispatch).toHaveBeenCalledWith('design_footings', {
       deadLoad: 0.5,
       snowLoad: 1,

@@ -21,12 +21,13 @@ import { connectionSolids } from './evaluate';
 import {
   framesOf,
   solveCombination,
-  WIND_CASES,
+  windCasesOf,
   HOISTING_CLASSES,
   type CraneModel,
   type FrameLoads,
   type HoistingClass,
   type FrameModel,
+  type WindCase,
   type LoadCase,
 } from './frameModel';
 import { boltResistance, memberBuckling, sectionResistance, yieldStrength } from './steelDesign';
@@ -58,12 +59,16 @@ interface Combination {
 }
 
 /** EN 1990 6.10 combinations (ψ0: snow 0.5, wind 0.6; crane γ = 1.35). */
-function ultimateCombinations(wind: boolean, crane: boolean): Combination[] {
+function ultimateCombinations(
+  wind: boolean,
+  crane: boolean,
+  windCases: ReadonlyArray<WindCase>,
+): Combination[] {
   const combinations: Combination[] = [
     { name: '1.35G+1.5S (→)', factors: { G: 1.35, S: 1.5 }, sway: 1 },
     { name: '1.35G+1.5S (←)', factors: { G: 1.35, S: 1.5 }, sway: -1 },
   ];
-  const winds = WIND_CASES.map((windCase) => ({
+  const winds = windCases.map((windCase) => ({
     load: windCase.loadCase,
     label: windCase.label,
     sway: windCase.from === 'left' ? (1 as const) : (-1 as const),
@@ -290,7 +295,7 @@ export function checkFrames(
   const { frames, skipped } = framesOf(doc, building, levelId, loads);
   const wind = loads.windPressure > 0;
   const crane = frames.some((frame) => frame.craneNodes.length > 0);
-  const combinations = ultimateCombinations(wind, crane);
+  const combinations = ultimateCombinations(wind, crane, windCasesOf(frames));
   const worst = new Map<string, CheckRow>();
   const keep = (row: CheckRow, key = row.elementId): void => {
     const current = worst.get(key);
@@ -442,7 +447,7 @@ export function checkFrames(
     }[] = [];
     if (wind) {
       swayCases.push(
-        ...WIND_CASES.map((windCase) => ({
+        ...windCasesOf([frame]).map((windCase) => ({
           name: `SLS ${windCase.label}`,
           factors: { [windCase.loadCase]: 1 },
           crane: false,
@@ -521,7 +526,8 @@ export const FRAME_LOAD_PROPERTIES = {
     type: 'number',
     description:
       'Peak velocity pressure qp, kN/m² (EN 1991-1-4; e.g. 0.6–1.0). Default 0 = wind not applied. ' +
-      'Coefficients: walls cpe +0.8 / −0.5, roof −0.6, each with internal pressure cpi +0.2 and −0.3.',
+      'Coefficients: walls cpe +0.8 / −0.5, roof −0.6 (monopitch roofs, EN 1991-1-4 Tab. 7.3a zone H: −0.6 with ' +
+      'wind on the low eaves, −0.8 on the high eaves), each with internal pressure cpi +0.2 and −0.3.',
   },
   craneCapacity: {
     type: 'number',
@@ -634,7 +640,7 @@ export const checkPortalFrames: CommandDefinition<FrameLoadParams> = {
   annotations: { readOnly: true, idempotent: true },
   description:
     'Structural check of the steel portal frames of a level. Each frame (rafters in a vertical ' +
-    'plane + the columns under them, pinned bases) is solved as a 2D frame (direct stiffness, ' +
+    "plane + the columns under them; bases pinned, or fixed when the base plates have columnBase 'fixed') is solved as a 2D frame (direct stiffness, " +
     'section properties from the profile outline, no root radii) for every EN 1990 combination of ' +
     'dead G (deadLoad + self-weight), snow S, wind W (windPressure, both directions, incl. uplift) ' +
     'and crane C (from add_crane_runway capacity, EN 1991-3 load groups 1 and 5: wheel reactions by statics ' +

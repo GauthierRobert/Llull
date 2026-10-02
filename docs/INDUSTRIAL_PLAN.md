@@ -150,3 +150,37 @@ Each step ships with unit tests and is covered by the Playwright suite.
 - [ ] **I37 — Multi-span roof wind.** EN 1991-1-4 §7.2.7: windward span with the duopitch
       coefficients, downwind spans reduced (factor 0.6 on suction for the downwind roofs per
       Fig. 7.10), internal valleys; frame and purlin checks use them.
+
+## Phase 10 — fixed bases, monopitch roofs
+
+- [x] **I38 — Fixed column bases.** `add_portal_frame_building` / base plates: `columnBase:
+      'pinned' | 'fixed'`. Fixed bases restrain rotation in the frame analysis (sway stiffness for
+      crane halls), carry base moments into `baseReactions`, size the base plate and anchor bolts
+      for M + N (EN 1993-1-8 §6.2.8, T-stub tension zone simplified), and the footing checks /
+      design take the moment (eccentric bearing, overturning).
+- [x] **I39 — Monopitch roofs.** `add_portal_frame_building` `roofType: 'duopitch' | 'monopitch'`
+      (single slope from the low to the high eaves); wind with EN 1991-1-4 Tab. 7.3a monopitch
+      coefficients (zones F / G / H for wind on the high and the low eaves) in the frame and purlin
+      checks; elevations, IFC and quantities work unchanged.
+
+## Phase 11 — automatic sizing of foundations and secondary steel
+
+- [x] **I40 — Pad sizing.** `design_footings` sizes the pad plan dimensions and thickness (not only
+      the reinforcement) so bearing (with base moments), overturning, uplift, sliding, shear and
+      punching pass — essential for fixed bases.
+- [x] **I41 — Purlin / rail design.** `design_purlins`: up-sizes purlin and rail profiles (per zone
+      group, keeping rows uniform) until `check_purlins` passes, and re-seats them on the rafters /
+      columns.
+- [x] **I42 — Bracing strut on multi-span halls.** Find and fix the eaves-strut force reported on
+      two-span (monopitch) halls.
+
+## Phase 12 — wind over the full pitch range, longitudinal crane actions
+
+- [x] **I43 — Wind coefficients for every roof the generator makes.** One `windCoefficients.ts`:
+      flat roofs (EN 1991-1-4 §7.2.3, pitch < 5°), monopitch Tab. 7.3a and duopitch Tab. 7.4a/b
+      over −5°…45° with linear interpolation, including the positive-pressure cases on steep
+      windward slopes; frame, purlin and bracing checks read from it.
+- [x] **I44 — Longitudinal crane actions.** Drive forces HL (group 1), buffer forces HB (load
+      group 7, EN 1991-3 §2.11, φ7) and the test load (group 8, φ6): runway end stops, runway
+      beams in axial load, and the wall bracing of the crane bay (`check_bracing` adds the crane
+      longitudinal force path to the foundations).

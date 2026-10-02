@@ -282,6 +282,10 @@ function elementErrors(
     if (!(typeof bolts === 'number' && Number.isInteger(bolts) && bolts % 2 === 0)) {
       errors.push(`building element ${key}: boltCount must be an even integer`);
     }
+    const fixity = element['fixity'];
+    if (fixity !== undefined && fixity !== 'pinned' && fixity !== 'fixed') {
+      errors.push(`building element ${key}: fixity must be pinned or fixed`);
+    }
   }
   if (category === 'door' || category === 'window') {
     const hostId = element['hostId'];

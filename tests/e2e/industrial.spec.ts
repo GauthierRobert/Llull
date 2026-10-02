@@ -281,4 +281,85 @@ test.describe('industrial workflow', () => {
     expect(nc.text).toMatch(/^ST/m);
     await expect(page.getByTestId('building-export-status')).toContainText('DSTV NC1:');
   });
+
+  test('I38 — a fixed-base crane hall designs lighter than a pinned one', async ({ page }) => {
+    await openBuilding(page);
+    const hallFields = {
+      span: '24000',
+      length: '30000',
+      cladding: 'false',
+      craneRailHeight: '6000',
+    };
+    await applyTool(page, 'hall', hallFields);
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s)');
+    await expect(page.getByTestId('takeoff-member.HEB500.kg')).toBeVisible();
+
+    await openBuilding(page);
+    await applyTool(page, 'hall', { ...hallFields, columnBase: 'fixed' });
+    await expect(status(page)).toContainText('fixed column bases');
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('fixed bases: plate');
+    await expect(page.getByTestId('takeoff-member.HEB500.kg')).toHaveCount(0);
+    await expect(page.getByTestId('takeoff-member.HEA400.kg')).toBeVisible();
+    await page.getByTestId('frame-check').click();
+    await expect(page.getByTestId('frame-check-summary')).toContainText('all OK');
+    await page.getByTestId('foundation-check').click();
+    // Moment bases need wider pads than the generated ones: the check reports the eccentric pressure.
+    await expect(page.getByTestId('frame-check-summary')).toContainText('overturning EQU');
+  });
+
+  test('I39 — a monopitch hall is generated, designed and checked', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', {
+      span: '24000',
+      length: '30000',
+      roofType: 'monopitch',
+      cladding: 'false',
+    });
+    await expect(status(page)).toContainText('eaves 7.00 m, high eaves 9.52 m');
+    await expect(status(page)).toContainText('monopitch roof');
+    await expect(elementRows(page, 'connection')).toHaveCount(12);
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.5');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s)');
+    await page.getByTestId('frame-check').click();
+    const summary = page.getByTestId('frame-check-summary');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('purlin-check').click();
+    await expect(summary).toContainText('Purlin check (qp 0.5 kN/m²');
+    await expect(summary).toContainText('all OK');
+    await page.getByTestId('bracing-check').click();
+    await expect(summary).toContainText('all OK');
+  });
+
+  test('full design workflow — fixed-base crane hall passes every check', async ({ page }) => {
+    await openBuilding(page);
+    await applyTool(page, 'hall', {
+      span: '24000',
+      length: '30000',
+      cladding: 'false',
+      craneRailHeight: '6000',
+      columnBase: 'fixed',
+    });
+    await page.getByLabel('Wind pressure qp (kN/m²)').fill('0.7');
+    await page.getByTestId('frame-design').click();
+    await expect(status(page)).toContainText('Designed 6 frame(s)');
+    await page.getByTestId('purlin-design').click();
+    await page.getByTestId('footing-design').click();
+    await expect(status(page)).toContainText('Designed 12 of 12 footing(s)');
+    const summary = page.getByTestId('frame-check-summary');
+    for (const check of [
+      'frame-check',
+      'bracing-check',
+      'purlin-check',
+      'foundation-check',
+      'runway-check',
+    ]) {
+      await page.getByTestId(check).click();
+      await expect(summary).toContainText('all OK');
+    }
+  });
 });

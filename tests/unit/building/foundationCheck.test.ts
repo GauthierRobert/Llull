@@ -374,7 +374,11 @@ describe('crane load groups in the foundation combinations (EN 1991-3 Tab. 2.2)'
       expect.arrayContaining(['1.0G+1.35C(right)', '1.0G+1.35C5(left)', '1.0G+1.35C5(right)']),
     );
     expect(ultimateCombinations(false, false, false)).toHaveLength(1);
-    expect(ultimateCombinations(true, true, false)).toHaveLength(1 + 4 + 4);
+    // 1 gravity + 6 wind (4 suction + 2 roof-pressure cases) + 4 crane.
+    expect(ultimateCombinations(true, true, false)).toHaveLength(1 + 6 + 4);
+    expect(
+      ultimateCombinations(true, false, false).map((combination) => combination.name),
+    ).toContain('1.35G+1.5W→(roof pressure)+0.75S');
   });
 
   it('checks the default crane hall with the group 5 combinations', () => {

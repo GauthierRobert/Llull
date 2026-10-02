@@ -224,6 +224,15 @@ export const addCraneRunway: CommandDefinition<AddCraneRunwayParams> = {
   },
 };
 
+/** One roof slope of a span: from its low end at a column line up to its high end. */
+interface Slope {
+  readonly side: -1 | 1;
+  readonly lowX: number;
+  readonly lowZ: number;
+  readonly highX: number;
+  readonly highZ: number;
+}
+
 interface PortalHallParams {
   origin?: Vec2;
   span?: number;
@@ -232,6 +241,7 @@ interface PortalHallParams {
   baySpacing?: number;
   eaveHeight?: number;
   roofPitch?: number;
+  roofType?: 'duopitch' | 'monopitch';
   columnProfile?: string;
   rafterProfile?: string;
   purlinProfile?: string;
@@ -242,6 +252,7 @@ interface PortalHallParams {
   railSpacing?: number;
   footings?: boolean;
   basePlates?: boolean;
+  columnBase?: 'pinned' | 'fixed';
   connections?: boolean;
   cladding?: boolean;
   floorSlab?: boolean;
@@ -297,7 +308,17 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         description: 'Target frame spacing; adjusted to divide the length. Default 6000 mm.',
       },
       eaveHeight: { type: 'number', description: 'Column height to the eaves. Default 7000 mm.' },
-      roofPitch: { type: 'number', description: 'Roof slope in degrees (duo-pitch). Default 6.' },
+      roofPitch: { type: 'number', description: 'Roof slope in degrees. Default 6.' },
+      roofType: {
+        type: 'string',
+        enum: ['duopitch', 'monopitch'],
+        description:
+          "Roof shape: 'duopitch' (default: ridge mid-span, eaveHeight at both column lines) or 'monopitch' " +
+          '(one rafter per span rising at roofPitch from the low eaves at the left (x = origin, height eaveHeight) ' +
+          'to the high eaves on the right; the columns get different heights, with several spans the slope ' +
+          'continues across the internal column lines; no apex connection, two eaves connections per frame; wind ' +
+          'with EN 1991-1-4 Tab. 7.3a monopitch coefficients).',
+      },
       columnProfile: { type: 'string', description: 'Default HEA400.' },
       rafterProfile: { type: 'string', description: 'Default IPE450.' },
       purlinProfile: { type: 'string', description: 'Default C200x75x2.5.' },
@@ -318,6 +339,14 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       basePlates: {
         type: 'boolean',
         description: 'Base plates with 4 M24 anchor bolts under every column. Default true.',
+      },
+      columnBase: {
+        type: 'string',
+        enum: ['pinned', 'fixed'],
+        description:
+          "Column base fixity: 'pinned' (default) or 'fixed' (rotation restrained in the frame analysis: " +
+          'stiffer sway, base moments in the reactions and footing / base plate M+N checks; requires basePlates; ' +
+          'size the plates with design_portal_frames).',
       },
       cladding: { type: 'boolean', description: 'Roof, side and gable cladding. Default true.' },
       floorSlab: { type: 'boolean', description: 'Ground-bearing slab. Default true.' },
@@ -376,6 +405,26 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       return noChange(
         doc,
         'add_portal_frame_building failed: roofPitch must be in [0, 45) degrees.',
+      );
+    }
+    const roofType = params.roofType ?? 'duopitch';
+    if (roofType !== 'duopitch' && roofType !== 'monopitch') {
+      return noChange(
+        doc,
+        "add_portal_frame_building failed: roofType must be 'duopitch' or 'monopitch'.",
+      );
+    }
+    const columnBase = params.columnBase ?? 'pinned';
+    if (columnBase !== 'pinned' && columnBase !== 'fixed') {
+      return noChange(
+        doc,
+        "add_portal_frame_building failed: columnBase must be 'pinned' or 'fixed'.",
+      );
+    }
+    if (columnBase === 'fixed' && params.basePlates === false) {
+      return noChange(
+        doc,
+        "add_portal_frame_building failed: columnBase 'fixed' needs base plates (basePlates must not be false).",
       );
     }
     const names = {
@@ -442,45 +491,60 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
     const x1 = columnLines[columnLines.length - 1] as number;
     const totalWidth = x1 - x0;
     const ys = Array.from({ length: bays + 1 }, (_, index) => origin[1] + index * bay);
-    const ridgeOf = ([a, b]: readonly [number, number]): number =>
-      eave + ((b - a) / 2) * Math.tan(pitch);
-    const ridge = Math.max(...spanBounds.map(ridgeOf));
-    /** Roof-line height above x (eave at the column lines, ridge mid-span). */
+    const rise = Math.tan(pitch);
+    const monopitch = roofType === 'monopitch';
+    /** Roof-line height above x: monopitch rises from the low eaves at x0, duopitch peaks mid-span. */
     const roofLine = (x: number): number => {
+      if (monopitch) return eave + (x - x0) * rise;
       const [a, b] =
         spanBounds.find(([from, to]) => x >= from && x <= to) ??
         (x < x0
           ? (spanBounds[0] as readonly [number, number])
           : (spanBounds[spanBounds.length - 1] as readonly [number, number]));
-      return eave + Math.min(x - a, b - x) * Math.tan(pitch);
+      return eave + Math.min(x - a, b - x) * rise;
     };
+    /** Column height at a column line (the eaves). */
+    const columnTop = (x: number): number => (monopitch ? roofLine(x) : eave);
+    /** Roof slopes of a span, each from its low end (at a column line) up to its high end. */
+    const slopesOf = (bounds: readonly [number, number]): Slope[] => {
+      const [a, b] = bounds;
+      if (monopitch) {
+        return [{ side: -1, lowX: a, lowZ: roofLine(a), highX: b, highZ: roofLine(b) }];
+      }
+      const middle = (a + b) / 2;
+      const peak = eave + ((b - a) / 2) * rise;
+      return [
+        { side: -1, lowX: a, lowZ: eave, highX: middle, highZ: peak },
+        { side: 1, lowX: b, lowZ: eave, highX: middle, highZ: peak },
+      ];
+    };
+    const ridge = Math.max(
+      ...spanBounds.flatMap((bounds) => slopesOf(bounds).map((slope) => slope.highZ)),
+    );
     const y0 = ys[0] as number;
     const yEnd = ys[ys.length - 1] as number;
     const h = (profile: SteelProfile): number => mm(profile.h);
     const specs: MemberSpec[] = [];
 
-    // Portal frames: columns on every column line, a duo-pitch rafter pair per span.
+    // Portal frames: columns on every column line, the rafters of every roof slope per span.
     for (const y of ys) {
       for (const x of columnLines) {
-        specs.push({ role: 'column', profile: p.column.name, start: [x, y, 0], end: [x, y, eave] });
+        specs.push({
+          role: 'column',
+          profile: p.column.name,
+          start: [x, y, 0],
+          end: [x, y, columnTop(x)],
+        });
       }
       for (const bounds of spanBounds) {
-        const [a, b] = bounds;
-        const middle = (a + b) / 2;
-        specs.push(
-          {
+        for (const slope of slopesOf(bounds)) {
+          specs.push({
             role: 'rafter',
             profile: p.rafter.name,
-            start: [a, y, eave],
-            end: [middle, y, ridgeOf(bounds)],
-          },
-          {
-            role: 'rafter',
-            profile: p.rafter.name,
-            start: [b, y, eave],
-            end: [middle, y, ridgeOf(bounds)],
-          },
-        );
+            start: [slope.lowX, y, slope.lowZ],
+            end: [slope.highX, y, slope.highZ],
+          });
+        }
       }
     }
     // Gable wind posts at both ends (≈ 6 m centres per span), up to the rafter underside.
@@ -501,17 +565,16 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         }
       }
     }
-    // Purlins on both slopes of every span, one per bay.
+    // Purlins on every slope of every span, one per bay.
     const lift = h(p.rafter) / 2 + h(p.purlin) / 2;
-    for (const [a, b] of spanBounds) {
-      const slopeLength = (b - a) / 2 / Math.cos(pitch);
-      const purlinCount = Math.max(1, Math.ceil(slopeLength / purlinSpacing));
-      for (const side of [-1, 1] as const) {
-        const fromX = side === -1 ? a : b;
+    for (const bounds of spanBounds) {
+      for (const { side, lowX, lowZ, highX } of slopesOf(bounds)) {
+        const slopeLength = Math.abs(highX - lowX) / Math.cos(pitch);
+        const purlinCount = Math.max(1, Math.ceil(slopeLength / purlinSpacing));
         for (let index = 0; index <= purlinCount; index++) {
           const t = (index * slopeLength) / purlinCount;
-          const x = fromX - side * t * Math.cos(pitch) + side * lift * Math.sin(pitch);
-          const z = eave + t * Math.sin(pitch) + lift * Math.cos(pitch);
+          const x = lowX - side * t * Math.cos(pitch) + side * lift * Math.sin(pitch);
+          const z = lowZ + t * Math.sin(pitch) + lift * Math.cos(pitch);
           for (let j = 0; j < bays; j++) {
             specs.push({
               role: 'purlin',
@@ -524,13 +587,16 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
         }
       }
     }
-    // Side rails, outboard of the outer columns.
+    // Side rails, outboard of the outer columns, up to the eaves of their own column line.
     const railOffset = h(p.column) / 2 + h(p.rail) / 2;
-    for (let z = railSpacing; z < eave - railSpacing / 3; z += railSpacing) {
-      for (const [x, roll] of [
-        [x0 - railOffset, Math.PI / 2],
-        [x1 + railOffset, -Math.PI / 2],
-      ] as const) {
+    const railSides = [
+      [x0 - railOffset, Math.PI / 2, columnTop(x0)],
+      [x1 + railOffset, -Math.PI / 2, columnTop(x1)],
+    ] as const;
+    const railTop = Math.max(...railSides.map(([, , top]) => top));
+    for (let z = railSpacing; z < railTop - railSpacing / 3; z += railSpacing) {
+      for (const [x, roll, top] of railSides) {
+        if (z >= top - railSpacing / 3) continue;
         for (let j = 0; j < bays; j++) {
           specs.push({
             role: 'rail',
@@ -547,28 +613,28 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
     for (const j of endBays) {
       const [ya, yb] = [ys[j] as number, ys[j + 1] as number];
       for (const bounds of spanBounds) {
-        const middle = (bounds[0] + bounds[1]) / 2;
-        for (const fromX of bounds) {
+        for (const { lowX, lowZ, highX, highZ } of slopesOf(bounds)) {
           specs.push(
             {
               role: 'brace',
               profile: p.brace.name,
-              start: [fromX, ya, eave],
-              end: [middle, yb, ridgeOf(bounds)],
+              start: [lowX, ya, lowZ],
+              end: [highX, yb, highZ],
             },
             {
               role: 'brace',
               profile: p.brace.name,
-              start: [fromX, yb, eave],
-              end: [middle, ya, ridgeOf(bounds)],
+              start: [lowX, yb, lowZ],
+              end: [highX, ya, highZ],
             },
           );
         }
       }
       for (const fromX of [x0, x1]) {
+        const top = columnTop(fromX);
         specs.push(
-          { role: 'brace', profile: p.brace.name, start: [fromX, ya, 0], end: [fromX, yb, eave] },
-          { role: 'brace', profile: p.brace.name, start: [fromX, yb, 0], end: [fromX, ya, eave] },
+          { role: 'brace', profile: p.brace.name, start: [fromX, ya, 0], end: [fromX, yb, top] },
+          { role: 'brace', profile: p.brace.name, start: [fromX, yb, 0], end: [fromX, ya, top] },
         );
       }
     }
@@ -606,14 +672,20 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       ids.push(...connections.ids);
     }
     if (params.basePlates !== false) {
-      const plates = appendBasePlates(
-        doc,
-        building,
-        columnsWithoutPlates(building, null, new Set(membersAdded.ids)),
-        {},
-      );
-      building = plates.building;
-      ids.push(...plates.ids);
+      const unplated = columnsWithoutPlates(building, null, new Set(membersAdded.ids));
+      // Fixed bases apply to frame columns only: gable wind posts (rolled about the vertical axis) stay pinned.
+      const groups =
+        columnBase === 'fixed'
+          ? ([
+              [unplated.filter((column) => column.roll === 0), 'fixed'],
+              [unplated.filter((column) => column.roll !== 0), 'pinned'],
+            ] as const)
+          : ([[unplated, 'pinned']] as const);
+      for (const [columns, fixity] of groups) {
+        const plates = appendBasePlates(doc, building, columns, { fixity });
+        building = plates.building;
+        ids.push(...plates.ids);
+      }
     }
     // Crane runway on both sides, inboard of the columns.
     if (params.crane) {
@@ -695,31 +767,23 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       spanBounds.forEach(([a, b], index) => {
         const left = index === 0 ? wallX0 : a;
         const right = index === spanBounds.length - 1 ? wallX1 : b;
-        const middle = (a + b) / 2;
-        profileLine.push([left, roofZ(left)], [middle, roofZ(middle)]);
+        const breaks = monopitch ? [left, right] : [left, (a + b) / 2, right];
+        profileLine.push(...breaks.slice(0, -1).map((x): Vec2 => [x, roofZ(x)]));
         if (index === spanBounds.length - 1) profileLine.push([right, roofZ(right)]);
-        panels.push(
-          {
+        breaks.slice(1).forEach((to, panel) => {
+          const from = breaks[panel] as number;
+          const rising = monopitch ? roofZ(to) >= roofZ(from) : panel === 0;
+          panels.push({
             role: 'roof',
-            outward: [-Math.sin(pitch), 0, Math.cos(pitch)],
+            outward: [rising ? -Math.sin(pitch) : Math.sin(pitch), 0, Math.cos(pitch)],
             corners: [
-              [left, ya, roofZ(left)],
-              [left, yb, roofZ(left)],
-              [middle, yb, roofZ(middle)],
-              [middle, ya, roofZ(middle)],
+              [from, ya, roofZ(from)],
+              [from, yb, roofZ(from)],
+              [to, yb, roofZ(to)],
+              [to, ya, roofZ(to)],
             ],
-          },
-          {
-            role: 'roof',
-            outward: [Math.sin(pitch), 0, Math.cos(pitch)],
-            corners: [
-              [middle, ya, roofZ(middle)],
-              [middle, yb, roofZ(middle)],
-              [right, yb, roofZ(right)],
-              [right, ya, roofZ(right)],
-            ],
-          },
-        );
+          });
+        });
       });
       for (const [x, outward] of [
         [wallX0, -1],
@@ -771,8 +835,9 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       summary:
         `Added portal-frame hall ${toMetres(doc, totalWidth).toFixed(1)} × ${toMetres(doc, hallLength).toFixed(1)} m` +
         `${spanWidths.length > 1 ? ` (${spanWidths.length} spans)` : ''}, ` +
-        `${bays + 1} frames at ${toMetres(doc, bay).toFixed(2)} m, eaves ${toMetres(doc, eave).toFixed(2)} m, ridge ${toMetres(doc, ridge).toFixed(2)} m: ` +
+        `${bays + 1} frames at ${toMetres(doc, bay).toFixed(2)} m, eaves ${toMetres(doc, eave).toFixed(2)} m, ${monopitch ? 'high eaves' : 'ridge'} ${toMetres(doc, ridge).toFixed(2)} m: ` +
         `${memberCount} steel members (${tonnes.toFixed(1)} t)` +
+        `${monopitch ? ', monopitch roof' : ''}${columnBase === 'fixed' ? ', fixed column bases' : ''}` +
         `${params.crane ? `, crane runway ${params.crane.capacity ?? 10} t` : ''}, ${gridCount} grid lines, ${ids.length - memberCount - gridCount} other element(s).`,
       affected: elementAffected(document, ids),
       data: {

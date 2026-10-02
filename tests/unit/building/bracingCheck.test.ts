@@ -228,11 +228,109 @@ describe('check_bracing', () => {
     expect((result.data as { failures: string[] }).failures.length).toBeGreaterThan(0);
   });
 
+  it('reports the same eaves-strut force on single- and two-span halls (internal lines are unbraced)', () => {
+    const eavesOf = (spans: number[], roofType: string): BracingRow[] =>
+      rowsOf(hall({ span: undefined, spans, length: 30000, roofType }), {
+        windPressure: 0.7,
+      }).filter((row) => /eaves strut/.test(row.check));
+    for (const roofType of ['monopitch', 'duopitch']) {
+      const single = eavesOf([24000], roofType);
+      const double = eavesOf([12000, 12000], roofType);
+      expect(double).toHaveLength(4);
+      for (const row of double) {
+        // monopitch: identical gable; duopitch: the ridge of two 12 m spans is lower (smaller gable)
+        expect(row.force).toBeCloseTo(single[0]?.force ?? 0, roofType === 'monopitch' ? 6 : -1);
+        expect(row.check).toMatch(/outer wall line, independent of the number of spans/);
+      }
+    }
+    // the larger monopitch gable loads the default C200x75x2.5 eaves purlin harder than a duopitch one
+    const monopitch = eavesOf([12000, 12000], 'monopitch');
+    expect(monopitch[0]?.force).toBeGreaterThan(eavesOf([12000, 12000], 'duopitch')[0]?.force ?? 0);
+    // a heavier eaves purlin carries it
+    const heavy = rowsOf(
+      hall({
+        span: undefined,
+        spans: [12000, 12000],
+        length: 30000,
+        roofType: 'monopitch',
+        purlinProfile: 'C300x90x3.0',
+      }),
+      { windPressure: 1 },
+    ).filter((row) => /eaves strut/.test(row.check));
+    const light = rowsOf(
+      hall({ span: undefined, spans: [12000, 12000], length: 30000, roofType: 'monopitch' }),
+      { windPressure: 1 },
+    ).filter((row) => /eaves strut/.test(row.check));
+    expect(light.every((row) => row.utilisation > 1)).toBe(true);
+    expect(heavy.every((row) => row.utilisation < 1)).toBe(true);
+  });
+
   it('applies net pressure 1.0 to gable posts', () => {
     const post = rowsOf(hall(), { windPressure: 1 }).find((row) => row.kind === 'gable-post');
     expect(post?.check).toMatch(/q (\d+\.\d+) kN\/m/);
     const q = Number(/q (\d+\.\d+) kN\/m/.exec(post?.check ?? '')?.[1]);
     // 1.5 · qp 1.0 · cp 1.0 · tributary 6 m
     expect(q).toBeCloseTo(9, 1);
+  });
+});
+
+describe('check_bracing crane longitudinal path', () => {
+  const crane = { crane: { capacity: 10, railHeight: 6000 } };
+  const wallDiagonals = (rows: BracingRow[]): BracingRow[] =>
+    rows.filter((row) => row.group.startsWith('wall bracing') && row.check.startsWith('tension'));
+  type CraneData = {
+    crane: {
+      design: number;
+      governing: string;
+      driveGroup1: number;
+      bufferGroup7: number;
+      foundationHorizontalY: { perColumn: number; total: number }[];
+    } | null;
+  };
+
+  it('raises the wall bracing utilisation versus a hall without a crane', () => {
+    const plain = wallDiagonals(rowsOf(hall()));
+    const craned = wallDiagonals(rowsOf(hall(crane)));
+    expect(plain.length).toBeGreaterThan(0);
+    expect(craned.length).toBe(plain.length);
+    expect(Math.max(...craned.map((row) => row.utilisation))).toBeGreaterThan(
+      Math.max(...plain.map((row) => row.utilisation)),
+    );
+    expect((checkBracing.run(hall(), {}).data as CraneData).crane).toBeNull();
+  });
+
+  it('reports the crane longitudinal rows and foundation forces', () => {
+    const result = checkBracing.run(hall(crane), {});
+    const data = result.data as CraneData;
+    const rows = (result.data as { rows: BracingRow[] }).rows;
+    const craneRows = rows.filter((row) =>
+      row.check.startsWith('crane longitudinal (group 1 / group 7)'),
+    );
+    expect(craneRows.length).toBeGreaterThanOrEqual(2);
+    expect(data.crane?.design).toBeCloseTo(
+      Math.max(data.crane?.driveGroup1 ?? 0, data.crane?.bufferGroup7 ?? 0),
+      9,
+    );
+    expect(data.crane?.bufferGroup7).toBeCloseTo(23.1, 0);
+    expect(data.crane?.governing).toBe('group 7');
+    expect(data.crane?.foundationHorizontalY.length).toBe(craneRows.length);
+    for (const entry of data.crane?.foundationHorizontalY ?? []) {
+      expect(entry.perColumn).toBeCloseTo(entry.total / 2, 9);
+    }
+  });
+
+  it('scales with travelSpeed and is a no-op on bad crane params', () => {
+    const doc = hall(crane);
+    const design = (travelSpeed: number): number =>
+      (checkBracing.run(doc, { travelSpeed }).data as CraneData).crane?.bufferGroup7 ?? 0;
+    expect(design(0.6) / design(0.3)).toBeCloseTo(2, 6);
+    for (const params of [{ travelSpeed: 0 }, { bufferStiffness: -5 }, { craneCapacity: 0 }]) {
+      const result = checkBracing.run(doc, params);
+      expect(result.document).toBe(doc);
+      expect(result.data).toBeUndefined();
+      expect(result.summary).toMatch(/failed/);
+    }
+    const override = checkBracing.run(hall(), { craneCapacity: 10 }).data as CraneData;
+    expect(override.crane).toBeNull();
   });
 });

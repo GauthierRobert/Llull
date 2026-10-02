@@ -38,6 +38,8 @@ interface PlateSize {
   readonly thickness?: number;
   readonly boltCount?: number;
   readonly boltDiameter?: number;
+  /** Stored on the plate only when 'fixed' (absent = pinned). */
+  readonly fixity?: 'pinned' | 'fixed';
 }
 
 /** Adds one base plate per column (sized from its profile + margin); no regeneration. */
@@ -66,6 +68,7 @@ export function appendBasePlates(
       boltCount: size.boltCount ?? 4,
       boltDiameter: size.boltDiameter ?? fromMm(doc, 24),
       material: 'S355',
+      ...(size.fixity === 'fixed' ? { fixity: 'fixed' as const } : {}),
     };
     next = withElement(next, plate);
     ids.push(plate.id);

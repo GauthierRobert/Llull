@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
+  bufferForce,
   runwayCheck,
   wheelMoment,
   wheelShear,
@@ -44,7 +45,7 @@ describe('check_crane_runways', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(data.failures).toEqual([]);
-    expect(data.rows.length % 9).toBe(0);
+    expect(data.rows.length % 12).toBe(0);
     for (const kind of ['strength', 'ltb', 'deflection', 'fatigue', 'local']) {
       expect(data.rows.some((row) => row.kind === kind)).toBe(true);
     }
@@ -265,5 +266,62 @@ describe('metre documents', () => {
     const max = (doc: CadDocument): number =>
       (runwayCheck.run(doc, {}).data as { maxUtilisation: number }).maxUtilisation;
     expect(max(metres)).toBeCloseTo(max(hall()), 6);
+  });
+});
+
+describe('check_crane_runways longitudinal actions (EN 1991-3 groups 7 and 8)', () => {
+  it('hand-checks HB,1 = φ7 v1 √(mc SB) for a 10 t crane', () => {
+    // Gc = 0.5·98.1 + 20 = 69.05 kN, mc = 7038.7 kg, v1 = 0.7·0.63, SB = 1000 kN/m
+    const expected = 1.25 * 0.441 * Math.sqrt((69050 / 9.81) * 1e6);
+    expect(bufferForce(69050, 0.63, 1000)).toBeCloseTo(expected, 6);
+    expect(bufferForce(69050, 0.63, 1000)).toBeCloseTo(46250, -1);
+    const rows = rowsOf(hall());
+    const stop = find(rows, 'strength', 'buffer stop HB,1/nr');
+    expect(stop.value).toBeCloseTo(expected / 2, -1);
+    expect(stop.check).toContain('SB 1000 kN/m');
+    expect(stop.utilisation).toBeGreaterThan(0);
+    expect(stop.utilisation).toBeLessThan(1);
+    expect(find(rows, 'strength', 'buffer end-bay').utilisation).toBeGreaterThan(0);
+    expect(rows.some((row) => row.check.startsWith('longitudinal stop force'))).toBe(true);
+  });
+
+  it('scales the buffer rows with travelSpeed and bufferStiffness', () => {
+    const doc = hall();
+    const slow = find(rowsOf(doc, { travelSpeed: 0.3 }), 'strength', 'buffer stop').value;
+    const fast = find(rowsOf(doc, { travelSpeed: 0.6 }), 'strength', 'buffer stop').value;
+    expect(fast / slow).toBeCloseTo(2, 2);
+    const soft = find(rowsOf(doc, { bufferStiffness: 250 }), 'strength', 'buffer stop').value;
+    const stiff = find(rowsOf(doc, { bufferStiffness: 1000 }), 'strength', 'buffer stop').value;
+    expect(stiff / soft).toBeCloseTo(2, 2);
+    const eccSlow = find(rowsOf(doc, { travelSpeed: 0.3 }), 'strength', 'buffer end-bay');
+    const eccFast = find(rowsOf(doc, { travelSpeed: 0.6 }), 'strength', 'buffer end-bay');
+    expect(eccFast.utilisation).toBeGreaterThan(eccSlow.utilisation);
+  });
+
+  it('adds a test load bending row governed by max(φ6·1.1, 1.25) Qh with γ 1.1', () => {
+    const rows = rowsOf(hall());
+    const test = find(rows, 'strength', 'test load');
+    expect(test.check).toContain('γ 1.1');
+    expect(test.check).toContain('Qtest 1.25 Qh');
+    expect(test.utilisation).toBeGreaterThan(0.05);
+    expect(test.utilisation).toBeLessThan(1);
+    const heavier = find(rowsOf(hall(), { craneCapacity: 16 }), 'strength', 'test load');
+    expect(heavier.utilisation).toBeGreaterThan(test.utilisation);
+  });
+
+  it('is a no-op on bad travelSpeed / bufferStiffness', () => {
+    const doc = hall();
+    for (const params of [
+      { travelSpeed: 0 },
+      { travelSpeed: -1 },
+      { bufferStiffness: 0 },
+      { bufferStiffness: Number.NaN },
+    ]) {
+      const result = runwayCheck.run(doc, params);
+      expect(result.document).toBe(doc);
+      expect(result.affected).toEqual([]);
+      expect(result.data).toBeUndefined();
+      expect(result.summary).toMatch(/failed/);
+    }
   });
 });

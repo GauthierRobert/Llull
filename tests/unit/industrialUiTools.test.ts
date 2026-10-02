@@ -73,6 +73,28 @@ describe('industrial tools', () => {
     expect(hall.ok && 'span' in hall.params).toBe(false);
   });
 
+  it('passes the column base fixity and the roof type to the hall generator', () => {
+    const defaults = tool('hall').build(defaultValues(tool('hall')), context);
+    expect(defaults.ok && defaults.params).toMatchObject({
+      columnBase: 'pinned',
+      roofType: 'duopitch',
+    });
+    const hall = tool('hall').build(
+      { ...defaultValues(tool('hall')), columnBase: 'fixed', roofType: 'monopitch' },
+      context,
+    );
+    expect(hall.ok && hall.params).toMatchObject({ columnBase: 'fixed', roofType: 'monopitch' });
+    const doc = apply(createEmptyDocument(), 'hall', {
+      columnBase: 'fixed',
+      roofType: 'monopitch',
+    });
+    expect(
+      Object.values(doc.building!.elements).some(
+        (element) => element.category === 'plate' && element.fixity === 'fixed',
+      ),
+    ).toBe(true);
+  });
+
   it('converts degrees and omits blank optional fields', () => {
     const member = tool('member').build({ ...defaultValues(tool('member')), roll: '90' }, context);
     expect(member.ok && member.params['roll']).toBeCloseTo(Math.PI / 2);

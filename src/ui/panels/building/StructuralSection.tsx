@@ -3,7 +3,7 @@
  *
  * StructuralSection — roof / wind loads → the read-only structural checks (frames, bracing,
  * foundations, crane runways; utilisation list, click selects the element) and
- * design_portal_frames (dispatched; up-sizes sections and bolt groups).
+ * design_portal_frames / design_purlins (dispatched; up-size sections, bolt groups, purlins and rails).
  */
 
 import React, { useState } from 'react';
@@ -129,6 +129,20 @@ export function StructuralSection(): React.ReactElement {
           data-testid="frame-design"
         >
           Design frames
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() =>
+            dispatch('design_purlins', {
+              roofDeadLoad: loads.deadLoad,
+              snowLoad: loads.snowLoad,
+              windPressure: loads.windPressure,
+            })
+          }
+          data-testid="purlin-design"
+        >
+          Design purlins
         </button>
         <button
           type="button"
