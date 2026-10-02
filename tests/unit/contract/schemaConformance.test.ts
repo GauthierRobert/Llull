@@ -68,3 +68,37 @@ describe('schema conformance: schema-shaped params never make a command throw', 
     });
   }
 });
+
+describe('schemas never rewrite params (run receives the raw, validated params)', () => {
+  function rewritingNodes(schema: unknown, path: string, out: string[], depth = 0): void {
+    if (depth > 12 || schema === null || typeof schema !== 'object') return;
+    const def = (schema as { def?: Record<string, unknown> }).def;
+    if (!def) return;
+    if (def['type'] === 'default' || def['type'] === 'transform' || def['type'] === 'pipe') {
+      out.push(`${path}: ${String(def['type'])}`);
+    }
+    for (const key of ['innerType', 'element', 'in', 'out']) {
+      rewritingNodes(def[key], path, out, depth + 1);
+    }
+    for (const key of ['shape']) {
+      const shape = def[key];
+      if (shape && typeof shape === 'object') {
+        for (const [k, v] of Object.entries(shape))
+          rewritingNodes(v, `${path}.${k}`, out, depth + 1);
+      }
+    }
+    for (const key of ['items', 'options']) {
+      const list = def[key];
+      if (Array.isArray(list))
+        list.forEach((v, i) => rewritingNodes(v, `${path}[${i}]`, out, depth + 1));
+    }
+  }
+
+  it('no command schema uses .default(), .transform() or .pipe()', () => {
+    const offenders: string[] = [];
+    for (const def of listCommands()) {
+      if (def.paramsValidator) rewritingNodes(def.paramsValidator, def.name, offenders);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
