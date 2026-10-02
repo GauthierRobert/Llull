@@ -55,8 +55,12 @@ import {
   applyBridgeToolCall,
   buildExchangeToolDefinitions,
   applyExchangeToolCall,
+  isPromptEnabled,
+  isToolEnabled,
+  parseToolsets,
+  toolsetOf,
 } from '@core/mcp';
-import type { UiBridge } from '@core/mcp';
+import type { ToolsetName, UiBridge } from '@core/mcp';
 import type { CadDocument } from '@core/model/types';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
@@ -551,6 +555,7 @@ function buildMcpServer(
   getDoc: () => CadDocument,
   bridge: UiBridge,
   exchange: ExchangeOptions,
+  enabledToolsets: ReadonlySet<ToolsetName>,
 ): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
@@ -685,7 +690,11 @@ function buildMcpServer(
       inputSchema: t.inputSchema,
       ...(t.annotations ? { annotations: t.annotations } : {}),
     }));
-    return { tools: [...tools, ...bridgeTools, ...exchangeTools] };
+    return {
+      tools: [...tools, ...bridgeTools, ...exchangeTools].filter((t) =>
+        isToolEnabled(t.name, enabledToolsets),
+      ),
+    };
   });
 
   // tools/call — route through commandBus so MCP edits share history + broadcast,
@@ -693,6 +702,14 @@ function buildMcpServer(
   // in core/mcp (shapeToolCallContent).  execute() runs exactly once (in the bus).
   const handleToolCall = async (req: CallToolRequest): Promise<CallToolResult> => {
     const { name, arguments: args } = req.params;
+
+    const disabledToolset = isToolEnabled(name, enabledToolsets) ? undefined : toolsetOf(name);
+    if (disabledToolset !== undefined) {
+      return makeErrorResult(
+        `Tool ${name} is disabled on this server: enable its toolset "${disabledToolset}" in ` +
+          'LLULL_TOOLSETS, or call it as a build_project step.',
+      );
+    }
 
     // -----------------------------------------------------------------------
     // Bridge tool intercept — snapshot_in_from_ui / snapshot_out_to_ui
@@ -815,7 +832,9 @@ function buildMcpServer(
 
   // prompts/list — enumerate registered prompt templates
   server.setRequestHandler(ListPromptsRequestSchema, () => {
-    return { prompts: listMcpPrompts() };
+    return {
+      prompts: listMcpPrompts().filter((prompt) => isPromptEnabled(prompt.name, enabledToolsets)),
+    };
   });
 
   // prompts/get — resolve a prompt template by name, substituting provided args
@@ -827,7 +846,7 @@ function buildMcpServer(
         if (typeof v === 'string') args[k] = v;
       }
     }
-    const result = getMcpPrompt(name, args);
+    const result = isPromptEnabled(name, enabledToolsets) ? getMcpPrompt(name, args) : null;
     if (result === null) {
       throw new Error(`Unknown prompt: ${name}`);
     }
@@ -865,6 +884,7 @@ function buildMcpServer(
 function allocateSession(
   bridge: UiBridge,
   exchange: ExchangeOptions,
+  enabledToolsets: ReadonlySet<ToolsetName>,
 ): {
   transport: StreamableHTTPServerTransport;
   server: Server;
@@ -892,7 +912,7 @@ function allocateSession(
 
   // Wire the shared live document read accessor and the UI bridge.
   // Mutations route through commandBus.applyCommand (not setLiveDoc directly).
-  const server = buildMcpServer(getLiveDoc, bridge, exchange);
+  const server = buildMcpServer(getLiveDoc, bridge, exchange, enabledToolsets);
 
   return { transport, server };
 }
@@ -900,6 +920,17 @@ function allocateSession(
 // ---------------------------------------------------------------------------
 // Router factory
 // ---------------------------------------------------------------------------
+
+/** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = all). Warns on unknown names. */
+export function toolsetsFromEnv(
+  raw: string | undefined = process.env['LLULL_TOOLSETS'],
+): ReadonlySet<ToolsetName> {
+  const { enabled, unknown } = parseToolsets(raw);
+  if (unknown.length > 0) {
+    console.warn(`[llull-mcp] LLULL_TOOLSETS: ignoring unknown toolset(s): ${unknown.join(', ')}`);
+  }
+  return enabled;
+}
 
 /**
  * Build and return the Express Router that mounts the MCP endpoint.
@@ -921,10 +952,12 @@ function allocateSession(
  *
  * @param bridge - the UI↔MCP bridge injected at server startup.
  * @param exchange - STEP/code exchange port (defaults to the environment-configured Python bridge).
+ * @param enabledToolsets - toolsets exposed by tools/list + tools/call (defaults to `LLULL_TOOLSETS`).
  */
 export function buildMcpRouter(
   bridge: UiBridge,
   exchange: ExchangeOptions = exchangeOptionsFromEnv(),
+  enabledToolsets: ReadonlySet<ToolsetName> = toolsetsFromEnv(),
 ): Router {
   // Start the background idle-TTL sweep (no-op if already running).
   startSessionSweep();
@@ -979,7 +1012,7 @@ export function buildMcpRouter(
       if (handled) return;
 
       // No session id → this is an `initialize` request; allocate a new session.
-      const { transport, server } = allocateSession(bridge, exchange);
+      const { transport, server } = allocateSession(bridge, exchange, enabledToolsets);
 
       try {
         await server.connect(transport as Transport);

@@ -219,6 +219,7 @@ Done. Client closed cleanly.
 | `LLULL_PYTHON_TIMEOUT_MS`  | no       | `120000`          | Per-request Python timeout |
 | `LLULL_EXCHANGE_DIR`       | no       | unset             | Directory for the exchange tools' `path` arguments; `export_step` also saves there |
 | `LLULL_ALLOW_CODE_EXECUTION` | no     | unset             | `1` enables `import_code`, which **runs arbitrary Python** with server privileges |
+| `LLULL_TOOLSETS`           | no       | all               | Comma-separated MCP toolsets exposed by `tools/list` / `tools/call`: `core` (always on), `2d`, `3d`, `measure`, `parametric`, `assembly`, `exchange`, `building`, or `all`. Unknown names are ignored with a warning. Prompts that need a hidden toolset are hidden too. Hidden tools stay usable as `build_project` steps and in the UI, but their schemas are not listed, so an agent must already know their params. See `src/core/mcp/toolsets.ts` |
 
 ### REST mutation policy (`/command`, `/undo`, `/redo`)
 
