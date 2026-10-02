@@ -13,6 +13,7 @@ import '@fontsource/geist-mono/latin-600.css';
 import '@ui/styles/index.css';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@core/geometry/manifoldKernel';
+import { parseKernelChoice } from '@core/geometry/kernelChoice';
 
 // ---------------------------------------------------------------------------
 // Kernel selection: ?kernel=occt swaps in OCC (dev/power-user toggle).
@@ -27,12 +28,12 @@ import { createManifoldKernel } from '@core/geometry/manifoldKernel';
 
 const useOcct =
   typeof window !== 'undefined' &&
-  new URLSearchParams(window.location.search).get('kernel') === 'occt';
+  parseKernelChoice(new URLSearchParams(window.location.search).get('kernel')) === 'occt';
 
 if (useOcct) {
   // Lazy-import OCC so its 63 MB WASM is never fetched in the default path.
-  import('@ui/geometry/occtKernel')
-    .then(({ createOcctKernel }) => createOcctKernel())
+  import('@ui/geometry/occtKernelBrowser')
+    .then(({ createBrowserOcctKernel }) => createBrowserOcctKernel())
     .then(setGeometryKernel)
     .catch((e: unknown) => {
       console.warn('OCC kernel init failed — falling back to Manifold', e);

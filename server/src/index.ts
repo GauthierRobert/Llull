@@ -25,7 +25,7 @@ import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { buildMcpRouter } from './mcp';
 import { exchangeOptionsFromEnv } from './pythonExchange';
-import { installGeometryKernel } from './geometryKernel';
+import { getActiveKernelName, installGeometryKernel } from './geometryKernel';
 import { exportStepFile } from '@core/mcp';
 import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
@@ -81,7 +81,7 @@ const mutationGuard = guardMutation();
 // ---------------------------------------------------------------------------
 
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', kernel: getActiveKernelName() });
 });
 
 /**
