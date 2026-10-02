@@ -1,7 +1,7 @@
 /**
  * @layer core/mcp
  *
- * Unit tests for `src/core/mcp/conventions.ts`.
+ * Unit tests for `packages/mcp/src/conventions.ts`.
  *
  * Verifies the CONVENTIONS_GUIDE content covers the required modeling topics
  * and that CONVENTIONS_URI matches the expected value.
@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from '@core/mcp/conventions';
+import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from '@mcp/conventions';
 
 describe('CONVENTIONS_URI', () => {
   it('is the expected cad://conventions URI', () => {

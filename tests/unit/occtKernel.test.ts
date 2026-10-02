@@ -181,7 +181,7 @@ describe('meshDataToTopoDSShape — static / contract tests (Batch 15)', () => {
   it('createOcctKernel is exported from occtKernel module (import check)', async () => {
     // This confirms the module compiles and the named export exists.
     // We do NOT call createOcctKernel() here — that would load 63 MB WASM.
-    const mod = await import('@core/geometry/occtKernel');
+    const mod = await import('@kernel-occt/occtKernel');
     expect(typeof mod.createOcctKernel).toBe('function');
     expect(typeof mod.__resetOccModule).toBe('function');
   });
@@ -195,7 +195,7 @@ describe('meshDataToTopoDSShape — static / contract tests (Batch 15)', () => {
 
 describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)', () => {
   it('booleanOp union of two boxes returns mesh', async () => {
-    const { createOcctKernel } = await import('@core/geometry/occtKernel');
+    const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
     const result = kernel.booleanOp('union', BOX_A, BOX_B);
     expect(result).not.toBeNull();
@@ -207,7 +207,7 @@ describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)',
     // Batch 15: filletEdges now uses meshDataToTopoDSShape (BRepBuilderAPI_Sewing)
     // instead of AABB-rebuild. This mesh is a closed manifold box — sewing
     // should produce a solid and the fillet should succeed.
-    const { createOcctKernel } = await import('@core/geometry/occtKernel');
+    const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
     // 8-vertex closed box mesh (manifold — all 12 triangles close the surface).
     const boxMesh: MeshData = {
@@ -262,7 +262,7 @@ describe.skip('OcctKernel live WASM (requires node env + 63 MB opencascade.js)',
   it('filletEdges on an open (non-manifold) mesh gracefully returns null', async () => {
     // An open mesh (single triangle) — sewing produces an open shell, not a solid.
     // meshDataToTopoDSShape returns null → filletEdges returns null.
-    const { createOcctKernel } = await import('@core/geometry/occtKernel');
+    const { createOcctKernel } = await import('@kernel-occt/occtKernel');
     const kernel = await createOcctKernel();
     const openMesh: MeshData = {
       positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],

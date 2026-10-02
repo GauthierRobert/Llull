@@ -13,8 +13,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { listCommands } from '@core/commands/registry';
-import { buildMcpTools, listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from '@core/mcp';
-import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from '@core/mcp';
+import { buildMcpTools, listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from '@mcp/index';
+import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from '@mcp/index';
 import { createEmptyDocument } from '@core/model/types';
 
 // ---------------------------------------------------------------------------

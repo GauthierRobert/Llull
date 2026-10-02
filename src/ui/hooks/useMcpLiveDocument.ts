@@ -17,7 +17,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
-import type { LiveCommandEvent, LiveSnapshotEvent } from '@core/mcp/liveSync';
+import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import { SERVER_BASE } from '@ui/serverConfig';
 import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 

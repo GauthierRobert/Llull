@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { findProfile } from '@core/commands/building/steel/profiles';
+import { findProfile } from '@aec/steel/profiles';
 import {
   checkPurlins,
   effectiveModulusRatio,
   type PurlinRow,
   type ZoneSummary,
-} from '@core/commands/building/industrial/purlinCheck';
+} from '@aec/industrial/purlinCheck';
 
 interface PurlinData {
   rows: PurlinRow[];

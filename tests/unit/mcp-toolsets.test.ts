@@ -10,7 +10,7 @@ import {
   listMcpPrompts,
   parseToolsets,
   toolsetOf,
-} from '@core/mcp';
+} from '@mcp/index';
 
 const allToolNames = [
   ...listCommands().map((command) => command.name),

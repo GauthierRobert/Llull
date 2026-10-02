@@ -9,7 +9,7 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
-import type { CostLine } from '@core/commands/building';
+import type { CostLine } from '@aec/index';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { downloadText } from '@ui/download';
 

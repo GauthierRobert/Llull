@@ -2,16 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BuildingElement, FootingElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import {
-  designFootings,
-  designMat,
-  type FootingDesignRow,
-} from '@core/commands/building/industrial/footingDesign';
-import {
-  foundationCheck,
-  type FoundationRow,
-} from '@core/commands/building/industrial/foundationCheck';
-import type { TakeoffLine } from '@core/commands/building/quantities';
+import { designFootings, designMat, type FootingDesignRow } from '@aec/industrial/footingDesign';
+import { foundationCheck, type FoundationRow } from '@aec/industrial/foundationCheck';
+import type { TakeoffLine } from '@aec/quantities';
 
 function hall(params: Record<string, unknown> = {}): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {

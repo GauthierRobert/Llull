@@ -1,0 +1,10 @@
+{
+  "name": "@llull/domain-aec",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Building (AEC/BIM) and industrial-steel plugins.",
+  "dependencies": {
+    "@llull/core": "0.1.0"
+  }
+}

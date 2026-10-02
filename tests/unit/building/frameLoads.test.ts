@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { CheckRow } from '@core/commands/building/industrial/frameCheck';
+import type { CheckRow } from '@aec/industrial/frameCheck';
 import {
   bucklingReduction,
   criticalMoment,
   lateralTorsionalReduction,
   memberBuckling,
   sectionResistance,
-} from '@core/commands/building/industrial/steelDesign';
+} from '@aec/industrial/steelDesign';
 import {
   baseReactions,
   craneActions,
@@ -16,9 +16,9 @@ import {
   valleyLines,
   craneCapacityOf,
   DOWNWIND_ROOF_FACTOR,
-} from '@core/commands/building/industrial/frameModel';
-import { frameRoofAverage } from '@core/commands/building/industrial/windCoefficients';
-import { findProfile, sectionProperties } from '@core/commands/building/steel/profiles';
+} from '@aec/industrial/frameModel';
+import { frameRoofAverage } from '@aec/industrial/windCoefficients';
+import { findProfile, sectionProperties } from '@aec/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';
 
 const HALL = { span: 24000, length: 30000 };

@@ -2,17 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { BuildingElement } from '@core/model/building';
-import {
-  findProfile,
-  profileOutline,
-  STEEL_PROFILES,
-} from '@core/commands/building/steel/profiles';
-import { boxOverlap, type Clash, type OrientedBox } from '@core/commands/building/industrial/clash';
-import { buildPlanDrawing } from '@core/commands/building/plan';
-import type { TakeoffLine } from '@core/commands/building/quantities';
-import type { IfcExport } from '@core/commands/building/ifc';
+import { findProfile, profileOutline, STEEL_PROFILES } from '@aec/steel/profiles';
+import { boxOverlap, type Clash, type OrientedBox } from '@aec/industrial/clash';
+import { buildPlanDrawing } from '@aec/plan';
+import type { TakeoffLine } from '@aec/quantities';
+import type { IfcExport } from '@aec/ifc';
 import { serializeDocument } from '@core/commands/persistence';
-import { buildingErrors } from '@core/commands/building/validate';
+import { buildingErrors } from '@aec/validate';
 import { polygonArea } from '@lib/polygon';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {

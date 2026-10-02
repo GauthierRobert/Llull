@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { exportStepFile, type CadExchangePort } from '@core/mcp';
+import { exportStepFile, type CadExchangePort } from '@mcp/index';
 import {
   bridgeEnvironment,
   createPythonExchangePort,

@@ -398,7 +398,7 @@ describe('DimensionRenderer2D — is2D classification', () => {
   });
 
   it('is2D returns true for a dimension entity', async () => {
-    const { is2D } = await import('../../src/core/model/types');
+    const { is2D } = await import('@core/model/types');
     const idA = addPoint(0, 0);
     const idB = addPoint(5, 0);
     const result = localDispatch('add_dimension', {

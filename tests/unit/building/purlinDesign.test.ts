@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import { findProfile } from '@core/commands/building/steel/profiles';
-import { nextSecondaryProfile } from '@core/commands/building/industrial/purlinDesign';
-import type { PurlinRow } from '@core/commands/building/industrial/purlinCheck';
+import { findProfile } from '@aec/steel/profiles';
+import { nextSecondaryProfile } from '@aec/industrial/purlinDesign';
+import type { PurlinRow } from '@aec/industrial/purlinCheck';
 
 const hall = (params: Record<string, unknown> = {}): CadDocument =>
   execute(createEmptyDocument(), 'add_portal_frame_building', {

@@ -8,7 +8,7 @@ import {
   TOOLSET_NAMES,
   type ToolSearchResult,
   type ToolsetName,
-} from '@core/mcp';
+} from '@mcp/index';
 import { getCommand } from '@core/commands/registry';
 
 const coreOnly = (): Set<ToolsetName> => new Set(parseToolsets('').enabled);

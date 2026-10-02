@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  buildElevationDrawing,
-  chainLoops,
-  type ElevationSheet,
-} from '@core/commands/building/elevation';
+import { buildElevationDrawing, chainLoops, type ElevationSheet } from '@aec/elevation';
 
 function hall(): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {

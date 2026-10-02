@@ -19,10 +19,22 @@
     "baseUrl": ".",
     "paths": {
       "@core/*": [
-        "../src/core/*"
+        "../packages/core/src/*"
       ],
       "@lib/*": [
-        "../src/lib/*"
+        "../packages/core/src/lib/*"
+      ],
+      "@mcp/*": [
+        "../packages/mcp/src/*"
+      ],
+      "@aec/*": [
+        "../packages/domain-aec/src/*"
+      ],
+      "@kernel-manifold/*": [
+        "../packages/kernel-manifold/src/*"
+      ],
+      "@kernel-occt/*": [
+        "../packages/kernel-occt/src/*"
       ],
       "@app/*": [
         "../src/app/*"
@@ -33,8 +45,11 @@
     "src",
     "examples",
     "tests",
-    "../src/core",
-    "../src/lib",
+    "../packages/core/src",
+    "../packages/mcp/src",
+    "../packages/domain-aec/src",
+    "../packages/kernel-manifold/src",
+    "../packages/kernel-occt/src",
     "../src/app"
   ],
   "exclude": [

@@ -9,8 +9,8 @@ import {
   type ExchangeCommandResult,
   type ExchangeDeps,
   type ProgramRun,
-} from '@core/mcp/exchangeTools';
-import { shapeToolCallContent } from '@core/mcp/dispatch';
+} from '@mcp/exchangeTools';
+import { shapeToolCallContent } from '@mcp/dispatch';
 
 interface Harness {
   deps: ExchangeDeps;
@@ -468,7 +468,7 @@ describe('shapeToolCallContent code blocks', () => {
   });
 
   it('applies to the real export_code result through applyMcpToolCall', async () => {
-    const { applyMcpToolCall } = await import('@core/mcp/dispatch');
+    const { applyMcpToolCall } = await import('@mcp/dispatch');
     const doc = docWithBox();
     const result = applyMcpToolCall(doc, 'export_code', { language: 'openscad' });
     expect(result.isError).toBe(false);

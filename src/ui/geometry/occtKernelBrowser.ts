@@ -5,7 +5,7 @@
  */
 
 import type { GeometryKernel } from '@core/geometry/kernel';
-import { createOcctKernel } from '@core/geometry/occtKernel';
+import { createOcctKernel } from '@kernel-occt/occtKernel';
 import wasmUrl from 'opencascade.js/dist/opencascade.wasm.wasm?url';
 
 export function createBrowserOcctKernel(): Promise<GeometryKernel> {

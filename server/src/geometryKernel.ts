@@ -8,7 +8,7 @@
 
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { parseKernelChoice, type KernelChoice } from '@core/geometry/kernelChoice';
-import { createManifoldKernel } from '@core/geometry/manifoldKernel';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 
 let activeKernel: KernelChoice | null = null;
 

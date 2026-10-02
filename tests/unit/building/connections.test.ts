@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildingErrors } from '@core/commands/building/validate';
+import { buildingErrors } from '@aec/validate';
 import type { BuildingElement, MomentConnectionElement } from '@core/model/building';
-import type { TakeoffLine } from '@core/commands/building/quantities';
-import type { IfcExport } from '@core/commands/building/ifc';
+import type { TakeoffLine } from '@aec/quantities';
+import type { IfcExport } from '@aec/ifc';
 
 const HALL = { span: 18000, length: 12000, eaveHeight: 6000, roofPitch: 6 };
 

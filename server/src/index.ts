@@ -27,7 +27,7 @@ import cors from 'cors';
 import { buildMcpRouter } from './mcp';
 import { exchangeOptionsFromEnv } from './pythonExchange';
 import { getActiveKernelName, installGeometryKernel } from './geometryKernel';
-import { exportStepFile } from '@core/mcp';
+import { exportStepFile } from '@mcp/index';
 import {
   subscribeLive,
   getLiveSnapshot,

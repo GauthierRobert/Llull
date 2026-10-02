@@ -6,7 +6,7 @@ import { stripOuterParens } from '@core/commands/code_trace';
 import { MAX_TRACE_FEATURES } from '@core/commands/limits';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import { createManifoldKernel } from '@core/geometry/manifoldKernel';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 
 interface CodeData {
   format: string;

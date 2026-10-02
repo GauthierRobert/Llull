@@ -7,19 +7,12 @@ import {
   framesOf,
   solveCombination,
   type FrameLoads,
-} from '@core/commands/building/industrial/frameModel';
-import {
-  BEARING_STRENGTH,
-  checkPlateMN,
-  sizeBasePlate,
-} from '@core/commands/building/industrial/basePlateMN';
-import {
-  footingMoment,
-  type FoundationRow,
-} from '@core/commands/building/industrial/foundationCheck';
-import type { FootingDesignRow } from '@core/commands/building/industrial/footingDesign';
-import { findProfile } from '@core/commands/building/steel/profiles';
-import { buildingErrors } from '@core/commands/building/validate';
+} from '@aec/industrial/frameModel';
+import { BEARING_STRENGTH, checkPlateMN, sizeBasePlate } from '@aec/industrial/basePlateMN';
+import { footingMoment, type FoundationRow } from '@aec/industrial/foundationCheck';
+import type { FootingDesignRow } from '@aec/industrial/footingDesign';
+import { findProfile } from '@aec/steel/profiles';
+import { buildingErrors } from '@aec/validate';
 
 const HALL = { span: 24000, length: 30000 };
 const LOADS: FrameLoads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0.7 };

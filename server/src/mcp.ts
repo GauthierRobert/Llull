@@ -58,8 +58,8 @@ import {
   isToolEnabled,
   parseToolsets,
   toolsetOf,
-} from '@core/mcp';
-import type { ToolsetName } from '@core/mcp';
+} from '@mcp/index';
+import type { ToolsetName } from '@mcp/index';
 import type { CadDocument } from '@core/model/types';
 import { getLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';

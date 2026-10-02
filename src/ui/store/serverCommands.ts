@@ -15,7 +15,7 @@
  */
 
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
-import type { LiveSnapshotEvent } from '@core/mcp/liveSync';
+import type { LiveSnapshotEvent } from '@mcp/liveSync';
 
 // ---------------------------------------------------------------------------
 // Response type

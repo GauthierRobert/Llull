@@ -1,0 +1,10 @@
+{
+  "name": "@llull/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP tool/resource/prompt surface over the command registry.",
+  "dependencies": {
+    "@llull/core": "0.1.0"
+  }
+}

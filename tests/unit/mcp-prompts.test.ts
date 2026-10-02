@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { listMcpPrompts, getMcpPrompt } from '@core/mcp';
+import { listMcpPrompts, getMcpPrompt } from '@mcp/index';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 

@@ -7,8 +7,8 @@ import {
   wheelMoment,
   wheelShear,
   type RunwayCheckRow,
-} from '@core/commands/building/industrial/runwayCheck';
-import { craneActions } from '@core/commands/building/industrial/frameModel';
+} from '@aec/industrial/runwayCheck';
+import { craneActions } from '@aec/industrial/frameModel';
 
 function hall(capacity = 10): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {

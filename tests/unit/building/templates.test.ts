@@ -89,7 +89,7 @@ describe('second review regressions', () => {
   });
 
   it('copies of generated geometry are refused and never resolve to the element (H1)', async () => {
-    const { buildingElementOf } = await import('@core/commands/building');
+    const { buildingElementOf } = await import('@aec/index');
     const doc = execute(createEmptyDocument(), 'add_wall', {
       start: [0, 0],
       end: [4000, 0],

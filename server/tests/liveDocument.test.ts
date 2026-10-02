@@ -19,7 +19,7 @@ import {
   _resetLiveDoc,
   _subscriberCount,
 } from '../src/liveDocument';
-import { applyMcpToolCall } from '@core/mcp/dispatch';
+import { applyMcpToolCall } from '@mcp/dispatch';
 import { createEmptyDocument } from '@core/model/types';
 
 // ---------------------------------------------------------------------------

@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  exportNcFiles,
-  type NcExport,
-  type NcFile,
-} from '@core/commands/building/industrial/ncExport';
+import { exportNcFiles, type NcExport, type NcFile } from '@aec/industrial/ncExport';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
-import { findProfile } from '@core/commands/building/steel/profiles';
+import { findProfile } from '@aec/steel/profiles';
 
 const HALL = { span: 24000, length: 30000 };
 

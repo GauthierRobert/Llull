@@ -32,7 +32,7 @@ import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { listCommands } from '@core/commands/registry';
 import * as registry from '@core/commands/registry';
-import { buildDiscoveryToolDefinitions, buildExchangeToolDefinitions } from '@core/mcp';
+import { buildDiscoveryToolDefinitions, buildExchangeToolDefinitions } from '@mcp/index';
 
 // ---------------------------------------------------------------------------
 // SSE parsing helpers

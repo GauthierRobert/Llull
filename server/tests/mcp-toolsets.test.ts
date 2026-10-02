@@ -9,7 +9,7 @@ import request from 'supertest';
 import { buildMcpRouter, toolsetsFromEnv } from '../src/mcp';
 import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
-import { TOOLSET_NAMES, TOOLSETS } from '@core/mcp';
+import { TOOLSET_NAMES, TOOLSETS } from '@mcp/index';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 const app = express();

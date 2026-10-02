@@ -35,8 +35,8 @@ vi.mock('@core/commands/registry', () => ({
   },
 }));
 
-import { shapeToolCallContent } from '@core/mcp/dispatch';
-import { applyMcpToolCall } from '@core/mcp/dispatch';
+import { shapeToolCallContent } from '@mcp/dispatch';
+import { applyMcpToolCall } from '@mcp/dispatch';
 
 // ---------------------------------------------------------------------------
 // shapeToolCallContent — the single shaping implementation

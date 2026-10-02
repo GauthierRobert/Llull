@@ -11,7 +11,7 @@
  */
 
 import { installDefaultPlugins } from '../src/app/plugins.ts';
-import { listCommands, toToolSchemas } from '../src/core/commands/registry.ts';
+import { listCommands, toToolSchemas } from '@core/commands/registry.ts';
 
 installDefaultPlugins();
 const commandNames = listCommands()

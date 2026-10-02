@@ -11,12 +11,7 @@ import React, { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { Text } from '@react-three/drei';
 import type { Vec2 } from '@core/model/types';
-import {
-  buildPlanDrawing,
-  CATEGORY_LAYER,
-  fromMm,
-  type PlanPrimitive,
-} from '@core/commands/building';
+import { buildPlanDrawing, CATEGORY_LAYER, fromMm, type PlanPrimitive } from '@aec/index';
 import { useStore } from '@ui/store';
 import { useThemeStore } from '@ui/store/themeStore';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';

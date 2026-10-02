@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { getGeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import { createManifoldKernel } from '@core/geometry/manifoldKernel';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { kernelPlans } from './plans';
 import { normalize, normalizeGeometry } from './normalize';
 import { runPlan } from './runPlan';

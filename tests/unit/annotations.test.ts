@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { listCommands, toToolSchemas, execute } from '@core/commands/registry';
-import { buildMcpTools } from '@core/mcp/tools';
+import { buildMcpTools } from '@mcp/tools';
 
 // ---------------------------------------------------------------------------
 // Helpers

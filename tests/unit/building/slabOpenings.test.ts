@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { slabMesh } from '@core/commands/building/evaluate';
-import { buildPlanDrawing } from '@core/commands/building/plan';
-import type { TakeoffLine } from '@core/commands/building/quantities';
-import type { IfcExport } from '@core/commands/building/ifc';
+import { slabMesh } from '@aec/evaluate';
+import { buildPlanDrawing } from '@aec/plan';
+import type { TakeoffLine } from '@aec/quantities';
+import type { IfcExport } from '@aec/ifc';
 import { segmentsIntersect, pointInPolygon } from '@lib/polygon';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {

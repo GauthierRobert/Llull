@@ -4,7 +4,7 @@
  * tools/list augmentation: advertise the server-side render_view enrichment params.
  */
 
-import type { McpToolDefinition } from '@core/mcp';
+import type { McpToolDefinition } from '@mcp/index';
 
 /** Augment the core render_view tool definition with the server-side enrichment params. */
 export function augmentRenderViewTool(t: McpToolDefinition): {

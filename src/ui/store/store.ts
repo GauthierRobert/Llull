@@ -51,8 +51,8 @@ import {
   ServerCommandError,
 } from './serverCommands';
 import { execute } from '@core/commands/registry';
-import type { LiveCommandEvent, LiveSnapshotEvent } from '@core/mcp/liveSync';
-import { applyLiveCommand } from '@core/mcp/liveSync';
+import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
+import { applyLiveCommand } from '@mcp/liveSync';
 
 // ---------------------------------------------------------------------------
 // State shape

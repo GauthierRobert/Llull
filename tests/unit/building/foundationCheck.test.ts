@@ -7,12 +7,9 @@ import {
   type ClayLayer,
   type FoundationRow,
   ultimateCombinations,
-} from '@core/commands/building/industrial/foundationCheck';
-import { baseReactions } from '@core/commands/building/industrial/frameModel';
-import {
-  anchorBoltResistance,
-  boltResistance,
-} from '@core/commands/building/industrial/steelDesign';
+} from '@aec/industrial/foundationCheck';
+import { baseReactions } from '@aec/industrial/frameModel';
+import { anchorBoltResistance, boltResistance } from '@aec/industrial/steelDesign';
 
 const HALL = { span: 24000, length: 30000 };
 

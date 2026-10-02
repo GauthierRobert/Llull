@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
-import { buildingElementOf } from '@core/commands/building';
+import { buildingElementOf } from '@aec/index';
 
 export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

@@ -9,7 +9,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import type { GeometryKernel } from '@core/geometry/kernel';
-import { createOcctKernel, type OcctFactory } from '@core/geometry/occtKernel';
+import { createOcctKernel, type OcctFactory } from '@kernel-occt/occtKernel';
 
 export async function createNodeOcctKernel(): Promise<GeometryKernel> {
   const distDir = join(dirname(createRequire(__filename).resolve('opencascade.js')), 'dist');

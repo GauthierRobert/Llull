@@ -11,8 +11,12 @@ import { resolve } from 'node:path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@core': resolve(__dirname, '../src/core'),
-      '@lib': resolve(__dirname, '../src/lib'),
+      '@core': resolve(__dirname, '../packages/core/src'),
+      '@lib': resolve(__dirname, '../packages/core/src/lib'),
+      '@mcp': resolve(__dirname, '../packages/mcp/src'),
+      '@aec': resolve(__dirname, '../packages/domain-aec/src'),
+      '@kernel-manifold': resolve(__dirname, '../packages/kernel-manifold/src'),
+      '@kernel-occt': resolve(__dirname, '../packages/kernel-occt/src'),
       '@app': resolve(__dirname, '../src/app'),
     },
   },

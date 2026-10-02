@@ -18,7 +18,7 @@ module.exports = {
   },
   overrides: [
     {
-      files: ['src/**/*.{ts,tsx}', 'server/src/**/*.ts'],
+      files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts', 'server/src/**/*.ts'],
       rules: { 'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }] },
     },
   ],

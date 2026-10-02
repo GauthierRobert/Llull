@@ -23,11 +23,15 @@
 
     /* Path aliases so imports read cleanly (resolved relative to this tsconfig) */
     "paths": {
-      "@core/*": ["./src/core/*"],
+      "@core/*": ["./packages/core/src/*"],
+      "@lib/*": ["./packages/core/src/lib/*"],
+      "@mcp/*": ["./packages/mcp/src/*"],
+      "@aec/*": ["./packages/domain-aec/src/*"],
+      "@kernel-manifold/*": ["./packages/kernel-manifold/src/*"],
+      "@kernel-occt/*": ["./packages/kernel-occt/src/*"],
       "@ui/*": ["./src/ui/*"],
-      "@lib/*": ["./src/lib/*"],
       "@app/*": ["./src/app/*"]
     }
   },
-  "include": ["src", "tests"]
+  "include": ["src", "packages", "tests"]
 }

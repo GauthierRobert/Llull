@@ -1,0 +1,11 @@
+{
+  "name": "@llull/kernel-occt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenCascade (B-rep) geometry kernel behind the core GeometryKernel interface.",
+  "dependencies": {
+    "@llull/core": "0.1.0",
+    "opencascade.js": "^1.1.1"
+  }
+}

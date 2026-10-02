@@ -22,8 +22,8 @@ import type { Response } from 'express';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
-import { documentHash } from '@core/mcp/liveSync';
-import type { LiveCommandEvent, LiveSnapshotEvent } from '@core/mcp/liveSync';
+import { documentHash } from '@mcp/liveSync';
+import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 
 // ---------------------------------------------------------------------------
 // Disk persistence (autosave between server restarts)

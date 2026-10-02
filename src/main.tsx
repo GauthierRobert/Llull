@@ -13,7 +13,7 @@ import '@fontsource/geist-mono/latin-600.css';
 import '@ui/styles/index.css';
 import { installDefaultPlugins } from '@app/plugins';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { createManifoldKernel } from '@core/geometry/manifoldKernel';
+import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { parseKernelChoice } from '@core/geometry/kernelChoice';
 
 // ---------------------------------------------------------------------------

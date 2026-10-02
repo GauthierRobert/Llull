@@ -14,7 +14,7 @@ import {
   listMcpResources,
   readMcpResource,
   CAD_RESOURCE_URIS,
-} from '@core/mcp';
+} from '@mcp/index';
 
 // ---------------------------------------------------------------------------
 // buildMcpTools

@@ -12,13 +12,8 @@ import {
   pointToSegDistSq,
   entityDistSq,
 } from '../../src/ui/viewport/2d/modifyHelpers';
-import type { Vec2 } from '../../src/core/model/types';
-import type {
-  LineEntity,
-  PolylineEntity,
-  CircleEntity,
-  RectangleEntity,
-} from '../../src/core/model/types';
+import type { Vec2 } from '@core/model/types';
+import type { LineEntity, PolylineEntity, CircleEntity, RectangleEntity } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
 // nearestVertex
