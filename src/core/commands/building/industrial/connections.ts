@@ -9,7 +9,8 @@ import type {
   SteelMemberElement,
 } from '../../../model/building';
 import type { CadDocument, Vec3 } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -145,21 +146,13 @@ export function appendConnections(
   return { building: next, ids };
 }
 
-interface AddMomentConnectionsParams {
-  rafterIds?: string[];
-  levelId?: string;
-  plateThickness?: number;
-  boltDiameter?: number;
-  haunchLength?: number;
-}
-
 /**
  * @command add_moment_connections
  * @pure
  * @affects creates 1 connection per unconnected eaves / apex joint of the rafters
  * @failure bad sizes / no unconnected joints -> no-op
  */
-export const addMomentConnections: CommandDefinition<AddMomentConnectionsParams> = {
+export const addMomentConnections = defineCommand({
   name: 'add_moment_connections',
   description:
     'Detail the portal frame moment connections: a bolted end plate at every rafter-to-column joint ' +
@@ -167,24 +160,19 @@ export const addMomentConnections: CommandDefinition<AddMomentConnectionsParams>
     '(apex), for the given rafters or every rafter of the level. Sized from the rafter section ' +
     '(plate 20/25 mm, M20 bolts, haunch = 1/5 of the rafter plan length). Follows the rafter; plate, ' +
     'haunch and bolt quantities feed the takeoff and the connection schedule.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      rafterIds: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Rafter member ids. Default: every rafter of the level.',
-      },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-      plateThickness: { type: 'number', description: 'End plate thickness. Default 20 / 25 mm.' },
-      boltDiameter: { type: 'number', description: 'Bolt diameter. Default 20 mm (M20).' },
-      haunchLength: {
-        type: 'number',
-        description: 'Eaves haunch length along the rafter. Default 1/5 of its plan length.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    rafterIds: z
+      .array(z.string())
+      .optional()
+      .describe('Rafter member ids. Default: every rafter of the level.'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    plateThickness: z.number().optional().describe('End plate thickness. Default 20 / 25 mm.'),
+    boltDiameter: z.number().optional().describe('Bolt diameter. Default 20 mm (M20).'),
+    haunchLength: z
+      .number()
+      .optional()
+      .describe('Eaves haunch length along the rafter. Default 1/5 of its plan length.'),
+  }),
   run: (doc, params): CommandResult => {
     const positive = (value: number | undefined): boolean =>
       value === undefined || (isFiniteNumber(value) && value > 0);
@@ -240,7 +228,7 @@ export const addMomentConnections: CommandDefinition<AddMomentConnectionsParams>
       data: { elementIds: added.ids },
     };
   },
-};
+});
 
 /**
  * Connections of `memberId` whose joint no longer exists (rafter no longer a rafter, the column

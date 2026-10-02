@@ -5,7 +5,8 @@
  */
 
 import type { SteelMemberElement } from '../../../model/building';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
 import { findProfile, sectionProperties } from '../steel/profiles';
 import { toCsv } from '../quantities';
@@ -329,7 +330,7 @@ function checkBeam(
  * @affects none; data = { rows: RunwayCheckRow[], csv, maxUtilisation, failures }
  * @failure bad params / unknown level / no crane beams -> no data
  */
-export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
+export const runwayCheck = defineCommand({
   name: 'check_crane_runways',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -354,77 +355,75 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
     '(7) test load, group 8 (§2.10): Qtest = max(φ6 · 1.1, 1.25) Qh, φ6 = 0.5 (1 + φ2), γ = 1.1, bending row. ' +
     'Utilisation > 1 fails. Not covered: torsion, rail-wheel contact, continuity, ' +
     'connections - not a substitute for the engineer of record.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      craneCapacity: {
-        type: 'number',
-        description:
-          'Crane capacity in tonnes (> 0) applied to every runway beam. Default: read from each ' +
+  params: z.object({
+    craneCapacity: z
+      .number()
+      .optional()
+      .describe(
+        'Crane capacity in tonnes (> 0) applied to every runway beam. Default: read from each ' +
           "runway beam's note (add_crane_runway capacity).",
-      },
-      wheelBase: {
-        type: 'number',
-        description:
-          'Distance between the two wheels of a rail wheel group, mm (> 0). Default 3000.',
-      },
-      hoistingClass: {
-        type: 'string',
-        enum: ['HC1', 'HC2', 'HC3', 'HC4'],
-        description:
-          'EN 1991-3 hoisting class: φ2 = φ2,min + β2 vh (HC1 1.05 + 0.17 vh, HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.',
-      },
-      hoistingSpeed: {
-        type: 'number',
-        description: 'Hoisting speed vh in m/s (>= 0). Default 0.1.',
-      },
-      craneSpan: {
-        type: 'number',
-        description:
-          'Bridge span between the two runway rails, mm (> 0). Default: x distance to the paired runway beam, else 20000.',
-      },
-      craneSelfWeight: {
-        type: 'number',
-        description:
-          'Crane self-weight Gc in kN (> 0, bridge + trolley, trolley = 0.2 Gc). Default 0.5 Q + 20 kN.',
-      },
-      minHookApproach: {
-        type: 'number',
-        description:
-          'Minimum hook approach to the rail in m (>= 0); positions the trolley for the maximum wheel load. Default 1.0.',
-      },
-      travelSpeed: {
-        type: 'number',
-        description:
-          'Crane long travel speed in m/s (> 0) for the buffer force HB,1 (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
-      },
-      bufferStiffness: {
-        type: 'number',
-        description:
-          'Buffer spring constant SB in kN/m (> 0) for HB,1 = φ7 v1 √(mc SB). Default 1000 kN/m.',
-      },
-      craneClass: {
-        type: 'string',
-        enum: ['S2', 'S3', 'S4'],
-        description:
-          'EN 1991-3 / EN 1993-6 fatigue duty class (S2 light, S3 medium, S4 heavy). Default S3.',
-      },
-      railSize: {
-        type: 'string',
-        enum: ['A45', 'A55', 'A65', 'A75', 'A100', 'flat50x30'],
-        description:
-          'Crane rail (DIN 536 Form A, approximate section data, or flat bar 50x30). Its mass joins the runway self-weight and its inertia (75 % of Ir for wear) spreads the wheel load in the local web check. Default A55.',
-      },
-      girder: {
-        type: 'string',
-        enum: ['rolled', 'welded-full', 'welded-fillet'],
-        description:
-          'Runway girder type for local web fatigue (EN 1993-1-9 Tab. 8.10): rolled section = detail category 160; welded-full = welded plate girder with full-penetration web-to-flange welds = 71; welded-fillet = fillet or partial-penetration welds = 36. Default rolled.',
-      },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-    },
-    required: [],
-  },
+      ),
+    wheelBase: z
+      .number()
+      .optional()
+      .describe('Distance between the two wheels of a rail wheel group, mm (> 0). Default 3000.'),
+    hoistingClass: z
+      .enum(['HC1', 'HC2', 'HC3', 'HC4'])
+      .optional()
+      .describe(
+        'EN 1991-3 hoisting class: φ2 = φ2,min + β2 vh (HC1 1.05 + 0.17 vh, HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.',
+      ),
+    hoistingSpeed: z.number().optional().describe('Hoisting speed vh in m/s (>= 0). Default 0.1.'),
+    craneSpan: z
+      .number()
+      .optional()
+      .describe(
+        'Bridge span between the two runway rails, mm (> 0). Default: x distance to the paired runway beam, else 20000.',
+      ),
+    craneSelfWeight: z
+      .number()
+      .optional()
+      .describe(
+        'Crane self-weight Gc in kN (> 0, bridge + trolley, trolley = 0.2 Gc). Default 0.5 Q + 20 kN.',
+      ),
+    minHookApproach: z
+      .number()
+      .optional()
+      .describe(
+        'Minimum hook approach to the rail in m (>= 0); positions the trolley for the maximum wheel load. Default 1.0.',
+      ),
+    travelSpeed: z
+      .number()
+      .optional()
+      .describe(
+        'Crane long travel speed in m/s (> 0) for the buffer force HB,1 (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
+      ),
+    bufferStiffness: z
+      .number()
+      .optional()
+      .describe(
+        'Buffer spring constant SB in kN/m (> 0) for HB,1 = φ7 v1 √(mc SB). Default 1000 kN/m.',
+      ),
+    craneClass: z
+      .enum(['S2', 'S3', 'S4'])
+      .optional()
+      .describe(
+        'EN 1991-3 / EN 1993-6 fatigue duty class (S2 light, S3 medium, S4 heavy). Default S3.',
+      ),
+    railSize: z
+      .enum(['A45', 'A55', 'A65', 'A75', 'A100', 'flat50x30'])
+      .optional()
+      .describe(
+        'Crane rail (DIN 536 Form A, approximate section data, or flat bar 50x30). Its mass joins the runway self-weight and its inertia (75 % of Ir for wear) spreads the wheel load in the local web check. Default A55.',
+      ),
+    girder: z
+      .enum(['rolled', 'welded-full', 'welded-fillet'])
+      .optional()
+      .describe(
+        'Runway girder type for local web fatigue (EN 1993-1-9 Tab. 8.10): rolled section = detail category 160; welded-full = welded plate girder with full-penetration web-to-flange welds = 71; welded-fillet = fillet or partial-penetration welds = 36. Default rolled.',
+      ),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  }),
   run: (doc, params): CommandResult => {
     const {
       craneCapacity,
@@ -608,4 +607,4 @@ export const runwayCheck: CommandDefinition<RunwayCheckParams> = {
       },
     };
   },
-};
+});

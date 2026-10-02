@@ -189,10 +189,10 @@ describe('export_anchor_plan', () => {
       { embedment: -1 },
       { levelId: 'level-99' },
     ]) {
-      const result = anchorPlan.run(doc, params);
+      const result = execute(doc, 'export_anchor_plan', params);
       expect(result.document, JSON.stringify(params)).toBe(doc);
       expect(result.affected).toEqual([]);
-      expect(result.summary).toContain('failed');
+      expect(result.summary).toMatch(/failed|rejected/);
     }
   });
 

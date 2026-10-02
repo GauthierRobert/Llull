@@ -166,7 +166,7 @@ describe('design_purlins', () => {
       const result = execute(doc, 'design_purlins', bad);
       expect(result.document).toBe(doc);
       expect(result.affected).toEqual([]);
-      expect(result.summary).toMatch(/design_purlins failed/);
+      expect(result.summary).toMatch(/design_purlins (failed|rejected)/);
     }
     const empty = createEmptyDocument();
     expect(execute(empty, 'design_purlins', {}).document).toBe(empty);

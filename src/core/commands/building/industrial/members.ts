@@ -11,7 +11,8 @@ import type {
   PanelElement,
   SteelMemberElement,
 } from '../../../model/building';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -124,38 +125,27 @@ export function appendMembers(
   return { building: next, ids };
 }
 
-interface ListSteelProfilesParams {
-  family?: string;
-}
-
 /**
  * @command list_steel_profiles
  * @pure read-only
  * @affects none; data = { profiles: SteelProfile[] }
  */
-export const listSteelProfiles: CommandDefinition<ListSteelProfilesParams> = {
+export const listSteelProfiles = defineCommand({
   name: 'list_steel_profiles',
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only steel section catalogue: IPE, HEA, HEB, UPN, cold-formed C purlins, SHS, RHS, CHS and ' +
     'equal angles L, with depth h, width b, web / flange thickness (mm), mass (kg/m), area (mm²) and paint ' +
     'perimeter (mm). Optionally filter by family.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      family: {
-        type: 'string',
-        enum: ['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L'],
-        description: 'Only this family.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    family: z
+      .enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L'])
+      .optional()
+      .describe('Only this family.'),
+  }),
   run: (doc, { family }): CommandResult => {
     const profiles = STEEL_PROFILES.filter(
-      (profile) =>
-        family === undefined ||
-        (typeof family === 'string' && profile.family === family.trim().toUpperCase()),
+      (profile) => family === undefined || profile.family === family.trim().toUpperCase(),
     );
     return {
       document: doc,
@@ -164,31 +154,12 @@ export const listSteelProfiles: CommandDefinition<ListSteelProfilesParams> = {
       data: { profiles },
     };
   },
-};
-
-const LEVEL_PROPERTY = {
-  type: 'string',
-  description: 'Level id. Default: the active level (a "Level 0" is created if none).',
-} as const;
-
-const POINT3 = (
-  description: string,
-): { type: 'array'; items: { type: 'number' }; description: string } => ({
-  type: 'array',
-  items: { type: 'number' },
-  description,
 });
 
-interface AddSteelMemberParams {
-  profile: string;
-  start: Vec3;
-  end: Vec3;
-  role?: MemberRole;
-  roll?: number;
-  levelId?: string;
-  material?: string;
-  note?: string;
-}
+const levelIdSchema = z
+  .string()
+  .optional()
+  .describe('Level id. Default: the active level (a "Level 0" is created if none).');
 
 /**
  * @command add_steel_member
@@ -196,31 +167,26 @@ interface AddSteelMemberParams {
  * @affects creates 1 steel member (exact section mesh on its role layer)
  * @failure unknown profile / role, zero length, unknown level -> no-op
  */
-export const addSteelMember: CommandDefinition<AddSteelMemberParams> = {
+export const addSteelMember = defineCommand({
   name: 'add_steel_member',
   description:
     'Add a steel member with a catalogue section (e.g. "HEA300", "IPE400", "CHS76.1x3.6") between two 3D ' +
     'points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, ' +
     'brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and ' +
     'along +X for vertical columns; roll (radians) turns it about the axis.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      profile: { type: 'string', description: 'Catalogue section name (list_steel_profiles).' },
-      start: POINT3('Axis start [x, y, z], z relative to the level.'),
-      end: POINT3('Axis end [x, y, z].'),
-      role: {
-        type: 'string',
-        enum: [...MEMBER_ROLES],
-        description: 'Structural role. Default beam.',
-      },
-      roll: { type: 'number', description: 'Section rotation about the axis, radians. Default 0.' },
-      levelId: LEVEL_PROPERTY,
-      material: { type: 'string', description: 'Steel grade. Default S355.' },
-      note: { type: 'string', description: 'Note carried to the member schedule.' },
-    },
-    required: ['profile', 'start', 'end'],
-  },
+  params: z.object({
+    profile: z.string().describe('Catalogue section name (list_steel_profiles).'),
+    start: z.array(z.number()).describe('Axis start [x, y, z], z relative to the level.'),
+    end: z.array(z.number()).describe('Axis end [x, y, z].'),
+    role: z
+      .enum([...MEMBER_ROLES])
+      .optional()
+      .describe('Structural role. Default beam.'),
+    roll: z.number().optional().describe('Section rotation about the axis, radians. Default 0.'),
+    levelId: levelIdSchema,
+    material: z.string().optional().describe('Steel grade. Default S355.'),
+    note: z.string().optional().describe('Note carried to the member schedule.'),
+  }),
   run: (
     doc,
     { profile, start, end, role = 'beam', roll = 0, levelId, material, note },
@@ -229,11 +195,8 @@ export const addSteelMember: CommandDefinition<AddSteelMemberParams> = {
     const to = toVec3(end);
     if (!from || !to)
       return noChange(doc, 'add_steel_member failed: start and end must be [x, y, z].');
-    if (!MEMBER_ROLES.includes(role) || !isFiniteNumber(roll)) {
-      return noChange(
-        doc,
-        `add_steel_member failed: role must be one of ${MEMBER_ROLES.join(', ')} and roll finite.`,
-      );
+    if (!isFiniteNumber(roll)) {
+      return noChange(doc, 'add_steel_member failed: roll must be finite.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noChange(doc, `add_steel_member failed: ${resolution.reason}.`);
@@ -261,42 +224,30 @@ export const addSteelMember: CommandDefinition<AddSteelMemberParams> = {
       data: { elementId: added.ids[0] },
     };
   },
-};
-
-interface UpdateSteelMemberParams {
-  memberId: string;
-  profile?: string;
-  start?: Vec3;
-  end?: Vec3;
-  role?: MemberRole;
-  roll?: number;
-  material?: string;
-  note?: string;
-}
+});
 
 /**
  * @command update_steel_member
  * @pure
  * @failure unknown member / profile / role, zero length -> no-op
  */
-export const updateSteelMember: CommandDefinition<UpdateSteelMemberParams> = {
+export const updateSteelMember = defineCommand({
   name: 'update_steel_member',
   description:
     'Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade or note.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      memberId: { type: 'string', description: 'Member element id, e.g. "member-3".' },
-      profile: { type: 'string', description: 'New catalogue section.' },
-      start: POINT3('New axis start [x, y, z].'),
-      end: POINT3('New axis end [x, y, z].'),
-      role: { type: 'string', enum: [...MEMBER_ROLES], description: 'New role.' },
-      roll: { type: 'number', description: 'New roll, radians.' },
-      material: { type: 'string', description: 'New steel grade.' },
-      note: { type: 'string', description: 'New schedule note.' },
-    },
-    required: ['memberId'],
-  },
+  params: z.object({
+    memberId: z.string().describe('Member element id, e.g. "member-3".'),
+    profile: z.string().optional().describe('New catalogue section.'),
+    start: z.array(z.number()).optional().describe('New axis start [x, y, z].'),
+    end: z.array(z.number()).optional().describe('New axis end [x, y, z].'),
+    role: z
+      .enum([...MEMBER_ROLES])
+      .optional()
+      .describe('New role.'),
+    roll: z.number().optional().describe('New roll, radians.'),
+    material: z.string().optional().describe('New steel grade.'),
+    note: z.string().optional().describe('New schedule note.'),
+  }),
   run: (doc, { memberId, profile, start, end, role, roll, material, note }): CommandResult => {
     const building = getBuilding(doc);
     const member = building.elements[memberId];
@@ -307,15 +258,10 @@ export const updateSteelMember: CommandDefinition<UpdateSteelMemberParams> = {
       return noChange(doc, `update_steel_member failed: unknown steel profile '${profile ?? ''}'.`);
     const from = start !== undefined ? toVec3(start) : member.start;
     const to = end !== undefined ? toVec3(end) : member.end;
-    if (
-      !from ||
-      !to ||
-      (role !== undefined && !MEMBER_ROLES.includes(role)) ||
-      (roll !== undefined && !isFiniteNumber(roll))
-    ) {
+    if (!from || !to || (roll !== undefined && !isFiniteNumber(roll))) {
       return noChange(
         doc,
-        'update_steel_member failed: start/end must be [x, y, z], role valid, roll finite.',
+        'update_steel_member failed: start/end must be [x, y, z] and roll finite.',
       );
     }
     if (Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]) === 0) {
@@ -350,18 +296,7 @@ export const updateSteelMember: CommandDefinition<UpdateSteelMemberParams> = {
       affected: elementAffected(document, [memberId, ...refit.resized]),
     };
   },
-};
-
-interface AddFootingParams {
-  location?: Vec2;
-  underColumns?: boolean;
-  width?: number;
-  length?: number;
-  thickness?: number;
-  topOffset?: number;
-  levelId?: string;
-  material?: string;
-}
+});
 
 /** Upper bound on members one generator call may create (keeps agents from hanging the host). */
 export const MAX_GENERATED_MEMBERS = 5000;
@@ -461,29 +396,25 @@ export function appendFootings(
  * @affects creates 1 pad footing, or one under every column of the level
  * @failure no location / no columns / sizes <= 0 -> no-op
  */
-export const addFooting: CommandDefinition<AddFootingParams> = {
+export const addFooting = defineCommand({
   name: 'add_footing',
   description:
     'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and ' +
     'concrete column foot of the level. Top of footing at level + topOffset (default −300 mm); default ' +
     '1500 × 1500 × 600 mm.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      location: { type: 'array', items: { type: 'number' }, description: 'Footing centre [x, y].' },
-      underColumns: { type: 'boolean', description: 'Place one under each column of the level.' },
-      width: { type: 'number', description: 'Size along X. Default 1500 mm.' },
-      length: { type: 'number', description: 'Size along Y. Default = width.' },
-      thickness: { type: 'number', description: 'Depth of the pad. Default 600 mm.' },
-      topOffset: {
-        type: 'number',
-        description: 'Top of footing relative to the level. Default −300 mm.',
-      },
-      levelId: LEVEL_PROPERTY,
-      material: { type: 'string', description: 'Default concrete.' },
-    },
-    required: [],
-  },
+  params: z.object({
+    location: z.array(z.number()).optional().describe('Footing centre [x, y].'),
+    underColumns: z.boolean().optional().describe('Place one under each column of the level.'),
+    width: z.number().optional().describe('Size along X. Default 1500 mm.'),
+    length: z.number().optional().describe('Size along Y. Default = width.'),
+    thickness: z.number().optional().describe('Depth of the pad. Default 600 mm.'),
+    topOffset: z
+      .number()
+      .optional()
+      .describe('Top of footing relative to the level. Default −300 mm.'),
+    levelId: levelIdSchema,
+    material: z.string().optional().describe('Default concrete.'),
+  }),
   run: (doc, params): CommandResult => {
     const positive = (value: number | undefined): boolean =>
       value === undefined || (isFiniteNumber(value) && value > 0);
@@ -528,15 +459,7 @@ export const addFooting: CommandDefinition<AddFootingParams> = {
       data: { elementIds: added.ids },
     };
   },
-};
-
-interface AddPanelParams {
-  corners: Vec3[];
-  role?: 'roof' | 'wall';
-  thickness?: number;
-  levelId?: string;
-  material?: string;
-}
+});
 
 /** Adds one cladding panel (no regeneration); null when the corners are not a usable plane. */
 export function appendPanel(
@@ -566,31 +489,19 @@ export function appendPanel(
  * @affects creates 1 cladding panel (mesh on layer A-CLAD)
  * @failure < 3 corners / degenerate plane / thickness <= 0 -> no-op
  */
-export const addPanel: CommandDefinition<AddPanelParams> = {
+export const addPanel = defineCommand({
   name: 'add_panel',
   description:
     'Add a planar cladding, roofing or sandwich panel through 3D corners [[x, y, z], …] (z above the level). ' +
     'The panel thickness grows along the plane normal (right-hand rule on the corner order). Use for ' +
     'pitched roofs, façades and gables.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      corners: {
-        type: 'array',
-        items: { type: 'array', items: { type: 'number' } },
-        description: 'Coplanar corners [[x, y, z], …], at least 3.',
-      },
-      role: {
-        type: 'string',
-        enum: ['roof', 'wall'],
-        description: 'Roofing or wall cladding. Default wall.',
-      },
-      thickness: { type: 'number', description: 'Panel thickness. Default 80 mm.' },
-      levelId: LEVEL_PROPERTY,
-      material: { type: 'string', description: 'Default sandwich-panel (or steel-sheet, …).' },
-    },
-    required: ['corners'],
-  },
+  params: z.object({
+    corners: z.array(z.array(z.number())).describe('Coplanar corners [[x, y, z], …], at least 3.'),
+    role: z.enum(['roof', 'wall']).optional().describe('Roofing or wall cladding. Default wall.'),
+    thickness: z.number().optional().describe('Panel thickness. Default 80 mm.'),
+    levelId: levelIdSchema,
+    material: z.string().optional().describe('Default sandwich-panel (or steel-sheet, …).'),
+  }),
   run: (doc, { corners, role = 'wall', thickness, levelId, material }): CommandResult => {
     const points = Array.isArray(corners) ? corners.map(toVec3) : [];
     if (points.length < 3 || points.some((point) => point === null)) {
@@ -616,4 +527,4 @@ export const addPanel: CommandDefinition<AddPanelParams> = {
       data: { elementId: added.id },
     };
   },
-};
+});

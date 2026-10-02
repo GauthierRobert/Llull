@@ -5,7 +5,6 @@ import { execute } from '@core/commands/registry';
 import {
   designFootings,
   designMat,
-  type FootingDesignParams,
   type FootingDesignRow,
 } from '@core/commands/building/industrial/footingDesign';
 import {
@@ -202,9 +201,9 @@ describe('design_footings', () => {
       { allowShrink: 1 },
       { clayLayer: { topDepth: 1 } },
     ] as Array<Record<string, unknown>>) {
-      const result = designFootings.run(doc, params as FootingDesignParams);
+      const result = execute(doc, 'design_footings', params);
       expect(result.document).toBe(doc);
-      expect(result.summary).toContain('design_footings failed');
+      expect(result.summary).toMatch(/design_footings (failed|rejected)/);
     }
   });
 

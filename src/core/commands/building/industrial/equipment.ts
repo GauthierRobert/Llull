@@ -3,9 +3,10 @@
  * @layer core/commands/building/industrial
  */
 
-import type { Vec2, Vec3 } from '../../../model/types';
+import type { Vec3 } from '../../../model/types';
 import type { EquipmentElement, PipeElement } from '../../../model/building';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -23,60 +24,37 @@ import {
 import { regenerateBuilding } from '../evaluate';
 import { toVec3 } from './members';
 
-interface AddEquipmentParams {
-  name: string;
-  location: Vec2;
-  size: Vec3;
-  angle?: number;
-  clearance?: number;
-  weight?: number;
-  levelId?: string;
-  mark?: string;
-}
-
 /**
  * @command add_equipment
  * @pure
  * @affects creates 1 equipment footprint (box on layer Q-EQPM; clearance drawn in plan)
  * @failure missing name / bad location / size <= 0 / clearance < 0 -> no-op
  */
-export const addEquipment: CommandDefinition<AddEquipmentParams> = {
+export const addEquipment = defineCommand({
   name: 'add_equipment',
   description:
     'Place a machine / process equipment on a level: name, plan centre, size [length, width, height], ' +
     'plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and ' +
     'operating weight in kg (for floor loads). Shown as a block in 3D and with its clearance zone in plan.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Equipment name, e.g. "CNC lathe", "Compressor".' },
-      location: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Footprint centre [x, y].',
-      },
-      size: {
-        type: 'array',
-        items: { type: 'number' },
-        description: '[length (local x), width (local y), height], all > 0.',
-      },
-      angle: { type: 'number', description: 'Plan rotation in radians. Default 0.' },
-      clearance: {
-        type: 'number',
-        description: 'Maintenance / operating clearance around it. Default 800 mm.',
-      },
-      weight: { type: 'number', description: 'Operating weight in kg. Default 0 (unknown).' },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-      mark: { type: 'string', description: 'Equipment tag. Default EQn.' },
-    },
-    required: ['name', 'location', 'size'],
-  },
+  params: z.object({
+    name: z.string().describe('Equipment name, e.g. "CNC lathe", "Compressor".'),
+    location: z.array(z.number()).describe('Footprint centre [x, y].'),
+    size: z.array(z.number()).describe('[length (local x), width (local y), height], all > 0.'),
+    angle: z.number().optional().describe('Plan rotation in radians. Default 0.'),
+    clearance: z
+      .number()
+      .optional()
+      .describe('Maintenance / operating clearance around it. Default 800 mm.'),
+    weight: z.number().optional().describe('Operating weight in kg. Default 0 (unknown).'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    mark: z.string().optional().describe('Equipment tag. Default EQn.'),
+  }),
   run: (
     doc,
     { name, location, size, angle = 0, clearance, weight = 0, levelId, mark },
   ): CommandResult => {
     const dimensions = toVec3(size);
-    if (typeof name !== 'string' || name.trim() === '' || !isVec2(location)) {
+    if (name.trim() === '' || !isVec2(location)) {
       return noChange(doc, 'add_equipment failed: name and location [x, y] are required.');
     }
     if (
@@ -122,15 +100,7 @@ export const addEquipment: CommandDefinition<AddEquipmentParams> = {
       data: { elementId: equipment.id },
     };
   },
-};
-
-interface AddPipeRunParams {
-  points: Vec3[];
-  diameter?: number;
-  service?: string;
-  material?: string;
-  levelId?: string;
-}
+});
 
 /**
  * @command add_pipe_run
@@ -138,27 +108,21 @@ interface AddPipeRunParams {
  * @affects creates 1 pipe run (segments + bends on layer P-PIPE)
  * @failure < 2 points / repeated point / diameter <= 0 -> no-op
  */
-export const addPipeRun: CommandDefinition<AddPipeRunParams> = {
+export const addPipeRun = defineCommand({
   name: 'add_pipe_run',
   description:
     'Route a pipe through 3D points [[x, y, z], …] (z above the level) with an outside diameter and a ' +
     'service / fluid name (compressed air, cooling water, steam, gas…). Bends are placed at every interior ' +
     'point. Pipe lengths feed the takeoff; clashes are reported by check_clashes.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      points: {
-        type: 'array',
-        items: { type: 'array', items: { type: 'number' } },
-        description: 'Pipe centreline [[x, y, z], …], at least 2 points.',
-      },
-      diameter: { type: 'number', description: 'Outside diameter. Default 114.3 mm (DN100).' },
-      service: { type: 'string', description: 'Fluid / service. Default "process".' },
-      material: { type: 'string', description: 'Default steel.' },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-    },
-    required: ['points'],
-  },
+  params: z.object({
+    points: z
+      .array(z.array(z.number()))
+      .describe('Pipe centreline [[x, y, z], …], at least 2 points.'),
+    diameter: z.number().optional().describe('Outside diameter. Default 114.3 mm (DN100).'),
+    service: z.string().optional().describe('Fluid / service. Default "process".'),
+    material: z.string().optional().describe('Default steel.'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  }),
   run: (doc, { points, diameter, service, material, levelId }): CommandResult => {
     const route = Array.isArray(points) ? points.map(toVec3) : [];
     if (route.length < 2 || route.some((point) => point === null)) {
@@ -210,4 +174,4 @@ export const addPipeRun: CommandDefinition<AddPipeRunParams> = {
       data: { elementId: pipe.id },
     };
   },
-};
+});

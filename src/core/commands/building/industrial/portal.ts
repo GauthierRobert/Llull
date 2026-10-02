@@ -5,7 +5,8 @@
 
 import type { CadDocument, Vec2, Vec3 } from '../../../model/types';
 import type { BuildingModel, SlabElement } from '../../../model/building';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -123,49 +124,28 @@ function runwayMembers(
   return members;
 }
 
-interface AddCraneRunwayParams {
-  start: Vec2;
-  end: Vec2;
-  railHeight: number;
-  profile?: string;
-  capacity?: number;
-  supportSpacing?: number;
-  bracketProfile?: string;
-  levelId?: string;
-}
-
 /**
  * @command add_crane_runway
  * @pure
  * @affects creates runway beam segments + brackets to nearby steel columns
  * @failure bad points / railHeight <= 0 / unknown profile -> no-op
  */
-export const addCraneRunway: CommandDefinition<AddCraneRunwayParams> = {
+export const addCraneRunway = defineCommand({
   name: 'add_crane_runway',
   description:
     'Add an overhead-crane runway: crane beams along a plan line with their top at railHeight, split at ' +
     'supports every supportSpacing, each support carried by a bracket cantilevered from the nearest steel ' +
     'column (within 2 m). Capacity (t) is noted on the members for schedules.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      start: { type: 'array', items: { type: 'number' }, description: 'Runway start [x, y].' },
-      end: { type: 'array', items: { type: 'number' }, description: 'Runway end [x, y].' },
-      railHeight: { type: 'number', description: 'Top of the runway beam above the level (> 0).' },
-      profile: { type: 'string', description: 'Runway beam section. Default HEB300.' },
-      capacity: {
-        type: 'number',
-        description: 'Crane capacity in tonnes (for notes). Default 10.',
-      },
-      supportSpacing: {
-        type: 'number',
-        description: 'Distance between supports. Default 6000 mm.',
-      },
-      bracketProfile: { type: 'string', description: 'Bracket section. Default HEB200.' },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-    },
-    required: ['start', 'end', 'railHeight'],
-  },
+  params: z.object({
+    start: z.array(z.number()).describe('Runway start [x, y].'),
+    end: z.array(z.number()).describe('Runway end [x, y].'),
+    railHeight: z.number().describe('Top of the runway beam above the level (> 0).'),
+    profile: z.string().optional().describe('Runway beam section. Default HEB300.'),
+    capacity: z.number().optional().describe('Crane capacity in tonnes (for notes). Default 10.'),
+    supportSpacing: z.number().optional().describe('Distance between supports. Default 6000 mm.'),
+    bracketProfile: z.string().optional().describe('Bracket section. Default HEB200.'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  }),
   run: (doc, params): CommandResult => {
     if (!isVec2(params.start) || !isVec2(params.end)) {
       return noChange(doc, 'add_crane_runway failed: start and end must be [x, y].');
@@ -222,7 +202,7 @@ export const addCraneRunway: CommandDefinition<AddCraneRunwayParams> = {
       data: { elementIds: added.ids },
     };
   },
-};
+});
 
 /** One roof slope of a span: from its low end at a column line up to its high end. */
 interface Slope {
@@ -231,33 +211,6 @@ interface Slope {
   readonly lowZ: number;
   readonly highX: number;
   readonly highZ: number;
-}
-
-interface PortalHallParams {
-  origin?: Vec2;
-  span?: number;
-  spans?: number[];
-  length?: number;
-  baySpacing?: number;
-  eaveHeight?: number;
-  roofPitch?: number;
-  roofType?: 'duopitch' | 'monopitch';
-  columnProfile?: string;
-  rafterProfile?: string;
-  purlinProfile?: string;
-  railProfile?: string;
-  braceProfile?: string;
-  gablePostProfile?: string;
-  purlinSpacing?: number;
-  railSpacing?: number;
-  footings?: boolean;
-  basePlates?: boolean;
-  columnBase?: 'pinned' | 'fixed';
-  connections?: boolean;
-  cladding?: boolean;
-  floorSlab?: boolean;
-  crane?: { capacity?: number; railHeight: number; profile?: string };
-  levelId?: string;
 }
 
 /** Outward-facing panel corners: reversed when the Newell normal points against `outward`. */
@@ -275,7 +228,7 @@ function facing(corners: Vec3[], outward: Vec3): Vec3[] {
  * @affects creates a complete steel hall (members, footings, cladding, slab) — all-or-nothing
  * @failure invalid dimensions / unknown profiles / crane above eaves -> no-op
  */
-export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
+export const addPortalFrameBuilding = defineCommand({
   name: 'add_portal_frame_building',
   description:
     'Generate a pre-engineered steel hall (factory / warehouse) in one step: portal frames every baySpacing ' +
@@ -283,90 +236,73 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
     'end bays (roof and walls), pad footings under every column, roof / wall / gable cladding, a ground ' +
     'slab and optionally an overhead crane runway on brackets. All sizes in document units, roofPitch in ' +
     'degrees. Defaults: 24 m span, 48 m long, 6 m bays, 7 m eaves, 6° roof, HEA400 columns, IPE450 rafters.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      origin: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Corner (gridline A1) [x, y]. Default [0, 0].',
-      },
-      span: {
-        type: 'number',
-        description: 'Clear span between column axes (X). Default 24000 mm.',
-      },
-      spans: {
-        type: 'array',
-        items: { type: 'number' },
-        description:
-          'Multi-span hall: widths of side-by-side spans along X (internal columns on shared lines, ' +
+  params: z.object({
+    origin: z.array(z.number()).optional().describe('Corner (gridline A1) [x, y]. Default [0, 0].'),
+    span: z.number().optional().describe('Clear span between column axes (X). Default 24000 mm.'),
+    spans: z
+      .array(z.number())
+      .optional()
+      .describe(
+        'Multi-span hall: widths of side-by-side spans along X (internal columns on shared lines, ' +
           'valley between roofs). Overrides span.',
-      },
-      length: { type: 'number', description: 'Hall length (Y). Default 48000 mm.' },
-      baySpacing: {
-        type: 'number',
-        description: 'Target frame spacing; adjusted to divide the length. Default 6000 mm.',
-      },
-      eaveHeight: { type: 'number', description: 'Column height to the eaves. Default 7000 mm.' },
-      roofPitch: { type: 'number', description: 'Roof slope in degrees. Default 6.' },
-      roofType: {
-        type: 'string',
-        enum: ['duopitch', 'monopitch'],
-        description:
-          "Roof shape: 'duopitch' (default: ridge mid-span, eaveHeight at both column lines) or 'monopitch' " +
+      ),
+    length: z.number().optional().describe('Hall length (Y). Default 48000 mm.'),
+    baySpacing: z
+      .number()
+      .optional()
+      .describe('Target frame spacing; adjusted to divide the length. Default 6000 mm.'),
+    eaveHeight: z.number().optional().describe('Column height to the eaves. Default 7000 mm.'),
+    roofPitch: z.number().optional().describe('Roof slope in degrees. Default 6.'),
+    roofType: z
+      .enum(['duopitch', 'monopitch'])
+      .optional()
+      .describe(
+        "Roof shape: 'duopitch' (default: ridge mid-span, eaveHeight at both column lines) or 'monopitch' " +
           '(one rafter per span rising at roofPitch from the low eaves at the left (x = origin, height eaveHeight) ' +
           'to the high eaves on the right; the columns get different heights, with several spans the slope ' +
           'continues across the internal column lines; no apex connection, two eaves connections per frame; wind ' +
           'with EN 1991-1-4 Tab. 7.3a monopitch coefficients).',
-      },
-      columnProfile: { type: 'string', description: 'Default HEA400.' },
-      rafterProfile: { type: 'string', description: 'Default IPE450.' },
-      purlinProfile: { type: 'string', description: 'Default C200x75x2.5.' },
-      railProfile: {
-        type: 'string',
-        description:
-          'Side rails. Default C200x75x2.5 (passes check_purlins at qp 0.6 on 6 m bays).',
-      },
-      braceProfile: { type: 'string', description: 'Bracing. Default CHS76.1x3.6.' },
-      gablePostProfile: { type: 'string', description: 'Gable wind posts. Default HEA200.' },
-      purlinSpacing: { type: 'number', description: 'Along the slope. Default 1800 mm.' },
-      railSpacing: { type: 'number', description: 'Vertical. Default 1800 mm.' },
-      footings: { type: 'boolean', description: 'Pad footings under columns. Default true.' },
-      connections: {
-        type: 'boolean',
-        description: 'Bolted end-plate moment connections (haunched eaves, apex). Default true.',
-      },
-      basePlates: {
-        type: 'boolean',
-        description: 'Base plates with 4 M24 anchor bolts under every column. Default true.',
-      },
-      columnBase: {
-        type: 'string',
-        enum: ['pinned', 'fixed'],
-        description:
-          "Column base fixity: 'pinned' (default) or 'fixed' (rotation restrained in the frame analysis: " +
+      ),
+    columnProfile: z.string().optional().describe('Default HEA400.'),
+    rafterProfile: z.string().optional().describe('Default IPE450.'),
+    purlinProfile: z.string().optional().describe('Default C200x75x2.5.'),
+    railProfile: z
+      .string()
+      .optional()
+      .describe('Side rails. Default C200x75x2.5 (passes check_purlins at qp 0.6 on 6 m bays).'),
+    braceProfile: z.string().optional().describe('Bracing. Default CHS76.1x3.6.'),
+    gablePostProfile: z.string().optional().describe('Gable wind posts. Default HEA200.'),
+    purlinSpacing: z.number().optional().describe('Along the slope. Default 1800 mm.'),
+    railSpacing: z.number().optional().describe('Vertical. Default 1800 mm.'),
+    footings: z.boolean().optional().describe('Pad footings under columns. Default true.'),
+    connections: z
+      .boolean()
+      .optional()
+      .describe('Bolted end-plate moment connections (haunched eaves, apex). Default true.'),
+    basePlates: z
+      .boolean()
+      .optional()
+      .describe('Base plates with 4 M24 anchor bolts under every column. Default true.'),
+    columnBase: z
+      .enum(['pinned', 'fixed'])
+      .optional()
+      .describe(
+        "Column base fixity: 'pinned' (default) or 'fixed' (rotation restrained in the frame analysis: " +
           'stiffer sway, base moments in the reactions and footing / base plate M+N checks; requires basePlates; ' +
           'size the plates with design_portal_frames).',
-      },
-      cladding: { type: 'boolean', description: 'Roof, side and gable cladding. Default true.' },
-      floorSlab: { type: 'boolean', description: 'Ground-bearing slab. Default true.' },
-      crane: {
-        type: 'object',
-        description: 'Optional crane runway on both sides: { capacity (t), railHeight, profile }.',
-        properties: {
-          capacity: { type: 'number', description: 'Tonnes. Default 10.' },
-          railHeight: {
-            type: 'number',
-            description: 'Top of runway beam (must be below the eaves).',
-          },
-          profile: { type: 'string', description: 'Runway section. Default HEB300.' },
-        },
-        required: ['railHeight'],
-      },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-    },
-    required: [],
-  },
+      ),
+    cladding: z.boolean().optional().describe('Roof, side and gable cladding. Default true.'),
+    floorSlab: z.boolean().optional().describe('Ground-bearing slab. Default true.'),
+    crane: z
+      .object({
+        capacity: z.number().optional().describe('Tonnes. Default 10.'),
+        railHeight: z.number().describe('Top of runway beam (must be below the eaves).'),
+        profile: z.string().optional().describe('Runway section. Default HEB300.'),
+      })
+      .optional()
+      .describe('Optional crane runway on both sides: { capacity (t), railHeight, profile }.'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  }),
   run: (doc, params): CommandResult => {
     const mm = (value: number): number => fromMm(doc, value);
     const origin = params.origin ?? [0, 0];
@@ -849,4 +785,4 @@ export const addPortalFrameBuilding: CommandDefinition<PortalHallParams> = {
       },
     };
   },
-};
+});

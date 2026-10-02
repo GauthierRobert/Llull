@@ -12,7 +12,8 @@ import type {
   SteelMemberElement,
 } from '../../../model/building';
 import type { CadDocument, Vec2 } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import { fileSlug, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import {
   BINDING_MARGIN,
@@ -67,13 +68,6 @@ function gridRef(axis: GridAxis | null, offsetMm: number): string {
 }
 
 const n = (value: number): string => String(Math.round(value * 100) / 100);
-
-interface AnchorPlanParams {
-  levelId?: string;
-  scale?: number;
-  paper?: PaperSize;
-  embedment?: number;
-}
 
 /** One base plate placed in plan, all lengths in millimetres. */
 interface PlacedPlate {
@@ -297,7 +291,7 @@ function scheduleTable(rows: ReadonlyArray<ReadonlyArray<string>>, x: number, y:
  * @affects none; data = { svg, filename, boltCount, plates, paper, scale, levelId }
  * @failure unknown level / paper, invalid scale or embedment, no base plates -> no data
  */
-export const exportAnchorPlan: CommandDefinition<AnchorPlanParams> = {
+export const exportAnchorPlan = defineCommand({
   name: 'export_anchor_plan',
   annotations: { readOnly: true, idempotent: true },
   description:
@@ -307,38 +301,29 @@ export const exportAnchorPlan: CommandDefinition<AnchorPlanParams> = {
     'typical group), a label per plate with top-of-concrete / grout level, and a bolt schedule (plate mark, ' +
     'grid ref like A/1, bolt count x size, embedment, projection above concrete, plate size). Needs steel ' +
     'columns with base plates (add_base_plates). data.svg holds the file text.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      levelId: {
-        type: 'string',
-        description: 'Level whose base plates are drawn. Default: active level.',
-      },
-      scale: {
-        type: 'number',
-        description:
-          'Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits the paper.',
-      },
-      paper: {
-        type: 'string',
-        enum: Object.keys(PAPER_MM),
-        description: 'Paper size (landscape). Default A3.',
-      },
-      embedment: {
-        type: 'number',
-        description:
-          'Anchor bolt embedment below the plate underside in the schedule, in document units. Default 300 mm.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    levelId: z
+      .string()
+      .optional()
+      .describe('Level whose base plates are drawn. Default: active level.'),
+    scale: z
+      .number()
+      .optional()
+      .describe(
+        'Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits the paper.',
+      ),
+    paper: z
+      .enum(Object.keys(PAPER_MM) as [PaperSize, ...PaperSize[]])
+      .optional()
+      .describe('Paper size (landscape). Default A3.'),
+    embedment: z
+      .number()
+      .optional()
+      .describe(
+        'Anchor bolt embedment below the plate underside in the schedule, in document units. Default 300 mm.',
+      ),
+  }),
   run: (doc, { levelId, scale, paper, embedment }): CommandResult => {
-    if (paper !== undefined && !(paper in PAPER_MM)) {
-      return noChange(
-        doc,
-        `export_anchor_plan failed: paper must be one of ${Object.keys(PAPER_MM).join(', ')}.`,
-      );
-    }
     if (scale !== undefined && !(isFiniteNumber(scale) && scale > 0)) {
       return noChange(doc, 'export_anchor_plan failed: scale must be a number > 0.');
     }
@@ -633,4 +618,4 @@ export const exportAnchorPlan: CommandDefinition<AnchorPlanParams> = {
       },
     };
   },
-};
+});

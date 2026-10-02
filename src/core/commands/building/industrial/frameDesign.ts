@@ -10,7 +10,8 @@ import type {
   SteelMemberElement,
 } from '../../../model/building';
 import type { CadDocument, Vec3 } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -29,9 +30,8 @@ import {
   checkFrames,
   connectionCheck,
   describeLoads,
-  FRAME_LOAD_PROPERTIES,
+  FRAME_LOAD_SHAPE,
   resolveFrameLoads,
-  type FrameLoadParams,
 } from './frameCheck';
 
 /**
@@ -59,10 +59,6 @@ export function nextProfile(name: string): string | null {
 
 const BOLT_SIZES_MM = [20, 24, 27, 30];
 
-interface DesignPortalFramesParams extends FrameLoadParams {
-  targetUtilisation?: number;
-}
-
 /**
  * @command design_portal_frames
  * @pure
@@ -70,7 +66,7 @@ interface DesignPortalFramesParams extends FrameLoadParams {
  *          level, keeping frames uniform) and sizes the bolt groups of every moment connection
  * @failure bad loads / unknown level / no frame / no section large enough -> no-op or partial report
  */
-export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
+export const designPortalFrames = defineCommand({
   name: 'design_portal_frames',
   description:
     'Preliminary design of the portal frames of a level with the same loads, combinations and ' +
@@ -79,17 +75,13 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
     'targetUtilisation to the next heavier profile of the same family (uniformly for all frames), ' +
     'then sizes the bolt groups of the moment connections (bolt diameter M20–M30 and rows) per ' +
     'connection type for every combination. Reports every change and the final utilisations.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      ...FRAME_LOAD_PROPERTIES,
-      targetUtilisation: {
-        type: 'number',
-        description: 'Maximum accepted utilisation (0.5–1). Default 0.95.',
-      },
-    },
-    required: [],
-  },
+  params: z.object({
+    ...FRAME_LOAD_SHAPE,
+    targetUtilisation: z
+      .number()
+      .optional()
+      .describe('Maximum accepted utilisation (0.5–1). Default 0.95.'),
+  }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95 } = params;
     if (
@@ -285,7 +277,7 @@ export const designPortalFrames: CommandDefinition<DesignPortalFramesParams> = {
       data: { changes, maxUtilisation: worst, failures },
     };
   },
-};
+});
 
 /**
  * Members placed from a resized member's depth follow it: purlins on a rafter move along the

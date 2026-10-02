@@ -63,7 +63,7 @@ describe('steel profile catalogue', () => {
 
   it('list_steel_profiles filters by family and is read-only', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'list_steel_profiles', { family: 'hea' });
+    const result = execute(doc, 'list_steel_profiles', { family: 'HEA' });
     const profiles = (result.data as { profiles: Array<{ family: string }> }).profiles;
     expect(profiles.length).toBeGreaterThan(5);
     expect(profiles.every((p) => p.family === 'HEA')).toBe(true);
@@ -102,7 +102,7 @@ describe('add_steel_member / update_steel_member', () => {
     ]) {
       const result = execute(doc, 'add_steel_member', params);
       expect(result.affected, JSON.stringify(params)).toEqual([]);
-      expect(result.summary).toMatch(/add_steel_member failed/);
+      expect(result.summary).toMatch(/add_steel_member (failed|rejected)/);
     }
   });
 
@@ -723,8 +723,8 @@ describe('review regressions', () => {
     const doc = createEmptyDocument();
     expect(
       execute(doc, 'add_steel_member', { profile: 300, start: [0, 0, 0], end: [1, 0, 0] }).summary,
-    ).toMatch(/unknown steel profile/);
-    expect(execute(doc, 'list_steel_profiles', { family: 3 }).summary).toMatch(/^0 steel/);
+    ).toMatch(/rejected: invalid params/);
+    expect(execute(doc, 'list_steel_profiles', { family: 3 }).summary).toMatch(/rejected/);
   });
 
   it('rejects saved buildings with invalid industrial fields', () => {
@@ -792,7 +792,7 @@ describe('multi-span halls', () => {
 
   it.each([[[]], [[0, 10000]], [Array(11).fill(6000)], ['12000']])('rejects spans %j', (spans) => {
     expect(execute(createEmptyDocument(), 'add_portal_frame_building', { spans }).summary).toMatch(
-      /spans must be 1–10 widths/,
+      /spans must be 1–10 widths|rejected: invalid params/,
     );
   });
 });
@@ -877,7 +877,7 @@ describe('add_cable_tray', () => {
   ])('rejects %j', (params) => {
     const result = execute(createEmptyDocument(), 'add_cable_tray', params);
     expect(result.affected).toEqual([]);
-    expect(result.summary).toMatch(/add_cable_tray failed/);
+    expect(result.summary).toMatch(/add_cable_tray (failed|rejected)/);
   });
 
   it('feeds takeoff, schedule, plan, IFC, clashes and survives save / load', () => {
@@ -1063,7 +1063,7 @@ describe('phase 2 review regressions', () => {
     for (const spans of [18000, {}]) {
       expect(
         execute(createEmptyDocument(), 'add_portal_frame_building', { spans }).summary,
-      ).toMatch(/spans must be 1–10 widths/);
+      ).toMatch(/rejected: invalid params/);
     }
   });
 

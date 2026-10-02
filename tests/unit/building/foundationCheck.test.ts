@@ -161,9 +161,9 @@ describe('check_foundations', () => {
       'thrust taken by a tie',
     );
     for (const params of [{ tieCapacity: 0 }, { thrustTie: 'yes' }] as Record<string, unknown>[]) {
-      const result = foundationCheck.run(doc, params);
+      const result = execute(doc, 'check_foundations', params);
       expect(result.data).toBeUndefined();
-      expect(result.summary).toContain('check_foundations failed');
+      expect(result.summary).toMatch(/check_foundations (failed|rejected)/);
     }
   });
 });

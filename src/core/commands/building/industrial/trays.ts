@@ -5,7 +5,8 @@
 
 import type { CableTrayElement } from '../../../model/building';
 import type { Vec3 } from '../../../model/types';
-import type { CommandDefinition, CommandResult } from '../../types';
+import type { CommandResult } from '../../types';
+import { defineCommand, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -30,41 +31,27 @@ export function trayLength(tray: CableTrayElement): number {
   }, 0);
 }
 
-interface AddCableTrayParams {
-  points: Vec3[];
-  width?: number;
-  height?: number;
-  system?: string;
-  levelId?: string;
-}
-
 /**
  * @command add_cable_tray
  * @pure
  * @affects creates 1 cable tray run (U-section segments on layer E-TRAY)
  * @failure < 2 points / repeated point / width or height <= 0 -> no-op
  */
-export const addCableTray: CommandDefinition<AddCableTrayParams> = {
+export const addCableTray = defineCommand({
   name: 'add_cable_tray',
   description:
     'Route a cable tray (open U section) through 3D points [[x, y, z], …] (z = tray centre above the ' +
     'level) with a width, side height and cable system (power, data, instrumentation…). Lengths feed ' +
     'the takeoff; clashes with steel, pipes and equipment are reported by check_clashes.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      points: {
-        type: 'array',
-        items: { type: 'array', items: { type: 'number' } },
-        description: 'Tray centreline [[x, y, z], …], at least 2 points.',
-      },
-      width: { type: 'number', description: 'Tray width. Default 300 mm.' },
-      height: { type: 'number', description: 'Side height. Default 60 mm.' },
-      system: { type: 'string', description: 'Cable system. Default "power".' },
-      levelId: { type: 'string', description: 'Level id. Default: the active level.' },
-    },
-    required: ['points'],
-  },
+  params: z.object({
+    points: z
+      .array(z.array(z.number()))
+      .describe('Tray centreline [[x, y, z], …], at least 2 points.'),
+    width: z.number().optional().describe('Tray width. Default 300 mm.'),
+    height: z.number().optional().describe('Side height. Default 60 mm.'),
+    system: z.string().optional().describe('Cable system. Default "power".'),
+    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  }),
   run: (doc, { points, width, height, system, levelId }): CommandResult => {
     const route = Array.isArray(points) ? points.map(toVec3) : [];
     if (route.length < 2 || route.some((point) => point === null)) {
@@ -113,4 +100,4 @@ export const addCableTray: CommandDefinition<AddCableTrayParams> = {
       data: { elementId: tray.id },
     };
   },
-};
+});
