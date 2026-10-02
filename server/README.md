@@ -128,13 +128,24 @@ The server holds one module-level `CadDocument` initialized from `createEmptyDoc
 
 ---
 
+## Tool discovery (`search_tools`, `enable_toolset`)
+
+By default a session lists only the `core` toolset plus two discovery tools (defined in `src/core/mcp/discovery.ts`; MCP-layer tools, not registry commands):
+
+- `search_tools { query, limit? }` — keyword search over every tool (enabled or not); returns `data.results: [{ name, toolset, enabled, description }]`.
+- `enable_toolset { toolset }` — enables a toolset for the calling session only; the server then sends `notifications/tools/list_changed` (`capabilities.tools.listChanged: true`). An unknown name is an `isError` result listing the valid toolsets.
+
+Calling a tool of a disabled toolset returns an error that names `enable_toolset`. `build_project` steps can use any command regardless.
+
+---
+
 ## Example MCP agent
 
 `server/examples/mcp-agent.ts` is a standalone script that connects to the llull MCP server as an external MCP client and drives the document end-to-end over the Streamable HTTP transport. It demonstrates the full round-trip: tool discovery → command execution → id chaining.
 
 ### What the demo proves
 
-1. `tools/list` returns every command registered in the llull registry (the tool count matches `listCommands()` exactly — no duplication, one source of truth).
+1. `tools/list` returns the `core` toolset plus the `search_tools` / `enable_toolset` discovery tools by default (`LLULL_TOOLSETS=all` lists every registry command, matching `listCommands()` — no duplication, one source of truth); the demo then calls `enable_toolset` for `3d` and `2d`.
 2. `add_box` creates a 2×2×2 box and returns its entity id in `affected`.
 3. `draw_circle` creates a circle and returns its entity id.
 4. `extrude_sketch` receives the circle's id (parsed from step 3's result) and extrudes it into a 3-unit solid — proving that id chaining between sequential tool calls works correctly.
@@ -220,7 +231,7 @@ Done. Client closed cleanly.
 | `LLULL_PYTHON_TIMEOUT_MS`  | no       | `120000`          | Per-request Python timeout |
 | `LLULL_EXCHANGE_DIR`       | no       | unset             | Directory for the exchange tools' `path` arguments; `export_step` also saves there |
 | `LLULL_ALLOW_CODE_EXECUTION` | no     | unset             | `1` enables `import_code`, which **runs arbitrary Python** with server privileges |
-| `LLULL_TOOLSETS`           | no       | all               | Comma-separated MCP toolsets exposed by `tools/list` / `tools/call`: `core` (always on), `2d`, `3d`, `measure`, `parametric`, `assembly`, `exchange`, `building`, or `all`. Unknown names are ignored with a warning. Prompts that need a hidden toolset are hidden too. Hidden tools stay usable as `build_project` steps and in the UI, but their schemas are not listed, so an agent must already know their params. See `src/core/mcp/toolsets.ts` |
+| `LLULL_TOOLSETS`           | no       | `core`            | Comma-separated MCP toolsets a session starts with: `core` (always on: core commands + the `search_tools` / `enable_toolset` discovery tools), `2d`, `3d`, `measure`, `parametric`, `assembly`, `exchange`, `building`, or `all` (every tool, the pre-MG6.3 behavior). Unset = `core` only, so clients do not load ~230 schemas; an agent calls `search_tools` to find a tool and `enable_toolset` to load its toolset for that session (the server then sends `notifications/tools/list_changed`). Unknown names are ignored with a warning. Prompts that need a hidden toolset are hidden until it is enabled. Hidden tools stay usable as `build_project` steps and in the UI. See `src/core/mcp/toolsets.ts`, `src/core/mcp/discovery.ts` |
 
 ### REST mutation policy (`/command`, `/undo`, `/redo`)
 
