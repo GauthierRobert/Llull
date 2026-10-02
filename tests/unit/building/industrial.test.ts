@@ -63,7 +63,7 @@ describe('steel profile catalogue', () => {
 
   it('list_steel_profiles filters by family and is read-only', () => {
     const doc = createEmptyDocument();
-    const result = execute(doc, 'list_steel_profiles', { family: 'HEA' });
+    const result = execute(doc, 'list_steel_profiles', { family: 'hea' });
     const profiles = (result.data as { profiles: Array<{ family: string }> }).profiles;
     expect(profiles.length).toBeGreaterThan(5);
     expect(profiles.every((p) => p.family === 'HEA')).toBe(true);
@@ -724,7 +724,7 @@ describe('review regressions', () => {
     expect(
       execute(doc, 'add_steel_member', { profile: 300, start: [0, 0, 0], end: [1, 0, 0] }).summary,
     ).toMatch(/rejected: invalid params/);
-    expect(execute(doc, 'list_steel_profiles', { family: 3 }).summary).toMatch(/rejected/);
+    expect(execute(doc, 'list_steel_profiles', { family: 3 }).summary).toMatch(/must be a string/);
   });
 
   it('rejects saved buildings with invalid industrial fields', () => {

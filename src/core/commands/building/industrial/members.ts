@@ -12,7 +12,7 @@ import type {
   SteelMemberElement,
 } from '../../../model/building';
 import type { CommandResult } from '../../types';
-import { defineCommand, z } from '../../schema';
+import { defineCommand, tolerant, z } from '../../schema';
 import {
   elementAffected,
   fromMm,
@@ -138,14 +138,22 @@ export const listSteelProfiles = defineCommand({
     'equal angles L, with depth h, width b, web / flange thickness (mm), mass (kg/m), area (mm²) and paint ' +
     'perimeter (mm). Optionally filter by family.',
   params: z.object({
-    family: z
-      .enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L'])
-      .optional()
-      .describe('Only this family.'),
+    // tolerant: lower-case / padded family names are normalised in run, as before MG2.
+    family: tolerant(
+      z
+        .enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L'])
+        .optional()
+        .describe('Only this family.'),
+    ),
   }),
   run: (doc, { family }): CommandResult => {
+    const raw: unknown = family;
+    if (raw !== undefined && typeof raw !== 'string') {
+      return noChange(doc, 'list_steel_profiles: family must be a string such as "HEA".');
+    }
+    const wanted = raw?.trim().toUpperCase();
     const profiles = STEEL_PROFILES.filter(
-      (profile) => family === undefined || profile.family === family.trim().toUpperCase(),
+      (profile) => wanted === undefined || profile.family === wanted,
     );
     return {
       document: doc,
