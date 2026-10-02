@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 import { plans } from './plans';
 import { normalize, normalizeGeometry } from './normalize';
 import { runPlan } from './runPlan';
@@ -9,8 +8,6 @@ import { runPlan } from './runPlan';
 const REPLAY_DIVERGES: Record<string, string> = {};
 
 describe('golden replay corpus', () => {
-  beforeEach(() => __resetIdCounter());
-
   for (const [name, actions] of Object.entries(plans)) {
     describe(name, () => {
       it('executes every step and matches the golden snapshot', async () => {

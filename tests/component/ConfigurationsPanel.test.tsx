@@ -20,7 +20,6 @@
 import { liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
@@ -54,7 +53,6 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
 
 describe('ConfigurationsPanel — rendering', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -118,7 +116,6 @@ describe('ConfigurationsPanel — rendering', () => {
 
 describe('ConfigurationsPanel — activate', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -161,7 +158,6 @@ describe('ConfigurationsPanel — activate', () => {
 
 describe('ConfigurationsPanel — create form', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -296,7 +292,6 @@ describe('ConfigurationsPanel — create form', () => {
 
 describe('ConfigurationsPanel — parameter row management', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

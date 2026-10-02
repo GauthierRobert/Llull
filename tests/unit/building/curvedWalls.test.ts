@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
@@ -14,7 +14,6 @@ import type { TakeoffLine } from '@core/commands/building/quantities';
 import type { IfcExport } from '@core/commands/building/ifc';
 import type { DxfExport } from '@core/commands/building/dxf';
 import type { Clash } from '@core/commands/building/industrial/clash';
-import { __resetIdCounter } from '@lib/id';
 
 /** Half circle of radius 5000 from (−5000, 0) over (0, 5000) to (5000, 0). */
 const HALF = { start: [-5000, 0], through: [0, 5000], end: [5000, 0], thickness: 300 };
@@ -24,8 +23,6 @@ function wallOf(doc: CadDocument, id = 'curvedWall-1'): CurvedWallElement {
   if (element?.category !== 'curvedWall') throw new Error(id);
   return element;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('arcThrough', () => {
   it('finds centre, radius and the sweep through the middle point', () => {

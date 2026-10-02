@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { CheckRow } from '@core/commands/building/industrial/frameCheck';
@@ -20,7 +20,6 @@ import {
 import { frameRoofAverage } from '@core/commands/building/industrial/windCoefficients';
 import { findProfile, sectionProperties } from '@core/commands/building/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';
-import { __resetIdCounter } from '@lib/id';
 
 const HALL = { span: 24000, length: 30000 };
 
@@ -42,8 +41,6 @@ function check(doc: CadDocument, params: Record<string, unknown> = {}): CheckDat
 
 const row = (data: CheckData, mark: string, kind: CheckRow['kind']): CheckRow =>
   data.rows.find((candidate) => candidate.mark === mark && candidate.kind === kind)!;
-
-beforeEach(() => __resetIdCounter());
 
 describe('member buckling (EN 1993-1-1 §6.3)', () => {
   it('matches the buckling curves', () => {

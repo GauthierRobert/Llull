@@ -1,13 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { formatLength } from '@core/commands/units';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
-import { __resetIdCounter } from '@lib/id';
 
 describe('set_units command', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ---------------------------------------------------------------------------
   // Happy paths
   // ---------------------------------------------------------------------------

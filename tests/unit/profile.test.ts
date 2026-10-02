@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type {
   CircleEntity,
@@ -10,7 +10,6 @@ import type {
 } from '@core/model/types';
 import { DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // helpers — build minimal 2D entities directly in doc for test setup
@@ -125,8 +124,6 @@ function docWithLine(): { doc: ReturnType<typeof createEmptyDocument>; id: strin
 // ---------------------------------------------------------------------------
 
 describe('extrude_sketch', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('circle → creates an extrusion with 32 profile points and correct depth', () => {
     const { doc, id } = docWithCircle();
     const result = execute(doc, 'extrude_sketch', { id, depth: 10 });
@@ -286,8 +283,6 @@ const TRI_PROFILE: ReadonlyArray<readonly [number, number]> = [
 ];
 
 describe('revolve_profile', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ── happy paths ────────────────────────────────────────────────────────────
 
   it('full 2π revolution creates a revolution entity with correct kind and defaults', () => {

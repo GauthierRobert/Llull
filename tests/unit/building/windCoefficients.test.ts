@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
@@ -16,9 +16,6 @@ import {
   type WindDirection,
 } from '@core/commands/building/industrial/windCoefficients';
 import type { PurlinRow, ZoneSummary } from '@core/commands/building/industrial/purlinCheck';
-import { __resetIdCounter } from '@lib/id';
-
-beforeEach(() => __resetIdCounter());
 
 const cpe = (
   roofType: RoofType,

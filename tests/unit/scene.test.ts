@@ -4,7 +4,7 @@
  * Pure: a document is built with createEmptyDocument(); ids reset between tests.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -14,11 +14,8 @@ import {
   rotatedEntityBounds,
   instanceBoundsFromDoc,
 } from '@core/commands/scene';
-import { __resetIdCounter } from '@lib/id';
 
 describe('describe_scene command', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('returns a snapshot in data and leaves the document unchanged', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
@@ -64,8 +61,6 @@ describe('describe_scene command', () => {
 });
 
 describe('computeSceneSnapshot — overall bounds', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('is null for an empty document', () => {
     expect(computeSceneSnapshot(createEmptyDocument()).bounds).toBeNull();
   });
@@ -81,8 +76,6 @@ describe('computeSceneSnapshot — overall bounds', () => {
 });
 
 describe('entityBounds — per kind', () => {
-  beforeEach(() => __resetIdCounter());
-
   function lastEntity(doc: ReturnType<typeof createEmptyDocument>): Entity {
     const id = doc.order[doc.order.length - 1]!;
     return doc.entities[id]!;
@@ -238,8 +231,6 @@ describe('entityBounds — per kind', () => {
 // ---------------------------------------------------------------------------
 
 describe('rotatedEntityBounds — zero rotation is byte-for-byte identical to entityBounds', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('box with zero rotation: no oriented flag, same values as entityBounds', () => {
     const doc = execute(createEmptyDocument(), 'add_box', {
       size: [4, 6, 8],
@@ -265,8 +256,6 @@ describe('rotatedEntityBounds — zero rotation is byte-for-byte identical to en
 });
 
 describe('rotatedEntityBounds — non-zero rotation produces oriented:true and correct extents', () => {
-  beforeEach(() => __resetIdCounter());
-
   const EPS = 1e-9;
   function approxEq(a: number, b: number): boolean {
     return Math.abs(a - b) < EPS;
@@ -407,8 +396,6 @@ describe('rotatedEntityBounds — non-zero rotation produces oriented:true and c
 // ---------------------------------------------------------------------------
 
 describe('instanceBoundsFromDoc — instance world AABB', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('happy path: instance bounds reflect the component child geometry', () => {
     // create_component promotes entities and inserts one instance
     let doc = createEmptyDocument();

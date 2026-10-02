@@ -24,7 +24,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -221,7 +220,6 @@ describe('profileKey — memo stability for multi-gear scenes', () => {
 
 describe('add_spur_gear — extrusion entity in the store', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

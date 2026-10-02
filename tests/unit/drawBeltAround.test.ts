@@ -1,12 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { PolylineEntity } from '@core/model/types';
 import { execute, listCommands, toToolSchemas } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 describe('draw_belt_around', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ---------------------------------------------------------------------------
   // Happy path — 2-pulley equal-radius
   // ---------------------------------------------------------------------------
@@ -232,7 +229,6 @@ describe('draw_belt_around', () => {
 
   it('different positions produce distinct entity placements', () => {
     const doc = createEmptyDocument();
-    __resetIdCounter();
     const r1 = execute(doc, 'draw_belt_around', {
       pulleys: [
         { center: [0, 0], radius: 4 },
@@ -240,7 +236,6 @@ describe('draw_belt_around', () => {
       ],
       position: [0, 0, 0],
     });
-    __resetIdCounter();
     const r2 = execute(doc, 'draw_belt_around', {
       pulleys: [
         { center: [0, 0], radius: 4 },

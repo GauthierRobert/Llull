@@ -5,10 +5,9 @@
  * with `createEmptyDocument()` and ids are reset between tests.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { listCommands } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 import {
   buildMcpTools,
   applyMcpToolCall,
@@ -62,8 +61,6 @@ describe('buildMcpTools()', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyMcpToolCall() — known command', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('add_box: returns a new document containing the box', () => {
     const doc = createEmptyDocument();
     const result = applyMcpToolCall(doc, 'add_box', { size: [2, 2, 2] });
@@ -111,8 +108,6 @@ describe('applyMcpToolCall() — known command', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyMcpToolCall() — unknown tool name', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('returns isError true', () => {
     const doc = createEmptyDocument();
     const result = applyMcpToolCall(doc, 'nonexistent_tool', {});
@@ -143,8 +138,6 @@ describe('applyMcpToolCall() — unknown tool name', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyMcpToolCall() — purity', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('input document is not mutated by a successful command', () => {
     const doc = createEmptyDocument();
     const snapshot = JSON.stringify(doc);
@@ -253,8 +246,6 @@ describe('readMcpResource() — cad://document', () => {
 // ---------------------------------------------------------------------------
 
 describe('readMcpResource() — cad://scene', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('returns non-null content for an empty document', () => {
     const doc = createEmptyDocument();
     const content = readMcpResource(doc, 'cad://scene');

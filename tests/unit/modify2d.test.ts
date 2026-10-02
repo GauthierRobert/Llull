@@ -5,7 +5,7 @@
  * Also unit-tests the pure geometry helpers exported from modify2d.ts.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type {
   LineEntity,
@@ -15,7 +15,6 @@ import type {
   RectangleEntity,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 import {
   cross2,
   dot2,
@@ -192,8 +191,6 @@ describe('geometry helpers', () => {
 // ---------------------------------------------------------------------------
 
 describe('2D modify commands', () => {
-  beforeEach(() => __resetIdCounter());
-
   // -------------------------------------------------------------------------
   // Purity guard (shared)
   // -------------------------------------------------------------------------

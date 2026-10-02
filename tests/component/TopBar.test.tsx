@@ -16,7 +16,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useLayoutStore, useStore, useThemeStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { TopBar } from '@ui/components/TopBar';
@@ -39,7 +38,6 @@ function resetStore(): void {
 
 describe('TopBar — brand', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -55,7 +53,6 @@ describe('TopBar — brand', () => {
 
 describe('TopBar — agent pill', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -97,7 +94,6 @@ describe('TopBar — agent pill', () => {
 
 describe('TopBar — tabs', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -122,7 +118,6 @@ describe('TopBar — tabs', () => {
 
 describe('TopBar — theme toggle', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -147,7 +142,6 @@ describe('TopBar — theme toggle', () => {
 
 describe('TopBar — dock toggles and actions', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
     useLayoutStore.setState({ sidebarOpen: true, inspectorOpen: true });
   });

@@ -17,7 +17,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { MeasurementHUD } from '@ui/components/MeasurementHUD';
@@ -40,7 +39,6 @@ function setMeasure(command: string, data: unknown): void {
 
 describe('MeasurementHUD — no measure', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -56,7 +54,6 @@ describe('MeasurementHUD — no measure', () => {
 
 describe('MeasurementHUD — measure_distance', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -89,7 +86,6 @@ describe('MeasurementHUD — measure_distance', () => {
 
 describe('MeasurementHUD — measure_angle', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -113,7 +109,6 @@ describe('MeasurementHUD — measure_angle', () => {
 
 describe('MeasurementHUD — measure_area', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -139,7 +134,6 @@ describe('MeasurementHUD — measure_area', () => {
 
 describe('MeasurementHUD — measure_perimeter', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -164,7 +158,6 @@ describe('MeasurementHUD — measure_perimeter', () => {
 
 describe('MeasurementHUD — measure_bounding_box', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -206,7 +199,6 @@ describe('MeasurementHUD — measure_bounding_box', () => {
 
 describe('MeasurementHUD — measure_volume', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -224,7 +216,6 @@ describe('MeasurementHUD — measure_volume', () => {
 
 describe('MeasurementHUD — mass_properties', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -251,7 +242,6 @@ describe('MeasurementHUD — mass_properties', () => {
 
 describe('MeasurementHUD — dismiss', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -283,7 +273,6 @@ describe('MeasurementHUD — dismiss', () => {
 
 describe('MeasurementHUD — store lastMeasure integration', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

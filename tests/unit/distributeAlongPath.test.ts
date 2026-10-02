@@ -4,11 +4,10 @@
  * Setup pattern: draw a path (polyline or belt), create a tiny component from a box,
  * then call distribute_along_path and assert the resulting instances.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { InstanceEntity, PolylineEntity } from '@core/model/types';
 import { execute, listCommands, toToolSchemas } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -106,8 +105,6 @@ function drawBeltLoop(doc: ReturnType<typeof createEmptyDocument>): {
 // ---------------------------------------------------------------------------
 
 describe('distribute_along_path', () => {
-  beforeEach(() => __resetIdCounter());
-
   // -------------------------------------------------------------------------
   // Happy paths — open path
   // -------------------------------------------------------------------------
@@ -397,7 +394,6 @@ describe('distribute_along_path', () => {
     // must NOT introduce a similar non-deterministic POSITION source — ids are time-
     // tagged for global uniqueness but positions must depend only on params.
     const run = (): ReadonlyArray<readonly [number, number, number]> => {
-      __resetIdCounter();
       const init = buildDocWithComponent();
       let doc = init.doc;
       const beltResult = drawBeltLoop(doc);

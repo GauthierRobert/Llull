@@ -10,11 +10,10 @@
  * cannot silently rot them.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { listMcpPrompts, getMcpPrompt } from '@core/mcp';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // listMcpPrompts
@@ -314,10 +313,6 @@ function extractJsonBlock(text: string): unknown {
 }
 
 describe('build_project validate regression — model_bracket (default 2 holes)', () => {
-  beforeEach(() => {
-    __resetIdCounter();
-  });
-
   it('emitted plan passes build_project validate:true', () => {
     const result = getMcpPrompt('model_bracket', {
       width: '80',
@@ -391,10 +386,6 @@ describe('build_project validate regression — model_bracket (default 2 holes)'
 });
 
 describe('build_project validate regression — parametric_part', () => {
-  beforeEach(() => {
-    __resetIdCounter();
-  });
-
   it('emitted plan passes build_project validate:true (default part_name)', () => {
     const result = getMcpPrompt('parametric_part', {});
     expect(result).not.toBeNull();

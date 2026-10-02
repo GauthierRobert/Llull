@@ -8,11 +8,10 @@
  * All tests are pure: no network, no DOM, no server imports.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { computeDocPatch, applyDocPatch } from '@core/mcp/docPatch';
-import { __resetIdCounter } from '@lib/id';
 import type { CadDocument } from '@core/model/types';
 import type { DocPatch } from '@core/mcp/docPatch';
 
@@ -37,10 +36,6 @@ function patchPayloadBytes(patch: DocPatch): number {
 // ---------------------------------------------------------------------------
 
 describe('computeDocPatch — entity delta', () => {
-  beforeEach(() => {
-    __resetIdCounter();
-  });
-
   it('returns empty delta for identical documents', () => {
     const doc = createEmptyDocument();
     const patch = computeDocPatch(doc, doc);
@@ -95,10 +90,6 @@ describe('computeDocPatch — entity delta', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyDocPatch — round-trip', () => {
-  beforeEach(() => {
-    __resetIdCounter();
-  });
-
   it('applying the patch yields a document observationally equivalent to next', () => {
     const prev = createEmptyDocument();
     const { document: next } = execute(prev, 'add_box', { size: [2, 3, 4] });
@@ -185,7 +176,6 @@ describe('W5F — SSE patch payload is O(change_k), not O(document size)', () =>
    * A full-doc broadcast would grow linearly, giving a ratio of N.
    */
   it('patch payload size stays constant as entity count grows to 100', () => {
-    __resetIdCounter();
     const N = 100;
     const payloadSizes: number[] = [];
 
@@ -212,7 +202,6 @@ describe('W5F — SSE patch payload is O(change_k), not O(document size)', () =>
   });
 
   it('patch entity count equals 1 for each single add_box command', () => {
-    __resetIdCounter();
     let doc: CadDocument = createEmptyDocument();
 
     for (let i = 0; i < 20; i++) {
@@ -226,7 +215,6 @@ describe('W5F — SSE patch payload is O(change_k), not O(document size)', () =>
   });
 
   it('full-doc size at step N is significantly larger than the patch at step N', () => {
-    __resetIdCounter();
     const N = 50;
     let doc: CadDocument = createEmptyDocument();
     let lastPatchSize = 0;

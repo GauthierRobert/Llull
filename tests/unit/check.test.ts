@@ -6,16 +6,15 @@
  *    the right severity and code appear.
  *  - Happy path: a clean doc → ok:true, issues:[].
  *  - Purity: same doc reference returned, affected:[].
- *  - `__resetIdCounter()` in beforeEach for stable ids.
+ *  - ids are step-scoped (deterministic per document), no counter reset needed.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { runModelChecks } from '@core/commands/check';
 import type { CheckResult } from '@core/commands/check';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,8 +41,6 @@ const BASE = {
 // ---------------------------------------------------------------------------
 
 describe('check_model — clean document', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('returns ok:true for an empty document (empty-layer info does not make ok=false)', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'check_model', {});
@@ -70,8 +67,6 @@ describe('check_model — clean document', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — purity', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('returns the SAME doc reference and affected:[]', () => {
     const doc = createEmptyDocument();
     const snapshot = JSON.stringify(doc);
@@ -87,8 +82,6 @@ describe('check_model — purity', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — degenerate_size', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('flags a box with a zero size component', () => {
     const badBox: Entity = { ...BASE, id: 'b1', kind: 'box', size: [1, 0, 1] };
     const doc = injectEntity(createEmptyDocument(), badBox);
@@ -216,8 +209,6 @@ describe('check_model — degenerate_size', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — open_profile', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('flags an open polyline with a warning', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'draw_polyline', {
@@ -254,8 +245,6 @@ describe('check_model — open_profile', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — insufficient_points', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('flags a polyline with fewer than 2 points', () => {
     const bad: Entity = { ...BASE, id: 'pl1', kind: 'polyline', points: [[0, 0]], closed: false };
     const doc = injectEntity(createEmptyDocument(), bad);
@@ -301,8 +290,6 @@ describe('check_model — insufficient_points', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — far_from_origin', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('flags an entity whose bounding-box center exceeds the threshold', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [1, 1, 1], position: [2e6, 0, 0] }).document;
@@ -339,8 +326,6 @@ describe('check_model — far_from_origin', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — empty_layer', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('flags a layer with no entities as info', () => {
     // The empty document has 'layer-default' with no entities.
     const doc = createEmptyDocument();
@@ -364,8 +349,6 @@ describe('check_model — empty_layer', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — orphaned_group_member', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('flags a group that references a missing entity id', () => {
     const doc: CadDocument = {
       ...createEmptyDocument(),
@@ -401,8 +384,6 @@ describe('check_model — orphaned_group_member', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — parameter_error', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('flags a parameter whose error field is set', () => {
     const doc: CadDocument = {
       ...createEmptyDocument(),
@@ -436,8 +417,6 @@ describe('check_model — parameter_error', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — ok flag', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('ok is false when there are error-severity issues', () => {
     const bad: Entity = { ...BASE, id: 'b1', kind: 'box', size: [0, 1, 1] };
     const doc = injectEntity(createEmptyDocument(), bad);
@@ -468,8 +447,6 @@ describe('check_model — ok flag', () => {
 // ---------------------------------------------------------------------------
 
 describe('check_model — summary', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('summary mentions counts when issues are present', () => {
     const bad: Entity = { ...BASE, id: 'b1', kind: 'box', size: [-1, 1, 1] };
     const doc = injectEntity(createEmptyDocument(), bad);

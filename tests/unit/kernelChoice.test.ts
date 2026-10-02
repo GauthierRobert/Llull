@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { parseKernelChoice } from '@core/geometry/kernelChoice';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { defaultContext, type ExecutionContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { __resetIdCounter, type IdSource } from '@lib/id';
+import { type IdSource } from '@lib/id';
 
 describe('parseKernelChoice', () => {
   it.each([
@@ -40,8 +40,6 @@ function makeContext(kernel: GeometryKernel): ExecutionContext {
 }
 
 describe('kernel parity across callers', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('the same fillet_edge call yields the same entity for UI-style and server-style contexts', () => {
     const base = execute(
       createEmptyDocument(),

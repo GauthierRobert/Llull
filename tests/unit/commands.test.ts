@@ -1,13 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createEmptyDocument, is2D } from '@core/model/types';
 import type { Entity, TextEntity } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
 import { entityBounds } from '@core/commands/scene';
-import { __resetIdCounter } from '@lib/id';
 
 describe('command layer', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('add_box creates one entity and reports it as affected', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'add_box', { size: [2, 2, 2] });
@@ -619,8 +616,6 @@ describe('extractReferences', () => {
 // ---------------------------------------------------------------------------
 
 describe('set_parameter', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('creates a literal parameter and reports it in summary', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'set_parameter', { name: 'width', expression: '10' });
@@ -770,8 +765,6 @@ describe('set_parameter', () => {
 });
 
 describe('delete_parameter', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('removes an existing parameter', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'set_parameter', { name: 'x', expression: '5' }).document;
@@ -831,8 +824,6 @@ describe('delete_parameter', () => {
 // ---------------------------------------------------------------------------
 
 describe('draw_ellipse', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('creates one ellipse entity with correct geometry', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'draw_ellipse', { center: [1, 2], radiusX: 5, radiusY: 3 });
@@ -896,8 +887,6 @@ describe('draw_ellipse', () => {
 // ---------------------------------------------------------------------------
 
 describe('draw_spline', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('creates one spline entity with correct through-points', () => {
     const doc = createEmptyDocument();
     const pts = [
@@ -988,8 +977,6 @@ describe('draw_spline', () => {
 // ---------------------------------------------------------------------------
 
 describe('scale_entity — ellipse and spline', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('scales ellipse radiusX, radiusY, and center by factor', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'draw_ellipse', { center: [2, 4], radiusX: 3, radiusY: 1 }).document;
@@ -1735,8 +1722,6 @@ describe('scale_entity — ellipse and spline', () => {
 // ---------------------------------------------------------------------------
 
 describe('render_view', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('empty doc returns a valid SVG, entityCount 0, bounds null', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'render_view', {});
@@ -2965,8 +2950,6 @@ describe('render_view', () => {
 // ---------------------------------------------------------------------------
 
 describe('add_dimension', () => {
-  beforeEach(() => __resetIdCounter());
-
   // Helpers to seed reference entities
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   function makeDoc() {
@@ -3709,8 +3692,6 @@ describe('add_dimension', () => {
 import { resolveStepParams, buildParamEnv } from '@core/commands/regenerate';
 
 describe('KI3 — =expr param resolution in replay_history', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ── AC1: headline round-trip ─────────────────────────────────────────────
 
   it('AC1 round-trip: =expr param in a step reflects updated parameter after replay', () => {
@@ -4608,8 +4589,6 @@ describe('KI3 — =expr param resolution in replay_history', () => {
 // ---------------------------------------------------------------------------
 
 describe('Q4 — replayHistory id-remapping', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ── AC1: move + assign_material + delete all survive replay ─────────────
 
   it('AC1: move_entity applied to a replayed entity lands at the correct position', () => {
@@ -5162,8 +5141,6 @@ describe('instantiate_template (templates.ts generators)', () => {
 // ---------------------------------------------------------------------------
 
 describe('export_stl', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ── helpers ───────────────────────────────────────────────────────────────
 
   /** Decode a base64 string into a Uint8Array (pure, mirrors uint8ArrayToBase64). */
@@ -5814,8 +5791,6 @@ describe('export_stl', () => {
 // ---------------------------------------------------------------------------
 
 describe('W4A/W4C — rotation at creation and AABB summaries', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ── add_box ──────────────────────────────────────────────────────────────
 
   it('add_box stores non-zero rotation on the entity', () => {
@@ -6103,8 +6078,6 @@ describe('W4A/W4C — rotation at creation and AABB summaries', () => {
 // ---------------------------------------------------------------------------
 
 describe('W4B — unified placement anchor', () => {
-  beforeEach(() => __resetIdCounter());
-
   /** Per-component near-equality on a Vec3 (avoids -0 / float noise). */
   function expectVec(actual: readonly number[], expected: readonly number[]): void {
     expect(actual).toHaveLength(expected.length);
@@ -6303,8 +6276,6 @@ describe('W4B — unified placement anchor', () => {
 // ── clear_document ──────────────────────────────────────────────────────────
 
 describe('clear_document', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('clears all entities, order, selection, groups and resets layers', () => {
     let doc = createEmptyDocument();
     const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
@@ -6401,8 +6372,6 @@ describe('clear_document', () => {
 // ---------------------------------------------------------------------------
 
 describe('set_camera', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('updates all four camera fields when all are provided', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'set_camera', {
@@ -6473,8 +6442,6 @@ describe('set_camera', () => {
 // ---------------------------------------------------------------------------
 
 describe('look_at', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('sets target and preserves distance', () => {
     const doc = createEmptyDocument();
     const prevDistance = doc.camera.distance;
@@ -6553,8 +6520,6 @@ describe('look_at', () => {
 // ---------------------------------------------------------------------------
 
 describe('fit_view', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('fits all entities — target near scene centre, distance > 0', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] }).document;
@@ -6702,8 +6667,6 @@ describe('fit_view', () => {
 // ---------------------------------------------------------------------------
 
 describe('export_obj', () => {
-  beforeEach(() => __resetIdCounter());
-
   /** Helper: decode base64 to Uint8Array (same as in export_stl tests). */
   function base64ToUint8Array(b64: string): Uint8Array {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -6852,8 +6815,6 @@ describe('export_obj', () => {
 // ---------------------------------------------------------------------------
 
 describe('export_gltf', () => {
-  beforeEach(() => __resetIdCounter());
-
   /** Decode base64 → Uint8Array. */
   function base64ToUint8Array(b64: string): Uint8Array {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -7065,8 +7026,6 @@ describe('export_gltf', () => {
 // ---------------------------------------------------------------------------
 
 describe('export revolution regression', () => {
-  beforeEach(() => __resetIdCounter());
-
   type StlData = { format: string; triangleCount: number; stl?: string };
   type ObjData = { format: string; text: string; triangleCount: number };
   type GltfData = { format: string; triangleCount: number; text?: string; base64?: string };
@@ -7135,8 +7094,6 @@ describe('export revolution regression', () => {
 // ---------------------------------------------------------------------------
 
 describe('align', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('aligns min-x of targets to reference min-x', () => {
     let doc = createEmptyDocument();
     const refR = execute(doc, 'add_box', { size: [2, 2, 2], position: [10, 0, 0] });
@@ -7220,8 +7177,6 @@ describe('align', () => {
 // ---------------------------------------------------------------------------
 
 describe('distribute', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('distributes 3 boxes with equal-spacing along x', () => {
     let doc = createEmptyDocument();
     // Place boxes at x=0, x=5, x=20 (not evenly spaced); distribute should move middle to x=10.
@@ -7301,8 +7256,6 @@ describe('distribute', () => {
 // ---------------------------------------------------------------------------
 
 describe('stack_on', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('stacks a box on top of another box along z (default)', () => {
     let doc = createEmptyDocument();
     // base: position [0,0,0], size [4,4,2] → bounds.max.z = 1
@@ -7373,8 +7326,6 @@ describe('stack_on', () => {
 // ---------------------------------------------------------------------------
 
 describe('array_along_path', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('places count=5 copies of a box along a straight path', () => {
     let doc = createEmptyDocument();
     const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
@@ -7504,8 +7455,6 @@ describe('array_along_path', () => {
 // ---------------------------------------------------------------------------
 
 describe('distribute_on_arc', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('places count=4 copies around a full circle in XY plane', () => {
     let doc = createEmptyDocument();
     const srcR = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
@@ -7634,8 +7583,6 @@ describe('distribute_on_arc', () => {
 // ---------------------------------------------------------------------------
 
 describe('build_project repeat/for_each', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('repeat: creates 5 boxes using count literal', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', {
@@ -8689,8 +8636,6 @@ describe('build_project repeat/for_each', () => {
 });
 
 describe('replayHistory preserves non-regenerated document state', () => {
-  beforeEach(() => __resetIdCounter());
-
   const steel = {
     name: 'steel',
     density: 0.00785,
@@ -8753,8 +8698,6 @@ describe('replayHistory preserves non-regenerated document state', () => {
 });
 
 describe('build_project / template / spline / recipe allocation limits', () => {
-  beforeEach(() => __resetIdCounter());
-
   const box = { command: 'add_box', params: { size: [1, 1, 1] } };
 
   it('build_project rejects more than MAX_PROJECT_ACTIONS actions', () => {
@@ -8863,8 +8806,6 @@ describe('build_project / template / spline / recipe allocation limits', () => {
 });
 
 describe('guardCommand contract', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('free text equal to an Object.prototype key is accepted (add_text, set_entity_name, add_layer)', () => {
     const text = execute(createEmptyDocument(), 'add_text', {
       content: 'constructor',
@@ -8950,8 +8891,6 @@ describe('guardCommand contract', () => {
 });
 
 describe('delete_entities', () => {
-  beforeEach(() => __resetIdCounter());
-
   function threeBoxes(): { doc: ReturnType<typeof createEmptyDocument>; ids: string[] } {
     let doc = createEmptyDocument();
     const ids: string[] = [];

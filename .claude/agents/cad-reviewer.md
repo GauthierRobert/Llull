@@ -30,7 +30,7 @@ Get the diff (`git diff` if initialized, else inspect changed files). Check, in 
 - [ ] Structured doc-comment tags present on commands (C2).
 
 ### Tests & quality (blocking)
-- [ ] New command has happy + failure-path tests; `__resetIdCounter()` used.
+- [ ] New command has happy + failure-path tests.
 - [ ] `npm run check` green; `core/commands/**` coverage gate satisfied (run it).
 - [ ] `toToolSchemas()` length == `listCommands()` length.
 

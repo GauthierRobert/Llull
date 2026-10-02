@@ -7,7 +7,6 @@ import { MAX_TRACE_FEATURES } from '@core/commands/limits';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@core/geometry/manifoldKernel';
-import { __resetIdCounter } from '@lib/id';
 
 interface CodeData {
   format: string;
@@ -94,7 +93,6 @@ const fakeKernel: GeometryKernel = {
 };
 
 beforeEach(() => {
-  __resetIdCounter();
   setGeometryKernel(fakeKernel);
 });
 

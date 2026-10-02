@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { findProfile } from '@core/commands/building/steel/profiles';
@@ -8,7 +8,6 @@ import {
   type PurlinRow,
   type ZoneSummary,
 } from '@core/commands/building/industrial/purlinCheck';
-import { __resetIdCounter } from '@lib/id';
 
 interface PurlinData {
   rows: PurlinRow[];
@@ -64,8 +63,6 @@ const uplift = (row: PurlinRow): number => row.upliftUtilisation ?? 0;
 /** Interior purlins carry a full tributary width (edge purlins carry half). */
 const interior = (rows: PurlinRow[]): PurlinRow[] =>
   rows.filter((row) => row.check.includes('tributary 1724'));
-
-beforeEach(() => __resetIdCounter());
 
 describe('effectiveModulusRatio', () => {
   it('reduces a slender C, keeps C200x75x2.5 fully effective and a stocky section gross', () => {

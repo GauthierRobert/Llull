@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BuildingElement, FootingElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
@@ -12,7 +12,6 @@ import {
   type FoundationRow,
 } from '@core/commands/building/industrial/foundationCheck';
 import type { TakeoffLine } from '@core/commands/building/quantities';
-import { __resetIdCounter } from '@lib/id';
 
 function hall(params: Record<string, unknown> = {}): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {
@@ -57,8 +56,6 @@ const steelMass = (doc: CadDocument): number =>
     const bars = footing.reinforcement;
     return sum + (bars ? (bars.barDiameter ** 2 / bars.spacing) * footing.width : 0);
   }, 0);
-
-beforeEach(() => __resetIdCounter());
 
 describe('design_footings', () => {
   it('gives the default hall realistic bars and stores them on every analysed footing', () => {

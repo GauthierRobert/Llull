@@ -34,7 +34,7 @@ LOAD FIRST: `.claude/rules/architecture.md`, `.claude/rules/conventions.md`,
 3. Register: import the const into `registry.ts` and append to `definitions`.
 4. Write tests in `tests/unit/commands.test.ts`: happy path (asserts `affected`,
    resulting entity, `document.order`) AND a failure path (missing id / invalid input
-   ⇒ no-op). Use `__resetIdCounter()` in `beforeEach`.
+   ⇒ no-op). Ids are step-scoped and deterministic — no reset needed.
 5. Run `npm run check`. Fix until green. Confirm `core/commands/**` coverage gate
    (90/85/90/90) still holds.
 

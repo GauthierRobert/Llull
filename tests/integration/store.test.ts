@@ -17,7 +17,6 @@
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { serializeDocument } from '@core/commands/persistence';
@@ -85,7 +84,6 @@ const DEFAULT_RESPONSE: ServerCommandResponse = {
 
 describe('CadStore — networked dispatch', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -340,7 +338,6 @@ describe('CadStore — networked dispatch', () => {
 
 describe('CadStore — renderOrigin (floating-origin)', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -369,7 +366,6 @@ describe('CadStore — renderOrigin (floating-origin)', () => {
 
 describe('CadStore — offline fallback', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -560,7 +556,6 @@ function makeOfflineEdit(): void {
 
 describe('CadStore — sync race fixes', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -659,7 +654,6 @@ describe('CadStore — sync race fixes', () => {
 
 describe('CadStore — live command log (MG5.1)', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

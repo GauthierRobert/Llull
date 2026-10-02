@@ -11,7 +11,6 @@ import { currentContext, defaultContext } from '@core/commands/context';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { IdSource } from '@lib/id';
-import { __resetIdCounter } from '@lib/id';
 
 const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
 
@@ -44,7 +43,6 @@ function twoBoxes(): { doc: CadDocument; a: string; b: string } {
 
 describe('ExecutionContext', () => {
   beforeEach(() => {
-    __resetIdCounter();
     setGeometryKernel(null);
   });
   afterEach(() => setGeometryKernel(null));

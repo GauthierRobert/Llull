@@ -1,13 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { ExtrusionEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildSpurGearProfile } from '@core/commands/gears';
-import { __resetIdCounter } from '@lib/id';
 
 describe('add_spur_gear', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ---------------------------------------------------------------------------
   // Happy path
   // ---------------------------------------------------------------------------
@@ -115,9 +112,7 @@ describe('add_spur_gear', () => {
 
   it('omitting pressureAngle uses 20° default — matches explicit 20° call', () => {
     const doc = createEmptyDocument();
-    __resetIdCounter();
     const r1 = execute(doc, 'add_spur_gear', { module: 1, teeth: 20, faceWidth: 5 });
-    __resetIdCounter();
     const r2 = execute(doc, 'add_spur_gear', {
       module: 1,
       teeth: 20,
@@ -166,14 +161,12 @@ describe('add_spur_gear', () => {
 
   it('changing position shifts the entity', () => {
     const doc = createEmptyDocument();
-    __resetIdCounter();
     const r1 = execute(doc, 'add_spur_gear', {
       module: 1,
       teeth: 10,
       faceWidth: 3,
       position: [0, 0, 0],
     });
-    __resetIdCounter();
     const r2 = execute(doc, 'add_spur_gear', {
       module: 1,
       teeth: 10,

@@ -5,10 +5,9 @@
  * and their failure/validation paths.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 // Helper: add a box at a given position and return its id.
 function addBox(
@@ -21,8 +20,6 @@ function addBox(
 }
 
 describe('find_entities — spatial & fuzzy filters (EN3)', () => {
-  beforeEach(() => __resetIdCounter());
-
   // -----------------------------------------------------------------------
   // nearPoint
   // -----------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type {
   BuildingElement,
@@ -11,7 +11,6 @@ import { baseReactions, framesOf } from '@core/commands/building/industrial/fram
 import type { PurlinRow, ZoneSummary } from '@core/commands/building/industrial/purlinCheck';
 import type { ElevationSheet } from '@core/commands/building/elevation';
 import type { IfcExport } from '@core/commands/building/ifc';
-import { __resetIdCounter } from '@lib/id';
 
 const HALL = { span: 24000, length: 30000 };
 const PITCH = (6 * Math.PI) / 180;
@@ -35,8 +34,6 @@ const membersOf = (doc: CadDocument, role: SteelMemberElement['role']): SteelMem
   );
 
 const topOf = (member: SteelMemberElement): number => Math.max(member.start[2], member.end[2]);
-
-beforeEach(() => __resetIdCounter());
 
 describe('add_portal_frame_building roofType', () => {
   it('keeps duopitch as the default (explicit duopitch gives the identical document)', () => {

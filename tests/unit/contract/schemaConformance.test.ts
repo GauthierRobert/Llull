@@ -10,7 +10,6 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import type { ParamItemSpec, ParamSpec } from '@core/commands/types';
 import { execute, listCommands } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 const ID_KEY = /^id$|Id$/;
 const IDS_KEY = /Ids$|^ids$/;
@@ -49,7 +48,6 @@ function sample(spec: ParamSpec | ParamItemSpec, key: string, entityId: string):
 describe('schema conformance: schema-shaped params never make a command throw', () => {
   let warn: MockInstance<typeof console.warn>;
   beforeEach(() => {
-    __resetIdCounter();
     warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
   afterEach(() => warn.mockRestore());

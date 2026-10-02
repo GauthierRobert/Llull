@@ -5,7 +5,6 @@ import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import type { Entity } from '@core/model/types';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // Canned meshes
@@ -111,7 +110,6 @@ describe('modify3d commands', () => {
   let fake: ReturnType<typeof makeFakeKernel>;
 
   beforeEach(() => {
-    __resetIdCounter();
     fake = makeFakeKernel();
     setGeometryKernel(fake);
   });

@@ -23,7 +23,7 @@ LOAD FIRST: `.claude/rules/workflow.md` (W3), `.claude/context/command-layer.md`
 
 ## Principles
 
-- Determinism: `__resetIdCounter()` in `beforeEach`. No reliance on `Date.now()` output.
+- Determinism: ids are step-scoped and deterministic per document. No reliance on `Date.now()` output.
 - Assert observable behavior: created entities, `affected` ids, `summary` text, doc
   `order`/`selection` — not private structure.
 - Always include the purity check pattern for new commands (input doc unchanged:

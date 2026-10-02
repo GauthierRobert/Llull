@@ -1,9 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { wallLoop, gridIntersections } from '@core/commands/building/structure';
 import type { WallElement } from '@core/model/building';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -19,8 +18,6 @@ const SQUARE = [
 function perimeter(): CadDocument {
   return run(createEmptyDocument(), 'draw_walls', { points: SQUARE, closed: true });
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('add_slab', () => {
   it('creates a slab from a boundary with its top at the level', () => {

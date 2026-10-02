@@ -5,18 +5,15 @@
  * Also covers the B1 regression: rotated-entity summaries use the world AABB
  * (rotatedEntityBounds), so a π/4 box reports expanded extents.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { InstanceEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/commands/scene';
 import { expandInstance } from '@core/commands/assemblies';
-import { __resetIdCounter } from '@lib/id';
 import type { Component } from '@core/model/types';
 
 describe('assemblies', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ---------------------------------------------------------------------------
   // B1 regression — rotated-entity summary AABB is expanded vs. unrotated
   // ---------------------------------------------------------------------------

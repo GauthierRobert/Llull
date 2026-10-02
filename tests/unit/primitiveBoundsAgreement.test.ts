@@ -3,7 +3,7 @@
  * rotatedEntityBounds) and export tessellation must all describe the same +Z-up solid.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { createEmptyDocument } from '@core/model/types';
 import type { Entity, Vec3 } from '@core/model/types';
@@ -19,7 +19,6 @@ import {
   buildTorusGeometry,
   buildWedgeGeometry,
 } from '@ui/viewport/3d/entities/primitiveGeometry';
-import { __resetIdCounter } from '@lib/id';
 import { groupEntitiesForInstancing } from '@ui/viewport/3d/grouping';
 import { makeGeometry } from '@ui/viewport/3d/InstancedRenderer';
 
@@ -106,8 +105,6 @@ const CASES: Case[] = [
 ];
 
 describe('primitive bounds agreement (render / core bbox / export tessellation)', () => {
-  beforeEach(() => __resetIdCounter());
-
   for (const testCase of CASES) {
     it(`${testCase.kind}: rendered geometry == entityBounds == rotatedEntityBounds == tessellation`, () => {
       const result = execute(createEmptyDocument(), testCase.command, {

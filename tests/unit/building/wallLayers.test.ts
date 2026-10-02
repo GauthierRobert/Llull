@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildPlanDrawing } from '@core/commands/building/plan';
@@ -7,7 +7,6 @@ import { layerBoundaries, parseWallLayers } from '@core/commands/building/wallLa
 import type { TakeoffLine } from '@core/commands/building/quantities';
 import type { IfcExport } from '@core/commands/building/ifc';
 import type { WallElement } from '@core/model/building';
-import { __resetIdCounter } from '@lib/id';
 
 const BUILD_UP = [
   { material: 'brick', thickness: 100, function: 'finish' },
@@ -29,8 +28,6 @@ function wallOf(doc: CadDocument, id = 'wall-1'): WallElement {
   if (element?.category !== 'wall') throw new Error(id);
   return element;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('set_wall_layers', () => {
   it('sets a build-up, its total thickness and structural material', () => {

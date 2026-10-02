@@ -17,7 +17,6 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -32,7 +31,6 @@ function resetStore(): void {
 
 describe('EntityRenderer — cone kind', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -69,7 +67,6 @@ describe('EntityRenderer — cone kind', () => {
 
 describe('EntityRenderer — torus kind', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -106,7 +103,6 @@ describe('EntityRenderer — torus kind', () => {
 
 describe('EntityRenderer — wedge kind', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -142,7 +138,6 @@ describe('EntityRenderer — wedge kind', () => {
 
 describe('EntityRenderer — pyramid kind', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -182,7 +177,6 @@ describe('EntityRenderer — pyramid kind', () => {
 
 describe('EntityRenderer switch coverage — all new 3D solid kinds are in the document order', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

@@ -4,10 +4,9 @@
  * Pure: documents from createEmptyDocument(); ids reset between tests.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 interface StepReport {
   index: number;
@@ -27,8 +26,6 @@ interface BuildData {
 }
 
 describe('build_project — happy path', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('runs a multi-step plan and reports each step', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', {
@@ -103,8 +100,6 @@ describe('build_project — happy path', () => {
 });
 
 describe('build_project — abort (default) rolls back', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('aborts on the first failing step and returns the input document unchanged', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', {
@@ -170,8 +165,6 @@ describe('build_project — abort (default) rolls back', () => {
 });
 
 describe('build_project — continue mode', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('applies the good steps and records the failures without rolling back', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', {
@@ -222,8 +215,6 @@ describe('build_project — continue mode', () => {
 });
 
 describe('build_project — validate (dry run)', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('reports a valid plan without mutating the document', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', {
@@ -270,8 +261,6 @@ describe('build_project — validate (dry run)', () => {
 });
 
 describe('build_project — empty / invalid input', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('no-ops on an empty actions list', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'build_project', { actions: [] });

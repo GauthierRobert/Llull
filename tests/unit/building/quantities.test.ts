@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
@@ -7,7 +7,6 @@ import {
   type TakeoffLine,
   type CostLine,
 } from '@core/commands/building/quantities';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -45,8 +44,6 @@ function line(lines: ReadonlyArray<TakeoffLine>, key: string): TakeoffLine {
   if (!found) throw new Error(`missing ${key}`);
   return found;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('quantity_takeoff', () => {
   it('computes metric quantities with the centerline method', () => {

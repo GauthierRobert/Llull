@@ -20,7 +20,6 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useNamedViewStore } from '@ui/store';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
@@ -62,7 +61,6 @@ function nullSnapshot(): null {
 
 describe('namedViewStore — saveNamedView', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -118,7 +116,6 @@ describe('namedViewStore — saveNamedView', () => {
 
 describe('namedViewStore — restoreNamedView', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -158,7 +155,6 @@ describe('namedViewStore — restoreNamedView', () => {
 
 describe('namedViewStore — deleteNamedView', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -190,7 +186,6 @@ describe('namedViewStore — deleteNamedView', () => {
 
 describe('NamedViewsOverlay — toggle button', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -226,7 +221,6 @@ describe('NamedViewsOverlay — toggle button', () => {
 
 describe('NamedViewsOverlay — save row', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -261,7 +255,6 @@ describe('NamedViewsOverlay — save row', () => {
 
 describe('NamedViewsOverlay — saved views list', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 

@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { getGeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@core/geometry/manifoldKernel';
-import { __resetIdCounter } from '@lib/id';
 import { kernelPlans } from './plans';
 import { normalize, normalizeGeometry } from './normalize';
 import { runPlan } from './runPlan';
@@ -20,8 +19,6 @@ describe('golden replay corpus (Manifold kernel)', () => {
   }, 60_000);
 
   afterAll(() => setGeometryKernel(previousKernel));
-
-  beforeEach(() => __resetIdCounter());
 
   for (const [name, actions] of Object.entries(kernelPlans)) {
     describe(name, () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BasePlateElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
@@ -20,7 +20,6 @@ import {
 import type { FootingDesignRow } from '@core/commands/building/industrial/footingDesign';
 import { findProfile } from '@core/commands/building/steel/profiles';
 import { buildingErrors } from '@core/commands/building/validate';
-import { __resetIdCounter } from '@lib/id';
 
 const HALL = { span: 24000, length: 30000 };
 const LOADS: FrameLoads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0.7 };
@@ -69,8 +68,6 @@ function sections(doc: CadDocument): { column: string; rafter: string; tonnes: n
 
 const foundationRows = (doc: CadDocument): FoundationRow[] =>
   (execute(doc, 'check_foundations', { windPressure: 0.7 }).data as { rows: FoundationRow[] }).rows;
-
-beforeEach(() => __resetIdCounter());
 
 describe('add_portal_frame_building columnBase', () => {
   it('keeps pinned bases as the default: no fixity on the plates, no base moments', () => {

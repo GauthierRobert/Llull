@@ -29,7 +29,8 @@
   Pure functions ⇒ exhaustive and fast.
 - `tests/integration/` — `store.dispatch` end-to-end (command → store → undo).
 - Component tests (Testing Library) — panels & param-gathering, NOT geometry math.
-- Determinism: call `__resetIdCounter()` in `beforeEach` so ids are stable.
+- Determinism: ids are step-scoped (`<prefix>-<step>.<k>`, derived from `doc.nextStepNumber`), so the
+  same commands on the same document always produce the same ids — no counter reset needed.
 - Assert behavior the user/AI observes (entity created, `affected` ids, `summary`),
   not internal structure.
 

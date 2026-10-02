@@ -1,9 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { defaultValues, type ElementTool } from '@ui/panels/building/elementTools';
 import { INDUSTRIAL_TOOLS } from '@ui/panels/building/industrialTools';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { __resetIdCounter } from '@lib/id';
 
 const context = { levelId: null, wallIds: [] };
 
@@ -20,8 +19,6 @@ function apply(doc: CadDocument, id: string, overrides: Record<string, string> =
   expect(result.affected.length, result.summary).toBeGreaterThan(0);
   return result.document;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('industrial tools', () => {
   it('the default forms build a working steel hall with process plant', () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
@@ -9,7 +9,6 @@ import {
   type RunwayCheckRow,
 } from '@core/commands/building/industrial/runwayCheck';
 import { craneActions } from '@core/commands/building/industrial/frameModel';
-import { __resetIdCounter } from '@lib/id';
 
 function hall(capacity = 10): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {
@@ -29,8 +28,6 @@ const find = (rows: RunwayCheckRow[], kind: string, check = ''): RunwayCheckRow 
   if (!match) throw new Error(`no ${kind} row`);
   return match;
 };
-
-beforeEach(() => __resetIdCounter());
 
 describe('check_crane_runways', () => {
   it('checks the default 10 t runway with realistic utilisations', () => {

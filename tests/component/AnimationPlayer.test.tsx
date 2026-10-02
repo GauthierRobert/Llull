@@ -19,7 +19,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useViewportStore } from '@ui/store';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { __resetIdCounter } from '@lib/id';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { findClickAnimationsForEntity } from '@ui/viewport/3d/animationClickHelpers';
 import type { Animation, EntityGroup } from '@core/model/types';
@@ -65,7 +64,6 @@ function resetStores(): void {
 
 describe('viewportStore — animation state defaults', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -84,7 +82,6 @@ describe('viewportStore — animation state defaults', () => {
 
 describe('viewportStore — toggleAnimationPlaying', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -102,7 +99,6 @@ describe('viewportStore — toggleAnimationPlaying', () => {
 
 describe('viewportStore — setAnimationPlaying', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -120,7 +116,6 @@ describe('viewportStore — setAnimationPlaying', () => {
 
 describe('viewportStore — resetAnimations', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -153,7 +148,6 @@ describe('viewportStore — resetAnimations', () => {
 
 describe('viewportStore — toggleClickAnimation', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -193,7 +187,6 @@ describe('viewportStore — toggleClickAnimation', () => {
 
 describe('ViewportControls — animation transport controls (no animations)', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -207,7 +200,6 @@ describe('ViewportControls — animation transport controls (no animations)', ()
 
 describe('ViewportControls — animation transport controls (with animations)', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
     // Inject a document with one animation so the transport controls appear.
     const doc = createEmptyDocument();

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
@@ -8,7 +8,6 @@ import {
 } from '@core/commands/building/industrial/ncExport';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import { findProfile } from '@core/commands/building/steel/profiles';
-import { __resetIdCounter } from '@lib/id';
 
 const HALL = { span: 24000, length: 30000 };
 
@@ -50,8 +49,6 @@ function stField(file: NcFile, index: number): string {
 }
 
 describe('export_nc_files', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('produces NC1 files for the default hall without touching the document', () => {
     const doc = hall();
     const before = JSON.stringify(doc);

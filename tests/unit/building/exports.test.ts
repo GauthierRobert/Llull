@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildPlanDrawing, boundsOf, dimensionLabel } from '@core/commands/building/plan';
@@ -6,7 +6,6 @@ import { dxfLayerName, dxfText, type DxfExport } from '@core/commands/building/d
 import { escapeXml, fitScale, type PlanSheet } from '@core/commands/building/sheet';
 import { ifcGuid, ifcReal, ifcString, type IfcExport } from '@core/commands/building/ifc';
 import { fileSlug } from '@core/commands/building/model';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -50,8 +49,6 @@ function house(): CadDocument {
   });
   return doc;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('plan drawing', () => {
   it('cuts walls at door gaps and window gaps but not high windows', () => {

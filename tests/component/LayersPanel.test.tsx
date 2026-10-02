@@ -14,7 +14,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore, useViewportStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { DEFAULT_LAYER_ID } from '@core/model/types';
@@ -46,7 +45,6 @@ function addLayer(name: string, color?: string): string {
 
 describe('LayersPanel — read-only viewer', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

@@ -17,7 +17,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useViewportStore } from '@ui/store';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { __resetIdCounter } from '@lib/id';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -41,7 +40,6 @@ function resetStores(): void {
 
 describe('viewportStore — displayMode', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -68,7 +66,6 @@ describe('viewportStore — displayMode', () => {
 
 describe('viewportStore — clipPlane', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -109,7 +106,6 @@ describe('viewportStore — clipPlane', () => {
 
 describe('viewportStore — hiddenEntityIds', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -151,7 +147,6 @@ describe('viewportStore — hiddenEntityIds', () => {
 
 describe('ViewportControls — display mode buttons', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -198,7 +193,6 @@ describe('ViewportControls — display mode buttons', () => {
 
 describe('ViewportControls — section plane toggle', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -268,7 +262,6 @@ describe('ViewportControls — section plane toggle', () => {
 
 describe('PropertiesPanel — entity visibility toggle', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 

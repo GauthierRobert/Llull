@@ -17,7 +17,6 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -44,7 +43,6 @@ function getVisibleEntities(): Entity[] {
 
 describe('InstancedRenderer integration — 100 identical boxes → 1 batch', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -86,7 +84,6 @@ describe('InstancedRenderer integration — 100 identical boxes → 1 batch', ()
 
 describe('InstancedRenderer integration — unique-color boxes → separate batches', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -119,7 +116,6 @@ describe('InstancedRenderer integration — unique-color boxes → separate batc
 
 describe('InstancedRenderer integration — non-batchable entities', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -168,7 +164,6 @@ describe('InstancedRenderer integration — non-batchable entities', () => {
 
 describe('InstancedRenderer integration — mixed batchable + non-batchable', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -194,7 +189,6 @@ describe('InstancedRenderer integration — mixed batchable + non-batchable', ()
 
 describe('InstancedRenderer integration — cylinder and sphere batching', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -237,7 +231,6 @@ describe('InstancedRenderer integration — cylinder and sphere batching', () =>
 
 describe('InstancedRenderer integration — entityIdFromInstanceId', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

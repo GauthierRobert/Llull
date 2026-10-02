@@ -9,11 +9,10 @@
  *   5. Unannotated commands produce no `annotations` field in toToolSchemas().
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { listCommands, toToolSchemas, execute } from '@core/commands/registry';
 import { buildMcpTools } from '@core/mcp/tools';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -219,8 +218,6 @@ describe('buildMcpTools() — no annotations on plain command', () => {
 // ---------------------------------------------------------------------------
 
 describe('readOnly commands — document reference unchanged', () => {
-  beforeEach(() => __resetIdCounter());
-
   const READ_ONLY_CASES: Array<[string, Record<string, unknown>]> = [
     ['describe_scene', {}],
     ['check_model', {}],

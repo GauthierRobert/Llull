@@ -38,7 +38,7 @@ That is the entire AI + MCP wiring — `toToolSchemas()` exposes it automaticall
 ### 4. Test (same change)
 In `tests/unit/commands.test.ts`: happy path (assert `affected`, entity `kind`/props,
 `document.order`) + failure path (missing id / invalid input ⇒ no-op). Purity check.
-`__resetIdCounter()` in `beforeEach`.
+no id reset needed (ids are step-scoped and deterministic).
 
 ### 5. (Optional) UI
 Most tools need no bespoke button — a generic toolbar can iterate `listCommands()`.

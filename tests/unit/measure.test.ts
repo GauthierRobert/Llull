@@ -8,14 +8,11 @@
  *   - summary is factual (contains the numeric result or an explanatory message)
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 describe('measure commands', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ---------------------------------------------------------------------------
   // Shared helpers
   // ---------------------------------------------------------------------------

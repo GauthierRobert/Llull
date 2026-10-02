@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { buildFeatureProgram } from '@core/codegen/featureProgram';
-import { __resetIdCounter } from '@lib/id';
 
 const triangle = [0, 0, 0, 1, 0, 0, 0, 1, 0];
 
@@ -13,10 +12,6 @@ function box(ref?: string): Record<string, unknown> {
     params: { size: [{ value: 1 }, { value: 2 }, { value: 3 }] },
   };
 }
-
-beforeEach(() => {
-  __resetIdCounter();
-});
 
 describe('apply_code_trace validation', () => {
   it('rejects an unknown mode instead of treating it as replace', () => {

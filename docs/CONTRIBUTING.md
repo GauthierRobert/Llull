@@ -44,7 +44,7 @@ docs(architecture): clarify dependency direction
   `tests/integration`.
 - Prefer behavioural assertions (what the user/AI observes) over implementation
   details.
-- Reset ids with `__resetIdCounter()` in `beforeEach` for deterministic output.
+- Ids are deterministic per document (step-scoped `<prefix>-<step>.<k>`); no reset is needed.
 
 ## Definition of done
 

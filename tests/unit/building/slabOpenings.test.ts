@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { slabMesh } from '@core/commands/building/evaluate';
@@ -6,7 +6,6 @@ import { buildPlanDrawing } from '@core/commands/building/plan';
 import type { TakeoffLine } from '@core/commands/building/quantities';
 import type { IfcExport } from '@core/commands/building/ifc';
 import { segmentsIntersect, pointInPolygon } from '@lib/polygon';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -27,8 +26,6 @@ function twoStoreys(): CadDocument {
   doc = run(doc, 'add_stair', { start: [1000, 1000], levelId: 'level-1' });
   return run(doc, 'add_slab', { boundary: rect(0, 0, 10000, 8000), levelId: 'level-2' });
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('slabMesh', () => {
   it('is watertight with outward-facing triangles and the net volume', () => {

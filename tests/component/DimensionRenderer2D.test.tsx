@@ -22,7 +22,6 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import type { DimensionEntity } from '@core/model/types';
@@ -69,7 +68,6 @@ function addCircle(cx: number, cy: number, r: number): string {
 
 describe('DimensionRenderer2D — linear dimension between two points', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -123,7 +121,6 @@ describe('DimensionRenderer2D — linear dimension between two points', () => {
 
 describe('DimensionRenderer2D — radial dimension on a circle', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -161,7 +158,6 @@ describe('DimensionRenderer2D — radial dimension on a circle', () => {
 
 describe('DimensionRenderer2D — angular dimension on 3 points', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -205,7 +201,6 @@ describe('DimensionRenderer2D — angular dimension on 3 points', () => {
 
 describe('DimensionRenderer2D — missing reference entity', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -235,7 +230,6 @@ describe('DimensionRenderer2D — missing reference entity', () => {
 
 describe('DimensionRenderer2D — wrong-kind reference for radial', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -266,7 +260,6 @@ describe('DimensionRenderer2D — wrong-kind reference for radial', () => {
 
 describe('DimensionRenderer2D — precision override', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -303,7 +296,6 @@ describe('DimensionRenderer2D — precision override', () => {
 
 describe('DimensionRenderer2D — label override', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -327,7 +319,6 @@ describe('DimensionRenderer2D — label override', () => {
 
 describe('DimensionRenderer2D — not routed through instanced renderer', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -351,7 +342,6 @@ describe('DimensionRenderer2D — not routed through instanced renderer', () => 
 
 describe('DimensionRenderer2D — aligned dimension', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -377,7 +367,6 @@ describe('DimensionRenderer2D — aligned dimension', () => {
 
 describe('DimensionRenderer2D — angular dimension using lines', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -405,7 +394,6 @@ describe('DimensionRenderer2D — angular dimension using lines', () => {
 
 describe('DimensionRenderer2D — is2D classification', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

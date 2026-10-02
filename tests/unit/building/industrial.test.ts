@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { BuildingElement } from '@core/model/building';
@@ -14,7 +14,6 @@ import type { IfcExport } from '@core/commands/building/ifc';
 import { serializeDocument } from '@core/commands/persistence';
 import { buildingErrors } from '@core/commands/building/validate';
 import { polygonArea } from '@lib/polygon';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   const result = execute(doc, name, params);
@@ -39,8 +38,6 @@ const SMALL_HALL = {
   eaveHeight: 6000,
   roofPitch: 6,
 };
-
-beforeEach(() => __resetIdCounter());
 
 describe('steel profile catalogue', () => {
   it('finds profiles case- and space-insensitively', () => {

@@ -14,7 +14,6 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -46,7 +45,6 @@ function sphericalToCartesian(
 
 describe('CameraReactor — document.camera updated by set_camera command', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -126,7 +124,6 @@ describe('CameraReactor — sphericalToCartesian eye position', () => {
 
 describe('CameraReactor — fit_view updates document.camera', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

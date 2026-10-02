@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -40,7 +39,6 @@ const SQUARE_PROFILE: ReadonlyArray<readonly [number, number]> = [
 
 describe('RevolutionMesh — revolve_profile command → kind "revolution"', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, is2D, is3D } from '@core/model/types';
 import type {
   LineEntity,
@@ -9,11 +9,8 @@ import type {
   PointEntity,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 describe('2D draw commands', () => {
-  beforeEach(() => __resetIdCounter());
-
   // -------------------------------------------------------------------------
   // draw_line
   // -------------------------------------------------------------------------

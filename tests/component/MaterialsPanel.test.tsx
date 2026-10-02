@@ -19,7 +19,6 @@
 import { liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
@@ -59,7 +58,6 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
 
 describe('MaterialsPanel — rendering', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -144,7 +142,6 @@ describe('MaterialsPanel — rendering', () => {
 
 describe('MaterialsPanel — assign', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -221,7 +218,6 @@ describe('MaterialsPanel — assign', () => {
 
 describe('MaterialsPanel — create form', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -311,7 +307,6 @@ describe('MaterialsPanel — create form', () => {
 
 describe('MaterialsPanel — per-entity PBR resolution', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

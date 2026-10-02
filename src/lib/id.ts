@@ -62,8 +62,3 @@ export function nextId(prefix = 'e'): string {
 export function uniqueId(prefix: string): string {
   return counterIdSource.next(prefix);
 }
-
-/** Reset — used by tests to get deterministic ids. */
-export function __resetIdCounter(): void {
-  counter = 0;
-}

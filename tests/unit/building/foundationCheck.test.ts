@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import {
@@ -13,7 +13,6 @@ import {
   anchorBoltResistance,
   boltResistance,
 } from '@core/commands/building/industrial/steelDesign';
-import { __resetIdCounter } from '@lib/id';
 
 const HALL = { span: 24000, length: 30000 };
 
@@ -32,8 +31,6 @@ function rowsOf(doc: CadDocument, params: Record<string, unknown> = {}): Foundat
 
 const maxOf = (rows: FoundationRow[], check: string): number =>
   Math.max(...rows.filter((row) => row.check.startsWith(check)).map((row) => row.utilisation));
-
-beforeEach(() => __resetIdCounter());
 
 describe('check_foundations', () => {
   it('checks footings and base plates of the default hall (read-only)', () => {

@@ -1,9 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type BoxEntity, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { endAdjustment, wallPieces } from '@core/commands/building/evaluate';
 import type { WallElement } from '@core/model/building';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -20,8 +19,6 @@ function wall(doc: CadDocument, id: string): WallElement {
   if (element?.category !== 'wall') throw new Error(`${id} is not a wall`);
   return element;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('add_wall', () => {
   it('creates a wall on an auto-created level with default 200 mm × level height', () => {

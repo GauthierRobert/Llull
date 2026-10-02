@@ -1,13 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { PolylineEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { sampleInvolute } from '@core/commands/gears';
-import { __resetIdCounter } from '@lib/id';
 
 describe('draw_involute', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ---------------------------------------------------------------------------
   // Happy path — basic shape
   // ---------------------------------------------------------------------------
@@ -115,9 +112,7 @@ describe('draw_involute', () => {
 
   it('omitting startAngle defaults to 0 — same as explicit startAngle=0', () => {
     const doc = createEmptyDocument();
-    __resetIdCounter();
     const r1 = execute(doc, 'draw_involute', { baseRadius: 4, endAngle: 2 });
-    __resetIdCounter();
     const r2 = execute(doc, 'draw_involute', { baseRadius: 4, startAngle: 0, endAngle: 2 });
     const p1 = (r1.document.entities[r1.affected[0]!] as PolylineEntity).points;
     const p2 = (r2.document.entities[r2.affected[0]!] as PolylineEntity).points;
@@ -156,9 +151,7 @@ describe('draw_involute', () => {
 
   it('different positions produce distinct entity placements', () => {
     const doc = createEmptyDocument();
-    __resetIdCounter();
     const r1 = execute(doc, 'draw_involute', { baseRadius: 3, endAngle: 1, position: [0, 0, 0] });
-    __resetIdCounter();
     const r2 = execute(doc, 'draw_involute', { baseRadius: 3, endAngle: 1, position: [10, 0, 0] });
     expect(r2.document.entities[r2.affected[0]!]!.position[0]).toBe(10);
     expect(r1.document.entities[r1.affected[0]!]!.position[0]).toBe(0);

@@ -2,11 +2,10 @@
  * Fuzz contract: every registered command, given garbage params, must never throw,
  * never mutate the input document, and never emit non-finite numbers into the document.
  */
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { execute, listCommands } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 // The guard warns (with stack) when a command throws on garbage input; silence the expected noise.
 beforeAll(() => {
@@ -56,7 +55,6 @@ function findNonFinite(value: unknown, path: string, seen: Set<unknown>): string
 }
 
 describe('fuzz: every command tolerates garbage params', () => {
-  beforeEach(() => __resetIdCounter());
   for (const def of listCommands()) {
     it(def.name, () => {
       const doc = seeded();
@@ -94,7 +92,6 @@ describe('fuzz: every command tolerates garbage params', () => {
 });
 
 describe('resource caps: huge counts are rejected, not allocated', () => {
-  beforeEach(() => __resetIdCounter());
   const base = (): { doc: CadDocument; id: string } => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     return { doc, id: Object.keys(doc.entities)[0]! };
@@ -139,7 +136,6 @@ describe('resource caps: huge counts are rejected, not allocated', () => {
 });
 
 describe('registry guard: prototype keys and short vectors', () => {
-  beforeEach(() => __resetIdCounter());
   it('does not treat Object.prototype keys as entity ids', () => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     for (const id of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
@@ -163,7 +159,6 @@ describe('registry guard: prototype keys and short vectors', () => {
 });
 
 describe('registry guard: planar position shorthand', () => {
-  beforeEach(() => __resetIdCounter());
   it('pads a 2-element position to [x, y, 0] for draw_rectangle', () => {
     const r = execute(createEmptyDocument(), 'draw_rectangle', {
       position: [5, 6],

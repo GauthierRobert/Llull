@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { CheckRow } from '@core/commands/building/industrial/frameCheck';
@@ -7,7 +7,6 @@ import { boltResistance, yieldStrength } from '@core/commands/building/industria
 import { connectionWelds } from '@core/commands/building/industrial/connections';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import type { TakeoffLine } from '@core/commands/building/quantities';
-import { __resetIdCounter } from '@lib/id';
 
 const HALL = { span: 24000, length: 30000 };
 
@@ -15,8 +14,6 @@ function hall(params: Record<string, unknown> = {}): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, ...params })
     .document;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('design helpers', () => {
   it('reads yield strengths, bolt resistances and the next section size', () => {

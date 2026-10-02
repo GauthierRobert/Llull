@@ -12,7 +12,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { EmptyState } from '@ui/components/EmptyState';
@@ -32,7 +31,6 @@ function resetStore(): void {
 
 describe('EmptyState — visibility', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -73,7 +71,6 @@ describe('EmptyState — visibility', () => {
 
 describe('EmptyState — dismiss', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -109,7 +106,6 @@ describe('EmptyState — dismiss', () => {
 
 describe('EmptyState — content', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
