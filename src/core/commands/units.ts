@@ -8,56 +8,37 @@
  */
 
 import type { CadDocument, DocumentUnit } from '../model/types';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
+import { defineCommand, z } from './schema';
 
-const VALID_UNITS: ReadonlySet<string> = new Set<DocumentUnit>(['mm', 'cm', 'm', 'in', 'ft']);
+const UNITS = ['mm', 'cm', 'm', 'in', 'ft'] as const satisfies readonly DocumentUnit[];
 
-interface SetUnitsParams {
-  units?: DocumentUnit;
-  displayPrecision?: number;
-}
-
-export const setUnits: CommandDefinition<SetUnitsParams> = {
+export const setUnits = defineCommand({
   name: 'set_units',
   annotations: { idempotent: true },
   description:
     'Set the document unit of length and/or the display precision (decimal places). ' +
     'Affects how all geometry values are displayed and labelled. ' +
     'At least one of units or displayPrecision should be provided.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      units: {
-        type: 'string',
-        enum: ['mm', 'cm', 'm', 'in', 'ft'],
-        description:
-          "Unit of length for the document. Allowed values: 'mm' (millimetres), " +
+  params: z.object({
+    units: z
+      .enum(UNITS)
+      .optional()
+      .describe(
+        "Unit of length for the document. Allowed values: 'mm' (millimetres), " +
           "'cm' (centimetres), 'm' (metres), 'in' (inches), 'ft' (feet).",
-      },
-      displayPrecision: {
-        type: 'number',
-        description:
-          'Number of decimal places to show when formatting length values (e.g. 2 → "12.50 mm"). ' +
+      ),
+    displayPrecision: z
+      .number()
+      .optional()
+      .describe(
+        'Number of decimal places to show when formatting length values (e.g. 2 → "12.50 mm"). ' +
           'Must be a non-negative integer.',
-      },
-    },
-    required: [],
-  },
+      ),
+  }),
   run: (doc, { units, displayPrecision }): CommandResult => {
-    if (units !== undefined && !VALID_UNITS.has(units)) {
-      return {
-        document: doc,
-        summary: `Invalid unit '${String(units)}'. Allowed: mm, cm, m, in, ft.`,
-        affected: [],
-      };
-    }
-
     if (displayPrecision !== undefined) {
-      if (
-        typeof displayPrecision !== 'number' ||
-        displayPrecision < 0 ||
-        !Number.isInteger(displayPrecision)
-      ) {
+      if (displayPrecision < 0 || !Number.isInteger(displayPrecision)) {
         return {
           document: doc,
           summary: `Invalid displayPrecision ${String(displayPrecision)}. Must be a non-negative integer.`,
@@ -85,7 +66,7 @@ export const setUnits: CommandDefinition<SetUnitsParams> = {
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // Pure display helper — reusable by measure / annotation commands.

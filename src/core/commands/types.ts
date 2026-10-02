@@ -14,6 +14,7 @@
 
 import type { CadDocument } from '../model/types';
 import type { ExecutionContext } from './context';
+import type { ZodType } from 'zod';
 
 export interface CommandResult {
   /** The next document state. */
@@ -100,6 +101,11 @@ export interface CommandDefinition<P> {
   readonly description: string;
   /** JSON-schema-like parameter spec, consumed by the AI/MCP tool generators. */
   readonly paramsSchema: ParamsSchema;
+  /**
+   * Runtime validator derived from the same zod schema as `paramsSchema` (set by
+   * `defineCommand`, MG2). `execute` no-ops with the failing path when params don't match.
+   */
+  readonly paramsValidator?: ZodType;
   readonly run: Command<P>;
   /**
    * Optional safety hints for AI agents and MCP clients.

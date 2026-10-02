@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "llull \u2014 a modern, MCP-first 3D CAD app whose every operation is one command drivable by UI, AI, or any MCP agent.",
+  "description": "llull — a modern, MCP-first 3D CAD app whose every operation is one command drivable by UI, AI, or any MCP agent.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -28,6 +28,7 @@
     "react-dom": "^18.3.1",
     "three": "^0.169.0",
     "three-mesh-bvh": "^0.9.10",
+    "zod": "^4.6.5",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

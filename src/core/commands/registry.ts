@@ -12,6 +12,7 @@ import type { CadDocument, FeatureStep } from '../model/types';
 import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
 import type { ExecutionContext } from './context';
 import { currentContext, runInContext } from './context';
+import { formatIssues } from './schema';
 import {
   addBox,
   addCylinder,
@@ -164,6 +165,7 @@ function corruptionReason(entity: unknown): string | null {
 
 /**
  * @pure
+ * @failure params fail `paramsValidator` (MG2 zod schema) -> no-op naming the failing path
  * @failure run throws (warned with stack), id-like params equal an Object.prototype key
  * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
  * components or a non-Vec3 position -> no-op, affected:[]
@@ -184,6 +186,16 @@ function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknow
           summary: `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
           affected: [],
         };
+      }
+      if (def.paramsValidator) {
+        const checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
+        if (!checked.success) {
+          return {
+            document: doc,
+            summary: `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
+            affected: [],
+          };
+        }
       }
       let result: CommandResult;
       try {
