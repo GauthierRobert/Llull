@@ -1,9 +1,9 @@
 /**
  * OpenCascade.js (OCC WASM) geometry kernel — opt-in production kernel.
  *
- * @layer ui/geometry
+ * @layer core/geometry
  *
- * STATUS: OPT-IN. Inject via `?kernel=occt` URL param (see main.tsx).
+ * STATUS: OPT-IN. Inject via `?kernel=occt` URL param (see main.tsx) or `LLULL_KERNEL=occt` on the server.
  * Manifold remains the default kernel. OCC is injected only when the URL flag
  * is set (dev/power-user toggle). See docs/decisions/KI4-occt-spike.md.
  *
@@ -41,11 +41,9 @@
  *     close but not exact for non-polyhedral inputs.
  *   - API availability verified by the same "all OCC APIs are callable despite
  *     the 'unsupported' badge" rule established in KI4 Batch 13 spike.
- *     Runtime correctness of the sewing path is EXPECTED to work in-browser via Vite
- *     but is UNVERIFIED at commit time: bare Node.js ESM cannot resolve the static
- *     `import wasmFile from './dist/opencascade.wasm.wasm'` entry point without
- *     --experimental-wasm-modules, so the live WASM tests are still `describe.skip`.
- *     See docs/decisions/KI4-occt-spike.md (Batch 15 section) for follow-up.
+ *     Verified live under Node (LLULL_KERNEL=occt, server/tests/kernelChoice.test.ts): this
+ *     opencascade.js build (OCC 7.4) needs `MakePolygon_1` / `MakeSolid_1` constructors and a
+ *     null `Handle_Message_ProgressIndicator` for `Sewing.Perform`.
  *
  * Operand types now correctly handled by filletEdges:
  *   - box entity     → exact B-rep via BRepPrimAPI_MakeBox_2 (unchanged, always worked)
@@ -156,7 +154,7 @@ interface OccMakeFace {
 
 interface OccSewing {
   Add(shape: OccShape): void;
-  Perform(): void;
+  Perform(progress: unknown): void;
   SewedShape(): OccShape;
   delete(): void;
 }
@@ -176,6 +174,18 @@ interface OccTopoDS_ModuleFull extends OccTopoDS_Module {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OccApi = any; // The WASM binding is extremely wide; all narrowing is done above.
 
+/** Injected loader inputs: core never fetches; the caller supplies WASM bytes or a locator. */
+export interface OcctKernelOptions {
+  /** Pre-loaded WASM bytes (Node). */
+  readonly wasmBinary?: ArrayBuffer | Uint8Array;
+  /** Maps an asset path to a URL/path (browser). */
+  readonly locateFile?: (path: string) => string;
+  /** Emscripten factory of the OCC glue; defaults to `opencascade.js/dist/opencascade.wasm.js`. */
+  readonly factory?: OcctFactory;
+}
+
+export type OcctFactory = (moduleOptions: Record<string, unknown>) => Promise<OccApi>;
+
 // ---------------------------------------------------------------------------
 // Module-level singleton — WASM init is expensive; run it once.
 // ---------------------------------------------------------------------------
@@ -191,18 +201,16 @@ let _modulePromise: Promise<OccApi> | null = null;
  * In Node.js (server/tests), pass the WASM as `wasmBinary` — see spike
  * test for the pattern.
  */
-async function getOccModule(wasmBinary?: Uint8Array): Promise<OccApi> {
+async function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
   if (_modulePromise) return _modulePromise;
 
   _modulePromise = (async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod = (await import('opencascade.js')) as { default: any };
-    const factory = mod.default;
+    const factory: OcctFactory =
+      options.factory ?? (await import('opencascade.js/dist/opencascade.wasm.js')).default;
 
     const opts: Record<string, unknown> = {};
-    if (wasmBinary) {
-      opts['wasmBinary'] = wasmBinary;
-    }
+    if (options.wasmBinary) opts['wasmBinary'] = options.wasmBinary;
+    if (options.locateFile) opts['locateFile'] = options.locateFile;
 
     const api = await factory(opts);
     return api;
@@ -332,7 +340,7 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
     const gp1: OccGpPnt = new api.gp_Pnt_3(x1, y1, z1);
     const gp2: OccGpPnt = new api.gp_Pnt_3(x2, y2, z2);
 
-    const poly: OccMakePolygon = new api.BRepBuilderAPI_MakePolygon();
+    const poly: OccMakePolygon = new api.BRepBuilderAPI_MakePolygon_1();
     poly.Add_1(gp0);
     poly.Add_1(gp1);
     poly.Add_1(gp2);
@@ -362,7 +370,9 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   // createdFaces are passed to sewing; sewing holds them internally.
   // We do NOT delete them here — sewing manages their lifetime.
 
-  sewing.Perform();
+  const noProgress = new api.Handle_Message_ProgressIndicator_1();
+  sewing.Perform(noProgress);
+  noProgress.delete();
   const sewn = sewing.SewedShape() as OccShape | null;
 
   if (!sewn) {
@@ -371,7 +381,7 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   }
 
   // Promote the sewed shell to a solid.
-  const makeSolid: OccMakeSolid = new api.BRepBuilderAPI_MakeSolid();
+  const makeSolid: OccMakeSolid = new api.BRepBuilderAPI_MakeSolid_1();
   const shellExp: OccExplorer = new api.TopExp_Explorer_2(
     sewn,
     api.TopAbs_ShapeEnum.TopAbs_SHELL,
@@ -445,9 +455,7 @@ function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
 /**
  * Create an OCC-backed geometry kernel.
  *
- * @param wasmBinary - Optional pre-loaded WASM bytes (required in Node.js).
- *   In the browser, omit this and let the WASM load from the network via
- *   Vite's asset pipeline.
+ * @param options - Optional injected `wasmBinary` / `locateFile` (see OcctKernelOptions).
  *
  * Implements the full `GeometryKernel` interface:
  *   - `booleanOp` — union / subtract / intersect via BRepAlgoAPI.
@@ -458,8 +466,8 @@ function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
  *   - `chamferEdges` — TODO: BRepFilletAPI_MakeChamfer spike pending.
  *   - `shellSolid`   — TODO: BRepOffsetAPI_MakeThickSolid spike pending.
  */
-export async function createOcctKernel(wasmBinary?: Uint8Array): Promise<GeometryKernel> {
-  const api = await getOccModule(wasmBinary);
+export async function createOcctKernel(options: OcctKernelOptions = {}): Promise<GeometryKernel> {
+  const api = await getOccModule(options);
 
   return {
     booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null {

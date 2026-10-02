@@ -214,6 +214,7 @@ Done. Client closed cleanly.
 | `LLULL_AUTOSAVE_DEBOUNCE_MS` | no     | `300`             | Autosave write coalescing delay; flushed on shutdown |
 | `LLULL_AUTOSAVE_DISABLED`  | no       | unset             | `true` disables autosave |
 | `MCP_SESSION_TTL_MS` / `MCP_SESSION_SWEEP_MS` | no | `1800000` / `60000` | Idle MCP session eviction |
+| `LLULL_KERNEL`             | no       | `manifold`        | Geometry kernel: `manifold` or `occt` (OpenCascade WASM, ~63 MB, ~1.5 s cold start; needed for `fillet_edge`). Same setting as the browser's `?kernel=occt`. Falls back to Manifold with a warning if OCC fails to load. `GET /health` reports the active `kernel` |
 | `LLULL_PYTHON`             | no       | `python3`         | Python with CadQuery for `export_step` / `import_step` / `import_code`; `off` disables the bridge. See [docs/CAD_EXCHANGE.md](../docs/CAD_EXCHANGE.md) |
 | `LLULL_PYTHON_BUILD123D`   | no       | `LLULL_PYTHON`    | Python with build123d (keep it in its own virtualenv) |
 | `LLULL_PYTHON_TIMEOUT_MS`  | no       | `120000`          | Per-request Python timeout |
