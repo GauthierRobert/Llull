@@ -10,8 +10,10 @@
  * @invariant toToolSchemas().map(t=>t.name).sort() === listCommands().map(d=>d.name).sort()
  */
 
+import { installDefaultPlugins } from '../src/app/plugins.ts';
 import { listCommands, toToolSchemas } from '../src/core/commands/registry.ts';
 
+installDefaultPlugins();
 const commandNames = listCommands()
   .map((d) => d.name)
   .sort();
