@@ -16,13 +16,15 @@ import {
 import { fromMm } from '../model';
 import { findProfile, sectionProperties } from '../steel/profiles';
 import { E_STEEL } from './steelDesign';
+import { FLAT_ROOF_LIMIT, frameRoofAverage, type CoefficientSet } from './windCoefficients';
 
 /**
  * G dead, S snow, WL / WR wind from the left (+x) / right with internal pressure cpi = +0.2,
  * WLs / WRs the same with internal suction cpi = −0.3, CL / CR crane load group 1 (EN 1991-3 Tab. 2.2:
  * φ1 Gc + φ2 Q + drive forces) with the maximum wheel load at the left / right rail, CL5 / CR5 load
  * group 5 (φ4 + skewing HS) likewise, CLk / CRk the serviceability version of group 1 (static wheel
- * loads, φ = 1, drive force HT / φ5; EN 1993-6 §7.3).
+ * loads, φ = 1, drive force HT / φ5; EN 1993-6 §7.3). WLp / WRp: wind from the left / right with the
+ * roof pressure set (EN 1991-1-4 Tab. 7.3a / 7.4a / 7.2: positive on the windward slope) and cpi = −0.3.
  */
 export type LoadCase =
   | 'G'
@@ -31,6 +33,8 @@ export type LoadCase =
   | 'WR'
   | 'WLs'
   | 'WRs'
+  | 'WLp'
+  | 'WRp'
   | 'CL'
   | 'CR'
   | 'CL5'
@@ -39,20 +43,68 @@ export type LoadCase =
   | 'CRk';
 
 export interface WindCase {
-  readonly loadCase: 'WL' | 'WR' | 'WLs' | 'WRs';
+  readonly loadCase: 'WL' | 'WR' | 'WLs' | 'WRs' | 'WLp' | 'WRp';
   readonly from: 'left' | 'right';
   readonly internalPressure: number;
+  /** Roof coefficient set of EN 1991-1-4 (`suction` = large windward suction, `pressure` = alternative). */
+  readonly roofSet: CoefficientSet;
   /** Combination label, e.g. "W→" or "W←(cpi−0.3)". */
   readonly label: string;
 }
 
-/** The four wind cases (EN 1991-1-4 §7.2.9: cpi +0.2 / −0.3 when openings are not dominant). */
+/** The four base wind cases (EN 1991-1-4 §7.2.9: cpi +0.2 / −0.3 when openings are not dominant). */
 export const WIND_CASES: ReadonlyArray<WindCase> = [
-  { loadCase: 'WL', from: 'left', internalPressure: 0.2, label: 'W→' },
-  { loadCase: 'WR', from: 'right', internalPressure: 0.2, label: 'W←' },
-  { loadCase: 'WLs', from: 'left', internalPressure: -0.3, label: 'W→(cpi−0.3)' },
-  { loadCase: 'WRs', from: 'right', internalPressure: -0.3, label: 'W←(cpi−0.3)' },
+  { loadCase: 'WL', from: 'left', internalPressure: 0.2, roofSet: 'suction', label: 'W→' },
+  { loadCase: 'WR', from: 'right', internalPressure: 0.2, roofSet: 'suction', label: 'W←' },
+  {
+    loadCase: 'WLs',
+    from: 'left',
+    internalPressure: -0.3,
+    roofSet: 'suction',
+    label: 'W→(cpi−0.3)',
+  },
+  {
+    loadCase: 'WRs',
+    from: 'right',
+    internalPressure: -0.3,
+    roofSet: 'suction',
+    label: 'W←(cpi−0.3)',
+  },
 ];
+
+/**
+ * Roof pressure-set cases (cpi −0.3): present on a frame only when `FrameModel.windCases` lists them
+ * (a rafter sees cpe ≥ ROOF_PRESSURE_CASE_MIN_CPE). Use `windCasesOf(frames)` to iterate the cases
+ * that carry load.
+ */
+export const WIND_PRESSURE_CASES: ReadonlyArray<WindCase> = [
+  {
+    loadCase: 'WLp',
+    from: 'left',
+    internalPressure: -0.3,
+    roofSet: 'pressure',
+    label: 'W→(roof pressure)',
+  },
+  {
+    loadCase: 'WRp',
+    from: 'right',
+    internalPressure: -0.3,
+    roofSet: 'pressure',
+    label: 'W←(roof pressure)',
+  },
+];
+
+/** A pressure-set case is generated when a rafter sees at least this cpe,10 (positive = pressure). */
+export const ROOF_PRESSURE_CASE_MIN_CPE = 0.15;
+
+/** The wind cases that carry load on at least one of the frames. */
+export function windCasesOf(frames: ReadonlyArray<Pick<FrameModel, 'windCases'>>): WindCase[] {
+  return [...WIND_CASES, ...WIND_PRESSURE_CASES].filter(
+    (windCase) =>
+      windCase.roofSet === 'suction' ||
+      frames.some((frame) => frame.windCases.some((own) => own.loadCase === windCase.loadCase)),
+  );
+}
 
 /** Uniform member load per unit length, global components (N/mm). */
 export type CaseLoads = Partial<Record<LoadCase, { readonly qx: number; readonly qy: number }>>;
@@ -89,6 +141,8 @@ export interface FrameModel {
   readonly label: string;
   readonly nodes: FrameNode[];
   readonly members: AnalysisMember[];
+  /** Wind cases with load on this frame: the four base cases + the roof pressure cases that apply. */
+  readonly windCases: ReadonlyArray<WindCase>;
   readonly nodeLoads: NodeCaseLoad[];
   /** Column tops (mm above the base) — sway / imperfection / Horne loads act here. */
   readonly columnTops: ReadonlyArray<{ node: number; height: number; elementId: string }>;
@@ -110,14 +164,8 @@ export interface FrameLoads {
   readonly craneModel?: CraneModel;
 }
 
-/** Simplified external pressure coefficients (EN 1991-1-4: walls D / E, duopitch roof average). */
-export const WIND_COEFFICIENTS = { windward: 0.8, leeward: 0.5, roofSuction: 0.6 } as const;
-
-/**
- * Monopitch roof suction per wind direction, EN 1991-1-4 Tab. 7.3a (pitch 5–15°), zone H as the
- * frame average: θ = 0° (wind on the low eaves) H −0.6, θ = 180° (wind on the high eaves) H −0.8.
- */
-export const MONOPITCH_ROOF_SUCTION = { lowEaves: 0.6, highEaves: 0.8 } as const;
+/** Simplified external pressure coefficients of the walls (EN 1991-1-4 zones D / E). Roofs: `windCoefficients.ts`. */
+export const WIND_COEFFICIENTS = { windward: 0.8, leeward: 0.5 } as const;
 
 /** Crane capacity (t) from the runway note written by add_crane_runway ("Crane 10 t, …"). */
 export function craneCapacityOf(member: SteelMemberElement): number | null {
@@ -386,21 +434,24 @@ export function framesOf(
         end: rafter.end.map(mm),
       })),
     );
-    for (const rafter of candidate.rafters) {
-      const profile = findProfile(rafter.profile);
-      if (!profile) continue;
-      const section = sectionProperties(profile);
+    const rafterEnds = (
+      rafter: SteelMemberElement,
+    ): { x0: number; z0: number; x1: number; z1: number; flip: boolean } => {
       const flip = rafter.start[0] > rafter.end[0];
       const [first, second] = flip ? [rafter.end, rafter.start] : [rafter.start, rafter.end];
-      const [x0, z0, x1, z1] = [mm(first[0]), mm(first[2]), mm(second[0]), mm(second[2])];
-      const length = Math.hypot(x1 - x0, z1 - z0);
-      // Roof loads per horizontal length, spread along the rafter.
-      const perLength = (kN: number): number => (area(kN) * tributary * Math.abs(x1 - x0)) / length;
-      const spanIndex = valleys.filter((valley) => valley < (x0 + x1) / 2).length;
-      // A monopitch rafter has no partner meeting it at its high end (no apex).
-      const highEnd = (point: readonly number[], other: readonly number[]): boolean =>
-        (point[2] ?? 0) >= (other[2] ?? 0);
-      const sharesApex = candidate.rafters.some((other) => {
+      return {
+        x0: mm(first[0]),
+        z0: mm(first[2]),
+        x1: mm(second[0]),
+        z1: mm(second[2]),
+        flip,
+      };
+    };
+    // A monopitch rafter has no partner meeting it at its high end (no apex).
+    const highEnd = (point: readonly number[], other: readonly number[]): boolean =>
+      (point[2] ?? 0) >= (other[2] ?? 0);
+    const hasApex = (rafter: SteelMemberElement): boolean =>
+      candidate.rafters.some((other) => {
         if (other.id === rafter.id) return false;
         const [mine, theirs] = [
           highEnd(rafter.start, rafter.end) ? rafter.start : rafter.end,
@@ -408,17 +459,55 @@ export function framesOf(
         ];
         return mine.every((value, axis) => near(mm(value), mm(theirs[axis] ?? 0)));
       });
-      const risesRight = z1 > z0;
-      const roofSuction = (windCase: WindCase): number => {
-        if (!sharesApex) {
-          return (windCase.from === 'left') === risesRight
-            ? MONOPITCH_ROOF_SUCTION.lowEaves
-            : MONOPITCH_ROOF_SUCTION.highEaves;
-        }
-        return spanIndex === (windCase.from === 'left' ? 0 : valleys.length)
-          ? WIND_COEFFICIENTS.roofSuction
-          : DOWNWIND_ROOF_FACTOR * WIND_COEFFICIENTS.roofSuction;
-      };
+    /**
+     * Frame-average roof cpe,10 of a rafter for a wind case (EN 1991-1-4 via windCoefficients.ts):
+     * duopitch windward slope H, leeward I/J; monopitch H of the wind direction; flat (< 5°) roofs H on the
+     * windward half of the hall and I on the other, weighted by the rafter length in each half. Spans
+     * downwind of the windward span (Fig. 7.10, simplified) keep their suction × DOWNWIND_ROOF_FACTOR.
+     */
+    const roofCpe = (rafter: SteelMemberElement, windCase: WindCase): number => {
+      const { x0, z0, x1, z1 } = rafterEnds(rafter);
+      const pitchDegrees = (Math.atan2(Math.abs(z1 - z0), Math.abs(x1 - x0)) * 180) / Math.PI;
+      const fromLeft = windCase.from === 'left';
+      const apex = hasApex(rafter);
+      if (pitchDegrees < FLAT_ROOF_LIMIT) {
+        const middle = (low + high) / 2;
+        const [half0, half1] = fromLeft ? [low, middle] : [middle, high];
+        const overlap = Math.max(0, Math.min(x1, half1) - Math.max(x0, half0));
+        const share = Math.min(1, overlap / Math.max(x1 - x0, 1));
+        const flat = (slope: 'windward' | 'leeward'): number =>
+          frameRoofAverage('flat', pitchDegrees, 0, windCase.roofSet, slope);
+        return share * flat('windward') + (1 - share) * flat('leeward');
+      }
+      const faces = fromLeft === z1 > z0;
+      if (!apex) {
+        return frameRoofAverage('monopitch', pitchDegrees, faces ? 0 : 180, windCase.roofSet);
+      }
+      const spanIndex = valleys.filter((valley) => valley < (x0 + x1) / 2).length;
+      const cpe = frameRoofAverage(
+        'duopitch',
+        pitchDegrees,
+        0,
+        windCase.roofSet,
+        faces ? 'windward' : 'leeward',
+      );
+      const windwardSpan = spanIndex === (fromLeft ? 0 : valleys.length);
+      return windwardSpan || cpe > 0 ? cpe : DOWNWIND_ROOF_FACTOR * cpe;
+    };
+    const windCases = [
+      ...WIND_CASES,
+      ...WIND_PRESSURE_CASES.filter((windCase) =>
+        candidate.rafters.some((rafter) => roofCpe(rafter, windCase) >= ROOF_PRESSURE_CASE_MIN_CPE),
+      ),
+    ];
+    for (const rafter of candidate.rafters) {
+      const profile = findProfile(rafter.profile);
+      if (!profile) continue;
+      const section = sectionProperties(profile);
+      const { x0, z0, x1, z1, flip } = rafterEnds(rafter);
+      const length = Math.hypot(x1 - x0, z1 - z0);
+      // Roof loads per horizontal length, spread along the rafter.
+      const perLength = (kN: number): number => (area(kN) * tributary * Math.abs(x1 - x0)) / length;
       const stations = [x0, x1, ...purlins.filter((x) => x > x0 && x < x1)].sort((a, b) => a - b);
       const purlinGap = Math.max(
         ...stations.slice(1).map((x, index) => x - (stations[index] as number)),
@@ -439,12 +528,12 @@ export function framesOf(
           G: { qx: 0, qy: -(perLength(loads.deadLoad) + selfWeight(rafter.profile)) },
           S: { qx: 0, qy: -perLength(loads.snowLoad) },
           ...Object.fromEntries(
-            WIND_CASES.map((windCase) => [
+            windCases.map((windCase) => [
               windCase.loadCase,
               {
                 qx: 0,
                 qy: perLength(
-                  (roofSuction(windCase) + windCase.internalPressure) * loads.windPressure,
+                  (windCase.internalPressure - roofCpe(rafter, windCase)) * loads.windPressure,
                 ),
               },
             ]),
@@ -553,7 +642,7 @@ export function framesOf(
         outer === null
           ? {}
           : Object.fromEntries(
-              WIND_CASES.map((windCase) => {
+              windCases.map((windCase) => {
                 const coefficient =
                   outer === windCase.from
                     ? WIND_COEFFICIENTS.windward - windCase.internalPressure
@@ -664,6 +753,7 @@ export function framesOf(
             : gridLabel(y),
         nodes,
         members: analysis,
+        windCases,
         nodeLoads,
         columnTops,
         craneNodes,
@@ -737,6 +827,8 @@ const LOAD_CASES: ReadonlyArray<LoadCase> = [
   'WR',
   'WLs',
   'WRs',
+  'WLp',
+  'WRp',
   'CL',
   'CR',
   'CL5',
@@ -755,7 +847,11 @@ export function baseReactions(
 ): BaseReaction[] {
   const { frames } = framesOf(doc, building, levelId, loads);
   return frames.flatMap((frame) => {
-    const results = LOAD_CASES.map((loadCase) => ({
+    const present = (loadCase: LoadCase): boolean =>
+      loadCase !== 'WLp' && loadCase !== 'WRp'
+        ? true
+        : frame.windCases.some((windCase) => windCase.loadCase === loadCase);
+    const results = LOAD_CASES.filter(present).map((loadCase) => ({
       loadCase,
       result: solveCombination(frame, { [loadCase]: 1 }),
     }));

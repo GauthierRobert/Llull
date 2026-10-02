@@ -118,26 +118,26 @@ describe('check_purlins', () => {
     expect(result.summary).toMatch(/max utilisation purlins [\d.]+, rails [\d.]+/);
   });
 
-  it('puts edge purlins in zones F / G and the middle in H/I with growing uplift', () => {
+  it('puts edge purlins in zones F / G and the middle in I with growing uplift', () => {
     const data = check(hall());
     expect(data.zones.map((zone) => `${zone.surface}:${zone.zone}`)).toEqual(
-      expect.arrayContaining(['roof:F', 'roof:G', 'roof:H/I']),
+      expect.arrayContaining(['roof:F', 'roof:G', 'roof:H', 'roof:I']),
     );
     const cpes = (zone: string): number[] =>
       data.zones
         .filter((entry) => entry.surface === 'roof' && entry.zone === zone)
         .map((entry) => entry.cpe);
-    // wind across the ridge gives F -1.7 / G -1.2 / H,I -0.6; along the ridge F -1.6 / G -1.3 / H -0.7 / I -0.6
-    expect(cpes('F')).toContain(-1.7);
-    expect(cpes('G')).toEqual(expect.arrayContaining([-1.2]));
-    expect(cpes('H/I')).toContain(-0.6);
+    // 6° pitch, Tab. 7.4a across the ridge: F -1.62 / G -1.16; Tab. 7.4b along it: F -1.57 / G -1.3 / H -0.69 / I -0.59
+    expect(cpes('F')).toContain(-1.62);
+    expect(cpes('G')).toEqual(expect.arrayContaining([-1.16]));
+    expect(cpes('I')).toContain(-0.59);
     expect(Math.min(...cpes('G'))).toBeGreaterThanOrEqual(-1.3);
     const zoneRows = (zone: string): PurlinRow[] =>
       interior(purlinsOf(data)).filter((row) => row.zone === zone);
     const maxUplift = (zone: string): number => Math.max(...zoneRows(zone).map(uplift));
     expect(maxUplift('F')).toBeGreaterThan(maxUplift('G'));
-    expect(maxUplift('G')).toBeGreaterThan(maxUplift('H/I'));
-    // the eaves line of the end bay is corner zone F; an interior bay middle purlin is H/I
+    expect(maxUplift('G')).toBeGreaterThan(maxUplift('I'));
+    // the eaves line of the end bay is corner zone F; an interior bay middle purlin is I
     const mark = (row: PurlinRow): number => Number(row.mark.replace(/\D/g, ''));
     const first = purlinsOf(data).find((row) => mark(row) === 1);
     expect(first?.zone).toBe('F');

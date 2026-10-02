@@ -176,7 +176,7 @@ Each step ships with unit tests and is covered by the Playwright suite.
 
 ## Phase 12 — wind over the full pitch range, longitudinal crane actions
 
-- [ ] **I43 — Wind coefficients for every roof the generator makes.** One `windCoefficients.ts`:
+- [x] **I43 — Wind coefficients for every roof the generator makes.** One `windCoefficients.ts`:
       flat roofs (EN 1991-1-4 §7.2.3, pitch < 5°), monopitch Tab. 7.3a and duopitch Tab. 7.4a/b
       over −5°…45° with linear interpolation, including the positive-pressure cases on steep
       windward slopes; frame, purlin and bracing checks read from it.

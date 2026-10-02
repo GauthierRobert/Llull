@@ -215,7 +215,7 @@ describe('monopitch frames and wind', () => {
     expect((rechecked.data as { failures: string[] }).failures).toEqual([]);
   });
 
-  it('lifts the roof more with wind on the high eaves (zone H −0.8 vs −0.6); duopitch is symmetric', () => {
+  it('lifts the roof more with wind on the high eaves (zone H −0.81 vs −0.57 at 6°); duopitch is symmetric', () => {
     const uplift = (doc: CadDocument, key: 'WL' | 'WR' | 'WLs' | 'WRs'): number => {
       const building = doc.building!;
       return baseReactions(doc, building, building.levelOrder[0]!, LOADS)
@@ -223,9 +223,9 @@ describe('monopitch frames and wind', () => {
         .reduce((sum, reaction) => sum - reaction.cases[key]!.vertical, 0);
     };
     const mono = hall();
-    // Roof suction ratio (cpe + cpi): 0.8 + 0.2 over 0.6 + 0.2 and 0.8 − 0.3 over 0.6 − 0.3.
-    expect(uplift(mono, 'WR') / uplift(mono, 'WL')).toBeCloseTo(1.0 / 0.8, 6);
-    expect(uplift(mono, 'WRs') / uplift(mono, 'WLs')).toBeCloseTo(0.5 / 0.3, 6);
+    // Roof suction ratio (cpe + cpi) at 6°: H −0.81 (high eaves) over −0.57 (low eaves), Tab. 7.3a interpolated.
+    expect(uplift(mono, 'WR') / uplift(mono, 'WL')).toBeCloseTo(1.01 / 0.77, 6);
+    expect(uplift(mono, 'WRs') / uplift(mono, 'WLs')).toBeCloseTo(0.51 / 0.27, 6);
     expect(uplift(mono, 'WR')).toBeGreaterThan(uplift(mono, 'WL'));
     const duo = hall({ roofType: 'duopitch' });
     expect(uplift(duo, 'WR')).toBeCloseTo(uplift(duo, 'WL'), 3);
@@ -247,17 +247,17 @@ describe('check_purlins on a monopitch roof (EN 1991-1-4 Tab. 7.3a)', () => {
     expect(result.roofType).toBe('monopitch');
     const zones = roofZones(result.zones);
     for (const expected of [
-      ['F', -2.3],
+      ['F', -2.32],
       ['G', -1.3],
-      ['H', -0.8],
-      ['G', -1.2],
-      ['F', -1.7],
+      ['H', -0.81],
+      ['G', -1.16],
+      ['F', -1.62],
       ['G', -1.8],
     ] as const) {
       expect(zones, `${expected}`).toContainEqual([expected[0], expected[1]]);
     }
     // Duopitch values are not used on a monopitch roof.
-    expect(zones).not.toContainEqual(['H/I', -0.6]);
+    expect(zones.some(([zone]) => zone === 'H/I' || zone === 'J')).toBe(false);
   });
 
   it('puts the strongest uplift on the purlins at the high eaves', () => {
@@ -274,17 +274,17 @@ describe('check_purlins on a monopitch roof (EN 1991-1-4 Tab. 7.3a)', () => {
     expect(lowest.row.zone).toBe('G');
     expect(highest.row.upliftUtilisation!).toBeGreaterThan(lowest.row.upliftUtilisation!);
     const cornerHigh = result.rows
-      .filter((row) => row.check.includes('cpe -2.3'))
+      .filter((row) => row.check.includes('cpe -2.32'))
       .every((row) => row.zone === 'F');
     expect(cornerHigh).toBe(true);
   });
 
-  it('keeps duopitch zones unchanged', () => {
+  it('keeps the duopitch zones on a duopitch roof', () => {
     const result = data(hall({ roofType: 'duopitch' }));
     expect(result.roofType).toBe('duopitch');
     const zones = roofZones(result.zones);
-    expect(zones).toContainEqual(['H/I', -0.6]);
-    expect(zones.some(([, cpe]) => cpe === -2.3)).toBe(false);
+    expect(zones).toContainEqual(['I', -0.59]);
+    expect(zones.some(([, cpe]) => cpe === -2.32)).toBe(false);
   });
 });
 

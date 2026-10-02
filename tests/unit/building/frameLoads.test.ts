@@ -15,7 +15,9 @@ import {
   framesOf,
   valleyLines,
   craneCapacityOf,
+  DOWNWIND_ROOF_FACTOR,
 } from '@core/commands/building/industrial/frameModel';
+import { frameRoofAverage } from '@core/commands/building/industrial/windCoefficients';
 import { findProfile, sectionProperties } from '@core/commands/building/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';
 import { __resetIdCounter } from '@lib/id';
@@ -377,6 +379,9 @@ describe('design_portal_frames with wind and crane', () => {
   });
 });
 
+const windward = frameRoofAverage('duopitch', 6, 0, 'suction', 'windward');
+const leeward = frameRoofAverage('duopitch', 6, 0, 'suction', 'leeward');
+
 describe('internal pressure (EN 1991-1-4 §7.2.9)', () => {
   it('loads the windward column harder with internal suction and lifts the roof more with pressure', () => {
     const doc = hall();
@@ -390,10 +395,11 @@ describe('internal pressure (EN 1991-1-4 §7.2.9)', () => {
     const total = (key: 'WL' | 'WLs'): number =>
       reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.horizontal, 0);
     expect(total('WLs')).toBeCloseTo(total('WL'), 0);
-    // Roof uplift 0.6 + 0.2 = 0.8 vs 0.6 − 0.3 = 0.3.
+    // Roof uplift (cpi − cpe over both slopes, 6°): windward H, leeward I/J average.
     const uplift = (key: 'WL' | 'WLs'): number =>
       reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.vertical, 0);
-    expect(uplift('WL') / uplift('WLs')).toBeCloseTo(0.8 / 0.3, 1);
+    const roof = windward + leeward;
+    expect(uplift('WL') / uplift('WLs')).toBeCloseTo((0.4 - roof) / (-0.6 - roof), 3);
   });
 });
 
@@ -458,19 +464,35 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
     expect(frame.spans).toHaveLength(3);
     const wind = uplifts(doc, 'WL');
     expect(wind).toHaveLength(6);
-    // Windward rafters (span 1): (0.6 + 0.2) qp; downwind (spans 2, 3): (0.6 × 0.6 + 0.2) qp.
-    const [windward, downwind] = [wind[0]!, wind[2]!];
-    expect(downwind).toBeLessThan(windward);
-    expect(downwind / windward).toBeCloseTo((0.36 + 0.2) / 0.8, 3);
-    expect(wind.slice(0, 2)).toEqual([windward, windward]);
-    expect(wind.slice(2)).toEqual(Array(4).fill(downwind));
+    // Windward span: slopes (cpi − H) and (cpi − I/J); downwind spans (spans 2, 3): the same × 0.6 on the suction.
+    const [windwardSlope, leewardSlope, downwindWindward, downwindLeeward] = wind as [
+      number,
+      number,
+      number,
+      number,
+    ];
+    expect(downwindWindward / windwardSlope).toBeCloseTo(
+      (0.2 - DOWNWIND_ROOF_FACTOR * windward) / (0.2 - windward),
+      6,
+    );
+    expect(downwindLeeward / leewardSlope).toBeCloseTo(
+      (0.2 - DOWNWIND_ROOF_FACTOR * leeward) / (0.2 - leeward),
+      6,
+    );
+    expect(wind[4]).toBeCloseTo(downwindWindward, 9);
+    expect(wind[5]).toBeCloseTo(downwindLeeward, 9);
     // Wind from the right mirrors it: the last span is windward.
     const mirrored = uplifts(doc, 'WR');
-    expect(mirrored[5]).toBeCloseTo(windward, 9);
-    expect(mirrored[0]).toBeCloseTo(downwind, 9);
-    // Internal suction cpi = −0.3: (0.6 − 0.3) vs (0.36 − 0.3).
+    expect(mirrored[5]).toBeCloseTo(windwardSlope, 9);
+    expect(mirrored[4]).toBeCloseTo(leewardSlope, 9);
+    expect(mirrored[1]).toBeCloseTo(downwindWindward, 9);
+    expect(mirrored[0]).toBeCloseTo(downwindLeeward, 9);
+    // Internal suction cpi = −0.3.
     const suction = uplifts(doc, 'WLs');
-    expect(suction[2]! / suction[0]!).toBeCloseTo(0.06 / 0.3, 3);
+    expect(suction[2]! / suction[0]!).toBeCloseTo(
+      (-0.3 - DOWNWIND_ROOF_FACTOR * windward) / (-0.3 - windward),
+      6,
+    );
   });
 
   it('puts wall pressure on the outer columns only', () => {
@@ -487,12 +509,14 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
     }
   });
 
-  it('leaves a single span unchanged: both roof slopes carry the full coefficient', () => {
+  it('leaves a single span unreduced: windward slope H, leeward slope I/J, mirrored by the wind side', () => {
     const doc = hall();
     const wind = uplifts(doc, 'WL');
     expect(wind).toHaveLength(2);
-    expect(wind[0]).toBeCloseTo(wind[1]!, 9);
-    expect(uplifts(doc, 'WR')[0]).toBeCloseTo(wind[0]!, 9);
-    expect(uplifts(doc, 'WLs')[0]! / wind[0]!).toBeCloseTo(0.3 / 0.8, 6);
+    expect(wind[1]! / wind[0]!).toBeCloseTo((0.2 - leeward) / (0.2 - windward), 6);
+    const mirrored = uplifts(doc, 'WR');
+    expect(mirrored[1]).toBeCloseTo(wind[0]!, 9);
+    expect(mirrored[0]).toBeCloseTo(wind[1]!, 9);
+    expect(uplifts(doc, 'WLs')[0]! / wind[0]!).toBeCloseTo((-0.3 - windward) / (0.2 - windward), 6);
   });
 });
