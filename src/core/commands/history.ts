@@ -21,6 +21,8 @@ import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { stepIdSource, stepKeyOf } from '../../lib/id';
 import { orphanState } from './history_carry';
+import { nextStateKey } from './replayCache';
+import { hashText } from '../../lib/hash';
 import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
 
 // ---------------------------------------------------------------------------
@@ -36,6 +38,21 @@ export interface ReplayStepEvent {
   readonly params: unknown;
   readonly before: CadDocument;
   readonly after: CadDocument;
+}
+
+/** Map each legacy recorded id to the id the replay produced at the same position. */
+function extendIdMap(
+  idMap: Map<string, string>,
+  recorded: readonly string[] | undefined,
+  replayed: readonly string[],
+): void {
+  if (!recorded) return;
+  const len = Math.min(recorded.length, replayed.length);
+  for (let i = 0; i < len; i++) {
+    const oldId = recorded[i];
+    const newId = replayed[i];
+    if (oldId !== undefined && newId !== undefined && oldId !== newId) idMap.set(oldId, newId);
+  }
 }
 
 /**
@@ -101,53 +118,52 @@ export function replayHistory(
   // idMap tracks old entity id (from when the step was first recorded) → new id
   // (assigned during this replay). Subsequent steps' params are rewritten via
   // remapIds. Step-scoped ids (MG3) replay identically, so this only maps legacy (pre-v2) ids.
-  const idMap = new Map<string, string>();
+  let idMap = new Map<string, string>();
+  const cache = context.replayCache;
+  // MG4.3: states are keyed by everything that determines them, so an unchanged prefix of an
+  // edited history (or of a parameter change) is served from the cache instead of re-run.
+  let stateKey = cache ? hashText(JSON.stringify({ ...doc, featureHistory: [] })) : '';
 
   for (const step of history) {
     if (step.suppressed) continue;
     const cmd = getCommandFn(step.name);
     if (!cmd) continue; // Unknown command — skip gracefully.
-    try {
-      // 1. Resolve any `=expr` strings against the current parameter environment.
-      const env = buildParamEnv(doc.parameters);
-      const { resolved, errors } = resolveStepParams(step.params, env);
-      for (const e of errors) {
-        resolveWarnings?.push(
-          `step '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`,
-        );
-      }
-      // 2. Rewrite stale entity-id references using the accumulated idMap.
-      const remapped = remapIds(resolved, idMap);
-      const stepKey = stepKeyOf(step.id);
-      const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
-      const result = runInContext(stepContext, () => cmd.run(doc, remapped, stepContext));
-      const before = doc;
-      // Accept the new geometry but keep OUR featureHistory intact.
-      doc = { ...result.document, featureHistory: history };
-      onStep?.({
-        step,
-        rawParams: remapIds(step.params, idMap),
-        params: remapped,
-        before,
-        after: doc,
-      });
-
-      // 3. Extend idMap: zip step.affected (old ids) with result.affected (new ids)
-      // positionally. Commands produce entities in the same order given the same
-      // params, so positional zip is correct. If lengths differ, map the common prefix.
-      if (step.affected && step.affected.length > 0 && result.affected.length > 0) {
-        const len = Math.min(step.affected.length, result.affected.length);
-        for (let i = 0; i < len; i++) {
-          const oldId = step.affected[i];
-          const newId = result.affected[i];
-          if (oldId !== undefined && newId !== undefined && oldId !== newId) {
-            idMap.set(oldId, newId);
-          }
-        }
-      }
-    } catch {
-      // A step that throws (e.g. referencing a now-deleted entity) is skipped.
+    // 1. Resolve any `=expr` strings against the current parameter environment.
+    const env = buildParamEnv(doc.parameters);
+    const { resolved, errors } = resolveStepParams(step.params, env);
+    for (const e of errors) {
+      resolveWarnings?.push(`step '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`);
     }
+    // 2. Rewrite stale entity-id references using the accumulated idMap.
+    const remapped = remapIds(resolved, idMap);
+    const before = doc;
+    const key = cache ? nextStateKey(stateKey, step.id, step.name, remapped) : '';
+    const hit = cache?.get(key);
+    if (hit !== undefined) {
+      doc = { ...hit.doc, featureHistory: history };
+      idMap = new Map(hit.idMap);
+    } else {
+      try {
+        const stepKey = stepKeyOf(step.id);
+        const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
+        const result = runInContext(stepContext, () => cmd.run(doc, remapped, stepContext));
+        // Accept the new geometry but keep OUR featureHistory intact.
+        doc = { ...result.document, featureHistory: history };
+        // 3. Legacy steps: zip step.affected (old ids) with result.affected (new ids) positionally.
+        extendIdMap(idMap, step.affected, result.affected);
+      } catch {
+        // A step that throws (e.g. referencing a now-deleted entity) is skipped.
+      }
+      cache?.set(key, { doc, idMap: new Map(idMap) });
+    }
+    stateKey = key;
+    onStep?.({
+      step,
+      rawParams: remapIds(step.params, idMap),
+      params: remapped,
+      before,
+      after: doc,
+    });
   }
 
   return doc;
@@ -252,11 +268,6 @@ export const setStepSuppressed = defineCommand({
 // edit_step_params
 // ---------------------------------------------------------------------------
 
-interface EditStepParamsParams {
-  stepId: string;
-  params: unknown;
-}
-
 /**
  * @command edit_step_params
  * @pure
@@ -265,30 +276,25 @@ interface EditStepParamsParams {
  * @invariant featureHistory length is unchanged; step name is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-export const editStepParams: CommandDefinition<EditStepParamsParams> = {
+export const editStepParams = defineCommand({
   name: 'edit_step_params',
   description:
     'Replace the params of a feature history step by its stepId, then regenerate ' +
     'the document by replaying featureHistory. Use to parametrically edit a past ' +
     'operation (e.g. change the size of a box created earlier).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      stepId: {
-        type: 'string',
-        description:
-          'Id of the FeatureStep whose params are to be replaced (from doc.featureHistory[*].id).',
-      },
-      params: {
-        type: 'object',
-        description:
-          'New params object for the step. Must be compatible with the command named in the step ' +
+  params: z.object({
+    stepId: z
+      .string()
+      .describe(
+        'Id of the FeatureStep whose params are to be replaced (from doc.featureHistory[*].id).',
+      ),
+    params: z
+      .object({})
+      .describe(
+        'New params object for the step. Must be compatible with the command named in the step ' +
           '(i.e. a valid params object for step.name). The document is regenerated after replacement.',
-        properties: {},
-      },
-    },
-    required: ['stepId', 'params'],
-  },
+      ),
+  }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { stepId, params: newParams }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
@@ -313,7 +319,7 @@ export const editStepParams: CommandDefinition<EditStepParamsParams> = {
       affected: regenerated.order,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // reorder_step
@@ -418,13 +424,6 @@ export const deleteStep = defineCommand({
 // insert_step
 // ---------------------------------------------------------------------------
 
-interface InsertStepParams {
-  afterStepId?: string;
-  name: string;
-  params: unknown;
-  label?: string;
-}
-
 /**
  * @command insert_step
  * @pure
@@ -433,40 +432,36 @@ interface InsertStepParams {
  * @invariant featureHistory length increases by 1
  * @failure afterStepId provided but not found -> no-op, affected:[]
  */
-export const insertStep: CommandDefinition<InsertStepParams> = {
+export const insertStep = defineCommand({
   name: 'insert_step',
   description:
     'Splice a new feature history step into featureHistory immediately after the step ' +
     'with id afterStepId, then regenerate the document. If afterStepId is omitted the ' +
     'step is appended at the end. The new step is always active (suppressed=false).',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      afterStepId: {
-        type: 'string',
-        description:
-          'Id of the existing FeatureStep after which to insert the new step. ' +
+  params: z.object({
+    afterStepId: z
+      .string()
+      .optional()
+      .describe(
+        'Id of the existing FeatureStep after which to insert the new step. ' +
           'If omitted, the new step is appended at the end of featureHistory.',
-      },
-      name: {
-        type: 'string',
-        description:
-          'Registry command name (snake_case) for the new step, e.g. "add_box". ' +
+      ),
+    name: z
+      .string()
+      .describe(
+        'Registry command name (snake_case) for the new step, e.g. "add_box". ' +
           'Must be a known command name; unknown names are stored but skipped during replay.',
-      },
-      params: {
-        type: 'object',
-        description:
-          'Params object for the command named in `name`. Must be compatible with that command.',
-        properties: {},
-      },
-      label: {
-        type: 'string',
-        description: 'Optional human/AI-readable label for this step, e.g. "Base plate".',
-      },
-    },
-    required: ['name', 'params'],
-  },
+      ),
+    params: z
+      .object({})
+      .describe(
+        'Params object for the command named in `name`. Must be compatible with that command.',
+      ),
+    label: z
+      .string()
+      .optional()
+      .describe('Optional human/AI-readable label for this step, e.g. "Base plate".'),
+  }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { afterStepId, name: cmdName, params: stepParams, label }): CommandResult => {
     if (afterStepId !== undefined) {
@@ -512,7 +507,7 @@ export const insertStep: CommandDefinition<InsertStepParams> = {
       affected: regenerated.order,
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // Convenience re-export — typed as CommandDefinition<unknown> for registry.ts

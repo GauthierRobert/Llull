@@ -10,7 +10,7 @@
 
 import type { CadDocument, Configuration, Parameter } from '../model/types';
 import { currentContext } from './context';
-import type { CommandDefinition, CommandResult } from './types';
+import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { reEvaluateAll } from './parameters';
 import { replayHistory } from './history';
@@ -18,11 +18,6 @@ import { replayHistory } from './history';
 // ---------------------------------------------------------------------------
 // create_configuration
 // ---------------------------------------------------------------------------
-
-interface CreateConfigurationParams {
-  name: string;
-  parameterValues: Record<string, string>;
-}
 
 /**
  * @command create_configuration
@@ -32,7 +27,7 @@ interface CreateConfigurationParams {
  * @invariant existing configurations with different names are not touched
  * @failure blank name → no-op; parameterValues not an object of strings → no-op
  */
-export const createConfiguration: CommandDefinition<CreateConfigurationParams> = {
+export const createConfiguration = defineCommand({
   name: 'create_configuration',
   description:
     'Define or replace a named configuration (design-table variant). ' +
@@ -40,28 +35,24 @@ export const createConfiguration: CommandDefinition<CreateConfigurationParams> =
     'of the model (e.g. "small": {w:"10"}, "large": {w:"40"}). ' +
     'Storing a configuration does NOT change any geometry — call activate_configuration to apply it. ' +
     'If a configuration with the same name already exists it is replaced.',
-  paramsSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description:
-          'Human-readable identifier for the configuration, e.g. "small", "production_v2". ' +
+  params: z.object({
+    name: z
+      .string()
+      .describe(
+        'Human-readable identifier for the configuration, e.g. "small", "production_v2". ' +
           'Must be a non-empty string. Used as both the display name and the lookup key for activate_configuration.',
-      },
-      parameterValues: {
-        type: 'object',
-        description:
-          'Map of parameter name → expression string that defines this variant. ' +
+      ),
+    // Values are checked in run (each must be a string expression) so the summary names the key.
+    parameterValues: z
+      .looseObject({})
+      .describe(
+        'Map of parameter name → expression string that defines this variant. ' +
           'Each key must be a string (parameter name) and each value must be a string expression ' +
           'in the same format as set_parameter (e.g. {"w": "10", "h": "w * 2"}). ' +
           'Only the parameters listed here are changed when the configuration is activated; ' +
           'all other document parameters keep their current expressions.',
-        properties: {},
-      },
-    },
-    required: ['name', 'parameterValues'],
-  },
+      ),
+  }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, parameterValues }): CommandResult => {
     if (typeof name !== 'string' || name.trim() === '') {
@@ -72,21 +63,12 @@ export const createConfiguration: CommandDefinition<CreateConfigurationParams> =
       };
     }
 
-    if (
-      typeof parameterValues !== 'object' ||
-      parameterValues === null ||
-      Array.isArray(parameterValues)
-    ) {
-      return {
-        document: doc,
-        summary: `create_configuration '${name}' failed: parameterValues must be a plain object mapping parameter names to expression strings.`,
-        affected: [],
-      };
-    }
-
     // Validate that every value is a string expression.
+    const expressions: Record<string, string> = {};
     for (const [k, v] of Object.entries(parameterValues)) {
-      if (typeof v !== 'string') {
+      if (typeof v === 'string') {
+        expressions[k] = v;
+      } else {
         return {
           document: doc,
           summary: `create_configuration '${name}' failed: parameterValues['${k}'] must be a string expression, got ${typeof v}.`,
@@ -95,10 +77,7 @@ export const createConfiguration: CommandDefinition<CreateConfigurationParams> =
       }
     }
 
-    const configuration: Configuration = {
-      name,
-      parameterValues: { ...parameterValues },
-    };
+    const configuration: Configuration = { name, parameterValues: expressions };
 
     const newDoc: CadDocument = {
       ...doc,
@@ -115,7 +94,7 @@ export const createConfiguration: CommandDefinition<CreateConfigurationParams> =
       affected: [],
     };
   },
-};
+});
 
 // ---------------------------------------------------------------------------
 // activate_configuration

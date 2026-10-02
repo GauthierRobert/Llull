@@ -33,7 +33,7 @@ export function nextStateKey(
   return hashText(`${previous}|${stepId}|${commandName}|${JSON.stringify(resolvedParams) ?? ''}`);
 }
 
-export function createReplayCache(capacity = 512): ReplayCache {
+export function createReplayCache(capacity = 256): ReplayCache {
   const entries = new Map<string, ReplayState>();
   return {
     get(key) {

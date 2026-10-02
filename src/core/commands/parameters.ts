@@ -12,6 +12,7 @@ import type { CadDocument, Parameter } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { evaluateExpression, extractReferences } from './expression';
+import { regenerateParameterDependents } from './dependents';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -208,13 +209,15 @@ export const setParameter = defineCommand({
     const dependentCount = Object.values(evaluated).filter(
       (p) => p.name !== name && extractReferences(p.expression).has(name),
     ).length;
+    const { document, dependentSteps } = regenerateParameterDependents(doc, newDoc);
 
     return {
-      document: newDoc,
+      document,
       summary:
         `set_parameter '${name}' = ${param.value} (expression: '${expression}')` +
-        (dependentCount > 0 ? `; ${dependentCount} dependent(s) re-evaluated.` : '.'),
-      affected: [],
+        (dependentCount > 0 ? `; ${dependentCount} dependent(s) re-evaluated` : '') +
+        (dependentSteps > 0 ? `; regenerated ${dependentSteps} dependent feature step(s).` : '.'),
+      affected: dependentSteps > 0 ? document.order : [],
     };
   },
 });
