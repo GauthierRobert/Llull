@@ -7,7 +7,7 @@
  * pointer events in world-space coordinates, then finds the nearest 2D entity
  * to the click and forwards the pick to `useModifyTool.handleEntityPick`.
  *
- * Entity proximity is computed by `entityDistSq` from modifyHelpers — a pure
+ * Entity proximity is computed by `nearestEntityId` from modifyHelpers — a pure
  * function tested independently (R1, architecture keep-math-in-helpers rule).
  * The tolerance (in world units) is exposed as a prop.
  *
@@ -21,8 +21,9 @@ import { useThree } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
 import type { PolylineEntity } from '@core/model/types';
 import { useStore } from '@ui/store';
-import { entityDistSq } from './modifyHelpers';
-import type { ModifyToolKind, ModifyToolPhase } from './useModifyTool';
+import { nearestEntityId } from './modifyHelpers';
+import type { ModifyToolKind } from '@ui/store';
+import type { ModifyToolPhase } from './useModifyTool';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -80,22 +81,7 @@ export function ModifyPickInteraction({
 
       const [originX, originY] = useStore.getState().renderOrigin;
       const worldPick: Vec2 = [e.point.x + originX, e.point.y + originY];
-      const toleranceSq = tolerance * tolerance;
-
-      let bestId: string | null = null;
-      let bestDist = Infinity;
-
-      for (const id of document.order) {
-        const entity = document.entities[id];
-        if (!entity) continue;
-
-        const dSq = entityDistSq(entity, worldPick);
-        if (dSq < toleranceSq && dSq < bestDist) {
-          bestDist = dSq;
-          bestId = id;
-        }
-      }
-
+      const bestId = nearestEntityId(document, worldPick, tolerance);
       if (bestId === null) return;
 
       const bestEntity = document.entities[bestId]!;

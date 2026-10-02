@@ -37,13 +37,14 @@ import { Entities2D } from './Entities2D';
 import { BuildingPlan2D } from './BuildingPlan2D';
 import { SnapIndicator } from './SnapIndicator';
 import { DrawInteraction } from './DrawInteraction';
-import { DrawTools } from './DrawTools';
 import { useDrawTool } from './useDrawTool';
-import type { DrawToolKind } from './useDrawTool';
+import type { DrawToolKind } from '@ui/store';
 import { ModifyTools } from './ModifyTools';
 import { useModifyTool } from './useModifyTool';
-import type { ModifyToolKind, ModifyToolPhase } from './useModifyTool';
+import type { ModifyToolKind } from '@ui/store';
+import type { ModifyToolPhase } from './useModifyTool';
 import { ModifyPickInteraction } from './ModifyPickInteraction';
+import { SelectPickInteraction } from './SelectPickInteraction';
 import { ScaleBar } from './ScaleBar';
 import {
   adaptiveGridStep,
@@ -405,8 +406,9 @@ function SceneContents2D({
         <BuildingPlan2D />
         <Entities2D document={document} />
 
-        {/* Snap indicator: shown when no draw or modify tool is active */}
+        {/* Snap indicator + click-to-select: shown when no draw or modify tool is active */}
         {!isDrawing && !isModifying && <SnapIndicator zoom={zoom} />}
+        {!isDrawing && !isModifying && <SelectPickInteraction zoom={zoom} />}
 
         {/* Draw interaction: click-capture + rubber-band preview */}
         <DrawInteraction
@@ -436,14 +438,7 @@ function SceneContents2D({
 // ---------------------------------------------------------------------------
 
 export function Viewport2D(): React.ReactElement {
-  const {
-    activeTool,
-    collectedPoints,
-    setActiveTool: setDrawTool,
-    handleClick,
-    finishPolyline,
-    finishSpline,
-  } = useDrawTool();
+  const { activeTool, collectedPoints, handleClick, finishPolyline, finishSpline } = useDrawTool();
 
   const {
     activeTool: activeModifyTool,
@@ -460,24 +455,6 @@ export function Viewport2D(): React.ReactElement {
   // Camera zoom state — updated by ZoomReader inside the canvas, displayed by
   // ScaleBar outside it. Initial value matches the OrthographicCamera zoom prop.
   const [cameraZoom, setCameraZoom] = useState<number>(50);
-
-  // Mutual exclusion: selecting a draw tool clears any active modify tool.
-  const handleSelectDrawTool = useCallback(
-    (tool: DrawToolKind) => {
-      if (tool !== 'none') setModifyTool('none');
-      setDrawTool(tool);
-    },
-    [setDrawTool, setModifyTool],
-  );
-
-  // Mutual exclusion: selecting a modify tool clears any active draw tool.
-  const handleSelectModifyTool = useCallback(
-    (tool: ModifyToolKind) => {
-      if (tool !== 'none') setDrawTool('none');
-      setModifyTool(tool);
-    },
-    [setDrawTool, setModifyTool],
-  );
 
   const onDoubleClick = useCallback(() => {
     if (activeTool === 'spline') finishSpline(false);
@@ -515,14 +492,13 @@ export function Viewport2D(): React.ReactElement {
       {/* HTML overlay: scale bar (bottom-right) */}
       <ScaleBar zoom={cameraZoom} document={document} />
 
-      {/* Left-edge dock: draw palette above modify palette, stacked by flex layout */}
+      {/* Left-edge dock: 2D modify palette (draw tools live in the main toolbar) */}
       <div className="vp-tool-dock">
-        <DrawTools activeTool={activeTool} onSelectTool={handleSelectDrawTool} />
         <ModifyTools
           activeTool={activeModifyTool}
           phase={modifyPhase}
           pendingValue={pendingValue}
-          onSelectTool={handleSelectModifyTool}
+          onSelectTool={setModifyTool}
           onSetValue={setPendingValue}
           onCommitValue={commitValue}
         />

@@ -8,7 +8,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ModifyTools } from '../../src/ui/viewport/2d/ModifyTools';
-import type { ModifyToolKind, ModifyToolPhase } from '../../src/ui/viewport/2d/useModifyTool';
+import type { ModifyToolKind } from '@ui/store';
+import type { ModifyToolPhase } from '../../src/ui/viewport/2d/useModifyTool';
 
 // ---------------------------------------------------------------------------
 // Helpers

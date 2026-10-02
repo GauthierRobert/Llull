@@ -1,5 +1,5 @@
 /**
- * Component tests for <PropertiesPanel /> — viewer mode (read-only inspector).
+ * Component tests for <PropertiesPanel /> — inspector + editable name/position/rotation.
  *
  * Asserts observable behavior:
  *   - Selection section reflects the store's document.selection.
@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
@@ -120,5 +120,90 @@ describe('PropertiesPanel — no mutation controls in viewer mode', () => {
   it('does NOT render a Run button', () => {
     render(<PropertiesPanel />);
     expect(screen.queryByRole('button', { name: /run/i })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Editing — every committed field dispatches a command
+// ---------------------------------------------------------------------------
+
+describe('PropertiesPanel — editing', () => {
+  beforeEach(() => {
+    __resetIdCounter();
+    useStore.getState().setDocument(createEmptyDocument());
+    useStore.setState({ liveStatus: 'disconnected' });
+  });
+
+  function commit(label: string, value: string): void {
+    const input = screen.getByLabelText(label);
+    fireEvent.change(input, { target: { value } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input);
+  }
+
+  it('typing a position moves the entity to that coordinate', () => {
+    const id = createBox();
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    commit('Position X', '5');
+    commit('Position Z', '-2.5');
+    expect(useStore.getState().document.entities[id]?.position).toEqual([5, 0, -2.5]);
+  });
+
+  it('typing a rotation in degrees rotates the entity', () => {
+    const id = createBox();
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    commit('Rotation Z', '90');
+    expect(useStore.getState().document.entities[id]?.rotation[2]).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('typing a name renames the entity', () => {
+    const id = createBox();
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    commit('Name', 'Base plate');
+    expect(useStore.getState().document.entities[id]?.name).toBe('Base plate');
+  });
+
+  it('non-numeric or unchanged input dispatches nothing', () => {
+    const id = createBox();
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    const before = useStore.getState().document;
+    commit('Position Y', 'abc');
+    const unchanged = screen.getByLabelText('Position X');
+    fireEvent.blur(unchanged);
+    expect(useStore.getState().document).toBe(before);
+  });
+
+  it('Escape reverts a draft', () => {
+    const id = createBox();
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    const input = screen.getByLabelText('Position X');
+    fireEvent.change(input, { target: { value: '9' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.blur(input);
+    expect(useStore.getState().document.entities[id]?.position[0]).toBe(0);
+  });
+
+  it('Duplicate and Delete act on the selection', () => {
+    const id = createBox();
+    useStore.getState().select([id]);
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+    expect(useStore.getState().document.order).toHaveLength(2);
+    useStore.getState().select([id]);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(useStore.getState().document.entities[id]).toBeUndefined();
+  });
+
+  it('offers rotation for solids only', () => {
+    const line = localDispatch('draw_line', { start: [0, 0], end: [1, 0] }).affected[0]!;
+    useStore.getState().select([line]);
+    render(<PropertiesPanel />);
+    expect(screen.queryByLabelText('Rotation Z')).toBeNull();
+    expect(screen.getByLabelText('Position X')).toBeDefined();
   });
 });

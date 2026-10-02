@@ -99,6 +99,7 @@ import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
 import { deleteEntities } from './deleteMany';
+import { moveEntities } from './moveMany';
 import { buildingCommands } from './building';
 import { editedBuildingElements } from './building/integrity';
 
@@ -341,6 +342,7 @@ const rawDefinitions = [
   drawBeltAround,
   distributeAlongPath,
   deleteEntities,
+  moveEntities,
   ...buildingCommands,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 

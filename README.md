@@ -34,7 +34,7 @@ and pipe runs, clash detection, steel tonnage / cut lists, and elevation / secti
 | 3D viewport    | three.js + @react-three/fiber + drei     | Mature, declarative Three.js |
 | State          | Zustand                                  | One store, no boilerplate, easy to drive externally |
 | Tests          | Vitest + Testing Library                 | Fast, Vite-native |
-| Lint / format  | ESLint + Prettier                        | Consistent, enforced in CI |
+| Lint / format  | ESLint + Prettier                        | Consistent, enforced by `npm run check` |
 | Backend (opt.) | Node + Express                           | Only for hosting the MCP endpoint |
 
 ## Architecture in one picture

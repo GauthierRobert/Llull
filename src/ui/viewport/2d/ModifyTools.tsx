@@ -14,7 +14,8 @@
 import React, { useCallback, useRef, useEffect } from 'react';
 import { Icon } from '@ui/components/Icon';
 import type { IconName } from '@ui/components/Icon';
-import type { ModifyToolKind, ModifyToolPhase } from './useModifyTool';
+import type { ModifyToolKind } from '@ui/store';
+import type { ModifyToolPhase } from './useModifyTool';
 
 // ---------------------------------------------------------------------------
 // Props
