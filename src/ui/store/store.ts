@@ -43,11 +43,16 @@
 import { create } from 'zustand';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, EntityId } from '@core/model/types';
-import { postCommand, postUndo, postRedo, ServerCommandError } from './serverCommands';
+import {
+  fetchLiveSnapshot,
+  postCommand,
+  postUndo,
+  postRedo,
+  ServerCommandError,
+} from './serverCommands';
 import { execute } from '@core/commands/registry';
-import { serializeDocument } from '@core/commands/persistence';
-import type { DocPatch } from '@core/mcp/docPatch';
-import { applyDocPatch } from '@core/mcp/docPatch';
+import type { LiveCommandEvent, LiveSnapshotEvent } from '@core/mcp/liveSync';
+import { applyLiveCommand } from '@core/mcp/liveSync';
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -62,6 +67,12 @@ export interface LastMeasure {
 }
 
 export type SyncState = 'idle' | 'syncing' | 'failed';
+
+/** One locally executed mutating command awaiting replay on the server. */
+export interface OutboxCommand {
+  readonly name: string;
+  readonly params: unknown;
+}
 
 export interface CadStoreState {
   /** The live CAD document — single source of truth, hydrated by the /live SSE stream. */
@@ -129,6 +140,21 @@ export interface CadStoreState {
 
   /** Offline redo snapshots, most recently undone last. */
   localRedoStack: CadDocument[];
+
+  /**
+   * Offline outbox (MG5.2): the local mutating commands, in order, that turned the last server
+   * state into the current local document. Replayed to the server on reconnect.
+   */
+  localOutbox: OutboxCommand[];
+
+  /** Outbox entries undone offline (most recently undone last); re-queued by local redo. */
+  localRedoOutbox: OutboxCommand[];
+
+  /** Client copy of the server document (server selection) at log position `liveSeq` (MG5.1). */
+  liveBase: CadDocument;
+
+  /** Log position of `liveBase`; -1 before the first snapshot. */
+  liveSeq: number;
 
   // -------------------------------------------------------------------------
   // Actions
@@ -202,25 +228,22 @@ export interface CadStoreState {
    * Preserves the current local selection — filtered to entity ids that still
    * exist in the incoming document — so click-highlights survive a server push.
    *
-   * Used for: initial connect, undo/redo (full state replacement).
+   * Used for: initial connect, undo/redo, resync after a log gap or hash mismatch.
+   * Ignored while offline edits are still being replayed to the server (MG5.2).
    *
    * @pure  This is display sync, NOT a document mutation routed through execute().
    *        Allowed by the PRIME DIRECTIVE because it does not originate a CAD command.
    */
-  hydrateLiveDocument(doc: CadDocument): void;
+  hydrateLiveDocument(snapshot: LiveSnapshotEvent): void;
 
   /**
-   * Apply an incremental entity-level patch from the server SSE stream.
-   * Only touched entities are updated in the store; unchanged entities keep
-   * their same object references so React does not re-render unaffected meshes.
+   * Apply one broadcast command (MG5.1) by re-running it through `execute` on `liveBase` and
+   * verifying the server's state hash. Unchanged entities keep their object references.
    *
-   * Preserves the current local selection (filters stale ids after the patch).
-   *
-   * Used for: every normal mutating command result (O(change) cost).
-   *
-   * @pure  Display sync only, not a CAD command.
+   * @returns false on a log gap or hash mismatch — the caller then fetches a snapshot.
+   * @pure  Display sync: the same command the server already applied, not a new CAD command.
    */
-  applyLivePatch(patch: DocPatch): void;
+  applyLiveCommand(event: LiveCommandEvent): boolean;
 
   /**
    * Update the live SSE connection status.
@@ -315,6 +338,8 @@ function runLocally(set: StoreSet, get: StoreGet, name: string, params: unknown)
     lastMeasure,
     localUndoStack: undoStack,
     localRedoStack: [],
+    localOutbox: [...state.localOutbox, { name, params }],
+    localRedoOutbox: [],
     canUndo: true,
     canRedo: false,
     hasUnsyncedLocalEdits: true,
@@ -338,7 +363,9 @@ function stepLocalHistory(set: StoreSet, get: StoreGet, direction: 'undo' | 'red
   ];
   const undoStack = direction === 'undo' ? remaining : other.slice(-LOCAL_HISTORY_LIMIT);
   const redoStack = direction === 'undo' ? other : remaining;
+  const outbox = moveLastOutboxEntry(state, direction);
   set({
+    ...outbox,
     document: { ...target, selection: target.selection.filter((id) => id in target.entities) },
     localUndoStack: undoStack,
     localRedoStack: redoStack,
@@ -350,34 +377,65 @@ function stepLocalHistory(set: StoreSet, get: StoreGet, direction: 'undo' | 'red
   });
 }
 
+/** Offline undo moves the newest outbox command to the redo outbox; redo moves it back. */
+function moveLastOutboxEntry(
+  state: CadStoreState,
+  direction: 'undo' | 'redo',
+): Pick<CadStoreState, 'localOutbox' | 'localRedoOutbox'> {
+  const from = direction === 'undo' ? state.localOutbox : state.localRedoOutbox;
+  const moved = from[from.length - 1];
+  if (moved === undefined) {
+    return { localOutbox: state.localOutbox, localRedoOutbox: state.localRedoOutbox };
+  }
+  const rest = from.slice(0, -1);
+  return direction === 'undo'
+    ? { localOutbox: rest, localRedoOutbox: [...state.localRedoOutbox, moved] }
+    : { localOutbox: [...state.localOutbox, moved], localRedoOutbox: rest };
+}
+
+/** Selection survives a document replacement, minus ids that no longer exist. */
+function withLocalSelection(doc: CadDocument, selection: readonly EntityId[]): CadDocument {
+  return { ...doc, selection: selection.filter((id) => id in doc.entities) };
+}
+
 /**
- * Client-wins reconcile: push the local document via `load_document`. Repeats until the counter
- * captured at push start equals the current counter; retries with backoff on failure.
+ * Offline -> online reconcile (MG5.2): replay the outbox to the server as ordinary commands, in
+ * order (the server rebases them onto whatever happened meanwhile), then adopt the server
+ * snapshot. Commands queued during the flush are sent too. Retries with backoff on failure.
  */
-function pushLocalDocument(set: StoreSet, get: StoreGet): void {
+function flushOutbox(set: StoreSet, get: StoreGet): void {
   if (syncInFlight) return;
   cancelSyncRetry();
   syncInFlight = true;
-  const pushed = get().document;
-  const capturedCounter = get().localEditCounter;
   set({ syncState: 'syncing' });
-  void postCommand('load_document', { json: serializeDocument(pushed) })
-    .then((response) => {
+  const sent: string[] = [];
+  const sendNext = async (): Promise<void> => {
+    for (;;) {
+      const next = get().localOutbox[0];
+      if (next === undefined) break;
+      const response = await postCommand(next.name, next.params);
+      sent.push(response.summary);
+      set((state) => ({ localOutbox: state.localOutbox.slice(1) }));
+    }
+    const snapshot = await fetchLiveSnapshot();
+    if (get().localOutbox.length > 0) return sendNext();
+    const state = get();
+    set({
+      hasUnsyncedLocalEdits: false,
+      syncState: 'idle',
+      localUndoStack: [],
+      localRedoStack: [],
+      localRedoOutbox: [],
+      liveBase: snapshot.document,
+      liveSeq: snapshot.seq,
+      document: withLocalSelection(snapshot.document, state.document.selection),
+      lastSummary: `Synced ${sent.length} offline command${sent.length === 1 ? '' : 's'} to the server.`,
+    });
+  };
+  void sendNext()
+    .then(() => {
       syncInFlight = false;
       syncAttempt = 0;
-      if (get().localEditCounter !== capturedCounter) {
-        pushLocalDocument(set, get);
-        return;
-      }
-      set({
-        hasUnsyncedLocalEdits: false,
-        syncState: 'idle',
-        localUndoStack: [],
-        localRedoStack: [],
-        canUndo: response.canUndo,
-        canRedo: response.canRedo,
-        lastSummary: `Synced offline edits to server. ${response.summary}`,
-      });
     })
     .catch((err: unknown) => {
       syncInFlight = false;
@@ -392,7 +450,7 @@ function pushLocalDocument(set: StoreSet, get: StoreGet): void {
         syncRetryTimer = null;
         const state = get();
         if (state.hasUnsyncedLocalEdits && state.liveStatus !== 'disconnected') {
-          pushLocalDocument(set, get);
+          flushOutbox(set, get);
         }
       }, delay);
     });
@@ -412,6 +470,10 @@ export const useStore = create<CadStoreState>()((set, get) => ({
   sseEverConnected: false,
   localUndoStack: [],
   localRedoStack: [],
+  localOutbox: [],
+  localRedoOutbox: [],
+  liveBase: createEmptyDocument(),
+  liveSeq: -1,
 
   dispatch(name: string, params?: unknown): void {
     if (isLocalMode(get())) {
@@ -454,6 +516,8 @@ export const useStore = create<CadStoreState>()((set, get) => ({
       canRedo: false,
       localUndoStack: [],
       localRedoStack: [],
+      localOutbox: [],
+      localRedoOutbox: [],
     });
   },
 
@@ -523,30 +587,31 @@ export const useStore = create<CadStoreState>()((set, get) => ({
     set({ lastMeasure: null });
   },
 
-  hydrateLiveDocument(doc: CadDocument): void {
+  hydrateLiveDocument(snapshot: LiveSnapshotEvent): void {
     if (get().hasUnsyncedLocalEdits) {
-      pushLocalDocument(set, get);
+      flushOutbox(set, get);
       return;
     }
-    const currentSelection = get().document.selection;
-    // Preserve ids that still exist in the incoming doc; drop stale ones.
-    const nextSelection = currentSelection.filter((id) => id in doc.entities);
     set({
-      document: { ...doc, selection: nextSelection },
+      liveBase: snapshot.document,
+      liveSeq: snapshot.seq,
+      document: withLocalSelection(snapshot.document, get().document.selection),
       localUndoStack: [],
       localRedoStack: [],
     });
   },
 
-  applyLivePatch(patch: DocPatch): void {
+  applyLiveCommand(event: LiveCommandEvent): boolean {
     const state = get();
-    const next = applyDocPatch(state.document, patch);
-    // Preserve selection: filter out any ids removed by the patch.
-    const removedSet = new Set(patch.entities.removed);
-    const nextSelection = state.document.selection.filter((id) => !removedSet.has(id));
+    if (state.hasUnsyncedLocalEdits) return true; // the post-flush snapshot supersedes it
+    const applied = applyLiveCommand(state.liveBase, state.liveSeq, event);
+    if (!applied.ok) return false;
     set({
-      document: { ...next, selection: nextSelection },
+      liveBase: applied.document,
+      liveSeq: event.seq,
+      document: withLocalSelection(applied.document, state.document.selection),
     });
+    return true;
   },
 
   setLiveStatus(status: 'connecting' | 'connected' | 'disconnected'): void {
@@ -560,7 +625,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
       syncAttempt = 0;
       if (!syncInFlight && get().syncState !== 'idle') set({ syncState: 'idle' });
     } else if (status === 'connected' && get().hasUnsyncedLocalEdits) {
-      pushLocalDocument(set, get);
+      flushOutbox(set, get);
     }
   },
 }));

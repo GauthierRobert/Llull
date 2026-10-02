@@ -92,7 +92,8 @@ describe('applyCommand — mutating command', () => {
     expect(fakeRes.written).toHaveLength(2);
 
     const msg = fakeRes.written[1] ?? '';
-    expect(parseSseFrame(msg).event).toBe('patch');
+    expect(parseSseFrame(msg).event).toBe('command');
+    expect(parseSseFrame(msg).data['name']).toBe('add_box');
     expect(frameEntityIds(msg)).toHaveLength(1);
 
     unsub();

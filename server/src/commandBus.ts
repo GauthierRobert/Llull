@@ -106,7 +106,7 @@ export function applyCommand(name: string, params: unknown): CommandBusResult {
     // Mutating command — record history, broadcast.
     _undoStack = [..._undoStack, prior].slice(-MAX_UNDO_DEPTH);
     _redoStack = [];
-    setLiveDoc(result.document);
+    setLiveDoc(result.document, { name, params });
   }
   // No-op: document unchanged, no data — nothing to record or broadcast.
 
@@ -143,7 +143,7 @@ export function undo(): CommandBusResult {
   _redoStack = [..._redoStack, current].slice(-MAX_UNDO_DEPTH);
   // fullSnapshot=true: undo replaces the full doc state; a patch would be ambiguous
   // because entities may have been removed in the undone step.
-  setLiveDoc(previous, true);
+  setLiveDoc(previous);
   return {
     summary: 'Undid last change.',
     affected: [],
@@ -175,7 +175,7 @@ export function redo(): CommandBusResult {
   _redoStack = _redoStack.slice(0, -1);
   _undoStack = [..._undoStack, current].slice(-MAX_UNDO_DEPTH);
   // fullSnapshot=true: redo reinstates a prior full doc state.
-  setLiveDoc(next, true);
+  setLiveDoc(next);
   return {
     summary: 'Redid last change.',
     affected: [],

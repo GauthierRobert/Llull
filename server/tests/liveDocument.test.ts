@@ -165,7 +165,7 @@ describe('subscribeLive', () => {
 
     // The second write carries the updated document.
     const mutationMsg = resA.written[1] ?? '';
-    expect(parseSseFrame(mutationMsg).event).toBe('patch');
+    expect(parseSseFrame(mutationMsg).event).toBe('snapshot');
     expect(frameEntityIds(mutationMsg)).toHaveLength(1);
 
     unsubA();

@@ -22,7 +22,7 @@ import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { localDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
 import type { FeatureStep } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ function resetStore(): void {
  */
 function setHistory(steps: FeatureStep[]): void {
   const doc = useStore.getState().document;
-  useStore.getState().hydrateLiveDocument({ ...doc, featureHistory: steps });
+  useStore.getState().hydrateLiveDocument(liveSnapshot({ ...doc, featureHistory: steps }));
 }
 
 function makeStep(id: string, name: string, suppressed?: boolean, label?: string): FeatureStep {

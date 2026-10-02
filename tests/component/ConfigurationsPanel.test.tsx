@@ -17,6 +17,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
+import { liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { __resetIdCounter } from '@lib/id';
@@ -39,7 +40,7 @@ function resetStore(): void {
 /** Inject configurations directly into the store document for fixture setup. */
 function setConfigurations(configs: Record<string, Configuration>): void {
   const doc = useStore.getState().document;
-  useStore.getState().hydrateLiveDocument({ ...doc, configurations: configs });
+  useStore.getState().hydrateLiveDocument(liveSnapshot({ ...doc, configurations: configs }));
 }
 
 /** Patch the dispatch action on the store for spy purposes. Tests-only. */

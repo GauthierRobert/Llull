@@ -31,6 +31,7 @@ import { buildUiBridgeRouter } from './uiBridgeRouter';
 import { inMemoryBridge } from './uiBridge';
 import {
   subscribeLive,
+  getLiveSnapshot,
   flushAutosave,
   stopAutosave,
   closeAllSubscribers,
@@ -88,13 +89,17 @@ app.get('/health', (_req: Request, res: Response) => {
  *
  * Contract:
  *   - On connect: immediately emits a `snapshot` event with the current document.
- *   - On every mutation: emits a `patch` event (a `snapshot` after undo/redo).
+ *   - On every mutating command: emits a `command` event (the log entry); after undo/redo or a
+ *     bulk replacement: a `snapshot` event (MG5.1, see `@core/mcp/liveSync`).
  *   - Keepalive: sends `:keepalive\n\n` every ~25 s to prevent proxy timeouts.
  *   - On client disconnect: cleans up the subscription and the keepalive timer.
  *
  * Named SSE events:
- *   event: snapshot  data: <CadDocument>   — on connect and after undo/redo
- *   event: patch     data: <DocPatch>      — entity-level delta after each mutation
+ *   event: snapshot  data: { seq, stateHash, document } — on connect and after undo/redo
+ *   event: command   data: { seq, name, params, stateHash } — after each mutating command
+ *
+ * Clients re-run each `command` through `execute` and verify `stateHash`; on a seq gap or hash
+ * mismatch they fetch `GET /live/snapshot`.
  *
  * The browser connects with:
  *   const es = new EventSource('http://localhost:3001/live');
@@ -126,6 +131,14 @@ app.get('/live', (req: Request, res: Response) => {
     unsubscribe();
     res.end();
   });
+});
+
+/**
+ * GET /live/snapshot — the current document with its log position `{ seq, stateHash, document }`.
+ * Used by clients to resynchronise after a missed or mismatching `command` event.
+ */
+app.get('/live/snapshot', restLimiter, (_req: Request, res: Response) => {
+  res.status(200).json(getLiveSnapshot());
 });
 
 // ---------------------------------------------------------------------------

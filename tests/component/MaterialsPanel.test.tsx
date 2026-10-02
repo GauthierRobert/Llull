@@ -16,6 +16,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
+import { liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { __resetIdCounter } from '@lib/id';
@@ -38,7 +39,7 @@ function resetStore(): void {
 /** Inject materials directly into the store document for fixture setup. */
 function setMaterials(mats: Record<string, Material>): void {
   const doc = useStore.getState().document;
-  useStore.getState().hydrateLiveDocument({ ...doc, materials: mats });
+  useStore.getState().hydrateLiveDocument(liveSnapshot({ ...doc, materials: mats }));
 }
 
 /** Set the document selection directly (bypasses hydrateLiveDocument entity filter). */

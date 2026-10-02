@@ -15,6 +15,7 @@
  */
 
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
+import type { LiveSnapshotEvent } from '@core/mcp/liveSync';
 
 // ---------------------------------------------------------------------------
 // Response type
@@ -108,4 +109,24 @@ export async function postUndo(): Promise<ServerCommandResponse> {
  */
 export async function postRedo(): Promise<ServerCommandResponse> {
   return postJson('/redo', {});
+}
+
+/** GET /live/snapshot — the server document with its log position (MG5.1 resync). */
+export async function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
+  let response: Response;
+  try {
+    response = await fetch(`${SERVER_BASE}/live/snapshot`, { headers: serverAuthHeaders() });
+  } catch (cause) {
+    throw new ServerCommandError(
+      `Network error: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+  if (!response.ok) {
+    throw new ServerCommandError(
+      `Server responded with HTTP ${response.status} for /live/snapshot`,
+      'http',
+      response.status,
+    );
+  }
+  return response.json() as Promise<LiveSnapshotEvent>;
 }
