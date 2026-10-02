@@ -49,26 +49,33 @@ describe('ExecutionContext', () => {
   });
   afterEach(() => setGeometryKernel(null));
 
-  it('mints entity and step ids through ctx.ids', () => {
-    const result = execute(
-      createEmptyDocument(),
-      'add_box',
-      { size: [1, 1, 1] },
-      contextWith({ ids: prefixedIds('t') }),
-    );
-    expect(result.affected[0]).toMatch(/^t:/);
-    expect(result.document.featureHistory[0]?.id).toMatch(/^t:step:/);
+  it('a recorded command runs as step-<n> and mints step-scoped ids', () => {
+    const first = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
+    expect(first.document.featureHistory[0]?.id).toBe('step-1');
+    expect(first.affected[0]).toBe('box-1.1');
+    expect(first.document.nextStepNumber).toBe(2);
+    const second = execute(first.document, 'add_box', { size: [1, 1, 1] });
+    expect(second.affected[0]).toBe('box-2.1');
   });
 
-  it('nested executes (build_project steps) inherit the caller context', () => {
-    const result = execute(
-      createEmptyDocument(),
-      'build_project',
-      { actions: [{ command: 'add_box', params: { size: [1, 1, 1] } }] },
-      contextWith({ ids: prefixedIds('plan') }),
-    );
-    expect(result.affected.length).toBeGreaterThan(0);
-    expect(result.affected.every((id) => id.startsWith('plan:'))).toBe(true);
+  it('build_project inner steps each get their own step number', () => {
+    const result = execute(createEmptyDocument(), 'build_project', {
+      actions: [
+        { command: 'add_box', params: { size: [1, 1, 1] } },
+        { command: 'add_box', params: { size: [1, 1, 1] } },
+      ],
+    });
+    expect(result.document.featureHistory.map((step) => step.id)).toEqual(['step-1', 'step-2']);
+    expect(result.affected).toEqual(['box-1.1', 'box-2.1']);
+  });
+
+  it('non-step commands mint through ctx.ids', () => {
+    let seen = 0;
+    const counting: IdSource = { next: (prefix) => `${prefix}-ctx-${++seen}` };
+    const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
+    execute(doc, 'replay_history', {}, contextWith({ ids: counting }));
+    expect(seen).toBe(0);
+    expect(contextWith({ ids: counting }).ids.next('x')).toBe('x-ctx-1');
   });
 
   it('uses ctx.kernel even when no process kernel is installed', () => {

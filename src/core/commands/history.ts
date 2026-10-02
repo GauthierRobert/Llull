@@ -15,10 +15,11 @@
 import type { CadDocument, FeatureStep } from '../model/types';
 import { createEmptyDocument } from '../model/types';
 import { createEmptyBuilding } from '../model/building';
-import { currentContext } from './context';
+import type { ExecutionContext } from './context';
+import { currentContext, runInContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { nextId } from '../../lib/id';
+import { stepIdSource, stepKeyOf } from '../../lib/id';
 import { orphanState } from './history_carry';
 import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
 
@@ -83,6 +84,7 @@ export function replayHistory(
     layers: base.layers,
     layerOrder: base.layerOrder,
     featureHistory: history,
+    ...(base.nextStepNumber !== undefined ? { nextStepNumber: base.nextStepNumber } : {}),
     // Recipes must survive replay so that a recorded `instantiate_recipe` step can
     // re-expand its recipe when this history is replayed again (e.g. via replay_history).
     recipes: base.recipes,
@@ -98,7 +100,7 @@ export function replayHistory(
 
   // idMap tracks old entity id (from when the step was first recorded) → new id
   // (assigned during this replay). Subsequent steps' params are rewritten via
-  // remapIds so that id references survive even though nextId() produces new ids.
+  // remapIds. Step-scoped ids (MG3) replay identically, so this only maps legacy (pre-v2) ids.
   const idMap = new Map<string, string>();
 
   for (const step of history) {
@@ -116,7 +118,9 @@ export function replayHistory(
       }
       // 2. Rewrite stale entity-id references using the accumulated idMap.
       const remapped = remapIds(resolved, idMap);
-      const result = cmd.run(doc, remapped, context);
+      const stepKey = stepKeyOf(step.id);
+      const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
+      const result = runInContext(stepContext, () => cmd.run(doc, remapped, stepContext));
       const before = doc;
       // Accept the new geometry but keep OUR featureHistory intact.
       doc = { ...result.document, featureHistory: history };
@@ -476,8 +480,9 @@ export const insertStep: CommandDefinition<InsertStepParams> = {
       }
     }
 
+    const stepNumber = doc.nextStepNumber ?? 1;
     const newStep: FeatureStep = {
-      id: nextId('step'),
+      id: `step-${stepNumber}`,
       name: cmdName,
       params: stepParams,
       suppressed: false,
@@ -496,7 +501,10 @@ export const insertStep: CommandDefinition<InsertStepParams> = {
       ];
     }
 
-    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
+    const regenerated = {
+      ...replayHistory(doc, newHistory, currentContext().registry),
+      nextStepNumber: stepNumber + 1,
+    };
     const count = Object.keys(regenerated.entities).length;
     return {
       document: regenerated,

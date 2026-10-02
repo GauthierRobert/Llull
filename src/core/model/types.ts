@@ -889,6 +889,12 @@ export interface CadDocument {
    */
   featureHistory: FeatureStep[];
   /**
+   * Number of the next feature-history step (`step-<n>`); never reused, so step-scoped entity
+   * ids (`<prefix>-<n>.<k>`) stay unique and replay re-mints identical ids (MG3).
+   * Absent on documents that never recorded a step — read as 1.
+   */
+  nextStepNumber?: number;
+  /**
    * Named parameter-value sets ("design table"). Each entry maps a configuration
    * name to a `Configuration` that lists parameter expressions for that variant.
    * Activating a configuration overwrites the listed parameters and replays the

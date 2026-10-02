@@ -1508,6 +1508,7 @@
     "jointOrder": [],
     "driveRelations": {},
     "driveRelationOrder": [],
+    "nextStepNumber": 14,
     "building": {
       "project": {
         "name": "Untitled project",

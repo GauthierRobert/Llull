@@ -139,7 +139,8 @@ function fillStructure(spec: ParamItemSpec, core: z.ZodType): void {
   const item = itemSchema(core);
   if (item) spec.items = toItemSpec(item);
   const shape = objectShape(core);
-  if (shape && Object.keys(shape).length > 0) {
+  if (shape) {
+    // `z.object({})` = an open object declared with `properties: {}`; `z.record` emits none.
     const { properties, required } = describeChildren(shape);
     spec.properties = properties;
     if (required.length > 0) spec.required = required;
@@ -202,11 +203,13 @@ export function defineCommand<S extends ParamsObject>(
 }
 
 /** 2-number vector `[x, y]` (local work-plane coordinates). */
-export function vec2(description: string): z.ZodTuple<[z.ZodNumber, z.ZodNumber]> {
+export function vec2(description: string): z.ZodTuple<[z.ZodNumber, z.ZodNumber], null> {
   return z.tuple([z.number(), z.number()]).describe(description);
 }
 
 /** 3-number vector `[x, y, z]`. */
-export function vec3(description: string): z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber]> {
+export function vec3(
+  description: string,
+): z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null> {
   return z.tuple([z.number(), z.number(), z.number()]).describe(description);
 }

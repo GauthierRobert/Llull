@@ -384,6 +384,7 @@
     "joints": {},
     "jointOrder": [],
     "driveRelations": {},
-    "driveRelationOrder": []
+    "driveRelationOrder": [],
+    "nextStepNumber": 7
   }
 }

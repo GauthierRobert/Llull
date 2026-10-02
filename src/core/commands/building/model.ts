@@ -11,7 +11,7 @@ import type {
   BuildingModel,
 } from '../../model/building';
 import { createEmptyBuilding } from '../../model/building';
-import { nextId } from '../../../lib/id';
+import { uniqueId } from '../../../lib/id';
 import type { CommandResult } from '../types';
 
 export const METRES_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
@@ -97,7 +97,7 @@ function issued(building: BuildingModel, prefix: string, keys: ReadonlyArray<str
 
 /** Records that id "<prefix>-<n>" was issued (and gives a new building its unique uid). */
 function withCounter(source: BuildingModel, id: string): BuildingModel {
-  const building = source.uid === undefined ? { ...source, uid: nextId('building') } : source;
+  const building = source.uid === undefined ? { ...source, uid: uniqueId('building') } : source;
   const match = /^(.*)-(\d+)$/.exec(id);
   if (!match) return building;
   const [, prefix = '', number = '0'] = match;

@@ -4946,6 +4946,7 @@
         "stair": 1,
         "room": 4
       }
-    }
+    },
+    "nextStepNumber": 2
   }
 }

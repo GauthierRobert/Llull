@@ -7,7 +7,9 @@
 import type { CadDocument } from '@core/model/types';
 import { serializeDocument } from '@core/commands/persistence';
 
-const NEXT_ID_PATTERN = /[A-Za-z][A-Za-z0-9_]*-[0-9a-z]{6,}-[0-9a-z]+/;
+/** Legacy `prefix-<time36>-<counter36>` ids, step-scoped `prefix-<n>.<k>` ids, and `step-<n>`. */
+const NEXT_ID_PATTERN =
+  /[A-Za-z][A-Za-z0-9_]*-[0-9a-z]{6,}-[0-9a-z]+|[A-Za-z][A-Za-z0-9_]*-\d+\.\d+|step-\d+/;
 
 function collectStructuralIds(value: unknown, into: Set<string>): void {
   if (Array.isArray(value)) {

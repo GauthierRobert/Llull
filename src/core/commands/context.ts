@@ -10,6 +10,9 @@
 
 import type { GeometryKernel } from '../geometry/kernel';
 import { getGeometryKernel } from '../geometry/kernel';
+import { memoizeKernel } from '../geometry/kernelCache';
+import type { ReplayCache } from './replayCache';
+import { createReplayCache } from './replayCache';
 import type { IdSource } from '../../lib/id';
 import { counterIdSource, withIdSource } from '../../lib/id';
 import type { CommandDefinition } from './types';
@@ -28,18 +31,56 @@ export interface ExecutionContext {
   readonly projectDepth: number;
   /** Nesting depth of `instantiate_recipe` expansions (re-entrancy guard). */
   readonly recipeDepth: number;
+  /**
+   * Key of the feature-history step currently running, if any. A nested `execute` inside a
+   * step belongs to that step: it mints from the same id source and appends no step of its own.
+   */
+  readonly stepKey?: string;
+  /**
+   * Replay prefix cache (MG4.3); null disables it. Results depend on the kernel, so the default
+   * context keeps one cache per installed kernel.
+   */
+  readonly replayCache: ReplayCache | null;
 }
 
 let activeContext: ExecutionContext | null = null;
 
-/** Context built from the process defaults: installed kernel, counter ids, full registry. */
+/** One memoized wrapper per installed kernel, so the cache survives across executes (MG4.4). */
+const memoizedKernels = new WeakMap<GeometryKernel, GeometryKernel>();
+
+function memoized(kernel: GeometryKernel | null): GeometryKernel | null {
+  if (kernel === null) return null;
+  let wrapper = memoizedKernels.get(kernel);
+  if (wrapper === undefined) {
+    wrapper = memoizeKernel(kernel);
+    memoizedKernels.set(kernel, wrapper);
+  }
+  return wrapper;
+}
+
+const replayCaches = new WeakMap<object, ReplayCache>();
+const NO_KERNEL = {};
+
+function replayCacheFor(kernel: GeometryKernel | null): ReplayCache {
+  const key: object = kernel ?? NO_KERNEL;
+  let cache = replayCaches.get(key);
+  if (cache === undefined) {
+    cache = createReplayCache();
+    replayCaches.set(key, cache);
+  }
+  return cache;
+}
+
+/** Context built from the process defaults: installed kernel (memoized), counter ids, registry. */
 export function defaultContext(): ExecutionContext {
+  const kernel = memoized(getGeometryKernel());
   return {
-    kernel: getGeometryKernel(),
+    kernel,
     ids: counterIdSource,
     registry: getCommand,
     projectDepth: 0,
     recipeDepth: 0,
+    replayCache: replayCacheFor(kernel),
   };
 }
 

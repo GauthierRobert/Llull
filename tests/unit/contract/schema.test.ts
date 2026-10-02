@@ -82,7 +82,11 @@ describe('toParamsSchema', () => {
       },
       required: ['inner'],
     });
-    expect(schema.properties['empty']).toEqual({ type: 'object', description: 'Empty' });
+    expect(schema.properties['empty']).toEqual({
+      type: 'object',
+      description: 'Empty',
+      properties: {},
+    });
     expect(schema.properties['items']?.items).toEqual({
       type: 'object',
       description: 'Item',
