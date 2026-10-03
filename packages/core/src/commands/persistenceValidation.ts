@@ -2,6 +2,7 @@ import type { ConstraintKind, JointKind } from '../model/types';
 import { isRecord } from '../lib/isRecord';
 import { documentExtensions } from '../plugins/host';
 import {
+  isFiniteNumber,
   isStringArray,
   validateCamera,
   validateLayer,
@@ -46,11 +47,7 @@ function validateJointMateRef(id: string, field: string, v: unknown): string | n
  */
 function validateJointAxis(id: string, axis: unknown): string | null {
   if (axis === 'x' || axis === 'y' || axis === 'z') return null;
-  if (
-    Array.isArray(axis) &&
-    axis.length === 3 &&
-    (axis as unknown[]).every((c) => typeof c === 'number' && Number.isFinite(c))
-  ) {
+  if (Array.isArray(axis) && axis.length === 3 && (axis as unknown[]).every(isFiniteNumber)) {
     return null;
   }
   return `joint '${id}': axis must be 'x', 'y', 'z', or a [x,y,z] finite-number array, got ${JSON.stringify(axis)}`;
@@ -73,11 +70,11 @@ function validateJointValue(id: string, v: unknown): string | null {
   const axisErr = validateJointAxis(id, v['axis']);
   if (axisErr !== null) return axisErr;
   if (kind === 'revolute') {
-    if (typeof v['angle'] !== 'number' || !Number.isFinite(v['angle'] as number)) {
+    if (!isFiniteNumber(v['angle'])) {
       return `joint '${id}' (revolute): angle must be a finite number`;
     }
   } else {
-    if (typeof v['displacement'] !== 'number' || !Number.isFinite(v['displacement'] as number)) {
+    if (!isFiniteNumber(v['displacement'])) {
       return `joint '${id}' (prismatic): displacement must be a finite number`;
     }
   }
@@ -94,10 +91,9 @@ function validateDriveRelationValue(id: string, v: unknown): string | null {
     return `driveRelation '${id}': driver must be a non-empty string`;
   if (typeof v['driven'] !== 'string' || (v['driven'] as string).length === 0)
     return `driveRelation '${id}': driven must be a non-empty string`;
-  if (typeof v['ratio'] !== 'number' || !Number.isFinite(v['ratio'] as number))
-    return `driveRelation '${id}': ratio must be a finite number`;
+  if (!isFiniteNumber(v['ratio'])) return `driveRelation '${id}': ratio must be a finite number`;
   if ('offset' in v && v['offset'] !== undefined) {
-    if (typeof v['offset'] !== 'number' || !Number.isFinite(v['offset'] as number))
+    if (!isFiniteNumber(v['offset']))
       return `driveRelation '${id}': offset must be a finite number when present`;
   }
   return null;
@@ -233,62 +229,23 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
     if (!validateLayer(layer)) errors.push(`layer entry is malformed: ${JSON.stringify(layer)}`);
   }
 
-  // Materials (optional field — only validate if present and non-empty)
-  if (isRecord(v['materials'])) {
-    const mats = v['materials'] as Record<string, unknown>;
-    for (const [mname, mat] of Object.entries(mats)) {
-      const err = validateMaterialValue(mname, mat);
+  const validateSection = (
+    section: unknown,
+    validate: (key: string, value: unknown) => string | null,
+  ): void => {
+    if (!isRecord(section)) return;
+    for (const [key, value] of Object.entries(section)) {
+      const err = validate(key, value);
       if (err !== null) errors.push(err);
     }
-  }
-
-  // Parameters (optional field — only validate if present and non-empty)
-  if (isRecord(v['parameters'])) {
-    const params = v['parameters'] as Record<string, unknown>;
-    for (const [pname, param] of Object.entries(params)) {
-      const err = validateParameterValue(pname, param);
-      if (err !== null) errors.push(err);
-    }
-  }
-
-  // Recipes (optional field — only validate if present)
-  if (isRecord(v['recipes'])) {
-    const recs = v['recipes'] as Record<string, unknown>;
-    for (const [rname, rec] of Object.entries(recs)) {
-      const err = validateRecipeValue(rname, rec);
-      if (err !== null) errors.push(err);
-    }
-  }
-
-  // Constraints (optional field — only validate if present)
-  if (isRecord(v['constraints'])) {
-    const cons = v['constraints'] as Record<string, unknown>;
-    for (const [cid, con] of Object.entries(cons)) {
-      const err = validateConstraintValue(cid, con);
-      if (err !== null) errors.push(err);
-    }
-  }
-
-  // Joints (optional field — only validate if present)
-  if (isRecord(v['joints'])) {
-    const joints = v['joints'] as Record<string, unknown>;
-    for (const [jid, joint] of Object.entries(joints)) {
-      const err = validateJointValue(jid, joint);
-      if (err !== null) errors.push(err);
-    }
-  }
-
-  // Building model (optional field — validated when present)
+  };
+  validateSection(v['materials'], validateMaterialValue);
+  validateSection(v['parameters'], validateParameterValue);
+  validateSection(v['recipes'], validateRecipeValue);
+  validateSection(v['constraints'], validateConstraintValue);
+  validateSection(v['joints'], validateJointValue);
   for (const extension of documentExtensions()) errors.push(...extension.validate(v));
-
-  // DriveRelations (optional field — only validate if present)
-  if (isRecord(v['driveRelations'])) {
-    const drs = v['driveRelations'] as Record<string, unknown>;
-    for (const [drid, dr] of Object.entries(drs)) {
-      const err = validateDriveRelationValue(drid, dr);
-      if (err !== null) errors.push(err);
-    }
-  }
+  validateSection(v['driveRelations'], validateDriveRelationValue);
 
   return errors;
 }
