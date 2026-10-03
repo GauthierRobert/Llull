@@ -87,6 +87,44 @@ export function wallLoop(walls: ReadonlyArray<WallElement>): Vec2[] | null {
 }
 
 /**
+ * Plan outline of a room / slab from an explicit boundary or a closed wall loop.
+ * @failure walls on different levels -> `failure`; invalid input -> outline null
+ */
+export function resolveOutline(
+  building: BuildingModel,
+  source: { boundary: unknown; wallIds: string[] | undefined },
+  wallShift: (halfThickness: number) => number,
+  dropRepeatedPoints = false,
+): { outline: Vec2[] | null; wallLevelId?: string | undefined; failure?: string } {
+  if (source.boundary !== undefined) {
+    if (!isVec2List(source.boundary, 3)) return { outline: null };
+    const points = source.boundary.map(toVec2);
+    return {
+      outline: dropRepeatedPoints
+        ? points.filter((point, index) => {
+            const previous = points[(index - 1 + points.length) % points.length] as Vec2;
+            return index === 0 || point[0] !== previous[0] || point[1] !== previous[1];
+          })
+        : points,
+    };
+  }
+  const walls = (source.wallIds ?? []).map((id) => building.elements[id]);
+  if (
+    source.wallIds === undefined ||
+    !walls.every((wall): wall is WallElement => wall?.category === 'wall')
+  ) {
+    return { outline: null };
+  }
+  if (new Set(walls.map((wall) => wall.levelId)).size > 1) {
+    return { outline: null, failure: 'wallIds belong to different levels' };
+  }
+  const loop = wallLoop(walls);
+  const shift = wallShift(Math.max(...walls.map((wall) => wall.thickness)) / 2);
+  const outline = loop ? (shift === 0 ? loop : offsetPolygon(loop, shift)).map(toVec2) : null;
+  return { outline, wallLevelId: walls[0]?.levelId };
+}
+
+/**
  * @command add_slab
  * @pure
  * @affects creates 1 slab (extrusion on layer S-SLAB)
@@ -140,29 +178,13 @@ export const addSlab = defineCommand({
     },
   ): CommandResult => {
     const building = getBuilding(doc);
-    let outline: Vec2[] | null = null;
-    let wallLevelId: string | undefined;
-    if (boundary !== undefined) {
-      outline = isVec2List(boundary, 3)
-        ? boundary.map(toVec2).filter((point, index, points) => {
-            const previous = points[(index - 1 + points.length) % points.length] as Vec2;
-            return index === 0 ? true : point[0] !== previous[0] || point[1] !== previous[1];
-          })
-        : null;
-    } else if (wallIds !== undefined) {
-      const walls = wallIds.map((id) => building.elements[id]);
-      if (walls.every((wall): wall is WallElement => wall?.category === 'wall')) {
-        if (new Set(walls.map((wall) => wall.levelId)).size > 1) {
-          return noChange(doc, 'add_slab failed: wallIds belong to different levels.');
-        }
-        wallLevelId = walls[0]?.levelId;
-        const loop = wallLoop(walls);
-        const halfThickness = Math.max(...walls.map((wall) => wall.thickness)) / 2;
-        const shift =
-          wallFace === 'outer' ? halfThickness : wallFace === 'inner' ? -halfThickness : 0;
-        outline = loop ? (shift === 0 ? loop : offsetPolygon(loop, shift)).map(toVec2) : null;
-      }
-    }
+    const { outline, wallLevelId, failure } = resolveOutline(
+      building,
+      { boundary, wallIds },
+      (half) => (wallFace === 'outer' ? half : wallFace === 'inner' ? -half : 0),
+      true,
+    );
+    if (failure) return noChange(doc, `add_slab failed: ${failure}.`);
     if (!outline || !isValidPolygon(outline)) {
       return noChange(
         doc,

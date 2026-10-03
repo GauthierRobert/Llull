@@ -4,34 +4,27 @@
  */
 
 import type { Vec2, Vec3 } from '@core/model/types';
-import type {
-  BuildingElement,
-  BuildingModel,
-  RoomElement,
-  WallElement,
-} from '@core/model/building';
+import type { BuildingElement, BuildingModel, RoomElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { isValidPolygon, offsetPolygon, polygonArea } from '@lib/polygon';
+import { isValidPolygon, polygonArea } from '@lib/polygon';
 import {
   getBuilding,
   hostOf,
   dependenciesOf,
   isVec2,
-  isVec2List,
   nextElementId,
   nextMark,
   noChange,
   resolveLevel,
   toMetres,
-  toVec2,
   withElement,
   elementAffected,
   followLevelHeight,
   withoutElements,
 } from './model';
 import { regenerateBuilding } from './evaluateElements';
-import { wallLoop } from './structure';
+import { resolveOutline } from './structure';
 import { openingFitIssues } from './walls';
 import { nextMemberMark } from './industrial/memberSupport';
 
@@ -65,22 +58,12 @@ export const addRoom = defineCommand({
       return noChange(doc, 'add_room failed: name is required.');
     }
     const building = getBuilding(doc);
-    let outline: Vec2[] | null = null;
-    let wallLevelId: string | undefined;
-    if (boundary !== undefined) {
-      outline = isVec2List(boundary, 3) ? boundary.map(toVec2) : null;
-    } else if (wallIds !== undefined) {
-      const walls = wallIds.map((id) => building.elements[id]);
-      if (walls.every((wall): wall is WallElement => wall?.category === 'wall')) {
-        if (new Set(walls.map((wall) => wall.levelId)).size > 1) {
-          return noChange(doc, 'add_room failed: wallIds belong to different levels.');
-        }
-        wallLevelId = walls[0]?.levelId;
-        const loop = wallLoop(walls);
-        const halfThickness = Math.max(...walls.map((wall) => wall.thickness)) / 2;
-        outline = loop ? offsetPolygon(loop, -halfThickness).map(toVec2) : null;
-      }
-    }
+    const { outline, wallLevelId, failure } = resolveOutline(
+      building,
+      { boundary, wallIds },
+      (half) => -half,
+    );
+    if (failure) return noChange(doc, `add_room failed: ${failure}.`);
     if (!outline || !isValidPolygon(outline)) {
       return noChange(
         doc,
