@@ -8,6 +8,7 @@
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
+import { noop } from './noop';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 
@@ -31,7 +32,7 @@ export const rotateEntity = defineCommand({
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `No entity ${id} to rotate.`, affected: [] };
+      return noop(doc, `No entity ${id} to rotate.`);
     }
     const rotated: Entity = {
       ...target,
@@ -188,14 +189,10 @@ export const scaleEntity = defineCommand({
   run: (doc, { id, factor }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `No entity ${id} to scale.`, affected: [] };
+      return noop(doc, `No entity ${id} to scale.`);
     }
     if (factor <= 0) {
-      return {
-        document: doc,
-        summary: `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(doc, `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`);
     }
 
     const { scaled, dims } = scaleGeometry(target, factor);
@@ -233,14 +230,13 @@ export const mirrorEntity = defineCommand({
   run: (doc, { id, axis }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `No entity ${id} to mirror.`, affected: [] };
+      return noop(doc, `No entity ${id} to mirror.`);
     }
     if (!VALID_AXES.has(axis)) {
-      return {
-        document: doc,
-        summary: `mirror_entity: axis must be 'x', 'y', or 'z' (got '${axis}'); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `mirror_entity: axis must be 'x', 'y', or 'z' (got '${axis}'); entity ${id} unchanged.`,
+      );
     }
 
     const [px, py, pz] = target.position;
@@ -297,21 +293,19 @@ export const arrayLinear = defineCommand({
   run: (doc, { id, count, offset }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `array_linear: No entity ${id}.`, affected: [] };
+      return noop(doc, `array_linear: No entity ${id}.`);
     }
     if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
-      return {
-        document: doc,
-        summary: `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
+      );
     }
     if (!Number.isFinite(offset[0]) || !Number.isFinite(offset[1]) || !Number.isFinite(offset[2])) {
-      return {
-        document: doc,
-        summary: `array_linear: offset must be finite (got [${offset.join(', ')}]); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `array_linear: offset must be finite (got [${offset.join(', ')}]); entity ${id} unchanged.`,
+      );
     }
 
     const [ox, oy, oz] = target.position;
@@ -368,14 +362,13 @@ export const arrayPolar = defineCommand({
   run: (doc, { id, count, center, angle = 2 * Math.PI }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `array_polar: No entity ${id}.`, affected: [] };
+      return noop(doc, `array_polar: No entity ${id}.`);
     }
     if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
-      return {
-        document: doc,
-        summary: `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
+      );
     }
 
     const [px, py] = target.position;
