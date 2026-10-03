@@ -1,5 +1,4 @@
 /**
- * purlinCheck: purlinModel.
  * @layer domain-aec
  */
 
@@ -106,6 +105,3 @@ export interface Verdict {
   readonly utilisation: number;
   readonly combination: string;
 }
-
-export const round = (value: number, digits = 2): number =>
-  Math.round(value * 10 ** digits) / 10 ** digits;

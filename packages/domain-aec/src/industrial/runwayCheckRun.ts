@@ -1,5 +1,4 @@
 /**
- * runwayCheck: runwayCheckRun.
  * @layer domain-aec
  */
 
@@ -17,9 +16,10 @@ import {
   LOCAL_CATEGORIES,
   RAILS,
   type RunwayCheckRow,
-  round,
 } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
+import { round } from '../numeric';
+import { failureSummary } from './checkReport';
 
 /**
  * @command check_crane_runways
@@ -289,12 +289,11 @@ export const runwayCheck = defineCommand({
       summary:
         `Checked ${beams} crane runway beam(s), ${rows.length} check(s) (${[...capacities].join('/')} t, class ${craneClass}, wheelBase ${wheelBase} mm): ` +
         `max utilisation ${round(worst.utilisation)} (${worst.mark} ${worst.kind}: ${worst.check}); ` +
-        (failures.length === 0
-          ? 'all OK (preliminary, simply supported spans).'
-          : `${failures.length} failure(s): ${failures
-              .slice(0, 8)
-              .map((row) => `${row.mark} ${row.kind} ${round(row.utilisation)}`)
-              .join(', ')}${failures.length > 8 ? ', …' : ''}.`),
+        failureSummary(
+          failures,
+          (row) => `${row.mark} ${row.kind}`,
+          'all OK (preliminary, simply supported spans).',
+        ),
       affected: [],
       data: {
         rows,

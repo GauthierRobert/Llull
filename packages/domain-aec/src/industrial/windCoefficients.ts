@@ -162,7 +162,7 @@ export function roofCoefficients(
   return interpolate(direction === 180 ? MONOPITCH_HIGH_EAVES : MONOPITCH_LOW_EAVES, pitchDeg);
 }
 
-export type RoofSlope = 'windward' | 'leeward';
+type RoofSlope = 'windward' | 'leeward';
 
 /**
  * Frame-average cpe of a roof slope (the frame sees the whole slope, not the F / G corner zones).

@@ -1,5 +1,4 @@
 /**
- * ifc: ifcStep.
  * @layer domain-aec
  */
 

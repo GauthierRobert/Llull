@@ -1,5 +1,4 @@
 /**
- * members: memberFootingPanelCommands.
  * @layer domain-aec
  */
 

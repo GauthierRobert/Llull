@@ -1,5 +1,4 @@
 /**
- * ifc: ifcIndustrialExport.
  * @layer domain-aec
  */
 

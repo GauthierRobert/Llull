@@ -1,5 +1,4 @@
 /**
- * frameCheck: frameCheckPortal.
  * @layer domain-aec
  */
 
@@ -11,6 +10,8 @@ import { toCsv } from '../scheduleBuild';
 import { CraneModel, FrameLoads } from './frameModelTypes';
 import { checkFrames } from './frameCheckFrames';
 import type { CheckRow } from './frameCheckSolve';
+import { round } from '../numeric';
+import { failureSummary } from './checkReport';
 
 /** Load parameters shared by check_portal_frames and design_portal_frames. */
 export const FRAME_LOAD_SHAPE = {
@@ -66,7 +67,7 @@ export const FRAME_LOAD_SHAPE = {
   levelId: z.string().optional().describe('Level id. Default: the active level.'),
 };
 
-export type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>>;
+type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>>;
 
 /** Validated loads + level, or the failure reason. */
 export function resolveFrameLoads(
@@ -177,8 +178,6 @@ export const checkPortalFrames = defineCommand({
       (best, row) => (best === null || row.utilisation > best.utilisation ? row : best),
       null,
     );
-    const round = (value: number, digits = 2): number =>
-      Math.round(value * 10 ** digits) / 10 ** digits;
     const columns = [
       'Frame',
       'Mark',
@@ -212,12 +211,11 @@ export const checkPortalFrames = defineCommand({
         `Checked ${frames} frame(s), ${rows.length} check(s) over ${combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'} ${worst?.kind ?? ''}, ${worst?.frame ?? '—'}, ${worst?.combination ?? '—'}); ` +
         `min αcr ${Number.isFinite(minAlphaCritical) ? round(minAlphaCritical, 1) : '—'}; ` +
-        (failures.length === 0
-          ? 'all OK (frames only: see check_bracing, check_foundations, check_crane_runways).'
-          : `${failures.length} failure(s): ${failures
-              .slice(0, 8)
-              .map((row) => `${row.mark} ${row.kind} ${round(row.utilisation)}`)
-              .join(', ')}${failures.length > 8 ? ', …' : ''}.`) +
+        failureSummary(
+          failures,
+          (row) => `${row.mark} ${row.kind}`,
+          'all OK (frames only: see check_bracing, check_foundations, check_crane_runways).',
+        ) +
         `${skipped.length > 0 ? ` Not checked: ${skipped.join(', ')}.` : ''}`,
       affected: [],
       data: {

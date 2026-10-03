@@ -1,5 +1,4 @@
 /**
- * quantities: costing.
  * @layer domain-aec
  */
 

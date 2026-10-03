@@ -1,5 +1,4 @@
 /**
- * footingDesign: footingSizing.
  * @layer domain-aec
  */
 
@@ -157,7 +156,7 @@ function concreteShear(
   return { vRd: (stress * 1000 * effectiveMm) / 1000, stress, k, rho };
 }
 
-export interface Attempt {
+interface Attempt {
   readonly diameter: number;
   readonly spacing: number;
   readonly asRequired: number;
@@ -250,9 +249,6 @@ export function netLoads(
       : [];
   });
 }
-
-export const round = (value: number, digits = 2): number =>
-  Math.round(value * 10 ** digits) / 10 ** digits;
 
 const roundUp = (value: number, step: number): number => Math.ceil(value / step - 1e-9) * step;
 

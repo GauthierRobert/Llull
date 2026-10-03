@@ -1,5 +1,4 @@
 /**
- * plan: planArchitectural.
  * @layer domain-aec
  */
 

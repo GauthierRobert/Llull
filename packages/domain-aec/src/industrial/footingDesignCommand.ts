@@ -1,5 +1,4 @@
 /**
- * footingDesign: footingDesignCommand.
  * @layer domain-aec
  */
 
@@ -36,10 +35,10 @@ import {
   evaluatePad,
   geometryOf,
   netLoads,
-  round,
   sizeText,
   trialSizes,
 } from './footingSizing';
+import { round } from '../numeric';
 
 const footingDesignParams = z.object({
   ...FRAME_LOAD_SHAPE,
@@ -51,8 +50,6 @@ const footingDesignParams = z.object({
       'true = also reduce oversized pads that already pass to the smallest passing size. Default false (pads are only grown, never shrunk).',
     ),
 });
-
-export type FootingDesignParams = z.output<typeof footingDesignParams>;
 
 /**
  * @command design_footings

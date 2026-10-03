@@ -1,5 +1,4 @@
 /**
- * foundationCheck: foundationCheckRun.
  * @layer domain-aec
  */
 
@@ -25,7 +24,6 @@ import {
   footingRows,
   groundSlabWeight,
   plateRows,
-  round,
   slidingHorizontalOf,
 } from './foundationRows';
 import {
@@ -36,6 +34,8 @@ import {
   ultimateCombinations,
 } from './foundationCombinations';
 import { clayLayerError, footingSettlementParts } from './foundationSettlement';
+import { round } from '../numeric';
+import { failureSummary } from './checkReport';
 
 /**
  * Checks footings and base plates of the columns of a level.
@@ -203,8 +203,6 @@ const foundationCheckParams = z.object({
     ),
 });
 
-export type FoundationCheckParams = z.output<typeof foundationCheckParams>;
-
 /**
  * @command check_foundations
  * @pure read-only
@@ -314,12 +312,11 @@ export const foundationCheck = defineCommand({
           ? `${unchecked} footing(s) not checked (no analysed frame column, e.g. gable posts); `
           : '') +
         `max utilisation ${round(worstRow.utilisation)} (${worstRow.column} ${worstRow.check}, ${worstRow.combination}); ` +
-        (failures.length === 0
-          ? 'all OK (no reinforcement check).'
-          : `${failures.length} failure(s): ${failures
-              .slice(0, 8)
-              .map((row) => `${row.column} ${row.check} ${round(row.utilisation)}`)
-              .join(', ')}${failures.length > 8 ? ', …' : ''}.`),
+        failureSummary(
+          failures,
+          (row) => `${row.column} ${row.check}`,
+          'all OK (no reinforcement check).',
+        ),
       affected: [],
       data: {
         rows,

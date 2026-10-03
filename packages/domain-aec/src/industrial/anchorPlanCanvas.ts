@@ -1,5 +1,4 @@
 /**
- * anchorPlan: anchorPlanCanvas.
  * @layer domain-aec
  */
 

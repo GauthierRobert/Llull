@@ -5,10 +5,11 @@
 
 import { FLAT_ROOF_LIMIT, roofCoefficients } from './windCoefficients';
 import { DOWNWIND_ROOF_FACTOR } from './frameModelTypes';
-import { pressureOf, suctionOf, TOLERANCE, zoneOf, round } from './purlinModel';
+import { pressureOf, suctionOf, TOLERANCE, zoneOf } from './purlinModel';
 import type { Located, WindOption } from './purlinModel';
+import { round } from '../numeric';
 
-export interface HallEnvelope {
+interface HallEnvelope {
   readonly x0: number;
   readonly x1: number;
   readonly y0: number;
@@ -20,7 +21,7 @@ export interface HallEnvelope {
   readonly eAlong: number;
 }
 
-export interface PurlinWindInput {
+interface PurlinWindInput {
   readonly purlin: Located;
   readonly eavesEnd: Located;
   readonly highEnd: Located;
@@ -30,7 +31,7 @@ export interface PurlinWindInput {
   readonly envelope: HallEnvelope;
 }
 
-export interface PurlinWind {
+interface PurlinWind {
   readonly zone: string;
   readonly direction: string;
   readonly cpe: number;

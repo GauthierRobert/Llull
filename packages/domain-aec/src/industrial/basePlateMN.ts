@@ -16,7 +16,7 @@ const BISECTION_STEPS = 60;
 const MIN_TENSION_LEVER = 20;
 
 /** Plate and column sizes in mm. */
-export interface PlateMnGeometry {
+interface PlateMnGeometry {
   /** Along the column depth (the frame plane). */
   readonly length: number;
   readonly width: number;
@@ -27,7 +27,7 @@ export interface PlateMnGeometry {
   readonly columnDepth: number;
 }
 
-export interface PlateMnCheck {
+interface PlateMnCheck {
   readonly utilisation: number;
   /** Tension per bolt on the tension side, kN (0 without tension). */
   readonly boltTension: number;
@@ -128,7 +128,7 @@ export function checkPlateMN(
   };
 }
 
-export interface PlateSizing {
+interface PlateSizing {
   /** Overhang beyond the column profile on each side, mm. */
   readonly margin: number;
   readonly thickness: number;

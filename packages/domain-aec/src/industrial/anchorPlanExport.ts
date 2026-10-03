@@ -1,5 +1,4 @@
 /**
- * anchorPlan: anchorPlanExport.
  * @layer domain-aec
  */
 

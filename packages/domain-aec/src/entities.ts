@@ -76,7 +76,7 @@ export function colorForMaterial(material: string, fallback: string): string {
   return MATERIAL_COLOR[material.toLowerCase()] ?? fallback;
 }
 
-export interface EntityStub {
+interface EntityStub {
   readonly part: string;
   readonly label: string;
   /** Layer name override (default: the category layer). */

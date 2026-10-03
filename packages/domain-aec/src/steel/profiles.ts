@@ -8,7 +8,7 @@
 
 import type { Vec2 } from '@core/model/types';
 
-export type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
+type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
 
 export interface SteelProfile {
   readonly name: string;
@@ -36,11 +36,15 @@ const STEEL_DENSITY_KG_PER_MM2_M = 0.00785;
 
 type Row = readonly [string, number, number, number, number, number];
 
-function rolled(family: 'IPE' | 'HEA' | 'HEB', rows: ReadonlyArray<Row>): SteelProfile[] {
+function rolled(
+  family: 'IPE' | 'HEA' | 'HEB' | 'UPN',
+  rows: ReadonlyArray<Row>,
+  shape: 'I' | 'U' = 'I',
+): SteelProfile[] {
   return rows.map(([size, h, b, tw, tf, mass]) => ({
     name: `${family}${size}`,
     family,
-    shape: 'I',
+    shape,
     h,
     b,
     tw,
@@ -113,7 +117,8 @@ const HEB = rolled('HEB', [
   ['500', 500, 300, 14.5, 28, 187],
 ]);
 
-const UPN: SteelProfile[] = (
+const UPN = rolled(
+  'UPN',
   [
     ['80', 80, 45, 6, 8, 8.64],
     ['100', 100, 50, 6, 8.5, 10.6],
@@ -126,20 +131,9 @@ const UPN: SteelProfile[] = (
     ['240', 240, 85, 9.5, 13, 33.2],
     ['260', 260, 90, 10, 14, 37.9],
     ['300', 300, 100, 10, 16, 46.2],
-  ] as const
-).map(([size, h, b, tw, tf, mass]) => ({
-  name: `UPN${size}`,
-  family: 'UPN' as const,
-  shape: 'U' as const,
-  h,
-  b,
-  tw,
-  tf,
-  lip: 0,
-  massPerMetre: mass,
-  area: mass / STEEL_DENSITY_KG_PER_MM2_M,
-  perimeter: 2 * h + 4 * b - 2 * tw,
-}));
+  ],
+  'U',
+);
 
 function computed(base: Omit<SteelProfile, 'massPerMetre' | 'area'>, area: number): SteelProfile {
   const rounded = Math.round(area * STEEL_DENSITY_KG_PER_MM2_M * 100) / 100;
@@ -309,7 +303,7 @@ export function findProfile(name: unknown): SteelProfile | undefined {
   return typeof name === 'string' ? BY_NAME.get(name.replace(/\s+/g, '').toUpperCase()) : undefined;
 }
 
-export interface ProfileOutline {
+interface ProfileOutline {
   /** Outer boundary, counter-clockwise, mm, centred on the bounding box; +y = depth (h), +x = width (b). */
   readonly outer: Vec2[];
   readonly holes: Vec2[][];
@@ -411,7 +405,7 @@ export function profileOutline(profile: SteelProfile): ProfileOutline {
   }
 }
 
-export interface SectionProperties {
+interface SectionProperties {
   /** Area, mm². */
   readonly area: number;
   /** Second moment of area about the strong (horizontal) axis through the centroid, mm⁴. */
@@ -454,6 +448,18 @@ function clipAt(points: ReadonlyArray<Point>, level: number, side: 1 | -1): Poin
   return result;
 }
 
+interface Moments {
+  area: number;
+  first: number;
+  second: number;
+}
+
+const addMoments = (sum: Moments, m: Moments): Moments => ({
+  area: sum.area + m.area,
+  first: sum.first + m.first,
+  second: sum.second + m.second,
+});
+
 /**
  * Exact section properties from the profile outline (bending about the axis perpendicular to
  * the depth h). Units: mm.
@@ -462,10 +468,7 @@ function clipAt(points: ReadonlyArray<Point>, level: number, side: 1 | -1): Poin
 export function sectionProperties(profile: SteelProfile): SectionProperties {
   const { outer, holes } = profileOutline(profile);
   const loops = [outer, ...holes];
-  const signed = (
-    loop: ReadonlyArray<Point>,
-    sign: number,
-  ): { area: number; first: number; second: number } => {
+  const signed = (loop: ReadonlyArray<Point>, sign: number): Moments => {
     const m = moments(loop);
     const orientation = Math.sign(m.area) || 1;
     return {
@@ -476,14 +479,7 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
   };
   const total = loops
     .map((loop, index) => signed(loop, index === 0 ? 1 : -1))
-    .reduce(
-      (sum, m) => ({
-        area: sum.area + m.area,
-        first: sum.first + m.first,
-        second: sum.second + m.second,
-      }),
-      { area: 0, first: 0, second: 0 },
-    );
+    .reduce(addMoments, { area: 0, first: 0, second: 0 });
   const centroid = total.first / total.area;
   const inertia = total.second - total.area * centroid ** 2;
   const minor = loops
@@ -493,14 +489,7 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
         index === 0 ? 1 : -1,
       ),
     )
-    .reduce(
-      (sum, m) => ({
-        area: sum.area + m.area,
-        first: sum.first + m.first,
-        second: sum.second + m.second,
-      }),
-      { area: 0, first: 0, second: 0 },
-    );
+    .reduce(addMoments, { area: 0, first: 0, second: 0 });
   const minorInertia = minor.second - (minor.first * minor.first) / minor.area;
   const ys = outer.map((point) => point[1]);
   const extreme = Math.max(Math.max(...ys) - centroid, centroid - Math.min(...ys));

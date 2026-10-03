@@ -1,5 +1,4 @@
 /**
- * plan: planDrawing.
  * @layer domain-aec
  */
 

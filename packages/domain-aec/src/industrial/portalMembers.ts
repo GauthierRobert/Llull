@@ -5,7 +5,7 @@
 
 import type { HallGeometry, MemberSpec, PortalProfiles } from './portalGeometry';
 
-export interface HallMemberInput {
+interface HallMemberInput {
   readonly geometry: HallGeometry;
   readonly profiles: PortalProfiles;
   readonly purlinSpacing: number;

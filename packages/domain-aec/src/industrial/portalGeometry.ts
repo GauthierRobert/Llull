@@ -6,7 +6,7 @@
 import type { SteelProfile } from '../steel/profiles';
 import { appendMembers } from './memberSupport';
 
-export type MemberSpecs = Parameters<typeof appendMembers>[2];
+type MemberSpecs = Parameters<typeof appendMembers>[2];
 export type MemberSpec = MemberSpecs[number];
 
 /** Resolved steel sections of a portal hall. */
@@ -28,7 +28,7 @@ export interface Slope {
   readonly highZ: number;
 }
 
-export interface HallGeometryInput {
+interface HallGeometryInput {
   readonly originX: number;
   readonly originY: number;
   readonly spanWidths: ReadonlyArray<number>;

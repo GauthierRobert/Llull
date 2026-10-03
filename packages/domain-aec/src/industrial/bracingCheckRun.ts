@@ -1,5 +1,4 @@
 /**
- * bracingCheck: bracingCheckRun.
  * @layer domain-aec
  */
 
@@ -30,8 +29,9 @@ import {
   bucklingResistance,
   craneWallForce,
   near,
-  round,
 } from './bracingModel';
+import { round } from '../numeric';
+import { failureSummary } from './checkReport';
 
 /**
  * @command check_bracing
@@ -480,12 +480,11 @@ export const checkBracing = defineCommand({
         `ULS wind ${round(windUltimate, 1)} kN, roof level ${round(roofWind, 1)} kN + stability ${round(stability, 1)} kN ` +
         `over ${bays.size} braced bay(s) = ${round(bayForce, 1)} kN each; ${rows.length} check(s), ` +
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'} ${worst?.kind ?? ''}, ${worst?.group ?? '—'}); ` +
-        (failures.length === 0
-          ? 'all OK (preliminary, tension-only diagonals).'
-          : `${failures.length} failure(s): ${failures
-              .slice(0, 8)
-              .map((row) => `${row.mark} ${row.kind} ${round(row.utilisation)}`)
-              .join(', ')}${failures.length > 8 ? ', …' : ''}.`),
+        failureSummary(
+          failures,
+          (row) => `${row.mark} ${row.kind}`,
+          'all OK (preliminary, tension-only diagonals).',
+        ),
       affected: [],
       data: {
         rows,
