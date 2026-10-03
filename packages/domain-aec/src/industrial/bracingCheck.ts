@@ -4,6 +4,5 @@
  * @layer domain-aec
  */
 
-export { craneWallForce } from './bracingModel';
 export type { CraneWallForce, BracingRow } from './bracingModel';
 export { checkBracing } from './bracingCheckRun';

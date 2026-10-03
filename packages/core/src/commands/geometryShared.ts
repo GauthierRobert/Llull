@@ -48,7 +48,7 @@ export function resolveRotation(rotation: unknown): Vec3 {
  */
 export type PlacementAnchor = 'center' | 'min' | 'base-center';
 
-export const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>([
+const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>([
   'center',
   'min',
   'base-center',
@@ -122,7 +122,7 @@ export function resolvePosition(
 }
 
 /** Format an AABB for inclusion in a command summary. */
-export function boundsText(b: { min: Vec3; max: Vec3 }): string {
+function boundsText(b: { min: Vec3; max: Vec3 }): string {
   const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
   return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
 }

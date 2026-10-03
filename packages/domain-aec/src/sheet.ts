@@ -9,6 +9,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
 import { buildPlanDrawing, type PlanDrawing, type PlanPrimitive } from './plan';
+import { escapeXml } from '@lib/escapeXml';
 
 export type PaperSize = 'A4' | 'A3' | 'A2' | 'A1' | 'A0';
 
@@ -29,7 +30,7 @@ export const PAPER_MM: Readonly<Record<PaperSize, readonly [number, number]>> = 
   A0: [1189, 841],
 };
 
-export const STANDARD_SCALES: ReadonlyArray<number> = [
+const STANDARD_SCALES: ReadonlyArray<number> = [
   1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000,
 ];
 
@@ -37,12 +38,14 @@ export const MARGIN = 10;
 export const BINDING_MARGIN = 20;
 export const TITLE_HEIGHT = 42;
 
-export function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+/** Drawing area of a `width`×`height` mm sheet: inside the frame margins, above the title block. @pure */
+export function sheetDrawingArea(width: number, height: number): Viewport {
+  return {
+    x: BINDING_MARGIN + 4,
+    y: MARGIN + 4,
+    width: width - BINDING_MARGIN - MARGIN - 8,
+    height: height - 2 * MARGIN - TITLE_HEIGHT - 8,
+  };
 }
 
 const n = (value: number): string => String(Math.round(value * 100) / 100);
@@ -336,7 +339,7 @@ export function composeSheetSvg(
  * @pure
  * @failure unknown level, invalid paper or scale -> null
  */
-export function buildPlanSheet(doc: CadDocument, options: SheetOptions): PlanSheet | null {
+function buildPlanSheet(doc: CadDocument, options: SheetOptions): PlanSheet | null {
   const drawing = buildPlanDrawing(doc, options.levelId);
   const paper = options.paper ?? 'A3';
   const size = PAPER_MM[paper];
@@ -344,12 +347,7 @@ export function buildPlanSheet(doc: CadDocument, options: SheetOptions): PlanShe
   if (options.scale !== undefined && !(Number.isFinite(options.scale) && options.scale > 0))
     return null;
   const [width, height] = size;
-  const viewport: Viewport = {
-    x: BINDING_MARGIN + 4,
-    y: MARGIN + 4,
-    width: width - BINDING_MARGIN - MARGIN - 8,
-    height: height - 2 * MARGIN - TITLE_HEIGHT - 8,
-  };
+  const viewport = sheetDrawingArea(width, height);
   const millimetresPerUnit = toMetres(doc, 1) * 1000;
   const [minX, minY, maxX, maxY] = drawing.bounds;
   const scale =

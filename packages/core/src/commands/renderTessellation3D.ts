@@ -15,14 +15,14 @@ import { type PreDepthPolygon } from './renderTypes';
 import { sub3, cross3, normalize3 } from './renderMath';
 
 /** Compute outward face normal for a polygon (using the first 3 verts). */
-export function faceNormal(verts: Vec3[]): Vec3 {
+function faceNormal(verts: Vec3[]): Vec3 {
   if (verts.length < 3) return [0, 0, 1];
   const a = sub3(verts[1]!, verts[0]!);
   const b = sub3(verts[2]!, verts[0]!);
   return normalize3(cross3(a, b));
 }
 
-export function makePolygon(verts: Vec3[], color: string, stroke = false): PreDepthPolygon {
+function makePolygon(verts: Vec3[], color: string, stroke = false): PreDepthPolygon {
   const normal = faceNormal(verts);
   return { verts, color, normal, stroke };
 }

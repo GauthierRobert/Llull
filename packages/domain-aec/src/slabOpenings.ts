@@ -29,7 +29,7 @@ import { regenerateBuilding } from './evaluate';
 import { triangulatePolygon } from '@lib/triangulate';
 
 /** Plan footprint of a stair run, grown by `margin` on every side. */
-export function stairFootprint(stair: StairElement, margin: number): Vec2[] {
+function stairFootprint(stair: StairElement, margin: number): Vec2[] {
   const direction: Vec2 = [Math.cos(stair.angle), Math.sin(stair.angle)];
   const normal: Vec2 = [-direction[1], direction[0]];
   const half = stair.width / 2 + margin;
@@ -58,7 +58,7 @@ function polygonsTouch(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): boolean 
  * Why `opening` cannot be cut in `slab`, or null.
  * @invariant strictly inside the boundary, not touching another opening
  */
-export function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>): string | null {
+function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>): string | null {
   if (!isValidPolygon(opening)) return 'the opening needs ≥ 3 non-collinear points';
   const inside =
     opening.every((point) => pointInPolygon(point, slab.boundary)) &&

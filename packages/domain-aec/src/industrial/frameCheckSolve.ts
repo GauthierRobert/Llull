@@ -3,15 +3,11 @@
  * @layer domain-aec
  */
 
-import type {
-  BuildingModel,
-  MomentConnectionElement,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { solveFrame, type FrameResult } from '@lib/frame2d';
 import { fromMm } from '../model';
-import { connectionSolids } from './evaluate';
+import { buildingConnectionSolids } from './evaluate';
 import { solveCombination, type FrameModel, type WindCase, type LoadCase } from './frameModel';
 import { boltResistance } from './steelDesign';
 
@@ -223,13 +219,7 @@ export function connectionCheck(
   moment: number,
   shear: number,
 ): { utilisation: number; check: string } | null {
-  const level = building.levels[connection.levelId];
-  const members: Record<string, SteelMemberElement | undefined> = {};
-  for (const id of [connection.rafterId, connection.otherId]) {
-    const element = building.elements[id];
-    if (element?.category === 'member') members[id] = element;
-  }
-  const solids = level ? connectionSolids(doc, connection, members, level) : null;
+  const solids = buildingConnectionSolids(doc, building, connection);
   const plate = solids?.find((solid) => solid.part === 'plate');
   if (!solids || !plate) return null;
   const mm = (value: number): number => value / fromMm(doc, 1);

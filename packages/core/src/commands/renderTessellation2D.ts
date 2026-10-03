@@ -6,7 +6,7 @@ import { type PreDepthPolygon } from './renderTypes';
 // 2D shape tessellation — produces stroke polylines in local XY → world XY (Z=pos.z)
 // ---------------------------------------------------------------------------
 
-export function place2D(localPt: Vec2, position: Vec3): Vec3 {
+function place2D(localPt: Vec2, position: Vec3): Vec3 {
   return [position[0] + localPt[0], position[1] + localPt[1], position[2]];
 }
 

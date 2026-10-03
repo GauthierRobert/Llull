@@ -17,4 +17,4 @@ export {
 } from './wallGeometry';
 export type { WallFrame, WallExtent } from './wallGeometry';
 export { slabMesh, regenerateBuilding } from './evaluateElements';
-export { CATEGORY_LAYER, colorForMaterial, layerIdFor } from './entities';
+export { CATEGORY_LAYER } from './entities';

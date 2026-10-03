@@ -54,7 +54,7 @@ export const SOLID_PRESETS: readonly SolidPreset[] = [
 ];
 
 /** Gap (document units) left between a new primitive and the existing scene. */
-export const PLACEMENT_GAP = 1.5;
+const PLACEMENT_GAP = 1.5;
 
 /** Half-width of the default primitives' footprint. */
 const DEFAULT_HALF_WIDTH = 1;

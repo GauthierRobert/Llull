@@ -116,7 +116,7 @@ export function consolidationSettlement(
  * Elastic settlement (mm) of a pad under SLS G+S: s = q B (1 − ν²) Is / Es, Is 0.88 (rigid square), q = (V + footing + backfill) / area − 18 kN/m³ × founding depth.
  * @pure
  */
-export function footingSettlement(
+function footingSettlement(
   doc: CadDocument,
   reaction: BaseReaction,
   footing: FootingElement,

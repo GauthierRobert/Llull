@@ -24,7 +24,7 @@ import {
  * Execute a single inner step (for repeat/for_each bodies) against the current doc.
  * Returns { doc, stepReport, aborted } where aborted=true means the caller should stop.
  */
-export function runInnerStep(
+function runInnerStep(
   stepDef: { command: string; params?: Record<string, unknown> },
   current: CadDocument,
   bindings: Record<string, string[]>,
@@ -83,7 +83,7 @@ export function runInnerStep(
   return { doc: current, affected: [], aborted: onError === 'abort' };
 }
 /** Upper-bound count of executed commands a plan expands to (repeat/for_each multiply). */
-export function estimateSteps(actions: ActionItem[], doc: CadDocument): number {
+function estimateSteps(actions: ActionItem[], doc: CadDocument): number {
   let total = 0;
   for (const raw of actions) {
     if (isRepeatStep(raw)) {

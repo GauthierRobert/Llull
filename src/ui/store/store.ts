@@ -285,7 +285,7 @@ let syncAttempt = 0;
 /** Local id -> server id for ids minted differently while the entries were replayed (kept across retries). */
 let flushIdMap = new Map<string, string>();
 
-export function newCommandId(): string {
+function newCommandId(): string {
   const cryptoApi = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
   if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID();
   return `cmd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;

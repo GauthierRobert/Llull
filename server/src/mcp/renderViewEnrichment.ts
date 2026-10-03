@@ -20,7 +20,8 @@ import {
   buildSectionSvg,
   type RenderViewEnrichParams,
 } from '../renderViewEnrich';
-import { extractSvgInner, r2 } from '../renderViewEnrich/svgHelpers';
+import { r2 } from '@core/commands/renderMath';
+import { extractSvgInner } from '../renderViewEnrich/svgHelpers';
 
 /** The set of param keys that are handled server-side (not forwarded to core). */
 const ENRICH_PARAM_KEYS = new Set([

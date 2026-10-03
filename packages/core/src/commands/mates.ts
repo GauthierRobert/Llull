@@ -12,12 +12,11 @@
  *          as a warning row with componentName:'(missing)'; never throws.
  */
 
-import type { CadDocument, EntityKind, InstanceEntity, Vec3 } from '../model/types';
+import type { CadDocument, EntityKind, InstanceEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { expandInstance } from './assemblies';
-import { applyEulerXYZ } from '../lib/eulerRotation';
 
 // ---------------------------------------------------------------------------
 // MateRef — a reference to a named frame on an instance
@@ -36,43 +35,6 @@ import { applyEulerXYZ } from '../lib/eulerRotation';
 export interface MateRef {
   readonly instanceId: string;
   readonly frame?: 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
-}
-
-/** Unit vector for each axis frame in local space (before instance rotation). */
-const LOCAL_AXES: Record<'axis-x' | 'axis-y' | 'axis-z', Vec3> = {
-  'axis-x': [1, 0, 0],
-  'axis-y': [0, 1, 0],
-  'axis-z': [0, 0, 1],
-};
-
-/**
- * Resolve a MateRef to a world-space [x, y] point (for coincident/distance mates)
- * or a world-space direction [dx, dy] (for parallel mates on axis-* frames).
- *
- * Returns null when the instanceId does not exist in `doc.entities` or is not an instance.
- *
- * For 'origin' frame: returns the instance's world position projected to XY.
- * For 'axis-*' frames: applies the instance rotation to the local unit axis and
- *   returns the XY components of the rotated direction.
- *
- * @pure
- */
-function resolveFrame(ref: MateRef, doc: CadDocument): [number, number] | null {
-  const entity = doc.entities[ref.instanceId];
-  if (!entity || entity.kind !== 'instance') return null;
-  const instance = entity as InstanceEntity;
-
-  const frame = ref.frame ?? 'origin';
-
-  if (frame === 'origin') {
-    return [instance.position[0], instance.position[1]];
-  }
-
-  // Axis frame: rotate the local unit vector by the instance rotation and return XY.
-  const localAxis = LOCAL_AXES[frame];
-  const origin: Vec3 = [0, 0, 0];
-  const rotated = applyEulerXYZ(localAxis, origin, instance.rotation);
-  return [rotated[0], rotated[1]];
 }
 
 // ---------------------------------------------------------------------------
@@ -409,6 +371,3 @@ export const billOfMaterials = defineCommand({
     };
   },
 });
-
-// Re-export resolveFrame for testing convenience
-export { resolveFrame };

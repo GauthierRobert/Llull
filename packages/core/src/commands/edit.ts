@@ -239,6 +239,3 @@ export const setEntityName = defineCommand({
     };
   },
 });
-
-// Re-export for barrel convenience
-export const editCommands = [duplicateEntity, groupEntities, ungroupEntities, setEntityName];

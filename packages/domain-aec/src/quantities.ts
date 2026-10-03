@@ -5,9 +5,9 @@
  * @pure
  */
 
-export { wallQuantities, slabNetArea, stairVolume } from './takeoffBasics';
+export { wallQuantities } from './takeoffBasics';
 export type { TakeoffUnit, TakeoffLine, WallQuantities } from './takeoffBasics';
-export { computeTakeoff, memberLength, memberMass, pipeLength, panelArea } from './takeoffCompute';
+export { computeTakeoff } from './takeoffCompute';
 export { buildSchedule, toCsv } from './scheduleBuild';
 export type { ScheduleKind, Schedule } from './scheduleBuild';
 export { rateFor, priceTakeoff } from './costing';

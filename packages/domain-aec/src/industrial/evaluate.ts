@@ -16,6 +16,7 @@ import type {
 import type {
   BasePlateElement,
   BuildingLevel,
+  BuildingModel,
   CableTrayElement,
   EquipmentElement,
   MomentConnectionElement,
@@ -29,9 +30,10 @@ import { fromMm } from '../model';
 import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../entities';
 import { prismMesh, sweepFrame, sweepMesh } from '../mesh';
 import { findProfile, profileOutline } from '../steel/profiles';
-import { cross, dot, normalize, sub } from '../vec3';
+import { cross3, dot3, sub3 } from '@lib/vec3';
+import { normalize } from '../vec3';
 
-export const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
+const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
   column: 'Column',
   rafter: 'Rafter',
   beam: 'Beam',
@@ -117,8 +119,8 @@ export function panelFrame(corners: ReadonlyArray<Vec3>): {
   if (Math.hypot(...normalVector) < 1e-9 || corners.length < 3) return null;
   const normal = normalize(normalVector);
   const origin = corners[0] as Vec3;
-  const e1 = normalize(sub(corners[1] as Vec3, origin));
-  const e2 = cross(normal, e1);
+  const e1 = normalize(sub3(corners[1] as Vec3, origin));
+  const e2 = cross3(normal, e1);
   return { origin, e1, e2, normal };
 }
 
@@ -127,8 +129,8 @@ export function evaluatePanel(panel: PanelElement, level: BuildingLevel): Entity
   const frame = panelFrame(world);
   if (!frame) return [];
   const local = world.map((point): Vec2 => {
-    const offset = sub(point, frame.origin);
-    return [dot(offset, frame.e1), dot(offset, frame.e2)];
+    const offset = sub3(point, frame.origin);
+    return [dot3(offset, frame.e1), dot3(offset, frame.e2)];
   });
   const mesh = prismMesh(local, [], ([x, y], side) => [
     frame.origin[0] + frame.e1[0] * x + frame.e2[0] * y + frame.normal[0] * side * panel.thickness,
@@ -490,6 +492,22 @@ export function connectionSolids(
     }
   }
   return solids;
+}
+
+/** `connectionSolids` resolved against `building` (the connection's level and joined members). */
+export function buildingConnectionSolids(
+  doc: Pick<CadDocument, 'units'>,
+  building: BuildingModel,
+  connection: MomentConnectionElement,
+): ConnectionSolid[] | null {
+  const level = building.levels[connection.levelId];
+  if (!level) return null;
+  const members: Record<string, SteelMemberElement | undefined> = {};
+  for (const id of [connection.rafterId, connection.otherId]) {
+    const element = building.elements[id];
+    if (element?.category === 'member') members[id] = element;
+  }
+  return connectionSolids(doc, connection, members, level);
 }
 
 export function evaluateConnection(

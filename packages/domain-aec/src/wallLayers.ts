@@ -9,7 +9,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, getBuilding, isFiniteNumber, noChange, withElement } from './model';
 import { regenerateBuilding } from './evaluate';
 
-export const WALL_LAYER_FUNCTIONS = [
+const WALL_LAYER_FUNCTIONS = [
   'structure',
   'insulation',
   'membrane',
@@ -44,7 +44,7 @@ export function parseWallLayers(value: unknown): WallLayer[] | string {
 }
 
 /** Structural material of a build-up: the first structure layer, else the thickest layer. */
-export function structuralMaterial(layers: ReadonlyArray<WallLayer>): string {
+function structuralMaterial(layers: ReadonlyArray<WallLayer>): string {
   const structure = layers.find((layer) => layer.function === 'structure');
   const thickest = [...layers].sort((a, b) => b.thickness - a.thickness)[0];
   return (structure ?? thickest)?.material ?? 'concrete';

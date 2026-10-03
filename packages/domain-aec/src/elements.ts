@@ -28,6 +28,7 @@ import {
   withElement,
   elementAffected,
   followLevelHeight,
+  withoutElements,
 } from './model';
 import { regenerateBuilding } from './evaluate';
 import { wallLoop } from './structure';
@@ -143,19 +144,9 @@ export const deleteBuildingElement = defineCommand({
       return noChange(doc, 'delete_building_element: none of the given ids is a building element.');
     }
     const doomed = withHostedOpenings(building, known);
-    const elements = { ...building.elements };
-    const removedEntityIds: string[] = [];
-    for (const id of doomed) {
-      removedEntityIds.push(...(elements[id]?.entityIds ?? []));
-      delete elements[id];
-    }
-    const next: BuildingModel = {
-      ...building,
-      elements,
-      elementOrder: building.elementOrder.filter((id) => !doomed.has(id)),
-    };
+    const removedEntityIds = [...doomed].flatMap((id) => building.elements[id]?.entityIds ?? []);
     return {
-      document: regenerateBuilding(doc, next),
+      document: regenerateBuilding(doc, withoutElements(building, doomed)),
       summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.`,
       affected: [...doomed, ...removedEntityIds],
     };

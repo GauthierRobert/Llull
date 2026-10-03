@@ -6,7 +6,7 @@ import { type Bounds } from './sceneTypes';
 // Bounds
 // ---------------------------------------------------------------------------
 
-export function offset(p: Vec3, dx: number, dy: number, dz: number): Vec3 {
+function offset(p: Vec3, dx: number, dy: number, dz: number): Vec3 {
   return [p[0] + dx, p[1] + dy, p[2] + dz];
 }
 

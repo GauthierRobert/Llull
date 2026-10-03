@@ -10,7 +10,7 @@ export function isStringArray(v: unknown): v is string[] {
 }
 
 /** A Vec3 where all three components are finite numbers. */
-export function isFiniteVec3(v: unknown): v is Vec3 {
+function isFiniteVec3(v: unknown): v is Vec3 {
   return (
     Array.isArray(v) &&
     v.length === 3 &&
@@ -19,14 +19,14 @@ export function isFiniteVec3(v: unknown): v is Vec3 {
 }
 
 /** /^#[0-9a-fA-F]{6}$/ — the only hex format accepted by the renderer. */
-export const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
-export function isValidHexColor(v: unknown): v is string {
+function isValidHexColor(v: unknown): v is string {
   return typeof v === 'string' && HEX_COLOR_RE.test(v);
 }
 
 /** All legal entity kinds (must stay in sync with EntityKind union in types.ts). */
-export const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set<EntityKind>([
+const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set<EntityKind>([
   // 3D solids
   'box',
   'cylinder',

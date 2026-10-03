@@ -8,7 +8,8 @@
 import type { MeshData, Vec2, Vec3 } from '@core/model/types';
 import { triangulatePolygon } from '@lib/triangulate';
 import { toCounterClockwise } from '@lib/polygon';
-import { add, cross, dot, normalize, scale } from './vec3';
+import { add3, cross3, dot3, scale3 } from '@lib/vec3';
+import { normalize } from './vec3';
 
 /**
  * Builds the prism of `outer` minus `holes`. `place(point, side)` maps a local outline point to
@@ -61,13 +62,13 @@ export function sweepFrame(start: Vec3, end: Vec3, roll = 0): SweepFrame | null 
   const delta: Vec3 = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
   const length = Math.hypot(delta[0], delta[1], delta[2]);
   if (length === 0) return null;
-  const d = scale(delta, 1 / length);
+  const d = scale3(delta, 1 / length);
   const reference: Vec3 = Math.abs(d[2]) > 0.999 ? [1, 0, 0] : [0, 0, 1];
-  const up = normalize(add(reference, scale(d, -dot(reference, d))));
-  const side = cross(up, d);
+  const up = normalize(add3(reference, scale3(d, -dot3(reference, d))));
+  const side = cross3(up, d);
   const [cos, sin] = [Math.cos(roll), Math.sin(roll)];
-  const u = add(scale(side, cos), scale(up, -sin));
-  const v = add(scale(side, sin), scale(up, cos));
+  const u = add3(scale3(side, cos), scale3(up, -sin));
+  const v = add3(scale3(side, sin), scale3(up, cos));
   return { u, v, d, length };
 }
 
@@ -84,6 +85,6 @@ export function sweepMesh(
   if (!frame) return null;
   const ccwOuter = toCounterClockwise(outer);
   return prismMesh(ccwOuter, holes, ([x, y], side) =>
-    add(add(side === 0 ? start : end, scale(frame.u, x * factor)), scale(frame.v, y * factor)),
+    add3(add3(side === 0 ? start : end, scale3(frame.u, x * factor)), scale3(frame.v, y * factor)),
   );
 }

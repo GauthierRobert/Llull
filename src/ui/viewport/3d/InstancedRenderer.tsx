@@ -220,8 +220,6 @@ function InstanceBatchMesh({
     const mesh = meshRef.current;
     if (!mesh) return;
 
-    const needsColor = mesh.instanceColor !== null;
-
     // Ensure instance color buffer exists (InstancedMesh lazily creates it).
     if (!mesh.instanceColor) {
       // Force creation: set the first color (InstancedMesh allocates on setColorAt).
@@ -243,26 +241,15 @@ function InstanceBatchMesh({
       // Otherwise fall back to the entity's own color.
       // Selection highlight blends on top of whichever base color is active.
       const baseColor = batch.pbrMaterial ? batch.pbrMaterial.color : entity.color;
-      const isSelected = selectionSet.has(entity.id);
-      if (isSelected) {
-        // Blend base color with the highlight emissive tint.
-        _color.set(baseColor);
-        _color.lerp(SELECTED_EMISSIVE, SELECTED_EMISSIVE_INTENSITY);
-        mesh.setColorAt(i, _color);
-      } else {
-        _color.set(baseColor);
-        mesh.setColorAt(i, _color);
-      }
+      _color.set(baseColor);
+      if (selectionSet.has(entity.id)) _color.lerp(SELECTED_EMISSIVE, SELECTED_EMISSIVE_INTENSITY);
+      mesh.setColorAt(i, _color);
     }
 
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) {
       mesh.instanceColor.needsUpdate = true;
     }
-
-    // Suppress unused-variable warning on `needsColor` — it is used as a side-
-    // effect gate above to ensure the color buffer existed before the loop.
-    void needsColor;
   }, [entitySignature, batch.entities, batch.pbrMaterial, selectionSet, _dummy, _color]);
 
   // --- Xray mode: update opacity per frame is not needed; material opacity is uniform ---

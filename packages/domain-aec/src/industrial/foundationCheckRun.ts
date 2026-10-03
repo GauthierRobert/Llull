@@ -40,7 +40,7 @@ import { clayLayerError, footingSettlementParts } from './foundationSettlement';
  * Checks footings and base plates of the columns of a level.
  * @pure
  */
-export function checkFoundations(
+function checkFoundations(
   doc: CadDocument,
   levelId: string,
   loads: FrameLoads,

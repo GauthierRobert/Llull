@@ -4,5 +4,5 @@
  */
 
 export { dxfLayerName, dxfText } from './dxfWriter';
-export { buildDxf, exportDxf } from './dxfExport';
+export { exportDxf } from './dxfExport';
 export type { DxfExport } from './dxfExport';

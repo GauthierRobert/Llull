@@ -4,7 +4,8 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import { escapeXml, type Viewport } from '../sheet';
+import { escapeXml } from '@lib/escapeXml';
+import type { Viewport } from '../sheet';
 import { ROW_HEIGHT, n } from './anchorPlanLayout';
 
 export class PlanCanvas {

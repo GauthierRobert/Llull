@@ -3,7 +3,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildPlanDrawing, boundsOf, dimensionLabel } from '@aec/plan';
 import { dxfLayerName, dxfText, type DxfExport } from '@aec/dxf';
-import { escapeXml, fitScale, type PlanSheet } from '@aec/sheet';
+import { escapeXml } from '@lib/escapeXml';
+import { fitScale, type PlanSheet } from '@aec/sheet';
 import { ifcGuid, ifcReal, ifcString, type IfcExport } from '@aec/ifc';
 import { fileSlug } from '@aec/model';
 

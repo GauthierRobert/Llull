@@ -28,7 +28,7 @@ export interface IfcExport {
 }
 
 /** @pure */
-export function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
+function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
   const building = getBuilding(doc);
   const writer = new StepWriter();
   const factor = toMetres(doc, 1) * 1000;

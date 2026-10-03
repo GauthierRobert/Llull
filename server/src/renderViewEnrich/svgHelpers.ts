@@ -6,6 +6,8 @@
  */
 
 import type { RenderViewData } from '@core/commands/render';
+import { toScreenCoords } from '@core/commands/renderCamera';
+import { cross3, dot3, normalize3, sub3 } from '@lib/vec3';
 
 /**
  * Compute the orthoHalf value used for projection, matching appendDimensionLabels.
@@ -54,70 +56,4 @@ export function makeProjector(
     const offset = sub3(p, camera.position);
     return toScreenCoords(dot3(offset, right), dot3(offset, up), orthoHalf, width, height);
   };
-}
-
-/** Escape XML special characters for safe text embedding. */
-export function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// ---------------------------------------------------------------------------
-// Pure math helpers (duplicated from render.ts — server layer cannot import
-// unexported internal helpers; these are short and exact copies)
-// ---------------------------------------------------------------------------
-
-type Vec3Mutable = [number, number, number];
-
-export function sub3(
-  a: readonly [number, number, number],
-  b: readonly [number, number, number],
-): Vec3Mutable {
-  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-}
-
-export function dot3(
-  a: readonly [number, number, number],
-  b: readonly [number, number, number],
-): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-export function cross3(
-  a: readonly [number, number, number],
-  b: readonly [number, number, number],
-): Vec3Mutable {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-function len3(a: readonly [number, number, number]): number {
-  return Math.sqrt(dot3(a, a));
-}
-
-export function normalize3(a: readonly [number, number, number]): Vec3Mutable {
-  const l = len3(a);
-  return l > 1e-10 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 1];
-}
-
-export function r2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-export function toScreenCoords(
-  u: number,
-  v: number,
-  orthoHalf: number,
-  width: number,
-  height: number,
-): [number, number] {
-  const margin = 0.9;
-  const scaleX = ((width / 2) * margin) / orthoHalf;
-  const scaleY = ((height / 2) * margin) / orthoHalf;
-  const scale = Math.min(scaleX, scaleY);
-  const sx = width / 2 + u * scale;
-  const sy = height / 2 - v * scale;
-  return [sx, sy];
 }

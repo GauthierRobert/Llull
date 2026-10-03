@@ -3,14 +3,7 @@
  * @layer domain-aec
  */
 
-export {
-  MEMBER_ROLES,
-  nextMemberMark,
-  toVec3,
-  profileSummary,
-  appendMembers,
-  listSteelProfiles,
-} from './memberSupport';
+export { nextMemberMark, toVec3, appendMembers, listSteelProfiles } from './memberSupport';
 export { addSteelMember, updateSteelMember } from './memberSteelCommands';
 export {
   MAX_GENERATED_MEMBERS,

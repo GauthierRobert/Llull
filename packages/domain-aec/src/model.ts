@@ -14,7 +14,7 @@ import { createEmptyBuilding } from '@core/model/building';
 import { uniqueId } from '@lib/id';
 import type { CommandResult } from '@core/commands/types';
 
-export const METRES_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
+const METRES_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
   mm: 0.001,
   cm: 0.01,
   m: 1,
@@ -190,6 +190,17 @@ export function withElement(building: BuildingModel, element: BuildingElement): 
     },
     element.id,
   );
+}
+
+/** Returns a building with every element whose id is in `ids` removed. */
+export function withoutElements(building: BuildingModel, ids: ReadonlySet<string>): BuildingModel {
+  const elements = { ...building.elements };
+  for (const id of ids) delete elements[id];
+  return {
+    ...building,
+    elements,
+    elementOrder: building.elementOrder.filter((id) => !ids.has(id)),
+  };
 }
 
 export function lengthOf(start: Vec2, end: Vec2): number {

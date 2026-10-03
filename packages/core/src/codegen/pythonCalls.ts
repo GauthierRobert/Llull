@@ -19,7 +19,7 @@ function points(profile: readonly Term2[]): string {
 }
 
 /** Degrees in Python source (expressions stay symbolic over `math.pi`). */
-export function pythonDegrees(term: Term): string {
+function pythonDegrees(term: Term): string {
   return formatDegrees(term, 'math.pi');
 }
 

@@ -24,7 +24,7 @@ import { regenerateBuilding } from '../evaluate';
 import { refitPlates } from './plates';
 import { designFixedPlates } from './plateDesign';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
-import { connectionSolids } from './evaluate';
+import { buildingConnectionSolids } from './evaluate';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
 import { sweepFrame } from '../mesh';
 import {
@@ -361,13 +361,7 @@ function rowSpacingOk(
   connection: MomentConnectionElement,
 ): boolean {
   if (connection.boltRows < 2) return true;
-  const level = building.levels[connection.levelId];
-  const members: Record<string, SteelMemberElement | undefined> = {};
-  for (const id of [connection.rafterId, connection.otherId]) {
-    const element = building.elements[id];
-    if (element?.category === 'member') members[id] = element;
-  }
-  const solids = level ? connectionSolids(doc, connection, members, level) : null;
+  const solids = buildingConnectionSolids(doc, building, connection);
   if (!solids) return false;
   const diameter = connection.boltDiameter / fromMm(doc, 1);
   const hole = fromMm(doc, diameter + (diameter <= 24 ? 2 : 3));

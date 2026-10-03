@@ -11,7 +11,7 @@ import type { CadDocument } from './types';
 import { documentExtensions } from '../plugins/host';
 
 /** Keys holding evaluated geometry (the render/export cache). */
-export const EVALUATED_KEYS = ['entities', 'order'] as const;
+const EVALUATED_KEYS = ['entities', 'order'] as const;
 
 export type EvaluatedKey = (typeof EVALUATED_KEYS)[number];
 export type EvaluatedModel = Pick<CadDocument, EvaluatedKey>;

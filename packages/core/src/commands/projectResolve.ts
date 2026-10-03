@@ -17,14 +17,14 @@ import {
 // ---------------------------------------------------------------------------
 
 /** `$alias` or `$alias[N]` — references the affected ids bound by an earlier step. */
-export const REF = /^\$([A-Za-z_]\w*)(?:\[(\d+)\])?$/;
+const REF = /^\$([A-Za-z_]\w*)(?:\[(\d+)\])?$/;
 
 export interface Resolved {
   value: unknown;
   error: string | null;
 }
 
-export function resolveRef(text: string, bindings: Record<string, string[]>): Resolved {
+function resolveRef(text: string, bindings: Record<string, string[]>): Resolved {
   const m = REF.exec(text);
   if (!m || m[1] === undefined) return { value: text, error: null };
   const name = m[1];

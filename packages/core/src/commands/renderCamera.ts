@@ -100,8 +100,8 @@ export function toScreenCoords(
 // ---------------------------------------------------------------------------
 
 /** Fixed directional light direction in world space (Z-up). */
-export const LIGHT_DIR: Vec3 = normalize3([0.6, -0.8, 1.0]);
-export const AMBIENT = 0.35;
+const LIGHT_DIR: Vec3 = normalize3([0.6, -0.8, 1.0]);
+const AMBIENT = 0.35;
 
 export function shade(normal: Vec3, baseColor: string): string {
   const diff = Math.max(0, dot3(normal, LIGHT_DIR));
@@ -110,7 +110,7 @@ export function shade(normal: Vec3, baseColor: string): string {
 }
 
 /** Shade a back-face (face pointing away from light) darker. */
-export function tintHex(hex: string, factor: number): string {
+function tintHex(hex: string, factor: number): string {
   const c = hex.replace('#', '');
   const r = parseInt(c.substring(0, 2), 16);
   const g = parseInt(c.substring(2, 4), 16);

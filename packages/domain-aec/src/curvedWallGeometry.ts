@@ -122,7 +122,7 @@ export function evaluateCurvedWall(
 }
 
 /** Point and unit travel direction at arc length `s` from the start. */
-export function arcFrame(arc: Arc, s: number): { point: Vec2; tangent: Vec2 } {
+function arcFrame(arc: Arc, s: number): { point: Vec2; tangent: Vec2 } {
   const angle = arc.startAngle + Math.sign(arc.sweep) * (s / arc.radius);
   const sign = Math.sign(arc.sweep) || 1;
   return {

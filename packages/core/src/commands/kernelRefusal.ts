@@ -18,7 +18,7 @@ function recipeSteps(doc: Pick<CadDocument, 'recipes'>, step: FeatureStep): Feat
 }
 
 /** Name of the first live step (recursing into recipes) that needs the kernel, else null. */
-export function kernelStepIn(
+function kernelStepIn(
   doc: Pick<CadDocument, 'recipes'>,
   steps: readonly FeatureStep[],
   registry: CommandLookup,
