@@ -1,58 +1,30 @@
 /**
  * @layer ui/store
- *
- * Single Zustand store — the app's one source of truth.
- *
- * TWO MODES (both route every change through `execute(doc, name, params)`, PRIME DIRECTIVE)
- * ─────────
- * ONLINE (server-authoritative): the server owns the document. `dispatch` POSTs /command; the
- * /live command log arrives as `command` events re-run on `liveBase` through `execute`
- * (`applyLiveCommand`, hash-verified) or as `snapshot`s (`hydrateLiveDocument`). Undo/redo are
- * POST /undo and /redo; canUndo/canRedo come from responses.
- *
- * LOCAL MODE (offline fallback, architecture L6): dispatch/undo/redo run locally (`execute` +
- * bounded snapshot stack, LOCAL_HISTORY_LIMIT) when ANY of:
- *   - liveStatus is 'disconnected' (SSE down); or a POST fails with a network error while
- *     'connecting' and no SSE has ever connected (first dispatch races the first connect);
- *   - syncState is not 'idle' (an offline->online push is pending, in flight, or failed);
- *   - hasUnsyncedLocalEdits (local edits the server has not received).
- * Connectivity is decided ONLY by the SSE hook (`setLiveStatus`). A POST network error while the
- * SSE stream is open NEVER goes local (the command may have executed server-side -> duplicate) and
- * never changes liveStatus: lastSummary reports "not applied — network error, retry". HTTP 4xx/5xx
- * never fall back either.
- *
- * RECONCILIATION (outbox). Every local mutating command is queued in `localOutbox` (offline undo
- * moves it to `localRedoOutbox`, redo back). On (re)connect the outbox is replayed to the server as
- * ordinary commands, in order (the server rebases them onto its log; each keeps its own undo
- * step), then the client adopts `GET /live/snapshot`; syncState is 'syncing' meanwhile. On failure
- * syncState='failed' and the flush retries with exponential backoff while the client stays local.
- * Live events received during a flush are superseded by the post-flush snapshot.
- *
- * Local-only state (never sent to the server, never part of CadDocument):
- *   - selection              — which entity ids the user has clicked
- *   - renderOrigin           — floating-origin offset for three.js precision
- *   - liveStatus             — SSE connection health
- *   - lastSummary            — human-readable feedback from the last server response
- *   - lastMeasure            — structured result of the last read-only query command
- *   - canUndo / canRedo      — enabled-state for undo/redo UI (server responses or local stacks)
- *   - hasUnsyncedLocalEdits / localEditCounter / syncState / sseEverConnected — sync bookkeeping
- *   - localUndoStack / localRedoStack — offline snapshot history
- *   - localOutbox / localRedoOutbox — offline commands awaiting replay on the server
- *   - liveBase / liveSeq — client copy of the server document at its log position
+ * Single Zustand store (the app's one source of truth). Every change goes through
+ * `execute(doc, name, params)`.
+ * - ONLINE: `dispatch` POSTs /command; /live events are re-run on `liveBase` (`applyLiveCommand`)
+ *   or adopted as snapshots (`hydrateLiveDocument`). Undo/redo POST /undo and /redo.
+ * - LOCAL MODE (offline, L6): when liveStatus is 'disconnected', syncState is not 'idle', or
+ *   hasUnsyncedLocalEdits, commands run locally with a bounded snapshot stack and are queued in
+ *   `localOutbox` for replay (`./outbox`). A POST network error while SSE is open never goes
+ *   local (the command may have executed server-side); HTTP 4xx/5xx never fall back either.
+ * Connectivity is decided ONLY by the SSE hook (`setLiveStatus`).
  */
 
 import { create } from 'zustand';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, EntityId } from '@core/model/types';
+import { postCommand, postUndo, postRedo, ServerCommandError } from './serverCommands';
 import {
-  fetchLiveSnapshot,
-  postCommand,
-  postUndo,
-  postRedo,
-  ServerCommandError,
-} from './serverCommands';
+  flushOutbox,
+  moveLastOutboxEntry,
+  newCommandId,
+  onSseDisconnected,
+  resetSyncBookkeeping,
+  withLocalSelection,
+} from './outbox';
+import type { OutboxCommand, StoreGet, StoreSet } from './outbox';
 import { execute } from '@core/commands/registry';
-import { extendIdMap, remapIds } from '@core/commands/regenerate';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import { applyLiveCommand } from '@mcp/liveSync';
 
@@ -61,24 +33,14 @@ import { applyLiveCommand } from '@mcp/liveSync';
 // ---------------------------------------------------------------------------
 
 /** The structured result of the most recently dispatched read-only/query command. */
-export interface LastMeasure {
+interface LastMeasure {
   /** The command name, e.g. 'measure_distance'. */
   command: string;
   /** The structured data returned by the command (typed per command, but stored as unknown here). */
   data: unknown;
 }
 
-export type SyncState = 'idle' | 'syncing' | 'failed';
-
-/** One locally executed mutating command awaiting replay on the server. */
-export interface OutboxCommand {
-  /** Client-generated idempotency key; the flush acks by this id and sends it as `commandId`. */
-  readonly commandId: string;
-  readonly name: string;
-  readonly params: unknown;
-  /** Ids the local run produced; zipped with the server's `affected` to remap later entries. */
-  readonly affected: readonly string[];
-}
+type SyncState = 'idle' | 'syncing' | 'failed';
 
 export interface DispatchOptions {
   /** Replace the selection with the command's `affected` ids when it succeeds with any. */
@@ -89,49 +51,22 @@ export interface CadStoreState {
   /** The live CAD document — single source of truth, hydrated by the /live SSE stream. */
   document: CadDocument;
 
-  /**
-   * Floating-origin render offset — render-ONLY, NOT part of the document.
-   * All entity mesh positions are expressed relative to this origin to keep
-   * three.js float32 values small (avoids vertex jitter at large coordinates).
-   * Updated by the 3D viewport when the camera target drifts beyond the rebase
-   * threshold; never serialised into CadDocument.
-   */
+  /** Floating-origin render offset — render-ONLY, NOT part of the document. */
   renderOrigin: [number, number, number];
 
-  /**
-   * Summary returned by the most recent server response.
-   * Handy for status bars and other command-feedback surfaces.
-   * Null before any dispatch.
-   */
+  /** Summary returned by the most recent server response. */
   lastSummary: string | null;
 
-  /**
-   * Structured result of the most recent read-only/query command (one that
-   * returned `response.data`). Replaced on every new measure dispatch; cleared
-   * to null by `clearLastMeasure`. Mutating commands (those without `data`)
-   * do NOT touch this field — so the last measurement stays visible until the
-   * user explicitly dismisses it or runs a new measure.
-   */
+  /** Structured result of the most recent read-only/query command (one that returned `response.data`). */
   lastMeasure: LastMeasure | null;
 
-  /**
-   * Whether the server reports that undo is available.
-   * Updated from every /command, /undo, /redo response.
-   */
+  /** Whether the server reports that undo is available. */
   canUndo: boolean;
 
-  /**
-   * Whether the server reports that redo is available.
-   * Updated from every /command, /undo, /redo response.
-   */
+  /** Whether the server reports that redo is available. */
   canRedo: boolean;
 
-  /**
-   * Live connection status to the server-side SSE document stream.
-   * 'connecting' → EventSource opened, not yet confirmed.
-   * 'connected'  → received first onopen / message.
-   * 'disconnected' → EventSource errored; auto-reconnect pending.
-   */
+  /** Live connection status to the server-side SSE document stream. */
   liveStatus: 'connecting' | 'connected' | 'disconnected';
 
   /** True when local (offline) edits exist that the server has not received. */
@@ -152,10 +87,7 @@ export interface CadStoreState {
   /** Offline redo snapshots, most recently undone last. */
   localRedoStack: CadDocument[];
 
-  /**
-   * Offline outbox: the local mutating commands, in order, that turned the last server
-   * state into the current local document. Replayed to the server on reconnect.
-   */
+  /** Offline outbox: the local mutating commands, in order, that turned the last server state into the current local document. */
   localOutbox: OutboxCommand[];
 
   /** Outbox entries undone offline (most recently undone last); re-queued by local redo. */
@@ -174,96 +106,40 @@ export interface CadStoreState {
   // Actions
   // -------------------------------------------------------------------------
 
-  /**
-   * Send a named command to the server (POST /command).
-   *
-   * Fire-and-forget from the caller's perspective — returns void.
-   * On success: updates lastSummary, lastMeasure (if data present), canUndo/canRedo.
-   * On network error with SSE open: not applied, lastSummary says so. In local mode: runs locally.
-   * The document is NEVER mutated here; it arrives via the /live SSE stream.
-   *
-   * This is the ONLY way the UI changes the document (PRIME DIRECTIVE).
-   */
+  /** Send a named command to the server (POST /command). */
   dispatch(name: string, params?: unknown, options?: DispatchOptions): void;
 
-  /**
-   * Replace the current document wholesale (load / reset).
-   * Does NOT route through the server — use only for initial load or dev resets.
-   */
+  /** Replace the current document wholesale (load / reset). */
   setDocument(doc: CadDocument): void;
 
-  /**
-   * Walk back one step in server-side history (POST /undo).
-   * The reverted document arrives via the /live SSE stream.
-   * Updates lastSummary and canUndo/canRedo from the server response.
-   * No-op in the UI when canUndo is false.
-   */
+  /** Walk back one step in server-side history (POST /undo). */
   undo(): void;
 
-  /**
-   * Walk forward one step in server-side history (POST /redo).
-   * The re-applied document arrives via the /live SSE stream.
-   * Updates lastSummary and canUndo/canRedo from the server response.
-   * No-op in the UI when canRedo is false.
-   */
+  /** Walk forward one step in server-side history (POST /redo). */
   redo(): void;
 
-  /**
-   * Replace the current selection with `ids`.
-   * Selection is local view state — updated synchronously, never sent to server.
-   */
+  /** Replace the current selection with `ids`. */
   select(ids: EntityId[]): void;
 
-  /**
-   * Toggle a single entity in/out of selection.
-   */
+  /** Toggle a single entity in/out of selection. */
   toggleSelection(id: EntityId): void;
 
-  /**
-   * Clear all selected entities.
-   */
+  /** Clear all selected entities. */
   clearSelection(): void;
 
-  /**
-   * Update the floating render origin.
-   * Called by the 3D viewport when the camera target drifts beyond the rebase
-   * threshold. This is a render-only concern and MUST NOT touch the document.
-   */
+  /** Update the floating render origin. */
   setRenderOrigin(origin: [number, number, number]): void;
 
-  /**
-   * Dismiss the last measurement result (clears `lastMeasure` to null).
-   * Called by the MeasurementHUD dismiss button.
-   */
+  /** Dismiss the last measurement result (clears `lastMeasure` to null). */
   clearLastMeasure(): void;
 
-  /**
-   * Replace the document with a snapshot pushed by the server-side SSE stream.
-   * Preserves the current local selection — filtered to entity ids that still
-   * exist in the incoming document — so click-highlights survive a server push.
-   *
-   * Used for: initial connect, undo/redo, resync after a log gap or hash mismatch.
-   * Ignored while offline edits are still being replayed to the server.
-   *
-   * @pure  This is display sync, NOT a document mutation routed through execute().
-   *        Allowed by the PRIME DIRECTIVE because it does not originate a CAD command.
-   */
+  /** Replace the document with a snapshot pushed by the server-side SSE stream. */
   hydrateLiveDocument(snapshot: LiveSnapshotEvent): void;
 
-  /**
-   * Apply one broadcast command by re-running it through `execute` on `liveBase` and
-   * verifying the server's state hash. Unchanged entities keep their object references.
-   *
-   * @returns true for an already-applied event (same epoch, seq <= liveSeq); false on a log gap,
-   *   a different server epoch, or hash mismatch — the caller then fetches a snapshot.
-   * @pure  Display sync: the same command the server already applied, not a new CAD command.
-   */
+  /** Apply one broadcast command by re-running it through `execute` on `liveBase` and verifying the server's state hash. */
   applyLiveCommand(event: LiveCommandEvent): boolean;
 
-  /**
-   * Update the live SSE connection status.
-   * Called by useMcpLiveDocument on EventSource lifecycle events.
-   */
+  /** Update the live SSE connection status. */
   setLiveStatus(status: 'connecting' | 'connected' | 'disconnected'): void;
 }
 
@@ -274,32 +150,10 @@ export interface CadStoreState {
 const LOCAL_HISTORY_LIMIT = 100;
 const LOCAL_SUFFIX = ' (ran locally — offline)';
 
-const SYNC_RETRY_BASE_MS = 1000;
-const SYNC_RETRY_MAX_MS = 30000;
-
-/** Guards against concurrent pushes. */
-let syncInFlight = false;
-let syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
-let syncAttempt = 0;
-
-/** Local id -> server id for ids minted differently while the entries were replayed (kept across retries). */
-let flushIdMap = new Map<string, string>();
-
-function newCommandId(): string {
-  const cryptoApi = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
-  if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID();
-  return `cmd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-}
-
 /** History restore must not rewind the step counter, or undone ids would be re-minted. */
 function withMonotonicStepCounter(restored: CadDocument, current: CadDocument): CadDocument {
   const nextStepNumber = Math.max(current.nextStepNumber ?? 1, restored.nextStepNumber ?? 1);
   return restored.nextStepNumber === nextStepNumber ? restored : { ...restored, nextStepNumber };
-}
-
-function cancelSyncRetry(): void {
-  if (syncRetryTimer !== null) clearTimeout(syncRetryTimer);
-  syncRetryTimer = null;
 }
 
 function isNetworkError(err: unknown): boolean {
@@ -351,11 +205,6 @@ function handlePostFailure(
   }
   set({ lastSummary: postFailureMessage(err, what) });
 }
-
-type StoreSet = (
-  partial: Partial<CadStoreState> | ((state: CadStoreState) => Partial<CadStoreState>),
-) => void;
-type StoreGet = () => CadStoreState;
 
 /** Selection after a command: its affected ids when requested and non-empty, else unchanged. */
 function selectionAfter(
@@ -457,94 +306,6 @@ function stepLocalHistory(set: StoreSet, get: StoreGet, direction: 'undo' | 'red
   });
 }
 
-/** Offline undo moves the newest outbox command to the redo outbox; redo moves it back. */
-function moveLastOutboxEntry(
-  state: CadStoreState,
-  direction: 'undo' | 'redo',
-): Pick<CadStoreState, 'localOutbox' | 'localRedoOutbox'> {
-  const from = direction === 'undo' ? state.localOutbox : state.localRedoOutbox;
-  const moved = from[from.length - 1];
-  if (moved === undefined) {
-    return { localOutbox: state.localOutbox, localRedoOutbox: state.localRedoOutbox };
-  }
-  const rest = from.slice(0, -1);
-  return direction === 'undo'
-    ? { localOutbox: rest, localRedoOutbox: [...state.localRedoOutbox, moved] }
-    : { localOutbox: [...state.localOutbox, moved], localRedoOutbox: rest };
-}
-
-/** Selection survives a document replacement, minus ids that no longer exist. */
-function withLocalSelection(doc: CadDocument, selection: readonly EntityId[]): CadDocument {
-  return { ...doc, selection: selection.filter((id) => id in doc.entities) };
-}
-
-/**
- * Offline -> online reconcile: replay the outbox to the server as ordinary commands, in
- * order (the server rebases them onto whatever happened meanwhile), then adopt the server
- * snapshot. Commands queued during the flush are sent too. Retries with backoff on failure.
- */
-function flushOutbox(set: StoreSet, get: StoreGet): void {
-  if (syncInFlight) return;
-  cancelSyncRetry();
-  syncInFlight = true;
-  set({ syncState: 'syncing' });
-  const sent: string[] = [];
-  const sendNext = async (): Promise<void> => {
-    for (;;) {
-      const next = get().localOutbox[0];
-      if (next === undefined) break;
-      const response = await postCommand(
-        next.name,
-        remapIds(next.params, flushIdMap),
-        next.commandId,
-      );
-      sent.push(response.summary);
-      extendIdMap(flushIdMap, next.affected, response.affected);
-      set((state) => ({
-        localOutbox: state.localOutbox.filter((entry) => entry.commandId !== next.commandId),
-      }));
-    }
-    const snapshot = await fetchLiveSnapshot();
-    if (get().localOutbox.length > 0) return sendNext();
-    const state = get();
-    flushIdMap = new Map();
-    set({
-      hasUnsyncedLocalEdits: false,
-      syncState: 'idle',
-      localUndoStack: [],
-      localRedoStack: [],
-      localRedoOutbox: [],
-      liveBase: snapshot.document,
-      liveSeq: snapshot.seq,
-      liveEpoch: snapshot.epoch,
-      document: withLocalSelection(snapshot.document, state.document.selection),
-      lastSummary: `Synced ${sent.length} offline command${sent.length === 1 ? '' : 's'} to the server.`,
-    });
-  };
-  void sendNext()
-    .then(() => {
-      syncInFlight = false;
-      syncAttempt = 0;
-    })
-    .catch((err: unknown) => {
-      syncInFlight = false;
-      set({
-        syncState: 'failed',
-        lastSummary: `Could not sync offline edits (will retry): ${err instanceof Error ? err.message : String(err)}`,
-      });
-      if (get().liveStatus === 'disconnected') return;
-      const delay = Math.min(SYNC_RETRY_BASE_MS * 2 ** syncAttempt, SYNC_RETRY_MAX_MS);
-      syncAttempt += 1;
-      syncRetryTimer = setTimeout(() => {
-        syncRetryTimer = null;
-        const state = get();
-        if (state.hasUnsyncedLocalEdits && state.liveStatus !== 'disconnected') {
-          flushOutbox(set, get);
-        }
-      }, delay);
-    });
-}
-
 export const useStore = create<CadStoreState>()((set, get) => ({
   document: createEmptyDocument(),
   lastSummary: null,
@@ -584,9 +345,6 @@ export const useStore = create<CadStoreState>()((set, get) => ({
           lastSummary: response.summary,
           canUndo: response.canUndo,
           canRedo: response.canRedo,
-          // Only set lastMeasure when the response carries structured query data.
-          // Mutating commands do not set data so lastMeasure is preserved as-is
-          // (to keep measurement overlays until the user dismisses them).
           lastMeasure:
             response.data !== undefined
               ? { command: name, data: response.data }
@@ -601,9 +359,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
   },
 
   setDocument(doc: CadDocument): void {
-    cancelSyncRetry();
-    syncAttempt = 0;
-    flushIdMap = new Map();
+    resetSyncBookkeeping();
     set({
       hasUnsyncedLocalEdits: false,
       localEditCounter: 0,
@@ -726,9 +482,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
         : { liveStatus: status },
     );
     if (status === 'disconnected') {
-      cancelSyncRetry();
-      syncAttempt = 0;
-      if (!syncInFlight && get().syncState !== 'idle') set({ syncState: 'idle' });
+      onSseDisconnected(set, get);
     } else if (status === 'connected' && get().hasUnsyncedLocalEdits) {
       flushOutbox(set, get);
     }
