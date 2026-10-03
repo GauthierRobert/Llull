@@ -20,16 +20,15 @@
  * - DELETE terminates the session transport via `onsessionclosed`; the shared document
  *   is untouched.
  *
- * UI<->MCP sync (KI1-followup resolved):
+ * UI<->MCP sync:
  *   The shared document is the single source of truth for all MCP sessions.
- *   After every mutating `tools/call`, `setLiveDoc(result.document)` stores the new
- *   state and broadcasts it over the GET /live SSE endpoint, which the browser
- *   EventSource subscribes to for live updates.
+ *   Every mutating `tools/call` goes through `commandBus.applyCommand`, which stores the
+ *   new state via `setLiveDoc` and broadcasts the command over the GET /live SSE endpoint
+ *   that the browser EventSource subscribes to.
  */
 
 import { randomUUID } from 'node:crypto';
 import { type Request, type Response, type Router, Router as createRouter } from 'express';
-import rateLimit from 'express-rate-limit';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -51,486 +50,31 @@ import {
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
-  buildBridgeToolDefinitions,
-  applyBridgeToolCall,
   buildExchangeToolDefinitions,
   applyExchangeToolCall,
+  buildDiscoveryToolDefinitions,
+  applyDiscoveryToolCall,
   isPromptEnabled,
   isToolEnabled,
   parseToolsets,
   toolsetOf,
-} from '@core/mcp';
-import type { ToolsetName, UiBridge } from '@core/mcp';
+} from '@mcp/index';
+import type { ToolsetName } from '@mcp/index';
 import type { CadDocument } from '@core/model/types';
-import { getLiveDoc, setLiveDoc } from './liveDocument';
+import { getLiveDoc } from './liveDocument';
 import { applyCommand } from './commandBus';
 import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
-import { hasValidBearer } from './security';
-import { buildImageBlock, stripSvgFromData, rasterizeSvg } from './renderImage';
+import { buildImageBlock, stripSvgFromData } from './renderImage';
+import { sessions, startSessionSweep } from './mcp/sessions';
+import { buildAuthMiddleware, buildRateLimiter } from './mcp/middleware';
 import {
-  buildTurntableFrames,
-  buildIsolateSvg,
-  appendDimensionLabels,
-  appendAxesAndGrid,
-  appendEntityLabels,
-  buildSectionSvg,
-  type RenderViewEnrichParams,
-} from './renderViewEnrich';
+  applyRenderViewEnrichments,
+  makeErrorResult,
+  stripEnrichParams,
+} from './mcp/renderViewEnrichment';
+import { augmentRenderViewTool } from './mcp/renderViewSchema';
 
-// ---------------------------------------------------------------------------
-// Session registry
-// ---------------------------------------------------------------------------
-
-interface SessionEntry {
-  transport: StreamableHTTPServerTransport;
-  /** Epoch-ms of the last request routed to this session. Updated on every hit. */
-  lastSeenMs: number;
-}
-
-/**
- * Live session map: session id → entry.
- * Created on MCP `initialize`; removed by any of three paths:
- *   1. HTTP DELETE  → SDK calls `onsessionclosed`
- *   2. Transport close (e.g. SDK-level cleanup) → `transport.onclose`
- *   3. Idle TTL sweep → `startSessionSweep` evicts entries not seen within TTL
- * The session's document is held in a closure inside the Server's handlers.
- */
-const sessions = new Map<string, SessionEntry>();
-
-// ---------------------------------------------------------------------------
-// Idle-TTL sweep
-// ---------------------------------------------------------------------------
-
-/**
- * Default TTL / sweep interval (overridden by env vars).
- *
- * `MCP_SESSION_TTL_MS`   — max idle time before a session is evicted (default 30 min).
- * `MCP_SESSION_SWEEP_MS` — how often the sweep runs (default 60 s).
- *
- * Idle-TTL eviction is the catch-all for HTTP clients that abandon a session
- * without sending DELETE and without triggering a transport close event.
- * Active sessions are never evicted — every routed request touches `lastSeenMs`.
- */
-const DEFAULT_TTL_MS = 30 * 60_000; // 30 min
-const DEFAULT_SWEEP_MS = 60_000; // 60 s
-
-function parsePosInt(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const n = parseInt(value, 10);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
-/**
- * Start the background sweep.  The timer is `.unref()`'d so it never blocks
- * process exit.  Call once from `buildMcpRouter` — the singleton pattern
- * ensures only one sweep runs per process even if the router is rebuilt.
- */
-let sweepStarted = false;
-
-function startSessionSweep(): void {
-  if (sweepStarted) return;
-  sweepStarted = true;
-
-  const ttlMs = parsePosInt(process.env['MCP_SESSION_TTL_MS'], DEFAULT_TTL_MS);
-  const sweepMs = parsePosInt(process.env['MCP_SESSION_SWEEP_MS'], DEFAULT_SWEEP_MS);
-
-  console.warn(`[mcp] session sweep started — TTL ${ttlMs} ms, sweep every ${sweepMs} ms`);
-
-  const timer = setInterval(() => {
-    const now = Date.now();
-    for (const [id, entry] of sessions) {
-      if (now - entry.lastSeenMs >= ttlMs) {
-        console.warn(`[mcp] evicting idle session ${id} (idle ${now - entry.lastSeenMs} ms)`);
-        sessions.delete(id);
-        // Best-effort close; ignore errors (transport may already be gone).
-        entry.transport.close().catch(() => {});
-      }
-    }
-  }, sweepMs);
-
-  // Do not keep the process alive just for housekeeping.
-  timer.unref();
-}
-
-// ---------------------------------------------------------------------------
-// Auth middleware
-// ---------------------------------------------------------------------------
-
-/** Close and forget every MCP session (shutdown path). */
-export async function closeAllSessions(): Promise<void> {
-  const entries = [...sessions.values()];
-  sessions.clear();
-  await Promise.all(entries.map((entry) => entry.transport.close().catch(() => {})));
-}
-
-/** Number of live sessions (test helper). @internal */
-export function _sessionCount(): number {
-  return sessions.size;
-}
-
-/**
- * Bearer-token auth guard.
- *
- * If `MCP_AUTH_TOKEN` is set: require `Authorization: Bearer <token>`.
- * If unset: warn once at startup and allow all traffic (local dev only).
- * Never logs the token value.
- */
-function buildAuthMiddleware(): (req: Request, res: Response, next: () => void) => void {
-  const token = process.env['MCP_AUTH_TOKEN'];
-  if (!token) {
-    console.warn(
-      '[warn] MCP_AUTH_TOKEN is not set — /mcp endpoint is unprotected. Set it in production.',
-    );
-    return (_req, _res, next) => next();
-  }
-  return (req: Request, res: Response, next: () => void) => {
-    if (!hasValidBearer(req, token)) {
-      res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
-      return;
-    }
-    next();
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Rate limiting
-// ---------------------------------------------------------------------------
-
-/**
- * Defaults: 60 requests per minute per IP.
- * Override via `MCP_RATE_LIMIT_MAX` (requests) and `MCP_RATE_LIMIT_WINDOW_MS`.
- */
-function buildRateLimiter(): ReturnType<typeof rateLimit> {
-  const windowMs = process.env['MCP_RATE_LIMIT_WINDOW_MS']
-    ? parseInt(process.env['MCP_RATE_LIMIT_WINDOW_MS'], 10)
-    : 60_000;
-  const max = process.env['MCP_RATE_LIMIT_MAX']
-    ? parseInt(process.env['MCP_RATE_LIMIT_MAX'], 10)
-    : 60;
-  return rateLimit({
-    windowMs,
-    max,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many requests — please slow down.' },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// render_view enrichment helpers
-// ---------------------------------------------------------------------------
-
-/** The set of param keys that are handled server-side (not forwarded to core). */
-const ENRICH_PARAM_KEYS = new Set([
-  'turntable',
-  'isolate',
-  'showDimensions',
-  'section',
-  'showAxes',
-  'showGrid',
-  'showLabels',
-]);
-
-/**
- * Strip enrichment-only params from a render_view args object so the core
- * command only receives the params it understands (view, width, height).
- */
-function stripEnrichParams(args: unknown): unknown {
-  if (typeof args !== 'object' || args === null) return args;
-  const record = args as Record<string, unknown>;
-  const stripped: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(record)) {
-    if (!ENRICH_PARAM_KEYS.has(k)) stripped[k] = v;
-  }
-  return stripped;
-}
-
-/**
- * Apply server-side render_view enrichments when any enrichment param is present.
- *
- * Returns a `CallToolResult` when enrichment was applied, or `null` when no
- * enrichment params are present and neither showAxes nor showGrid are requested
- * (caller falls through to normal applyCommand path).
- *
- * Enrichments are applied in this priority order (only the first mutually-exclusive
- * one wins; showDimensions, showAxes, and showGrid compose with any other enrichment):
- *   1. turntable → N-frame horizontal PNG strip
- *   2. isolate   → highlight specific entities
- *   3. section   → section-plane view
- *   4. showDimensions / showAxes / showGrid only → base render + post-process
- *
- * showAxes and showGrid default to true when not explicitly set to false.
- */
-function applyRenderViewEnrichments(
-  args: Record<string, unknown>,
-  getDoc: () => CadDocument,
-): CallToolResult | null {
-  const params = args as RenderViewEnrichParams;
-
-  // showAxes and showGrid default to true (not false)
-  const wantAxes = params.showAxes !== false;
-  const wantGrid = params.showGrid !== false;
-
-  const wantLabels = params.showLabels === true;
-
-  const hasEnrichment =
-    params.turntable !== undefined ||
-    params.isolate !== undefined ||
-    params.showDimensions === true ||
-    params.section !== undefined ||
-    wantAxes ||
-    wantGrid ||
-    wantLabels;
-
-  if (!hasEnrichment) return null;
-
-  // Base render params forwarded to core
-  const baseView = typeof params.view === 'string' ? params.view : 'iso';
-  const baseWidth =
-    typeof params.width === 'number' ? Math.max(64, Math.min(2000, Math.round(params.width))) : 800;
-  const baseHeight =
-    typeof params.height === 'number'
-      ? Math.max(64, Math.min(2000, Math.round(params.height)))
-      : 600;
-
-  const doc = getDoc();
-  const docUnits: string = doc.units ?? 'mm';
-
-  // ------------------------------------------------------------------
-  // turntable: N-frame horizontal strip
-  // ------------------------------------------------------------------
-  if (params.turntable !== undefined) {
-    const frames = Math.max(1, Math.min(12, Math.round(params.turntable.frames)));
-    const svgs = buildTurntableFrames(doc, frames, baseView, baseWidth, baseHeight);
-    if (svgs === null || svgs.length === 0) {
-      return makeErrorResult('render_view turntable: failed to produce frames.');
-    }
-
-    // Rasterize each frame and concatenate horizontally into a single SVG strip.
-    // We compose the SVGs side-by-side in a wrapper SVG, then rasterize once.
-    const totalWidth = baseWidth * svgs.length;
-    const stripLines: string[] = [];
-    stripLines.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${baseHeight}" viewBox="0 0 ${totalWidth} ${baseHeight}">`,
-    );
-    stripLines.push(`  <rect width="${totalWidth}" height="${baseHeight}" fill="#1a1a2e"/>`);
-    for (let i = 0; i < svgs.length; i++) {
-      const inner = extractSvgInnerPublic(svgs[i] as string);
-      stripLines.push(`  <g transform="translate(${i * baseWidth}, 0)">${inner}</g>`);
-    }
-    // Frame number labels
-    for (let i = 0; i < svgs.length; i++) {
-      const angle = Math.round((360 * i) / svgs.length);
-      stripLines.push(
-        `  <text x="${r2Public(i * baseWidth + 4)}" y="32" font-family="monospace" font-size="13" fill="#aaaacc">${angle}°</text>`,
-      );
-    }
-    stripLines.push('</svg>');
-    const stripSvg = stripLines.join('\n');
-
-    const base64 = rasterizeSvg(stripSvg, totalWidth);
-    if (base64 === null) {
-      return makeErrorResult('render_view turntable: rasterization failed.');
-    }
-
-    const summary = `Rendered turntable strip: ${frames} frame(s), ${totalWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({
-      summary,
-      affected: [],
-      isError: false,
-    }) as CallToolResult;
-    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-    return shaped;
-  }
-
-  // ------------------------------------------------------------------
-  // isolate: highlight specific entities, dim everything else
-  // ------------------------------------------------------------------
-  if (params.isolate !== undefined) {
-    const rawIsolate = params.isolate;
-    const ids: string[] = Array.isArray(rawIsolate)
-      ? (rawIsolate as string[])
-      : typeof rawIsolate === 'string'
-        ? [rawIsolate]
-        : [];
-
-    let svg = buildIsolateSvg(doc, ids, baseView, baseWidth, baseHeight);
-    if (svg === null) {
-      return makeErrorResult('render_view isolate: render failed.');
-    }
-
-    // Compose overlay enrichments on top
-    const baseResult = applyCommand('render_view', {
-      view: baseView,
-      width: baseWidth,
-      height: baseHeight,
-    });
-    if (params.showDimensions === true && baseResult.data) {
-      svg = appendDimensionLabels(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-      );
-    }
-    if ((wantAxes || wantGrid) && baseResult.data) {
-      svg = appendAxesAndGrid(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-        docUnits,
-        wantAxes,
-        wantGrid,
-      );
-    }
-    if (wantLabels && baseResult.data) {
-      const allEntities = Object.values(doc.entities).filter(
-        (e): e is NonNullable<typeof e> => e !== undefined,
-      );
-      svg = appendEntityLabels(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-        allEntities,
-      );
-    }
-
-    const base64 = rasterizeSvg(svg, baseWidth);
-    if (base64 === null) {
-      return makeErrorResult('render_view isolate: rasterization failed.');
-    }
-
-    const summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${baseWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({
-      summary,
-      affected: [],
-      isError: false,
-    }) as CallToolResult;
-    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-    return shaped;
-  }
-
-  // ------------------------------------------------------------------
-  // section: section-plane view
-  // ------------------------------------------------------------------
-  if (params.section !== undefined) {
-    const { axis, offset } = params.section;
-    if (axis !== 'x' && axis !== 'y' && axis !== 'z') {
-      return makeErrorResult(
-        `render_view section: invalid axis "${String(axis)}". Must be "x", "y", or "z".`,
-      );
-    }
-
-    let svg = buildSectionSvg(doc, { axis, offset }, baseView, baseWidth, baseHeight);
-    if (svg === null) {
-      return makeErrorResult('render_view section: render failed.');
-    }
-
-    // Compose overlay enrichments on top
-    const baseResult = applyCommand('render_view', {
-      view: baseView,
-      width: baseWidth,
-      height: baseHeight,
-    });
-    if (params.showDimensions === true && baseResult.data) {
-      svg = appendDimensionLabels(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-      );
-    }
-    if ((wantAxes || wantGrid) && baseResult.data) {
-      svg = appendAxesAndGrid(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-        docUnits,
-        wantAxes,
-        wantGrid,
-      );
-    }
-    if (wantLabels && baseResult.data) {
-      const allEntities = Object.values(doc.entities).filter(
-        (e): e is NonNullable<typeof e> => e !== undefined,
-      );
-      svg = appendEntityLabels(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-        allEntities,
-      );
-    }
-
-    const base64 = rasterizeSvg(svg, baseWidth);
-    if (base64 === null) {
-      return makeErrorResult('render_view section: rasterization failed.');
-    }
-
-    const summary = `Rendered section view: cut at ${axis}=${offset}, ${baseWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({
-      summary,
-      affected: [],
-      isError: false,
-    }) as CallToolResult;
-    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-    return shaped;
-  }
-
-  // ------------------------------------------------------------------
-  // showDimensions / showAxes / showGrid (no other enrichment): base render + post-process
-  // ------------------------------------------------------------------
-  const busResult = applyCommand('render_view', {
-    view: baseView,
-    width: baseWidth,
-    height: baseHeight,
-  });
-  if (!busResult.data) {
-    return makeErrorResult('render_view enrichment: base render returned no data.');
-  }
-  const baseData = busResult.data as import('@core/commands/render').RenderViewData;
-
-  let enrichedSvg = baseData.svg;
-
-  if (params.showDimensions === true) {
-    enrichedSvg = appendDimensionLabels(enrichedSvg, baseData);
-  }
-  if (wantAxes || wantGrid) {
-    enrichedSvg = appendAxesAndGrid(enrichedSvg, baseData, docUnits, wantAxes, wantGrid);
-  }
-  if (wantLabels) {
-    const allEntities = Object.values(doc.entities).filter(
-      (e): e is NonNullable<typeof e> => e !== undefined,
-    );
-    enrichedSvg = appendEntityLabels(enrichedSvg, baseData, allEntities);
-  }
-
-  const base64 = rasterizeSvg(enrichedSvg, baseWidth);
-  if (base64 === null) {
-    return makeErrorResult('render_view enrichment: rasterization failed.');
-  }
-
-  const summary = `Rendered view: ${baseData.entityCount} entit${baseData.entityCount === 1 ? 'y' : 'ies'}, ${baseWidth}×${baseHeight}.`;
-  const shaped = shapeToolCallContent({
-    summary,
-    affected: [],
-    isError: false,
-    data: stripSvgFromData(busResult.data),
-  }) as CallToolResult;
-  (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-  return shaped;
-}
-
-/** Build an error CallToolResult for enrichment failures. */
-function makeErrorResult(message: string): CallToolResult {
-  return shapeToolCallContent({ summary: message, affected: [], isError: true }) as CallToolResult;
-}
-
-/** Extract SVG inner content (strips outer svg tags). Used by enrichment functions. */
-function extractSvgInnerPublic(svgString: string): string {
-  const openEnd = svgString.indexOf('>');
-  if (openEnd === -1) return svgString;
-  const closeStart = svgString.lastIndexOf('</svg>');
-  if (closeStart === -1) return svgString.substring(openEnd + 1);
-  return svgString.substring(openEnd + 1, closeStart);
-}
-
-/** Round to 2 decimal places (used in SVG coordinate output). */
-function r2Public(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+export { closeAllSessions, _sessionCount } from './mcp/sessions';
 
 // ---------------------------------------------------------------------------
 // MCP Server factory
@@ -544,123 +88,25 @@ function r2Public(n: number): number {
  * Mutations route through `commandBus.applyCommand` so every tools/call shares
  * the same undo/redo history as REST /command calls from the browser UI.
  *
- * Each session maintains its own working document for bridge operations:
- *   snapshot_in_from_ui replaces the session working doc from the UI bridge.
- *   snapshot_out_to_ui  stages the session working doc to the UI bridge.
- *
  * @param getDoc - returns the current shared document (used for resources/read)
- * @param bridge - the injected UiBridge for UI↔session sync tools
  */
 function buildMcpServer(
   getDoc: () => CadDocument,
-  bridge: UiBridge,
   exchange: ExchangeOptions,
-  enabledToolsets: ReadonlySet<ToolsetName>,
+  configuredToolsets: ReadonlySet<ToolsetName>,
 ): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
-    { capabilities: { tools: {}, resources: {}, prompts: {} } },
+    { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} } },
   );
-
-  // Session-level working document for bridge operations.
-  // Starts as the shared live doc; snapshot_in_from_ui can replace it.
-  let sessionDoc: CadDocument = getDoc();
+  // Per-session toolsets: the configured set, grown by the enable_toolset discovery tool.
+  const enabledToolsets = new Set<ToolsetName>(configuredToolsets);
 
   // tools/list — return the full registry as MCP tool definitions,
   // with render_view augmented to advertise the server-side enrichment params,
-  // plus the two UI bridge tools appended.
   server.setRequestHandler(ListToolsRequestSchema, () => {
     const tools = buildMcpTools().map((t) => {
-      if (t.name === 'render_view') {
-        // Augment the core render_view schema with server-side enrichment params.
-        // The core schema already has: view, width, height.
-        // We add: turntable, isolate, showDimensions, section.
-        const augmented = {
-          ...t.inputSchema,
-          properties: {
-            ...(t.inputSchema.properties ?? {}),
-            turntable: {
-              type: 'object',
-              description:
-                'Produce a horizontal strip of N evenly-spaced rotation frames around the Z (up) axis. ' +
-                'frames: integer 1..12. When omitted, behavior is unchanged (single frame).',
-              properties: {
-                frames: {
-                  type: 'number',
-                  description:
-                    'Number of frames (1..12). Each frame is a separate rotated view stitched into one wide PNG strip.',
-                },
-              },
-              required: ['frames'],
-            },
-            isolate: {
-              type: 'string',
-              description:
-                'Entity id (or JSON array of ids) to highlight. All other entities are rendered ' +
-                'dimmed/desaturated; the specified id(s) are shown at full color. ' +
-                'Pass a single id string or a JSON-encoded array of id strings.',
-            },
-            showDimensions: {
-              type: 'boolean',
-              description:
-                'When true, overlay the bounding-box dimensions (W × D × H) as text labels on the image. ' +
-                'Labels are placed near the bounding box edges in screen space.',
-            },
-            section: {
-              type: 'object',
-              description:
-                'Render a section-plane view: entities on the negative side of the cut plane are dimmed; ' +
-                'a colored dashed line marks the cut. axis: "x"|"y"|"z"; offset: world-space position of the plane.',
-              properties: {
-                axis: {
-                  type: 'string',
-                  description: 'Axis normal to the cut plane: "x", "y", or "z".',
-                },
-                offset: {
-                  type: 'number',
-                  description: 'World-space position of the cut plane along the axis.',
-                },
-              },
-              required: ['axis', 'offset'],
-            },
-            showAxes: {
-              type: 'boolean',
-              description:
-                'When true (default), overlay a world-frame X/Y/Z axis triad anchored at the world origin. ' +
-                'X=red, Y=green, Z=blue. A scale label (e.g. "1 mm = 42 px") is also shown. ' +
-                'Set to false to suppress.',
-            },
-            showGrid: {
-              type: 'boolean',
-              description:
-                'When true (default), overlay a faint ground grid on the Z=0 plane so you can judge ' +
-                'object placement relative to the world origin. Set to false to suppress.',
-            },
-            showLabels: {
-              type: 'boolean',
-              description:
-                'When true, overlay per-entity id/name labels and key-point markers on the image. ' +
-                'Each entity shows its name (or id) at the centroid of its key points (endpoints, center, ' +
-                'corners, AABB corners for solids). Markers are color-coded by category: ' +
-                'orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. ' +
-                'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
-            },
-          },
-        };
-        return {
-          name: t.name,
-          description:
-            t.description +
-            ' [Server enrichments available: turntable (multi-frame strip), isolate (highlight entity), ' +
-            'showDimensions (bbox labels), section (cut-plane view), showAxes (world triad, default on), ' +
-            'showGrid (ground grid, default on), showLabels (entity id/name labels + key-point markers, default off).]',
-          inputSchema: augmented as {
-            type: 'object';
-            properties?: Record<string, object>;
-            required?: string[];
-          },
-        };
-      }
+      if (t.name === 'render_view') return augmentRenderViewTool(t);
       return {
         name: t.name,
         description: t.description,
@@ -672,28 +118,17 @@ function buildMcpServer(
       };
     });
 
-    // Append the two bridge tools (not in the core registry — bridge-level only).
-    const bridgeTools = buildBridgeToolDefinitions().map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema as {
-        type: 'object';
-        properties?: Record<string, object>;
-        required?: string[];
-      },
-      annotations: t.annotations,
-    }));
-
-    const exchangeTools = buildExchangeToolDefinitions().map((t) => ({
+    const exchangeTools = [
+      ...buildExchangeToolDefinitions(),
+      ...buildDiscoveryToolDefinitions(),
+    ].map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema,
       ...(t.annotations ? { annotations: t.annotations } : {}),
     }));
     return {
-      tools: [...tools, ...bridgeTools, ...exchangeTools].filter((t) =>
-        isToolEnabled(t.name, enabledToolsets),
-      ),
+      tools: [...tools, ...exchangeTools].filter((t) => isToolEnabled(t.name, enabledToolsets)),
     };
   });
 
@@ -707,27 +142,18 @@ function buildMcpServer(
     if (disabledToolset !== undefined) {
       return makeErrorResult(
         `Tool ${name} is disabled on this server: enable its toolset "${disabledToolset}" in ` +
-          'LLULL_TOOLSETS, or call it as a build_project step.',
+          'LLULL_TOOLSETS, call enable_toolset to load it for this session (search_tools finds ' +
+          'tools by keyword), or call it as a build_project step.',
       );
     }
 
-    // -----------------------------------------------------------------------
-    // Bridge tool intercept — snapshot_in_from_ui / snapshot_out_to_ui
-    // -----------------------------------------------------------------------
-    // These tools operate on the per-session working document (sessionDoc) and
-    // are NOT routed through the shared command bus — they are bridge-level only.
-    const bridgeResult = await applyBridgeToolCall(sessionDoc, name, bridge);
-    if (bridgeResult !== null) {
-      // snapshot_in_from_ui: update sessionDoc with the UI doc (and also the
-      // shared live doc so other sessions and the SSE stream see the new state).
-      if (name === 'snapshot_in_from_ui' && bridgeResult.document !== sessionDoc) {
-        sessionDoc = bridgeResult.document;
-        setLiveDoc(sessionDoc);
+    // Discovery meta-tools — search_tools / enable_toolset (core toolset, always enabled).
+    const discovery = applyDiscoveryToolCall(name, args, enabledToolsets);
+    if (discovery !== null) {
+      if (discovery.toolsListChanged) {
+        server.sendToolListChanged().catch(() => {});
       }
-      // snapshot_out_to_ui does not change sessionDoc (it only stages a copy).
-      // Double cast: BridgeToolResult lacks the SDK's index signature — same
-      // pattern as shapeToolCallContent casts throughout this file.
-      return bridgeResult as unknown as CallToolResult;
+      return discovery.result as unknown as CallToolResult;
     }
 
     // -----------------------------------------------------------------------
@@ -742,7 +168,6 @@ function buildMcpServer(
       allowCodeExecution: exchange.allowCodeExecution,
     });
     if (exchangeResult !== null) {
-      sessionDoc = getLiveDoc();
       return exchangeResult as unknown as CallToolResult;
     }
 
@@ -768,11 +193,6 @@ function buildMcpServer(
     // history/broadcast (result.data !== undefined, same logic as the UI store).
     const coreArgs = name === 'render_view' ? stripEnrichParams(args ?? {}) : (args ?? {});
     const busResult = applyCommand(name, coreArgs);
-
-    // Keep sessionDoc in sync with the shared live doc after mutations.
-    if (busResult.affected.length > 0) {
-      sessionDoc = getLiveDoc();
-    }
 
     // Vision loop: rasterize data.svg → PNG image block (if present).
     // Failure is silent (buildImageBlock returns null) so a broken SVG never 500s
@@ -871,9 +291,9 @@ function buildMcpServer(
  * the pair is registered in `sessions`.
  *
  * Document access: all sessions share the single live document from `liveDocument.ts`.
- * `getLiveDoc` / `setLiveDoc` are passed as the accessor pair so `buildMcpServer`
- * is unchanged and testable in isolation. Mutations are broadcast to SSE subscribers
- * inside `setLiveDoc`.
+ * `getLiveDoc` is passed as the read accessor so `buildMcpServer` is testable in
+ * isolation. Mutations go through `commandBus.applyCommand`, which broadcasts to SSE
+ * subscribers via `setLiveDoc`.
  *
  * Cleanup paths (belt-and-suspenders):
  * - `onsessionclosed` fires on explicit HTTP DELETE → removes from `sessions`.
@@ -882,7 +302,6 @@ function buildMcpServer(
  *   preventing unbounded Map growth from clients that never send DELETE.
  */
 function allocateSession(
-  bridge: UiBridge,
   exchange: ExchangeOptions,
   enabledToolsets: ReadonlySet<ToolsetName>,
 ): {
@@ -910,9 +329,9 @@ function allocateSession(
     if (transport.sessionId) sessions.delete(transport.sessionId);
   };
 
-  // Wire the shared live document read accessor and the UI bridge.
+  // Wire the shared live document read accessor.
   // Mutations route through commandBus.applyCommand (not setLiveDoc directly).
-  const server = buildMcpServer(getLiveDoc, bridge, exchange, enabledToolsets);
+  const server = buildMcpServer(getLiveDoc, exchange, enabledToolsets);
 
   return { transport, server };
 }
@@ -921,7 +340,7 @@ function allocateSession(
 // Router factory
 // ---------------------------------------------------------------------------
 
-/** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = all). Warns on unknown names. */
+/** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = core only, `all` = everything). Warns on unknown names. */
 export function toolsetsFromEnv(
   raw: string | undefined = process.env['LLULL_TOOLSETS'],
 ): ReadonlySet<ToolsetName> {
@@ -936,7 +355,7 @@ export function toolsetsFromEnv(
  * Build and return the Express Router that mounts the MCP endpoint.
  *
  * Mount in `index.ts` with:
- *   `app.use('/mcp', buildMcpRouter(bridge));`
+ *   `app.use('/mcp', buildMcpRouter());`
  *
  * Exposed routes:
  *   POST   /mcp  — MCP Streamable HTTP (initialize + tools/list + tools/call)
@@ -950,12 +369,10 @@ export function toolsetsFromEnv(
  *   4. GET/DELETE without `mcp-session-id` header → 400 (header required).
  *   5. Any request with an unknown session id → 404.
  *
- * @param bridge - the UI↔MCP bridge injected at server startup.
  * @param exchange - STEP/code exchange port (defaults to the environment-configured Python bridge).
  * @param enabledToolsets - toolsets exposed by tools/list + tools/call (defaults to `LLULL_TOOLSETS`).
  */
 export function buildMcpRouter(
-  bridge: UiBridge,
   exchange: ExchangeOptions = exchangeOptionsFromEnv(),
   enabledToolsets: ReadonlySet<ToolsetName> = toolsetsFromEnv(),
 ): Router {
@@ -1012,7 +429,7 @@ export function buildMcpRouter(
       if (handled) return;
 
       // No session id → this is an `initialize` request; allocate a new session.
-      const { transport, server } = allocateSession(bridge, exchange, enabledToolsets);
+      const { transport, server } = allocateSession(exchange, enabledToolsets);
 
       try {
         await server.connect(transport as Transport);

@@ -1,13 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { CheckRow } from '@core/commands/building/industrial/frameCheck';
-import { nextProfile } from '@core/commands/building/industrial/frameDesign';
-import { boltResistance, yieldStrength } from '@core/commands/building/industrial/steelDesign';
-import { connectionWelds } from '@core/commands/building/industrial/connections';
+import type { CheckRow } from '@aec/industrial/frameCheck';
+import { nextProfile } from '@aec/industrial/frameDesign';
+import { boltResistance, yieldStrength } from '@aec/industrial/steelDesign';
+import { connectionWelds } from '@aec/industrial/connections';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
-import type { TakeoffLine } from '@core/commands/building/quantities';
-import { __resetIdCounter } from '@lib/id';
+import type { TakeoffLine } from '@aec/quantities';
 
 const HALL = { span: 24000, length: 30000 };
 
@@ -15,8 +14,6 @@ function hall(params: Record<string, unknown> = {}): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, ...params })
     .document;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('design helpers', () => {
   it('reads yield strengths, bolt resistances and the next section size', () => {
@@ -213,7 +210,7 @@ describe('structural review regressions', () => {
   });
 
   it('sizes weld throats by steel grade', async () => {
-    const { fullStrengthFactor } = await import('@core/commands/building/industrial/connections');
+    const { fullStrengthFactor } = await import('@aec/industrial/connections');
     expect(fullStrengthFactor(235)).toBeCloseTo(0.46, 2);
     expect(fullStrengthFactor(355)).toBeCloseTo(0.58, 2);
     expect(fullStrengthFactor(460)).toBeCloseTo(0.75, 2);

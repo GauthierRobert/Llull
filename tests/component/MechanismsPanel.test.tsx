@@ -20,7 +20,6 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
@@ -138,7 +137,6 @@ function buildFullDoc(): {
 
 describe('MechanismsPanel — empty state', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });
@@ -164,7 +162,6 @@ describe('MechanismsPanel — empty state', () => {
 
 describe('MechanismsPanel — constraints section', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });
@@ -204,7 +201,6 @@ describe('MechanismsPanel — constraints section', () => {
 
 describe('MechanismsPanel — joints section', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });
@@ -252,7 +248,6 @@ describe('MechanismsPanel — joints section', () => {
 
 describe('MechanismsPanel — drive relations section', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });

@@ -12,7 +12,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { PropertiesPanel } from '@ui/panels/PropertiesPanel';
@@ -37,7 +36,6 @@ function createBox(size: [number, number, number] = [2, 2, 2]): string {
 
 describe('PropertiesPanel — selection inspector', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -103,7 +101,6 @@ describe('PropertiesPanel — selection inspector', () => {
 
 describe('PropertiesPanel — no mutation controls in viewer mode', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -129,7 +126,6 @@ describe('PropertiesPanel — no mutation controls in viewer mode', () => {
 
 describe('PropertiesPanel — editing', () => {
   beforeEach(() => {
-    __resetIdCounter();
     useStore.getState().setDocument(createEmptyDocument());
     useStore.setState({ liveStatus: 'disconnected' });
   });

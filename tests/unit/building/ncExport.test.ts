@@ -1,14 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  exportNcFiles,
-  type NcExport,
-  type NcFile,
-} from '@core/commands/building/industrial/ncExport';
+import { exportNcFiles, type NcExport, type NcFile } from '@aec/industrial/ncExport';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
-import { findProfile } from '@core/commands/building/steel/profiles';
-import { __resetIdCounter } from '@lib/id';
+import { findProfile } from '@aec/steel/profiles';
 
 const HALL = { span: 24000, length: 30000 };
 
@@ -20,7 +15,7 @@ function run(
   doc: CadDocument,
   params: Record<string, unknown> = {},
 ): ReturnType<typeof exportNcFiles.run> {
-  return exportNcFiles.run(doc, params);
+  return execute(doc, 'export_nc_files', params);
 }
 
 function files(doc: CadDocument, params: Record<string, unknown> = {}): NcFile[] {
@@ -50,8 +45,6 @@ function stField(file: NcFile, index: number): string {
 }
 
 describe('export_nc_files', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('produces NC1 files for the default hall without touching the document', () => {
     const doc = hall();
     const before = JSON.stringify(doc);

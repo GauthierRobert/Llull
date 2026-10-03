@@ -12,8 +12,7 @@
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "agent:example": "tsx examples/mcp-agent.ts",
-    "demo:factory": "tsx examples/factory-demo.mts",
-    "verify:ui-bridge": "tsx examples/verify-ui-bridge.ts"
+    "demo:factory": "tsx examples/factory-demo.mts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -21,7 +20,8 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.2",
-    "manifold-3d": "^3.5.4"
+    "manifold-3d": "^3.5.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

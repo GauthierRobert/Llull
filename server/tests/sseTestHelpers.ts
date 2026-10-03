@@ -2,6 +2,10 @@
  * @layer server/tests
  * Parse one named SSE frame (`event: <type>\ndata: <json>\n\n`) written by liveDocument.
  */
+import { createEmptyDocument } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
+import { execute } from '@core/commands/registry';
+
 export interface ParsedSseFrame {
   event: string;
   data: Record<string, unknown>;
@@ -19,10 +23,16 @@ export function parseSseFrame(frame: string): ParsedSseFrame {
   };
 }
 
-/** Entity ids a frame makes present: snapshot → all entities; patch → added entities. */
-export function frameEntityIds(frame: string): string[] {
+/**
+ * Entity ids a frame makes present (MG5.1 protocol): snapshot → all entities of `document`;
+ * command → ids the command creates when re-run through `execute` on `base` (default: empty).
+ */
+export function frameEntityIds(frame: string, base: CadDocument = createEmptyDocument()): string[] {
   const { event, data } = parseSseFrame(frame);
-  if (event === 'snapshot') return Object.keys(data['entities'] as Record<string, unknown>);
-  const delta = data['entities'] as { added: Record<string, unknown> };
-  return Object.keys(delta.added);
+  if (event === 'snapshot') {
+    const document = data['document'] as { entities: Record<string, unknown> };
+    return Object.keys(document.entities);
+  }
+  const after = execute(base, data['name'] as string, data['params']).document;
+  return after.order.filter((id) => base.entities[id] === undefined);
 }

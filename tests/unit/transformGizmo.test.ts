@@ -10,10 +10,10 @@
  *   3. A group NOT in the scene tree has parent === null — confirming the
  *      original bug (detached object) would have triggered the error.
  *
- * Regression guard for W5C: ensures the target Object3D used by the gizmo is
+ * Regression guard: ensures the target Object3D used by the gizmo is
  * always scene-parented before attach() is called. If targetRef.current.parent
  * is null at attach time, three-stdlib logs an error every frame and keeps
- * calling invalidate(), breaking the demand frameloop (W5G).
+ * calling invalidate(), breaking the demand frameloop.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -45,10 +45,10 @@ describe('TransformGizmo pure delta helpers', () => {
 });
 
 // ---------------------------------------------------------------------------
-// W5C regression: scene-graph membership test
+// Regression: scene-graph membership test
 // ---------------------------------------------------------------------------
 
-describe('TransformGizmo scene-graph attachment invariant (W5C regression)', () => {
+describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
   it('a detached Object3D has parent === null — confirming the original bug', () => {
     // The old implementation created a bare new THREE.Object3D() and passed it
     // as the `object` prop to TransformControls. Because it was never added to

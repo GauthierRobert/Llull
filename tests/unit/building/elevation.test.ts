@@ -1,12 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  buildElevationDrawing,
-  chainLoops,
-  type ElevationSheet,
-} from '@core/commands/building/elevation';
-import { __resetIdCounter } from '@lib/id';
+import { buildElevationDrawing, chainLoops, type ElevationSheet } from '@aec/elevation';
 
 function hall(): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {
@@ -22,8 +17,6 @@ function box(): CadDocument {
     size: [2000, 1000, 1000],
   }).document;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('buildElevationDrawing', () => {
   it('projects a box onto the viewing plane, front faces only', () => {
@@ -115,10 +108,10 @@ describe('export_elevation_sheet', () => {
   });
 
   it.each([
-    [{ direction: 'up' }, /direction must be/],
-    [{ paper: 'B5' }, /paper must be/],
-    [{ cutAt: Number.NaN }, /cutAt must be/],
-    [{ exclude: 'panel' }, /exclude must be/],
+    [{ direction: 'up' }, /export_elevation_sheet rejected: invalid params — direction/],
+    [{ paper: 'B5' }, /rejected: invalid params — paper/],
+    [{ cutAt: Number.NaN }, /rejected: invalid params — cutAt/],
+    [{ exclude: 'panel' }, /rejected: invalid params — exclude/],
     [{ scale: 0 }, /no 3D geometry|invalid scale/],
   ])('rejects %j', (params, message) => {
     const result = execute(hall(), 'export_elevation_sheet', params);

@@ -1,13 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { PolylineEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { sampleInvolute } from '@core/commands/gears';
-import { __resetIdCounter } from '@lib/id';
 
 describe('draw_involute', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ---------------------------------------------------------------------------
   // Happy path — basic shape
   // ---------------------------------------------------------------------------
@@ -56,7 +53,7 @@ describe('draw_involute', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Math cross-check with PG1 (shared helper proves one source of truth)
+  // Math cross-check with add_spur_gear (shared helper proves one source of truth)
   // ---------------------------------------------------------------------------
 
   it('endpoint radius matches gear outerRadius — proves shared sampleInvolute helper', () => {
@@ -73,7 +70,7 @@ describe('draw_involute', () => {
     //   baseR * sqrt(1 + tMax²) = outerRadius  →  tMax = sqrt((outerRadius/baseR)² − 1)
     const tMax = Math.sqrt((outerRadius / baseR) ** 2 - 1);
 
-    // Sample the same curve PG1 uses internally.
+    // Sample the same curve add_spur_gear uses internally.
     const pts = sampleInvolute(baseR, 0, tMax, 14);
     const last = pts[pts.length - 1]!;
     const actualR = Math.sqrt(last[0] ** 2 + last[1] ** 2);
@@ -115,9 +112,7 @@ describe('draw_involute', () => {
 
   it('omitting startAngle defaults to 0 — same as explicit startAngle=0', () => {
     const doc = createEmptyDocument();
-    __resetIdCounter();
     const r1 = execute(doc, 'draw_involute', { baseRadius: 4, endAngle: 2 });
-    __resetIdCounter();
     const r2 = execute(doc, 'draw_involute', { baseRadius: 4, startAngle: 0, endAngle: 2 });
     const p1 = (r1.document.entities[r1.affected[0]!] as PolylineEntity).points;
     const p2 = (r2.document.entities[r2.affected[0]!] as PolylineEntity).points;
@@ -156,9 +151,7 @@ describe('draw_involute', () => {
 
   it('different positions produce distinct entity placements', () => {
     const doc = createEmptyDocument();
-    __resetIdCounter();
     const r1 = execute(doc, 'draw_involute', { baseRadius: 3, endAngle: 1, position: [0, 0, 0] });
-    __resetIdCounter();
     const r2 = execute(doc, 'draw_involute', { baseRadius: 3, endAngle: 1, position: [10, 0, 0] });
     expect(r2.document.entities[r2.affected[0]!]!.position[0]).toBe(10);
     expect(r1.document.entities[r1.affected[0]!]!.position[0]).toBe(0);

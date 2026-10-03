@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, MeshSolidEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { MAX_IMPORT_BODIES, MAX_IMPORT_TRIANGLES } from '@core/commands/limits';
-import { __resetIdCounter } from '@lib/id';
 
 const TRIANGLE = [0, 0, 0, 1, 0, 0, 0, 1, 0];
 
@@ -14,10 +13,6 @@ function importMesh(doc: CadDocument, bodies: unknown): ReturnType<typeof execut
 function meshOf(doc: CadDocument, id: string): MeshSolidEntity {
   return doc.entities[id] as MeshSolidEntity;
 }
-
-beforeEach(() => {
-  __resetIdCounter();
-});
 
 describe('import_mesh', () => {
   it('imports a triangle soup as one mesh entity with sequential indices', () => {
@@ -87,8 +82,13 @@ describe('import_mesh', () => {
     }
 
     it('rejects missing, non-array and empty bodies', () => {
-      expectNoOp(undefined, 'bodies must be a non-empty array');
-      expectNoOp('x', 'bodies must be a non-empty array');
+      for (const bodies of [undefined, 'x']) {
+        const doc = createEmptyDocument();
+        const result = importMesh(doc, bodies);
+        expect(result.document).toBe(doc);
+        expect(result.affected).toEqual([]);
+        expect(result.summary).toContain('import_mesh rejected: invalid params');
+      }
       expectNoOp([], 'bodies must be a non-empty array');
     });
 

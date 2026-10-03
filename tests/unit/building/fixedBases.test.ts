@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BasePlateElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
@@ -7,20 +7,12 @@ import {
   framesOf,
   solveCombination,
   type FrameLoads,
-} from '@core/commands/building/industrial/frameModel';
-import {
-  BEARING_STRENGTH,
-  checkPlateMN,
-  sizeBasePlate,
-} from '@core/commands/building/industrial/basePlateMN';
-import {
-  footingMoment,
-  type FoundationRow,
-} from '@core/commands/building/industrial/foundationCheck';
-import type { FootingDesignRow } from '@core/commands/building/industrial/footingDesign';
-import { findProfile } from '@core/commands/building/steel/profiles';
-import { buildingErrors } from '@core/commands/building/validate';
-import { __resetIdCounter } from '@lib/id';
+} from '@aec/industrial/frameModel';
+import { BEARING_STRENGTH, checkPlateMN, sizeBasePlate } from '@aec/industrial/basePlateMN';
+import { footingMoment, type FoundationRow } from '@aec/industrial/foundationCheck';
+import type { FootingDesignRow } from '@aec/industrial/footingDesign';
+import { findProfile } from '@aec/steel/profiles';
+import { buildingErrors } from '@aec/validate';
 
 const HALL = { span: 24000, length: 30000 };
 const LOADS: FrameLoads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0.7 };
@@ -70,8 +62,6 @@ function sections(doc: CadDocument): { column: string; rafter: string; tonnes: n
 const foundationRows = (doc: CadDocument): FoundationRow[] =>
   (execute(doc, 'check_foundations', { windPressure: 0.7 }).data as { rows: FoundationRow[] }).rows;
 
-beforeEach(() => __resetIdCounter());
-
 describe('add_portal_frame_building columnBase', () => {
   it('keeps pinned bases as the default: no fixity on the plates, no base moments', () => {
     const doc = hall();
@@ -110,7 +100,7 @@ describe('add_portal_frame_building columnBase', () => {
     const bad = execute(doc, 'add_portal_frame_building', { ...HALL, columnBase: 'hinged' });
     expect(bad.document).toBe(doc);
     expect(bad.affected).toEqual([]);
-    expect(bad.summary).toContain("columnBase must be 'pinned' or 'fixed'");
+    expect(bad.summary).toContain('add_portal_frame_building rejected: invalid params');
     const noPlates = execute(doc, 'add_portal_frame_building', {
       ...HALL,
       columnBase: 'fixed',

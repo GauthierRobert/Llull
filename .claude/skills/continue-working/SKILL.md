@@ -27,7 +27,8 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
 - Pick **one eligible task per free lane**, up to **4 lanes in parallel** (Lane 5 review is
   separate and runs after, not as one of the 4). Prefer the lowest-ID eligible task per lane.
 - Lanes own disjoint files (see board table) so parallel writes never collide. Never run two
-  tasks that both edit `src/core/commands/registry.ts` — only Lane 1 touches it.
+  tasks that both edit `packages/core/src/commands/registry.ts` — only Lane 1 touches it
+  (lane write scopes: `.claude/rules/workflow.md` W5).
 - Skip `[BLOCKED]` tasks. If the *only* remaining work is blocked, surface the Decision-log
   item to the user and stop.
 

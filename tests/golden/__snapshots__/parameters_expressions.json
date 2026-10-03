@@ -1,0 +1,134 @@
+{
+  "format": "llull-document",
+  "version": 2,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "box",
+        "size": [
+          10,
+          5,
+          20
+        ],
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      },
+      "#3": {
+        "id": "#3",
+        "kind": "cylinder",
+        "radius": 5,
+        "height": 10,
+        "position": [
+          20,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      }
+    },
+    "order": [
+      "#1",
+      "#3"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {
+      "w": {
+        "name": "w",
+        "expression": "10",
+        "value": 10
+      },
+      "h": {
+        "name": "h",
+        "expression": "w / 2",
+        "value": 5
+      }
+    },
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#4",
+        "name": "add_box",
+        "params": {
+          "size": [
+            "=w",
+            "=h",
+            "=w * 2"
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#1"
+        ]
+      },
+      {
+        "id": "#5",
+        "name": "add_cylinder",
+        "params": {
+          "radius": "=h",
+          "height": "=w",
+          "position": [
+            20,
+            0,
+            0
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#3"
+        ]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 3
+  }
+}

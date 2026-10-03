@@ -23,24 +23,39 @@ This is the whole design. Protect it.
 | 3D viewport| three.js + @react-three/fiber + drei (perspective) |
 | 2D viewport| same three.js scene, orthographic top-down; Line/Shape geometry |
 | State      | Zustand (single store, `dispatch`)      |
+| Schemas    | zod v4 (one schema per command → TS type + MCP JSON Schema + runtime validation) |
+| Kernels    | Manifold (default) / OpenCascade.js, behind `GeometryKernel` |
 | Tests      | Vitest + Testing Library                |
 | Lint/fmt   | ESLint + Prettier (`npm run check`)     |
-| Backend    | Node + Express (optional: AI proxy + MCP host) |
+| Backend    | Node + Express (optional: MCP host + shared live document) |
 
 ## LAYER MAP & DEPENDENCY LAW
 
+npm workspaces (`packages/*`); the web app and `server/` stay at the repo root.
+
 ```
-ui/    React. Imports core. Presentation + param-gathering ONLY. No business logic.
-core/  Framework-agnostic brain. NO react / DOM / window / fetch. Pure TS.
-  model/     domain types (2D shapes + 3D solids) + createEmptyDocument()
-  commands/  THE command layer — types.ts, registry.ts, geometry.ts
-  mcp/       MCP tool definitions, generated from registry
-lib/   Tiny pure helpers (id, math).
-server/  Express MCP host (optional)
+packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / window / fetch.
+  model/                           types.ts (CadDocument, Entity) · partition.ts · building.ts (types)
+  commands/                        THE command layer — schema.ts (defineCommand), context.ts,
+                                   registry.ts, types.ts, one file per domain
+  geometry/                        kernel.ts (GeometryKernel) · kernelCache.ts · kernelChoice.ts
+  plugins/                         plugin.ts (CadPlugin) · host.ts (installPlugin)
+  codegen/                         CadQuery / build123d / OpenSCAD / FreeCAD emitters
+  lib/                      @lib   Tiny pure helpers (id, hash, polygon, triangulate)
+packages/mcp/src/           @mcp   MCP tools/resources/prompts/toolsets/discovery/liveSync over the registry
+packages/domain-aec/src/    @aec   building + industrial plugins (commands, guard, document extension)
+packages/kernel-manifold/src/ @kernel-manifold   Manifold GeometryKernel
+packages/kernel-occt/src/   @kernel-occt       OpenCascade GeometryKernel
+src/app/                    @app   Composition root: installDefaultPlugins()
+src/ui/                     @ui    React. Presentation + param-gathering ONLY. No business logic.
+src/main.tsx                       installs the kernel (`?kernel=occt`) + default plugins, mounts <App>
+server/                            Express MCP host (optional; own package.json, not a workspace)
 ```
 
-**Dependency direction is one-way: `ui → core → lib`. `core` MUST NOT import `ui`.**
-This is enforced by a PreToolUse hook — a react/DOM/fetch import in `core/` is blocked.
+**Dependency direction is one-way: `src/ui`, `server` → `src/app`, plugins, kernels, `@mcp` → `packages/core`.**
+`packages/core` imports no other package; no package imports `src/ui`. Enforced by a PreToolUse
+hook (`.claude/hooks/enforce-architecture.mjs`): react/DOM/fetch in any `packages/<name>/src/`
+is blocked, and so is `packages/core` importing `@aec` / `@mcp` / `@kernel-*`.
 
 ## RULES (authoritative — read before editing)
 
@@ -63,9 +78,9 @@ This is enforced by a PreToolUse hook — a react/DOM/fetch import in `core/` is
 
 | Agent              | Use for                                                    |
 | ------------------ | ---------------------------------------------------------- |
-| `command-author`   | Adding/editing commands in `core/commands` (+ their tests) |
+| `command-author`   | Adding/editing commands in `packages/core/src/commands` or a plugin (+ tests) |
 | `viewport-engineer`| 2D + 3D viewport (r3f), gizmos, snapping, interaction       |
-| `mcp-engineer`     | MCP host (`core/mcp`, `server`) — the registry exposed to MCP agents |
+| `mcp-engineer`     | MCP host (`packages/mcp`, `server`) — the registry exposed to MCP agents |
 | `test-verifier`    | Writing tests, hitting the coverage gate, running checks   |
 | `cad-reviewer`     | Reviewing a diff against the architecture laws             |
 
@@ -85,18 +100,20 @@ Multi-agent is the default workflow. Parallelize independent work; converge on r
 ## COMMANDS
 
 ```bash
-npm install
+npm install          # root + every packages/* workspace
 npm run dev          # app at http://localhost:5173
-npm run check        # typecheck + lint + test — MUST pass before commit
+npm run check        # typecheck + lint + format:check + test — MUST pass before commit
 npm run test:coverage
-npm --prefix server install && npm --prefix server run dev   # optional backend
+npm --prefix server install && npm --prefix server run dev   # optional backend (not a workspace)
 ```
 
 ## NON-NEGOTIABLES (`npm run check` + the coverage gate reject otherwise)
 
 1. Commands are **pure**: return a new document, never mutate the argument. A test
    enforces this (`is pure`).
-2. New command ⇒ registered in `registry.ts` ⇒ has a unit test (happy + failure path).
-3. `core/commands/**` holds **90% statements / 85% branches / 90% functions / 90% lines**.
+2. New command ⇒ `defineCommand({ name, description, params: z.object(…), run })` ⇒ registered
+   (core: `registry.ts`; domain: its plugin's `commands`) ⇒ unit test (happy + failure path).
+3. `packages/core/src/commands/**` and `packages/domain-aec/src/**` hold **90% statements /
+   85% branches / 90% functions / 90% lines**.
 4. Tool/command `name` is `snake_case` (it is the MCP tool name that agents call).
-5. TypeScript strict, no `any`. `npm run check` green.
+5. TypeScript strict, no `any`. Max 500 code lines per file (ESLint, no allowlist). `npm run check` green.

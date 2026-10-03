@@ -7,15 +7,14 @@
  *   (A) conventions resource is listed in resources/list
  *   (B) conventions resource is readable and returns Markdown content
  *   (C) tool-count invariant: buildMcpTools().length === listCommands().length
- *       (the transport adds bridge tools separately — this invariant is about the
+ *       (the transport adds exchange tools separately — this invariant is about the
  *        CORE registry only; conventions is a resource, not a tool)
  */
 
 import { describe, it, expect } from 'vitest';
 import { listCommands } from '@core/commands/registry';
-import { buildMcpTools, listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from '@core/mcp';
-import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from '@core/mcp';
-import { buildBridgeToolDefinitions } from '@core/mcp';
+import { buildMcpTools, listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from '@mcp/index';
+import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from '@mcp/index';
 import { createEmptyDocument } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
@@ -148,12 +147,9 @@ describe('tool-count invariant', () => {
     }
   });
 
-  it('bridge tools are separate from core registry tools', () => {
-    const bridgeNames = buildBridgeToolDefinitions().map((t) => t.name);
-    const commandNames = listCommands().map((c) => c.name);
-    // Bridge tools are NOT in the core registry
-    for (const bridgeName of bridgeNames) {
-      expect(commandNames).not.toContain(bridgeName);
-    }
+  it('the retired UI bridge tools are gone (MG5.3)', () => {
+    const toolNames = buildMcpTools().map((t) => t.name);
+    expect(toolNames).not.toContain('snapshot_in_from_ui');
+    expect(toolNames).not.toContain('snapshot_out_to_ui');
   });
 });

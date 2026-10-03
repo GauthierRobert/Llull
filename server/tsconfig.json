@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "node",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "outDir": "dist",
     "strict": true,
     "noUnusedLocals": true,
@@ -16,10 +18,42 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@core/*": ["../src/core/*"],
-      "@lib/*": ["../src/lib/*"]
+      "@core/*": [
+        "../packages/core/src/*"
+      ],
+      "@lib/*": [
+        "../packages/core/src/lib/*"
+      ],
+      "@mcp/*": [
+        "../packages/mcp/src/*"
+      ],
+      "@aec/*": [
+        "../packages/domain-aec/src/*"
+      ],
+      "@kernel-manifold/*": [
+        "../packages/kernel-manifold/src/*"
+      ],
+      "@kernel-occt/*": [
+        "../packages/kernel-occt/src/*"
+      ],
+      "@app/*": [
+        "../src/app/*"
+      ]
     }
   },
-  "include": ["src", "examples", "tests", "../src/core", "../src/lib"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "examples",
+    "tests",
+    "../packages/core/src",
+    "../packages/mcp/src",
+    "../packages/domain-aec/src",
+    "../packages/kernel-manifold/src",
+    "../packages/kernel-occt/src",
+    "../src/app"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

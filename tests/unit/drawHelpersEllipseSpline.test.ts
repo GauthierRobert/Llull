@@ -1,5 +1,5 @@
 /**
- * Unit tests for the ellipse and spline pure geometry helpers added in VS1.
+ * Unit tests for the ellipse and spline pure geometry helpers.
  * Pure functions — no React/three.js dependencies.
  */
 

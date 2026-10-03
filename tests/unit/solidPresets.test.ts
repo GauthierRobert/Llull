@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -16,8 +15,6 @@ function addPreset(doc: CadDocument, index: number): CadDocument {
 }
 
 describe('solid presets', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('every preset creates exactly one solid resting on the ground plane', () => {
     for (const preset of SOLID_PRESETS) {
       const result = execute(

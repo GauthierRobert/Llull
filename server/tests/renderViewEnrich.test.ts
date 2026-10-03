@@ -14,10 +14,9 @@
  * is involved.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 import type { CadDocument } from '@core/model/types';
 import type { RenderViewData } from '@core/commands/render';
 import { rasterizeSvg } from '../src/renderImage';
@@ -60,10 +59,6 @@ function makeDocWithBox(): { doc: CadDocument; boxId: string } {
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
-
-beforeEach(() => {
-  __resetIdCounter();
-});
 
 // ---------------------------------------------------------------------------
 // (A) turntable — N evenly-spaced frames around Z axis

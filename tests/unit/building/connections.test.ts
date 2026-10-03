@@ -1,11 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildingErrors } from '@core/commands/building/validate';
+import { buildingErrors } from '@aec/validate';
 import type { BuildingElement, MomentConnectionElement } from '@core/model/building';
-import type { TakeoffLine } from '@core/commands/building/quantities';
-import type { IfcExport } from '@core/commands/building/ifc';
-import { __resetIdCounter } from '@lib/id';
+import type { TakeoffLine } from '@aec/quantities';
+import type { IfcExport } from '@aec/ifc';
 
 const HALL = { span: 18000, length: 12000, eaveHeight: 6000, roofPitch: 6 };
 
@@ -33,8 +32,6 @@ function meshXs(doc: CadDocument, id: string): number[] {
   if (entity?.kind !== 'mesh') throw new Error(id);
   return entity.mesh.positions.filter((_, index) => index % 3 === 0);
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('add_moment_connections', () => {
   it('details eaves (haunched) and apex joints of a frame', () => {

@@ -1,11 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument, DEFAULT_LAYER_ID } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 describe('transform commands', () => {
-  beforeEach(() => __resetIdCounter());
-
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------

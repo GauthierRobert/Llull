@@ -17,9 +17,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
+import { liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
@@ -39,7 +39,7 @@ function resetStore(): void {
 /** Inject configurations directly into the store document for fixture setup. */
 function setConfigurations(configs: Record<string, Configuration>): void {
   const doc = useStore.getState().document;
-  useStore.getState().hydrateLiveDocument({ ...doc, configurations: configs });
+  useStore.getState().hydrateLiveDocument(liveSnapshot({ ...doc, configurations: configs }));
 }
 
 /** Patch the dispatch action on the store for spy purposes. Tests-only. */
@@ -53,7 +53,6 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
 
 describe('ConfigurationsPanel — rendering', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -117,7 +116,6 @@ describe('ConfigurationsPanel — rendering', () => {
 
 describe('ConfigurationsPanel — activate', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -160,7 +158,6 @@ describe('ConfigurationsPanel — activate', () => {
 
 describe('ConfigurationsPanel — create form', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -295,7 +292,6 @@ describe('ConfigurationsPanel — create form', () => {
 
 describe('ConfigurationsPanel — parameter row management', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * PreToolUse guard — enforces architecture L2: `core/` is framework-agnostic.
- * Blocks any Edit/Write that introduces react / DOM / fetch into `src/core/`.
+ * Blocks any Edit/Write that introduces react / DOM / fetch into a library package
+ * (any `packages/<name>/src/`), or makes `packages/core` import another package (plugins depend on core).
  * Fails open: any internal error exits 0 (never wedge the session).
  *
  * Block mechanism: write reason to stderr + exit 2 (universally supported), and
@@ -12,8 +13,9 @@ async function main() {
   const input = data.tool_input ?? {};
   const filePath = String(input.file_path ?? '').replace(/\\/g, '/');
 
-  // Only police source under src/core. Tests, docs, .claude, ui, server are exempt.
-  if (!/\/src\/core\//.test(filePath) && !/^src\/core\//.test(filePath)) return ok();
+  // Only police library packages. Tests, docs, .claude, ui (src/), server are exempt.
+  if (!/(^|\/)packages\/[^/]+\/src\//.test(filePath)) return ok();
+  const inCore = /(^|\/)packages\/core\/src\//.test(filePath);
 
   const text = collectText(input);
   if (!text) return ok();
@@ -27,11 +29,14 @@ async function main() {
   if (/\bdocument\.(getElementById|querySelector|createElement|body|cookie|addEventListener)\b/.test(text))
     violations.push('document.* (DOM global)');
 
+  if (inCore && /from\s+['"]@(aec|mcp|kernel-manifold|kernel-occt)\//.test(text))
+    violations.push('core importing another package (core must not depend on plugins/kernels/mcp)');
+
   if (violations.length === 0) return ok();
 
   const reason =
-    `llull architecture L2 violation in core/ (${filePath}): ${violations.join(', ')}.\n` +
-    `core/ is framework-agnostic — no react, DOM, window, or fetch. Move this to ui/ ` +
+    `llull architecture L2 violation in a library package (${filePath}): ${violations.join(', ')}.\n` +
+    `packages/* are framework-agnostic — no react, DOM, window, or fetch. Move this to src/ui ` +
     `or server/, or inject it behind an interface. See .claude/rules/architecture.md.`;
 
   // Newer harness: structured deny.

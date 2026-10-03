@@ -1,0 +1,10 @@
+{
+  "name": "@llull/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Model, command layer, execution context, persistence, plugin host (framework-agnostic).",
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

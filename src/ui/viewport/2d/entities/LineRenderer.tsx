@@ -6,16 +6,17 @@
  * Geometry is memoized on the entity's start/end fields; disposed on unmount.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { LineEntity } from '@core/model/types';
+import { PlacedLineObject } from './PlacedLineObject';
 
 interface LineRendererProps {
   entity: LineEntity;
   selected: boolean;
 }
 
-export function LineRenderer({ entity, selected }: LineRendererProps): React.ReactElement {
+export function LineRenderer({ entity, selected }: LineRendererProps): React.ReactElement | null {
   const { start, end, position, color } = entity;
 
   const segmentsObject = useMemo(() => {
@@ -27,14 +28,5 @@ export function LineRenderer({ entity, selected }: LineRendererProps): React.Rea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start[0], start[1], end[0], end[1], color, selected]);
 
-  useEffect(() => {
-    return () => {
-      segmentsObject.geometry.dispose();
-      (segmentsObject.material as THREE.Material).dispose();
-    };
-  }, [segmentsObject]);
-
-  segmentsObject.position.set(position[0], position[1], position[2]);
-
-  return <primitive object={segmentsObject} />;
+  return <PlacedLineObject object={segmentsObject} position={position} />;
 }

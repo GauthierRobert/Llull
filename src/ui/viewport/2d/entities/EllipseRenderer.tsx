@@ -6,9 +6,10 @@
  * Geometry is memoized on the entity's center/radiusX/radiusY fields; disposed on unmount.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { EllipseEntity } from '@core/model/types';
+import { PlacedLineObject } from './PlacedLineObject';
 
 interface EllipseRendererProps {
   entity: EllipseEntity;
@@ -17,7 +18,10 @@ interface EllipseRendererProps {
 
 const ELLIPSE_SEGMENTS = 64;
 
-export function EllipseRenderer({ entity, selected }: EllipseRendererProps): React.ReactElement {
+export function EllipseRenderer({
+  entity,
+  selected,
+}: EllipseRendererProps): React.ReactElement | null {
   const { center, radiusX, radiusY, position, color } = entity;
 
   const lineObject = useMemo(() => {
@@ -39,14 +43,5 @@ export function EllipseRenderer({ entity, selected }: EllipseRendererProps): Rea
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center[0], center[1], radiusX, radiusY, color, selected]);
 
-  useEffect(() => {
-    return () => {
-      lineObject.geometry.dispose();
-      (lineObject.material as THREE.Material).dispose();
-    };
-  }, [lineObject]);
-
-  lineObject.position.set(position[0], position[1], position[2]);
-
-  return <primitive object={lineObject} />;
+  return <PlacedLineObject object={lineObject} position={position} />;
 }

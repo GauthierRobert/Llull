@@ -1,7 +1,7 @@
 /**
  * @layer server/tests
  * Auth/guard hardening: remote-peer guard, bearer verifier, Host allowlist, bind safety,
- * autosave stop mode, /ui-bridge mutation guard.
+ * autosave stop mode, browser mutation guard.
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -108,25 +108,27 @@ describe('checkBindSafety', () => {
   });
 });
 
-describe('/ui-bridge guard', () => {
-  it('blocks a disallowed Origin on push and pull', async () => {
-    const push = await request(app)
-      .post('/ui-bridge/push')
+describe('browser mutation guard (/command)', () => {
+  it('blocks a disallowed Origin', async () => {
+    const res = await request(app)
+      .post('/command')
       .set('Origin', 'http://evil.example')
-      .send({ entities: {}, order: [] });
-    expect(push.status).toBe(403);
-    expect(
-      (await request(app).post('/ui-bridge/pull').set('Origin', 'http://evil.example')).status,
-    ).toBe(403);
+      .send({ name: 'describe_scene', params: {} });
+    expect(res.status).toBe(403);
   });
 
   it('uses the shared bearer verifier (case-insensitive scheme)', async () => {
     process.env['MCP_AUTH_TOKEN'] = 'secret';
-    const res = await request(app).post('/ui-bridge/pull').set('Authorization', 'bearer secret');
-    expect(res.status).toBe(200);
-    expect(
-      (await request(app).post('/ui-bridge/pull').set('Authorization', 'Bearer nope')).status,
-    ).toBe(401);
+    const ok = await request(app)
+      .post('/command')
+      .set('Authorization', 'bearer secret')
+      .send({ name: 'describe_scene', params: {} });
+    expect(ok.status).toBe(200);
+    const bad = await request(app)
+      .post('/command')
+      .set('Authorization', 'Bearer nope')
+      .send({ name: 'describe_scene', params: {} });
+    expect(bad.status).toBe(401);
   });
 });
 

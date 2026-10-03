@@ -9,7 +9,7 @@ import React from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingElement } from '@core/model/building';
 import type { DocumentUnit } from '@core/model/types';
-import { boltSize } from '@core/commands/building/industrial/evaluate';
+import { boltSize } from '@aec/industrial/evaluate';
 import { Icon } from '@ui/components/Icon';
 import { PanelSection } from '@ui/panels/PanelParts';
 

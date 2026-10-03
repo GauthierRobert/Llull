@@ -3,8 +3,8 @@
  *
  * The 3D perspective viewport.
  *
- * FRAME-TIME BUDGET (W5H)
- * ───────────────────────
+ * FRAME-TIME BUDGET
+ * ─────────────────
  * Target: ≤ 16 ms median frame time on a 500-entity document on a mid-range
  * laptop (Intel UHD / Apple M1-class GPU, 1080p, Chrome).
  *
@@ -80,43 +80,7 @@ import { AnimationPlayer } from './AnimationPlayer';
 import { useRenderQuality } from './useRenderQuality';
 import { MechanismOverlay } from './MechanismOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
-
-// ---------------------------------------------------------------------------
-// StoreInvalidator — calls r3f invalidate() when the CAD store changes
-// ---------------------------------------------------------------------------
-
-/**
- * Subscribes to the Zustand store OUTSIDE the r3f render loop and calls
- * invalidate() whenever document or renderOrigin change. This ensures that
- * entity additions/deletions, selection changes, and render-origin rebases
- * all produce a fresh render frame under frameloop="demand".
- *
- * Must be mounted inside the Canvas so useThree(s => s.invalidate) resolves.
- * Uses useEffect + useStore.subscribe (not a reactive selector) to avoid
- * triggering a React re-render — the only effect is queuing an r3f frame.
- */
-function StoreInvalidator(): null {
-  const invalidate = useThree((s) => s.invalidate);
-
-  useEffect(() => {
-    // Subscribe to the raw Zustand store (Zustand v5 basic subscribe API).
-    // Compare the two slices that require a new render frame by reference;
-    // Object.is() is sufficient because commands are pure (L3) and always
-    // return new document objects when they change anything.
-    let prevDocument = useStore.getState().document;
-    let prevOrigin = useStore.getState().renderOrigin;
-
-    return useStore.subscribe((state) => {
-      if (state.document !== prevDocument || state.renderOrigin !== prevOrigin) {
-        prevDocument = state.document;
-        prevOrigin = state.renderOrigin;
-        invalidate();
-      }
-    });
-  }, [invalidate]);
-
-  return null;
-}
+import { StoreInvalidator } from '../StoreInvalidator';
 
 // ---------------------------------------------------------------------------
 // ViewportStoreInvalidator — calls r3f invalidate() when viewport render state changes
@@ -288,7 +252,7 @@ function RenderOriginSyncer(): null {
     // it extends EventDispatcher (the store's `controls` type) and exposes `target`.
     // COUPLING: ViewPresets.applyPreset() must call invalidate() + controls.update()
     // before returning so that this useFrame fires on the next demand frame and the
-    // rebase check runs against the new target position (P1 carry-forward).
+    // rebase check runs against the new target position.
     const orbitTarget = (controls as OrbitControlsImpl).target;
     if (!orbitTarget) return;
 

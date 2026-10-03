@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { exportAnchorPlan as anchorPlan } from '@core/commands/building/industrial/anchorPlan';
-import { __resetIdCounter } from '@lib/id';
+import { exportAnchorPlan as anchorPlan } from '@aec/industrial/anchorPlan';
 
 interface AnchorData {
   svg: string;
@@ -26,8 +25,6 @@ const texts = (svg: string): string[] =>
   [...svg.matchAll(/<text [^>]*>([^<]*)<\/text>/g)].map((match) => match[1] as string);
 
 describe('export_anchor_plan', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('draws every bolt and lists every plate in the schedule', () => {
     const doc = hall();
     const before = JSON.stringify(doc);
@@ -189,10 +186,10 @@ describe('export_anchor_plan', () => {
       { embedment: -1 },
       { levelId: 'level-99' },
     ]) {
-      const result = anchorPlan.run(doc, params);
+      const result = execute(doc, 'export_anchor_plan', params);
       expect(result.document, JSON.stringify(params)).toBe(doc);
       expect(result.affected).toEqual([]);
-      expect(result.summary).toContain('failed');
+      expect(result.summary).toMatch(/failed|rejected/);
     }
   });
 

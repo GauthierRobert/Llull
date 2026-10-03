@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -16,8 +15,6 @@ function run(doc: CadDocument, name: string, params: unknown): [CadDocument, str
 }
 
 describe('2D picking', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('measures distance to points, arcs, ellipses and splines', () => {
     let doc = createEmptyDocument();
     let id: string;

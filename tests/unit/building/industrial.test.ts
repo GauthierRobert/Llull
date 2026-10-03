@@ -1,20 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { BuildingElement } from '@core/model/building';
-import {
-  findProfile,
-  profileOutline,
-  STEEL_PROFILES,
-} from '@core/commands/building/steel/profiles';
-import { boxOverlap, type Clash, type OrientedBox } from '@core/commands/building/industrial/clash';
-import { buildPlanDrawing } from '@core/commands/building/plan';
-import type { TakeoffLine } from '@core/commands/building/quantities';
-import type { IfcExport } from '@core/commands/building/ifc';
+import { findProfile, profileOutline, STEEL_PROFILES } from '@aec/steel/profiles';
+import { boxOverlap, type Clash, type OrientedBox } from '@aec/industrial/clash';
+import { buildPlanDrawing } from '@aec/plan';
+import type { TakeoffLine } from '@aec/quantities';
+import type { IfcExport } from '@aec/ifc';
 import { serializeDocument } from '@core/commands/persistence';
-import { buildingErrors } from '@core/commands/building/validate';
+import { buildingErrors } from '@aec/validate';
 import { polygonArea } from '@lib/polygon';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   const result = execute(doc, name, params);
@@ -39,8 +34,6 @@ const SMALL_HALL = {
   eaveHeight: 6000,
   roofPitch: 6,
 };
-
-beforeEach(() => __resetIdCounter());
 
 describe('steel profile catalogue', () => {
   it('finds profiles case- and space-insensitively', () => {
@@ -102,7 +95,7 @@ describe('add_steel_member / update_steel_member', () => {
     ]) {
       const result = execute(doc, 'add_steel_member', params);
       expect(result.affected, JSON.stringify(params)).toEqual([]);
-      expect(result.summary).toMatch(/add_steel_member failed/);
+      expect(result.summary).toMatch(/add_steel_member (failed|rejected)/);
     }
   });
 
@@ -723,8 +716,8 @@ describe('review regressions', () => {
     const doc = createEmptyDocument();
     expect(
       execute(doc, 'add_steel_member', { profile: 300, start: [0, 0, 0], end: [1, 0, 0] }).summary,
-    ).toMatch(/unknown steel profile/);
-    expect(execute(doc, 'list_steel_profiles', { family: 3 }).summary).toMatch(/^0 steel/);
+    ).toMatch(/rejected: invalid params/);
+    expect(execute(doc, 'list_steel_profiles', { family: 3 }).summary).toMatch(/must be a string/);
   });
 
   it('rejects saved buildings with invalid industrial fields', () => {
@@ -792,7 +785,7 @@ describe('multi-span halls', () => {
 
   it.each([[[]], [[0, 10000]], [Array(11).fill(6000)], ['12000']])('rejects spans %j', (spans) => {
     expect(execute(createEmptyDocument(), 'add_portal_frame_building', { spans }).summary).toMatch(
-      /spans must be 1–10 widths/,
+      /spans must be 1–10 widths|rejected: invalid params/,
     );
   });
 });
@@ -877,7 +870,7 @@ describe('add_cable_tray', () => {
   ])('rejects %j', (params) => {
     const result = execute(createEmptyDocument(), 'add_cable_tray', params);
     expect(result.affected).toEqual([]);
-    expect(result.summary).toMatch(/add_cable_tray failed/);
+    expect(result.summary).toMatch(/add_cable_tray (failed|rejected)/);
   });
 
   it('feeds takeoff, schedule, plan, IFC, clashes and survives save / load', () => {
@@ -1063,7 +1056,7 @@ describe('phase 2 review regressions', () => {
     for (const spans of [18000, {}]) {
       expect(
         execute(createEmptyDocument(), 'add_portal_frame_building', { spans }).summary,
-      ).toMatch(/spans must be 1–10 widths/);
+      ).toMatch(/rejected: invalid params/);
     }
   });
 

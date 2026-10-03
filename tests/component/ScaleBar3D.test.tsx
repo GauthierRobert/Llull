@@ -9,10 +9,9 @@
  * No three.js or Canvas involvement — ScaleBar3D is a plain HTML overlay.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { createEmptyDocument } from '@core/model/types';
-import { __resetIdCounter } from '@lib/id';
 import { ScaleBar3D } from '@ui/viewport/3d/ScaleBar3D';
 
 // ---------------------------------------------------------------------------
@@ -31,10 +30,6 @@ function makeDoc(
 // ---------------------------------------------------------------------------
 
 describe('ScaleBar3D', () => {
-  beforeEach(() => {
-    __resetIdCounter();
-  });
-
   it('renders without crashing', () => {
     const doc = makeDoc('mm');
     const { container } = render(<ScaleBar3D distance={10} viewportWidthPx={800} document={doc} />);

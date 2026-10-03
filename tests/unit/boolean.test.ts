@@ -5,7 +5,6 @@ import { execute } from '@core/commands/registry';
 import { setGeometryKernel, getGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
 import type { Entity } from '@core/model/types';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // Canned mesh — a minimal tetrahedron (4 vertices, 4 triangles)
@@ -69,7 +68,6 @@ describe('boolean commands', () => {
   let fake: ReturnType<typeof makeFakeKernel>;
 
   beforeEach(() => {
-    __resetIdCounter();
     fake = makeFakeKernel();
     setGeometryKernel(fake);
   });

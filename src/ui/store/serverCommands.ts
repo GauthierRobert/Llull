@@ -15,6 +15,7 @@
  */
 
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
+import type { LiveSnapshotEvent } from '@mcp/liveSync';
 
 // ---------------------------------------------------------------------------
 // Response type
@@ -83,11 +84,19 @@ async function postJson(path: string, body: unknown): Promise<ServerCommandRespo
 /**
  * POST /command — send a named command with params to the server.
  * The updated document arrives via the /live SSE stream, not in this response.
+ * `commandId` makes the request idempotent server-side (a repeated id is not re-applied).
  *
  * @throws ServerCommandError on network failure or non-ok HTTP status.
  */
-export async function postCommand(name: string, params: unknown): Promise<ServerCommandResponse> {
-  return postJson('/command', { name, params });
+export async function postCommand(
+  name: string,
+  params: unknown,
+  commandId?: string,
+): Promise<ServerCommandResponse> {
+  return postJson(
+    '/command',
+    commandId === undefined ? { name, params } : { name, params, commandId },
+  );
 }
 
 /**
@@ -108,4 +117,24 @@ export async function postUndo(): Promise<ServerCommandResponse> {
  */
 export async function postRedo(): Promise<ServerCommandResponse> {
   return postJson('/redo', {});
+}
+
+/** GET /live/snapshot — the server document with its log position (resync). */
+export async function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
+  let response: Response;
+  try {
+    response = await fetch(`${SERVER_BASE}/live/snapshot`, { headers: serverAuthHeaders() });
+  } catch (cause) {
+    throw new ServerCommandError(
+      `Network error: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+  if (!response.ok) {
+    throw new ServerCommandError(
+      `Server responded with HTTP ${response.status} for /live/snapshot`,
+      'http',
+      response.status,
+    );
+  }
+  return response.json() as Promise<LiveSnapshotEvent>;
 }

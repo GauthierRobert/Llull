@@ -1,11 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import { findProfile } from '@core/commands/building/steel/profiles';
-import { nextSecondaryProfile } from '@core/commands/building/industrial/purlinDesign';
-import type { PurlinRow } from '@core/commands/building/industrial/purlinCheck';
-import { __resetIdCounter } from '@lib/id';
+import { findProfile } from '@aec/steel/profiles';
+import { nextSecondaryProfile } from '@aec/industrial/purlinDesign';
+import type { PurlinRow } from '@aec/industrial/purlinCheck';
 
 const hall = (params: Record<string, unknown> = {}): CadDocument =>
   execute(createEmptyDocument(), 'add_portal_frame_building', {
@@ -26,8 +25,6 @@ const rowsOf = (doc: CadDocument, params: Record<string, unknown> = {}): PurlinR
 const maxOf = (rows: PurlinRow[]): number => Math.max(...rows.map((row) => row.utilisation));
 
 const depth = (member: SteelMemberElement): number => findProfile(member.profile)?.h ?? 0;
-
-beforeEach(() => __resetIdCounter());
 
 const largestProfile = (): string => {
   let name = 'C200x75x2.5';
@@ -166,7 +163,7 @@ describe('design_purlins', () => {
       const result = execute(doc, 'design_purlins', bad);
       expect(result.document).toBe(doc);
       expect(result.affected).toEqual([]);
-      expect(result.summary).toMatch(/design_purlins failed/);
+      expect(result.summary).toMatch(/design_purlins (failed|rejected)/);
     }
     const empty = createEmptyDocument();
     expect(execute(empty, 'design_purlins', {}).document).toBe(empty);

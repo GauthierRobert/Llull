@@ -17,7 +17,6 @@ import {
   numberRows,
   stepHeading,
 } from '@core/codegen/format';
-import { __resetIdCounter } from '@lib/id';
 
 const cannedMesh: MeshData = {
   positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
@@ -32,7 +31,6 @@ const fakeKernel: GeometryKernel = {
 };
 
 beforeEach(() => {
-  __resetIdCounter();
   setGeometryKernel(fakeKernel);
 });
 afterEach(() => {

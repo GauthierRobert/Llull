@@ -39,9 +39,14 @@ export default defineConfig(({ command }) => ({
       ...(command === 'build'
         ? { 'node:module': resolve(__dirname, 'src/ui/geometry/nodeModuleStub.ts') }
         : {}),
-      '@core': resolve(__dirname, 'src/core'),
+      '@core': resolve(__dirname, 'packages/core/src'),
+      '@lib': resolve(__dirname, 'packages/core/src/lib'),
+      '@mcp': resolve(__dirname, 'packages/mcp/src'),
+      '@aec': resolve(__dirname, 'packages/domain-aec/src'),
+      '@kernel-manifold': resolve(__dirname, 'packages/kernel-manifold/src'),
+      '@kernel-occt': resolve(__dirname, 'packages/kernel-occt/src'),
       '@ui': resolve(__dirname, 'src/ui'),
-      '@lib': resolve(__dirname, 'src/lib'),
+      '@app': resolve(__dirname, 'src/app'),
     },
   },
   test: {
@@ -57,13 +62,14 @@ export default defineConfig(({ command }) => ({
       provider: 'v8',
       reporter: ['text', 'html'],
       // The command layer is the heart of the app — hold it to a high bar.
-      include: ['src/core/**'],
+      include: ['packages/*/src/**'],
       // Type-only modules compile to nothing at runtime, so v8 reports them as 0%
       // (they are never loaded — `import type` is erased). Exclude them so the gate
       // measures real command logic, not declaration files.
-      exclude: ['src/core/**/types.ts'],
+      exclude: ['packages/*/src/**/types.ts', 'packages/*/src/**/*.d.ts'],
       thresholds: {
-        'src/core/commands/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
+        'packages/core/src/commands/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
+        'packages/domain-aec/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
       },
     },
   },

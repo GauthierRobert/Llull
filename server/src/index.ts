@@ -20,17 +20,17 @@
  * MCP_AUTH_TOKEN, LLULL_REQUIRE_TOKEN_FOR_REST, LLULL_ALLOWED_HOSTS, LLULL_ALLOW_UNAUTHENTICATED, LLULL_REST_RATE_LIMIT_*; see server/README.md.
  */
 
+import './plugins'; // must stay first: installs domain plugins before liveDocument loads
 import './loadEnv';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { buildMcpRouter } from './mcp';
 import { exchangeOptionsFromEnv } from './pythonExchange';
-import { installGeometryKernel } from './geometryKernel';
-import { exportStepFile } from '@core/mcp';
-import { buildUiBridgeRouter } from './uiBridgeRouter';
-import { inMemoryBridge } from './uiBridge';
+import { getActiveKernelName, installGeometryKernel } from './geometryKernel';
+import { exportStepFile } from '@mcp/index';
 import {
   subscribeLive,
+  getLiveSnapshot,
   flushAutosave,
   stopAutosave,
   closeAllSubscribers,
@@ -80,7 +80,7 @@ const mutationGuard = guardMutation();
 // ---------------------------------------------------------------------------
 
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', kernel: getActiveKernelName() });
 });
 
 /**
@@ -88,18 +88,22 @@ app.get('/health', (_req: Request, res: Response) => {
  *
  * Contract:
  *   - On connect: immediately emits a `snapshot` event with the current document.
- *   - On every mutation: emits a `patch` event (a `snapshot` after undo/redo).
+ *   - On every mutating command: emits a `command` event (the log entry); after undo/redo or a
+ *     bulk replacement: a `snapshot` event (see `@mcp/liveSync`).
  *   - Keepalive: sends `:keepalive\n\n` every ~25 s to prevent proxy timeouts.
  *   - On client disconnect: cleans up the subscription and the keepalive timer.
  *
  * Named SSE events:
- *   event: snapshot  data: <CadDocument>   — on connect and after undo/redo
- *   event: patch     data: <DocPatch>      — entity-level delta after each mutation
+ *   event: snapshot  data: { seq, stateHash, document } — on connect and after undo/redo
+ *   event: command   data: { seq, name, params, stateHash } — after each mutating command
+ *
+ * Clients re-run each `command` through `execute` and verify `stateHash`; on a seq gap or hash
+ * mismatch they fetch `GET /live/snapshot`.
  *
  * The browser connects with:
  *   const es = new EventSource('http://localhost:3001/live');
  *   es.addEventListener('snapshot', (e) => { ... });
- *   es.addEventListener('patch', (e) => { ... });
+ *   es.addEventListener('command', (e) => { ... });
  *
  * No auth required (EventSource cannot send Authorization headers).
  */
@@ -128,6 +132,14 @@ app.get('/live', (req: Request, res: Response) => {
   });
 });
 
+/**
+ * GET /live/snapshot — the current document with its log position `{ seq, stateHash, document }`.
+ * Used by clients to resynchronise after a missed or mismatching `command` event.
+ */
+app.get('/live/snapshot', restLimiter, (_req: Request, res: Response) => {
+  res.status(200).json(getLiveSnapshot());
+});
+
 // ---------------------------------------------------------------------------
 // REST command bus — OUTSIDE /mcp auth (browser sends no Authorization header)
 // ---------------------------------------------------------------------------
@@ -135,7 +147,8 @@ app.get('/live', (req: Request, res: Response) => {
 /**
  * POST /command — apply a named command to the shared live document.
  *
- * Request body: { name: string, params?: unknown }
+ * Request body: { name: string, params?: unknown, commandId?: string }
+ *   commandId makes retries idempotent: a repeated id returns the first result without re-applying.
  *
  * Response 200: { summary, affected, isError, data?, canUndo, canRedo }
  *   - summary   — human/AI readable description of what happened.
@@ -155,12 +168,20 @@ app.post('/command', restLimiter, mutationGuard, (req: Request, res: Response) =
     res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
     return;
   }
-  const { name, params } = body as { name: unknown; params?: unknown };
+  const { name, params, commandId } = body as {
+    name: unknown;
+    params?: unknown;
+    commandId?: unknown;
+  };
   if (typeof name !== 'string' || name.length === 0) {
     res.status(400).json({ error: '"name" must be a non-empty string.' });
     return;
   }
-  const result = applyCommand(name, params ?? {});
+  if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
+    res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
+    return;
+  }
+  const result = applyCommand(name, params ?? {}, commandId);
   res.status(200).json(result);
 });
 
@@ -230,22 +251,34 @@ app.get('/export/stl', restLimiter, (req: Request, res: Response) => {
 
   const data = result.data as ExportStlData;
 
-  res.setHeader('Content-Disposition', `attachment; filename="${name}.stl"`);
-  res.setHeader('Content-Type', 'model/stl');
-
-  if (data.format === 'binary') {
-    if (!data.stlBase64) {
-      res.status(500).json({ error: 'export_stl binary result missing stlBase64.' });
-      return;
-    }
-    const buf = Buffer.from(data.stlBase64, 'base64');
-    res.setHeader('Content-Length', buf.length);
-    res.status(200).end(buf);
-  } else {
-    const body = data.stl ?? '';
-    res.status(200).send(body);
+  if (data.format === 'binary' && !data.stlBase64) {
+    res.status(500).json({ error: 'export_stl binary result missing stlBase64.' });
+    return;
   }
+  sendDownload(
+    res,
+    `${name}.stl`,
+    'model/stl',
+    data.format === 'binary' ? Buffer.from(data.stlBase64 ?? '', 'base64') : (data.stl ?? ''),
+  );
 });
+
+/** The one file-download responder: attachment headers + a text (send) or binary (end) body. */
+function sendDownload(
+  res: Response,
+  fileName: string,
+  contentType: string,
+  body: string | Buffer,
+): void {
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Content-Type', contentType);
+  if (typeof body === 'string') {
+    res.status(200).send(body);
+    return;
+  }
+  res.setHeader('Content-Length', body.length);
+  res.status(200).end(body);
+}
 
 /** Python bridge for STEP / parametric code (shared by /export/step and the MCP exchange tools). */
 const exchange = exchangeOptionsFromEnv();
@@ -269,8 +302,7 @@ app.get('/export/code', restLimiter, (req: Request, res: Response) => {
     res.status(500).json({ error: result.summary });
     return;
   }
-  res.setHeader('Content-Disposition', `attachment; filename="${data.fileName}"`);
-  res.type('text/plain; charset=utf-8').status(200).send(data.text);
+  sendDownload(res, data.fileName, 'text/plain; charset=utf-8', data.text);
 });
 
 /**
@@ -291,11 +323,7 @@ app.get('/export/step', restLimiter, (req: Request, res: Response) => {
         res.status(500).json({ error: file.error });
         return;
       }
-      const body = Buffer.from(file.stepBase64, 'base64');
-      res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
-      res.setHeader('Content-Type', 'model/step');
-      res.setHeader('Content-Length', body.length);
-      res.status(200).end(body);
+      sendDownload(res, file.fileName, 'model/step', Buffer.from(file.stepBase64, 'base64'));
     })
     .catch((error: unknown) => {
       res.status(500).json({
@@ -304,13 +332,9 @@ app.get('/export/step', restLimiter, (req: Request, res: Response) => {
     });
 });
 
-// UI↔MCP live-sync bridge routes — guarded by the same bearer auth as /mcp.
-// See server/src/uiBridgeRouter.ts for the implementation.
-app.use('/ui-bridge', buildUiBridgeRouter());
-
 // MCP endpoint — Streamable HTTP, guarded by bearer auth + rate limiting.
 // See server/src/mcp.ts for the implementation.
-app.use('/mcp', buildMcpRouter(inMemoryBridge, exchange));
+app.use('/mcp', buildMcpRouter(exchange));
 
 app.use(jsonErrorHandler);
 

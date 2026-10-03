@@ -16,9 +16,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
+import { liveSnapshot } from '../helpers/storeTestHelpers';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
@@ -38,7 +38,7 @@ function resetStore(): void {
 /** Inject materials directly into the store document for fixture setup. */
 function setMaterials(mats: Record<string, Material>): void {
   const doc = useStore.getState().document;
-  useStore.getState().hydrateLiveDocument({ ...doc, materials: mats });
+  useStore.getState().hydrateLiveDocument(liveSnapshot({ ...doc, materials: mats }));
 }
 
 /** Set the document selection directly (bypasses hydrateLiveDocument entity filter). */
@@ -58,7 +58,6 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
 
 describe('MaterialsPanel — rendering', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -143,7 +142,6 @@ describe('MaterialsPanel — rendering', () => {
 
 describe('MaterialsPanel — assign', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -220,7 +218,6 @@ describe('MaterialsPanel — assign', () => {
 
 describe('MaterialsPanel — create form', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -310,7 +307,6 @@ describe('MaterialsPanel — create form', () => {
 
 describe('MaterialsPanel — per-entity PBR resolution', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

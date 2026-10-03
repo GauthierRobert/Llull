@@ -6,9 +6,10 @@
  * Geometry is memoized; disposed on unmount.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { PointEntity } from '@core/model/types';
+import { PlacedLineObject } from './PlacedLineObject';
 
 interface PointRendererProps {
   entity: PointEntity;
@@ -17,7 +18,7 @@ interface PointRendererProps {
 
 const CROSS_SIZE = 0.1;
 
-export function PointRenderer({ entity, selected }: PointRendererProps): React.ReactElement {
+export function PointRenderer({ entity, selected }: PointRendererProps): React.ReactElement | null {
   const { position, color } = entity;
 
   const segmentsObject = useMemo(() => {
@@ -43,14 +44,5 @@ export function PointRenderer({ entity, selected }: PointRendererProps): React.R
     return new THREE.LineSegments(geo, mat);
   }, [color, selected]);
 
-  useEffect(() => {
-    return () => {
-      segmentsObject.geometry.dispose();
-      (segmentsObject.material as THREE.Material).dispose();
-    };
-  }, [segmentsObject]);
-
-  segmentsObject.position.set(position[0], position[1], position[2]);
-
-  return <primitive object={segmentsObject} />;
+  return <PlacedLineObject object={segmentsObject} position={position} />;
 }

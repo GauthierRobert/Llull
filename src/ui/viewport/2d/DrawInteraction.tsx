@@ -14,8 +14,7 @@
  * Presentation only — no document mutations (R1).
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import * as THREE from 'three';
+import { useState, useCallback, useMemo } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from '@ui/store';
 import type { Vec2 } from '@core/model/types';
@@ -23,6 +22,7 @@ import { useSnap } from './useSnap';
 import { DrawPreview, CollectedPointMarkers } from './DrawPreview';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { DrawToolKind } from '@ui/store';
+import { useGroundPlane } from './useGroundPlane';
 
 /** three.js hit points are render-space (document − renderOrigin); input works in document space. */
 function toDocumentPoint(point: { x: number; y: number }): Vec2 {
@@ -77,19 +77,7 @@ export function DrawInteraction({
     [snapResult],
   );
 
-  // Invisible ground-plane geometry (shared with SnapIndicator but separate instance).
-  const geo = useMemo(() => new THREE.PlaneGeometry(1e8, 1e8), []);
-  const mat = useMemo(
-    () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
-    [],
-  );
-
-  useEffect(() => {
-    return () => {
-      geo.dispose();
-      mat.dispose();
-    };
-  }, [geo, mat]);
+  const { geo, mat } = useGroundPlane();
 
   const handleMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {

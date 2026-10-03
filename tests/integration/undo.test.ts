@@ -12,10 +12,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { liveSnapshot, localDispatch } from '../helpers/storeTestHelpers';
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
 
 /** Flush all pending microtasks (multiple promise chain hops). */
@@ -61,7 +60,6 @@ function mockFetch(response: ServerCommandResponse): ReturnType<typeof vi.fn> {
 
 describe('undo — server-authoritative', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -122,7 +120,7 @@ describe('undo — server-authoritative', () => {
 
     // Simulating the /live push with the reverted doc:
     const emptyDoc = createEmptyDocument();
-    getState().hydrateLiveDocument(emptyDoc);
+    getState().hydrateLiveDocument(liveSnapshot(emptyDoc));
     expect(getState().document.order).toHaveLength(0);
   });
 
@@ -143,7 +141,6 @@ describe('undo — server-authoritative', () => {
 
 describe('redo — server-authoritative', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -205,7 +202,6 @@ describe('redo — server-authoritative', () => {
 
 describe('canUndo / canRedo state', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

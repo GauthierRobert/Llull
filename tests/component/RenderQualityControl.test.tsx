@@ -1,5 +1,5 @@
 /**
- * Component tests for the Quality selector in ViewportControls (W5H).
+ * Component tests for the Quality selector in ViewportControls.
  *
  * Asserts observable behavior:
  *   - The "Quality" label and select element render.
@@ -20,7 +20,6 @@ import { useViewportStore } from '@ui/store';
 import { ViewportControls } from '@ui/viewport/3d/ViewportControls';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,7 +41,6 @@ function resetStores(): void {
 
 describe('ViewportControls — Quality selector', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -129,7 +127,6 @@ describe('ViewportControls — Quality selector', () => {
 
 describe('viewportStore — setQualityOverride action', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 

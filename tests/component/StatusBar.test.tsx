@@ -14,7 +14,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { StatusBar } from '@ui/components/StatusBar';
@@ -44,7 +43,6 @@ function createBox(): string {
 
 describe('StatusBar — live indicator', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -73,7 +71,6 @@ describe('StatusBar — live indicator', () => {
 
 describe('StatusBar — units', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -107,7 +104,6 @@ describe('StatusBar — units', () => {
 
 describe('StatusBar — selection count', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -140,7 +136,6 @@ describe('StatusBar — selection count', () => {
 
 describe('StatusBar — last command summary', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -180,7 +175,6 @@ describe('StatusBar — last command summary', () => {
 
 describe('StatusBar — entity count', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

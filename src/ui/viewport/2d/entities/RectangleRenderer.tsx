@@ -7,9 +7,10 @@
  * Geometry is memoized on the entity's width/height fields; disposed on unmount.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { RectangleEntity } from '@core/model/types';
+import { PlacedLineObject } from './PlacedLineObject';
 
 interface RectangleRendererProps {
   entity: RectangleEntity;
@@ -19,7 +20,7 @@ interface RectangleRendererProps {
 export function RectangleRenderer({
   entity,
   selected,
-}: RectangleRendererProps): React.ReactElement {
+}: RectangleRendererProps): React.ReactElement | null {
   const { width, height, position, color } = entity;
 
   const lineObject = useMemo(() => {
@@ -47,14 +48,5 @@ export function RectangleRenderer({
     return new THREE.Line(geo, mat);
   }, [width, height, color, selected]);
 
-  useEffect(() => {
-    return () => {
-      lineObject.geometry.dispose();
-      (lineObject.material as THREE.Material).dispose();
-    };
-  }, [lineObject]);
-
-  lineObject.position.set(position[0], position[1], position[2]);
-
-  return <primitive object={lineObject} />;
+  return <PlacedLineObject object={lineObject} position={position} />;
 }

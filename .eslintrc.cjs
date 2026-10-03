@@ -16,5 +16,11 @@ module.exports = {
     '@typescript-eslint/explicit-function-return-type': ['warn', { allowExpressions: true }],
     'no-console': ['warn', { allow: ['warn', 'error'] }],
   },
+  overrides: [
+    {
+      files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts', 'server/src/**/*.ts'],
+      rules: { 'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }] },
+    },
+  ],
   ignorePatterns: ['dist', 'coverage', 'node_modules', '*.cjs'],
 };

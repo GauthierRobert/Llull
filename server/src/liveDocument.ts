@@ -11,19 +11,19 @@
  * - This module is TRANSPORT / STATE GLUE only. No command or geometry logic.
  * - `setLiveDoc` stores the document produced by `execute` and fires the SSE fan-out.
  *   It never creates or validates entities.
- * - Sync is now implemented: single shared doc, broadcast over GET /live.
- *   (Replaces the former TODO(KI1-followup) per-session isolation approach.)
+ * - Sync: one shared doc for every session, broadcast over GET /live.
  */
 
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { createAutosaver } from './autosave';
 import type { Response } from 'express';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
-import { computeDocPatch } from './docPatch';
-import type { DocPatch } from './docPatch';
+import { documentHash } from '@mcp/liveSync';
+import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 
 // ---------------------------------------------------------------------------
 // Disk persistence (autosave between server restarts)
@@ -96,9 +96,20 @@ export function closeAllSubscribers(): void {
 /** The single live document shared across all MCP sessions and the browser UI. */
 let _liveDoc: CadDocument = loadAutosave();
 
+/** Number of changes applied to the live document since process start (the log position). */
+let _seq = 0;
+
+/** Random per process: `_seq` restarts at 0 on restart, so clients compare `(epoch, seq)`. */
+const _epoch: string = randomUUID();
+
 /** Return the current shared document. */
 export function getLiveDoc(): CadDocument {
   return _liveDoc;
+}
+
+/** The current document with its log position — `GET /live/snapshot` and the SSE `snapshot` event. */
+export function getLiveSnapshot(): LiveSnapshotEvent {
+  return { epoch: _epoch, seq: _seq, stateHash: documentHash(_liveDoc), document: _liveDoc };
 }
 
 // ---------------------------------------------------------------------------
@@ -126,27 +137,10 @@ function writeSseEvent(res: Response, eventType: string, payload: unknown): bool
   }
 }
 
-/**
- * Broadcast a full-document snapshot to all SSE subscribers.
- * Used on initial connect and as fallback after undo/redo (full state replacement).
- * Named event: `snapshot`.
- */
-function broadcastSnapshot(doc: CadDocument): void {
+/** Broadcast one named SSE event to every subscriber, dropping dead connections. */
+function broadcast(eventType: 'snapshot' | 'command', payload: unknown): void {
   for (const res of _subscribers) {
-    if (!writeSseEvent(res, 'snapshot', doc)) {
-      _subscribers.delete(res);
-    }
-  }
-}
-
-/**
- * Broadcast an entity-level patch to all SSE subscribers.
- * Named event: `patch`.
- * The browser applies this incrementally — only changed entities re-render.
- */
-function broadcastPatch(patch: DocPatch): void {
-  for (const res of _subscribers) {
-    if (!writeSseEvent(res, 'patch', patch)) {
+    if (!writeSseEvent(res, eventType, payload)) {
       _subscribers.delete(res);
     }
   }
@@ -156,32 +150,37 @@ function broadcastPatch(patch: DocPatch): void {
 // Public API
 // ---------------------------------------------------------------------------
 
+/** The mutating command that produced a new live document (broadcast as the log entry). */
+export interface LiveCommand {
+  readonly name: string;
+  readonly params: unknown;
+}
+
 /**
  * Replace the shared document and broadcast the change to all SSE subscribers.
  *
- * Computes an entity-level patch (prev→next) and emits it as a `patch` SSE event.
- * The browser applies the patch incrementally — only changed entities cause React
- * to re-render, keeping per-command cost O(change) rather than O(doc size).
+ * With `command`: emits a `command` event `{ seq, name, params, stateHash }` — clients re-run the
+ * same command through `execute` and verify `stateHash`. Without it (undo/redo/reset/bulk
+ * replacement): emits a full `snapshot` event `{ seq, stateHash, document }`.
  *
- * When `fullSnapshot` is true (undo/redo/reset paths), a `snapshot` event is
- * emitted instead so the browser replaces the full document — necessary when
- * entities may have been removed and there is no safe patch base.
- *
- * Called by the MCP router after every mutating `tools/call` and by `commandBus`.
- *
- * @sideeffect replaces module-level `_liveDoc` and broadcasts to all subscribers.
+ * @sideeffect replaces module-level `_liveDoc`, advances `_seq`, broadcasts to all subscribers.
  */
-export function setLiveDoc(next: CadDocument, fullSnapshot = false): void {
-  const prev = _liveDoc;
+export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
   _liveDoc = next;
+  _seq += 1;
   writeAutosave(next);
-
-  if (fullSnapshot) {
-    broadcastSnapshot(next);
-  } else {
-    const patch = computeDocPatch(prev, next);
-    broadcastPatch(patch);
+  if (command === undefined) {
+    broadcast('snapshot', getLiveSnapshot());
+    return;
   }
+  const event: LiveCommandEvent = {
+    epoch: _epoch,
+    seq: _seq,
+    name: command.name,
+    params: command.params,
+    stateHash: documentHash(next),
+  };
+  broadcast('command', event);
 }
 
 /**
@@ -198,7 +197,7 @@ export function subscribeLive(res: Response): () => void {
 
   // Send the current snapshot immediately so the browser is in sync from t=0.
   // Named event `snapshot` — the browser hook listens for this distinct event type.
-  if (!writeSseEvent(res, 'snapshot', _liveDoc)) {
+  if (!writeSseEvent(res, 'snapshot', getLiveSnapshot())) {
     // If the write fails immediately the client is already gone; clean up now.
     _subscribers.delete(res);
   }

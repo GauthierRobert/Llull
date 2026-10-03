@@ -16,7 +16,7 @@
  * Value = entity.label if set, else computed. Precision = entity.precision if set, else
  * document displayPrecision.
  *
- * Must be rendered inside the -renderOrigin group in Viewport2D.tsx (U4 convention).
+ * Must be rendered inside the -renderOrigin group in Viewport2D.tsx.
  */
 
 import { useMemo, useEffect } from 'react';

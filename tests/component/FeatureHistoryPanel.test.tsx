@@ -18,11 +18,10 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
-import { localDispatch } from '../helpers/storeTestHelpers';
+import { localDispatch, liveSnapshot } from '../helpers/storeTestHelpers';
 import type { FeatureStep } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
@@ -42,7 +41,7 @@ function resetStore(): void {
  */
 function setHistory(steps: FeatureStep[]): void {
   const doc = useStore.getState().document;
-  useStore.getState().hydrateLiveDocument({ ...doc, featureHistory: steps });
+  useStore.getState().hydrateLiveDocument(liveSnapshot({ ...doc, featureHistory: steps }));
 }
 
 function makeStep(id: string, name: string, suppressed?: boolean, label?: string): FeatureStep {
@@ -66,7 +65,6 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
 
 describe('FeatureHistoryPanel — rendering', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -118,7 +116,6 @@ describe('FeatureHistoryPanel — rendering', () => {
 
 describe('FeatureHistoryPanel — toggle suppress', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -155,7 +152,6 @@ describe('FeatureHistoryPanel — toggle suppress', () => {
 
 describe('FeatureHistoryPanel — reorder', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -210,7 +206,6 @@ describe('FeatureHistoryPanel — reorder', () => {
 
 describe('FeatureHistoryPanel — delete step', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -230,7 +225,6 @@ describe('FeatureHistoryPanel — delete step', () => {
 
 describe('FeatureHistoryPanel — replay', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -266,7 +260,6 @@ describe('FeatureHistoryPanel — replay', () => {
 
 describe('FeatureHistoryPanel — live dispatch (integration smoke)', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

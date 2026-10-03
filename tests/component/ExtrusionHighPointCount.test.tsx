@@ -1,8 +1,8 @@
 /**
  * Component tests for the `kind:'extrusion'` render path with high-point-count
- * concave profiles — the VPG1 verification suite for spur-gear extrusions.
+ * concave profiles — the verification suite for spur-gear extrusions.
  *
- * Context: PG1 (`add_spur_gear`) produces an `extrusion` entity whose profile
+ * Context: `add_spur_gear` produces an `extrusion` entity whose profile
  * can exceed 840 points for a 42-tooth gear. THREE.ExtrudeGeometry internally
  * uses earcut for triangulation; this suite verifies:
  *   1. A synthetic 840-point concave profile triangulates without producing
@@ -24,7 +24,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
@@ -221,7 +220,6 @@ describe('profileKey — memo stability for multi-gear scenes', () => {
 
 describe('add_spur_gear — extrusion entity in the store', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

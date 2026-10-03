@@ -1,13 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildPlanDrawing } from '@core/commands/building/plan';
-import { buildingErrors } from '@core/commands/building/validate';
-import { layerBoundaries, parseWallLayers } from '@core/commands/building/wallLayers';
-import type { TakeoffLine } from '@core/commands/building/quantities';
-import type { IfcExport } from '@core/commands/building/ifc';
+import { buildPlanDrawing } from '@aec/plan';
+import { buildingErrors } from '@aec/validate';
+import { layerBoundaries, parseWallLayers } from '@aec/wallLayers';
+import type { TakeoffLine } from '@aec/quantities';
+import type { IfcExport } from '@aec/ifc';
 import type { WallElement } from '@core/model/building';
-import { __resetIdCounter } from '@lib/id';
 
 const BUILD_UP = [
   { material: 'brick', thickness: 100, function: 'finish' },
@@ -29,8 +28,6 @@ function wallOf(doc: CadDocument, id = 'wall-1'): WallElement {
   if (element?.category !== 'wall') throw new Error(id);
   return element;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('set_wall_layers', () => {
   it('sets a build-up, its total thickness and structural material', () => {
@@ -69,7 +66,7 @@ describe('set_wall_layers', () => {
       { wallIds: ['wall-1'], layers: [{ material: 'x', thickness: 10, function: 'glue' }] },
       /function/,
     ],
-    [{ wallIds: 'wall-1', layers: BUILD_UP }, /must list existing walls/],
+    [{ wallIds: 'wall-1', layers: BUILD_UP }, /rejected: invalid params — wallIds/],
   ])('rejects %j', (params, message) => {
     const result = execute(wallDoc(), 'set_wall_layers', params);
     expect(result.affected).toEqual([]);

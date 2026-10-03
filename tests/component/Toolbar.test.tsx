@@ -5,7 +5,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { Toolbar } from '@ui/components/toolbar/Toolbar';
@@ -15,7 +14,6 @@ const button = (name: string): HTMLElement => screen.getByRole('button', { name 
 
 describe('Toolbar', () => {
   beforeEach(() => {
-    __resetIdCounter();
     useStore.getState().setDocument(createEmptyDocument());
     useStore.setState({ liveStatus: 'disconnected', localUndoStack: [], localRedoStack: [] });
     useToolStore.setState({

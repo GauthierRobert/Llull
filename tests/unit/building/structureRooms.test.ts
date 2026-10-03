@@ -1,9 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { wallLoop, gridIntersections } from '@core/commands/building/structure';
+import { wallLoop, gridIntersections } from '@aec/structure';
 import type { WallElement } from '@core/model/building';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -19,8 +18,6 @@ const SQUARE = [
 function perimeter(): CadDocument {
   return run(createEmptyDocument(), 'draw_walls', { points: SQUARE, closed: true });
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('add_slab', () => {
   it('creates a slab from a boundary with its top at the level', () => {
@@ -366,7 +363,7 @@ describe('review follow-ups', () => {
   });
 
   it('copied room numbers stay unique and readable', async () => {
-    const { copiedRoomNumber } = await import('@core/commands/building/elements');
+    const { copiedRoomNumber } = await import('@aec/elements');
     let doc = run(createEmptyDocument(), 'add_level', {});
     doc = run(doc, 'add_level', {});
     doc = run(doc, 'add_room', { name: 'A', number: '003', boundary: SQUARE, levelId: 'level-1' });

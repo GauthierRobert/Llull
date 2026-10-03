@@ -1,14 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { gridLetter } from '@core/commands/building/grid';
-import { __resetIdCounter } from '@lib/id';
+import { gridLetter } from '@aec/grid';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('add_level / update_level / delete_level / set_active_level', () => {
   it('adds stacked levels with default 3 m height and makes the newest active', () => {
@@ -197,17 +194,6 @@ describe('integration with document-level commands', () => {
     const restored = deserializeDocument(serializeDocument(doc));
     expect(restored.building).toEqual(doc.building);
     expect(restored.entities['wall-1:body-0']).toEqual(doc.entities['wall-1:body-0']);
-  });
-
-  it('doc patches carry the building model both ways', async () => {
-    const { computeDocPatch, applyDocPatch } = await import('@core/mcp/docPatch');
-    const before = createEmptyDocument();
-    const after = run(before, 'add_wall', { start: [0, 0], end: [1000, 0] });
-    const patch = computeDocPatch(before, after);
-    expect(applyDocPatch(before, patch).building).toEqual(after.building);
-    const cleared = execute(after, 'clear_document', {}).document;
-    expect(applyDocPatch(after, computeDocPatch(after, cleared)).building).toBeUndefined();
-    expect(computeDocPatch(after, after).building).toBeUndefined();
   });
 
   it('undo-style history replay regenerates the same building', () => {

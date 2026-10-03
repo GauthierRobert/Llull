@@ -1,13 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  rateFor,
-  toCsv,
-  type TakeoffLine,
-  type CostLine,
-} from '@core/commands/building/quantities';
-import { __resetIdCounter } from '@lib/id';
+import { rateFor, toCsv, type TakeoffLine, type CostLine } from '@aec/quantities';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -45,8 +39,6 @@ function line(lines: ReadonlyArray<TakeoffLine>, key: string): TakeoffLine {
   if (!found) throw new Error(`missing ${key}`);
   return found;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('quantity_takeoff', () => {
   it('computes metric quantities with the centerline method', () => {
@@ -118,7 +110,7 @@ describe('building_schedule', () => {
   it('rejects an unknown kind', () => {
     const doc = house();
     const result = execute(doc, 'building_schedule', { kind: 'roof' });
-    expect(result.summary).toMatch(/kind must be/);
+    expect(result.summary).toMatch(/rejected: invalid params — kind/);
     expect(result.data).toBeUndefined();
   });
 });
@@ -155,7 +147,7 @@ describe('cost estimate', () => {
     expect(doc.building!.currency).toBe('EUR');
     expect(execute(doc, 'set_cost_rates', { rates: {} }).document).toBe(doc);
     expect(execute(doc, 'set_cost_rates', { rates: { a: -1 } }).document).toBe(doc);
-    expect(execute(doc, 'estimate_cost', { rates: [] }).summary).toMatch(/failed/);
+    expect(execute(doc, 'estimate_cost', { rates: [] }).summary).toMatch(/rejected/);
   });
 
   it('rateFor and toCsv helpers', () => {

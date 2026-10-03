@@ -19,7 +19,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { rasterizeSvg, buildImageBlock, stripSvgFromData } from '../src/renderImage';
-import { shapeToolCallContent } from '@core/mcp';
+import { shapeToolCallContent } from '@mcp/index';
 
 // ---------------------------------------------------------------------------
 // Fixtures

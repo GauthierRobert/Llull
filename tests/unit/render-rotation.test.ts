@@ -1,25 +1,22 @@
 /**
  * Tests that render_view honors entity.rotation for 3D solid kinds.
  *
- * Bug context: tessellate<Kind> functions in render.ts previously built vertices
- * using only entity.position, ignoring entity.rotation. The live three.js viewport
- * applied rotation correctly via <mesh rotation={...}/>, so the SVG renderer was
- * broken for any rotated entity.
+ * Regression guard: tessellate<Kind> in render.ts must apply entity.rotation, matching
+ * the live three.js viewport's <mesh rotation={...}/>.
  *
  * Rotation convention confirmed from src/ui/viewport/3d/entities/*Mesh.tsx:
  *   <mesh rotation={[rotation[0], rotation[1], rotation[2]]}>
  * three.js Euler default order is 'XYZ': column-vector composition M = Rx·Ry·Rz,
  * meaning Rz acts on the vector first, then Ry, then Rx (verified in three.js
  * Matrix4.makeRotationFromEuler where M[0][2] = sin(y), matching Rx·Ry·Rz·ẑ).
- * The render.ts fix applies the same Rx·Ry·Rz matrix about entity.position.
+ * render.ts applies the same Rx·Ry·Rz matrix about entity.position.
  *
  * @layer tests/unit
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 import { applyEulerXYZ } from '@core/commands/render';
 
 // ---------------------------------------------------------------------------
@@ -99,8 +96,6 @@ function renderSvg(doc: ReturnType<typeof createEmptyDocument>, view: string): s
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — cylinder', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('unrotated cylinder front view is taller than wide', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_cylinder', { radius: 1, height: 4, position: [0, 0, 0] }).document;
@@ -156,8 +151,6 @@ describe('render_view rotation — cylinder', () => {
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — box', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('unrotated box [1,1,4] front view is taller than wide', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [1, 1, 4], position: [0, 0, 0] }).document;
@@ -208,8 +201,6 @@ describe('render_view rotation — box', () => {
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — torus', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('torus rotated [π/2,0,0] produces different bbox from unrotated torus', () => {
     let docA = createEmptyDocument();
     docA = execute(docA, 'add_torus', {
@@ -249,8 +240,6 @@ describe('render_view rotation — torus', () => {
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — cone', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('cone rotated [π/2,0,0] has different front-view height than unrotated', () => {
     let docA = createEmptyDocument();
     docA = execute(docA, 'add_cone', { radius: 1, height: 4, position: [0, 0, 0] }).document;
@@ -273,16 +262,12 @@ describe('render_view rotation — cone', () => {
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — zero rotation is a no-op', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('cylinder with rotation [0,0,0] produces identical SVG to default (no rotation)', () => {
     // Both docs are created fresh with the same id counter state — they produce
     // the same entity id, same geometry, same SVG.
     let docA = createEmptyDocument();
     docA = execute(docA, 'add_cylinder', { radius: 1, height: 2, position: [0, 0, 0] }).document;
     const svgA = renderSvg(docA, 'iso');
-
-    __resetIdCounter();
 
     let docB = createEmptyDocument();
     docB = execute(docB, 'add_cylinder', { radius: 1, height: 2, position: [0, 0, 0] }).document;
@@ -299,8 +284,6 @@ describe('render_view rotation — zero rotation is a no-op', () => {
     docA = execute(docA, 'add_box', { size: [2, 3, 4], position: [0, 0, 0] }).document;
     const svgA = renderSvg(docA, 'iso');
 
-    __resetIdCounter();
-
     let docB = createEmptyDocument();
     docB = execute(docB, 'add_box', { size: [2, 3, 4], position: [0, 0, 0] }).document;
     const idB = docB.order[0]!;
@@ -316,8 +299,6 @@ describe('render_view rotation — zero rotation is a no-op', () => {
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — pyramid', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('pyramid rotated [π/2,0,0] has different front-view bbox than unrotated', () => {
     let docA = createEmptyDocument();
     docA = execute(docA, 'add_pyramid', {
@@ -346,8 +327,6 @@ describe('render_view rotation — pyramid', () => {
 });
 
 describe('render_view rotation — wedge', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('wedge rotated [0,0,π/2] has different front-view bbox than unrotated', () => {
     let docA = createEmptyDocument();
     docA = execute(docA, 'add_wedge', { size: [1, 4, 1], position: [0, 0, 0] }).document;
@@ -444,8 +423,6 @@ describe('applyEulerXYZ — compound rotation math (convention discriminator)', 
 // ---------------------------------------------------------------------------
 
 describe('render_view rotation — compound-rotation end-to-end (convention discriminator)', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('thin box [100,4,4] rotated [π/2, π/2, 0]: front-view appears nearly square (long axis into depth)', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [100, 4, 4], position: [0, 0, 0] }).document;

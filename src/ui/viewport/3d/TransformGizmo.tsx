@@ -141,7 +141,7 @@ export function TransformGizmo({
   // Ref to the <group> sibling that TransformControls attaches to.
   // Typed as THREE.Group | null so React gives us a MutableRefObject (current
   // is writable). The group IS rendered into the scene — parent != null after
-  // mount — so controls.attach(targetRef.current) succeeds without error (W5C).
+  // mount — so controls.attach(targetRef.current) succeeds without error.
   const targetRef = useRef<THREE.Group | null>(null);
 
   // Pre-drag baseline — captured in the dragging-changed → true handler so
@@ -178,30 +178,24 @@ export function TransformGizmo({
     snapCandidatesRef.current = collectSnapCandidates3D(doc, selectedId);
   }, [selectedId]);
 
+  // ---- Place the gizmo target at the entity's render-space transform ----
+  function syncTargetFromEntity(): void {
+    if (!entity) return;
+    const t = targetRef.current;
+    if (!t) return;
+    const rp = toRenderPosition(entity.position, renderOrigin);
+    t.position.set(rp[0], rp[1], rp[2]);
+    t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
+    t.scale.set(1, 1, 1);
+    t.updateMatrixWorld(true);
+  }
+
   // ---- Sync target from entity on id change ----
   // Compute render-space position from entity's world position minus renderOrigin.
-  useEffect(() => {
-    if (!entity) return;
-    const t = targetRef.current;
-    if (!t) return;
-    const rp = toRenderPosition(entity.position, renderOrigin);
-    t.position.set(rp[0], rp[1], rp[2]);
-    t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
-    t.scale.set(1, 1, 1);
-    t.updateMatrixWorld(true);
-  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(syncTargetFromEntity, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Sync target from entity after a committed dispatch ----
-  useEffect(() => {
-    if (!entity) return;
-    const t = targetRef.current;
-    if (!t) return;
-    const rp = toRenderPosition(entity.position, renderOrigin);
-    t.position.set(rp[0], rp[1], rp[2]);
-    t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
-    t.scale.set(1, 1, 1);
-    t.updateMatrixWorld(true);
-  }, [entity, renderOrigin]);
+  useEffect(syncTargetFromEntity, [entity, renderOrigin]);
 
   // ---- Per-frame snap computation (translate only) ----
   // NOTE: this useFrame runs ONLY when a drag is in progress (isDraggingRef.current).
@@ -348,7 +342,7 @@ export function TransformGizmo({
           controls.attach(object instanceof THREE.Object3D ? object : object.current)
         Because targetRef.current is a proper scene node (parent != null),
         the "attached object must be part of the scene graph" error never fires
-        and the demand frameloop quiesces when idle (W5C / W5G).
+        and the demand frameloop quiesces when idle.
       */}
       <group
         ref={targetRef}

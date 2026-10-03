@@ -5,39 +5,28 @@
  * command + params (param-gathering only — the command does all document work, react R1).
  */
 
-export type FieldKind = 'number' | 'text' | 'select' | 'checkbox';
+import {
+  FieldReader,
+  num,
+  onLevel,
+  result,
+  type ElementTool,
+  type ToolField,
+} from './elementToolForm';
 
-/** Live element lists a select field can offer. */
-export type ElementListKind = 'walls' | 'hosts' | 'stairs' | 'slabs';
-
-export interface ToolField {
-  readonly key: string;
-  readonly label: string;
-  readonly kind: FieldKind;
-  readonly defaultValue: string;
-  /** For 'select': [value, label] pairs, or a live list (active level's walls / stairs, all slabs). */
-  readonly options?: ReadonlyArray<readonly [string, string]> | ElementListKind;
-  /** Optional numeric fields may be left blank → the command default applies. */
-  readonly optional?: boolean;
-}
-
-export interface ToolContext {
-  readonly levelId: string | null;
-  readonly wallIds: ReadonlyArray<string>;
-}
-
-export type ToolCommand =
-  | { readonly ok: true; readonly command: string; readonly params: Record<string, unknown> }
-  | { readonly ok: false; readonly reason: string };
-
-export interface ElementTool {
-  readonly id: string;
-  readonly label: string;
-  /** Picker group heading. Default "Building". */
-  readonly group?: string;
-  readonly fields: ReadonlyArray<ToolField>;
-  readonly build: (values: Readonly<Record<string, string>>, context: ToolContext) => ToolCommand;
-}
+export {
+  FieldReader,
+  defaultValues,
+  num,
+  onLevel,
+  result,
+  type ElementListKind,
+  type ElementTool,
+  type FieldKind,
+  type ToolCommand,
+  type ToolContext,
+  type ToolField,
+} from './elementToolForm';
 
 const MATERIALS: ReadonlyArray<readonly [string, string]> = [
   ['concrete', 'Concrete'],
@@ -49,78 +38,31 @@ const MATERIALS: ReadonlyArray<readonly [string, string]> = [
   ['gypsum', 'Gypsum board'],
 ];
 
-export function num(key: string, label: string, defaultValue = '', optional = false): ToolField {
-  return { key, label, kind: 'number', defaultValue, optional };
+/** Thickness / optional height / material fields shared by every wall tool. */
+function wallSectionFields(thickness: string, material: string): ToolField[] {
+  return [
+    num('thickness', 'Thickness', thickness),
+    num('height', 'Height', '', true),
+    {
+      key: 'material',
+      label: 'Material',
+      kind: 'select',
+      defaultValue: material,
+      options: MATERIALS,
+    },
+  ];
 }
 
-export class FieldReader {
-  readonly missing: string[] = [];
-
-  constructor(private readonly values: Readonly<Record<string, string>>) {}
-
-  number(key: string): number {
-    const value = Number(this.values[key]);
-    if (this.values[key]?.trim() === '' || !Number.isFinite(value)) this.missing.push(key);
-    return value;
-  }
-
-  optionalNumber(key: string): number | undefined {
-    const raw = this.values[key]?.trim() ?? '';
-    if (raw === '') return undefined;
-    const value = Number(raw);
-    if (!Number.isFinite(value)) this.missing.push(key);
-    return value;
-  }
-
-  text(key: string): string {
-    return this.values[key]?.trim() ?? '';
-  }
-
-  flag(key: string): boolean {
-    return this.values[key] === 'true';
-  }
-
-  numberList(key: string): number[] {
-    const parts = this.text(key)
-      .split(/[,;\s]+/)
-      .filter((part) => part !== '')
-      .map(Number);
-    if (parts.length === 0 || parts.some((part) => !Number.isFinite(part))) this.missing.push(key);
-    return parts;
-  }
-
-  /** "x,y,z; x,y,z; …" → [[x, y, z], …] (at least `minimum` points). */
-  pointList(key: string, minimum: number): Array<[number, number, number]> {
-    const points = this.text(key)
-      .split(';')
-      .map((part) => part.trim())
-      .filter((part) => part !== '')
-      .map((part) => part.split(/[,\s]+/).map(Number));
-    if (
-      points.length < minimum ||
-      points.some((point) => point.length !== 3 || point.some((value) => !Number.isFinite(value)))
-    ) {
-      this.missing.push(key);
-    }
-    return points.map((point) => [point[0] ?? 0, point[1] ?? 0, point[2] ?? 0]);
-  }
-}
-
-export function result(
-  reader: FieldReader,
-  command: string,
-  params: Record<string, unknown>,
-): ToolCommand {
-  if (reader.missing.length > 0)
-    return { ok: false, reason: `Check: ${reader.missing.join(', ')}` };
-  const cleaned = Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined),
-  );
-  return { ok: true, command, params: cleaned };
-}
-
-export function onLevel(context: ToolContext): Record<string, unknown> {
-  return context.levelId === null ? {} : { levelId: context.levelId };
+function wallSection(reader: FieldReader): {
+  thickness: number;
+  height: number | undefined;
+  material: string;
+} {
+  return {
+    thickness: reader.number('thickness'),
+    height: reader.optionalNumber('height'),
+    material: reader.text('material'),
+  };
 }
 
 function rectangle(reader: FieldReader): Array<[number, number]> {
@@ -169,24 +111,14 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('y1', 'Y1', '0'),
       num('x2', 'X2', '10000'),
       num('y2', 'Y2', '8000'),
-      num('thickness', 'Thickness', '300'),
-      num('height', 'Height', '', true),
-      {
-        key: 'material',
-        label: 'Material',
-        kind: 'select',
-        defaultValue: 'masonry',
-        options: MATERIALS,
-      },
+      ...wallSectionFields('300', 'masonry'),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'draw_walls', {
         points: rectangle(reader),
         closed: true,
-        thickness: reader.number('thickness'),
-        height: reader.optionalNumber('height'),
-        material: reader.text('material'),
+        ...wallSection(reader),
         ...onLevel(context),
       });
     },
@@ -199,24 +131,14 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('y1', 'Start Y', '0'),
       num('x2', 'End X', '5000'),
       num('y2', 'End Y', '0'),
-      num('thickness', 'Thickness', '200'),
-      num('height', 'Height', '', true),
-      {
-        key: 'material',
-        label: 'Material',
-        kind: 'select',
-        defaultValue: 'concrete',
-        options: MATERIALS,
-      },
+      ...wallSectionFields('200', 'concrete'),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'add_wall', {
         start: [reader.number('x1'), reader.number('y1')],
         end: [reader.number('x2'), reader.number('y2')],
-        thickness: reader.number('thickness'),
-        height: reader.optionalNumber('height'),
-        material: reader.text('material'),
+        ...wallSection(reader),
         ...onLevel(context),
       });
     },
@@ -231,15 +153,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('ym', 'Through Y', '1500'),
       num('x2', 'End X', '6000'),
       num('y2', 'End Y', '0'),
-      num('thickness', 'Thickness', '200'),
-      num('height', 'Height', '', true),
-      {
-        key: 'material',
-        label: 'Material',
-        kind: 'select',
-        defaultValue: 'concrete',
-        options: MATERIALS,
-      },
+      ...wallSectionFields('200', 'concrete'),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
@@ -247,9 +161,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
         start: [reader.number('x1'), reader.number('y1')],
         through: [reader.number('xm'), reader.number('ym')],
         end: [reader.number('x2'), reader.number('y2')],
-        thickness: reader.number('thickness'),
-        height: reader.optionalNumber('height'),
-        material: reader.text('material'),
+        ...wallSection(reader),
         ...onLevel(context),
       });
     },
@@ -541,7 +453,3 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     },
   },
 ];
-
-export function defaultValues(tool: ElementTool): Record<string, string> {
-  return Object.fromEntries(tool.fields.map((field) => [field.key, field.defaultValue]));
-}

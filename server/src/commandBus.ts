@@ -28,8 +28,18 @@ import { getLiveDoc, setLiveDoc } from './liveDocument';
 /** Maximum undo/redo depth — mirrors MAX_UNDO_DEPTH in the UI store. */
 const MAX_UNDO_DEPTH = 100;
 
+/** Idempotency cache size: commandId -> result, least recently used evicted first. */
+const MAX_IDEMPOTENCY_ENTRIES = 1000;
+const _resultsByCommandId = new Map<string, CommandBusResult>();
+
 let _undoStack: CadDocument[] = [];
 let _redoStack: CadDocument[] = [];
+
+/** Restored history documents keep the newest step counter so undone ids are never re-minted. */
+function withMonotonicStepCounter(restored: CadDocument, current: CadDocument): CadDocument {
+  const nextStepNumber = Math.max(current.nextStepNumber ?? 1, restored.nextStepNumber ?? 1);
+  return restored.nextStepNumber === nextStepNumber ? restored : { ...restored, nextStepNumber };
+}
 
 // ---------------------------------------------------------------------------
 // Result type
@@ -72,8 +82,27 @@ export interface CommandBusResult {
  *
  * @param name   - snake_case command name (== MCP tool name).
  * @param params - raw params object forwarded to execute().
+ * @param commandId - optional client id; a repeated id returns the cached result without re-applying
+ *   (network retries are safe). Bounded LRU of MAX_IDEMPOTENCY_ENTRIES.
  */
-export function applyCommand(name: string, params: unknown): CommandBusResult {
+export function applyCommand(name: string, params: unknown, commandId?: string): CommandBusResult {
+  if (commandId === undefined) return runCommand(name, params);
+  const cached = _resultsByCommandId.get(commandId);
+  if (cached !== undefined) {
+    _resultsByCommandId.delete(commandId);
+    _resultsByCommandId.set(commandId, cached); // refresh LRU position
+    return cached;
+  }
+  const result = runCommand(name, params);
+  _resultsByCommandId.set(commandId, result);
+  if (_resultsByCommandId.size > MAX_IDEMPOTENCY_ENTRIES) {
+    const oldest = _resultsByCommandId.keys().next();
+    if (!oldest.done) _resultsByCommandId.delete(oldest.value);
+  }
+  return result;
+}
+
+function runCommand(name: string, params: unknown): CommandBusResult {
   const isError = getCommand(name) === undefined;
   const prior = getLiveDoc();
   let result: ReturnType<typeof execute>;
@@ -106,7 +135,7 @@ export function applyCommand(name: string, params: unknown): CommandBusResult {
     // Mutating command — record history, broadcast.
     _undoStack = [..._undoStack, prior].slice(-MAX_UNDO_DEPTH);
     _redoStack = [];
-    setLiveDoc(result.document);
+    setLiveDoc(result.document, { name, params });
   }
   // No-op: document unchanged, no data — nothing to record or broadcast.
 
@@ -143,7 +172,7 @@ export function undo(): CommandBusResult {
   _redoStack = [..._redoStack, current].slice(-MAX_UNDO_DEPTH);
   // fullSnapshot=true: undo replaces the full doc state; a patch would be ambiguous
   // because entities may have been removed in the undone step.
-  setLiveDoc(previous, true);
+  setLiveDoc(withMonotonicStepCounter(previous, current));
   return {
     summary: 'Undid last change.',
     affected: [],
@@ -175,7 +204,7 @@ export function redo(): CommandBusResult {
   _redoStack = _redoStack.slice(0, -1);
   _undoStack = [..._undoStack, current].slice(-MAX_UNDO_DEPTH);
   // fullSnapshot=true: redo reinstates a prior full doc state.
-  setLiveDoc(next, true);
+  setLiveDoc(withMonotonicStepCounter(next, current));
   return {
     summary: 'Redid last change.',
     affected: [],
@@ -201,6 +230,7 @@ export function canRedo(): boolean {
  * @internal — exposed for tests only.
  */
 export function _resetHistory(): void {
+  _resultsByCommandId.clear();
   _undoStack = [];
   _redoStack = [];
 }

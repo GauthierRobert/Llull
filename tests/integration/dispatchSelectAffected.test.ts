@@ -4,7 +4,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 
@@ -14,7 +13,6 @@ async function flushPromises(): Promise<void> {
 
 describe('dispatch selectAffected', () => {
   beforeEach(() => {
-    __resetIdCounter();
     useStore.getState().setDocument(createEmptyDocument());
     useStore.setState({ liveStatus: 'disconnected', localUndoStack: [], localRedoStack: [] });
   });

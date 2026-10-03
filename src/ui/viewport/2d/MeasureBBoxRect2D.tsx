@@ -14,23 +14,8 @@
  */
 
 import { useMemo, useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useStore } from '@ui/store';
-
-// ---------------------------------------------------------------------------
-// Type narrowing
-// ---------------------------------------------------------------------------
-
-interface BBoxData {
-  min: readonly [number, number, number];
-  max: readonly [number, number, number];
-  size: readonly [number, number, number];
-}
-
-function isBBoxData(d: unknown): d is BBoxData {
-  return typeof d === 'object' && d !== null && 'min' in d && 'max' in d && 'size' in d;
-}
+import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
 
 // ---------------------------------------------------------------------------
 // RectLines2D — XY rectangle rendered as a LineLoop on Z=0.1 (above entities)
@@ -80,16 +65,7 @@ function RectLines2D({ min, max }: RectLines2DProps): React.ReactElement | null 
 // ---------------------------------------------------------------------------
 
 export function MeasureBBoxRect2D(): React.ReactElement | null {
-  const lastMeasure = useStore((s) => s.lastMeasure);
-  const { invalidate } = useThree();
-
-  useEffect(() => {
-    invalidate();
-  }, [lastMeasure, invalidate]);
-
-  if (!lastMeasure || lastMeasure.command !== 'measure_bounding_box') return null;
-  if (!isBBoxData(lastMeasure.data)) return null;
-
-  const { min, max } = lastMeasure.data;
-  return <RectLines2D min={min} max={max} />;
+  const bbox = useBoundingBoxMeasure();
+  if (!bbox) return null;
+  return <RectLines2D min={bbox.min} max={bbox.max} />;
 }

@@ -1,34 +1,25 @@
 /**
  * @layer ui/hooks
  *
- * useMcpLiveDocument — subscribes to the server-side SSE document stream.
+ * useMcpLiveDocument — subscribes to the server-side SSE command log.
  *
  * Opens `GET <SERVER_BASE>/live` as an EventSource (SERVER_BASE from @ui/serverConfig).
  *
- * Protocol (named SSE events):
- *   - `snapshot` event: full CadDocument JSON. Used on initial connect and after
- *     undo/redo. The store replaces the whole document (hydrateLiveDocument).
- *   - `patch` event: incremental DocPatch JSON. Emitted after every normal mutating
- *     command. The store applies only the changed entities (applyLivePatch), so
- *     cost is O(change) not O(document size). Unchanged entity object refs stay
- *     stable → React does not re-render unaffected meshes.
+ * Protocol (named SSE events, types in `@mcp/liveSync`; `epoch` = server process id, seq is per epoch):
+ *   - `snapshot` `{ seq, stateHash, document }`: on connect and after undo/redo → hydrateLiveDocument.
+ *   - `command` `{ seq, name, params, stateHash }`: after every mutating command. The store re-runs
+ *     it through `execute` (applyLiveCommand); on a seq gap or hash mismatch this hook fetches
+ *     `GET /live/snapshot` and hydrates from it.
  *
- * Lifecycle:
- *   - onopen  → setLiveStatus('connected')
- *   - snapshot → JSON.parse → hydrateLiveDocument (full replace)
- *   - patch   → JSON.parse → applyLivePatch (incremental update)
- *   - onerror → setLiveStatus('disconnected'), close, reconnect with exponential backoff (1s..30s)
- *   - unmount → EventSource.close()
- *
- * Mount once at the App root. Uses narrow store selectors (R3).
- * EventSource is a browser API — belongs in the ui/ layer (architecture L2).
+ * Lifecycle: onopen → 'connected'; onerror → 'disconnected', close, reconnect with exponential
+ * backoff (1s..30s); unmount → close. EventSource is a browser API — ui/ layer only (L2).
  */
 
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
-import type { CadDocument } from '@core/model/types';
-import type { DocPatch } from '@core/mcp/docPatch';
+import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import { SERVER_BASE } from '@ui/serverConfig';
+import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 
 const LIVE_URL = `${SERVER_BASE}/live`;
 const RETRY_BASE_MS = 1000;
@@ -40,7 +31,7 @@ const RETRY_MAX_MS = 30000;
  */
 export function useMcpLiveDocument(): void {
   const hydrateLiveDocument = useStore((s) => s.hydrateLiveDocument);
-  const applyLivePatch = useStore((s) => s.applyLivePatch);
+  const applyLiveCommand = useStore((s) => s.applyLiveCommand);
   const setLiveStatus = useStore((s) => s.setLiveStatus);
 
   useEffect(() => {
@@ -48,6 +39,27 @@ export function useMcpLiveDocument(): void {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
     let disposed = false;
+    let resyncInFlight = false;
+    let resyncQueued = false;
+
+    // One snapshot fetch at a time; failures arriving meanwhile coalesce into one follow-up.
+    const resync = (): void => {
+      if (resyncInFlight) {
+        resyncQueued = true;
+        return;
+      }
+      resyncInFlight = true;
+      void fetchLiveSnapshot()
+        .then(hydrateLiveDocument)
+        .catch(() => undefined) // next event or reconnect resyncs
+        .finally(() => {
+          resyncInFlight = false;
+          if (resyncQueued && !disposed) {
+            resyncQueued = false;
+            resync();
+          }
+        });
+    };
 
     const scheduleReconnect = (): void => {
       if (disposed || retryTimer !== null) return;
@@ -71,28 +83,22 @@ export function useMcpLiveDocument(): void {
 
       es.addEventListener('snapshot', (e: Event) => {
         try {
-          hydrateLiveDocument(JSON.parse((e as MessageEvent<string>).data) as CadDocument);
+          hydrateLiveDocument(JSON.parse((e as MessageEvent<string>).data) as LiveSnapshotEvent);
         } catch {
           // Malformed JSON from server — ignore, stay connected.
         }
       });
 
-      es.addEventListener('patch', (e: Event) => {
+      es.addEventListener('command', (e: Event) => {
+        let event: LiveCommandEvent;
         try {
-          applyLivePatch(JSON.parse((e as MessageEvent<string>).data) as DocPatch);
+          event = JSON.parse((e as MessageEvent<string>).data) as LiveCommandEvent;
         } catch {
-          // Malformed JSON from server — ignore, stay connected.
+          return; // Malformed JSON from server — ignore, stay connected.
         }
+        if (applyLiveCommand(event)) return;
+        resync();
       });
-
-      // Unnamed events: treated as a full snapshot (backward compatibility).
-      es.onmessage = (e: MessageEvent<string>) => {
-        try {
-          hydrateLiveDocument(JSON.parse(e.data) as CadDocument);
-        } catch {
-          // Malformed JSON — ignore.
-        }
-      };
 
       // Close the native auto-retry (fixed ~3s, noisy) and back off exponentially instead.
       es.onerror = () => {
@@ -109,5 +115,5 @@ export function useMcpLiveDocument(): void {
       if (retryTimer !== null) clearTimeout(retryTimer);
       source?.close();
     };
-  }, [hydrateLiveDocument, applyLivePatch, setLiveStatus]);
+  }, [hydrateLiveDocument, applyLiveCommand, setLiveStatus]);
 }

@@ -1,7 +1,7 @@
 /**
  * @layer ui/viewport/3d
  *
- * NamedViews — savable camera bookmarks for the 3D viewport (EN9).
+ * NamedViews — savable camera bookmarks for the 3D viewport.
  *
  * Architecture follows the same Canvas-boundary bridge pattern as ViewPresets:
  *   - `NamedViewsInner` is mounted INSIDE the r3f Canvas (uses `useThree`).
@@ -10,7 +10,7 @@
  *   - `NamedViewsOverlay` is mounted OUTSIDE the Canvas as a DOM overlay.
  *     It reads from `useNamedViewStore` and calls the ref callbacks.
  *
- * CRITICAL (P1 carry-forward): any programmatic camera move MUST call both
+ * CRITICAL: any programmatic camera move MUST call both
  * `controls.update()` AND `invalidate()` under frameloop="demand". Without
  * `invalidate()` the demand loop never fires; without `controls.update()` the
  * OrbitControls internal spherical state is stale and the RenderOriginSyncer
@@ -87,7 +87,7 @@ export function NamedViewsInner(): null {
       camera.lookAt(targetVec);
       orbit.target.copy(targetVec);
 
-      // P1: must call both update() and invalidate() under frameloop="demand".
+      // Must call both update() and invalidate() under frameloop="demand".
       // update() syncs OrbitControls internal spherical state; invalidate()
       // queues the next render frame (RenderOriginSyncer depends on this too).
       orbit.update();

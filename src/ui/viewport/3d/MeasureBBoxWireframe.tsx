@@ -13,23 +13,8 @@
  */
 
 import { useMemo, useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useStore } from '@ui/store';
-
-// ---------------------------------------------------------------------------
-// Type narrowing for the bbox data shape
-// ---------------------------------------------------------------------------
-
-interface BBoxData {
-  min: readonly [number, number, number];
-  max: readonly [number, number, number];
-  size: readonly [number, number, number];
-}
-
-function isBBoxData(d: unknown): d is BBoxData {
-  return typeof d === 'object' && d !== null && 'min' in d && 'max' in d && 'size' in d;
-}
+import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
 
 // ---------------------------------------------------------------------------
 // BBoxLines — renders the 12 edges of the AABB as a LineSegments object
@@ -120,17 +105,7 @@ function BBoxLines({ min, max }: BBoxLinesProps): React.ReactElement | null {
  * world coords — pass them through unchanged).
  */
 export function MeasureBBoxWireframe(): React.ReactElement | null {
-  const lastMeasure = useStore((s) => s.lastMeasure);
-  const { invalidate } = useThree();
-
-  // Call invalidate when the measure data changes so demand-mode canvas redraws.
-  useEffect(() => {
-    invalidate();
-  }, [lastMeasure, invalidate]);
-
-  if (!lastMeasure || lastMeasure.command !== 'measure_bounding_box') return null;
-  if (!isBBoxData(lastMeasure.data)) return null;
-
-  const { min, max } = lastMeasure.data;
-  return <BBoxLines min={min} max={max} />;
+  const bbox = useBoundingBoxMeasure();
+  if (!bbox) return null;
+  return <BBoxLines min={bbox.min} max={bbox.max} />;
 }

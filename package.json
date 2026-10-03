@@ -12,10 +12,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"scripts/**/*.ts\" playwright.config.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"scripts/**/*.ts\" playwright.config.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"scripts/**/*.ts\" playwright.config.ts",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" \"scripts/**/*.ts\" playwright.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -28,6 +28,7 @@
     "react-dom": "^18.3.1",
     "three": "^0.169.0",
     "three-mesh-bvh": "^0.9.10",
+    "zod": "^4.6.5",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
@@ -52,5 +53,8 @@
   },
   "engines": {
     "node": ">=20.12"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }

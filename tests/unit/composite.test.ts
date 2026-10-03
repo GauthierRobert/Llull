@@ -9,10 +9,9 @@
  * against the same convention the viewport uses.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // Mirror of applyEulerXYZ from render.ts (intrinsic XYZ = Rz * Ry * Rx)
@@ -86,8 +85,6 @@ function expectClose(actual: Vec3, expected: Vec3, eps = 1e-6, label = ''): void
 // ---------------------------------------------------------------------------
 
 describe('make_tube_between', () => {
-  beforeEach(() => __resetIdCounter());
-
   // --- Happy paths: axis-aligned directions ---
 
   it('axis +X: tube from [0,0,0] to [10,0,0] has correct endpoints', () => {

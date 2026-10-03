@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, BoxEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { executeRecorded } from '@core/commands/record';
-import { __resetIdCounter } from '@lib/id';
 
 function project(doc: CadDocument, actions: unknown[]): ReturnType<typeof execute> {
   return execute(doc, 'build_project', { actions });
@@ -12,10 +11,6 @@ function project(doc: CadDocument, actions: unknown[]): ReturnType<typeof execut
 function boxes(doc: CadDocument): BoxEntity[] {
   return Object.values(doc.entities).filter((e): e is BoxEntity => e.kind === 'box');
 }
-
-beforeEach(() => {
-  __resetIdCounter();
-});
 
 describe('build_project feature history', () => {
   it('records the inner steps only; replay_history builds exactly the solids once', () => {
@@ -190,6 +185,23 @@ describe('executeRecorded', () => {
     expect(doc.featureHistory.map((s) => s.params)).toEqual([
       { size: [1, 1, 1] },
       { radius: '=R' },
+    ]);
+  });
+});
+
+describe('build_project + insert_step', () => {
+  it('keeps the inserted step params (does not overwrite them with insert_step params)', () => {
+    const result = execute(createEmptyDocument(), 'build_project', {
+      actions: [
+        { command: 'set_parameter', params: { name: 'w', expression: '10' } },
+        {
+          command: 'insert_step',
+          params: { name: 'add_box', params: { size: ['=w', '=w', '=w'] } },
+        },
+      ],
+    });
+    expect(result.document.featureHistory.map((step) => step.params)).toEqual([
+      { size: ['=w', '=w', '=w'] },
     ]);
   });
 });

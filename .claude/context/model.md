@@ -1,14 +1,21 @@
 # CONTEXT: document & entity schema
 
-Ground-truth reference for `src/core/model/types.ts`. Entities are constructed ONLY
-inside `core/commands`.
+Ground-truth reference for `packages/core/src/model/` (`@core/model/*`): `types.ts` (document,
+entities), `partition.ts` (constructive vs evaluated), `building.ts` (AEC types). Entities are
+constructed ONLY inside commands (core or a plugin).
 
 ## Primitives
 
 ```ts
 type EntityId = string;
-type Vec3 = readonly [number, number, number];
-type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion';   // the 3D set
+type Vec2 = readonly [number, number];          // local work-plane coordinates
+type Vec3 = readonly [number, number, number];  // world, right-handed, +Z up
+type DocumentUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
+type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh' | 'cone' | 'torus'
+               | 'wedge' | 'pyramid' | 'revolution';
+type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse'
+                 | 'spline' | 'text' | 'dimension';
+type EntityKind = SolidKind | Shape2DKind | 'instance';
 ```
 
 ## Entities (discriminated union on `kind`)
@@ -16,144 +23,121 @@ type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion';   // the 3D set
 ```ts
 interface BaseEntity {
   readonly id: EntityId;
-  readonly kind: SolidKind;
-  position: Vec3;        // world-space origin
+  readonly kind: EntityKind;
+  position: Vec3;        // world origin (work-plane origin for 2D)
   rotation: Vec3;        // Euler radians
   layerId: string;
   color: string;         // hex, e.g. '#c8553d'
+  name?: string; tags?: readonly string[]; materialId?: string;
 }
 
-BoxEntity        : kind:'box';       size: Vec3            // w,h,d
-CylinderEntity   : kind:'cylinder';  radius: number; height: number
-SphereEntity     : kind:'sphere';    radius: number
-ExtrusionEntity  : kind:'extrusion'; profile: ReadonlyArray<readonly [number,number]>; depth: number
-
-type Entity = BoxEntity | CylinderEntity | SphereEntity | ExtrusionEntity;
+// 3D
+BoxEntity        'box'        size: Vec3
+CylinderEntity   'cylinder'   radius; height
+SphereEntity     'sphere'     radius
+ExtrusionEntity  'extrusion'  profile: ReadonlyArray<[number, number]>; depth
+MeshSolidEntity  'mesh'       mesh: MeshData            // kernel result (boolean / fillet)
+ConeEntity       'cone'       radius; height
+TorusEntity      'torus'      ringRadius; tubeRadius
+WedgeEntity      'wedge'      size: Vec3
+PyramidEntity    'pyramid'    baseWidth; baseDepth; height
+RevolutionEntity 'revolution' profile; axis: Vec3; angle; segments
+// 2D (geometry LOCAL to the work plane placed by position/rotation; default z=0, normal +Z)
+LineEntity       'line'       start: Vec2; end: Vec2
+PolylineEntity   'polyline'   points: Vec2[]; closed
+ArcEntity        'arc'        center: Vec2; radius; startAngle; endAngle
+CircleEntity     'circle'     center: Vec2; radius
+RectangleEntity  'rectangle'  width; height
+PointEntity      'point'
+EllipseEntity    'ellipse'    center: Vec2; radiusX; radiusY
+SplineEntity     'spline'     points: Vec2[]; closed
+TextEntity       'text'       content; height; anchor?
+DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'angular'; entityIds; offset?; precision?; label?
+// Assembly
+InstanceEntity   'instance'   componentId; scale?: Vec3
 ```
 
-Adding a new solid = add a literal to `SolidKind`, add a `*Entity` interface, add it
-to the `Entity` union, then add the command(s) that create/edit it. The viewport must
-gain a renderer branch for the new `kind`.
-
-## 2D shapes — PLANNED design (not yet in code; architecture L7)
-
-llull is also a 2D drafting tool. 2D shapes live in the SAME document and command layer
-as 3D solids. The model will extend like this (keep the shared `BaseEntity`):
-
-```ts
-type Vec2 = readonly [number, number];
-type Shape2DKind = 'line' | 'polyline' | 'circle' | 'arc' | 'rectangle' | 'point' | 'text' | 'dimension';
-type EntityKind = SolidKind | Shape2DKind;       // SolidKind stays the 3D set
-
-// 2D geometry is LOCAL to the entity's work plane; BaseEntity.position places that
-// plane in the shared 3D space (default plane z=0, normal +Z).
-interface LineEntity      extends BaseEntity { readonly kind: 'line';      a: Vec2; b: Vec2; }
-interface PolylineEntity  extends BaseEntity { readonly kind: 'polyline';  points: ReadonlyArray<Vec2>; closed: boolean; }
-interface CircleEntity2D  extends BaseEntity { readonly kind: 'circle';    radius: number; }
-interface ArcEntity       extends BaseEntity { readonly kind: 'arc';       radius: number; startAngle: number; endAngle: number; }
-interface RectEntity      extends BaseEntity { readonly kind: 'rectangle'; width: number; height: number; }
-interface PointEntity     extends BaseEntity { readonly kind: 'point'; }
-interface TextEntity      extends BaseEntity { readonly kind: 'text';      value: string; height: number; }
-interface DimensionEntity extends BaseEntity { readonly kind: 'dimension'; a: Vec2; b: Vec2; offset: number; }
-// Entity union extends to include all of the above.
-```
-
-Rules:
-- Add `is2D(kind): boolean` / `is3D(kind)` helpers in `model` for branching (viewport
-  render, selection filters, view mode).
-- `position` is the work-plane origin in 3D; `rotation` orients the plane. Introduce an
-  explicit `plane`/work-plane type only when multi-plane sketching is needed.
-- A closed `polyline`/profile is the input to `extrude_profile` (and later
-  `revolve_profile`). `ExtrusionEntity.profile` already foreshadows this 2D→3D bridge.
-
-## View mode — PLANNED
-`CameraState`/the document gains a drafting view mode: orthographic top-down for 2D vs
-the current 3D perspective orbit. View mode is presentation only — the entity bag is
-shared between the two views.
+`is2D(e)` / `is3D(e)` branch on `kind`. New kind ⇒ add the literal to `SolidKind` /
+`Shape2DKind`, the `*Entity` interface, the `Entity` union (and `SHAPE2D_KINDS` for 2D), the
+command(s) that create it, and a viewport render branch.
 
 ## Document
 
 ```ts
 interface CadDocument {
-  entities: Record<EntityId, Entity>;
-  order: EntityId[];           // z-order / creation order
-  layers: Record<string, Layer>;
-  layerOrder: string[];
-  selection: EntityId[];
-  camera: CameraState;
+  entities: Record<EntityId, Entity>;  order: EntityId[];          // EVALUATED (render/export cache)
+  layers: Record<string, Layer>;       layerOrder: string[];
+  selection: EntityId[];               camera: CameraState;        // per-client view state
+  groups: Record<string, EntityGroup>;
+  units: DocumentUnit;                 displayPrecision: number;
+  parameters: Record<string, Parameter>;        // { name, expression, value, error? }
+  animations: Record<string, Animation>;
+  featureHistory: FeatureStep[];                // the recipe (architecture L8)
+  nextStepNumber?: number;                      // next step-<n>; absent ⇒ 1; never reused
+  configurations: Record<string, Configuration>;
+  materials: Record<string, Material>;
+  recipes: Record<string, Recipe>;
+  components: Record<string, Component>;
+  constraints: Record<string, Constraint>;      constraintOrder: string[];
+  joints: Record<string, Joint>;                jointOrder: string[];
+  driveRelations: Record<string, DriveRelation>; driveRelationOrder: string[];
+  building?: BuildingModel;                     // building plugin's constructive model
 }
 
-interface Layer { readonly id: string; name: string; visible: boolean; locked: boolean; }
-interface CameraState { target: Vec3; azimuth: number; polar: number; distance: number; } // spherical orbit
+interface FeatureStep {
+  readonly id: string;          // 'step-<n>' (step-scoped ids: '<prefix>-<n>.<k>')
+  readonly name: string;        // registry command name
+  readonly params: unknown;     // as passed; '=expr' strings resolve against parameters on replay
+  suppressed?: boolean; label?: string;
+  affected?: readonly EntityId[];
+}
 
+interface Layer { readonly id: string; name: string; visible: boolean; locked: boolean; color?: string }
+interface CameraState { target: Vec3; azimuth: number; polar: number; distance: number } // spherical orbit
 const DEFAULT_LAYER_ID = 'layer-default';
-createEmptyDocument(): CadDocument            // one default layer 'Layer 0', empty selection
+createEmptyDocument(): CadDocument   // one default layer 'Layer 0', every table empty
 ```
 
-## Parametric model — PLANNED design (architecture L8)
+Constraint kinds: geometric `coincident | parallel | perpendicular | tangent`, dimensional
+`distance | angle`; solved by the pure `solve_constraints` (`commands/constraintSolver.ts`).
+Joints: `revolute | prismatic`.
 
-A full CAD stores the recipe, not just geometry. These extend `CadDocument`; keep them
-OPTIONAL and incremental (v1 may omit them — history = the undo snapshot stack).
+## Constructive vs evaluated (`partition.ts`)
 
 ```ts
-type ParamValue = number | string | boolean;
-interface Parameter  { readonly id: string; name: string; value: ParamValue; expression?: string; unit?: string; }
-
-type ConstraintKind =
-  | 'coincident' | 'parallel' | 'perpendicular' | 'tangent' | 'concentric'
-  | 'horizontal' | 'vertical' | 'equal'                       // geometric
-  | 'distance' | 'angle' | 'radius';                          // dimensional (driving)
-interface Constraint { readonly id: string; kind: ConstraintKind; entities: EntityId[]; value?: number; }
-
-// A feature = a recorded command invocation that can be re-evaluated.
-interface Feature    { readonly id: string; command: string; params: unknown; suppressed?: boolean; }
-
-interface CadDocument {
-  // ...existing fields...
-  parameters?: Record<string, Parameter>;
-  constraints?: Record<string, Constraint>;
-  history?: Feature[];        // ordered feature tree; replaying it (re)builds `entities`
-}
+EVALUATED_KEYS = ['entities', 'order']
+type EvaluatedModel = Pick<CadDocument, 'entities' | 'order'>;
+type DocumentDefinition = Omit<CadDocument, 'entities' | 'order'>;
+definitionOf(doc); evaluatedOf(doc); withEvaluated(definition, evaluated);
+derivedEntityIds(doc): Set<string>   // ids a plugin regenerates from its definition
 ```
 
-Rules:
-- When `history` is present it is the SOURCE OF TRUTH; `entities` is a DERIVED cache
-  produced by replaying `history` (constructive → evaluated). Editing a parameter or a
-  feature re-evaluates downstream — done in the store/evaluator, not in each command.
-- Constraints reference entities by id; a PURE solver (core/lib, unit-tested) positions
-  geometry to satisfy them.
-- Commands stay pure and keep the `CommandResult` contract — parametric is layered on top,
-  never a rewrite of the command API. See the `parametric` skill.
+- The definition is the source of truth; evaluated geometry is derivable (replay
+  `featureHistory`, plugin derivers). Edit the definition, never derived geometry (derivation
+  guards reject it).
+- `CommandResult.data` carries query values; queries return the same doc and `affected: []`.
 
-## Query results — PLANNED (read-only commands)
+## Persistence (`commands/persistence.ts`)
 
-Measurement/inspection tools don't mutate the document. Extend the result channel:
-
-```ts
-interface CommandResult {
-  document: CadDocument;   // UNCHANGED for a query
-  summary: string;         // factual, with units: "distance = 42.0 mm"
-  affected: string[];      // [] for a query
-  data?: unknown;          // structured measured value for programmatic agents
-}
-```
-
-A query returns the unchanged document, `affected: []`, a human/AI `summary`, and the
-value in `data`. See the `measure` skill (`measure_distance`, `volume_of`, ...).
+Envelope `{ format: 'llull-document', version: 2, document }` (`serializeDocument(doc,
+{ includeDerived? })` / `deserializeDocument(json)`, `load_document`). v2 omits plugin-derived
+entities (building) and re-derives them on load (`DocumentExtension.restore`); version 1 files
+are still read and migrated.
 
 ## Invariants commands must preserve
 
 - Every `entities[id].id === id` and `id ∈ order`.
 - Every `entity.layerId ∈ layers`.
 - `selection ⊆ keys(entities)`; deleting an entity removes it from `order` AND `selection`.
-- `position`/`rotation` are length-3; `color` is a hex string.
+- `position`/`rotation` are length-3 finite numbers (execute rejects corrupt results); `color` is hex.
 - New entity default layer = `DEFAULT_LAYER_ID` unless a command specifies otherwise.
+- `affected` order is deterministic for the same doc + params.
 
-## Building (AEC/BIM) — `CadDocument.building?` (src/core/model/building.ts)
+## Building (AEC/BIM) — `CadDocument.building?`
 
-Constructive building model (levels, elements, project info, cost rates). Building commands
-(`src/core/commands/building/`) edit it and call `regenerateBuilding()`, which replaces the
-evaluated entities (ids `<elementId>:<part>`, tag `bim`). No new entity kinds. Categories: grid,
-wall, door, window, slab, column, beam, stair, room (architecture) + member, footing, panel,
-equipment, pipe (industrial; `building/industrial/`, profiles in `building/steel/`). Guides:
-`docs/CONSTRUCTION.md`, `docs/INDUSTRIAL.md`.
+Types in `packages/core/src/model/building.ts` (levels, elements, project info, cost rates).
+Commands live in the building / industrial plugins (`packages/domain-aec/src`, `@aec/*`;
+industrial in `industrial/`, steel profiles in `steel/`). They edit the model and call
+`regenerateBuilding()` (`@aec/evaluate`), which replaces the evaluated entities (ids
+`<elementId>:<part>`, tag `bim`). No new entity kinds. Generated entities are read-only (building
+derivation guard) and are not stored in v2 files. Guides: `docs/CONSTRUCTION.md`, `docs/INDUSTRIAL.md`.

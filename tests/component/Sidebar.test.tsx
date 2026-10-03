@@ -9,7 +9,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useLayoutStore, useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { Sidebar } from '@ui/components/Sidebar';
@@ -27,7 +26,6 @@ const TAB_LABELS = [
 
 describe('Sidebar', () => {
   beforeEach(() => {
-    __resetIdCounter();
     useStore.setState({ document: createEmptyDocument(), lastSummary: null });
     useLayoutStore.setState({ sidebarTab: 'layers', sidebarOpen: true });
   });

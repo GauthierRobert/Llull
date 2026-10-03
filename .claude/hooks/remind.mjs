@@ -17,13 +17,17 @@ async function main() {
   if (/\bconsole\.log\s*\(/.test(text))
     notes.push('console.log present — remove before commit (console.warn/error allowed). [conventions C7]');
 
-  const isCommandLayer = /\/src\/core\/commands\//.test(filePath) || /^src\/core\/commands\//.test(filePath);
+  const isSource = /\.(ts|tsx|mts)$/.test(filePath);
+  const isCommandLayer =
+    /(^|\/)packages\/core\/src\/commands\//.test(filePath) || /(^|\/)packages\/domain-[^/]+\/src\//.test(filePath);
   if (isCommandLayer) {
-    notes.push('Command layer changed — ensure: registered in registry.ts, has happy + failure-path tests, ' +
-      'purity asserted, then run `npm run check` (coverage gate 90/85/90/90 on core/commands/**). [add-command]');
+    notes.push('Command layer changed — ensure: defineCommand + registered (registry.ts or the plugin\'s commands), ' +
+      'happy + failure-path tests, purity asserted, then run `npm run check` (coverage gate 90/85/90/90 on ' +
+      'packages/core/src/commands/** + packages/domain-aec/src/**). [add-command]');
   }
-  if (/CommandDefinition\s*</.test(text) && !isCommandLayer)
-    notes.push('A CommandDefinition appears outside core/commands — commands belong in core/commands. [architecture L1]');
+  const inPackage = /(^|\/)packages\/[^/]+\/src\//.test(filePath);
+  if (isSource && /\bdefineCommand\s*\(/.test(text) && !inPackage && !/(^|\/)tests\//.test(filePath))
+    notes.push('defineCommand appears outside packages/*/src — commands belong in packages/core/src/commands or a plugin. [architecture L1]');
 
   if (notes.length === 0) return done();
   const msg = 'llull reminders:\n- ' + notes.join('\n- ');

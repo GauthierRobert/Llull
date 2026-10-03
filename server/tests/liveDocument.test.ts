@@ -14,12 +14,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { frameEntityIds, parseSseFrame } from './sseTestHelpers';
 import {
   getLiveDoc,
+  getLiveSnapshot,
   setLiveDoc,
   subscribeLive,
   _resetLiveDoc,
   _subscriberCount,
 } from '../src/liveDocument';
-import { applyMcpToolCall } from '@core/mcp/dispatch';
+import { applyMcpToolCall } from '@mcp/dispatch';
 import { createEmptyDocument } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
@@ -165,7 +166,7 @@ describe('subscribeLive', () => {
 
     // The second write carries the updated document.
     const mutationMsg = resA.written[1] ?? '';
-    expect(parseSseFrame(mutationMsg).event).toBe('patch');
+    expect(parseSseFrame(mutationMsg).event).toBe('snapshot');
     expect(frameEntityIds(mutationMsg)).toHaveLength(1);
 
     unsubA();
@@ -218,5 +219,20 @@ describe('subscribeLive', () => {
     const custom = createEmptyDocument();
     _resetLiveDoc(custom);
     expect(getLiveDoc()).toBe(custom);
+  });
+});
+
+describe('epoch', () => {
+  it('snapshots and command events carry the same per-process epoch', () => {
+    const snapshot = getLiveSnapshot();
+    expect(snapshot.epoch.length).toBeGreaterThan(0);
+
+    const res = makeFakeRes();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    subscribeLive(res as any);
+    setLiveDoc(createEmptyDocument(), { name: 'noop', params: {} });
+    const commandFrame = parseSseFrame(res.written[res.written.length - 1] ?? '');
+    expect(commandFrame.event).toBe('command');
+    expect(commandFrame.data['epoch']).toBe(snapshot.epoch);
   });
 });

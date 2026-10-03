@@ -1,0 +1,124 @@
+{
+  "format": "llull-document",
+  "version": 2,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "box",
+        "size": [
+          10,
+          10,
+          10
+        ],
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      }
+    },
+    "order": [
+      "#1"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 0.5,
+      "polar": 1,
+      "distance": 30
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 2,
+    "parameters": {},
+    "animations": {
+      "#3": {
+        "id": "#3",
+        "targetId": "#1",
+        "targetKind": "entity",
+        "channel": "rotation",
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "mode": "spin",
+        "speed": 1,
+        "amplitude": 0,
+        "frequency": 0,
+        "trigger": "auto"
+      }
+    },
+    "featureHistory": [
+      {
+        "id": "#4",
+        "name": "set_units",
+        "params": {
+          "units": "mm",
+          "displayPrecision": 2
+        },
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "#5",
+        "name": "add_box",
+        "params": {
+          "size": [
+            10,
+            10,
+            10
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#1"
+        ]
+      },
+      {
+        "id": "#6",
+        "name": "animate_spin",
+        "params": {
+          "targetId": "#1",
+          "speed": 1
+        },
+        "suppressed": false,
+        "affected": []
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 4
+  }
+}

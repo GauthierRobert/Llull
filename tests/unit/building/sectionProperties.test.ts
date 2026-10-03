@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findProfile, sectionProperties } from '@core/commands/building/steel/profiles';
+import { findProfile, sectionProperties } from '@aec/steel/profiles';
 
 describe('sectionProperties', () => {
   it.each([

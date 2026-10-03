@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
-import { __resetIdCounter } from '@lib/id';
 
 // ---------------------------------------------------------------------------
 // Helpers — build minimal valid envelopes without going through commands
@@ -67,8 +66,6 @@ function validEntityBase(
 }
 
 describe('serializeDocument / deserializeDocument', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('round-trips an empty document exactly', () => {
     const doc = createEmptyDocument();
     const result = deserializeDocument(serializeDocument(doc));
@@ -93,7 +90,7 @@ describe('serializeDocument / deserializeDocument', () => {
     const json = serializeDocument(doc);
     const parsed = JSON.parse(json) as Record<string, unknown>;
     expect(parsed['format']).toBe('llull-document');
-    expect(parsed['version']).toBe(1);
+    expect(parsed['version']).toBe(2);
     expect(parsed['document']).toBeDefined();
   });
 
@@ -120,7 +117,7 @@ describe('serializeDocument / deserializeDocument', () => {
   });
 
   it('throws on wrong version', () => {
-    const bad = JSON.stringify({ format: 'llull-document', version: 2, document: {} });
+    const bad = JSON.stringify({ format: 'llull-document', version: 3, document: {} });
     expect(() => deserializeDocument(bad)).toThrow(/version/i);
   });
 
@@ -174,8 +171,6 @@ describe('serializeDocument / deserializeDocument', () => {
 });
 
 describe('load_document command', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('happy path: replaces the document and reports entity/layer counts', () => {
     let sourceDoc = createEmptyDocument();
     sourceDoc = execute(sourceDoc, 'add_box', { size: [1, 1, 1] }).document;
@@ -275,14 +270,11 @@ describe('load_document command', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — Validation branches: entity kind-specific guards
-// These tests target the switch/case branches in validateEntityValue that were
-// previously uncovered: text (line 232), default (line 235).
+// Validation branches: entity kind-specific guards
+// These tests target the text and default switch/case branches in validateEntityValue.
 // ---------------------------------------------------------------------------
 
 describe('deserializeDocument — entity kind-specific validation', () => {
-  beforeEach(() => __resetIdCounter());
-
   // ── text — valid passes, invalid height fails ────────────────────────────
 
   it('accepts a valid text entity (height > 0) — covers break in text case', () => {
@@ -657,12 +649,10 @@ describe('deserializeDocument — entity kind-specific validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — Material validation branches
+// Material validation branches
 // ---------------------------------------------------------------------------
 
 describe('deserializeDocument — material validation', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('accepts a valid material and round-trips it', () => {
     const json = makeEnvelope({
       materials: {
@@ -756,12 +746,10 @@ describe('deserializeDocument — material validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — Parameter validation branches
+// Parameter validation branches
 // ---------------------------------------------------------------------------
 
 describe('deserializeDocument — parameter validation', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('throws when a parameter entry is not an object', () => {
     const json = makeEnvelope({ parameters: { bad: 'not-an-object' } });
     expect(() => deserializeDocument(json)).toThrow(/parameter/i);
@@ -810,12 +798,10 @@ describe('deserializeDocument — parameter validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — Migration: older documents missing optional fields get correct defaults
+// Migration: older documents missing optional fields get correct defaults
 // ---------------------------------------------------------------------------
 
 describe('deserializeDocument — migration / back-compat defaults', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('fills parameters: {} when the field is absent', () => {
     const json = makeEnvelope(); // makeEnvelope does not include parameters
     const restored = deserializeDocument(json);
@@ -907,12 +893,10 @@ describe('deserializeDocument — migration / back-compat defaults', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — add_box guard branches: NaN / Infinity / unresolved-expression-string
+// add_box guard branches: NaN / Infinity / unresolved-expression-string
 // ---------------------------------------------------------------------------
 
 describe('add_box — dimension guard branches', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('NaN width is a safe no-op', () => {
     const doc = createEmptyDocument();
     const result = execute(doc, 'add_box', { size: [NaN, 1, 1] });
@@ -938,12 +922,10 @@ describe('add_box — dimension guard branches', () => {
 });
 
 // ---------------------------------------------------------------------------
-// KI6 — geometry.ts line 599: delete_entity on doc where groups is undefined
+// delete_entity on doc where groups is undefined
 // ---------------------------------------------------------------------------
 
 describe('delete_entity — doc.groups null-safety', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('deletes an entity safely when doc.groups is undefined', () => {
     let doc = createEmptyDocument();
     const created = execute(doc, 'add_box', { size: [1, 1, 1] });

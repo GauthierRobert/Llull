@@ -16,7 +16,7 @@
 import { spawn } from 'node:child_process';
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { CadExchangePort, ProgramRun, PythonLanguage } from '@core/mcp';
+import type { CadExchangePort, ProgramRun, PythonLanguage } from '@mcp/index';
 
 /** Response size cap (it is JSON.parse'd in memory). ~96 MB of STEP once base64-encoded. */
 const MAX_OUTPUT_BYTES = 128 * 1024 * 1024;

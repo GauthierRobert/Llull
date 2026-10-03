@@ -12,14 +12,14 @@ CLAUDE.md            (repo root) entrypoint; imports the rules; read this first
 .claude/
   settings.json      permissions (fewer prompts) + hook wiring
   rules/             AUTHORITATIVE ruleset, imported by CLAUDE.md
-    architecture.md    the laws L1–L9 (command-layer, deps, purity, 2D/3D, parametric, kernel)
+    architecture.md    the laws L1–L10 (command-layer, deps, purity, 2D/3D, parametric, kernel, plugins)
     conventions.md     machine-first code style + structured doc-comment tags
     workflow.md        loop, branch/commit, testing, definition of done
     solid.md           SOLID principles mapped onto the command layer
     ai-context.md      keep the codebase clean & legible for AI agents
     react.md           React + r3f + Zustand best practices (on-demand; ui/ work only)
   agents/            focused subagents (delegate to these)
-    command-author.md    add/modify commands in core/commands (+ tests)
+    command-author.md    add/modify commands in packages/core or a plugin (+ tests)
     viewport-engineer.md 2D + 3D viewport (r3f), snapping & interaction
     mcp-engineer.md      MCP host over the registry
     test-verifier.md     tests + coverage gate + the check loop
@@ -37,16 +37,16 @@ CLAUDE.md            (repo root) entrypoint; imports the rules; read this first
     model.md             document/entity schema (2D shapes + 3D solids) + invariants
   hooks/             guardrails + reminders (Node, cross-platform)
     session-start.mjs       injects invariants at session start
-    enforce-architecture.mjs PreToolUse: blocks react/DOM/fetch in core/
+    enforce-architecture.mjs PreToolUse: blocks react/DOM/fetch in packages/*/src, plugin imports in core
     remind.mjs              PostToolUse: console.log + command-layer reminders
 ```
 
 ## How it fits together
 
-- **CLAUDE.md** is always in context and imports the three `rules/` files. They are
+- **CLAUDE.md** is always in context and imports five `rules/` files (react.md loads on demand). They are
   the law. `context/` files are pulled in only when an agent/skill needs the detail.
-- **Hooks** enforce the one rule that's easy to violate silently (core/ purity of
-  layering) and nudge on the rest — without slowing iteration.
+- **Hooks** enforce the one rule that's easy to violate silently (layering of
+  `packages/*`) and nudge on the rest — without slowing iteration.
 - **Agents** are the default unit of work: delegate, parallelize, converge on
   `cad-reviewer`. **Skills** are the recipes those agents (and the main thread) follow.
 - The design philosophy is **machine-first**: source optimizes for unambiguous AI
@@ -62,7 +62,7 @@ not a requirement. The **Playwright** MCP server (browser automation for `verify
 is provided by the harness plugin and needs no config here.
 
 > Not to be confused with llull's OWN MCP server (the product feature in `server/` +
-> `core/mcp`), which exposes CAD commands to external agents. That is built by
+> `packages/mcp`), which exposes CAD commands to external agents. That is built by
 > `mcp-engineer`, not configured here.
 
 ## Tuning

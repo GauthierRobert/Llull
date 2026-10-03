@@ -1,0 +1,1043 @@
+/**
+ * Domain model — the single source of truth for a CAD document.
+ *
+ * Everything else in the app (UI, AI bridge, MCP server) reads and mutates
+ * this model exclusively through the command layer. Nothing constructs or
+ * edits entities directly outside of `core/commands`.
+ */
+
+import type { MeshData } from '../geometry/kernel';
+import type { BuildingModel } from './building';
+export type { MeshData };
+
+export type EntityId = string;
+
+export type Vec3 = readonly [number, number, number];
+
+/** Units of length used for display and measurement throughout the document. */
+export type DocumentUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
+
+/** 2D coordinate in a local work plane. */
+export type Vec2 = readonly [number, number];
+
+/** Primitive solids supported in v1. Extend this union to add new geometry. */
+export type SolidKind =
+  | 'box'
+  | 'cylinder'
+  | 'sphere'
+  | 'extrusion'
+  | 'mesh'
+  | 'cone'
+  | 'torus'
+  | 'wedge'
+  | 'pyramid'
+  | 'revolution';
+
+/** 2D drafting shape kinds. Geometry is LOCAL to the entity work plane; BaseEntity.position places that plane in 3D space. */
+export type Shape2DKind =
+  | 'line'
+  | 'polyline'
+  | 'arc'
+  | 'circle'
+  | 'rectangle'
+  | 'point'
+  | 'ellipse'
+  | 'spline'
+  | 'text'
+  | 'dimension';
+
+/** All entity kinds — 3D solids, 2D shapes, and assembly references. */
+export type EntityKind = SolidKind | Shape2DKind | 'instance';
+
+export interface BaseEntity {
+  readonly id: EntityId;
+  readonly kind: EntityKind;
+  /** World-space position of the entity origin (work-plane origin for 2D entities). */
+  position: Vec3;
+  /** Euler rotation in radians. */
+  rotation: Vec3;
+  /** Layer this entity belongs to. */
+  layerId: string;
+  /** Hex color, e.g. "#c8553d". */
+  color: string;
+  /**
+   * Optional human-readable name for the entity, set by `set_entity_name`.
+   * Enables AI/MCP plans to reference entities by meaning rather than generated ids.
+   */
+  name?: string;
+  /**
+   * Optional semantic tags for the entity, set by `set_entity_name`.
+   * Used by `find_entities` to filter by tag.
+   * @example ['structural', 'visible']
+   */
+  tags?: readonly string[];
+  /**
+   * Optional reference to a material defined in `CadDocument.materials`.
+   * When set, `mass_properties` uses the material's density instead of a caller-supplied value.
+   * Set by `assign_material`.
+   */
+  materialId?: string;
+}
+
+export interface BoxEntity extends BaseEntity {
+  readonly kind: 'box';
+  size: Vec3; // width, height, depth
+}
+
+export interface CylinderEntity extends BaseEntity {
+  readonly kind: 'cylinder';
+  radius: number;
+  height: number;
+}
+
+export interface SphereEntity extends BaseEntity {
+  readonly kind: 'sphere';
+  radius: number;
+}
+
+/** A 2D profile extruded along Z — the simplest path to "AutoCAD-like" modeling. */
+export interface ExtrusionEntity extends BaseEntity {
+  readonly kind: 'extrusion';
+  /** Closed polygon in the XY plane. */
+  profile: ReadonlyArray<readonly [number, number]>;
+  depth: number;
+}
+
+/**
+ * An arbitrary triangle mesh (boolean / fillet / chamfer result, imported mesh, generated geometry).
+ * `mesh` holds world-space geometry; `position` is [0,0,0] (mesh is already in world space).
+ * Created by `boolean_*`, `fillet_edge`, `chamfer_edge`, `import_mesh` and plugin-generated geometry.
+ * Rendered by src/ui/viewport/3d/entities/MeshSolidMesh.tsx.
+ */
+export interface MeshSolidEntity extends BaseEntity {
+  readonly kind: 'mesh';
+  /** World-space triangle mesh produced by a boolean kernel operation. */
+  mesh: MeshData;
+}
+
+/**
+ * A cone solid — circular base in the XY plane, apex above the base center along +Z.
+ * `position` is the world-space center of the base circle.
+ * `radius` is the base radius; `height` is the distance from base center to apex.
+ * Both must be > 0.
+ */
+export interface ConeEntity extends BaseEntity {
+  readonly kind: 'cone';
+  /** Radius of the circular base. Must be > 0. */
+  radius: number;
+  /** Height from the base center to the apex along the local +Z axis. Must be > 0. */
+  height: number;
+}
+
+/**
+ * A torus (donut) solid centered at `position`.
+ * `ringRadius` is the distance from the torus center to the center of the tube (the major radius).
+ * `tubeRadius` is the radius of the circular tube cross-section (the minor radius).
+ * Both must be > 0 and tubeRadius < ringRadius for a valid (non-self-intersecting) torus.
+ */
+export interface TorusEntity extends BaseEntity {
+  readonly kind: 'torus';
+  /** Distance from torus center to tube center (major radius). Must be > 0. */
+  ringRadius: number;
+  /** Radius of the tube cross-section (minor radius). Must be > 0. */
+  tubeRadius: number;
+}
+
+/**
+ * A wedge solid — a right-triangular prism (ramp shape).
+ * `size` is [width, height, depth] of the enclosing box.
+ * The wedge occupies the full box in X (width) and Z (depth) but is sloped in Y:
+ * the front face (at z=0) has full height, the back face (at z=depth) tapers to zero height.
+ * In other words, the slope cuts the top-rear corner: the solid has vertices at
+ * (0,0,0), (width,0,0), (0,height,0), (width,height,0) on the front face and
+ * (0,0,depth), (width,0,depth) on the back edge (height=0 at z=depth).
+ * `position` is at the lower-front-left corner.
+ * All three size components must be > 0.
+ */
+export interface WedgeEntity extends BaseEntity {
+  readonly kind: 'wedge';
+  /**
+   * Bounding dimensions [width, height, depth].
+   * width = extent along X; height = full height at the front face (z=0);
+   * depth = extent along Z (the ramp direction). All must be > 0.
+   */
+  size: Vec3;
+}
+
+/**
+ * A pyramid solid with a rectangular base and apex above the base center.
+ * `position` is the world-space center of the rectangular base.
+ * The base extends ±baseWidth/2 in X and ±baseDepth/2 in Y from `position`.
+ * The apex is at (position[0], position[1], position[2]+height).
+ * All three dimensions must be > 0.
+ */
+export interface PyramidEntity extends BaseEntity {
+  readonly kind: 'pyramid';
+  /** Width of the rectangular base (extent along X). Must be > 0. */
+  baseWidth: number;
+  /** Depth of the rectangular base (extent along Y). Must be > 0. */
+  baseDepth: number;
+  /** Height from the base center to the apex along the local +Z axis. Must be > 0. */
+  height: number;
+}
+
+/**
+ * A surface of revolution — a closed 2D profile rotated around an axis.
+ *
+ * `profile` is the generating cross-section: a closed polygon in the half-plane
+ * where the axis is the Y axis of the profile plane (Y ≥ 0 for a well-formed solid).
+ * Points are [x, y] in the profile plane; x is the radial offset from the axis.
+ *
+ * `axis` is the revolution axis expressed as a unit Vec3 in local entity space.
+ * Canonical values: [0,1,0] = Y axis, [1,0,0] = X axis, [0,0,1] = Z axis.
+ *
+ * `angle` is the sweep angle in radians (0 < angle ≤ 2π). 2π = full revolution.
+ *
+ * `segments` is the number of radial subdivisions used to tessellate the surface.
+ * Minimum 3; default 32.
+ *
+ * `position` is the world-space origin of the revolution axis (the axis passes
+ * through this point and extends in the `axis` direction).
+ *
+ * @invariant profile.length >= 3
+ * @invariant 0 < angle <= 2π
+ * @invariant segments >= 3
+ * @see revolve_profile
+ */
+export interface RevolutionEntity extends BaseEntity {
+  readonly kind: 'revolution';
+  /** Closed polygon defining the cross-section in the profile plane. Each point is [radialOffset, axialOffset]. */
+  profile: ReadonlyArray<readonly [number, number]>;
+  /** Revolution axis direction in local entity space (unit vector). */
+  axis: Vec3;
+  /** Sweep angle in radians. 2π = full revolution. */
+  angle: number;
+  /** Number of radial subdivisions for tessellation. Minimum 3. */
+  segments: number;
+}
+
+// ---------------------------------------------------------------------------
+// 2D shape entities — geometry is LOCAL to the work plane (Vec2);
+// BaseEntity.position places the plane origin in 3D space (default z=0, normal +Z).
+// ---------------------------------------------------------------------------
+
+/** A straight line segment defined by two endpoints in the local work plane. */
+export interface LineEntity extends BaseEntity {
+  readonly kind: 'line';
+  /** Start point in local 2D work-plane coordinates. */
+  start: Vec2;
+  /** End point in local 2D work-plane coordinates. */
+  end: Vec2;
+}
+
+/** An ordered sequence of connected line segments in the local work plane. */
+export interface PolylineEntity extends BaseEntity {
+  readonly kind: 'polyline';
+  /** Ordered vertices in local 2D work-plane coordinates. Minimum 2 points. */
+  points: ReadonlyArray<Vec2>;
+  /** When true the last point connects back to the first, forming a closed loop. */
+  closed: boolean;
+}
+
+/** A circular arc in the local work plane. */
+export interface ArcEntity extends BaseEntity {
+  readonly kind: 'arc';
+  /** Center of the arc in local 2D work-plane coordinates. */
+  center: Vec2;
+  /** Arc radius. Must be > 0. */
+  radius: number;
+  /** Start angle in radians (measured counter-clockwise from +X). */
+  startAngle: number;
+  /** End angle in radians (measured counter-clockwise from +X). */
+  endAngle: number;
+}
+
+/** A full circle in the local work plane. */
+export interface CircleEntity extends BaseEntity {
+  readonly kind: 'circle';
+  /** Center of the circle in local 2D work-plane coordinates. */
+  center: Vec2;
+  /** Circle radius. Must be > 0. */
+  radius: number;
+}
+
+/**
+ * An axis-aligned rectangle in the local work plane.
+ * Origin is at the lower-left corner; width extends along +X, height along +Y.
+ */
+export interface RectangleEntity extends BaseEntity {
+  readonly kind: 'rectangle';
+  /** Width along local X axis. Must be > 0. */
+  width: number;
+  /** Height along local Y axis. Must be > 0. */
+  height: number;
+}
+
+/** A single point in the local work plane. Geometry is captured by BaseEntity.position. */
+export interface PointEntity extends BaseEntity {
+  readonly kind: 'point';
+}
+
+/**
+ * An axis-aligned ellipse in the local work plane.
+ * `center` is the ellipse center in local 2D coordinates.
+ * `radiusX` and `radiusY` are the semi-axes along the local plane's X and Y axes respectively.
+ * The entity `position`/`rotation` places the work plane in 3D space.
+ * Both radii must be > 0.
+ */
+export interface EllipseEntity extends BaseEntity {
+  readonly kind: 'ellipse';
+  /** Center of the ellipse in local 2D work-plane coordinates. */
+  center: Vec2;
+  /** Semi-axis length along the local X axis. Must be > 0. */
+  radiusX: number;
+  /** Semi-axis length along the local Y axis. Must be > 0. */
+  radiusY: number;
+}
+
+/**
+ * A Catmull-Rom interpolating spline in the local work plane.
+ * `points` are the through-points (the spline passes through each one).
+ * Requires at least 2 points.
+ * When `closed` is true, the curve loops back from the last point to the first.
+ *
+ * Convention for renderers: tessellate as a Catmull-Rom spline with
+ * centripetal parameterization. The control points ARE the through-points;
+ * no separate control polygon is stored. For closed splines, treat the point
+ * array as periodic (wrap the first/last points).
+ */
+export interface SplineEntity extends BaseEntity {
+  readonly kind: 'spline';
+  /** Ordered through-points in local 2D work-plane coordinates. Minimum 2 points. */
+  points: ReadonlyArray<Vec2>;
+  /** When true the spline loops back from the last point to the first. */
+  closed: boolean;
+}
+
+/**
+ * An annotation text label placed in the document.
+ * Geometry is anchored at `position` (world-space, same convention as other 2D entities: z=0 plane by default).
+ * `content` is the displayed string; `height` is the cap-height in model units.
+ * Optional `anchor` controls the horizontal alignment of the text relative to `position`:
+ *   'left'   — position is the left edge of the first glyph (default)
+ *   'center' — position is the horizontal midpoint of the text
+ *   'right'  — position is the right edge of the last glyph
+ * Optional `layer` is inherited from BaseEntity.layerId if omitted during creation.
+ * Both `content` must be non-empty and `height` must be > 0.
+ */
+export interface TextEntity extends BaseEntity {
+  readonly kind: 'text';
+  /** The text string to display. Must not be empty. */
+  content: string;
+  /** Cap-height of the text in model units. Must be > 0. */
+  height: number;
+  /** Horizontal alignment of the text relative to `position`. Default: 'left'. */
+  anchor?: 'left' | 'center' | 'right';
+}
+
+/**
+ * An associative dimension annotation placed in the document.
+ * `dimensionKind` controls the measurement type and the required `entityIds` count:
+ *   - 'linear'  : measures the straight-line distance between two endpoints; `entityIds` = 2 (line/point entities)
+ *   - 'aligned' : like linear but parallel to the segment between the two reference points; `entityIds` = 2
+ *   - 'radial'  : measures the radius of a circle, arc, or ellipse; `entityIds` = 1 (circle/arc/ellipse entity)
+ *   - 'angular' : measures the angle at the vertex of two line segments; `entityIds` = 3 (vertex point + 2 line entities, or 3 point entities)
+ * `entityIds` contains references to existing document entities; the dimension updates if those entities move.
+ * Optional `offset` is the perpendicular distance (in model units) from the measured geometry to the dimension line; default 5.
+ * Optional `precision` overrides the document display precision (number of decimal places) for this dimension only.
+ * Optional `label` replaces the computed numeric value with a custom string.
+ */
+export interface DimensionEntity extends BaseEntity {
+  readonly kind: 'dimension';
+  /** Controls how the measurement is computed and how many entityIds are required. */
+  dimensionKind: 'linear' | 'aligned' | 'radial' | 'angular';
+  /**
+   * Ids of the referenced document entities.
+   * linear/aligned: exactly 2 ids (line or point entities).
+   * radial: exactly 1 id (circle, arc, or ellipse entity).
+   * angular: exactly 3 ids (vertex point + 2 line entities, or 3 point entities).
+   * All ids must exist in the document. Dangling refs are flagged by check_model.
+   */
+  entityIds: readonly string[];
+  /** Perpendicular offset (model units) from the measured geometry to the dimension line. Default: 5. */
+  offset?: number;
+  /** Decimal precision override for this dimension; overrides CadDocument.displayPrecision when present. */
+  precision?: number;
+  /** Custom label overriding the computed numeric value. If absent, the value is computed at render time. */
+  label?: string;
+}
+
+/**
+ * A placed reference to a Component definition.
+ *
+ * An instance renders the component's child entities at the instance's world-space
+ * transform. Editing the component's definition is automatically reflected in every
+ * instance — no geometry is duplicated here.
+ *
+ * `position` and `rotation` (inherited from BaseEntity) define the world-space
+ * placement. `scale` multiplies each axis independently about the component origin;
+ * defaults to [1, 1, 1] when omitted.
+ *
+ * @invariant componentId must exist in CadDocument.components
+ * @see Component, create_component, insert_instance, explode_instance
+ */
+export interface InstanceEntity extends BaseEntity {
+  readonly kind: 'instance';
+  /** Id of the Component definition this instance references. */
+  componentId: string;
+  /** Optional per-axis scale applied about the component origin. Default: [1,1,1]. */
+  scale?: Vec3;
+}
+
+export type Entity =
+  | BoxEntity
+  | CylinderEntity
+  | SphereEntity
+  | ExtrusionEntity
+  | MeshSolidEntity
+  | ConeEntity
+  | TorusEntity
+  | WedgeEntity
+  | PyramidEntity
+  | RevolutionEntity
+  | LineEntity
+  | PolylineEntity
+  | ArcEntity
+  | CircleEntity
+  | RectangleEntity
+  | PointEntity
+  | EllipseEntity
+  | SplineEntity
+  | TextEntity
+  | DimensionEntity
+  | InstanceEntity;
+
+// ---------------------------------------------------------------------------
+// Kind helpers
+// ---------------------------------------------------------------------------
+
+const SHAPE2D_KINDS: ReadonlySet<string> = new Set<Shape2DKind>([
+  'line',
+  'polyline',
+  'arc',
+  'circle',
+  'rectangle',
+  'point',
+  'ellipse',
+  'spline',
+  'text',
+  'dimension',
+]);
+
+/** Returns true if the entity is a 2D drafting shape. */
+export function is2D(e: Entity): boolean {
+  return SHAPE2D_KINDS.has(e.kind);
+}
+
+/** Returns true if the entity is a 3D solid. */
+export function is3D(e: Entity): boolean {
+  return !SHAPE2D_KINDS.has(e.kind);
+}
+
+export interface Layer {
+  readonly id: string;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  /** Optional hex color string used by the UI to tint layer contents, e.g. "#ff0000". */
+  color?: string;
+}
+
+export interface CameraState {
+  /** Orbit target. */
+  target: Vec3;
+  /** Spherical orbit angles (radians) + distance. */
+  azimuth: number;
+  polar: number;
+  distance: number;
+}
+
+/**
+ * A named group of entities. Groups are lightweight: they record membership but
+ * do NOT change entity kinds or positions. The `groups` map in `CadDocument` is
+ * the authoritative container; commands create/remove groups, members stay as-is.
+ */
+export interface EntityGroup {
+  readonly id: string;
+  /** Human-readable label, e.g. "Wheel assembly". */
+  name: string;
+  /** Ids of member entities. All must exist in `entities`. */
+  memberIds: EntityId[];
+}
+
+/**
+ * A named set of parameter-value overrides that produces a model variant.
+ *
+ * Each entry in `parameterValues` maps a parameter name to an expression string
+ * (the same format as `Parameter.expression`). Activating a configuration applies
+ * those expressions to `CadDocument.parameters` and replays the feature history so
+ * `=expr` geometry regenerates with the variant's values.
+ *
+ * @see create_configuration, activate_configuration
+ */
+export interface Configuration {
+  /** Human-readable identifier, also used as the configuration key. */
+  readonly name: string;
+  /**
+   * Map of parameter name → expression string for this variant.
+   * Only parameters listed here are changed when the configuration is activated;
+   * all other parameters retain their current expressions.
+   */
+  parameterValues: Record<string, string>;
+}
+
+/**
+ * A named numeric parameter that can reference other parameters via expressions.
+ *
+ * `expression` is the source of truth (e.g. `"width * 2"` or a literal `"10"`).
+ * `value` is the last successful evaluation result.
+ * `error` is set when evaluation fails (unknown reference, cycle, parse error).
+ * The shape is intentionally minimal and JSON-serializable.
+ */
+export interface Parameter {
+  /** Human-readable name used in expressions, e.g. `"width"`. */
+  readonly name: string;
+  /**
+   * The expression string that defines this parameter's value.
+   * May be a numeric literal (`"10"`) or reference other parameters (`"width * 2"`).
+   */
+  expression: string;
+  /** Last successfully evaluated numeric value. */
+  value: number;
+  /** Set to a descriptive message when evaluation failed; absent on success. */
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Animation — declarative movement clips (no physics). The document DECLARES
+// motion (L8: the document is the recipe); the viewport player EVALUATES it
+// per-frame (derived, not stored). Two profiles cover bike-mechanics motion:
+//   - spin:      constant velocity (wheels, pedals, crank, gears)
+//   - oscillate: sinusoidal back-and-forth (steering wobble, piston bob)
+// Either an `entity` or a `group` can be the target, so a whole sub-assembly
+// (e.g. a wheel + spokes) moves rigidly about a shared pivot.
+// ---------------------------------------------------------------------------
+
+/** Transform channel an animation drives. */
+export type AnimationChannel = 'rotation' | 'position';
+
+/** Motion profile: constant-velocity spin, or sinusoidal oscillation. */
+export type AnimationMode = 'spin' | 'oscillate';
+
+/** What runs the clip: global Play, or clicking the target in the viewport. */
+export type AnimationTrigger = 'auto' | 'click';
+
+/** Whether `targetId` names a single entity or a group of entities. */
+export type AnimationTargetKind = 'entity' | 'group';
+
+/**
+ * A declarative movement clip. Pure JSON-serializable document data; the
+ * viewport `AnimationPlayer` reads these and mutates three.js transforms each
+ * frame (the document transform is never touched — animation is a render-time
+ * overlay, like selection).
+ */
+export interface Animation {
+  readonly id: string;
+  /** Id of the entity or group to animate. */
+  targetId: EntityId;
+  /** Whether `targetId` names an entity or a group. */
+  targetKind: AnimationTargetKind;
+  /** Which transform channel to drive. */
+  channel: AnimationChannel;
+  /**
+   * Direction the animation acts along: the rotation axle for `rotation`, or the
+   * translation direction for `position`. Need not be unit-length — the player
+   * normalizes it. e.g. [0,1,0] spins about the world Y axis.
+   */
+  axis: Vec3;
+  /** 'spin' = constant velocity; 'oscillate' = sinusoidal back-and-forth. */
+  mode: AnimationMode;
+  /** spin only: angular velocity (rad/s) for rotation, or linear velocity (units/s) for position. */
+  speed: number;
+  /** oscillate only: peak amplitude — radians for rotation, units for position. */
+  amplitude: number;
+  /** oscillate only: cycles per second (Hz). */
+  frequency: number;
+  /** rotation only: world-space pivot; defaults to the target's position when omitted. */
+  pivot?: Vec3;
+  /** 'auto' runs under global Play; 'click' toggles when the target is clicked. */
+  trigger: AnimationTrigger;
+}
+
+/**
+ * A single recorded command invocation in the document's editable history.
+ *
+ * `name` is the registry command name (snake_case). `params` is the params
+ * object that was passed. When `suppressed` is true the step is skipped during
+ * replay. `label` is an optional human/AI-readable note.
+ *
+ * The history list is the SOURCE OF TRUTH for the document's constructive
+ * recipe (architecture L8). Replaying all non-suppressed steps from
+ * `createEmptyDocument()` regenerates the evaluated `entities` bag.
+ */
+export interface FeatureStep {
+  /** Unique step id `step-<n>` (`CadDocument.nextStepNumber`); legacy v1 files keep their old ids. */
+  readonly id: string;
+  /** Registry command name (snake_case). */
+  readonly name: string;
+  /** Original params object passed to the command. */
+  readonly params: unknown;
+  /**
+   * When true this step is skipped during replay.
+   * Allows toggling a feature off without deleting it.
+   * Default: false (active).
+   */
+  suppressed?: boolean;
+  /** Optional human/AI-readable label for this step, e.g. "Base plate". */
+  label?: string;
+  /**
+   * Entity ids created or affected when this step was first recorded (`CommandResult.affected`).
+   * Step-scoped ids replay identically; for legacy (v1) steps `replayHistory` zips these with the
+   * replayed ids to remap later references. Optional: steps without it get no legacy remap.
+   */
+  affected?: readonly EntityId[];
+}
+
+/**
+ * A named, reusable constructive recipe.
+ *
+ * A recipe is a snapshot of a `featureHistory` sequence. Calling `instantiate_recipe`
+ * re-plays those steps ADDITIVELY on the current document, assigning fresh entity ids.
+ * This lets an agent define a parametric sub-assembly once and stamp it out many times.
+ *
+ * @see save_recipe   — snapshot the current featureHistory into a named recipe
+ * @see instantiate_recipe — replay a recipe additively with fresh entity ids
+ */
+export interface Recipe {
+  /** Lookup key in `CadDocument.recipes` and displayed label; also used by `instantiate_recipe`. */
+  readonly name: string;
+  /** Ordered constructive steps — a deep copy of the featureHistory at save time. */
+  readonly steps: FeatureStep[];
+  /** Optional human/AI note describing the recipe's purpose. */
+  label?: string;
+}
+
+/**
+ * A reusable component definition — a named set of entities in local (component-space) coordinates.
+ *
+ * Entities stored inside a component carry positions relative to the component origin.
+ * Instances (`InstanceEntity`) reference a component by id and place it in the world using
+ * their own position/rotation/scale transform. Editing a component's entities is immediately
+ * reflected in all instances — no geometry is copied into the instance.
+ *
+ * @invariant Every entity id in `order` must be a key in `entities`.
+ * @see InstanceEntity, create_component, insert_instance, explode_instance
+ */
+export interface Component {
+  /** Unique id, generated by nextId('comp'). */
+  readonly id: string;
+  /** Human-readable name, e.g. "Wheel". */
+  name: string;
+  /** Component-local entities keyed by entity id. */
+  entities: Record<EntityId, Entity>;
+  /** Creation order of entity ids within the component. */
+  order: EntityId[];
+}
+
+// ---------------------------------------------------------------------------
+// Constraints — geometric and dimensional relationships between entities.
+// The solver (solve_constraints command) reads this table and adjusts entity
+// positions to satisfy the declared relationships.
+// ---------------------------------------------------------------------------
+
+/**
+ * A reference to a specific geometric point on an entity.
+ *
+ * `{ entityId }` — uses the entity's `position` (point-like entity or centroid).
+ * `{ entityId, kind }` — selects a named sub-point on a line, arc, or circle:
+ *   'start'  — first endpoint of a line or start of an arc.
+ *   'end'    — second endpoint of a line or end of an arc.
+ *   'center' — center of a circle, arc, or the midpoint of a line.
+ *   'mid'    — midpoint of a line segment.
+ */
+export type EntityRef =
+  | { readonly entityId: string }
+  | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
+
+/**
+ * Geometric (non-driving) constraint kinds.
+ * These impose a positional or directional relationship with no numeric target.
+ */
+export type GeometricConstraintKind = 'coincident' | 'parallel' | 'perpendicular' | 'tangent';
+
+/**
+ * Dimensional (driving) constraint kinds.
+ * These impose a numeric distance or angle target between entities.
+ */
+export type DimensionalConstraintKind = 'distance' | 'angle';
+
+/** All constraint kinds — geometric or dimensional. */
+export type ConstraintKind = GeometricConstraintKind | DimensionalConstraintKind;
+
+/**
+ * A coincident constraint: point `a` and point `b` share the same location.
+ * The solver minimises `||pa - pb||²`.
+ */
+export interface CoincidentConstraint {
+  readonly id: string;
+  readonly kind: 'coincident';
+  /** First entity reference. */
+  readonly a: EntityRef;
+  /** Second entity reference. */
+  readonly b: EntityRef;
+}
+
+/**
+ * A parallel constraint: the direction of entity `a` is parallel to entity `b`.
+ * Both entities should be line-like. The solver minimises `(da × db)²`.
+ */
+export interface ParallelConstraint {
+  readonly id: string;
+  readonly kind: 'parallel';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+}
+
+/**
+ * A perpendicular constraint: the direction of entity `a` is perpendicular to entity `b`.
+ * Both entities should be line-like. The solver minimises `(da · db)²`.
+ */
+export interface PerpendicularConstraint {
+  readonly id: string;
+  readonly kind: 'perpendicular';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+}
+
+/**
+ * A tangent constraint between a line and a circle/arc, or two circles/arcs.
+ * For line↔circle: solver minimises `(||pc - pline|| - radius)²`.
+ * For circle↔circle: solver minimises `(||pc1 - pc2|| - (r1 + r2))²` (external tangency).
+ */
+export interface TangentConstraint {
+  readonly id: string;
+  readonly kind: 'tangent';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+}
+
+/**
+ * A distance constraint: the distance between point `a` and point `b` equals `value`.
+ * `value` may be a numeric literal or a parameter name/expression string.
+ * The solver minimises `(||pa - pb|| - target)²`.
+ */
+export interface DistanceConstraint {
+  readonly id: string;
+  readonly kind: 'distance';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+  /** Target distance in document units. May be a number or a parameter expression string. */
+  readonly value: number | string;
+}
+
+/**
+ * An angle constraint: the angle from direction `a` to direction `b` (radians) equals `value`.
+ * `value` may be a numeric literal or a parameter name/expression string.
+ * The solver minimises `(atan2(da×db, da·db) - target)²`.
+ */
+export interface AngleConstraint {
+  readonly id: string;
+  readonly kind: 'angle';
+  readonly a: EntityRef;
+  readonly b: EntityRef;
+  /** Target angle in radians. May be a number or a parameter expression string. */
+  readonly value: number | string;
+}
+
+/** Discriminated union of all constraint types. */
+export type Constraint =
+  | CoincidentConstraint
+  | ParallelConstraint
+  | PerpendicularConstraint
+  | TangentConstraint
+  | DistanceConstraint
+  | AngleConstraint;
+
+// ---------------------------------------------------------------------------
+// Kinematic joints — connect two InstanceEntity frames to form a mechanism.
+// ---------------------------------------------------------------------------
+
+/**
+ * A MateRef used by a joint: identifies an InstanceEntity and its named frame.
+ * Reuses the same shape as MateRef in mates.ts; redeclared here so types.ts has
+ * no cross-command dependency.
+ */
+export interface JointMateRef {
+  /** Id of the InstanceEntity in doc.entities. */
+  readonly instanceId: string;
+  /** Frame selector. Defaults to 'origin'. */
+  readonly frame?: 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
+}
+
+/**
+ * A revolute joint: instance `b` rotates around `axis` relative to instance `a`.
+ * `angle` is the current joint value in radians.
+ *
+ * @invariant axis must be 'x'|'y'|'z' or a Vec3 unit vector
+ * @see add_joint, set_joint_value, evaluate_motion, bake_motion
+ */
+export interface RevoluteJoint {
+  readonly id: string;
+  readonly kind: 'revolute';
+  readonly a: JointMateRef;
+  readonly b: JointMateRef;
+  /** Rotation axis: 'x'|'y'|'z' shorthand or an explicit Vec3 unit vector. */
+  axis: 'x' | 'y' | 'z' | Vec3;
+  /** Current joint angle in radians. */
+  angle: number;
+}
+
+/**
+ * A prismatic joint: instance `b` slides along `axis` relative to instance `a`.
+ * `displacement` is the current joint value in document units.
+ *
+ * @invariant axis must be 'x'|'y'|'z' or a Vec3 unit vector
+ * @see add_joint, set_joint_value, evaluate_motion, bake_motion
+ */
+export interface PrismaticJoint {
+  readonly id: string;
+  readonly kind: 'prismatic';
+  readonly a: JointMateRef;
+  readonly b: JointMateRef;
+  /** Slide axis: 'x'|'y'|'z' shorthand or an explicit Vec3 unit vector. */
+  axis: 'x' | 'y' | 'z' | Vec3;
+  /** Current joint displacement in document units. */
+  displacement: number;
+}
+
+/** Discriminated union of all joint types. */
+export type Joint = RevoluteJoint | PrismaticJoint;
+
+/** All joint kind literals (used for validation). */
+export type JointKind = Joint['kind'];
+
+/**
+ * A coupling between two joints: `driven = driver * ratio + offset`.
+ *
+ * This models gear trains, belt drives, cam followers, and linkages where
+ * one joint's value is a linear function of another's.
+ *
+ * @invariant driver and driven must exist in doc.joints
+ * @invariant driver !== driven (no self-coupling)
+ * @invariant the drive graph is acyclic
+ * @see add_drive_relation, delete_drive_relation, evaluate_motion
+ */
+export interface DriveRelation {
+  readonly id: string;
+  /** Id of the driving joint (source of motion). */
+  driver: string;
+  /** Id of the driven joint (receives motion). */
+  driven: string;
+  /** Gear/belt ratio: driven_value = driver_value * ratio + offset. */
+  ratio: number;
+  /** Optional phase or linear offset. Default: 0. */
+  offset?: number;
+}
+
+export interface CadDocument {
+  entities: Record<EntityId, Entity>;
+  /** Z-order / creation order of entity ids. */
+  order: EntityId[];
+  layers: Record<string, Layer>;
+  layerOrder: string[];
+  selection: EntityId[];
+  camera: CameraState;
+  /** Named entity groups. Keyed by group id. Initialized as {} in createEmptyDocument. */
+  groups: Record<string, EntityGroup>;
+  /** Unit of length for all geometry values in this document. Default: 'mm'. */
+  units: DocumentUnit;
+  /** Number of decimal places used when displaying/formatting length values. Default: 3. */
+  displayPrecision: number;
+  /**
+   * Named numeric parameters. Keyed by parameter name.
+   * Parameters may reference each other via expressions; the system maintains
+   * topological evaluation order and marks cycles/unknown refs with `error`.
+   * Initialized as {} in createEmptyDocument.
+   */
+  parameters: Record<string, Parameter>;
+  /**
+   * Declarative movement animations. Keyed by animation id.
+   * The document only DECLARES motion; the viewport player evaluates it per
+   * frame (no physics). Initialized as {} in createEmptyDocument.
+   */
+  animations: Record<string, Animation>;
+  /**
+   * Ordered feature history: the named, replayable command list.
+   *
+   * Each entry records a command invocation (name + params). Replaying all
+   * non-suppressed steps from `createEmptyDocument()` regenerates `entities`
+   * deterministically. This is the constructive recipe (architecture L8).
+   *
+   * Mutating commands append a step automatically (via `execute()`).
+   * Meta-commands (`replay_history`, `set_step_suppressed`, etc.) do NOT
+   * append — they only edit the list itself.
+   *
+   * Initialized as [] in createEmptyDocument.
+   */
+  featureHistory: FeatureStep[];
+  /**
+   * Number of the next feature-history step (`step-<n>`); never reused, so step-scoped entity
+   * ids (`<prefix>-<n>.<k>`) stay unique and replay re-mints identical ids.
+   * Absent on documents that never recorded a step — read as 1.
+   */
+  nextStepNumber?: number;
+  /**
+   * Named parameter-value sets ("design table"). Each entry maps a configuration
+   * name to a `Configuration` that lists parameter expressions for that variant.
+   * Activating a configuration overwrites the listed parameters and replays the
+   * feature history so `=expr` geometry regenerates as the variant.
+   * Initialized as {} in createEmptyDocument.
+   */
+  configurations: Record<string, Configuration>;
+  /**
+   * Named material definitions. Keyed by material name.
+   * Each material carries physical properties (density) and visual PBR properties
+   * (color, metalness, roughness). Entities reference materials via `BaseEntity.materialId`.
+   * `mass_properties` uses the assigned material's density when present.
+   * Initialized as {} in createEmptyDocument.
+   */
+  materials: Record<string, Material>;
+  /**
+   * Named constructive recipes. Keyed by recipe name.
+   * Each recipe is a snapshot of a featureHistory sequence that can be re-instantiated
+   * additively onto any document any number of times, assigning fresh entity ids each time.
+   * Recipes let an agent save a build sequence once and stamp it out many times.
+   * @see save_recipe, instantiate_recipe
+   * Initialized as {} in createEmptyDocument.
+   */
+  recipes: Record<string, Recipe>;
+  /**
+   * Reusable component definitions. Keyed by component id.
+   * Each component holds a named set of local-space entities. InstanceEntity references
+   * one of these by id; changing the component definition is reflected in all its instances.
+   * @see Component, InstanceEntity, create_component, insert_instance, explode_instance
+   * Initialized as {} in createEmptyDocument.
+   */
+  components: Record<string, Component>;
+  /**
+   * Geometric and dimensional constraints. Keyed by constraint id.
+   * The solver (solve_constraints) reads this table and adjusts entity positions to
+   * satisfy the declared relationships. Initialized as {} in createEmptyDocument.
+   * @see add_constraint, delete_constraint, update_constraint, solve_constraints
+   */
+  constraints: Record<string, Constraint>;
+  /**
+   * Ordered constraint ids — mirrors the `entities`/`order` pattern.
+   * Initialized as [] in createEmptyDocument.
+   */
+  constraintOrder: string[];
+  /**
+   * Kinematic joints connecting pairs of InstanceEntity frames to form a mechanism.
+   * Each joint is either revolute (rotation) or prismatic (translation).
+   * Keyed by joint id. Initialized as {} in createEmptyDocument.
+   * @see add_joint, delete_joint, set_joint_value, evaluate_motion, bake_motion
+   */
+  joints: Record<string, Joint>;
+  /**
+   * Ordered joint ids — mirrors the `entities`/`order` pattern.
+   * Initialized as [] in createEmptyDocument.
+   */
+  jointOrder: string[];
+  /**
+   * Drive relations coupling joint values: driven = driver * ratio + offset.
+   * Model gear trains, belt drives, linkages. Keyed by drive relation id.
+   * Initialized as {} in createEmptyDocument.
+   * @see add_drive_relation, delete_drive_relation, evaluate_motion
+   */
+  driveRelations: Record<string, DriveRelation>;
+  /**
+   * Ordered drive relation ids — mirrors the `entities`/`order` pattern.
+   * Initialized as [] in createEmptyDocument.
+   */
+  driveRelationOrder: string[];
+  /** Constructive building (AEC/BIM) model; absent until the first building command. */
+  building?: BuildingModel;
+}
+
+/**
+ * A physical + visual material definition.
+ *
+ * `density` drives mass computation in `mass_properties` (mass = volume × density).
+ * `color`, `metalness`, `roughness` are PBR visual properties used by the viewport renderer.
+ *
+ * Density units match the document unit system: the value is in mass-per-(document-unit)³
+ * so that mass = volume × density works directly (e.g. for a mm document: g/mm³).
+ *
+ * JSON-serializable and immutable by convention; use `create_material` to define/replace.
+ */
+export interface Material {
+  /** Human-readable name used as the lookup key in `CadDocument.materials`. */
+  readonly name: string;
+  /**
+   * Density in (mass unit) per (document-length-unit)³.
+   * For a document in mm: density is g/mm³ (steel ≈ 0.00785, aluminium ≈ 0.0027).
+   * Must be > 0 and finite.
+   */
+  density: number;
+  /**
+   * Diffuse/albedo color as a CSS hex string, e.g. "#b0b0b0".
+   * Used by the viewport PBR renderer. Must match /^#[0-9a-fA-F]{6}$/.
+   */
+  color: string;
+  /**
+   * PBR metalness factor in [0, 1].
+   * 0 = fully dielectric (plastic/wood), 1 = fully metallic.
+   */
+  metalness: number;
+  /**
+   * PBR roughness factor in [0, 1].
+   * 0 = mirror smooth, 1 = fully rough/diffuse.
+   */
+  roughness: number;
+}
+
+export const DEFAULT_LAYER_ID = 'layer-default';
+
+export function createEmptyDocument(): CadDocument {
+  return {
+    entities: {},
+    order: [],
+    layers: {
+      [DEFAULT_LAYER_ID]: {
+        id: DEFAULT_LAYER_ID,
+        name: 'Layer 0',
+        visible: true,
+        locked: false,
+      },
+    },
+    layerOrder: [DEFAULT_LAYER_ID],
+    selection: [],
+    camera: {
+      target: [0, 0, 0],
+      azimuth: (3 * Math.PI) / 4,
+      polar: Math.PI / 3,
+      distance: 12,
+    },
+    groups: {},
+    units: 'mm',
+    displayPrecision: 3,
+    parameters: {},
+    animations: {},
+    featureHistory: [],
+    configurations: {},
+    materials: {},
+    recipes: {},
+    components: {},
+    constraints: {},
+    constraintOrder: [],
+    joints: {},
+    jointOrder: [],
+    driveRelations: {},
+    driveRelationOrder: [],
+  };
+}

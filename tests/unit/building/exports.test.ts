@@ -1,12 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildPlanDrawing, boundsOf, dimensionLabel } from '@core/commands/building/plan';
-import { dxfLayerName, dxfText, type DxfExport } from '@core/commands/building/dxf';
-import { escapeXml, fitScale, type PlanSheet } from '@core/commands/building/sheet';
-import { ifcGuid, ifcReal, ifcString, type IfcExport } from '@core/commands/building/ifc';
-import { fileSlug } from '@core/commands/building/model';
-import { __resetIdCounter } from '@lib/id';
+import { buildPlanDrawing, boundsOf, dimensionLabel } from '@aec/plan';
+import { dxfLayerName, dxfText, type DxfExport } from '@aec/dxf';
+import { escapeXml, fitScale, type PlanSheet } from '@aec/sheet';
+import { ifcGuid, ifcReal, ifcString, type IfcExport } from '@aec/ifc';
+import { fileSlug } from '@aec/model';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -50,8 +49,6 @@ function house(): CadDocument {
   });
   return doc;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('plan drawing', () => {
   it('cuts walls at door gaps and window gaps but not high windows', () => {
@@ -187,7 +184,9 @@ describe('export_plan_sheet', () => {
       .data as PlanSheet;
     expect(sheet.svg).toContain('width="841mm"');
     expect(sheet.svg).toContain('Plan &lt;RDC&gt;');
-    expect(execute(doc, 'export_plan_sheet', { paper: 'B5' }).summary).toMatch(/paper must be/);
+    expect(execute(doc, 'export_plan_sheet', { paper: 'B5' }).summary).toMatch(
+      /rejected: invalid params — paper/,
+    );
     expect(execute(doc, 'export_plan_sheet', { scale: 0 }).summary).toMatch(/invalid scale/);
     expect(execute(createEmptyDocument(), 'export_plan_sheet', {}).data).toBeUndefined();
   });

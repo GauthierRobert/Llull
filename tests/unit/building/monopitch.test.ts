@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type {
   BuildingElement,
@@ -7,11 +7,10 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import { baseReactions, framesOf } from '@core/commands/building/industrial/frameModel';
-import type { PurlinRow, ZoneSummary } from '@core/commands/building/industrial/purlinCheck';
-import type { ElevationSheet } from '@core/commands/building/elevation';
-import type { IfcExport } from '@core/commands/building/ifc';
-import { __resetIdCounter } from '@lib/id';
+import { baseReactions, framesOf } from '@aec/industrial/frameModel';
+import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlinCheck';
+import type { ElevationSheet } from '@aec/elevation';
+import type { IfcExport } from '@aec/ifc';
 
 const HALL = { span: 24000, length: 30000 };
 const PITCH = (6 * Math.PI) / 180;
@@ -36,8 +35,6 @@ const membersOf = (doc: CadDocument, role: SteelMemberElement['role']): SteelMem
 
 const topOf = (member: SteelMemberElement): number => Math.max(member.start[2], member.end[2]);
 
-beforeEach(() => __resetIdCounter());
-
 describe('add_portal_frame_building roofType', () => {
   it('keeps duopitch as the default (explicit duopitch gives the identical document)', () => {
     const defaulted = execute(createEmptyDocument(), 'add_portal_frame_building', HALL);
@@ -59,7 +56,7 @@ describe('add_portal_frame_building roofType', () => {
     const result = execute(doc, 'add_portal_frame_building', { ...HALL, roofType: 'sawtooth' });
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
-    expect(result.summary).toContain("roofType must be 'duopitch' or 'monopitch'");
+    expect(result.summary).toContain('add_portal_frame_building rejected: invalid params');
   });
 
   it('generates one rafter per frame rising from the low eaves (left) to the high eaves', () => {

@@ -9,7 +9,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { EmptyState } from '@ui/components/EmptyState';
@@ -25,7 +24,6 @@ const card = (): HTMLElement | null => screen.queryByRole('region', { name: /get
 
 describe('EmptyState — visibility', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -50,7 +48,6 @@ describe('EmptyState — visibility', () => {
 
 describe('EmptyState — quick starts', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 
@@ -82,7 +79,6 @@ describe('EmptyState — quick starts', () => {
 
 describe('EmptyState — dismiss', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStores();
   });
 

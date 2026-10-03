@@ -9,13 +9,13 @@
  * which would otherwise occlude this one; having no move handler, this plane lets moves through.
  */
 
-import { useCallback, useEffect, useMemo } from 'react';
-import * as THREE from 'three';
+import { useCallback } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
 import type { Entity } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { pickEntityId } from './modifyHelpers';
+import { useGroundPlane } from './useGroundPlane';
 
 /** Pick radius in screen pixels. */
 const PICK_RADIUS_PX = 10;
@@ -29,18 +29,7 @@ interface SelectPickInteractionProps {
 }
 
 export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): React.ReactElement {
-  const geo = useMemo(() => new THREE.PlaneGeometry(1e8, 1e8), []);
-  const mat = useMemo(
-    () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
-    [],
-  );
-
-  useEffect(() => {
-    return () => {
-      geo.dispose();
-      mat.dispose();
-    };
-  }, [geo, mat]);
+  const { geo, mat } = useGroundPlane();
 
   const handleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {

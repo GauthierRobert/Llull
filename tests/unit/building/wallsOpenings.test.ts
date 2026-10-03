@@ -1,9 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type BoxEntity, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { endAdjustment, wallPieces } from '@core/commands/building/evaluate';
+import { endAdjustment, wallPieces } from '@aec/evaluate';
 import type { WallElement } from '@core/model/building';
-import { __resetIdCounter } from '@lib/id';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -20,8 +19,6 @@ function wall(doc: CadDocument, id: string): WallElement {
   if (element?.category !== 'wall') throw new Error(`${id} is not a wall`);
   return element;
 }
-
-beforeEach(() => __resetIdCounter());
 
 describe('add_wall', () => {
   it('creates a wall on an auto-created level with default 200 mm × level height', () => {
@@ -233,7 +230,7 @@ describe('update_wall', () => {
     );
     expect(execute(doc, 'update_wall', { wallId: 'x' }).summary).toMatch(/no wall/);
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', start: [1] }).summary).toMatch(
-      /\[x, y\]/,
+      /rejected: invalid params — start/,
     );
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', thickness: 0 }).summary).toMatch(/> 0/);
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', levelId: 'zz' }).summary).toMatch(
@@ -304,7 +301,7 @@ describe('feature-history replay keeps hosts linked', () => {
 
 describe('built wall extents', () => {
   it('quantities measure the abutting wall body at a T joint', async () => {
-    const { wallQuantities } = await import('@core/commands/building/quantities');
+    const { wallQuantities } = await import('@aec/quantities');
     let doc = run(createEmptyDocument(), 'add_wall', { start: [0, 0], end: [8000, 0] });
     doc = run(doc, 'add_wall', { start: [4000, 0], end: [4000, 5000] });
     expect(wallQuantities(doc.building!, wall(doc, 'wall-2')).length).toBeCloseTo(4900);

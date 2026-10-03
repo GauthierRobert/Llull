@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -9,9 +9,8 @@ import {
   type ExchangeCommandResult,
   type ExchangeDeps,
   type ProgramRun,
-} from '@core/mcp/exchangeTools';
-import { shapeToolCallContent } from '@core/mcp/dispatch';
-import { __resetIdCounter } from '@lib/id';
+} from '@mcp/exchangeTools';
+import { shapeToolCallContent } from '@mcp/dispatch';
 
 interface Harness {
   deps: ExchangeDeps;
@@ -101,10 +100,6 @@ const STEP_RUN: ProgramRun = { trace: {}, traced: true, stepBase64: 'U1RFUFNURVA
 function textOf(result: { content: Array<{ text: string }> } | null): string {
   return result === null ? '' : result.content.map((c) => c.text).join('\n');
 }
-
-beforeEach(() => {
-  __resetIdCounter();
-});
 
 describe('buildExchangeToolDefinitions', () => {
   it('defines export_step, import_step and import_code with annotations', () => {
@@ -473,7 +468,7 @@ describe('shapeToolCallContent code blocks', () => {
   });
 
   it('applies to the real export_code result through applyMcpToolCall', async () => {
-    const { applyMcpToolCall } = await import('@core/mcp/dispatch');
+    const { applyMcpToolCall } = await import('@mcp/dispatch');
     const doc = docWithBox();
     const result = applyMcpToolCall(doc, 'export_code', { language: 'openscad' });
     expect(result.isError).toBe(false);

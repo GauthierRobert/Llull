@@ -1,0 +1,197 @@
+{
+  "format": "llull-document",
+  "version": 2,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "cone",
+        "radius": 2,
+        "height": 4,
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      },
+      "#3": {
+        "id": "#3",
+        "kind": "torus",
+        "ringRadius": 3,
+        "tubeRadius": 0.5,
+        "position": [
+          8,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      },
+      "#4": {
+        "id": "#4",
+        "kind": "wedge",
+        "size": [
+          2,
+          2,
+          2
+        ],
+        "position": [
+          0,
+          8,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      },
+      "#5": {
+        "id": "#5",
+        "kind": "pyramid",
+        "baseWidth": 3,
+        "baseDepth": 3,
+        "height": 4,
+        "position": [
+          8,
+          8,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      }
+    },
+    "order": [
+      "#1",
+      "#3",
+      "#4",
+      "#5"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#6",
+        "name": "add_cone",
+        "params": {
+          "radius": 2,
+          "height": 4
+        },
+        "suppressed": false,
+        "affected": [
+          "#1"
+        ]
+      },
+      {
+        "id": "#7",
+        "name": "add_torus",
+        "params": {
+          "ringRadius": 3,
+          "tubeRadius": 0.5,
+          "position": [
+            8,
+            0,
+            0
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#3"
+        ]
+      },
+      {
+        "id": "#8",
+        "name": "add_wedge",
+        "params": {
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "position": [
+            0,
+            8,
+            0
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#4"
+        ]
+      },
+      {
+        "id": "#9",
+        "name": "add_pyramid",
+        "params": {
+          "baseWidth": 3,
+          "baseDepth": 3,
+          "height": 4,
+          "position": [
+            8,
+            8,
+            0
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "#5"
+        ]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 5
+  }
+}

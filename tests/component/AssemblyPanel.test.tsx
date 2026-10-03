@@ -14,7 +14,6 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
@@ -34,7 +33,6 @@ function resetStore(): void {
 
 describe('AssemblyPanel — empty state', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -53,7 +51,6 @@ describe('AssemblyPanel — empty state', () => {
 
 describe('AssemblyPanel — components section', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -113,7 +110,6 @@ describe('AssemblyPanel — components section', () => {
 
 describe('AssemblyPanel — instances section', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

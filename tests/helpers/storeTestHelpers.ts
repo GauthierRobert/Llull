@@ -15,6 +15,9 @@
  * `core/commands/execute`, never inline.
  */
 
+import type { CadDocument } from '@core/model/types';
+import { documentHash } from '@mcp/liveSync';
+import type { LiveSnapshotEvent } from '@mcp/liveSync';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
 import { useStore } from '@ui/store';
@@ -30,6 +33,17 @@ import { useStore } from '@ui/store';
 export function localDispatch(name: string, params: unknown): CommandResult {
   const doc = useStore.getState().document;
   const result = execute(doc, name, params);
-  useStore.getState().hydrateLiveDocument(result.document);
+  useStore.getState().hydrateLiveDocument(liveSnapshot(result.document));
   return result;
+}
+
+export const TEST_EPOCH = 'test-epoch';
+
+/** Wrap a document as a live snapshot event (live-sync protocol). USE IN TESTS ONLY. */
+export function liveSnapshot(
+  document: CadDocument,
+  seq = 0,
+  epoch = TEST_EPOCH,
+): LiveSnapshotEvent {
+  return { epoch, seq, stateHash: documentHash(document), document };
 }

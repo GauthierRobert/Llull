@@ -6,7 +6,7 @@
  */
 
 import type { Vec3 } from '@core/model/types';
-import { buildingElementOf } from '@core/commands/building';
+import { buildingElementOf } from '@aec/index';
 import { rotatedEntityBounds } from '@core/commands/scene';
 import { useStore } from '@ui/store';
 

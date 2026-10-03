@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
+import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
@@ -12,8 +11,6 @@ function twoBoxes(): CadDocument {
 }
 
 describe('move_entities', () => {
-  beforeEach(() => __resetIdCounter());
-
   it('is registered', () => {
     expect(getCommand('move_entities')).toBeDefined();
   });
@@ -45,11 +42,11 @@ describe('move_entities', () => {
 
   it.each([
     [{ ids: [], delta: [1, 0, 0] }, /non-empty array/],
-    [{ ids: [1], delta: [1, 0, 0] }, /non-empty array/],
-    [{ ids: 'x', delta: [1, 0, 0] }, /non-empty array/],
+    [{ ids: [1], delta: [1, 0, 0] }, /rejected: invalid params — ids\.0/],
+    [{ ids: 'x', delta: [1, 0, 0] }, /rejected: invalid params — ids/],
     [{ ids: Array.from({ length: 100_000 }, (_, i) => `e${i}`), delta: [1, 0, 0] }, /exceeds/],
-    [{ ids: ['a'], delta: [1, 0] }, /delta must be/],
-    [{ ids: ['a'], delta: [1, Number.NaN, 0] }, /delta must be/],
+    [{ ids: ['a'], delta: [1, 0] }, /rejected: invalid params — delta/],
+    [{ ids: ['a'], delta: [1, Number.NaN, 0] }, /rejected: invalid params — delta\.1/],
     [{ ids: ['missing'], delta: [1, 0, 0] }, /no listed entity exists/],
   ])('no-op on bad input %#', (params, message) => {
     const doc = twoBoxes();

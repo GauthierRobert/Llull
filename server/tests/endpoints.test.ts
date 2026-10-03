@@ -198,3 +198,21 @@ describe('MCP tools/call + REST /undo interop', () => {
     expect(Object.keys(getLiveDoc().entities)).toHaveLength(0);
   });
 });
+
+describe('POST /command — commandId idempotency', () => {
+  it('a retried commandId is not applied twice and returns the same result', async () => {
+    const body = { name: 'add_box', params: { size: [1, 1, 1] }, commandId: 'retry-1' };
+    const first = await request(app).post('/command').send(body);
+    const retry = await request(app).post('/command').send(body);
+    expect(retry.status).toBe(200);
+    expect(retry.body).toEqual(first.body);
+    expect(getLiveDoc().order).toHaveLength(1);
+  });
+
+  it('rejects a non-string or empty commandId with 400', async () => {
+    const numeric = await request(app).post('/command').send({ name: 'add_box', commandId: 5 });
+    const empty = await request(app).post('/command').send({ name: 'add_box', commandId: '' });
+    expect(numeric.status).toBe(400);
+    expect(empty.status).toBe(400);
+  });
+});

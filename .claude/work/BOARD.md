@@ -12,8 +12,8 @@ The user only ever has to say **"continue working"**. Humans may edit this file 
 - **Deps** reference other task IDs. A task is *eligible* only when every dep is `[DONE]`.
 - **Lanes** own disjoint file sets (below) so parallel agents don't collide. One task per
   lane runs at a time. Default parallelism = **4 lanes** (+ Lane 5 review runs after each).
-- The only shared file is `src/core/commands/registry.ts` — **Lane 1 owns it**; no other
-  lane edits it.
+- The only shared file is `packages/core/src/commands/registry.ts` — **Lane 1 owns it**; no other
+  lane edits it. Domain commands register through plugins (`src/app/plugins.ts`), not registry.ts.
 
 ## How parallel agents coordinate (they don't talk — they don't need to)
 Agents are isolated; coordination is structural, run by the orchestrator:
@@ -28,15 +28,16 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 ## Lane → agent → file ownership
 | Lane | Agent | Owns (write scope) |
 | ---- | ----- | ------------------ |
-| 1 Core | `command-author` | `src/core/commands/**`, `registry.ts`, `src/core/model/types.ts` |
+| 1 Core | `command-author` | `packages/core/src/**` (incl. `commands/registry.ts`, `model/types.ts`), `packages/domain-aec/src/**` |
 | 2 3D+Shell | `viewport-engineer` | `src/ui/viewport/3d/**`, `src/ui/components/**`, `src/ui/panels/**`, `src/ui/store/**` |
 | 3 2D | `viewport-engineer` | `src/ui/viewport/2d/**`, snapping/tracking helpers |
-| 4 MCP | `mcp-engineer` | `src/core/mcp/**`, `server/**` |
+| 4 MCP | `mcp-engineer` | `packages/mcp/src/**`, `server/**`, kernels `packages/kernel-*/src/**` |
 | 5 Review | `test-verifier` + `cad-reviewer` | `tests/**`; reviews every diff (not a blocking lane) |
 
 ---
 
 ## NOW (auto-updated by the skill)
+- **WAVE 7 (architecture migration) DONE:** 2026-10-02 — MG0–MG6 delivered on branch `ccr-f92808cf-h1e9dk` (MG5.4 not adopted, by design). Results and deviations: `docs/MIGRATION_PLAN.md` → "Baseline vs result" / "As built". Feature freeze (D5) lifted.
 - **Batch 44 ELIGIBLE:** 2026-05-29 — **Batch 43 DONE & COMMITTING on `main`:** deferred nits bundle (the maintenance pass that had been at the top of "next up" for several batches). Four items shipped: (A) `measure_volume` for `revolution` now uses Pappus's theorem (V = sweepAngle · |x_centroid| · profileArea); axis-crossing profile → bbox fallback w/ caveat in summary; (B) `expandInstance` mints deterministic ids `expanded::<instanceId>::<sourceId>` instead of per-call `nextId` (fixes React-key stability + downstream determinism noted on the assemblies.ts NF1 follow-up); (C) new shared `core/commands/tessellation.ts` (SEG_* constants + `circlePoints` + a real `earClipTriangulate`) — `render.ts` + `export.ts` consolidated; **bonus real-bug fix:** `export.ts` extrusion cap triangulation switched from `fanTriangulate` (only correct for convex) to `earClipTriangulateVerts` (handles non-convex — so `export_stl` on a gear-shaped extrusion now produces correct caps); (D) +9 tessellation tests including a 1400-point non-convex star-like profile with strict `tris.length === n − 2` bound — pins ear-clipping correctness at gear scale. **Convergence story:** command-author stalled mid-task after finishing source for all 4 items but only writing tests for Item A; orchestrator added tests for Items B + D, fixed a typescript return-type warning, and applied 3 inline review items (2 SHOULD-FIX: axis-convention doc was already in measure.ts, added an A5b tangent-axis test pinning the `x<0` strict inequality at the boundary; 1 NIT: tightened the 1400-point assertion from `>N/2` to `===N−2`). +19 tests total; `npm run check` green = 2412 passed / 3 skipped, 79 files. `cad-reviewer` APPROVE-WITH-NITS, no blocking. **Eligible next:** L1 K3 sweep_profile/loft_profiles · L1 NF3 drawings & sheets · L1 EN5 associative dimensions · L1 KI7 typed bindings · L2 VPG2/VPG3 render polish.
 - **Batch 43 LAUNCHED:** 2026-05-29 — **Batch 42 DONE & COMMITTED on `main` (`a1f09ab`):** `distribute_along_path` (Wave-6 drivetrain story closes end-to-end). **WIP (1 lane):** L1 **deferred nits bundle** — the maintenance pass that's been at the top of "next up" for several batches: (a) `measure_volume` for `revolution` kind should use Pappus's theorem (V = 2π · centroidR · profileArea) instead of the bbox fallback (gives correct volumes for turned/revolved parts — torus, axles, spacers); (b) `expandInstance` (assemblies.ts) currently mints fresh entity ids each render-memo recompute, breaking React key stability + measure/find determinism — make the id mapping deterministic from `(instanceId, sourceId)`; (c) `export.ts` has duplicated tessellation/profile helpers — extract shared helpers to keep one source of truth; (d) verify `src/core/commands/render.ts` server-side extrusion tessellation handles 1400-point non-convex profiles (the VPG1 follow-up — a 42-tooth gear via `render_view` must not crash earcut or silently drop faces). Single-lane Lane-1 batch; all four touch `core/commands/**`. **Next up:** L1 K3 sweep_profile/loft_profiles · L1 NF3 drawings & sheets · L1 EN5 associative dimensions · L1 KI7 typed bindings · L2 VPG2/VPG3 render polish.
 - **Batch 42 ELIGIBLE:** 2026-05-29 — **Batch 42 DONE & COMMITTING on `main`:** `distribute_along_path` ships — the PG3 companion that places N component instances at evenly-spaced positions along a 2D path with optional tangent alignment (Z-rotation = `atan2(ty, tx)`). +32 tests (30 from the agent + 2 SHOULD-FIX reviewer follow-ups applied inline: closed-belt no-bunching/no-gap uniformity assertion + position-determinism-across-runs test). New file `src/core/commands/distribute.ts` (~420 lines). `npm run check` green = 2393 passed / 3 skipped, 78 files; coverage `core/commands/**` = 93.67/86.37/98.55/93.67 (gate held). `cad-reviewer` APPROVE-WITH-NITS (no blocking) — two NITs left (`as InstanceEntity & {name:string}` smuggling; richer schema with `minimum:1`/`integer` blocked by the same `ParamSpec` ceiling PG3 hit — future KI7). With this, **the bike-drivetrain story closes end-to-end:** PG1 gears + PG2 involutes + PG3 belt centerline + `distribute_along_path` chain-link instancing. **Eligible next:** L1 deferred nits bundle (Pappus volume, expandInstance deterministic ids, export.ts shared helpers, server-side extrusion tessellation verify for `render_view`) · L1 K3 sweep_profile/loft_profiles · L1 NF3 drawings & sheets · L1 EN5 associative dimensions · L1 KI7 typed bindings (would also unblock the richer-schema NITs across PG3/distribute_along_path) · L2 VPG2/VPG3 render polish.
@@ -365,7 +366,62 @@ Wave 3 scope to keep the wave shippable.
 
 ---
 
+# WAVE 7 — architecture migration (plan: `docs/MIGRATION_PLAN.md`)
+
+**Premise:** keep the one-registry/two-callers core; fix what accreted around it — injected execution context (T1), one schema per command (T2), recipe-first document (T3), one sync path (T4), small core + domain plugins (T5). Every task keeps `main` green and the MG0 golden corpus byte-identical unless the task says otherwise. **Feature freeze (D5):** no new domain commands until MG4 is `[DONE]`.
+
+## MG0 — Guardrails (Lane 5 + Lane 1)
+- `[DONE]` **MG0.1** Golden replay corpus `tests/golden/` (~30 `build_project` plans → serialized doc snapshots; replay reproduces). _Lane 5. deps: —._
+- `[DONE]` **MG0.2** Schema conformance test: minimal valid params from each `paramsSchema` never hits the `guardCommand` catch path. _Lane 5. deps: —._
+- `[DONE]` **MG0.3** ESLint `max-lines: 500` as error + allowlist of the current 49 offenders (list may only shrink). _Lane 5. deps: —._
+- `[DONE]` **MG0.4** Perf/size baseline (replay time, doc JSON size) recorded in `docs/MIGRATION_PLAN.md`. _Lane 5. deps: MG0.1._
+
+## MG1 — Execution context (Lane 1; MG1.4 Lane 4 + Lane 2)
+- `[DONE]` **MG1.1** `ExecutionContext { kernel, ids, registry }`; `execute(doc, name, params, ctx = defaultContext())`; `run(doc, params, ctx?)`. _Lane 1. deps: MG0.1._
+- `[DONE]` **MG1.2** Delete `setRegistryRef` / `setConfigRegistryRef` / `setRecipeRegistryRef` — use `ctx.registry`. _Lane 1. deps: MG1.1._
+- `[DONE]` **MG1.3** Kernel via `ctx.kernel` in boolean/modify3d/tessellation; `getGeometryKernel()` only inside `defaultContext()`. _Lane 1. deps: MG1.1._
+- `[DONE]` **MG1.4** Kernel parity: move `ui/geometry/occtKernel.ts` → `core/geometry/`; server honours `LLULL_KERNEL`; test fillet via MCP == via store. _Lane 4 + Lane 2. deps: MG1.3. D3 resolved: yes._
+- `[DONE]` **MG1.5** `requiresKernel` annotation; explicit "kernel loading" summary; replay waits for readiness. _Lane 1. deps: MG1.3._
+
+## MG2 — One schema per command (Lane 1; parallel to MG1)
+- `[DONE]` **MG2.1** `defineCommand({ params: <schema> })` deriving `paramsSchema` + params type. _Lane 1. deps: MG0.2. D1 resolved: zod v4._
+- `[DONE]` **MG2.2** Validate params in `execute`; move generic `guardCommand` checks into schema helpers (`vec3`, `entityId`, `position`). _Lane 1. deps: MG2.1._
+- `[DONE]` **MG2.3** Migrate per domain file (one PR each, `building/**` last); delete hand-written `<X>Params` + `paramsSchema`. _Lane 1. deps: MG2.2._
+- `[DONE]` **MG2.4** `toToolSchemas()` snapshot test. _Lane 5. deps: —._
+
+## MG3 — Deterministic ids (Lane 1)
+- `[DONE]` **MG3.1** Step-scoped ids `<stepId>.<n>` via `ctx.ids`; replay reuses recorded step ids; `remapIds` + `affected` zip become dead code. _Lane 1. deps: MG1.1._
+- `[DONE]` **MG3.2** Persistence v2: `migrate()` upgrades v1 docs (legacy replay once → rewrite ids). _Lane 1. deps: MG3.1. D4 resolved: yes._
+- `[DONE]` **MG3.3** Remove `__resetIdCounter` from tests. _Lane 5. deps: MG3.1._
+
+## MG4 — Recipe-first document (Lane 1 + Lane 2 for accessor call sites)
+- `[DONE]` **MG4.1** Accessors first (`entitiesOf`, `definitionOf`), then split `CadDocument` into `definition` / `evaluated`. _Lane 1 + Lane 2. deps: MG3.2._
+- `[DONE]` **MG4.2** Mesh results become cache (`source: { stepId }`); persistence v3 writes definition only. _As built: v2 files omit plugin-derived (building) geometry; kernel meshes stay in files (small) and are memoized — see plan "As built"._ _Lane 1. deps: MG4.1._
+- `[DONE]` **MG4.3** Step dependency DAG (`reads`); param/step edits re-evaluate downstream closure only. _As built: replay prefix cache + set_parameter regeneration (see plan)._ _Lane 1. deps: MG4.1._
+- `[DONE]` **MG4.4** Kernel memoization keyed by operand-definition hash. _Lane 1. deps: MG1.3, MG4.2._
+- `[DONE]` **MG4.5** Generic "generated entity is read-only, edit its source" rule replaces the building-specific `guardCommand` branch. _Lane 1. deps: MG4.2._
+
+## MG5 — One sync path (Lane 4 + Lane 2)
+- `[DONE]` **MG5.1** `/live` broadcasts `{ seq, stepId, name, params, stateHash }`; clients apply via `execute`; snapshot on gap/hash mismatch; retire `docPatch.ts`. _Lane 4 + Lane 2. deps: MG1.4, MG3.1._
+- `[DONE]` **MG5.2** Offline outbox of commands replaces "client wins" `load_document` push. _Lane 2. deps: MG5.1._
+- `[DONE]` **MG5.3** Retire `uiBridge` (`snapshot_in_from_ui` / `snapshot_out_to_ui`) after one deprecation release. _Lane 4. deps: MG5.1._
+- `[REMOVED]` **MG5.4** _(not adopted — see docs/MIGRATION_PLAN.md "As built": snapshot undo kept; history replay cannot undo non-step changes)._ History-based undo replaces server + client snapshot stacks. _Lane 4 + Lane 2. deps: MG4.3, MG5.1._
+
+## MG6 — Packages & plugins (all lanes; start after MG1, finish last)
+- `[DONE]` **MG6.1** npm workspaces: `packages/{core,kernel-manifold,kernel-occt,mcp,render,domain-building,domain-industrial}`, `apps/{web,server}`. _deps: MG1.3. D2 resolved: yes._
+- `[DONE]` **MG6.2** `definePlugin({ name, toolset, commands, entityKinds?, guards? })`; `TOOLSETS` derived, hand lists deleted. _As built: `CadPlugin` + `installPlugin`; plugin toolsets derived, core command groups stay listed in toolsets.ts (core metadata)._ _Lane 1 + Lane 4. deps: MG6.1._
+- `[DONE]` **MG6.3** Default MCP exposure = `core` + `search_tools` / `enable_toolset`. _Lane 4. deps: MG6.2._
+- `[DONE]` **MG6.4** Burn down the MG0.3 `max-lines` allowlist to zero. _All lanes. deps: MG0.3._
+- `[DONE]` **MG6.5** Refresh `CLAUDE.md`, `.claude/rules/*`, lane ownership, `docs/ARCHITECTURE.md`; strip batch/process notes from source comments. _Lane 5. deps: MG4, MG5, MG6.2._
+
+---
+
 ## Decision log (resolve `[BLOCKED]` items here)
+- **RESOLVED 2026-10-02 (user approved all recommendations) — D1 schema library (MG2):** zod v4 (built-in `toJSONSchema`, already a transitive dep via `@modelcontextprotocol/sdk`) vs TypeBox. Recommendation zod. New dependency ⇒ needs explicit user approval (CLAUDE.md STACK).
+- **RESOLVED 2026-10-02 (user approved all recommendations) — D2 npm workspaces monorepo (MG6.1):** recommendation yes.
+- **RESOLVED 2026-10-02 (user approved all recommendations) — D3 OCC WASM on the server (MG1.4):** ~63 MB, slow cold start; needed for kernel parity between UI and MCP. Recommendation yes, behind `LLULL_KERNEL`.
+- **RESOLVED 2026-10-02 (user approved all recommendations) — D4 document format v1 → v2/v3 with auto-migration on load, no v1 writer (MG3.2, MG4.2):** recommendation yes.
+- **RESOLVED 2026-10-02 (user approved all recommendations) — D5 feature freeze on new domain commands during MG1–MG4:** recommendation yes.
 - **A4 boolean CSG library:** RESOLVED 2026-05-25 → **manifold-3d (Manifold)**. Robust watertight mesh booleans (WASM). Behind a `GeometryKernel` interface (L9) so OpenCascade.js can replace it later for exact B-rep/STEP. Mesh-based results stored as a new `mesh` solid kind.
 - **In-app AI bridge:** REMOVED 2026-05-25 (user decision: "only MCP will be used"). Deleted `src/core/ai/**`, the Express `/api/ai` proxy + `anthropicClient.ts`, the chat panel (`ChatPanel`/`useAiChat`/`chat.css`), and the `@anthropic-ai/sdk` dependency. AI control is now delivered solely through the MCP host (`/mcp`). Architecture rules updated: L1 is now "two callers" (UI + MCP). Tasks F1/F2/F3 → `[REMOVED]`.
 - **OPEN — kernel capability for K1/K2/K3 (fillet/chamfer/shell):** Manifold (current kernel) does mesh booleans well but has **no robust edge fillet/chamfer or shell**. These need either (a) an OpenCascade.js B-rep kernel swapped in behind the existing `GeometryKernel` interface (L9) — large WASM, slow init, but the "real CAD" path that also unlocks STEP export, or (b) mesh-approximation fillets (lower quality). Decide before scheduling K1/K2. Sweep/loft (K3) are achievable mesh-side. **Default recommendation: defer K1/K2 until an OCC kernel is justified; build N0–N3, sweep/loft, and the rest of Wave 2 first.**

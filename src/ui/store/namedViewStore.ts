@@ -8,7 +8,7 @@
  * for unavailable storage (sandboxed iframes, test environments).
  *
  * This is UI-only presentation state, intentionally NOT part of CadDocument
- * (no Lane-1 model change required — see EN9 notes). Named views hold only
+ * Named views hold only
  * camera position/target; they do not encode document content.
  *
  * PRIME DIRECTIVE: no document mutations ever happen here.
@@ -94,7 +94,7 @@ export interface NamedViewStoreState {
   /**
    * Restore a previously saved named view by id.
    * `applyCamera` is a callback injected by the inner Canvas component
-   * that drives OrbitControls + calls update() + invalidate() (P1 carry-forward).
+   * that drives OrbitControls + calls update() + invalidate().
    * No-ops silently if the id is not found or the callback is unavailable.
    */
   restoreNamedView(

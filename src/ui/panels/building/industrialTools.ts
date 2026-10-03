@@ -5,7 +5,7 @@
  * ONE command + params (param-gathering only, react R1).
  */
 
-import { STEEL_PROFILES } from '@core/commands/building/steel/profiles';
+import { STEEL_PROFILES } from '@aec/steel/profiles';
 import {
   FieldReader,
   num,

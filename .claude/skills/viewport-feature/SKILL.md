@@ -13,7 +13,7 @@ generic AI defaults (consider the `frontend-design` skill). Delegate to the
 - `.claude/context/model.md` (what to render), `.claude/rules/architecture.md` (L2, L4)
 
 ## The boundary
-`ui/` renders and gathers params; it NEVER mutates the document. To change anything,
+`src/ui/` renders and gathers params; it NEVER mutates the document. To change anything,
 call `store.dispatch(commandName, params)`. If no command fits, stop and add one via
 the `add-command` skill first — do not edit entities in a component.
 
@@ -25,7 +25,7 @@ the `add-command` skill first — do not edit entities in a component.
    - reflect `selection` (highlight), `layers[].visible/locked`, and `camera`,
    - support both views: 2D orthographic top-down draft view and 3D perspective (same
      scene, view mode is presentation only). For 2D drafting features, use the `draw-2d`
-     skill; keep snap/ortho math pure in core/lib, applied (not computed) in the component.
+     skill; keep snap/ortho math pure (`src/ui/viewport/2d/snapping/`), applied (not computed) in the component.
 3. Wire interactions (toolbar, gizmo drag, click-select) to `dispatch`.
 4. r3f/drei declaratively; map `CameraState` (target/azimuth/polar/distance) to
    `<OrbitControls>`. Memoize geometry/materials; dispose on unmount; no per-frame allocs.

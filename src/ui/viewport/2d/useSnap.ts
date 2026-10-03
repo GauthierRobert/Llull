@@ -67,8 +67,8 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
   // (and perpendicular / tangent, which key off drawOrigin, not the cursor).
   // These change only when the entity bag or the draw origin changes — NOT on
   // pointer move — so the heavy pass (including the O(segments²) intersection
-  // scan) runs once per document/origin instead of once per mousemove. This is
-  // the hot-path fix: hovering the 2D canvas no longer recomputes candidates.
+  // scan) runs once per document/origin instead of once per mousemove: hovering the 2D
+  // canvas does not recompute candidates.
   // extension/nearest are forced off here (they are the only cursor-dependent
   // snap types) and a null cursor is passed so they are skipped entirely.
   const staticCandidates = useMemo(

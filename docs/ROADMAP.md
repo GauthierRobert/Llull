@@ -52,14 +52,14 @@ AI control — there is no in-app AI bridge).**
 
 ## v0.7 — Geometry kernel upgrade (behind a `core/` interface, L9)
 
-- [ ] `GeometryKernel` interface; start mesh-based (three.js / Manifold)
+- [x] `GeometryKernel` interface; start mesh-based (three.js / Manifold)
 - [ ] Exact boolean operations (union / subtract / intersect)
 - [ ] Fillet / chamfer / shell; later NURBS surfaces
-- [ ] Swap-in path for OpenCascade.js (B-rep) without touching commands
+- [x] Swap-in path for OpenCascade.js (B-rep) without touching commands (`?kernel=occt`, `LLULL_KERNEL=occt`)
 
 ## v0.8 — Interop & persistence
 
-- [ ] Native save/load + document versioning
+- [x] Native save/load + document versioning (llull-document v2; v1 still read)
 - [ ] 2D: DXF / DWG import + export
 - [x] 3D exchange: STEP export (exact B-rep, via CadQuery/OpenCascade) + STEP import (as meshes) — docs/CAD_EXCHANGE.md
 - [x] Parametric code exchange: CadQuery / build123d (round-trip), OpenSCAD + FreeCAD macro (export)
@@ -100,6 +100,20 @@ AI control — there is no in-app AI bridge).**
 - [x] Frame analysis, member and bolt checks, automatic sizing, weld detailing
 - [x] Wind / crane load cases, buckling, sway stability and deflection checks
 - [x] Lateral-torsional buckling, crane runway fatigue, bracing and foundation checks
+
+## Target architecture migration (Wave 7) — see docs/MIGRATION_PLAN.md
+
+- [x] Golden replay corpus, schema conformance and tool-schema snapshot tests
+- [x] Execution context: kernel, ids and registry injected per `execute`; one kernel choice for browser and server
+- [x] One zod schema per command (`defineCommand`): TS type, MCP JSON Schema and runtime validation
+- [x] Step-scoped deterministic ids; replay re-mints identical ids
+- [x] Replay prefix cache; parameter edits regenerate only dependent steps; kernel memoization
+- [x] Derivation guards; saved files omit plugin-derived geometry (llull-document v2)
+- [ ] Kernel (boolean / fillet) mesh results as a derived cache, not stored in files
+- [x] Command-log live sync (`/live`), offline outbox; UI bridge retired
+- [x] Plugins (building, industrial); npm workspaces; MCP tool discovery (`search_tools` / `enable_toolset`)
+- [x] Every source file under 500 code lines
+- [ ] History-based undo (MG5.4)
 
 ## Later
 

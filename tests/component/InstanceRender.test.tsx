@@ -13,7 +13,6 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import type { InstanceEntity } from '@core/model/types';
@@ -30,7 +29,6 @@ function resetStore(): void {
 
 describe('InstanceRender — expandInstance produces geometry', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -109,7 +107,6 @@ describe('InstanceRender — expandInstance produces geometry', () => {
 
 describe('InstanceRender — selection routing to instance id', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

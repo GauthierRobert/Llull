@@ -18,7 +18,6 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { ParametersPanel } from '@ui/panels/ParametersPanel';
@@ -50,7 +49,6 @@ function patchDispatch(spy: ReturnType<typeof vi.fn>): void {
 
 describe('ParametersPanel — rendering', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -122,7 +120,6 @@ describe('ParametersPanel — rendering', () => {
 
 describe('ParametersPanel — editing expression', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -192,7 +189,6 @@ describe('ParametersPanel — editing expression', () => {
 
 describe('ParametersPanel — delete parameter', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -216,7 +212,6 @@ describe('ParametersPanel — delete parameter', () => {
 
 describe('ParametersPanel — add parameter form', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 

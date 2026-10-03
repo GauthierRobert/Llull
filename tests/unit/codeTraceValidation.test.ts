@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { buildFeatureProgram } from '@core/codegen/featureProgram';
-import { __resetIdCounter } from '@lib/id';
 
 const triangle = [0, 0, 0, 1, 0, 0, 0, 1, 0];
 
@@ -14,10 +13,6 @@ function box(ref?: string): Record<string, unknown> {
   };
 }
 
-beforeEach(() => {
-  __resetIdCounter();
-});
-
 describe('apply_code_trace validation', () => {
   it('rejects an unknown mode instead of treating it as replace', () => {
     const doc = createEmptyDocument();
@@ -26,7 +21,7 @@ describe('apply_code_trace validation', () => {
       mode: 'merge',
     });
     expect(result.document).toBe(doc);
-    expect(result.summary).toMatch(/mode must be "replace" or "append"/);
+    expect(result.summary).toMatch(/apply_code_trace rejected: invalid params — mode/);
   });
 
   it('rejects duplicate refs and non-string names', () => {

@@ -1,19 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BuildingElement, FootingElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import {
-  designFootings,
-  designMat,
-  type FootingDesignParams,
-  type FootingDesignRow,
-} from '@core/commands/building/industrial/footingDesign';
-import {
-  foundationCheck,
-  type FoundationRow,
-} from '@core/commands/building/industrial/foundationCheck';
-import type { TakeoffLine } from '@core/commands/building/quantities';
-import { __resetIdCounter } from '@lib/id';
+import { designFootings, designMat, type FootingDesignRow } from '@aec/industrial/footingDesign';
+import { foundationCheck, type FoundationRow } from '@aec/industrial/foundationCheck';
+import type { TakeoffLine } from '@aec/quantities';
 
 function hall(params: Record<string, unknown> = {}): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {
@@ -58,8 +49,6 @@ const steelMass = (doc: CadDocument): number =>
     const bars = footing.reinforcement;
     return sum + (bars ? (bars.barDiameter ** 2 / bars.spacing) * footing.width : 0);
   }, 0);
-
-beforeEach(() => __resetIdCounter());
 
 describe('design_footings', () => {
   it('gives the default hall realistic bars and stores them on every analysed footing', () => {
@@ -202,9 +191,9 @@ describe('design_footings', () => {
       { allowShrink: 1 },
       { clayLayer: { topDepth: 1 } },
     ] as Array<Record<string, unknown>>) {
-      const result = designFootings.run(doc, params as FootingDesignParams);
+      const result = execute(doc, 'design_footings', params);
       expect(result.document).toBe(doc);
-      expect(result.summary).toContain('design_footings failed');
+      expect(result.summary).toMatch(/design_footings (failed|rejected)/);
     }
   });
 

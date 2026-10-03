@@ -1,5 +1,5 @@
 /**
- * Component tests for VT1 — TextEntity render branches (3D TextMesh + 2D TextRenderer2D).
+ * Component tests for the TextEntity render branches (3D TextMesh + 2D TextRenderer2D).
  *
  * Since jsdom cannot run WebGL (no Canvas / THREE.WebGLRenderer), we test the
  * observable behavior through the store:
@@ -19,7 +19,6 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { __resetIdCounter } from '@lib/id';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import type { TextEntity } from '@core/model/types';
@@ -35,7 +34,6 @@ function resetStore(): void {
 
 describe('TextEntity — add_text produces correct entity shape', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -94,7 +92,6 @@ describe('TextEntity — add_text produces correct entity shape', () => {
 
 describe('TextEntity — selection dispatches correctly', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -119,7 +116,6 @@ describe('TextEntity — selection dispatches correctly', () => {
 
 describe('TextEntity — anchor prop', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -167,7 +163,6 @@ describe('TextEntity — anchor prop', () => {
 
 describe('TextEntity — empty content guard', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
@@ -198,7 +193,6 @@ describe('TextEntity — empty content guard', () => {
 
 describe('TextEntity — not routed through instanced renderer', () => {
   beforeEach(() => {
-    __resetIdCounter();
     resetStore();
   });
 
