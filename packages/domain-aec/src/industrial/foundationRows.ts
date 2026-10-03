@@ -41,6 +41,20 @@ import {
 import { footingSettlementParts } from './foundationSettlement';
 import { round } from '../numeric';
 
+const rowOf =
+  (column: string, footing: string, elementId: string) =>
+  (check: string, best: Candidate, unit: string): FoundationRow => ({
+    column,
+    footing,
+    elementId,
+    check,
+    value: best.value,
+    limit: best.limit,
+    unit,
+    utilisation: best.utilisation,
+    combination: best.combination,
+  });
+
 /** Footing check rows (bearing, uplift, overturning, sliding, settlement) of one column's pad. */
 export function footingRows(
   doc: CadDocument,
@@ -66,17 +80,7 @@ export function footingRows(
   const soilWeight = BACKFILL_UNIT_WEIGHT * area * backfill;
   const weights = selfWeight + soilWeight;
   const lever = thickness + backfill;
-  const row = (check: string, best: Candidate, unit: string): FoundationRow => ({
-    column: columnMark,
-    footing: footing.mark,
-    elementId: footing.id,
-    check,
-    value: best.value,
-    limit: best.limit,
-    unit,
-    utilisation: best.utilisation,
-    combination: best.combination,
-  });
+  const row = rowOf(columnMark, footing.mark, footing.id);
   const rows: FoundationRow[] = [];
 
   const bearing: Candidate[] = [];
@@ -207,17 +211,7 @@ export function plateRows(
   const bolts = Math.max(1, plate.boltCount);
   const resistance = anchorBoltResistance(toMm(plate.boltDiameter));
   const [tensionLimit, shearLimit] = [resistance.tension / 1000, resistance.shear / 1000];
-  const row = (check: string, best: Candidate, unit: string): FoundationRow => ({
-    column: columnMark,
-    footing: footingMark,
-    elementId: plate.id,
-    check,
-    value: best.value,
-    limit: best.limit,
-    unit,
-    utilisation: best.utilisation,
-    combination: best.combination,
-  });
+  const row = rowOf(columnMark, footingMark, plate.id);
   const rows: FoundationRow[] = [];
 
   const bearing: Candidate[] = ultimateCombinations(wind, crane, false).map((combination) => {
