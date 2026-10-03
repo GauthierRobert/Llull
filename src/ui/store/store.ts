@@ -80,6 +80,11 @@ export interface OutboxCommand {
   readonly affected: readonly string[];
 }
 
+export interface DispatchOptions {
+  /** Replace the selection with the command's `affected` ids when it succeeds with any. */
+  selectAffected?: boolean;
+}
+
 export interface CadStoreState {
   /** The live CAD document — single source of truth, hydrated by the /live SSE stream. */
   document: CadDocument;
@@ -179,7 +184,7 @@ export interface CadStoreState {
    *
    * This is the ONLY way the UI changes the document (PRIME DIRECTIVE).
    */
-  dispatch(name: string, params?: unknown): void;
+  dispatch(name: string, params?: unknown, options?: DispatchOptions): void;
 
   /**
    * Replace the current document wholesale (load / reset).
@@ -352,8 +357,42 @@ type StoreSet = (
 ) => void;
 type StoreGet = () => CadStoreState;
 
+/** Selection after a command: its affected ids when requested and non-empty, else unchanged. */
+function selectionAfter(
+  current: EntityId[],
+  affected: readonly EntityId[],
+  options: DispatchOptions | undefined,
+): EntityId[] {
+  return options?.selectAffected === true && affected.length > 0 ? [...affected] : current;
+}
+
+/**
+ * Server path: the affected entities may arrive over SSE after this response, so the selection is
+ * taken as-is (snapshot hydration later filters any id that never materialised). If the user
+ * changed the selection while the request was in flight, their newer selection wins.
+ */
+function selectAffectedIn(
+  doc: CadDocument,
+  selectionAtDispatch: readonly EntityId[],
+  affected: readonly EntityId[],
+  options: DispatchOptions | undefined,
+): CadDocument {
+  const unchanged =
+    doc.selection.length === selectionAtDispatch.length &&
+    doc.selection.every((id, index) => id === selectionAtDispatch[index]);
+  if (!unchanged) return doc;
+  const selection = selectionAfter(doc.selection, affected, options);
+  return selection === doc.selection ? doc : { ...doc, selection };
+}
+
 /** Run a command locally via `execute` (offline mode). Pushes history only if the doc changed. */
-function runLocally(set: StoreSet, get: StoreGet, name: string, params: unknown): void {
+function runLocally(
+  set: StoreSet,
+  get: StoreGet,
+  name: string,
+  params: unknown,
+  options?: DispatchOptions,
+): void {
   const state = get();
   const result = execute(state.document, name, params);
   const summary = `${result.summary}${LOCAL_SUFFIX}`;
@@ -365,7 +404,10 @@ function runLocally(set: StoreSet, get: StoreGet, name: string, params: unknown)
   }
   const undoStack = [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT);
   set({
-    document: result.document,
+    document: {
+      ...result.document,
+      selection: selectionAfter(result.document.selection, result.affected, options),
+    },
     lastSummary: summary,
     lastMeasure,
     localUndoStack: undoStack,
@@ -534,15 +576,22 @@ export const useStore = create<CadStoreState>()((set, get) => ({
   liveSeq: -1,
   liveEpoch: null,
 
-  dispatch(name: string, params?: unknown): void {
+  dispatch(name: string, params?: unknown, options?: DispatchOptions): void {
     if (isLocalMode(get())) {
-      runLocally(set, get, name, params);
+      runLocally(set, get, name, params, options);
       return;
     }
     // Fire-and-forget — the document update comes from the /live SSE stream.
+    const selectionAtDispatch = get().document.selection;
     void postCommand(name, params, newCommandId())
       .then((response) => {
         set((state) => ({
+          document: selectAffectedIn(
+            state.document,
+            selectionAtDispatch,
+            response.affected,
+            options,
+          ),
           lastSummary: response.summary,
           canUndo: response.canUndo,
           canRedo: response.canRedo,
@@ -557,7 +606,7 @@ export const useStore = create<CadStoreState>()((set, get) => ({
       })
       .catch((err: unknown) => {
         handlePostFailure(set, get, err, `Command '${name}'`, () =>
-          runLocally(set, get, name, params),
+          runLocally(set, get, name, params, options),
         );
       });
   },

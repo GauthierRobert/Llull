@@ -1,0 +1,206 @@
+/* ==========================================================================
+   Main toolbar, viewport hint bar, shortcut sheet, keycaps
+   ========================================================================== */
+
+/* ---- Main toolbar (row under the top bar) ---------------------------------- */
+
+.toolbar {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: 4px var(--space-3) 2px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  user-select: none;
+}
+
+.tb-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tb-group__buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.tb-group__title {
+  margin-top: 1px;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.tb-sep {
+  flex-shrink: 0;
+  width: 1px;
+  margin: 4px 0;
+  background: var(--divider);
+}
+
+.tb-spacer {
+  flex: 1 0 var(--space-2);
+}
+
+.tb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 52px;
+  height: 46px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-muted);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.tb-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.tb-btn--active,
+.tb-btn--active:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+.tb-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.tb-btn__label {
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---- Viewport hint bar ----------------------------------------------------- */
+
+.hint-bar {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100% - 200px);
+  padding: 6px var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  background: var(--surface-float);
+  backdrop-filter: var(--backdrop);
+  -webkit-backdrop-filter: var(--backdrop);
+  border: 1px solid var(--border-float);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-float);
+  pointer-events: none;
+}
+
+.hint-bar > .icon {
+  flex-shrink: 0;
+  color: var(--accent-text);
+}
+
+.hint-bar > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Keycap ---------------------------------------------------------------- */
+
+.kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  text-align: center;
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+/* ---- Shortcut sheet -------------------------------------------------------- */
+
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--surface-scrim);
+}
+
+.shortcuts-dialog {
+  width: min(760px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  background: var(--surface-popover);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+}
+
+.shortcuts-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--divider);
+}
+
+.shortcuts-dialog__title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--fg);
+}
+
+.shortcuts-dialog__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-5);
+  padding: var(--space-4);
+}
+
+.shortcuts-group__title {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.shortcuts-group__list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: 6px var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.shortcuts-row {
+  display: contents;
+}

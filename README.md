@@ -36,7 +36,7 @@ and pipe runs, clash detection, steel tonnage / cut lists, and elevation / secti
 | Schemas        | zod                                      | One schema per command: TS type, MCP JSON Schema and runtime validation |
 | Geometry kernel| Manifold (default) / OpenCascade.js      | Booleans and fillets behind one interface |
 | Tests          | Vitest + Testing Library + Playwright    | Fast, Vite-native |
-| Lint / format  | ESLint + Prettier                        | Consistent, enforced in CI |
+| Lint / format  | ESLint + Prettier                        | Consistent, enforced by `npm run check` |
 | Backend (opt.) | Node + Express                           | Only for hosting the MCP endpoint |
 
 ## Architecture in one picture

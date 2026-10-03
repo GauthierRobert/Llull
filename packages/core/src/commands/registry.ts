@@ -104,6 +104,7 @@ import { distributeAlongPath } from './distribute';
 import { deleteEntities } from './deleteMany';
 import { derivationViolation } from './derivation';
 import { onPluginInstalled, pluginGuards } from '../plugins/host';
+import { moveEntities } from './moveMany';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
   if (typeof value === 'number') return !Number.isFinite(value);
@@ -363,6 +364,7 @@ const rawDefinitions = [
   drawBeltAround,
   distributeAlongPath,
   deleteEntities,
+  moveEntities,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 /** Core commands, then every installed plugin's commands in installation order. */

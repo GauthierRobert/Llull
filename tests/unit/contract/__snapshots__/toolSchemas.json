@@ -5202,6 +5202,33 @@
     "name": "move_building_element"
   },
   {
+    "description": "Translate several entities by the same delta in one step (one undo). Same semantics as move_entity applied to each id. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes.",
+    "input_schema": {
+      "properties": {
+        "delta": {
+          "description": "Translation [dx, dy, dz] in document units applied to every entity.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "ids": {
+          "description": "Entity ids to move (non-empty, at most 10000). Missing ids are skipped.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ids",
+        "delta"
+      ],
+      "type": "object"
+    },
+    "name": "move_entities"
+  },
+  {
     "description": "Translate an entity by a delta vector.",
     "input_schema": {
       "properties": {

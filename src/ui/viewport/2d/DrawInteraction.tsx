@@ -22,7 +22,7 @@ import type { Vec2 } from '@core/model/types';
 import { useSnap } from './useSnap';
 import { DrawPreview, CollectedPointMarkers } from './DrawPreview';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
-import type { DrawToolKind } from './useDrawTool';
+import type { DrawToolKind } from '@ui/store';
 
 /** three.js hit points are render-space (document − renderOrigin); input works in document space. */
 function toDocumentPoint(point: { x: number; y: number }): Vec2 {

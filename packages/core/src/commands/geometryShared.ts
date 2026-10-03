@@ -2,6 +2,18 @@ import type { CadDocument, Entity, Vec3 } from '../model/types';
 
 export const ORIGIN: Vec3 = [0, 0, 0];
 
+/** `entity` with its position offset by `delta` (the one translation used by every move command). */
+export function translated(entity: Entity, delta: Vec3): Entity {
+  return {
+    ...entity,
+    position: [
+      entity.position[0] + delta[0],
+      entity.position[1] + delta[1],
+      entity.position[2] + delta[2],
+    ],
+  };
+}
+
 /**
  * Validate an optional rotation param.
  * Returns [0,0,0] if rotation is absent, not length-3, or contains non-finite values.

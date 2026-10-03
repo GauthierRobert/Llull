@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useStore } from '@ui/store';
+import { useStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { useModifyTool } from '../../src/ui/viewport/2d/useModifyTool';
 
@@ -25,6 +25,7 @@ function resetStore(): void {
 
 describe('useModifyTool', () => {
   beforeEach(() => {
+    useToolStore.setState({ viewMode: '2d', drawTool: 'none', modifyTool: 'none' });
     resetStore();
   });
 
@@ -188,5 +189,25 @@ describe('useModifyTool', () => {
     });
     expect(result.current.phase).toBe('enter-value');
     expect(result.current.pickedVertexIndex).toBe(1); // [10,0] is nearest to [9.5,0.5]
+  });
+
+  it('Esc with nothing picked disarms the tool and is consumed', () => {
+    const { result } = renderHook(() => useModifyTool());
+    act(() => result.current.setActiveTool('trim'));
+    const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(result.current.activeTool).toBe('none');
+    expect(useToolStore.getState().modifyTool).toBe('none');
+  });
+
+  it('arming a draw tool elsewhere disarms the modify tool and its phase', () => {
+    const { result } = renderHook(() => useModifyTool());
+    act(() => result.current.setActiveTool('offset'));
+    act(() => useToolStore.getState().setDrawTool('line'));
+    expect(result.current.activeTool).toBe('none');
+    expect(result.current.phase).toBe('idle');
   });
 });

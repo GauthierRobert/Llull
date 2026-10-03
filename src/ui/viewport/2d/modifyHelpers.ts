@@ -11,11 +11,16 @@
 
 import type { Vec2 } from '@core/model/types';
 import type {
+  CadDocument,
   Entity,
+  EntityId,
   LineEntity,
   PolylineEntity,
   CircleEntity,
   RectangleEntity,
+  ArcEntity,
+  EllipseEntity,
+  SplineEntity,
 } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
@@ -128,7 +133,8 @@ export function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
  * is the work-plane origin in world space. The world-space pick is shifted into
  * the entity's local frame and all geometry is compared in that frame.
  *
- * Handles: line, polyline, circle, rectangle.
+ * Handles: line, polyline, circle, rectangle, point, arc (as its full circle),
+ * ellipse (sampled), spline (through its control points).
  * Returns Infinity for unsupported kinds.
  *
  * @pure
@@ -178,7 +184,153 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
         pointToSegDistSq(pick, tl, bl),
       );
     }
+    case 'point':
+      return dist2(pick, [0, 0]);
+    case 'arc': {
+      const a = entity as ArcEntity;
+      const d = Math.hypot(pick[0] - a.center[0], pick[1] - a.center[1]) - a.radius;
+      return d * d;
+    }
+    case 'ellipse': {
+      const el = entity as EllipseEntity;
+      const samples: Vec2[] = [];
+      for (let i = 0; i <= ELLIPSE_PICK_SAMPLES; i++) {
+        const t = (i / ELLIPSE_PICK_SAMPLES) * 2 * Math.PI;
+        samples.push([
+          el.center[0] + el.radiusX * Math.cos(t),
+          el.center[1] + el.radiusY * Math.sin(t),
+        ]);
+      }
+      return chainDistSq(pick, samples, false);
+    }
+    case 'spline': {
+      const sp = entity as SplineEntity;
+      return chainDistSq(pick, sp.points, sp.closed);
+    }
     default:
       return Infinity;
   }
+}
+
+/** Segments used to approximate an ellipse outline for picking. */
+const ELLIPSE_PICK_SAMPLES = 48;
+
+/** Minimum squared distance from `pick` to a chain of segments (optionally closed). @pure */
+function chainDistSq(pick: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): number {
+  let best = Infinity;
+  for (let i = 0; i < points.length - 1; i++) {
+    best = Math.min(best, pointToSegDistSq(pick, points[i]!, points[i + 1]!));
+  }
+  if (closed && points.length > 1) {
+    best = Math.min(best, pointToSegDistSq(pick, points[points.length - 1]!, points[0]!));
+  }
+  return best;
+}
+
+/**
+ * Id of the entity nearest to `worldPick` within `tolerance` world units, or null.
+ * Entities rejected by `isPickable` (e.g. hidden ones) are ignored.
+ * @pure
+ */
+export function nearestEntityId(
+  document: CadDocument,
+  worldPick: Vec2,
+  tolerance: number,
+  isPickable: (entity: Entity) => boolean = () => true,
+): EntityId | null {
+  const toleranceSq = tolerance * tolerance;
+  let bestId: EntityId | null = null;
+  let bestDist = Infinity;
+  for (const id of document.order) {
+    const entity = document.entities[id];
+    if (!entity || !isPickable(entity)) continue;
+    const dSq = entityDistSq(entity, worldPick);
+    if (dSq < toleranceSq && dSq < bestDist) {
+      bestDist = dSq;
+      bestId = id;
+    }
+  }
+  return bestId;
+}
+
+/** Point-in-polygon (even-odd ray cast) in local coordinates. @pure */
+function polygonContains(points: ReadonlyArray<Vec2>, pick: Vec2): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, yi] = points[i]!;
+    const [xj, yj] = points[j]!;
+    if (yi > pick[1] !== yj > pick[1] && pick[0] < ((xj - xi) * (pick[1] - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Enclosed area of a closed 2D entity when `worldPick` lies inside it, else null.
+ * Closed kinds: rectangle, circle, ellipse, closed polyline.
+ * @pure
+ */
+export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
+  const pick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
+  switch (entity.kind) {
+    case 'rectangle': {
+      const r = entity as RectangleEntity;
+      const inside = pick[0] >= 0 && pick[0] <= r.width && pick[1] >= 0 && pick[1] <= r.height;
+      return inside ? r.width * r.height : null;
+    }
+    case 'circle': {
+      const c = entity as CircleEntity;
+      const inside = dist2(pick, c.center) <= c.radius * c.radius;
+      return inside ? Math.PI * c.radius * c.radius : null;
+    }
+    case 'ellipse': {
+      const el = entity as EllipseEntity;
+      if (el.radiusX <= 0 || el.radiusY <= 0) return null;
+      const u = (pick[0] - el.center[0]) / el.radiusX;
+      const v = (pick[1] - el.center[1]) / el.radiusY;
+      return u * u + v * v <= 1 ? Math.PI * el.radiusX * el.radiusY : null;
+    }
+    case 'polyline': {
+      const poly = entity as PolylineEntity;
+      if (!poly.closed || poly.points.length < 3 || !polygonContains(poly.points, pick)) {
+        return null;
+      }
+      let twiceArea = 0;
+      for (let i = 0, j = poly.points.length - 1; i < poly.points.length; j = i++) {
+        twiceArea +=
+          poly.points[j]![0] * poly.points[i]![1] - poly.points[i]![0] * poly.points[j]![1];
+      }
+      return Math.abs(twiceArea) / 2;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Selection pick: the nearest outline within `tolerance` wins; otherwise the smallest closed
+ * shape containing the point; otherwise null.
+ * @pure
+ */
+export function pickEntityId(
+  document: CadDocument,
+  worldPick: Vec2,
+  tolerance: number,
+  isPickable: (entity: Entity) => boolean = () => true,
+): EntityId | null {
+  const onOutline = nearestEntityId(document, worldPick, tolerance, isPickable);
+  if (onOutline !== null) return onOutline;
+  let bestId: EntityId | null = null;
+  let bestArea = Infinity;
+  for (const id of document.order) {
+    const entity = document.entities[id];
+    if (!entity || !isPickable(entity)) continue;
+    const area = enclosingArea(entity, worldPick);
+    if (area !== null && area < bestArea) {
+      bestArea = area;
+      bestId = id;
+    }
+  }
+  return bestId;
 }

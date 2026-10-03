@@ -1,122 +1,92 @@
 /**
- * Component tests for <EmptyState /> — viewer mode.
+ * Component tests for <EmptyState /> — the "start your model" card.
  *
  * Asserts observable behavior (workflow W3, react R11):
- *   - Empty-state is rendered when document.order is empty.
- *   - Empty-state is absent once any entity exists in the document.
- *   - Dismiss button hides the overlay without changing the document.
- *   - Key viewer-mode copy is visible.
- *
- * Does NOT test geometry, CSS variables, or r3f internals.
+ *   - Shown when document.order is empty; absent once any entity exists or a 2D tool is armed.
+ *   - "Add a 3D box" creates a selected box; "Draw a 2D rectangle" arms the rectangle tool.
+ *   - Dismiss hides the card without changing the document.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useStore } from '@ui/store';
+import { useStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { EmptyState } from '@ui/components/EmptyState';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function resetStore(): void {
-  useStore.setState({ document: createEmptyDocument(), lastSummary: null });
+function resetStores(): void {
+  useStore.getState().setDocument(createEmptyDocument());
+  useStore.setState({ liveStatus: 'disconnected', lastSummary: null });
+  useToolStore.setState({ viewMode: '3d', drawTool: 'none', gizmoMode: 'translate' });
 }
 
-// ---------------------------------------------------------------------------
-// Tests — visibility based on entity count
-// ---------------------------------------------------------------------------
+const card = (): HTMLElement | null => screen.queryByRole('region', { name: /get started/i });
 
 describe('EmptyState — visibility', () => {
   beforeEach(() => {
-    resetStore();
+    resetStores();
   });
 
-  it('renders the empty-state when the document has 0 entities', () => {
+  it('renders the start card when the document has 0 entities', () => {
     render(<EmptyState />);
-    expect(screen.getByRole('status', { name: /waiting for mcp agent/i })).toBeDefined();
+    expect(card()).not.toBeNull();
+    expect(screen.getByText(/start your model/i)).toBeDefined();
   });
 
-  it('shows the viewer heading', () => {
-    render(<EmptyState />);
-    expect(screen.getByText(/waiting for your mcp agent/i)).toBeDefined();
-  });
-
-  it('includes a "ask Claude" message', () => {
-    render(<EmptyState />);
-    expect(screen.getByText(/ask claude/i)).toBeDefined();
-  });
-
-  it('does NOT render when the document has at least 1 entity', () => {
+  it('does NOT render when the document has an entity', () => {
     localDispatch('add_box', { size: [2, 2, 2] });
-
     render(<EmptyState />);
-    expect(screen.queryByRole('status', { name: /waiting for mcp agent/i })).toBeNull();
+    expect(card()).toBeNull();
   });
 
-  it('does NOT render when the document has multiple entities', () => {
-    localDispatch('add_box', { size: [1, 1, 1] });
-    localDispatch('add_box', { size: [2, 2, 2] });
-
+  it('does NOT render while a 2D draw tool is armed', () => {
+    useToolStore.getState().setDrawTool('line');
     render(<EmptyState />);
-    expect(screen.queryByRole('status', { name: /waiting for mcp agent/i })).toBeNull();
+    expect(card()).toBeNull();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tests — dismiss button
-// ---------------------------------------------------------------------------
+describe('EmptyState — quick starts', () => {
+  beforeEach(() => {
+    resetStores();
+  });
+
+  it('"Add a 3D box" creates a box, selects it and shows the 3D view', () => {
+    useToolStore.setState({ viewMode: '2d' });
+    render(<EmptyState />);
+    fireEvent.click(screen.getByRole('button', { name: /add a 3d box/i }));
+    const { document } = useStore.getState();
+    expect(document.order).toHaveLength(1);
+    expect(document.entities[document.order[0]!]?.kind).toBe('box');
+    expect(document.selection).toEqual(document.order);
+    expect(useToolStore.getState().viewMode).toBe('3d');
+  });
+
+  it('"Draw a 2D rectangle" arms the rectangle tool in the 2D view', () => {
+    render(<EmptyState />);
+    fireEvent.click(screen.getByRole('button', { name: /draw a 2d rectangle/i }));
+    expect(useToolStore.getState().drawTool).toBe('rectangle');
+    expect(useToolStore.getState().viewMode).toBe('2d');
+    expect(useStore.getState().document.order).toHaveLength(0);
+  });
+
+  it('explains how to move things and how to connect an agent', () => {
+    render(<EmptyState />);
+    expect(screen.getByText(/move things:/i)).toBeDefined();
+    expect(screen.getByText(/let ai build it/i)).toBeDefined();
+  });
+});
 
 describe('EmptyState — dismiss', () => {
   beforeEach(() => {
-    resetStore();
+    resetStores();
   });
 
-  it('renders a dismiss button', () => {
-    render(<EmptyState />);
-    expect(screen.getByRole('button', { name: /dismiss/i })).toBeDefined();
-  });
-
-  it('hides the overlay after the dismiss button is clicked', () => {
-    const { queryByRole } = render(<EmptyState />);
-
-    const dismissBtn = screen.getByRole('button', { name: /dismiss/i });
-    fireEvent.click(dismissBtn);
-
-    expect(queryByRole('status', { name: /waiting for mcp agent/i })).toBeNull();
-  });
-
-  it('does not change the document when dismissed (PRIME DIRECTIVE)', () => {
+  it('hides the card without changing the document (PRIME DIRECTIVE)', () => {
     const before = useStore.getState().document;
-
     render(<EmptyState />);
-    const dismissBtn = screen.getByRole('button', { name: /dismiss/i });
-    fireEvent.click(dismissBtn);
-
-    const after = useStore.getState().document;
-    expect(after).toBe(before);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — viewer content
-// ---------------------------------------------------------------------------
-
-describe('EmptyState — content', () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
-  it('shows viewer tips list', () => {
-    render(<EmptyState />);
-    expect(screen.getByRole('list', { name: /viewer tips/i })).toBeDefined();
-  });
-
-  it('mentions MCP in the tips', () => {
-    render(<EmptyState />);
-    const matches = screen.getAllByText(/MCP/i);
-    expect(matches.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
+    expect(card()).toBeNull();
+    expect(useStore.getState().document).toBe(before);
   });
 });

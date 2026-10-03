@@ -40,6 +40,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'load_document',
     'clear_document',
     'move_entity',
+    'move_entities',
     'rotate_entity',
     'scale_entity',
     'mirror_entity',

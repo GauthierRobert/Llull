@@ -107,7 +107,7 @@ npm run test:coverage
 npm --prefix server install && npm --prefix server run dev   # optional backend (not a workspace)
 ```
 
-## NON-NEGOTIABLES (the coverage gate / CI will reject otherwise)
+## NON-NEGOTIABLES (`npm run check` + the coverage gate reject otherwise)
 
 1. Commands are **pure**: return a new document, never mutate the argument. A test
    enforces this (`is pure`).

@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
-import type { DrawToolKind } from './useDrawTool';
+import type { DrawToolKind } from '@ui/store';
 import {
   rectParamsFromCorners,
   circleRadiusFromPoints,
@@ -210,7 +210,7 @@ export function DrawPreview({
     let geo: THREE.BufferGeometry | null = null;
     let useDash = false;
 
-    if (activeTool === 'line') {
+    if (activeTool === 'line' || activeTool === 'move') {
       if (collectedPoints.length === 1) {
         geo = buildLineGeo(collectedPoints[0]!, cursor);
       }

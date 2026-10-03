@@ -4,7 +4,7 @@
 
 .app-layout {
   display: grid;
-  grid-template-rows: var(--topbar-h) minmax(0, 1fr) var(--statusbar-h);
+  grid-template-rows: var(--topbar-h) auto minmax(0, 1fr) var(--statusbar-h);
   width: 100%;
   height: 100%;
   background: var(--surface-app);

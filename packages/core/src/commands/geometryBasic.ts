@@ -4,7 +4,14 @@ import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
 import { nextId } from '../lib/id';
 import { rotatedEntityBounds } from './scene';
-import { ORIGIN, resolveRotation, resolvePosition, boundsText, withEntity } from './geometryShared';
+import {
+  ORIGIN,
+  resolveRotation,
+  resolvePosition,
+  boundsText,
+  translated,
+  withEntity,
+} from './geometryShared';
 export const addBox = defineCommand({
   name: 'add_box',
   description:
@@ -169,16 +176,8 @@ export const move = defineCommand({
     if (!target) {
       return { document: doc, summary: `No entity ${id} to move.`, affected: [] };
     }
-    const moved: Entity = {
-      ...target,
-      position: [
-        target.position[0] + delta[0],
-        target.position[1] + delta[1],
-        target.position[2] + delta[2],
-      ],
-    };
     return {
-      document: { ...doc, entities: { ...doc.entities, [id]: moved } },
+      document: { ...doc, entities: { ...doc.entities, [id]: translated(target, delta) } },
       summary: `Moved ${id} by ${delta.join(', ')}.`,
       affected: [id],
     };
