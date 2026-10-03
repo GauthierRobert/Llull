@@ -86,7 +86,12 @@ export function budgetFailure(index: number): StepReport {
   };
 }
 
-export function noop(doc: CadDocument, data: BuildProjectData, summary: string): CommandResult {
+/** A rejected `build_project` run: unchanged doc plus the plan report. */
+export function rejectPlan(
+  doc: CadDocument,
+  data: BuildProjectData,
+  summary: string,
+): CommandResult {
   return { document: doc, summary, affected: [], data };
 }
 
