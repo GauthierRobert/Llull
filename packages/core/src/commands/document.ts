@@ -16,6 +16,7 @@ import type { CadDocument } from '../model/types';
 import { createEmptyDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 
 export const clearDocument = defineCommand({
   name: 'clear_document',
@@ -71,11 +72,7 @@ export const clearDocument = defineCommand({
       (keepLayers || isLayersDefault);
 
     if (isAlreadyEmpty) {
-      return {
-        document: doc,
-        summary: 'Document is already empty.',
-        affected: [],
-      };
+      return noop(doc, 'Document is already empty.');
     }
 
     const nextDoc: CadDocument = {

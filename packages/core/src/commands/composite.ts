@@ -10,8 +10,9 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
-import { cross3, dot3, normalize3 } from '../lib/vec3';
+import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { withEntity } from './entityOps';
+import { noop } from './noop';
 
 /**
  * Convert a unit-axis / angle rotation (Rodrigues) to an intrinsic XYZ Euler triple
@@ -141,67 +142,31 @@ export const makeTubeBetween = defineCommand({
       .optional(),
   }),
   run: (doc, { p1, p2, radius, color = '#6b8f9c' }): CommandResult => {
-    // --- Validate inputs ---
-    if (
-      !Array.isArray(p1) ||
-      p1.length < 3 ||
-      p1.some((v) => typeof v !== 'number' || !isFinite(v))
-    ) {
-      return {
-        document: doc,
-        summary: 'make_tube_between failed: p1 must be a numeric [x, y, z] array.',
-        affected: [],
-      };
+    const isPoint = (p: unknown): boolean =>
+      Array.isArray(p) && p.length >= 3 && p.every((v) => typeof v === 'number' && isFinite(v));
+    if (!isPoint(p1)) {
+      return noop(doc, 'make_tube_between failed: p1 must be a numeric [x, y, z] array.');
     }
-    if (
-      !Array.isArray(p2) ||
-      p2.length < 3 ||
-      p2.some((v) => typeof v !== 'number' || !isFinite(v))
-    ) {
-      return {
-        document: doc,
-        summary: 'make_tube_between failed: p2 must be a numeric [x, y, z] array.',
-        affected: [],
-      };
+    if (!isPoint(p2)) {
+      return noop(doc, 'make_tube_between failed: p2 must be a numeric [x, y, z] array.');
     }
-    if (typeof radius !== 'number' || !isFinite(radius) || radius <= 0) {
-      return {
-        document: doc,
-        summary: `make_tube_between failed: radius must be > 0, got ${radius}.`,
-        affected: [],
-      };
+    if (radius <= 0) {
+      return noop(doc, `make_tube_between failed: radius must be > 0, got ${radius}.`);
     }
 
-    // --- Compute direction and length ---
-    const dx = (p2[0] as number) - (p1[0] as number);
-    const dy = (p2[1] as number) - (p1[1] as number);
-    const dz = (p2[2] as number) - (p1[2] as number);
-    const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
+    const delta = sub3(p2, p1);
+    const length = Math.sqrt(dot3(delta, delta));
     if (length < 1e-9) {
-      return {
-        document: doc,
-        summary: `make_tube_between failed: p1 and p2 are the same point (distance ${length.toFixed(9)} < 1e-9).`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `make_tube_between failed: p1 and p2 are the same point (distance ${length.toFixed(9)} < 1e-9).`,
+      );
     }
 
-    // --- Solve orientation ---
-    const dir: Vec3 = [dx / length, dy / length, dz / length];
-    const rotation = directionToEulerXYZ(dir);
+    const rotation = directionToEulerXYZ(scale3(delta, 1 / length));
+    // Cylinders are centered on their centroid, so the entity sits at the midpoint of p1..p2.
+    const mid = scale3(add3(p1, p2), 0.5);
 
-    // --- Position: cylinder is centered at its midpoint in three.js, but our model
-    //     uses the base-center convention (cylinder spans [pos, pos + height along +Z]
-    //     BEFORE rotation). We want the base at p1 and top at p2.
-    //     The cylinder is centered at its centroid in three.js (render.ts tessellateCylinder
-    //     uses pz ± height/2). So we must place the entity at the midpoint.
-    const mid: Vec3 = [
-      ((p1[0] as number) + (p2[0] as number)) / 2,
-      ((p1[1] as number) + (p2[1] as number)) / 2,
-      ((p1[2] as number) + (p2[2] as number)) / 2,
-    ];
-
-    // --- Build entity ---
     const id = nextId('cyl');
     const entity: Entity = {
       id,
@@ -214,13 +179,11 @@ export const makeTubeBetween = defineCommand({
       color,
     };
 
-    const l3 = length.toFixed(3);
-    const p1s = `[${(p1[0] as number).toFixed(3)},${(p1[1] as number).toFixed(3)},${(p1[2] as number).toFixed(3)}]`;
-    const p2s = `[${(p2[0] as number).toFixed(3)},${(p2[1] as number).toFixed(3)},${(p2[2] as number).toFixed(3)}]`;
+    const fmtPoint = (p: Vec3): string => `[${p.map((v) => v.toFixed(3)).join(',')}]`;
 
     return {
       document: withEntity(doc, entity),
-      summary: `Created tube ${id} from ${p1s} to ${p2s}, radius ${radius}, length ${l3}.`,
+      summary: `Created tube ${id} from ${fmtPoint(p1)} to ${fmtPoint(p2)}, radius ${radius}, length ${length.toFixed(3)}.`,
       affected: [id],
     };
   },

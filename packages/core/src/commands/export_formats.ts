@@ -9,44 +9,28 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { uint8ArrayToBase64 } from '../lib/base64';
-import { collectExportTriangles } from './exportTriangulate';
+import { collectExportTriangles, exportSummary } from './exportTriangulate';
 import { facetNormal, type Triangle } from './exportMath';
 
-/**
- * Build a Wavefront OBJ text string from a triangle list.
- * Each triangle becomes 3 vertices + 1 face.  Normals are per-facet.
- * Indices are 1-based (OBJ convention).
- */
-function buildObjText(tris: Triangle[], objectName: string): string {
-  const lines: string[] = [`# Exported by llull`, `o ${objectName}`];
-
-  // Write all vertices then all normals then all faces.
-  const normals: Vec3[] = [];
+/** Wavefront OBJ text: per-facet normals, 1-based `f v//vn` indices. */
+function buildObjText(tris: Triangle[], header: string, objectName: string): string {
+  const lines: string[] = [header, `o ${objectName}`];
   for (const [v0, v1, v2] of tris) {
-    normals.push(facetNormal(v0, v1, v2));
-  }
-
-  for (const [v0, v1, v2] of tris) {
-    lines.push(`v ${v0[0]} ${v0[1]} ${v0[2]}`);
-    lines.push(`v ${v1[0]} ${v1[1]} ${v1[2]}`);
+    lines.push(`v ${v0[0]} ${v0[1]} ${v0[2]}`, `v ${v1[0]} ${v1[1]} ${v1[2]}`);
     lines.push(`v ${v2[0]} ${v2[1]} ${v2[2]}`);
   }
-
-  for (const n of normals) {
+  for (const [v0, v1, v2] of tris) {
+    const n = facetNormal(v0, v1, v2);
     lines.push(`vn ${n[0]} ${n[1]} ${n[2]}`);
   }
-
-  // f v//vn  v//vn  v//vn  (one face per triangle, 1-based)
   for (let i = 0; i < tris.length; i++) {
-    const vi = i * 3 + 1; // first vertex index of this triangle (1-based)
-    const ni = i + 1; // normal index (1-based)
+    const vi = i * 3 + 1;
+    const ni = i + 1;
     lines.push(`f ${vi}//${ni} ${vi + 1}//${ni} ${vi + 2}//${ni}`);
   }
-
   return lines.join('\n');
 }
 
@@ -99,24 +83,19 @@ export const exportObj = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const { entityIds, units } = params;
-    const unitLabel = units ?? (doc as CadDocument & { units?: string }).units ?? 'mm';
+    const unitLabel = units ?? doc.units;
 
-    const { tris, skipped2D, unknownIds } = collectExportTriangles(doc, entityIds);
-    const triangleCount = tris.length;
-
-    const text = [
+    const collected = collectExportTriangles(doc, entityIds);
+    const triangleCount = collected.tris.length;
+    const text = buildObjText(
+      collected.tris,
       `# llull OBJ export — units: ${unitLabel}`,
-      buildObjText(tris, 'llull_export').split('\n').slice(1).join('\n'),
-    ].join('\n');
-
-    const parts: string[] = [
-      `export_obj: ${triangleCount} triangle${triangleCount !== 1 ? 's' : ''} exported (format=obj).`,
-    ];
-    if (skipped2D > 0) parts.push(`${skipped2D} 2D entit${skipped2D !== 1 ? 'ies' : 'y'} skipped.`);
-    if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
+      'llull_export',
+    );
+    const summary = exportSummary('export_obj', 'obj', collected);
 
     const data: ExportObjData = { format: 'obj', text, triangleCount };
-    return { document: doc, summary: parts.join(' '), affected: [], data };
+    return { document: doc, summary, affected: [], data };
   },
 });
 
@@ -189,17 +168,16 @@ function align4(n: number): number {
 }
 
 /**
- * Build a minimal valid glTF 2.0 JSON object from a triangle list.
+ * Build a minimal valid glTF 2.0 JSON object from flat vertex positions.
  * Positions and normals are stored as separate bufferview/accessor pairs.
  * The binary buffer payload is returned as a separate Uint8Array.
  */
-function buildGltfJson(tris: Triangle[], binBuffer: Uint8Array): Record<string, unknown> {
-  const vertexCount = tris.length * 3;
+function buildGltfJson(positions: Float32Array, binBuffer: Uint8Array): Record<string, unknown> {
+  const vertexCount = positions.length / 3;
   // Buffer layout: positions (float32×3 per vertex) then normals (float32×3 per vertex)
   const posByteLength = vertexCount * 3 * 4;
   const normByteLength = vertexCount * 3 * 4;
 
-  const { positions } = buildGltfBuffers(tris);
   const aabb = computeAabb(positions);
 
   return {
@@ -302,15 +280,14 @@ function buildGlb(jsonObj: Record<string, unknown>, binPayload: Uint8Array): Uin
   return buf;
 }
 
-/** Build the combined BIN buffer payload (positions then normals, each Float32Array → Uint8Array). */
-function buildBinPayload(tris: Triangle[]): Uint8Array {
-  if (tris.length === 0) return new Uint8Array(0);
-  const { positions, normals } = buildGltfBuffers(tris);
-  const posBytes = new Uint8Array(positions.buffer, positions.byteOffset, positions.byteLength);
-  const normBytes = new Uint8Array(normals.buffer, normals.byteOffset, normals.byteLength);
-  const combined = new Uint8Array(posBytes.length + normBytes.length);
-  combined.set(posBytes, 0);
-  combined.set(normBytes, posBytes.length);
+/** Combined BIN payload: positions then normals as raw bytes. */
+function buildBinPayload(positions: Float32Array, normals: Float32Array): Uint8Array {
+  const combined = new Uint8Array(positions.byteLength + normals.byteLength);
+  combined.set(new Uint8Array(positions.buffer, positions.byteOffset, positions.byteLength), 0);
+  combined.set(
+    new Uint8Array(normals.buffer, normals.byteOffset, normals.byteLength),
+    positions.byteLength,
+  );
   return combined;
 }
 
@@ -374,37 +351,27 @@ export const exportGltf = defineCommand({
   run: (doc, params): CommandResult => {
     const { entityIds, binary = false } = params;
 
-    const { tris, skipped2D, unknownIds } = collectExportTriangles(doc, entityIds);
-    const triangleCount = tris.length;
-
-    const binPayload = buildBinPayload(tris);
-
-    const parts: string[] = [
-      `export_gltf: ${triangleCount} triangle${triangleCount !== 1 ? 's' : ''} exported (format=${binary ? 'glb' : 'gltf'}).`,
-    ];
-    if (skipped2D > 0) parts.push(`${skipped2D} 2D entit${skipped2D !== 1 ? 'ies' : 'y'} skipped.`);
-    if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
+    const collected = collectExportTriangles(doc, entityIds);
+    const triangleCount = collected.tris.length;
+    const { positions, normals } = buildGltfBuffers(collected.tris);
+    const binPayload = buildBinPayload(positions, normals);
+    const summary = exportSummary('export_gltf', binary ? 'glb' : 'gltf', collected);
+    const jsonObj = buildGltfJson(positions, binPayload);
 
     if (binary) {
-      const jsonObj = buildGltfJson(tris, binPayload);
-      const glbBytes = buildGlb(jsonObj, binPayload);
-      const base64 = uint8ArrayToBase64(glbBytes);
+      const base64 = uint8ArrayToBase64(buildGlb(jsonObj, binPayload));
       const data: ExportGltfData = { format: 'glb', triangleCount, base64 };
-      return { document: doc, summary: parts.join(' '), affected: [], data };
-    } else {
-      // JSON mode: inline BIN as a data: URI so the JSON is self-contained
-      const binBase64 = binPayload.length > 0 ? uint8ArrayToBase64(binPayload) : '';
-      const jsonObj = buildGltfJson(tris, binPayload) as Record<string, unknown>;
-
-      // Patch buffers[0] to carry the data URI
-      if (binPayload.length > 0) {
-        const buffers = jsonObj['buffers'] as Array<Record<string, unknown>>;
-        buffers[0]!['uri'] = `data:application/octet-stream;base64,${binBase64}`;
-      }
-
-      const text = JSON.stringify(jsonObj, null, 2);
-      const data: ExportGltfData = { format: 'gltf', triangleCount, text };
-      return { document: doc, summary: parts.join(' '), affected: [], data };
+      return { document: doc, summary, affected: [], data };
     }
+    if (binPayload.length > 0) {
+      const buffers = jsonObj['buffers'] as Array<Record<string, unknown>>;
+      buffers[0]!['uri'] = `data:application/octet-stream;base64,${uint8ArrayToBase64(binPayload)}`;
+    }
+    const data: ExportGltfData = {
+      format: 'gltf',
+      triangleCount,
+      text: JSON.stringify(jsonObj, null, 2),
+    };
+    return { document: doc, summary, affected: [], data };
   },
 });

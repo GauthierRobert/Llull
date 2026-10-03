@@ -15,6 +15,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { reEvaluateAll } from './parameters';
 import { replayHistory } from './history';
+import { noop } from './noop';
 
 /**
  * @command create_configuration
@@ -53,24 +54,18 @@ export const createConfiguration = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, parameterValues }): CommandResult => {
     if (typeof name !== 'string' || name.trim() === '') {
-      return {
-        document: doc,
-        summary: 'create_configuration failed: name must be a non-empty string.',
-        affected: [],
-      };
+      return noop(doc, 'create_configuration failed: name must be a non-empty string.');
     }
 
-    // Validate that every value is a string expression.
     const expressions: Record<string, string> = {};
     for (const [k, v] of Object.entries(parameterValues)) {
       if (typeof v === 'string') {
         expressions[k] = v;
       } else {
-        return {
-          document: doc,
-          summary: `create_configuration '${name}' failed: parameterValues['${k}'] must be a string expression, got ${typeof v}.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `create_configuration '${name}' failed: parameterValues['${k}'] must be a string expression, got ${typeof v}.`,
+        );
       }
     }
 
@@ -124,11 +119,7 @@ export const activateConfiguration = defineCommand({
   annotations: { idempotent: true, metaHistory: true },
   run: (doc, { name }): CommandResult => {
     if (name.trim() === '') {
-      return {
-        document: doc,
-        summary: 'activate_configuration failed: name must be a non-empty string.',
-        affected: [],
-      };
+      return noop(doc, 'activate_configuration failed: name must be a non-empty string.');
     }
 
     const config = doc.configurations[name];
@@ -138,11 +129,7 @@ export const activateConfiguration = defineCommand({
         available.length > 0
           ? ` Available configurations: ${available.join(', ')}.`
           : ' No configurations have been defined yet (use create_configuration first).';
-      return {
-        document: doc,
-        summary: `activate_configuration failed: configuration '${name}' not found.${hint}`,
-        affected: [],
-      };
+      return noop(doc, `activate_configuration failed: configuration '${name}' not found.${hint}`);
     }
 
     // Apply this configuration's parameter expressions to the current parameters record.
@@ -185,7 +172,7 @@ export const activateConfiguration = defineCommand({
     const warnings: string[] = [];
     const refused = kernelRefusal(baseDoc, doc.featureHistory);
     if (refused !== null) {
-      return { document: doc, summary: `activate_configuration: ${refused}`, affected: [] };
+      return noop(doc, `activate_configuration: ${refused}`);
     }
     const regenerated = replayHistory(
       baseDoc,

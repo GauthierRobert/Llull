@@ -3,6 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { detectCycleOnAdd, evaluateMotionInternal } from './jointsKinematics';
+import { noop } from './noop';
 /**
  * @command add_drive_relation
  * @pure
@@ -52,51 +53,42 @@ export const addDriveRelation = defineCommand({
   }),
   run: (doc, { driver, driven, ratio, offset, id }): CommandResult => {
     if (!(driver in doc.joints)) {
-      return {
-        document: doc,
-        summary: `add_drive_relation: driver joint '${String(driver)}' does not exist in doc.joints.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_drive_relation: driver joint '${String(driver)}' does not exist in doc.joints.`,
+      );
     }
     if (!(driven in doc.joints)) {
-      return {
-        document: doc,
-        summary: `add_drive_relation: driven joint '${String(driven)}' does not exist in doc.joints.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_drive_relation: driven joint '${String(driven)}' does not exist in doc.joints.`,
+      );
     }
     if (driver === driven) {
-      return {
-        document: doc,
-        summary: `add_drive_relation: driver and driven cannot be the same joint ('${driver}').`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_drive_relation: driver and driven cannot be the same joint ('${driver}').`,
+      );
     }
     if (!Number.isFinite(ratio)) {
-      return {
-        document: doc,
-        summary: `add_drive_relation: ratio must be a finite number, got ${String(ratio)}.`,
-        affected: [],
-      };
+      return noop(doc, `add_drive_relation: ratio must be a finite number, got ${String(ratio)}.`);
     }
 
     // Cycle detection
     const cyclePath = detectCycleOnAdd(doc.driveRelations, driver, driven);
     if (cyclePath !== null) {
-      return {
-        document: doc,
-        summary: `add_drive_relation: adding this relation would create a cycle: ${cyclePath}. No change made.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_drive_relation: adding this relation would create a cycle: ${cyclePath}. No change made.`,
+      );
     }
 
     const drId = typeof id === 'string' && id.length > 0 ? id : nextId('dr');
     if (drId in doc.driveRelations) {
-      return {
-        document: doc,
-        summary: `add_drive_relation: drive relation id '${drId}' already exists — no change made.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_drive_relation: drive relation id '${drId}' already exists — no change made.`,
+      );
     }
 
     const newDr: DriveRelation = {
@@ -148,11 +140,10 @@ export const deleteDriveRelation = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (!(id in doc.driveRelations)) {
-      return {
-        document: doc,
-        summary: `delete_drive_relation: drive relation '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `delete_drive_relation: drive relation '${String(id)}' does not exist — no change made.`,
+      );
     }
 
     const dr = doc.driveRelations[id]!;
@@ -240,11 +231,7 @@ export const bakeMotion = defineCommand({
   params: z.object({}),
   run: (doc, _params): CommandResult => {
     if (Object.keys(doc.joints).length === 0) {
-      return {
-        document: doc,
-        summary: 'bake_motion: no joints defined. Nothing to bake.',
-        affected: [],
-      };
+      return noop(doc, 'bake_motion: no joints defined. Nothing to bake.');
     }
 
     const { resolvedJoints, instancePositions, instanceRotations } = evaluateMotionInternal(doc);

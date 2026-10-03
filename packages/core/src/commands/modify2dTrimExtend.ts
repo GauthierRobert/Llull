@@ -3,6 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import type { Vec2 } from '../model/types';
 import { len2, segIntersect, evalLine } from './modify2dGeometry';
+import { noop } from './noop';
 
 /** `line` with its endpoint nearer to `point` moved onto `point` (a tie moves the start). */
 function withNearerEndpointAt(line: LineEntity, point: Vec2): LineEntity {
@@ -39,37 +40,21 @@ export const trim = defineCommand({
   }),
   run: (doc, { id, boundaryId }): CommandResult => {
     if (id === boundaryId) {
-      return {
-        document: doc,
-        summary: `trim: id and boundaryId must be different entities.`,
-        affected: [],
-      };
+      return noop(doc, `trim: id and boundaryId must be different entities.`);
     }
     const entity = doc.entities[id];
     const boundary = doc.entities[boundaryId];
     if (!entity) {
-      return { document: doc, summary: `trim: entity ${id} not found.`, affected: [] };
+      return noop(doc, `trim: entity ${id} not found.`);
     }
     if (!boundary) {
-      return {
-        document: doc,
-        summary: `trim: boundary entity ${boundaryId} not found.`,
-        affected: [],
-      };
+      return noop(doc, `trim: boundary entity ${boundaryId} not found.`);
     }
     if (entity.kind !== 'line') {
-      return {
-        document: doc,
-        summary: `trim: entity ${id} is kind '${entity.kind}', expected 'line'.`,
-        affected: [],
-      };
+      return noop(doc, `trim: entity ${id} is kind '${entity.kind}', expected 'line'.`);
     }
     if (boundary.kind !== 'line') {
-      return {
-        document: doc,
-        summary: `trim: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`,
-        affected: [],
-      };
+      return noop(doc, `trim: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`);
     }
 
     const line = entity as LineEntity;
@@ -77,21 +62,13 @@ export const trim = defineCommand({
     const hit = segIntersect(line.start, line.end, bLine.start, bLine.end);
 
     if (hit === null) {
-      return {
-        document: doc,
-        summary: `trim: lines ${id} and ${boundaryId} are parallel — no intersection.`,
-        affected: [],
-      };
+      return noop(doc, `trim: lines ${id} and ${boundaryId} are parallel — no intersection.`);
     }
 
     // The intersection must lie on the boundary segment (u ∈ [0,1])
     // and within the line segment (t ∈ [0,1])
     if (hit.t < -1e-9 || hit.t > 1 + 1e-9 || hit.u < -1e-9 || hit.u > 1 + 1e-9) {
-      return {
-        document: doc,
-        summary: `trim: intersection of ${id} and ${boundaryId} is outside segment bounds.`,
-        affected: [],
-      };
+      return noop(doc, `trim: intersection of ${id} and ${boundaryId} is outside segment bounds.`);
     }
 
     const intersectionPt = evalLine(line.start, line.end, hit.t);
@@ -136,37 +113,24 @@ export const extend = defineCommand({
   }),
   run: (doc, { id, boundaryId }): CommandResult => {
     if (id === boundaryId) {
-      return {
-        document: doc,
-        summary: `extend: id and boundaryId must be different entities.`,
-        affected: [],
-      };
+      return noop(doc, `extend: id and boundaryId must be different entities.`);
     }
     const entity = doc.entities[id];
     const boundary = doc.entities[boundaryId];
     if (!entity) {
-      return { document: doc, summary: `extend: entity ${id} not found.`, affected: [] };
+      return noop(doc, `extend: entity ${id} not found.`);
     }
     if (!boundary) {
-      return {
-        document: doc,
-        summary: `extend: boundary entity ${boundaryId} not found.`,
-        affected: [],
-      };
+      return noop(doc, `extend: boundary entity ${boundaryId} not found.`);
     }
     if (entity.kind !== 'line') {
-      return {
-        document: doc,
-        summary: `extend: entity ${id} is kind '${entity.kind}', expected 'line'.`,
-        affected: [],
-      };
+      return noop(doc, `extend: entity ${id} is kind '${entity.kind}', expected 'line'.`);
     }
     if (boundary.kind !== 'line') {
-      return {
-        document: doc,
-        summary: `extend: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `extend: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`,
+      );
     }
 
     const line = entity as LineEntity;
@@ -175,11 +139,7 @@ export const extend = defineCommand({
     // Use infinite-line intersection (no segment clamping)
     const hit = segIntersect(line.start, line.end, bLine.start, bLine.end);
     if (hit === null) {
-      return {
-        document: doc,
-        summary: `extend: lines ${id} and ${boundaryId} are parallel — no intersection.`,
-        affected: [],
-      };
+      return noop(doc, `extend: lines ${id} and ${boundaryId} are parallel — no intersection.`);
     }
 
     const intersectionPt = evalLine(line.start, line.end, hit.t);

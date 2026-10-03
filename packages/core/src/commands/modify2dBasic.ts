@@ -1,9 +1,10 @@
-import type { Entity, Vec2, Vec3, LineEntity, PolylineEntity } from '../model/types';
+import type { Entity, Vec2, PolylineEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { offsetSegment, miterJoin } from './modify2dGeometry';
 import { withEntity, withoutEntity } from './entityOps';
+import { noop } from './noop';
 
 /**
  * @command explode_polyline
@@ -25,25 +26,22 @@ export const explodePolyline = defineCommand({
   run: (doc, { id }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return { document: doc, summary: `explode_polyline: entity ${id} not found.`, affected: [] };
+      return noop(doc, `explode_polyline: entity ${id} not found.`);
     }
     if (entity.kind !== 'polyline') {
-      return {
-        document: doc,
-        summary: `explode_polyline: entity ${id} is kind '${entity.kind}', expected 'polyline'.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `explode_polyline: entity ${id} is kind '${entity.kind}', expected 'polyline'.`,
+      );
     }
     const poly = entity as PolylineEntity;
     if (poly.points.length < 2) {
-      return {
-        document: doc,
-        summary: `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`,
+      );
     }
 
-    // Build segments
     const segments: Array<[Vec2, Vec2]> = [];
     for (let i = 0; i < poly.points.length - 1; i++) {
       segments.push([poly.points[i]!, poly.points[i + 1]!]);
@@ -114,14 +112,10 @@ export const offset2D = defineCommand({
   run: (doc, { id, distance }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return { document: doc, summary: `offset_2d: entity ${id} not found.`, affected: [] };
+      return noop(doc, `offset_2d: entity ${id} not found.`);
     }
     if (distance === 0) {
-      return {
-        document: doc,
-        summary: `offset_2d: distance is 0 — no-op.`,
-        affected: [],
-      };
+      return noop(doc, `offset_2d: distance is 0 — no-op.`);
     }
 
     const newId = nextId('offset');
@@ -131,144 +125,72 @@ export const offset2D = defineCommand({
       layerId: entity.layerId,
       color: entity.color,
     };
+    let newEntity: Entity;
+    let summary: string;
 
-    if (entity.kind === 'line') {
-      const line = entity as LineEntity;
-      const [oa, ob] = offsetSegment(line.start, line.end, distance);
-      const newEntity: Entity = {
-        ...base,
-        id: newId,
-        kind: 'line',
-        start: oa,
-        end: ob,
-      };
-      return {
-        document: withEntity(doc, newEntity),
-        summary: `Offset line ${id} by ${distance} → new line ${newId}.`,
-        affected: [newId],
-      };
-    }
-
-    if (entity.kind === 'polyline') {
-      const poly = entity as PolylineEntity;
-      if (poly.points.length < 2) {
-        return {
-          document: doc,
-          summary: `offset_2d: polyline ${id} has fewer than 2 points — no-op.`,
-          affected: [],
+    switch (entity.kind) {
+      case 'line': {
+        const [start, end] = offsetSegment(entity.start, entity.end, distance);
+        newEntity = { ...base, id: newId, kind: 'line', start, end };
+        summary = `Offset line ${id} by ${distance} → new line ${newId}.`;
+        break;
+      }
+      case 'polyline': {
+        const pts = entity.points;
+        if (pts.length < 2) {
+          return noop(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
+        }
+        const segs = pts.slice(0, -1).map((p, i) => offsetSegment(p, pts[i + 1]!, distance));
+        if (entity.closed) segs.push(offsetSegment(pts[pts.length - 1]!, pts[0]!, distance));
+        const joins = (entity.closed ? segs : segs.slice(1)).map((seg, i) => {
+          const prev = segs[entity.closed ? (i - 1 + segs.length) % segs.length : i]!;
+          return miterJoin(prev[0], prev[1], seg[0], seg[1]);
+        });
+        const points: Vec2[] = entity.closed
+          ? joins
+          : [segs[0]![0], ...joins, segs[segs.length - 1]![1]];
+        newEntity = { ...base, id: newId, kind: 'polyline', points, closed: entity.closed };
+        summary = `Offset polyline ${id} by ${distance} → new polyline ${newId} (${points.length} points).`;
+        break;
+      }
+      case 'circle': {
+        const radius = entity.radius + distance;
+        if (radius <= 0) {
+          return noop(doc, `offset_2d: resulting circle radius ${radius} <= 0 — no-op.`);
+        }
+        newEntity = { ...base, id: newId, kind: 'circle', center: entity.center, radius };
+        summary = `Offset circle ${id} by ${distance} → new circle ${newId} radius ${radius}.`;
+        break;
+      }
+      case 'rectangle': {
+        const width = entity.width + 2 * distance;
+        const height = entity.height + 2 * distance;
+        if (width <= 0 || height <= 0) {
+          return noop(
+            doc,
+            `offset_2d: resulting rectangle ${width}×${height} is degenerate — no-op.`,
+          );
+        }
+        // The origin shifts by -distance on X and Y so the rectangle grows/shrinks on every side.
+        const [x, y, z] = entity.position;
+        newEntity = {
+          ...base,
+          id: newId,
+          kind: 'rectangle',
+          width,
+          height,
+          position: [x - distance, y - distance, z],
         };
+        summary = `Offset rectangle ${id} by ${distance} → new rectangle ${newId} ${width}×${height}.`;
+        break;
       }
-
-      // Offset each segment
-      const offsetSegs: Array<[Vec2, Vec2]> = [];
-      for (let i = 0; i < poly.points.length - 1; i++) {
-        offsetSegs.push(offsetSegment(poly.points[i]!, poly.points[i + 1]!, distance));
-      }
-      if (poly.closed) {
-        offsetSegs.push(
-          offsetSegment(poly.points[poly.points.length - 1]!, poly.points[0]!, distance),
+      default:
+        return noop(
+          doc,
+          `offset_2d: entity ${id} has unsupported kind '${entity.kind}'. Supported: line, polyline, circle, rectangle.`,
         );
-      }
-
-      // Compute miter join points
-      const newPoints: Vec2[] = [];
-      if (!poly.closed) {
-        // First point: just the start of the first offset segment
-        newPoints.push(offsetSegs[0]![0]);
-        // Interior vertices: miter between adjacent segments
-        for (let i = 0; i < offsetSegs.length - 1; i++) {
-          const [a0, a1] = offsetSegs[i]!;
-          const [b0, b1] = offsetSegs[i + 1]!;
-          newPoints.push(miterJoin(a0, a1, b0, b1));
-        }
-        // Last point: end of the last offset segment
-        newPoints.push(offsetSegs[offsetSegs.length - 1]![1]);
-      } else {
-        // For closed: every vertex is a miter join between the two adjacent segments
-        const n = offsetSegs.length;
-        for (let i = 0; i < n; i++) {
-          const prev = offsetSegs[(i - 1 + n) % n]!;
-          const curr = offsetSegs[i]!;
-          newPoints.push(miterJoin(prev[0], prev[1], curr[0], curr[1]));
-        }
-      }
-
-      const newEntity: Entity = {
-        ...base,
-        id: newId,
-        kind: 'polyline',
-        points: newPoints as ReadonlyArray<Vec2>,
-        closed: poly.closed,
-      };
-      return {
-        document: withEntity(doc, newEntity),
-        summary: `Offset polyline ${id} by ${distance} → new polyline ${newId} (${newPoints.length} points).`,
-        affected: [newId],
-      };
     }
 
-    if (entity.kind === 'circle') {
-      const circle = entity as { kind: 'circle'; center: Vec2; radius: number } & typeof base & {
-          id: string;
-        };
-      const newRadius = circle.radius + distance;
-      if (newRadius <= 0) {
-        return {
-          document: doc,
-          summary: `offset_2d: resulting circle radius ${newRadius} <= 0 — no-op.`,
-          affected: [],
-        };
-      }
-      const newEntity: Entity = {
-        ...base,
-        id: newId,
-        kind: 'circle',
-        center: circle.center,
-        radius: newRadius,
-      };
-      return {
-        document: withEntity(doc, newEntity),
-        summary: `Offset circle ${id} by ${distance} → new circle ${newId} radius ${newRadius}.`,
-        affected: [newId],
-      };
-    }
-
-    if (entity.kind === 'rectangle') {
-      const rect = entity as { kind: 'rectangle'; width: number; height: number } & typeof base & {
-          id: string;
-        };
-      const newWidth = rect.width + 2 * distance;
-      const newHeight = rect.height + 2 * distance;
-      if (newWidth <= 0 || newHeight <= 0) {
-        return {
-          document: doc,
-          summary: `offset_2d: resulting rectangle ${newWidth}×${newHeight} is degenerate — no-op.`,
-          affected: [],
-        };
-      }
-      // The offset rectangle is centered on the same position but shifted by -distance on each side.
-      // We shift the origin by -distance on X and Y (lower-left moves left/down for positive offset).
-      const origPos = entity.position;
-      const newPos: Vec3 = [origPos[0] - distance, origPos[1] - distance, origPos[2]];
-      const newEntity: Entity = {
-        ...base,
-        id: newId,
-        kind: 'rectangle',
-        width: newWidth,
-        height: newHeight,
-        position: newPos,
-      };
-      return {
-        document: withEntity(doc, newEntity),
-        summary: `Offset rectangle ${id} by ${distance} → new rectangle ${newId} ${newWidth}×${newHeight}.`,
-        affected: [newId],
-      };
-    }
-
-    return {
-      document: doc,
-      summary: `offset_2d: entity ${id} has unsupported kind '${entity.kind}'. Supported: line, polyline, circle, rectangle.`,
-      affected: [],
-    };
+    return { document: withEntity(doc, newEntity), summary, affected: [newId] };
   },
 });

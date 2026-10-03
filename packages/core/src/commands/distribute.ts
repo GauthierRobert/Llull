@@ -33,6 +33,8 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
 import { rotatePoint2 } from '../lib/polygon';
 import { MAX_COPIES_PER_COMMAND } from './limits';
+import { noop } from './noop';
+import { withEntity } from './entityOps';
 
 function vec2Add(a: Vec2, b: Vec2): Vec2 {
   return [a[0] + b[0], a[1] + b[1]];
@@ -60,11 +62,6 @@ function vec2Scale(v: Vec2, s: number): Vec2 {
 function toWorld3D(local: Vec2, entityPos: Vec3, entityRotZ: number): Vec3 {
   const rotated = rotatePoint2(local, entityRotZ);
   return [rotated[0] + entityPos[0], rotated[1] + entityPos[1], entityPos[2]];
-}
-
-/** Rotate a 2D tangent by the entity's Z rotation to get the world tangent. */
-function toWorldTangent(localTangent: Vec2, entityRotZ: number): Vec2 {
-  return rotatePoint2(localTangent, entityRotZ);
 }
 
 /**
@@ -230,86 +227,61 @@ export const distributeAlongPath = defineCommand({
     doc,
     { pathId, componentId, count, tangentAlign = true, startOffset = 0, endOffset = 0, name },
   ): CommandResult => {
-    // --- Validate path entity ---
     const pathEntity = doc.entities[pathId];
     if (!pathEntity) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: path entity "${pathId}" not found.`,
-        affected: [],
-      };
+      return noop(doc, `distribute_along_path: path entity "${pathId}" not found.`);
     }
     if (pathEntity.kind !== 'polyline' && pathEntity.kind !== 'spline') {
-      return {
-        document: doc,
-        summary: `distribute_along_path: entity "${pathId}" has kind "${pathEntity.kind}"; must be "polyline" or "spline".`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `distribute_along_path: entity "${pathId}" has kind "${pathEntity.kind}"; must be "polyline" or "spline".`,
+      );
     }
 
     const pathPoints = pathEntity.points as ReadonlyArray<Vec2>;
-    const pathClosed: boolean = pathEntity.closed;
+    const pathClosed = pathEntity.closed;
 
-    if (!Array.isArray(pathPoints) || pathPoints.length < 2) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: path "${pathId}" has fewer than 2 points (got ${Array.isArray(pathPoints) ? pathPoints.length : 0}).`,
-        affected: [],
-      };
+    if (pathPoints.length < 2) {
+      return noop(
+        doc,
+        `distribute_along_path: path "${pathId}" has fewer than 2 points (got ${pathPoints.length}).`,
+      );
     }
 
-    // --- Validate component ---
     const component = doc.components[componentId];
     if (!component) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: component "${componentId}" not found in doc.components.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `distribute_along_path: component "${componentId}" not found in doc.components.`,
+      );
     }
 
-    // --- Validate count ---
-    if (
-      !Number.isFinite(count) ||
-      count < 1 ||
-      !Number.isInteger(count) ||
-      count > MAX_COPIES_PER_COMMAND
-    ) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
-        affected: [],
-      };
+    if (count < 1 || !Number.isInteger(count) || count > MAX_COPIES_PER_COMMAND) {
+      return noop(
+        doc,
+        `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
+      );
     }
 
-    // --- Validate offsets ---
     if (!Number.isFinite(startOffset) || startOffset < 0) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: startOffset must be a finite non-negative number (got ${startOffset}).`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `distribute_along_path: startOffset must be a finite non-negative number (got ${startOffset}).`,
+      );
     }
     if (!Number.isFinite(endOffset) || endOffset < 0) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: endOffset must be a finite non-negative number (got ${endOffset}).`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `distribute_along_path: endOffset must be a finite non-negative number (got ${endOffset}).`,
+      );
     }
 
-    // --- Compute arc length ---
     const totalLength = totalArcLength(pathPoints, pathClosed);
 
     if (!Number.isFinite(totalLength) || totalLength < 1e-12) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: path "${pathId}" has zero or degenerate length.`,
-        affected: [],
-      };
+      return noop(doc, `distribute_along_path: path "${pathId}" has zero or degenerate length.`);
     }
 
-    // --- Compute placement arc-length positions ---
     const placements: number[] = [];
 
     if (pathClosed) {
@@ -344,14 +316,9 @@ export const distributeAlongPath = defineCommand({
       }
     }
 
-    // --- Extract entity position and Z-rotation ---
-    const entityPos: Vec3 = pathEntity.position ?? [0, 0, 0];
-    const entityRotZ: number =
-      Array.isArray(pathEntity.rotation) && pathEntity.rotation.length >= 3
-        ? (pathEntity.rotation[2] as number)
-        : 0;
+    const entityPos = pathEntity.position;
+    const entityRotZ = pathEntity.rotation[2];
 
-    // --- Create instances ---
     const instanceName = name ?? component.name;
     const createdIds: string[] = [];
     let newDoc: CadDocument = doc;
@@ -363,16 +330,12 @@ export const distributeAlongPath = defineCommand({
       // Convert local 2D point to world 3D position
       const worldPos: Vec3 = toWorld3D(sample.point, entityPos, entityRotZ);
 
-      // Compute rotation
-      let instanceRotation: Vec3;
-      if (tangentAlign) {
-        // World tangent = rotate local tangent by entity's Z rotation
-        const worldTangent = toWorldTangent(sample.tangent, entityRotZ);
-        const rz = Math.atan2(worldTangent[1], worldTangent[0]);
-        instanceRotation = [0, 0, rz];
-      } else {
-        instanceRotation = [0, 0, 0];
-      }
+      const worldTangent = rotatePoint2(sample.tangent, entityRotZ);
+      const instanceRotation: Vec3 = [
+        0,
+        0,
+        tangentAlign ? Math.atan2(worldTangent[1], worldTangent[0]) : 0,
+      ];
 
       const instanceId = nextId('instance');
       const instance: InstanceEntity = {
@@ -386,15 +349,10 @@ export const distributeAlongPath = defineCommand({
         name: `${instanceName}_${i}`,
       } as InstanceEntity & { name: string };
 
-      newDoc = {
-        ...newDoc,
-        entities: { ...newDoc.entities, [instanceId]: instance },
-        order: [...newDoc.order, instanceId],
-      };
+      newDoc = withEntity(newDoc, instance);
       createdIds.push(instanceId);
     }
 
-    // --- Build factual summary ---
     const spacing =
       count <= 1
         ? 0
