@@ -18,7 +18,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { runSolver } from './constraintSolver';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /** Semantic checks zod cannot express: non-empty entity ids; `value` on dimensional kinds. */
 function validateConstraintShape(c: {
@@ -115,13 +115,13 @@ export const addConstraint = defineCommand({
   run: (doc, { constraint, id }): CommandResult => {
     const err = validateConstraintShape(constraint);
     if (err !== null) {
-      return noOp(doc, `add_constraint failed: ${err}.`);
+      return noop(doc, `add_constraint failed: ${err}.`);
     }
 
     const constraintId = id !== undefined && id.length > 0 ? id : nextId('con');
 
     if (constraintId in doc.constraints) {
-      return noOp(
+      return noop(
         doc,
         `add_constraint: constraint id '${constraintId}' already exists — no change made.`,
       );
@@ -168,7 +168,7 @@ export const deleteConstraint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (!(id in doc.constraints)) {
-      return noOp(doc, `delete_constraint: constraint '${id}' does not exist — no change made.`);
+      return noop(doc, `delete_constraint: constraint '${id}' does not exist — no change made.`);
     }
 
     const constraint = doc.constraints[id]!;
@@ -242,7 +242,7 @@ export const updateConstraint = defineCommand({
   }),
   run: (doc, { id, patch }): CommandResult => {
     if (!(id in doc.constraints)) {
-      return noOp(doc, `update_constraint: constraint '${id}' does not exist — no change made.`);
+      return noop(doc, `update_constraint: constraint '${id}' does not exist — no change made.`);
     }
 
     const existing = doc.constraints[id]!;
@@ -250,21 +250,21 @@ export const updateConstraint = defineCommand({
 
     if (patch.a !== undefined) {
       if (patch.a.entityId.length === 0) {
-        return noOp(doc, `update_constraint: patch.a is not a valid EntityRef — no change made.`);
+        return noop(doc, `update_constraint: patch.a is not a valid EntityRef — no change made.`);
       }
       updates['a'] = patch.a;
     }
 
     if (patch.b !== undefined) {
       if (patch.b.entityId.length === 0) {
-        return noOp(doc, `update_constraint: patch.b is not a valid EntityRef — no change made.`);
+        return noop(doc, `update_constraint: patch.b is not a valid EntityRef — no change made.`);
       }
       updates['b'] = patch.b;
     }
 
     if (patch.value !== undefined) {
       if (existing.kind !== 'distance' && existing.kind !== 'angle') {
-        return noOp(
+        return noop(
           doc,
           `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`,
         );

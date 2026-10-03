@@ -23,7 +23,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
 import { pruneGroupMembers } from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 import { add3 } from '../lib/vec3';
 
 /**
@@ -134,12 +134,12 @@ export const createComponent = defineCommand({
   }),
   run: (doc, { name, entityIds, componentId }): CommandResult => {
     if (entityIds.length === 0) {
-      return noOp(doc, 'create_component: entityIds must be a non-empty array.');
+      return noop(doc, 'create_component: entityIds must be a non-empty array.');
     }
 
     const missing = entityIds.filter((id) => !(id in doc.entities));
     if (missing.length > 0) {
-      return noOp(
+      return noop(
         doc,
         `create_component: entity id(s) not found: [${missing.join(', ')}]. Document unchanged.`,
       );
@@ -237,7 +237,7 @@ export const insertInstance = defineCommand({
     const scale = rawScale ?? UNIT_SCALE;
     const component = doc.components[componentId];
     if (!component) {
-      return noOp(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
+      return noop(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
     }
 
     const instanceId = nextId('instance');
@@ -289,13 +289,13 @@ export const explodeInstance = defineCommand({
   run: (doc, { id }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity || entity.kind !== 'instance') {
-      return noOp(doc, `explode_instance: entity "${id}" is not an instance or does not exist.`);
+      return noop(doc, `explode_instance: entity "${id}" is not an instance or does not exist.`);
     }
 
     const instance = entity as InstanceEntity;
     const component = doc.components[instance.componentId];
     if (!component) {
-      return noOp(
+      return noop(
         doc,
         `explode_instance: component "${instance.componentId}" referenced by instance "${id}" not found.`,
       );

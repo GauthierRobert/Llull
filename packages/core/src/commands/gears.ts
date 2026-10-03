@@ -17,7 +17,7 @@ import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { withEntity } from './entityOps';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /**
  * Sample points along the involute of a circle with base radius `baseR`.
@@ -338,26 +338,26 @@ export const addSpurGear = defineCommand({
     },
   ): CommandResult => {
     if (!Number.isFinite(mod) || mod <= 0) {
-      return noOp(doc, `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`);
+      return noop(doc, `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`);
     }
 
     const teethInt = Math.round(teeth);
     if (!Number.isFinite(teeth) || teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
-      return noOp(
+      return noop(
         doc,
         `add_spur_gear failed: teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
       );
     }
 
     if (!Number.isFinite(pressureAngle) || pressureAngle <= 0 || pressureAngle >= Math.PI / 2) {
-      return noOp(
+      return noop(
         doc,
         `add_spur_gear failed: pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`,
       );
     }
 
     if (!Number.isFinite(faceWidth) || faceWidth <= 0) {
-      return noOp(
+      return noop(
         doc,
         `add_spur_gear failed: faceWidth must be finite and > 0, got ${String(faceWidth)}.`,
       );
@@ -365,10 +365,10 @@ export const addSpurGear = defineCommand({
 
     const pitchRadius = (mod * teethInt) / 2;
     if (!Number.isFinite(bore) || bore < 0) {
-      return noOp(doc, `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`);
+      return noop(doc, `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`);
     }
     if (bore >= pitchRadius) {
-      return noOp(
+      return noop(
         doc,
         `add_spur_gear failed: bore (${bore}) must be < pitchRadius (${pitchRadius}).`,
       );

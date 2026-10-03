@@ -22,7 +22,7 @@ import { MAX_COPIES_PER_COMMAND } from './limits';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { withEntity } from './entityOps';
 import { add3, cross3, distanceSq3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /** Total arc length of the polyline. */
 function polylineLength(path: Vec3[]): number {
@@ -93,16 +93,16 @@ export const arrayAlongPath = defineCommand({
   run: (doc, { sourceId, path, count }): CommandResult => {
     const source = doc.entities[sourceId];
     if (!source) {
-      return noOp(doc, `array_along_path: source entity "${sourceId}" not found.`);
+      return noop(doc, `array_along_path: source entity "${sourceId}" not found.`);
     }
     if (!Array.isArray(path) || path.length < 2) {
-      return noOp(
+      return noop(
         doc,
         `array_along_path: path must contain at least 2 points (got ${Array.isArray(path) ? path.length : 'non-array'}).`,
       );
     }
     if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
-      return noOp(
+      return noop(
         doc,
         `array_along_path: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
       );
@@ -118,7 +118,7 @@ export const arrayAlongPath = defineCommand({
         !Number.isFinite(pt[1]) ||
         !Number.isFinite(pt[2])
       ) {
-        return noOp(doc, `array_along_path: path[${i}] is not a valid [x,y,z] triple.`);
+        return noop(doc, `array_along_path: path[${i}] is not a valid [x,y,z] triple.`);
       }
       validatedPath.push([pt[0] as number, pt[1] as number, pt[2] as number]);
     }
@@ -191,22 +191,22 @@ export const distributeOnArc = defineCommand({
   run: (doc, { sourceId, center, normal, radius, startAngle, endAngle, count }): CommandResult => {
     const source = doc.entities[sourceId];
     if (!source) {
-      return noOp(doc, `distribute_on_arc: source entity "${sourceId}" not found.`);
+      return noop(doc, `distribute_on_arc: source entity "${sourceId}" not found.`);
     }
     if (!Number.isFinite(radius) || radius <= 0) {
-      return noOp(doc, `distribute_on_arc: radius must be > 0 (got ${radius}).`);
+      return noop(doc, `distribute_on_arc: radius must be > 0 (got ${radius}).`);
     }
     if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
-      return noOp(
+      return noop(
         doc,
         `distribute_on_arc: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
       );
     }
     if (!Array.isArray(center) || center.length < 3) {
-      return noOp(doc, 'distribute_on_arc: center must be a [x,y,z] triple.');
+      return noop(doc, 'distribute_on_arc: center must be a [x,y,z] triple.');
     }
     if (!Array.isArray(normal) || normal.length < 3) {
-      return noOp(doc, 'distribute_on_arc: normal must be a [x,y,z] triple.');
+      return noop(doc, 'distribute_on_arc: normal must be a [x,y,z] triple.');
     }
 
     const c: Vec3 = [center[0] as number, center[1] as number, center[2] as number];

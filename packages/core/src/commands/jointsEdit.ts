@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { resolveJointValue, isValidAxis, isValidMateRef } from './jointsKinematics';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 /**
  * @command add_joint
  * @pure
@@ -73,14 +73,14 @@ export const addJoint = defineCommand({
   }),
   run: (doc, { kind, a, b, axis, id }): CommandResult => {
     if (!isValidMateRef(a)) {
-      return noOp(doc, 'add_joint: "a" must be an object with a non-empty instanceId string.');
+      return noop(doc, 'add_joint: "a" must be an object with a non-empty instanceId string.');
     }
     if (!isValidMateRef(b)) {
-      return noOp(doc, 'add_joint: "b" must be an object with a non-empty instanceId string.');
+      return noop(doc, 'add_joint: "b" must be an object with a non-empty instanceId string.');
     }
 
     if (!isValidAxis(axis)) {
-      return noOp(
+      return noop(
         doc,
         `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`,
       );
@@ -88,14 +88,14 @@ export const addJoint = defineCommand({
 
     const entityA = doc.entities[a.instanceId];
     if (!entityA || entityA.kind !== 'instance') {
-      return noOp(
+      return noop(
         doc,
         `add_joint: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
       );
     }
     const entityB = doc.entities[b.instanceId];
     if (!entityB || entityB.kind !== 'instance') {
-      return noOp(
+      return noop(
         doc,
         `add_joint: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
       );
@@ -103,7 +103,7 @@ export const addJoint = defineCommand({
 
     const jointId = typeof id === 'string' && id.length > 0 ? id : nextId('joint');
     if (jointId in doc.joints) {
-      return noOp(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
+      return noop(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
     }
 
     type FrameValue = 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
@@ -176,7 +176,7 @@ export const deleteJoint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (!(id in doc.joints)) {
-      return noOp(doc, `delete_joint: joint '${String(id)}' does not exist — no change made.`);
+      return noop(doc, `delete_joint: joint '${String(id)}' does not exist — no change made.`);
     }
 
     const joint = doc.joints[id]!;
@@ -245,7 +245,7 @@ export const setJointValue = defineCommand({
   }),
   run: (doc, { id, value }): CommandResult => {
     if (!(id in doc.joints)) {
-      return noOp(doc, `set_joint_value: joint '${String(id)}' does not exist — no change made.`);
+      return noop(doc, `set_joint_value: joint '${String(id)}' does not exist — no change made.`);
     }
 
     const existing = doc.joints[id]!;

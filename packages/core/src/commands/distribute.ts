@@ -33,7 +33,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
 import { rotatePoint2 } from '../lib/polygon';
 import { MAX_COPIES_PER_COMMAND } from './limits';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 import { withEntity } from './entityOps';
 
 function vec2Add(a: Vec2, b: Vec2): Vec2 {
@@ -229,10 +229,10 @@ export const distributeAlongPath = defineCommand({
   ): CommandResult => {
     const pathEntity = doc.entities[pathId];
     if (!pathEntity) {
-      return noOp(doc, `distribute_along_path: path entity "${pathId}" not found.`);
+      return noop(doc, `distribute_along_path: path entity "${pathId}" not found.`);
     }
     if (pathEntity.kind !== 'polyline' && pathEntity.kind !== 'spline') {
-      return noOp(
+      return noop(
         doc,
         `distribute_along_path: entity "${pathId}" has kind "${pathEntity.kind}"; must be "polyline" or "spline".`,
       );
@@ -242,7 +242,7 @@ export const distributeAlongPath = defineCommand({
     const pathClosed = pathEntity.closed;
 
     if (pathPoints.length < 2) {
-      return noOp(
+      return noop(
         doc,
         `distribute_along_path: path "${pathId}" has fewer than 2 points (got ${pathPoints.length}).`,
       );
@@ -250,27 +250,27 @@ export const distributeAlongPath = defineCommand({
 
     const component = doc.components[componentId];
     if (!component) {
-      return noOp(
+      return noop(
         doc,
         `distribute_along_path: component "${componentId}" not found in doc.components.`,
       );
     }
 
     if (count < 1 || !Number.isInteger(count) || count > MAX_COPIES_PER_COMMAND) {
-      return noOp(
+      return noop(
         doc,
         `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
       );
     }
 
     if (!Number.isFinite(startOffset) || startOffset < 0) {
-      return noOp(
+      return noop(
         doc,
         `distribute_along_path: startOffset must be a finite non-negative number (got ${startOffset}).`,
       );
     }
     if (!Number.isFinite(endOffset) || endOffset < 0) {
-      return noOp(
+      return noop(
         doc,
         `distribute_along_path: endOffset must be a finite non-negative number (got ${endOffset}).`,
       );
@@ -279,7 +279,7 @@ export const distributeAlongPath = defineCommand({
     const totalLength = totalArcLength(pathPoints, pathClosed);
 
     if (!Number.isFinite(totalLength) || totalLength < 1e-12) {
-      return noOp(doc, `distribute_along_path: path "${pathId}" has zero or degenerate length.`);
+      return noop(doc, `distribute_along_path: path "${pathId}" has zero or degenerate length.`);
     }
 
     const placements: number[] = [];

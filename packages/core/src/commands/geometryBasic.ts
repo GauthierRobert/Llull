@@ -16,7 +16,7 @@ import {
   rotationField,
   translated,
 } from './geometryShared';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /**
  * @command add_box
@@ -106,13 +106,13 @@ export const extrude = defineCommand({
   }),
   run: (doc, { profile, depth, position = ORIGIN, rotation, color = '#c8553d' }): CommandResult => {
     if (!Array.isArray(profile) || profile.length < 3) {
-      return noOp(
+      return noop(
         doc,
         `extrude_profile: profile must be an array of at least 3 [x,y] points; no-op.`,
       );
     }
     if (!Number.isFinite(depth) || depth <= 0) {
-      return noOp(
+      return noop(
         doc,
         `extrude_profile: depth must be a finite number > 0 (got ${String(depth)}); no-op.`,
       );
@@ -142,7 +142,7 @@ export const move = defineCommand({
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return noOp(doc, `No entity ${id} to move.`);
+      return noop(doc, `No entity ${id} to move.`);
     }
     return {
       document: { ...doc, entities: { ...doc.entities, [id]: translated(target, delta) } },
@@ -172,7 +172,7 @@ export const deleteEntity = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (!doc.entities[id]) {
-      return noOp(doc, `No entity ${id} to delete.`);
+      return noop(doc, `No entity ${id} to delete.`);
     }
 
     const entities = { ...doc.entities };

@@ -24,7 +24,7 @@ import { nextStateKey } from './replayCache';
 import { hashText } from '../lib/hash';
 import { remapIds } from './regenerate';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /** One successfully replayed step, reported to `replayHistory`'s optional `onStep` observer. */
 export interface ReplayStepEvent {
@@ -149,7 +149,7 @@ function regenerateWith(
   nextStepNumber?: number,
 ): CommandResult {
   const refused = kernelRefusal(doc, newHistory);
-  if (refused !== null) return noOp(doc, `${command}: ${refused}`);
+  if (refused !== null) return noop(doc, `${command}: ${refused}`);
   const replayed = replayHistory(doc, newHistory, currentContext().registry);
   const regenerated = nextStepNumber === undefined ? replayed : { ...replayed, nextStepNumber };
   const count = Object.keys(regenerated.entities).length;
@@ -181,12 +181,12 @@ const replayHistory_cmd = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, _params): CommandResult => {
     if (doc.featureHistory.length === 0) {
-      return noOp(doc, 'replay_history: featureHistory is empty — nothing to replay.');
+      return noop(doc, 'replay_history: featureHistory is empty — nothing to replay.');
     }
     const warnings: string[] = [];
     const refused = kernelRefusal(doc, doc.featureHistory);
     if (refused !== null) {
-      return noOp(doc, `replay_history: ${refused}`);
+      return noop(doc, `replay_history: ${refused}`);
     }
     const regenerated = replayHistory(doc, doc.featureHistory, currentContext().registry, warnings);
     const count = Object.keys(regenerated.entities).length;
@@ -228,7 +228,7 @@ const setStepSuppressed = defineCommand({
   run: (doc, { stepId, suppressed }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
     if (idx === -1) {
-      return noOp(doc, `set_step_suppressed: step '${stepId}' not found in featureHistory.`);
+      return noop(doc, `set_step_suppressed: step '${stepId}' not found in featureHistory.`);
     }
     const newHistory = replaceAt(doc.featureHistory, idx, {
       ...doc.featureHistory[idx]!,
@@ -274,7 +274,7 @@ const editStepParams = defineCommand({
   run: (doc, { stepId, params: newParams }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
     if (idx === -1) {
-      return noOp(doc, `edit_step_params: step '${stepId}' not found in featureHistory.`);
+      return noop(doc, `edit_step_params: step '${stepId}' not found in featureHistory.`);
     }
     const newHistory = replaceAt(doc.featureHistory, idx, {
       ...doc.featureHistory[idx]!,
@@ -315,11 +315,11 @@ const reorderStep = defineCommand({
   run: (doc, { stepId, newIndex }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
     if (idx === -1) {
-      return noOp(doc, `reorder_step: step '${stepId}' not found in featureHistory.`);
+      return noop(doc, `reorder_step: step '${stepId}' not found in featureHistory.`);
     }
     const clamped = Math.max(0, Math.min(newIndex, doc.featureHistory.length - 1));
     if (clamped === idx) {
-      return noOp(doc, `reorder_step: step '${stepId}' is already at index ${idx}.`);
+      return noop(doc, `reorder_step: step '${stepId}' is already at index ${idx}.`);
     }
     const step = doc.featureHistory[idx]!;
     const without = [...doc.featureHistory.slice(0, idx), ...doc.featureHistory.slice(idx + 1)];
@@ -354,7 +354,7 @@ const deleteStep = defineCommand({
   run: (doc, { stepId }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
     if (idx === -1) {
-      return noOp(doc, `delete_step: step '${stepId}' not found in featureHistory.`);
+      return noop(doc, `delete_step: step '${stepId}' not found in featureHistory.`);
     }
     return regenerateWith(
       doc,
@@ -410,7 +410,7 @@ const insertStep = defineCommand({
         ? doc.featureHistory.length - 1
         : doc.featureHistory.findIndex((s) => s.id === afterStepId);
     if (afterStepId !== undefined && insertIdx === -1) {
-      return noOp(doc, `insert_step: afterStepId '${afterStepId}' not found in featureHistory.`);
+      return noop(doc, `insert_step: afterStepId '${afterStepId}' not found in featureHistory.`);
     }
 
     const stepNumber = doc.nextStepNumber ?? 1;

@@ -4,7 +4,7 @@ import { defineCommand, z } from './schema';
 import { instanceBoundsFromDoc } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { evaluateMotionInternal } from './jointsKinematics';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /** Per-step result of a motion study sweep. */
 interface MotionStep {
@@ -162,7 +162,7 @@ export const motionStudy = defineCommand({
   }),
   run: (doc, { mode, target, start, end, steps, interferenceCheck }): CommandResult => {
     if (target.length === 0) {
-      return noOp(doc, 'motion_study: "target" must be a non-empty string.');
+      return noop(doc, 'motion_study: "target" must be a non-empty string.');
     }
 
     const emptyStudy = {
@@ -194,16 +194,16 @@ export const motionStudy = defineCommand({
     // Mode-specific validation
     if (mode === 'joint') {
       if (!(target in doc.joints)) {
-        return noOp(doc, `motion_study: joint '${target}' does not exist in doc.joints.`);
+        return noop(doc, `motion_study: joint '${target}' does not exist in doc.joints.`);
       }
     } else {
       // mode === 'parameter'
       if (!(target in doc.parameters)) {
-        return noOp(doc, `motion_study: parameter '${target}' does not exist in doc.parameters.`);
+        return noop(doc, `motion_study: parameter '${target}' does not exist in doc.parameters.`);
       }
       const param = doc.parameters[target]!;
       if (typeof param.value !== 'number' || !Number.isFinite(param.value)) {
-        return noOp(
+        return noop(
           doc,
           `motion_study: parameter '${target}' is not numeric (value: ${String(param.value)}).`,
         );

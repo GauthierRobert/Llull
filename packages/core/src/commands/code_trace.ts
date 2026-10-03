@@ -16,7 +16,7 @@ import { buildParamEnv } from './regenerate';
 import { evaluateExpression, extractReferences } from './expression';
 import { MAX_TRACE_FEATURES } from './limits';
 import { isRecord } from '../lib/isRecord';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 interface TraceParameter {
   name: string;
@@ -204,7 +204,7 @@ function replaceBase(doc: CadDocument): CadDocument {
 }
 
 function abort(doc: CadDocument, reason: string): CommandResult {
-  return noOp(doc, `apply_code_trace: ${reason} — document unchanged.`);
+  return noop(doc, `apply_code_trace: ${reason} — document unchanged.`);
 }
 
 /**

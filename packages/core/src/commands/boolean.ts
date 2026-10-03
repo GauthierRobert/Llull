@@ -18,33 +18,33 @@ import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { replaceEntities } from './entityOps';
-import { noOp, type NoOpResult } from './commandResult';
+import { noop } from './noop';
 
 function validateOperands(
   doc: CadDocument,
   opName: string,
   a: string,
   b: string,
-): NoOpResult | null {
+): CommandResult | null {
   if (a === b) {
-    return noOp(doc, `${opName}: operands a and b must be different ids (got '${a}').`);
+    return noop(doc, `${opName}: operands a and b must be different ids (got '${a}').`);
   }
   const entA = doc.entities[a];
   if (!entA) {
-    return noOp(doc, `${opName}: entity '${a}' not found.`);
+    return noop(doc, `${opName}: entity '${a}' not found.`);
   }
   const entB = doc.entities[b];
   if (!entB) {
-    return noOp(doc, `${opName}: entity '${b}' not found.`);
+    return noop(doc, `${opName}: entity '${b}' not found.`);
   }
   if (!is3D(entA)) {
-    return noOp(
+    return noop(
       doc,
       `${opName}: entity '${a}' is a 2D shape; boolean operations require 3D solids.`,
     );
   }
   if (!is3D(entB)) {
-    return noOp(
+    return noop(
       doc,
       `${opName}: entity '${b}' is a 2D shape; boolean operations require 3D solids.`,
     );
@@ -68,7 +68,7 @@ function runBoolean(
 
   const k = (ctx ?? currentContext()).kernel;
   if (!k) {
-    return noOp(
+    return noop(
       doc,
       `${opName}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
     );
@@ -76,7 +76,7 @@ function runBoolean(
 
   const meshData = k.booleanOp(op, entA, entB);
   if (!meshData) {
-    return noOp(
+    return noop(
       doc,
       `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`,
     );
