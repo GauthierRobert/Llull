@@ -167,7 +167,6 @@ export const makeTubeBetween = defineCommand({
     // Cylinders are centered on their centroid, so the entity sits at the midpoint of p1..p2.
     const mid = scale3(add3(p1, p2), 0.5);
 
-    // --- Build entity ---
     const id = nextId('cyl');
     const entity: Entity = {
       id,

@@ -227,7 +227,6 @@ export const distributeAlongPath = defineCommand({
     doc,
     { pathId, componentId, count, tangentAlign = true, startOffset = 0, endOffset = 0, name },
   ): CommandResult => {
-    // --- Validate path entity ---
     const pathEntity = doc.entities[pathId];
     if (!pathEntity) {
       return noOp(doc, `distribute_along_path: path entity "${pathId}" not found.`);
@@ -249,7 +248,6 @@ export const distributeAlongPath = defineCommand({
       );
     }
 
-    // --- Validate component ---
     const component = doc.components[componentId];
     if (!component) {
       return noOp(
@@ -258,7 +256,6 @@ export const distributeAlongPath = defineCommand({
       );
     }
 
-    // --- Validate count ---
     if (count < 1 || !Number.isInteger(count) || count > MAX_COPIES_PER_COMMAND) {
       return noOp(
         doc,
@@ -266,7 +263,6 @@ export const distributeAlongPath = defineCommand({
       );
     }
 
-    // --- Validate offsets ---
     if (!Number.isFinite(startOffset) || startOffset < 0) {
       return noOp(
         doc,
@@ -280,14 +276,12 @@ export const distributeAlongPath = defineCommand({
       );
     }
 
-    // --- Compute arc length ---
     const totalLength = totalArcLength(pathPoints, pathClosed);
 
     if (!Number.isFinite(totalLength) || totalLength < 1e-12) {
       return noOp(doc, `distribute_along_path: path "${pathId}" has zero or degenerate length.`);
     }
 
-    // --- Compute placement arc-length positions ---
     const placements: number[] = [];
 
     if (pathClosed) {
@@ -322,11 +316,9 @@ export const distributeAlongPath = defineCommand({
       }
     }
 
-    // --- Extract entity position and Z-rotation ---
     const entityPos = pathEntity.position;
     const entityRotZ = pathEntity.rotation[2];
 
-    // --- Create instances ---
     const instanceName = name ?? component.name;
     const createdIds: string[] = [];
     let newDoc: CadDocument = doc;
@@ -361,7 +353,6 @@ export const distributeAlongPath = defineCommand({
       createdIds.push(instanceId);
     }
 
-    // --- Build factual summary ---
     const spacing =
       count <= 1
         ? 0

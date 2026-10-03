@@ -108,7 +108,6 @@ export const arrayAlongPath = defineCommand({
       );
     }
 
-    // Validate path points are Vec3.
     const validatedPath: Vec3[] = [];
     for (let i = 0; i < path.length; i++) {
       const pt = path[i];

@@ -202,7 +202,6 @@ export const drawInvolute = defineCommand({
       name,
     },
   ): CommandResult => {
-    // --- Validate all numerics are finite ---
     if (!Number.isFinite(baseRadius)) {
       return noOp(doc, `draw_involute: baseRadius must be finite, got ${String(baseRadius)}.`);
     }
@@ -216,7 +215,6 @@ export const drawInvolute = defineCommand({
       return noOp(doc, `draw_involute: samples must be finite, got ${String(samples)}.`);
     }
 
-    // --- Validate domain ---
     if (baseRadius <= 0) {
       return noOp(doc, `draw_involute: baseRadius must be > 0, got ${baseRadius}.`);
     }
@@ -234,19 +232,15 @@ export const drawInvolute = defineCommand({
       );
     }
 
-    // --- Resolve position/rotation (clamp non-finite to 0) ---
     const resolvedPos: Vec3 = finiteVec3OrZero(position);
 
     const resolvedRot: Vec3 = finiteVec3OrZero(rotation);
 
-    // --- Sample the involute using the shared helper from gears.ts ---
     const rawPoints = sampleInvolute(baseRadius, startAngle, endAngle, samplesInt);
     const pts: ReadonlyArray<Vec2> = rawPoints.map(([x, y]) => [x, y] as Vec2);
 
-    // --- Compute 2D AABB for summary ---
     const { minX, minY, maxX, maxY } = pointsExtent(pts);
 
-    // --- Mint entity id and build open polyline ---
     const id = nextId('inv');
     const entity: Entity = {
       id,

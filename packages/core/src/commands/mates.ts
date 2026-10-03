@@ -96,7 +96,6 @@ export const addMate = defineCommand({
       ),
   }),
   run: (doc, { kind, a, b, value, id }): CommandResult => {
-    // Validate ref shapes
     if (a.instanceId.length === 0) {
       return noOp(doc, `add_mate: a must be an object with a non-empty instanceId string.`);
     }
@@ -104,7 +103,6 @@ export const addMate = defineCommand({
       return noOp(doc, `add_mate: b must be an object with a non-empty instanceId string.`);
     }
 
-    // Validate both instance ids exist and are instances
     const entityA = doc.entities[a.instanceId];
     if (!entityA || entityA.kind !== 'instance') {
       return noOp(
@@ -120,7 +118,6 @@ export const addMate = defineCommand({
       );
     }
 
-    // Validate value for distance
     if (kind === 'distance') {
       if (value === undefined) {
         return noOp(

@@ -161,7 +161,6 @@ export const motionStudy = defineCommand({
       ),
   }),
   run: (doc, { mode, target, start, end, steps, interferenceCheck }): CommandResult => {
-    // Validate target
     if (target.length === 0) {
       return noOp(doc, 'motion_study: "target" must be a non-empty string.');
     }

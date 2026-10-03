@@ -57,7 +57,6 @@ export const createConfiguration = defineCommand({
       return noOp(doc, 'create_configuration failed: name must be a non-empty string.');
     }
 
-    // Validate that every value is a string expression.
     const expressions: Record<string, string> = {};
     for (const [k, v] of Object.entries(parameterValues)) {
       if (typeof v === 'string') {

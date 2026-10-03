@@ -67,7 +67,6 @@ function resolveRadius(doc: CadDocument, ref: EntityRef): number | null {
  */
 function resolveValue(doc: CadDocument, v: number | string): number | null {
   if (typeof v === 'number') return v;
-  // Build env from current parameter values.
   const env: Record<string, number> = {};
   for (const [name, param] of Object.entries(doc.parameters)) {
     env[name] = param.value;
