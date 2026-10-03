@@ -272,7 +272,6 @@ export const stopAnimation = defineCommand({
   run: (doc, { animationId, targetId }): CommandResult => {
     const existing = doc.animations;
 
-    // --- by animationId ---
     if (animationId !== undefined) {
       if (existing[animationId] === undefined) {
         return noOp(doc, `stop_animation: animation ${animationId} not found; nothing removed.`);
@@ -286,7 +285,6 @@ export const stopAnimation = defineCommand({
       };
     }
 
-    // --- by targetId ---
     if (targetId !== undefined) {
       const toRemove = Object.values(existing).filter((a) => a.targetId === targetId);
       if (toRemove.length === 0) {
@@ -306,7 +304,6 @@ export const stopAnimation = defineCommand({
       };
     }
 
-    // --- clear all ---
     const count = Object.keys(existing).length;
     if (count === 0) {
       return noOp(doc, 'stop_animation: no animations to clear.');

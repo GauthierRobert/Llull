@@ -191,7 +191,6 @@ export const addDimension = defineCommand({
       .optional(),
   }),
   run: (doc, { dimensionKind, entityIds, offset, precision, label, layer }): CommandResult => {
-    // Validate dimensionKind
     if (!VALID_DIMENSION_KINDS.has(dimensionKind)) {
       return noOp(
         doc,
@@ -199,12 +198,10 @@ export const addDimension = defineCommand({
       );
     }
 
-    // Validate entityIds is an array
     if (!Array.isArray(entityIds) || entityIds.length === 0) {
       return noOp(doc, `add_dimension: entityIds must be a non-empty array of entity ids.`);
     }
 
-    // Validate entityIds count matches kind
     const required = REQUIRED_IDS[dimensionKind]!;
     if (entityIds.length !== required) {
       return noOp(
@@ -213,7 +210,6 @@ export const addDimension = defineCommand({
       );
     }
 
-    // Validate all referenced entities exist
     for (const refId of entityIds) {
       if (!(refId in doc.entities)) {
         return noOp(
@@ -223,7 +219,6 @@ export const addDimension = defineCommand({
       }
     }
 
-    // Validate entity kind compatibility
     if (dimensionKind === 'radial') {
       const refEntity = doc.entities[entityIds[0]!]!;
       if (!RADIAL_KINDS.has(refEntity.kind)) {

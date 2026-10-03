@@ -42,7 +42,6 @@ export const explodePolyline = defineCommand({
       );
     }
 
-    // Build segments
     const segments: Array<[Vec2, Vec2]> = [];
     for (let i = 0; i < poly.points.length - 1; i++) {
       segments.push([poly.points[i]!, poly.points[i + 1]!]);

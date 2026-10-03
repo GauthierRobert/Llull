@@ -169,7 +169,6 @@ export const fillet2D = defineCommand({
     }
     const tangentDist = radius / tanHalf;
 
-    // Check that tangent points don't exceed segment lengths
     if (tangentDist > lenPrev - 1e-9 || tangentDist > lenNext - 1e-9) {
       return {
         document: doc,
@@ -226,7 +225,6 @@ export const fillet2D = defineCommand({
       arcEnd = startAngle;
     }
 
-    // Create arc entity
     const arcId = nextId('arc');
     const arcEntity: Entity = {
       id: arcId,
@@ -322,7 +320,6 @@ export const chamfer2D = defineCommand({
     const bevelPrev: Vec2 = [vertex[0] + dirPrev[0] * distance, vertex[1] + dirPrev[1] * distance];
     const bevelNext: Vec2 = [vertex[0] + dirNext[0] * distance, vertex[1] + dirNext[1] * distance];
 
-    // Create bevel line entity
     const bevelId = nextId('line');
     const bevelLine: Entity = {
       id: bevelId,

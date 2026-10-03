@@ -49,7 +49,6 @@ export const measureDistance = defineCommand({
       ),
   }),
   run: (doc, { point1, point2, entityId1, entityId2 }): CommandResult => {
-    // Resolve location A
     let locA: Vec3 | undefined;
     if (point1) {
       locA = [point1[0], point1[1], point1[2]];
@@ -61,7 +60,6 @@ export const measureDistance = defineCommand({
       locA = centroid(e);
     }
 
-    // Resolve location B
     let locB: Vec3 | undefined;
     if (point2) {
       locB = [point2[0], point2[1], point2[2]];

@@ -176,7 +176,6 @@ export const drawBeltAround = defineCommand({
       }
     }
 
-    // --- Check for coincident centers or pulley-inside-pulley ---
     const n = pulleys.length;
     for (let i = 0; i < n; i++) {
       const ni = (i + 1) % n;

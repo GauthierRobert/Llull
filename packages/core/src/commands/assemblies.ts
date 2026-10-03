@@ -133,12 +133,10 @@ export const createComponent = defineCommand({
       ),
   }),
   run: (doc, { name, entityIds, componentId }): CommandResult => {
-    // Validate: non-empty list
     if (entityIds.length === 0) {
       return noOp(doc, 'create_component: entityIds must be a non-empty array.');
     }
 
-    // Validate: all ids exist
     const missing = entityIds.filter((id) => !(id in doc.entities));
     if (missing.length > 0) {
       return noOp(
