@@ -10,7 +10,7 @@ import type {
   MomentConnectionElement,
   SteelMemberElement,
 } from '@core/model/building';
-import type { CadDocument, Vec3 } from '@core/model/types';
+import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, fromMm, getBuilding, noChange } from '../model';
@@ -134,6 +134,14 @@ function endPlateCutback(
   return ends.start + ends.end;
 }
 
+function outlineMean(outline: ReadonlyArray<Vec2>): Vec2 {
+  const count = outline.length;
+  return outline.reduce<Vec2>(
+    (sum, point) => [sum[0] + point[0] / count, sum[1] + point[1] / count],
+    [0, 0],
+  );
+}
+
 function memberHoles(
   doc: CadDocument,
   member: SteelMemberElement,
@@ -153,11 +161,7 @@ function memberHoles(
     if (!solids || !frame) continue;
     for (const solid of solids) {
       if (!solid.part.startsWith('bolt-')) continue;
-      const count = solid.outline.length;
-      const [cx, cy] = solid.outline.reduce<[number, number]>(
-        (sum, point) => [sum[0] + point[0] / count, sum[1] + point[1] / count],
-        [0, 0],
-      );
+      const [cx, cy] = outlineMean(solid.outline);
       const centre: Vec3 = [
         solid.origin[0] + solid.x[0] * cx + solid.y[0] * cy,
         solid.origin[1] + solid.x[1] * cx + solid.y[1] * cy,
@@ -469,11 +473,7 @@ export const exportNcFiles = defineCommand({
           const holes = solids
             .filter((solid) => solid.part.startsWith('bolt-'))
             .map((solid): NcHole => {
-              const count = solid.outline.length;
-              const [cx, cy] = solid.outline.reduce<[number, number]>(
-                (sum, point) => [sum[0] + point[0] / count, sum[1] + point[1] / count],
-                [0, 0],
-              );
+              const [cx, cy] = outlineMean(solid.outline);
               return {
                 face: 'o',
                 x: round2(mm(cy - minY)),
