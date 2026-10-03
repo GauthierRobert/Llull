@@ -1,18 +1,14 @@
 /**
- * Command registry.
- *
- * The registry is what makes "define once, use everywhere" work. Register a
- * command here and it is instantly available to:
- *   - the UI (iterate the registry to build menus)
- *   - the AI bridge (generate tool schemas via `toToolSchemas`)
- *   - the MCP server (same schemas, served over the wire)
+ * @layer core/commands
+ * The registry: core `definitions` + every installed plugin's commands. UI menus, MCP tool
+ * schemas (`toToolSchemas`) and `execute` all read it — register once, every surface gains it.
  */
 
 import type { CadDocument, FeatureStep } from '../model/types';
-import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
+import type { CommandDefinition, CommandResult } from './types';
 import type { ExecutionContext } from './context';
 import { currentContext, runInContext } from './context';
-import { formatIssues } from './schema';
+import { guardCommand } from './guard';
 import { stepIdSource } from '../lib/id';
 import { addWedge, addPyramid } from './geometryPrismatic';
 import { addCylinder, addSphere, addCone, addTorus } from './geometryRound';
@@ -80,154 +76,9 @@ import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
 import { deleteEntities } from './deleteMany';
-import { derivationViolation } from './derivation';
-import { onPluginInstalled, pluginGuards } from '../plugins/host';
+import { onPluginInstalled } from '../plugins/host';
 import { moveEntities } from './moveMany';
 
-function containsNonFinite(value: unknown, depth = 0): boolean {
-  if (typeof value === 'number') return !Number.isFinite(value);
-  if (typeof value !== 'object' || value === null || depth > 8) return false;
-  if (Array.isArray(value) && value.some((v) => v === undefined || v === null)) return true;
-  return Object.values(value).some((v) => containsNonFinite(v, depth + 1));
-}
-
-/** A top-level 2-number `position` is a planar shorthand: pad z=0 (never mutates `params`). */
-function padPlanarPosition(params: object): object {
-  const position = (params as { position?: unknown }).position;
-  const isPlanar =
-    Array.isArray(position) &&
-    position.length === 2 &&
-    position.every((n) => typeof n === 'number');
-  return isPlanar ? { ...params, position: [...position, 0] } : params;
-}
-
-/** Every entity carries a Vec3 `position`; a short/odd vector would poison downstream math. */
-function hasMalformedPosition(entity: unknown): boolean {
-  if (typeof entity !== 'object' || entity === null) return false;
-  const position = (entity as { position?: unknown }).position;
-  return position !== undefined && (!Array.isArray(position) || position.length !== 3);
-}
-
-/** Param keys whose string values are looked up as keys in document records (ids). */
-const ID_LIKE_KEY = /^id$|Ids?$|^ids$/;
-
-/**
- * True when an id-like param value is an Object.prototype key (`constructor`, `__proto__`, ...),
- * which would alias plain-object entity-bag lookups. Free text (names, content) is never scanned.
- */
-function hasPrototypeIdKey(value: unknown, keyHint = '', depth = 0): boolean {
-  if (typeof value === 'string') return ID_LIKE_KEY.test(keyHint) && value in Object.prototype;
-  if (typeof value !== 'object' || value === null || depth > 8) return false;
-  if (Array.isArray(value)) return value.some((v) => hasPrototypeIdKey(v, keyHint, depth + 1));
-  return Object.entries(value).some(([k, v]) => hasPrototypeIdKey(v, k, depth + 1));
-}
-
-const POSITION_CONTRACT = ' Format [x, y, z]; [x, y] is accepted and placed at z=0.';
-
-/** Append the position contract so the agent-visible schema matches `padPlanarPosition`. */
-function describePositionContract(schema: ParamsSchema): ParamsSchema {
-  const position = schema.properties['position'];
-  if (!position || position.type !== 'array') return schema;
-  return {
-    ...schema,
-    properties: {
-      ...schema.properties,
-      position: { ...position, description: position.description + POSITION_CONTRACT },
-    },
-  };
-}
-
-function corruptionReason(entity: unknown): string | null {
-  if (containsNonFinite(entity)) return 'non-finite numbers (NaN/Infinity/undefined components)';
-  if (hasMalformedPosition(entity)) return 'a malformed position (must be a 3-number [x, y, z])';
-  return null;
-}
-
-/**
- * @pure
- * @failure params fail `paramsValidator` (zod schema) -> no-op naming the failing path
- * @failure run throws (warned with stack), id-like params equal an Object.prototype key
- * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
- * components or a non-Vec3 position -> no-op, affected:[]
- * @invariant non-object params are coerced to {} so field destructuring cannot throw;
- * a 2-number `position` is padded to [x, y, 0]; free-text params are never rejected
- */
-function guardCommand(def: CommandDefinition<unknown>): CommandDefinition<unknown> {
-  return {
-    ...def,
-    paramsSchema: describePositionContract(def.paramsSchema),
-    run: (doc, params, ctx): CommandResult => {
-      const safeParams = padPlanarPosition(
-        typeof params === 'object' && params !== null ? params : {},
-      );
-      if (hasPrototypeIdKey(safeParams)) {
-        return {
-          document: doc,
-          summary: `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
-          affected: [],
-        };
-      }
-      if (def.paramsValidator) {
-        let checked: ReturnType<typeof def.paramsValidator.safeParse>;
-        try {
-          checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
-        } catch (error) {
-          console.warn(
-            `[llull] command '${def.name}' params validation threw:`,
-            error instanceof Error ? (error.stack ?? error.message) : error,
-          );
-          const reason = error instanceof Error ? error.message : String(error);
-          return {
-            document: doc,
-            summary: `${def.name} rejected: invalid params — ${reason}`,
-            affected: [],
-          };
-        }
-        if (!checked.success) {
-          return {
-            document: doc,
-            summary: `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
-            affected: [],
-          };
-        }
-      }
-      let result: CommandResult;
-      try {
-        result = def.run(doc, safeParams, ctx ?? currentContext());
-      } catch (error) {
-        console.warn(
-          `[llull] command '${def.name}' threw:`,
-          error instanceof Error ? (error.stack ?? error.message) : error,
-        );
-        const reason = error instanceof Error ? error.message : String(error);
-        return {
-          document: doc,
-          summary: `${def.name} failed: ${reason}; document unchanged.`,
-          affected: [],
-        };
-      }
-      const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);
-      if (violation !== null) {
-        return { document: doc, summary: violation, affected: [] };
-      }
-      if (result.document !== doc) {
-        for (const id of result.affected) {
-          const reason = corruptionReason(result.document.entities[id]);
-          if (reason !== null) {
-            return {
-              document: doc,
-              summary: `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`,
-              affected: [],
-            };
-          }
-        }
-      }
-      return result;
-    },
-  };
-}
-
-// Using `unknown` for params here; each definition narrows its own type internally.
 const rawDefinitions = [
   addBox,
   addCylinder,
@@ -374,25 +225,11 @@ export function getCommand(name: string): CommandDefinition<unknown> | undefined
 }
 
 /**
- * The single entry point every surface calls. Validates the command exists,
- * runs it, and returns the result. This is the choke point where you'd add
- * logging, undo-stack push, permission checks, etc.
- *
- * Feature history append rules (architecture L8):
- * - If the command is read-only (`annotations.readOnly`) it returns the same
- *   doc reference — no step is appended.
- * - If the command is flagged `annotations.metaHistory` no step is appended.
- *   This covers two cases: history meta-commands (which edit the history list
- *   itself — appending would recurse) and parameter-table commands
- *   (`set_parameter`/`delete_parameter`), whose effect is document INPUT state,
- *   not a replayable geometry step (L8). Their current values are carried into
- *   replay via `base.parameters` in `replayHistory`.
- * - Otherwise, when the returned document reference differs from the input
- *   (i.e. the command actually mutated the document), a FeatureStep is
- *   appended to the new document's featureHistory.
- * - Step-scoped ids: a recorded command runs as step `step-<n>` (n = doc.nextStepNumber)
- *   and mints `<prefix>-<n>.<k>`; replaying that step re-mints the same ids. An execute nested
- *   inside a running step joins it (same id source, no extra step).
+ * The single choke point every surface calls (architecture L5, L8).
+ * @invariant a mutating command (not `readOnly` / `metaHistory`) that changes the document appends
+ * FeatureStep `step-<n>` (n = doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay
+ * re-mints identical ids; an execute nested inside a running step joins it (no extra step)
+ * @failure unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[]
  */
 export function execute(
   doc: CadDocument,
@@ -423,7 +260,6 @@ export function execute(
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
   const result = runInContext(stepContext, () => def.run(doc, params, stepContext));
 
-  // Only append when the document actually changed (pure mutation detection).
   if (result.document === doc) {
     return result;
   }
@@ -446,40 +282,32 @@ export function execute(
   };
 }
 
-/** Generate AI/MCP tool schemas from the registry. */
-export function toToolSchemas(): Array<{
+/** One registry entry as an AI/MCP tool schema. */
+export interface ToolSchema {
   name: string;
   description: string;
   input_schema: CommandDefinition<unknown>['paramsSchema'];
-  annotations?: {
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-  };
-}> {
+  annotations?: { readOnlyHint?: true; destructiveHint?: true; idempotentHint?: true };
+}
+
+function toolAnnotations(def: CommandDefinition<unknown>): ToolSchema['annotations'] {
+  const ann: NonNullable<ToolSchema['annotations']> = {};
+  if (def.annotations?.readOnly === true) ann.readOnlyHint = true;
+  if (def.annotations?.destructive === true) ann.destructiveHint = true;
+  if (def.annotations?.idempotent === true) ann.idempotentHint = true;
+  return Object.keys(ann).length > 0 ? ann : undefined;
+}
+
+/** Generate AI/MCP tool schemas from the registry. */
+export function toToolSchemas(): ToolSchema[] {
   return definitions.map((d) => {
-    const schema: {
-      name: string;
-      description: string;
-      input_schema: CommandDefinition<unknown>['paramsSchema'];
-      annotations?: {
-        readOnlyHint?: boolean;
-        destructiveHint?: boolean;
-        idempotentHint?: boolean;
-      };
-    } = {
+    const schema: ToolSchema = {
       name: d.name,
       description: d.description,
       input_schema: d.paramsSchema,
     };
-    if (d.annotations) {
-      const ann: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean } =
-        {};
-      if (d.annotations.readOnly === true) ann.readOnlyHint = true;
-      if (d.annotations.destructive === true) ann.destructiveHint = true;
-      if (d.annotations.idempotent === true) ann.idempotentHint = true;
-      if (Object.keys(ann).length > 0) schema.annotations = ann;
-    }
+    const annotations = toolAnnotations(d);
+    if (annotations) schema.annotations = annotations;
     return schema;
   });
 }
