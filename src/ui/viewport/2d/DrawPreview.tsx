@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
+import { ellipseSegmentsGeometry } from './ellipseSegments';
 import type { DrawToolKind } from '@ui/store';
 import {
   rectParamsFromCorners,
@@ -113,48 +114,6 @@ function buildRectGeo(a: Vec2, b: Vec2): THREE.BufferGeometry {
   return geo;
 }
 
-/** Circle outline (32-segment approximation). */
-function buildCircleGeo(center: Vec2, radius: number): THREE.BufferGeometry {
-  const segments = 32;
-  const verts: number[] = [];
-  for (let i = 0; i < segments; i++) {
-    const a0 = (i / segments) * Math.PI * 2;
-    const a1 = ((i + 1) / segments) * Math.PI * 2;
-    verts.push(
-      center[0] + radius * Math.cos(a0),
-      center[1] + radius * Math.sin(a0),
-      0,
-      center[0] + radius * Math.cos(a1),
-      center[1] + radius * Math.sin(a1),
-      0,
-    );
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-  return geo;
-}
-
-/** Ellipse outline (32-segment approximation using bounding-box half-extents). */
-function buildEllipseGeo(center: Vec2, radiusX: number, radiusY: number): THREE.BufferGeometry {
-  const segments = 32;
-  const verts: number[] = [];
-  for (let i = 0; i < segments; i++) {
-    const a0 = (i / segments) * Math.PI * 2;
-    const a1 = ((i + 1) / segments) * Math.PI * 2;
-    verts.push(
-      center[0] + radiusX * Math.cos(a0),
-      center[1] + radiusY * Math.sin(a0),
-      0,
-      center[0] + radiusX * Math.cos(a1),
-      center[1] + radiusY * Math.sin(a1),
-      0,
-    );
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-  return geo;
-}
-
 /**
  * Spline rubber-band preview: draws straight segments from collected points
  * to the cursor. A full Catmull-Rom tessellation is intentionally avoided here
@@ -169,7 +128,7 @@ function buildSplinePreviewGeo(points: Vec2[], cursor: Vec2): THREE.BufferGeomet
 // DrawPreview props
 // ---------------------------------------------------------------------------
 
-export interface DrawPreviewProps {
+interface DrawPreviewProps {
   activeTool: DrawToolKind;
   collectedPoints: Vec2[];
   /** Current snapped cursor position; null when the cursor is off-canvas. */
@@ -247,7 +206,13 @@ export function DrawPreview({
       if (collectedPoints.length === 1) {
         const radius = circleRadiusFromPoints(collectedPoints[0]!, cursor);
         if (radius !== null) {
-          geo = buildCircleGeo(collectedPoints[0]!, radius);
+          geo = ellipseSegmentsGeometry(
+            collectedPoints[0]![0],
+            collectedPoints[0]![1],
+            radius,
+            radius,
+            32,
+          );
         }
       }
     } else if (activeTool === 'rectangle') {
@@ -261,7 +226,13 @@ export function DrawPreview({
       if (collectedPoints.length === 1) {
         const params = ellipseParamsFromCenterCorner(collectedPoints[0]!, cursor);
         if (params !== null) {
-          geo = buildEllipseGeo(params.center, params.radiusX, params.radiusY);
+          geo = ellipseSegmentsGeometry(
+            params.center[0],
+            params.center[1],
+            params.radiusX,
+            params.radiusY,
+            32,
+          );
         }
       }
     } else if (activeTool === 'spline') {

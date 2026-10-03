@@ -30,6 +30,7 @@ import { useSnap } from './useSnap';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { SnapType } from './snapping/types';
 import { useGroundPlane } from './useGroundPlane';
+import { ellipseSegmentsGeometry } from './ellipseSegments';
 
 // ---------------------------------------------------------------------------
 // Glyph colours per snap type
@@ -129,17 +130,7 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       return geo;
     }
     case 'center': {
-      // Circle: line loop approximated with 16 segments.
-      const segments = 16;
-      const verts: number[] = [];
-      for (let i = 0; i < segments; i++) {
-        const a0 = (i / segments) * Math.PI * 2;
-        const a1 = ((i + 1) / segments) * Math.PI * 2;
-        verts.push(s * Math.cos(a0), s * Math.sin(a0), 0, s * Math.cos(a1), s * Math.sin(a1), 0);
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-      return geo;
+      return ellipseSegmentsGeometry(0, 0, s, s, 16);
     }
     case 'intersection': {
       // X: two diagonal lines.
