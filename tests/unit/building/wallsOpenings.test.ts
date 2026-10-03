@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type BoxEntity, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { endAdjustment, wallPieces } from '@aec/wallGeometry';
+import { endAdjustment } from '@aec/wallGeometry';
+import { wallPieces } from '@aec/wallPieces';
 import type { WallElement } from '@core/model/building';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {

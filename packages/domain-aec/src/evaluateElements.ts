@@ -59,9 +59,9 @@ import {
   pointAlong,
   wallExtent,
   wallFrame,
-  wallPieces,
 } from './wallGeometry';
 
+import { wallPieces } from './wallPieces';
 function evaluateWall(
   context: EvaluationContext,
   wall: WallElement,
