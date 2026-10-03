@@ -11,6 +11,7 @@
 import type { CadDocument, Parameter } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 import { evaluateExpression, extractReferences } from './expression';
 import { regenerateParameterDependents } from './dependents';
 
@@ -160,18 +161,13 @@ export const setParameter = defineCommand({
   run: (doc, { name, expression }): CommandResult => {
     // Validate name: must be a valid identifier.
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-      return {
-        document: doc,
-        summary: `set_parameter failed: name '${String(name)}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `set_parameter failed: name '${String(name)}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
+      );
     }
     if (expression.trim() === '') {
-      return {
-        document: doc,
-        summary: `set_parameter failed: expression must be a non-empty string.`,
-        affected: [],
-      };
+      return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
     }
 
     // Insert/update the parameter, then re-evaluate all parameters in topo order.
@@ -203,7 +199,7 @@ export const setParameter = defineCommand({
     ).length;
     const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc);
     if (refusal !== undefined) {
-      return { document: doc, summary: `set_parameter '${name}': ${refusal}`, affected: [] };
+      return noop(doc, `set_parameter '${name}': ${refusal}`);
     }
 
     return {
@@ -247,11 +243,10 @@ export const deleteParameter = defineCommand({
   }),
   run: (doc, { name }): CommandResult => {
     if (!(name in doc.parameters)) {
-      return {
-        document: doc,
-        summary: `delete_parameter: parameter '${String(name)}' does not exist — no change made.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `delete_parameter: parameter '${String(name)}' does not exist — no change made.`,
+      );
     }
 
     // Build the new parameters map without the deleted name.

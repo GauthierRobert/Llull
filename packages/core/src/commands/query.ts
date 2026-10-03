@@ -9,9 +9,10 @@
  * than juggling generated ids.
  */
 
-import type { CadDocument, Entity, EntityKind } from '../model/types';
+import type { EntityKind } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 import { entityBounds } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { distanceSq3 } from '../lib/vec3';
@@ -35,60 +36,23 @@ function bboxCentroid(b: Bounds): readonly [number, number, number] {
   return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
 }
 
-/** Returns true when AABB `b` is fully inside `[qMin, qMax]`. */
-function insideAabb(
-  b: Bounds,
-  qMin: readonly [number, number, number],
-  qMax: readonly [number, number, number],
-): boolean {
-  return (
-    b.min[0] >= qMin[0] &&
-    b.max[0] <= qMax[0] &&
-    b.min[1] >= qMin[1] &&
-    b.max[1] <= qMax[1] &&
-    b.min[2] >= qMin[2] &&
-    b.max[2] <= qMax[2]
-  );
-}
+type Corner = readonly [number, number, number];
 
-/** Returns true when AABB `b` intersects `[qMin, qMax]` (at least one axis overlaps). */
-function overlapsAabb(
-  b: Bounds,
-  qMin: readonly [number, number, number],
-  qMax: readonly [number, number, number],
-): boolean {
-  return (
-    b.max[0] >= qMin[0] &&
-    b.min[0] <= qMax[0] &&
-    b.max[1] >= qMin[1] &&
-    b.min[1] <= qMax[1] &&
-    b.max[2] >= qMin[2] &&
-    b.min[2] <= qMax[2]
-  );
-}
+const axes = [0, 1, 2] as const;
 
-/** Returns true when the entity's world-space AABB overlaps the given bbox filter. */
-function overlapsBbox(
-  e: Entity,
-  bboxMin: readonly [number, number, number],
-  bboxMax: readonly [number, number, number],
-): boolean {
-  return overlapsAabb(entityBounds(e), bboxMin, bboxMax);
-}
+/** True when AABB `b` is fully inside `[qMin, qMax]`. */
+const insideAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean =>
+  axes.every((i) => b.min[i] >= qMin[i] && b.max[i] <= qMax[i]);
+
+/** True when AABB `b` intersects `[qMin, qMax]` on every axis. */
+const overlapsAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean =>
+  axes.every((i) => b.max[i] >= qMin[i] && b.min[i] <= qMax[i]);
+
+const isInverted = (min: Corner, max: Corner): boolean => axes.some((i) => min[i] > max[i]);
 
 const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
 
 const vec3Exact = (description: string): typeof POINT_3D => POINT_3D.describe(description);
-
-/**
- * Resolve the touching-id filter: compute the bbox of the reference entity and
- * return it, or null when the id is absent.
- */
-function resolveTouchingBounds(doc: CadDocument, touchingId: string): Bounds | null {
-  const ref = doc.entities[touchingId];
-  if (!ref) return null;
-  return entityBounds(ref);
-}
 
 /**
  * @command find_entities
@@ -234,151 +198,54 @@ export const findEntities = defineCommand({
       tagFuzzy,
     } = params;
 
-    // --- Validate legacy bbox: must supply both or neither ---
-    const hasBboxMin = bboxMin !== undefined;
-    const hasBboxMax = bboxMax !== undefined;
-    if (hasBboxMin !== hasBboxMax) {
-      return {
-        document: doc,
-        summary: 'find_entities: bboxMin and bboxMax must both be provided or both omitted.',
-        affected: [],
-      };
+    const fail = (summary: string): CommandResult => noop(doc, summary);
+    if ((bboxMin === undefined) !== (bboxMax === undefined)) {
+      return fail('find_entities: bboxMin and bboxMax must both be provided or both omitted.');
     }
-
-    // --- Validate nearPoint ---
-    if (nearPoint !== undefined) {
-      if (nearPoint.radius <= 0) {
-        return {
-          document: doc,
-          summary: 'find_entities: nearPoint.radius must be a finite number > 0.',
-          affected: [],
-        };
-      }
+    if (nearPoint !== undefined && nearPoint.radius <= 0) {
+      return fail('find_entities: nearPoint.radius must be a finite number > 0.');
     }
-
-    // --- Validate insideBBox ---
-    if (insideBBox !== undefined) {
-      const [qMin, qMax] = insideBBox;
-      if (qMin[0] > qMax[0] || qMin[1] > qMax[1] || qMin[2] > qMax[2]) {
-        return {
-          document: doc,
-          summary: 'find_entities: insideBBox min must be <= max on every axis.',
-          affected: [],
-        };
-      }
+    if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1])) {
+      return fail('find_entities: insideBBox min must be <= max on every axis.');
     }
-
-    // --- Validate overlapsBBox ---
-    if (overlapsBBox !== undefined) {
-      const [qMin, qMax] = overlapsBBox;
-      if (qMin[0] > qMax[0] || qMin[1] > qMax[1] || qMin[2] > qMax[2]) {
-        return {
-          document: doc,
-          summary: 'find_entities: overlapsBBox min must be <= max on every axis.',
-          affected: [],
-        };
-      }
+    if (overlapsBBox !== undefined && isInverted(overlapsBBox[0], overlapsBBox[1])) {
+      return fail('find_entities: overlapsBBox min must be <= max on every axis.');
     }
-
-    // --- Validate touchingId ---
-    let touchingBounds: Bounds | null = null;
-    if (touchingId !== undefined) {
-      touchingBounds = resolveTouchingBounds(doc, touchingId);
-      if (touchingBounds === null) {
-        return {
-          document: doc,
-          summary: `find_entities: touchingId "${touchingId}" does not exist in the document.`,
-          affected: [],
-        };
-      }
+    const touchingRef = touchingId !== undefined ? doc.entities[touchingId] : undefined;
+    if (touchingId !== undefined && !touchingRef) {
+      return fail(`find_entities: touchingId "${touchingId}" does not exist in the document.`);
     }
+    const touchingBounds = touchingRef ? entityBounds(touchingRef) : null;
+    const nearRadiusSq = nearPoint ? nearPoint.radius * nearPoint.radius : 0;
+    const nameLc = name?.toLowerCase();
+    const nameFuzzyLc = nameFuzzy?.toLowerCase();
+    const tagFuzzyLc = tagFuzzy?.toLowerCase();
 
-    // --- Precompute typed spatial params ---
-    const npPoint = nearPoint !== undefined ? nearPoint.point : null;
-    const npRadiusSq = nearPoint !== undefined ? nearPoint.radius * nearPoint.radius : 0;
-
-    const insideMin = insideBBox !== undefined ? insideBBox[0] : null;
-    const insideMax = insideBBox !== undefined ? insideBBox[1] : null;
-
-    const overlapMin = overlapsBBox !== undefined ? overlapsBBox[0] : null;
-    const overlapMax = overlapsBBox !== undefined ? overlapsBBox[1] : null;
-
-    const nameFuzzyLc = nameFuzzy !== undefined ? nameFuzzy.toLowerCase() : null;
-    const tagFuzzyLc = tagFuzzy !== undefined ? tagFuzzy.toLowerCase() : null;
-
-    // --- Main filter loop ---
     const matches: EntityMatch[] = [];
-
     for (const id of doc.order) {
       const e = doc.entities[id];
       if (!e) continue;
-
-      // kind filter
       if (kind !== undefined && e.kind !== kind) continue;
-
-      // layerId filter
       if (layerId !== undefined && e.layerId !== layerId) continue;
-
-      // name filter (exact / substring)
       if (name !== undefined) {
-        const entityName = e.name;
-        if (entityName === undefined) continue;
-        if (nameExact) {
-          if (entityName !== name) continue;
-        } else {
-          if (!entityName.toLowerCase().includes(name.toLowerCase())) continue;
-        }
+        if (e.name === undefined) continue;
+        if (nameExact ? e.name !== name : !e.name.toLowerCase().includes(nameLc ?? '')) continue;
       }
-
-      // tag filter (exact)
-      if (tag !== undefined) {
-        const entityTags = e.tags;
-        if (!entityTags || !entityTags.includes(tag)) continue;
+      if (tag !== undefined && !e.tags?.includes(tag)) continue;
+      if (nameFuzzyLc !== undefined && !e.name?.toLowerCase().includes(nameFuzzyLc)) continue;
+      if (tagFuzzyLc !== undefined && !e.tags?.some((t) => t.toLowerCase().includes(tagFuzzyLc))) {
+        continue;
       }
+      if (touchingId !== undefined && e.id === touchingId) continue;
 
-      // legacy bbox filter (overlap)
-      if (hasBboxMin && bboxMin !== undefined && bboxMax !== undefined) {
-        if (!overlapsBbox(e, bboxMin, bboxMax)) continue;
-      }
-
-      // nearPoint filter
-      if (npPoint !== null) {
+      const needsBounds = bboxMin || nearPoint || insideBBox || overlapsBBox || touchingBounds;
+      if (needsBounds) {
         const b = entityBounds(e);
-        const centroid = bboxCentroid(b);
-        if (distanceSq3(centroid, npPoint) > npRadiusSq) continue;
-      }
-
-      // insideBBox filter
-      if (insideMin !== null && insideMax !== null) {
-        const b = entityBounds(e);
-        if (!insideAabb(b, insideMin, insideMax)) continue;
-      }
-
-      // overlapsBBox filter
-      if (overlapMin !== null && overlapMax !== null) {
-        const b = entityBounds(e);
-        if (!overlapsAabb(b, overlapMin, overlapMax)) continue;
-      }
-
-      // touchingId filter (skip the reference entity itself)
-      if (touchingBounds !== null && touchingId !== undefined) {
-        if (e.id === touchingId) continue;
-        const b = entityBounds(e);
-        if (!overlapsAabb(b, touchingBounds.min, touchingBounds.max)) continue;
-      }
-
-      // nameFuzzy filter
-      if (nameFuzzyLc !== null) {
-        const entityName = e.name;
-        if (entityName === undefined || !entityName.toLowerCase().includes(nameFuzzyLc)) continue;
-      }
-
-      // tagFuzzy filter
-      if (tagFuzzyLc !== null) {
-        const entityTags = e.tags;
-        if (!entityTags) continue;
-        const anyMatch = entityTags.some((t) => t.toLowerCase().includes(tagFuzzyLc));
-        if (!anyMatch) continue;
+        if (bboxMin && bboxMax && !overlapsAabb(b, bboxMin, bboxMax)) continue;
+        if (nearPoint && distanceSq3(bboxCentroid(b), nearPoint.point) > nearRadiusSq) continue;
+        if (insideBBox && !insideAabb(b, insideBBox[0], insideBBox[1])) continue;
+        if (overlapsBBox && !overlapsAabb(b, overlapsBBox[0], overlapsBBox[1])) continue;
+        if (touchingBounds && !overlapsAabb(b, touchingBounds.min, touchingBounds.max)) continue;
       }
 
       matches.push({
@@ -396,7 +263,7 @@ export const findEntities = defineCommand({
     if (layerId !== undefined) filterParts.push(`layerId=${layerId}`);
     if (name !== undefined) filterParts.push(`name${nameExact ? '==' : '~'}"${name}"`);
     if (tag !== undefined) filterParts.push(`tag="${tag}"`);
-    if (hasBboxMin) filterParts.push('bbox');
+    if (bboxMin !== undefined) filterParts.push('bbox');
     if (nearPoint !== undefined) filterParts.push(`nearPoint(r=${nearPoint.radius})`);
     if (insideBBox !== undefined) filterParts.push('insideBBox');
     if (overlapsBBox !== undefined) filterParts.push('overlapsBBox');

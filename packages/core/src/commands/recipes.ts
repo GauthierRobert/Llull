@@ -3,6 +3,7 @@ import { kernelRefusal } from './kernelRefusal';
 import { currentContext, runInContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
 
@@ -94,11 +95,7 @@ export const saveRecipe = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, label }): CommandResult => {
     if (name.trim() === '') {
-      return {
-        document: doc,
-        summary: 'save_recipe failed: name must be a non-empty, non-whitespace-only string.',
-        affected: [],
-      };
+      return noop(doc, 'save_recipe failed: name must be a non-empty, non-whitespace-only string.');
     }
 
     // Deep-copy the steps so mutations to the live featureHistory cannot corrupt saved recipes.
@@ -158,11 +155,10 @@ export const instantiateRecipe = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
     if (context.recipeDepth >= MAX_PROJECT_DEPTH) {
-      return {
-        document: doc,
-        summary: `instantiate_recipe failed: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `instantiate_recipe failed: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,
+      );
     }
     return runInContext({ ...context, recipeDepth: context.recipeDepth + 1 }, () =>
       instantiateRecipeOnce(doc, params.name),
@@ -172,11 +168,7 @@ export const instantiateRecipe = defineCommand({
 
 function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
   if (name.trim() === '') {
-    return {
-      document: doc,
-      summary: 'instantiate_recipe failed: name must be a non-empty string.',
-      affected: [],
-    };
+    return noop(doc, 'instantiate_recipe failed: name must be a non-empty string.');
   }
 
   const recipe = doc.recipes[name];
@@ -186,24 +178,19 @@ function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
       available.length > 0
         ? ` Available recipes: ${available.join(', ')}.`
         : ' No recipes have been saved yet (call save_recipe first).';
-    return {
-      document: doc,
-      summary: `instantiate_recipe failed: recipe '${name}' not found.${hint}`,
-      affected: [],
-    };
+    return noop(doc, `instantiate_recipe failed: recipe '${name}' not found.${hint}`);
   }
 
   const refused = kernelRefusal(doc, recipe.steps);
   if (refused !== null) {
-    return { document: doc, summary: `instantiate_recipe: ${refused}`, affected: [] };
+    return noop(doc, `instantiate_recipe: ${refused}`);
   }
 
   if (recipe.steps.length > MAX_PROJECT_STEPS) {
-    return {
-      document: doc,
-      summary: `instantiate_recipe failed: recipe '${name}' has ${recipe.steps.length} steps, exceeding MAX_PROJECT_STEPS (${MAX_PROJECT_STEPS}).`,
-      affected: [],
-    };
+    return noop(
+      doc,
+      `instantiate_recipe failed: recipe '${name}' has ${recipe.steps.length} steps, exceeding MAX_PROJECT_STEPS (${MAX_PROJECT_STEPS}).`,
+    );
   }
 
   const warnings: string[] = [];

@@ -2,6 +2,7 @@ import type { ExtrusionEntity, RevolutionEntity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
+import { noop } from './noop';
 import { nextId } from '../lib/id';
 import { ORIGIN, commitSolid, resolveRotation } from './geometryShared';
 
@@ -47,26 +48,15 @@ export const extrudeSketch = defineCommand({
       .optional(),
   }),
   run: (doc, { id, depth, rotation }): CommandResult => {
-    // --- guard: depth ---
-    if (typeof depth !== 'number' || depth <= 0) {
-      return {
-        document: doc,
-        summary: `extrude_sketch: depth must be > 0 (got ${depth}); entity ${id} unchanged.`,
-        affected: [],
-      };
+    if (depth <= 0) {
+      return noop(doc, `extrude_sketch: depth must be > 0 (got ${depth}); entity ${id} unchanged.`);
     }
 
-    // --- guard: entity exists ---
     const source = doc.entities[id];
     if (!source) {
-      return {
-        document: doc,
-        summary: `extrude_sketch: no entity with id "${id}".`,
-        affected: [],
-      };
+      return noop(doc, `extrude_sketch: no entity with id "${id}".`);
     }
 
-    // --- derive profile polygon ---
     let profile: ReadonlyArray<readonly [number, number]> | null = null;
 
     if (source.kind === 'circle') {
@@ -88,30 +78,26 @@ export const extrudeSketch = defineCommand({
       ];
     } else if (source.kind === 'polyline') {
       if (!source.closed) {
-        return {
-          document: doc,
-          summary: `extrude_sketch: polyline "${id}" is not closed; cannot extrude an open profile.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `extrude_sketch: polyline "${id}" is not closed; cannot extrude an open profile.`,
+        );
       }
       if (source.points.length < 3) {
-        return {
-          document: doc,
-          summary: `extrude_sketch: polyline "${id}" has fewer than 3 points; not a valid closed profile.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `extrude_sketch: polyline "${id}" has fewer than 3 points; not a valid closed profile.`,
+        );
       }
       profile = source.points as ReadonlyArray<readonly [number, number]>;
     } else {
       // line, arc, point, 3D solids — not a closed 2D profile
-      return {
-        document: doc,
-        summary: `extrude_sketch: entity "${id}" (kind="${source.kind}") is not a closed 2D profile. Use a circle, rectangle, or closed polyline.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `extrude_sketch: entity "${id}" (kind="${source.kind}") is not a closed 2D profile. Use a circle, rectangle, or closed polyline.`,
+      );
     }
 
-    // --- build new extrusion ---
     const extId = nextId('ext');
     const extrusion: ExtrusionEntity = {
       id: extId,
@@ -232,37 +218,30 @@ export const revolveProfile = defineCommand({
       id: explicitId,
     },
   ): CommandResult => {
-    // --- guard: profile ---
-    if (!Array.isArray(profile) || profile.length < 3) {
-      return {
-        document: doc,
-        summary: `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${Array.isArray(profile) ? profile.length : 'non-array'}); no-op.`,
-        affected: [],
-      };
+    if (profile.length < 3) {
+      return noop(
+        doc,
+        `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${profile.length}); no-op.`,
+      );
     }
 
-    // --- guard: angle ---
     const TWO_PI = 2 * Math.PI;
     const angle = rawAngle !== undefined ? rawAngle : TWO_PI;
     if (!Number.isFinite(angle) || angle <= 0) {
-      return {
-        document: doc,
-        summary: `revolve_profile: angle must be a finite number > 0 (got ${String(angle)}); no-op.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `revolve_profile: angle must be a finite number > 0 (got ${String(angle)}); no-op.`,
+      );
     }
 
-    // --- guard: axis ---
     const axis = resolveAxis(rawAxis);
     if (axis === null) {
-      return {
-        document: doc,
-        summary: `revolve_profile: axis must be 'x', 'y', 'z', or a [dx,dy,dz] direction array (got ${JSON.stringify(rawAxis)}); no-op.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `revolve_profile: axis must be 'x', 'y', 'z', or a [dx,dy,dz] direction array (got ${JSON.stringify(rawAxis)}); no-op.`,
+      );
     }
 
-    // --- segments: clamp to minimum 3 ---
     const segments = Math.max(
       3,
       Math.round(
@@ -270,13 +249,11 @@ export const revolveProfile = defineCommand({
       ),
     );
 
-    // --- resolve layer ---
     const resolvedLayerId =
       typeof layerId === 'string' && doc.layers[layerId] !== undefined
         ? layerId
         : (Object.keys(doc.layers)[0] ?? 'layer-default');
 
-    // --- build entity ---
     const id = typeof explicitId === 'string' && explicitId.length > 0 ? explicitId : nextId('rev');
     const entity: RevolutionEntity = {
       id,

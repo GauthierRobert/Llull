@@ -22,77 +22,57 @@ function faceNormal(verts: Vec3[]): Vec3 {
   return normalize3(cross3(a, b));
 }
 
-function makePolygon(verts: Vec3[], color: string, stroke = false): PreDepthPolygon {
-  const normal = faceNormal(verts);
-  return { verts, color, normal, stroke };
+function makePolygon(verts: Vec3[], color: string): PreDepthPolygon {
+  return { verts, color, normal: faceNormal(verts), stroke: false };
 }
+
+const makePolygons = (faces: Vec3[][], color: string): PreDepthPolygon[] =>
+  faces.map((verts) => makePolygon(verts, color));
 
 export function tessellateBox(e: { position: Vec3; size: Vec3; color: string }): PreDepthPolygon[] {
   const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
-  const c = e.color;
-  // 6 quads (CCW when viewed from outside, Z-up)
-  return [
-    // bottom (-Z)
-    makePolygon(
+  // 6 quads (CCW when viewed from outside, Z-up): bottom, top, front, back, left, right.
+  return makePolygons(
+    [
       [
         [x0, y0, z0],
         [x1, y0, z0],
         [x1, y1, z0],
         [x0, y1, z0],
       ],
-      c,
-    ),
-    // top (+Z)
-    makePolygon(
       [
         [x0, y0, z1],
         [x0, y1, z1],
         [x1, y1, z1],
         [x1, y0, z1],
       ],
-      c,
-    ),
-    // front (-Y)
-    makePolygon(
       [
         [x0, y0, z0],
         [x0, y0, z1],
         [x1, y0, z1],
         [x1, y0, z0],
       ],
-      c,
-    ),
-    // back (+Y)
-    makePolygon(
       [
         [x0, y1, z0],
         [x1, y1, z0],
         [x1, y1, z1],
         [x0, y1, z1],
       ],
-      c,
-    ),
-    // left (-X)
-    makePolygon(
       [
         [x0, y0, z0],
         [x0, y1, z0],
         [x0, y1, z1],
         [x0, y0, z1],
       ],
-      c,
-    ),
-    // right (+X)
-    makePolygon(
       [
         [x1, y0, z0],
         [x1, y0, z1],
         [x1, y1, z1],
         [x1, y1, z0],
       ],
-      c,
-    ),
-  ];
+    ],
+    e.color,
+  );
 }
 
 /** Z-up cylinder: axis along Z, centered at position. */
@@ -178,20 +158,17 @@ export function tessellateWedge(e: {
   color: string;
 }): PreDepthPolygon[] {
   const { f00, f10, f11, f01, b00, b10 } = wedgeCorners(e.position, e.size);
-  // back top = same as back bottom (wedge tapers to zero height at z=d)
-  return [
-    // front face
-    makePolygon([f00, f10, f11, f01], e.color),
-    // bottom face
-    makePolygon([f00, b00, b10, f10], e.color),
-    // back edge (degenerate line — skip; back is just the 2 bottom verts)
-    // left triangle
-    makePolygon([f00, f01, b00], e.color),
-    // right triangle
-    makePolygon([f10, b10, f11], e.color),
-    // top slope (ramp)
-    makePolygon([f01, f11, b10, b00], e.color),
-  ];
+  // The back edge is degenerate (wedge tapers to zero height at z=d): no back face.
+  return makePolygons(
+    [
+      [f00, f10, f11, f01], // front
+      [f00, b00, b10, f10], // bottom
+      [f00, f01, b00], // left triangle
+      [f10, b10, f11], // right triangle
+      [f01, f11, b10, b00], // top slope
+    ],
+    e.color,
+  );
 }
 
 /**
@@ -205,15 +182,16 @@ export function tessellatePyramid(e: {
   color: string;
 }): PreDepthPolygon[] {
   const { b00, b10, b11, b01, apex } = pyramidCorners(e);
-  return [
-    // base (CCW looking down = face down)
-    makePolygon([b00, b01, b11, b10], e.color),
-    // 4 triangular faces
-    makePolygon([b00, b10, apex], e.color),
-    makePolygon([b10, b11, apex], e.color),
-    makePolygon([b11, b01, apex], e.color),
-    makePolygon([b01, b00, apex], e.color),
-  ];
+  return makePolygons(
+    [
+      [b00, b01, b11, b10], // base, facing down
+      [b00, b10, apex],
+      [b10, b11, apex],
+      [b11, b01, apex],
+      [b01, b00, apex],
+    ],
+    e.color,
+  );
 }
 
 /**

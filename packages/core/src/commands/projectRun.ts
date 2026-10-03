@@ -20,68 +20,175 @@ import {
   STEP_PARAM_COMMANDS,
 } from './projectResolve';
 
-/**
- * Execute a single inner step (for repeat/for_each bodies) against the current doc.
- * Returns { doc, stepReport, aborted } where aborted=true means the caller should stop.
- */
-function runInnerStep(
-  stepDef: { command: string; params?: Record<string, unknown> },
-  current: CadDocument,
+interface PlanRun {
+  current: CadDocument;
+  readonly bindings: Record<string, string[]>;
+  readonly steps: StepReport[];
+  readonly allAffected: string[];
+  readonly onError: 'abort' | 'continue';
+  executedSteps: number;
+}
+
+/** Records a failed control-flow step; true when the run must abort. */
+function failStep(run: PlanRun, index: number, command: string, summary: string): boolean {
+  run.steps.push({ index, command, ok: false, summary, affected: [] });
+  return run.onError === 'abort';
+}
+
+/** Runs one command; `label` (loop bodies only) prefixes the step summaries. */
+function execStep(
+  run: PlanRun,
+  index: number,
+  command: string,
+  params: Record<string, unknown>,
   bindings: Record<string, string[]>,
   env: Record<string, number>,
-  stepLabel: string,
-  steps: StepReport[],
-  allAffected: string[],
-  onError: 'abort' | 'continue',
-  outerIndex: number,
-): { doc: CadDocument; affected: string[]; aborted: boolean } {
-  const { command, params = {} } = stepDef;
-
+  label?: string,
+): { ok: boolean; affected: string[] } {
+  const report = (
+    ok: boolean,
+    summary: string,
+    affected: string[] = [],
+  ): { ok: boolean; affected: string[] } => {
+    run.steps.push({ index, command, ok, summary, affected });
+    return { ok, affected };
+  };
   if (!getCommand(command)) {
-    steps.push({
-      index: outerIndex,
-      command,
-      ok: false,
-      summary: `Unknown command: ${command} (${stepLabel})`,
-      affected: [],
-    });
-    return { doc: current, affected: [], aborted: onError === 'abort' };
+    return report(false, `Unknown command: ${command}${label ? ` (${label})` : ''}`);
   }
-
   const resolved = resolveExprInParam(params, bindings, env);
   if (resolved.error) {
-    steps.push({
-      index: outerIndex,
-      command,
-      ok: false,
-      summary: `Param error in ${stepLabel}: ${resolved.error}`,
-      affected: [],
-    });
-    return { doc: current, affected: [], aborted: onError === 'abort' };
+    return report(false, `Param error${label ? ` in ${label}` : ''}: ${resolved.error}`);
   }
-
-  const recorded = recordableParams(params, resolved.value, current.parameters);
+  const recorded = recordableParams(params, resolved.value, run.current.parameters);
   const result = executeRecorded(
-    current,
+    run.current,
     command,
     STEP_PARAM_COMMANDS.has(command) ? recorded : resolved.value,
     recorded,
   );
-  const ok = result.affected.length > 0 || result.document !== current;
-  steps.push({
-    index: outerIndex,
-    command,
-    ok,
-    summary: `${stepLabel}: ${result.summary}`,
-    affected: result.affected,
-  });
-
-  if (ok) {
-    allAffected.push(...result.affected);
-    return { doc: result.document, affected: result.affected, aborted: false };
-  }
-  return { doc: current, affected: [], aborted: onError === 'abort' };
+  // A graceful no-op (no change + nothing affected) is a soft failure for a plan step.
+  const ok = result.affected.length > 0 || result.document !== run.current;
+  report(ok, label ? `${label}: ${result.summary}` : result.summary, result.affected);
+  if (!ok) return { ok, affected: [] };
+  run.current = result.document;
+  run.allAffected.push(...result.affected);
+  return { ok, affected: result.affected };
 }
+
+/** Runs a loop body `count` times; true when the run must abort. */
+function runLoop(
+  run: PlanRun,
+  index: number,
+  step: { command: string; params?: Record<string, unknown> },
+  count: number,
+  label: string,
+  alias: string | undefined,
+  iteration: (iter: number) => {
+    extras: Record<string, number>;
+    bindings: Record<string, string[]>;
+  },
+): boolean {
+  let loopAffected: string[] = [];
+  for (let iter = 0; iter < count; iter++) {
+    if (++run.executedSteps > MAX_PROJECT_STEPS) {
+      run.steps.push(budgetFailure(index));
+      return true;
+    }
+    const { extras, bindings } = iteration(iter);
+    const env = buildEnv(run.current, { i: iter, ...extras });
+    const r = execStep(
+      run,
+      index,
+      step.command,
+      step.params ?? {},
+      bindings,
+      env,
+      `${label}[${iter}]`,
+    );
+    loopAffected = r.affected;
+    if (!r.ok && run.onError === 'abort') return true;
+  }
+  if (alias) run.bindings[alias] = loopAffected;
+  return false;
+}
+
+/** Runs one top-level action item; true when the run must abort. */
+function runAction(run: PlanRun, raw: ActionItem, index: number): boolean {
+  if (isRepeatStep(raw)) {
+    const countResult = resolveCount(raw.repeat.count, run.current);
+    if (countResult.error !== null) return failStep(run, index, 'repeat', countResult.error);
+    const count = Math.round(countResult.count);
+    if (count < 0) {
+      return failStep(run, index, 'repeat', `repeat: count must be >= 0 (got ${count}).`);
+    }
+    return runLoop(run, index, raw.step, count, 'repeat', raw.repeat.as, () => ({
+      extras: {},
+      bindings: run.bindings,
+    }));
+  }
+  if (isForEachStep(raw)) {
+    const valResult = resolveForEachValues(raw.for_each.values, run.current);
+    if (valResult.error !== null) return failStep(run, index, 'for_each', valResult.error);
+    const { values } = valResult;
+    const alias = raw.for_each.as;
+    return runLoop(run, index, raw.step, values.length, 'for_each', alias, (iter) => {
+      const elem = values[iter];
+      return {
+        extras: typeof elem === 'number' ? { [alias]: elem } : {},
+        bindings: { ...run.bindings, [alias]: [String(elem)] },
+      };
+    });
+  }
+  if (!isPlanAction(raw)) return failStep(run, index, '(invalid)', 'Not a valid action.');
+  const env = buildEnv(run.current, {});
+  const r = execStep(run, index, raw.command, raw.params ?? {}, run.bindings, env);
+  if (r.ok) {
+    if (raw.as) run.bindings[raw.as] = r.affected;
+    return false;
+  }
+  return run.onError === 'abort';
+}
+
+/** Static plan check: structure, command names, required params, undefined `$alias` refs. */
+function validatePlan(doc: CadDocument, actions: ActionItem[]): CommandResult {
+  const defined = new Set<string>();
+  const issues: string[] = [];
+  actions.forEach((raw, i) => {
+    if (isRepeatStep(raw) || isForEachStep(raw)) {
+      // Inner step expressions are validated at run time.
+      defined.add(isRepeatStep(raw) ? (raw.repeat.as ?? '') : raw.for_each.as);
+      return;
+    }
+    if (!isPlanAction(raw)) {
+      issues.push(`step ${i}: not a valid action (needs a string "command")`);
+      return;
+    }
+    const def = getCommand(raw.command);
+    const params = raw.params ?? {};
+    if (!def) {
+      issues.push(`step ${i} (${raw.command}): unknown command`);
+      return;
+    }
+    for (const req of def.paramsSchema.required) {
+      if (!(req in params))
+        issues.push(`step ${i} (${raw.command}): missing required param "${req}"`);
+    }
+    const refErr = findUndefinedRef(params, defined);
+    if (refErr) issues.push(`step ${i} (${raw.command}): ${refErr}`);
+    if (raw.as) defined.add(raw.as);
+  });
+  const ok = issues.length === 0;
+  return {
+    document: doc,
+    summary: ok
+      ? `Plan valid: ${actions.length} step(s) ready.`
+      : `Plan invalid: ${issues.length} issue(s) — ${issues.join('; ')}.`,
+    affected: [],
+    data: { ok, validated: true, stepCount: actions.length, steps: [], failedAt: null, issues },
+  };
+}
+
 /** Upper-bound count of executed commands a plan expands to (repeat/for_each multiply). */
 function estimateSteps(actions: ActionItem[], doc: CadDocument): number {
   let total = 0;
@@ -103,299 +210,48 @@ export function runProject(
   doc: CadDocument,
   { actions, onError = 'abort', validate = false }: BuildProjectParams,
 ): CommandResult {
-  if (actions.length === 0) {
-    return noop(
-      doc,
-      { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null },
-      'build_project: no actions provided.',
-    );
-  }
+  const rejected = (summary: string): CommandResult =>
+    noop(doc, { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null }, summary);
+  if (actions.length === 0) return rejected('build_project: no actions provided.');
   if (actions.length > MAX_PROJECT_ACTIONS) {
-    return noop(
-      doc,
-      { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null },
+    return rejected(
       `build_project: ${actions.length} actions exceeds MAX_PROJECT_ACTIONS (${MAX_PROJECT_ACTIONS}).`,
     );
   }
   const estimatedSteps = estimateSteps(actions, doc);
   if (estimatedSteps > MAX_PROJECT_STEPS) {
-    return noop(
-      doc,
-      { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null },
+    return rejected(
       `build_project: plan expands to ${estimatedSteps} steps, exceeding MAX_PROJECT_STEPS (${MAX_PROJECT_STEPS}).`,
     );
   }
+  if (validate) return validatePlan(doc, actions);
 
-  if (validate) {
-    const defined = new Set<string>();
-    const issues: string[] = [];
-    actions.forEach((raw, i) => {
-      if (isRepeatStep(raw) || isForEachStep(raw)) {
-        // Basic structural validation for control-flow steps.
-        defined.add(isRepeatStep(raw) ? (raw.repeat.as ?? '') : raw.for_each.as);
-        return; // deeper validation of inner step expressions deferred to run-time
-      }
-      if (!isPlanAction(raw)) {
-        issues.push(`step ${i}: not a valid action (needs a string "command")`);
-        return;
-      }
-      const def = getCommand(raw.command);
-      const params = raw.params ?? {};
-      if (!def) {
-        issues.push(`step ${i} (${raw.command}): unknown command`);
-        return;
-      }
-      for (const req of def.paramsSchema.required) {
-        if (!(req in params))
-          issues.push(`step ${i} (${raw.command}): missing required param "${req}"`);
-      }
-      const refErr = findUndefinedRef(params, defined);
-      if (refErr) issues.push(`step ${i} (${raw.command}): ${refErr}`);
-      if (raw.as) defined.add(raw.as);
-    });
-    const ok = issues.length === 0;
-    return {
-      document: doc,
-      summary: ok
-        ? `Plan valid: ${actions.length} step(s) ready.`
-        : `Plan invalid: ${issues.length} issue(s) — ${issues.join('; ')}.`,
-      affected: [],
-      data: { ok, validated: true, stepCount: actions.length, steps: [], failedAt: null, issues },
-    };
-  }
-
-  const bindings: Record<string, string[]> = {};
-  const steps: StepReport[] = [];
-  const allAffected: string[] = [];
-  let current = doc;
+  const run: PlanRun = {
+    current: doc,
+    bindings: {},
+    steps: [],
+    allAffected: [],
+    onError,
+    executedSteps: 0,
+  };
+  const { steps } = run;
   let failedAt: number | null = null;
-  let executedSteps = 0;
 
   for (let i = 0; i < actions.length; i++) {
-    const raw = actions[i];
-    if (++executedSteps > MAX_PROJECT_STEPS) {
+    if (++run.executedSteps > MAX_PROJECT_STEPS) {
       steps.push(budgetFailure(i));
       failedAt = steps.length - 1;
       break;
     }
-
-    // ── repeat ──────────────────────────────────────────────────────────
-    if (isRepeatStep(raw)) {
-      const countResult = resolveCount(raw.repeat.count, current);
-      if (countResult.error !== null) {
-        steps.push({
-          index: i,
-          command: 'repeat',
-          ok: false,
-          summary: countResult.error,
-          affected: [],
-        });
-        if (onError === 'abort') {
-          failedAt = i;
-          break;
-        }
-        continue;
-      }
-      const count = Math.round(countResult.count);
-      if (count < 0) {
-        steps.push({
-          index: i,
-          command: 'repeat',
-          ok: false,
-          summary: `repeat: count must be >= 0 (got ${count}).`,
-          affected: [],
-        });
-        if (onError === 'abort') {
-          failedAt = i;
-          break;
-        }
-        continue;
-      }
-      let loopAffected: string[] = [];
-      let aborted = false;
-      for (let iter = 0; iter < count; iter++) {
-        if (++executedSteps > MAX_PROJECT_STEPS) {
-          steps.push(budgetFailure(i));
-          aborted = true;
-          break;
-        }
-        const env = buildEnv(current, { i: iter });
-        const r = runInnerStep(
-          raw.step,
-          current,
-          bindings,
-          env,
-          `repeat[${iter}]`,
-          steps,
-          allAffected,
-          onError,
-          i,
-        );
-        current = r.doc;
-        loopAffected = r.affected;
-        if (r.aborted) {
-          aborted = true;
-          break;
-        }
-      }
-      if (aborted) {
-        failedAt = i;
-        break;
-      }
-      if (raw.repeat.as) bindings[raw.repeat.as] = loopAffected;
-      continue;
-    }
-
-    // ── for_each ────────────────────────────────────────────────────────
-    if (isForEachStep(raw)) {
-      const valResult = resolveForEachValues(raw.for_each.values, current);
-      if (valResult.error !== null) {
-        steps.push({
-          index: i,
-          command: 'for_each',
-          ok: false,
-          summary: valResult.error,
-          affected: [],
-        });
-        if (onError === 'abort') {
-          failedAt = i;
-          break;
-        }
-        continue;
-      }
-      if (!Array.isArray(valResult.values)) {
-        steps.push({
-          index: i,
-          command: 'for_each',
-          ok: false,
-          summary: 'for_each: values did not resolve to an array.',
-          affected: [],
-        });
-        if (onError === 'abort') {
-          failedAt = i;
-          break;
-        }
-        continue;
-      }
-      const alias = raw.for_each.as;
-      let loopAffected: string[] = [];
-      let aborted = false;
-      for (let iter = 0; iter < valResult.values.length; iter++) {
-        if (++executedSteps > MAX_PROJECT_STEPS) {
-          steps.push(budgetFailure(i));
-          aborted = true;
-          break;
-        }
-        const elem = valResult.values[iter];
-        // Inject $i and, if elem is numeric, $as as a number for expression resolution.
-        const extras: Record<string, number> = { i: iter };
-        if (typeof elem === 'number') extras[alias] = elem;
-        const env = buildEnv(current, extras);
-        // Also expose $alias as a string binding pointing to a numeric string for $alias refs.
-        const iterBindings: Record<string, string[]> = {
-          ...bindings,
-          [alias]: [String(elem)],
-        };
-        const r = runInnerStep(
-          raw.step,
-          current,
-          iterBindings,
-          env,
-          `for_each[${iter}]`,
-          steps,
-          allAffected,
-          onError,
-          i,
-        );
-        current = r.doc;
-        loopAffected = r.affected;
-        if (r.aborted) {
-          aborted = true;
-          break;
-        }
-      }
-      if (aborted) {
-        failedAt = i;
-        break;
-      }
-      bindings[alias] = loopAffected;
-      continue;
-    }
-
-    // ── plain action ────────────────────────────────────────────────────
-    if (!isPlanAction(raw)) {
-      steps.push({
-        index: i,
-        command: '(invalid)',
-        ok: false,
-        summary: 'Not a valid action.',
-        affected: [],
-      });
-      if (onError === 'abort') {
-        failedAt = i;
-        break;
-      }
-      continue;
-    }
-    if (!getCommand(raw.command)) {
-      steps.push({
-        index: i,
-        command: raw.command,
-        ok: false,
-        summary: `Unknown command: ${raw.command}`,
-        affected: [],
-      });
-      if (onError === 'abort') {
-        failedAt = i;
-        break;
-      }
-      continue;
-    }
-    const env = buildEnv(current, {});
-    const resolved = resolveExprInParam(raw.params ?? {}, bindings, env);
-    if (resolved.error) {
-      steps.push({
-        index: i,
-        command: raw.command,
-        ok: false,
-        summary: `Param error: ${resolved.error}`,
-        affected: [],
-      });
-      if (onError === 'abort') {
-        failedAt = i;
-        break;
-      }
-      continue;
-    }
-    const recorded = recordableParams(raw.params ?? {}, resolved.value, current.parameters);
-    const result = executeRecorded(
-      current,
-      raw.command,
-      STEP_PARAM_COMMANDS.has(raw.command) ? recorded : resolved.value,
-      recorded,
-    );
-    // A graceful no-op (no change + nothing affected) is a soft failure for a plan step.
-    const ok = result.affected.length > 0 || result.document !== current;
-    steps.push({
-      index: i,
-      command: raw.command,
-      ok,
-      summary: result.summary,
-      affected: result.affected,
-    });
-    if (ok) {
-      current = result.document;
-      allAffected.push(...result.affected);
-      if (raw.as) bindings[raw.as] = result.affected;
-    } else if (onError === 'abort') {
+    if (runAction(run, actions[i] as ActionItem, i)) {
       failedAt = i;
       break;
     }
   }
 
   const aborted = failedAt !== null;
-  const finalDoc = aborted ? doc : current;
-  const affected = aborted ? [] : allAffected;
+  const finalDoc = aborted ? doc : run.current;
+  const affected = aborted ? [] : run.allAffected;
   const allOk = !aborted && steps.every((s) => s.ok);
   const scene = computeSceneSnapshot(finalDoc);
 
