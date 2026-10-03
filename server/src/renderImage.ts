@@ -13,10 +13,6 @@
 
 import { Resvg } from '@resvg/resvg-js';
 
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
 /**
  * An MCP image content block.
  *
@@ -24,15 +20,11 @@ import { Resvg } from '@resvg/resvg-js';
  * `data` is a base64-encoded PNG with NO `data:` URI prefix — the SDK
  * or host handles the URI wrapping when needed.
  */
-export interface ImageContentBlock {
+interface ImageContentBlock {
   type: 'image';
   data: string;
   mimeType: 'image/png';
 }
-
-// ---------------------------------------------------------------------------
-// Rasterization
-// ---------------------------------------------------------------------------
 
 /**
  * Rasterize an SVG string to a base64-encoded PNG.
@@ -58,10 +50,6 @@ export function rasterizeSvg(svg: string, width?: number): string | null {
     return null;
   }
 }
-
-// ---------------------------------------------------------------------------
-// MCP content block builder
-// ---------------------------------------------------------------------------
 
 /**
  * Strip the `svg` field from a data record before text/structured content shaping.

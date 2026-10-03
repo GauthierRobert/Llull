@@ -31,10 +31,8 @@ import type { Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
 
-// ---------------------------------------------------------------------------
 // Minimal local interface for the Manifold WASM module (avoids `any`).
 // We only model the subset we actually call; the cast is at one boundary point.
-// ---------------------------------------------------------------------------
 
 interface ManifoldMesh {
   readonly numProp: number;
@@ -84,10 +82,6 @@ interface ManifoldModule {
   setup(): void;
 }
 
-// ---------------------------------------------------------------------------
-// Module-level singleton — WASM init is expensive; do it once.
-// ---------------------------------------------------------------------------
-
 let _cachedModule: ManifoldModule | null = null;
 
 async function getManifoldModule(): Promise<ManifoldModule> {
@@ -100,10 +94,6 @@ async function getManifoldModule(): Promise<ManifoldModule> {
   _cachedModule = raw as ManifoldModule;
   return _cachedModule;
 }
-
-// ---------------------------------------------------------------------------
-// Euler rotation (radians) → ManifoldShape.rotate (degrees) helper.
-// ---------------------------------------------------------------------------
 
 const RAD_TO_DEG = 180 / Math.PI;
 
@@ -127,10 +117,8 @@ function applyTransform(
   return translated;
 }
 
-// ---------------------------------------------------------------------------
 // Entity → Manifold solid tessellation.
 // Returns null for unsupported / degenerate input.
-// ---------------------------------------------------------------------------
 
 /**
  * Build a Manifold from triangles, merging coincident corners so the result is an oriented
@@ -261,10 +249,6 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
   }
 }
 
-// ---------------------------------------------------------------------------
-// MeshData extraction from a Manifold solid.
-// ---------------------------------------------------------------------------
-
 function manifoldToMeshData(solid: ManifoldShape): MeshData | null {
   if (solid.isEmpty()) return null;
   const mesh = solid.getMesh();
@@ -283,10 +267,6 @@ function manifoldToMeshData(solid: ManifoldShape): MeshData | null {
 
   return { positions, indices };
 }
-
-// ---------------------------------------------------------------------------
-// Kernel factory — the only export.
-// ---------------------------------------------------------------------------
 
 /**
  * Initialize the Manifold WASM module and return a synchronous GeometryKernel.

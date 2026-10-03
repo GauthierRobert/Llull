@@ -25,10 +25,6 @@ import { serializeDocument, deserializeDocument } from '@core/commands/persisten
 import { documentHash } from '@mcp/liveSync';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 
-// ---------------------------------------------------------------------------
-// Disk persistence (autosave between server restarts)
-// ---------------------------------------------------------------------------
-
 /**
  * Autosave path. Override via `LLULL_AUTOSAVE_PATH`; default lives next to the
  * server bundle. Autosave is disabled inside tests (vitest sets `VITEST`, our
@@ -89,10 +85,6 @@ export function closeAllSubscribers(): void {
   _subscribers.clear();
 }
 
-// ---------------------------------------------------------------------------
-// Shared document
-// ---------------------------------------------------------------------------
-
 /** The single live document shared across all MCP sessions and the browser UI. */
 let _liveDoc: CadDocument = loadAutosave();
 
@@ -111,10 +103,6 @@ export function getLiveDoc(): CadDocument {
 export function getLiveSnapshot(): LiveSnapshotEvent {
   return { epoch: _epoch, seq: _seq, stateHash: documentHash(_liveDoc), document: _liveDoc };
 }
-
-// ---------------------------------------------------------------------------
-// SSE subscriber registry
-// ---------------------------------------------------------------------------
 
 /**
  * Active SSE subscribers — each entry is an Express `Response` whose connection
@@ -146,12 +134,8 @@ function broadcast(eventType: 'snapshot' | 'command', payload: unknown): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
 /** The mutating command that produced a new live document (broadcast as the log entry). */
-export interface LiveCommand {
+interface LiveCommand {
   readonly name: string;
   readonly params: unknown;
 }

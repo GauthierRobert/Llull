@@ -16,10 +16,6 @@
 import type { ParamsSchema } from '@core/commands/types';
 import { toToolSchemas } from '@core/commands/registry';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /**
  * MCP tool annotations — safety hints for AI agents and MCP clients.
  * Field names follow the MCP Tool Annotations spec.
@@ -57,10 +53,6 @@ export interface McpToolDefinition {
    */
   annotations?: McpToolAnnotations;
 }
-
-// ---------------------------------------------------------------------------
-// Builder
-// ---------------------------------------------------------------------------
 
 /**
  * Generate one `McpToolDefinition` per registered command.

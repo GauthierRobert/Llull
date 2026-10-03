@@ -13,14 +13,14 @@ import fs from 'fs';
 import path from 'path';
 import type { CadDocument } from '@core/model/types';
 
-export interface Autosaver {
+interface Autosaver {
   schedule(doc: CadDocument): void;
   flush(): void;
   /** Flush, then make every later `schedule` write synchronously (shutdown path). */
   stop(): void;
 }
 
-export interface AutosaverOptions {
+interface AutosaverOptions {
   filePath: string;
   debounceMs: number;
   serialize: (doc: CadDocument) => string;

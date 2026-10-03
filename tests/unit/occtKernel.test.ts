@@ -181,7 +181,6 @@ describe('meshDataToTopoDSShape — static / contract tests', () => {
     // We do NOT call createOcctKernel() here — that would load 63 MB WASM.
     const mod = await import('@kernel-occt/occtKernel');
     expect(typeof mod.createOcctKernel).toBe('function');
-    expect(typeof mod.__resetOccModule).toBe('function');
   });
 });
 

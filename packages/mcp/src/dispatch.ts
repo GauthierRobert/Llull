@@ -23,10 +23,6 @@ import type { CadDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
 
-// ---------------------------------------------------------------------------
-// Result types
-// ---------------------------------------------------------------------------
-
 /** A single content block in an MCP tool result (text variant). */
 export interface McpTextContent {
   type: 'text';
@@ -75,10 +71,6 @@ function codeText(data: unknown): string | null {
     ? data.text
     : null;
 }
-
-// ---------------------------------------------------------------------------
-// Single shaping implementation
-// ---------------------------------------------------------------------------
 
 /**
  * Shape a pre-computed command result into an MCP `CallToolResult` payload.
@@ -138,10 +130,6 @@ export function shapeToolCallContent(result: {
 
   return { content, isError: result.isError };
 }
-
-// ---------------------------------------------------------------------------
-// Dispatcher (thin wrapper for pure unit tests)
-// ---------------------------------------------------------------------------
 
 /**
  * Apply an MCP tool call to a document.

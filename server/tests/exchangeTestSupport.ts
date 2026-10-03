@@ -15,7 +15,7 @@ export const CADQUERY_PYTHON =
   configuredPython === 'off' ? '/nonexistent/python' : configuredPython;
 export const BUILD123D_PYTHON = process.env['LLULL_TEST_BUILD123D_PYTHON'];
 
-export interface ProbeResult {
+interface ProbeResult {
   readonly cadquery: string | null;
   readonly build123d: string | null;
 }

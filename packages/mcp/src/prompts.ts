@@ -16,10 +16,6 @@
  * @pure — no side effects; only the provided args determine the output.
  */
 
-// ---------------------------------------------------------------------------
-// Types (minimal, mirrors MCP PromptMessage / Prompt schema shapes)
-// ---------------------------------------------------------------------------
-
 /**
  * A single message in a prompt result.
  * Mirrors the MCP `PromptMessage` schema (role + text content).
@@ -61,18 +57,10 @@ export interface McpPromptResult {
   messages: McpPromptMessage[];
 }
 
-// ---------------------------------------------------------------------------
-// Internal template definition shape
-// ---------------------------------------------------------------------------
-
 interface PromptTemplate {
   descriptor: McpPromptDescriptor;
   buildMessages: (args: Record<string, string>) => McpPromptMessage[];
 }
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
 
 function userMsg(text: string): McpPromptMessage {
   return { role: 'user', content: { type: 'text', text } };
@@ -81,10 +69,6 @@ function userMsg(text: string): McpPromptMessage {
 function assistantMsg(text: string): McpPromptMessage {
   return { role: 'assistant', content: { type: 'text', text } };
 }
-
-// ---------------------------------------------------------------------------
-// Template: model_bracket
-// ---------------------------------------------------------------------------
 
 /**
  * @prompt model_bracket
@@ -193,10 +177,6 @@ const modelBracket: PromptTemplate = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Template: orthographic_setup
-// ---------------------------------------------------------------------------
-
 /**
  * @prompt orthographic_setup
  * Guides an agent through orienting/inspecting the scene from standard
@@ -266,10 +246,6 @@ const orthographicSetup: PromptTemplate = {
     ];
   },
 };
-
-// ---------------------------------------------------------------------------
-// Template: parametric_part
-// ---------------------------------------------------------------------------
 
 /**
  * @prompt parametric_part
@@ -366,10 +342,6 @@ const parametricPart: PromptTemplate = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Template: design_building
-// ---------------------------------------------------------------------------
-
 /**
  * @prompt design_building
  * Guides an agent through the construction (AEC/BIM) workflow: levels → grid → walls →
@@ -416,10 +388,6 @@ const designBuilding: PromptTemplate = {
     ];
   },
 };
-
-// ---------------------------------------------------------------------------
-// Template: design_factory
-// ---------------------------------------------------------------------------
 
 /**
  * @prompt design_factory
@@ -471,10 +439,6 @@ const designFactory: PromptTemplate = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
-
 const TEMPLATES: ReadonlyArray<PromptTemplate> = [
   modelBracket,
   orthographicSetup,
@@ -484,10 +448,6 @@ const TEMPLATES: ReadonlyArray<PromptTemplate> = [
 ];
 
 const TEMPLATE_MAP = new Map<string, PromptTemplate>(TEMPLATES.map((t) => [t.descriptor.name, t]));
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Return the list of all registered prompt template descriptors.

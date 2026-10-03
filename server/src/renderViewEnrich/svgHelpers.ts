@@ -16,10 +16,6 @@ export function computeOrthoHalf(data: RenderViewData): number {
   return (radius < 0.1 ? 1 : radius) * 1.2 * 1.2;
 }
 
-// ---------------------------------------------------------------------------
-// SVG composition utilities
-// ---------------------------------------------------------------------------
-
 /**
  * Extract the inner content of an SVG string (strips outer `<svg ...>` and `</svg>` tags).
  * Returns the raw inner XML string.

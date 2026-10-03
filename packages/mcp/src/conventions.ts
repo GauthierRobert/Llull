@@ -11,10 +11,6 @@
  * @pure
  */
 
-// ---------------------------------------------------------------------------
-// Convention guide content (text/markdown)
-// ---------------------------------------------------------------------------
-
 /**
  * The full modeling conventions guide as a Markdown string.
  *
