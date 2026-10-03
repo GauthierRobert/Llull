@@ -7,11 +7,7 @@
 import type { McpToolDefinition } from '@mcp/index';
 
 /** Augment the core render_view tool definition with the server-side enrichment params. */
-export function augmentRenderViewTool(t: McpToolDefinition): {
-  name: string;
-  description: string;
-  inputSchema: { type: 'object'; properties?: Record<string, object>; required?: string[] };
-} {
+export function augmentRenderViewTool(t: McpToolDefinition): McpToolDefinition {
   // Augment the core render_view schema with server-side enrichment params.
   // The core schema already has: view, width, height.
   // We add: turntable, isolate, showDimensions, section.
@@ -88,16 +84,12 @@ export function augmentRenderViewTool(t: McpToolDefinition): {
     },
   };
   return {
-    name: t.name,
+    ...t,
     description:
       t.description +
       ' [Server enrichments available: turntable (multi-frame strip), isolate (highlight entity), ' +
       'showDimensions (bbox labels), section (cut-plane view), showAxes (world triad, default on), ' +
       'showGrid (ground grid, default on), showLabels (entity id/name labels + key-point markers, default off).]',
-    inputSchema: augmented as {
-      type: 'object';
-      properties?: Record<string, object>;
-      required?: string[];
-    },
+    inputSchema: augmented as McpToolDefinition['inputSchema'],
   };
 }

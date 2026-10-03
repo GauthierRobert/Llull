@@ -467,10 +467,10 @@ describe('shapeToolCallContent code blocks', () => {
     expect(nullData.content).toHaveLength(2);
   });
 
-  it('applies to the real export_code result through applyMcpToolCall', async () => {
-    const { applyMcpToolCall } = await import('@mcp/dispatch');
+  it('applies to the real export_code result through applyToolCall', async () => {
+    const { applyToolCall } = await import('../helpers/applyToolCall');
     const doc = docWithBox();
-    const result = applyMcpToolCall(doc, 'export_code', { language: 'openscad' });
+    const result = applyToolCall(doc, 'export_code', { language: 'openscad' });
     expect(result.isError).toBe(false);
     const last = result.content.at(-1)!.text;
     expect(last).toContain('cube([1, 2, 3], center = true)');

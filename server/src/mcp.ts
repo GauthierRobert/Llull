@@ -1,329 +1,27 @@
 /**
  * @layer server
+ * MCP endpoint — Streamable HTTP transport (auth + rate limit + session routing only; tool logic
+ * is `./mcp/server.ts` over `@mcp`, architecture L6).
  *
- * MCP endpoint — Streamable HTTP transport over the llull command registry.
+ *   POST   /mcp  no `mcp-session-id` -> `initialize`, allocates a session; with it -> that session
+ *   GET    /mcp  SSE stream for server notifications (session id required)
+ *   DELETE /mcp  close the session (the shared document is untouched)
+ *   unknown session id -> 404; missing header on GET/DELETE -> 400
  *
- * Architecture:
- * - ALL tool logic is delegated to `core/mcp` (`buildMcpTools`, `applyMcpToolCall`).
- * - This file owns ONLY the transport wiring, auth middleware, and rate limiting.
- * - No command/geometry logic lives here (architecture L6).
- *
- * Session model (v3 — shared live document):
- * - Each MCP `initialize` handshake (POST without `mcp-session-id`) creates a new
- *   session entry: a `StreamableHTTPServerTransport` with a UUID session id, and a
- *   bound `Server` whose handlers read/write the SINGLE shared `CadDocument` from
- *   `liveDocument.ts` via `getLiveDoc` / `setLiveDoc`.
- * - Subsequent requests carry the `mcp-session-id` header; the router routes them to
- *   the existing transport.
- * - All sessions see the same document. A mutation by session A is immediately visible
- *   to session B and to the browser UI (broadcast via GET /live SSE).
- * - DELETE terminates the session transport via `onsessionclosed`; the shared document
- *   is untouched.
- *
- * UI<->MCP sync:
- *   The shared document is the single source of truth for all MCP sessions.
- *   Every mutating `tools/call` goes through `commandBus.applyCommand`, which stores the
- *   new state via `setLiveDoc` and broadcasts the command over the GET /live SSE endpoint
- *   that the browser EventSource subscribes to.
+ * All sessions share the one live document (`liveDocument.ts`). A session is removed on DELETE
+ * (`onsessionclosed`), on any transport close, or by the idle-TTL sweep (`mcp/sessions.ts`).
  */
 
 import { randomUUID } from 'node:crypto';
 import { type Request, type Response, type Router, Router as createRouter } from 'express';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import {
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-  type CallToolRequest,
-  type CallToolResult,
-  type GetPromptResult,
-} from '@modelcontextprotocol/sdk/types.js';
-import {
-  buildMcpTools,
-  shapeToolCallContent,
-  listMcpResources,
-  readMcpResource,
-  listMcpPrompts,
-  getMcpPrompt,
-  buildExchangeToolDefinitions,
-  applyExchangeToolCall,
-  buildDiscoveryToolDefinitions,
-  applyDiscoveryToolCall,
-  isPromptEnabled,
-  isToolEnabled,
-  parseToolsets,
-  toolsetOf,
-} from '@mcp/index';
+import { parseToolsets } from '@mcp/index';
 import type { ToolsetName } from '@mcp/index';
-import type { CadDocument } from '@core/model/types';
-import { getLiveDoc } from './liveDocument';
-import { applyCommand } from './commandBus';
 import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
-import { buildImageBlock, stripSvgFromData } from './renderImage';
 import { sessions, startSessionSweep } from './mcp/sessions';
 import { buildAuthMiddleware, buildMcpRateLimiter } from './mcp/middleware';
-import {
-  applyRenderViewEnrichments,
-  makeErrorResult,
-  stripEnrichParams,
-} from './mcp/renderViewEnrichment';
-import { augmentRenderViewTool } from './mcp/renderViewSchema';
-/**
- * Build a `Server` instance whose handlers are bound to the provided document
- * accessor functions.
- *
- * All sessions share the single live document from `liveDocument.ts`.
- * Mutations route through `commandBus.applyCommand` so every tools/call shares
- * the same undo/redo history as REST /command calls from the browser UI.
- *
- * @param getDoc - returns the current shared document (used for resources/read)
- */
-function buildMcpServer(
-  getDoc: () => CadDocument,
-  exchange: ExchangeOptions,
-  configuredToolsets: ReadonlySet<ToolsetName>,
-): Server {
-  const server = new Server(
-    { name: 'llull', version: '0.1.0' },
-    { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} } },
-  );
-  // Per-session toolsets: the configured set, grown by the enable_toolset discovery tool.
-  const enabledToolsets = new Set<ToolsetName>(configuredToolsets);
-
-  // tools/list — return the full registry as MCP tool definitions,
-  // with render_view augmented to advertise the server-side enrichment params,
-  server.setRequestHandler(ListToolsRequestSchema, () => {
-    const tools = buildMcpTools().map((t) => {
-      if (t.name === 'render_view') return augmentRenderViewTool(t);
-      return {
-        name: t.name,
-        description: t.description,
-        inputSchema: t.inputSchema as {
-          type: 'object';
-          properties?: Record<string, object>;
-          required?: string[];
-        },
-      };
-    });
-
-    const exchangeTools = [
-      ...buildExchangeToolDefinitions(),
-      ...buildDiscoveryToolDefinitions(),
-    ].map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema,
-      ...(t.annotations ? { annotations: t.annotations } : {}),
-    }));
-    return {
-      tools: [...tools, ...exchangeTools].filter((t) => isToolEnabled(t.name, enabledToolsets)),
-    };
-  });
-
-  // tools/call — route through commandBus so MCP edits share history + broadcast,
-  // then shape the result into MCP content blocks via the single implementation
-  // in core/mcp (shapeToolCallContent).  execute() runs exactly once (in the bus).
-  const handleToolCall = async (req: CallToolRequest): Promise<CallToolResult> => {
-    const { name, arguments: args } = req.params;
-
-    const disabledToolset = isToolEnabled(name, enabledToolsets) ? undefined : toolsetOf(name);
-    if (disabledToolset !== undefined) {
-      return makeErrorResult(
-        `Tool ${name} is disabled on this server: enable its toolset "${disabledToolset}" in ` +
-          'LLULL_TOOLSETS, call enable_toolset to load it for this session (search_tools finds ' +
-          'tools by keyword), or call it as a build_project step.',
-      );
-    }
-
-    // Discovery meta-tools — search_tools / enable_toolset (core toolset, always enabled).
-    const discovery = applyDiscoveryToolCall(name, args, enabledToolsets);
-    if (discovery !== null) {
-      if (discovery.toolsListChanged) {
-        server.sendToolListChanged().catch(() => {});
-      }
-      return discovery.result as unknown as CallToolResult;
-    }
-
-    // -----------------------------------------------------------------------
-    // Exchange tool intercept — export_step / import_step / import_code
-    // -----------------------------------------------------------------------
-    // Python-kernel I/O lives behind the injected port; document changes still
-    // route through registry commands on the shared command bus.
-    const exchangeResult = await applyExchangeToolCall(name, args, {
-      port: exchange.port,
-      getDoc,
-      applyCommand,
-      allowCodeExecution: exchange.allowCodeExecution,
-    });
-    if (exchangeResult !== null) {
-      return exchangeResult as unknown as CallToolResult;
-    }
-
-    // -----------------------------------------------------------------------
-    // render_view enrichment intercept
-    // -----------------------------------------------------------------------
-    // When the tool is render_view with server-side enrichment params present,
-    // we handle the enrichment here before (or instead of) the normal command
-    // bus path.  Enrichment params are stripped before forwarding to applyCommand
-    // so the core command never receives unknown params.
-    if (name === 'render_view' && args != null) {
-      const enrichResult = applyRenderViewEnrichments(args, getDoc);
-      if (enrichResult !== null) {
-        return enrichResult;
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // Normal path: route through the command bus
-    // -----------------------------------------------------------------------
-    // Route through the command bus — runs execute() once, records history for
-    // mutations, and broadcasts via setLiveDoc.  Query commands are skipped from
-    // history/broadcast (result.data !== undefined, same logic as the UI store).
-    const coreArgs = name === 'render_view' ? stripEnrichParams(args ?? {}) : (args ?? {});
-    const busResult = applyCommand(name, coreArgs);
-
-    // Vision loop: rasterize data.svg → PNG image block (if present).
-    // Failure is silent (buildImageBlock returns null) so a broken SVG never 500s
-    // the tool call; the text/structured content is always returned intact.
-    const imageBlock = buildImageBlock(busResult.data);
-
-    // When an image block was produced, strip the raw SVG from the text/structured
-    // content shaping input.  The multi-KB <polygon> markup is redundant alongside
-    // the PNG — it only burns agent context tokens.  All other metadata fields
-    // (bounds, camera, entityCount, width, height, view) are preserved so
-    // non-multimodal clients and programmatic agents still receive them.
-    // When no image block was produced (normal commands), shapeInput === busResult
-    // and behavior is completely unchanged.
-    const shapeInput =
-      imageBlock !== null ? { ...busResult, data: stripSvgFromData(busResult.data) } : busResult;
-
-    // Delegate all content-block assembly to the single shaping function.
-    // Cast: McpShapedResult lacks the SDK Result index signature ([x: string]: unknown)
-    // which is a type-system artifact — the runtime shape satisfies CallToolResult.
-    const shaped = shapeToolCallContent(shapeInput) as CallToolResult;
-
-    if (imageBlock !== null) {
-      // Cast: the SDK's content array type is TextContent|ImageContent|EmbeddedResource
-      // but the TypeScript union is exhaustive at compile time; at runtime the MCP
-      // spec accepts any object with a valid `type` field. The cast is equivalent to
-      // what shapeToolCallContent already does for the whole return value above.
-      (shaped.content as unknown[]).push(imageBlock);
-    }
-
-    return shaped;
-  };
-
-  // Tool failures are returned as MCP isError results, never thrown as JSON-RPC errors.
-  server.setRequestHandler(CallToolRequestSchema, async (req): Promise<CallToolResult> => {
-    try {
-      return await handleToolCall(req);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return makeErrorResult(`Tool ${req.params.name} failed: ${message}`);
-    }
-  });
-
-  // resources/list — enumerate the three read-only CAD resources
-  server.setRequestHandler(ListResourcesRequestSchema, () => {
-    return { resources: listMcpResources() };
-  });
-
-  // resources/read — return the requested resource's current content
-  server.setRequestHandler(ReadResourceRequestSchema, (req) => {
-    const { uri } = req.params;
-    const content = readMcpResource(getDoc(), uri);
-    if (content === null) {
-      throw new Error(`Unknown resource URI: ${uri}`);
-    }
-    return { contents: [content] };
-  });
-
-  // prompts/list — enumerate registered prompt templates
-  server.setRequestHandler(ListPromptsRequestSchema, () => {
-    return {
-      prompts: listMcpPrompts().filter((prompt) => isPromptEnabled(prompt.name, enabledToolsets)),
-    };
-  });
-
-  // prompts/get — resolve a prompt template by name, substituting provided args
-  server.setRequestHandler(GetPromptRequestSchema, (req): GetPromptResult => {
-    const { name, arguments: rawArgs } = req.params;
-    const args: Record<string, string> = {};
-    if (rawArgs && typeof rawArgs === 'object') {
-      for (const [k, v] of Object.entries(rawArgs)) {
-        if (typeof v === 'string') args[k] = v;
-      }
-    }
-    const result = isPromptEnabled(name, enabledToolsets) ? getMcpPrompt(name, args) : null;
-    if (result === null) {
-      throw new Error(`Unknown prompt: ${name}`);
-    }
-    // McpPromptResult is structurally identical to GetPromptResult (description? + messages[])
-    // but lacks the index signature from the SDK's Result base type.
-    return result as GetPromptResult;
-  });
-
-  return server;
-}
-
-/**
- * Allocate a new MCP session bound to the shared live document.
- *
- * Returns a `{ transport, server }` pair ready to be connected and used for the
- * first `initialize` POST.  The transport's `onsessioninitialized` callback fires
- * once the SDK assigns the session id (during `handleRequest`), at which point
- * the pair is registered in `sessions`.
- *
- * Document access: all sessions share the single live document from `liveDocument.ts`.
- * `getLiveDoc` is passed as the read accessor so `buildMcpServer` is testable in
- * isolation. Mutations go through `commandBus.applyCommand`, which broadcasts to SSE
- * subscribers via `setLiveDoc`.
- *
- * Cleanup paths (belt-and-suspenders):
- * - `onsessionclosed` fires on explicit HTTP DELETE → removes from `sessions`.
- * - `transport.onclose` fires when the underlying transport closes by ANY path
- *   (client `close()`, dropped socket, crash) → also removes from `sessions`,
- *   preventing unbounded Map growth from clients that never send DELETE.
- */
-function allocateSession(
-  exchange: ExchangeOptions,
-  enabledToolsets: ReadonlySet<ToolsetName>,
-): {
-  transport: StreamableHTTPServerTransport;
-  server: Server;
-} {
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => randomUUID(),
-
-    onsessioninitialized: (sessionId: string): void => {
-      sessions.set(sessionId, { transport, lastSeenMs: Date.now() });
-    },
-
-    onsessionclosed: (sessionId: string): void => {
-      sessions.delete(sessionId);
-    },
-  });
-
-  // Belt-and-suspenders: also clean up when the transport closes via any path
-  // (client disconnect, dropped socket, crash) not covered by onsessionclosed/DELETE.
-  // Chain so we don't clobber any handler the SDK may have already set.
-  const priorOnClose = transport.onclose;
-  transport.onclose = (): void => {
-    priorOnClose?.();
-    if (transport.sessionId) sessions.delete(transport.sessionId);
-  };
-
-  // Wire the shared live document read accessor.
-  // Mutations route through commandBus.applyCommand (not setLiveDoc directly).
-  const server = buildMcpServer(getLiveDoc, exchange, enabledToolsets);
-
-  return { transport, server };
-}
+import { buildMcpServer } from './mcp/server';
 
 /** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = core only, `all` = everything). Warns on unknown names. */
 export function toolsetsFromEnv(
@@ -336,131 +34,87 @@ export function toolsetsFromEnv(
   return enabled;
 }
 
+const errorMessage = (err: unknown): string =>
+  err instanceof Error ? err.message : 'Unknown MCP error';
+
 /**
- * Build and return the Express Router that mounts the MCP endpoint.
- *
- * Mount in `index.ts` with:
- *   `app.use('/mcp', buildMcpRouter());`
- *
- * Exposed routes:
- *   POST   /mcp  — MCP Streamable HTTP (initialize + tools/list + tools/call)
- *   GET    /mcp  — SSE stream for server-initiated notifications (MCP spec)
- *   DELETE /mcp  — close session, free its document
- *
- * Session lifecycle:
- *   1. POST without `mcp-session-id` → new session (new UUID + empty document).
- *   2. POST/GET with `mcp-session-id` → route to existing session's transport.
- *   3. DELETE with `mcp-session-id` → SDK calls onsessionclosed → session removed.
- *   4. GET/DELETE without `mcp-session-id` header → 400 (header required).
- *   5. Any request with an unknown session id → 404.
- *
  * @param exchange - STEP/code exchange port (defaults to the environment-configured Python bridge).
- * @param enabledToolsets - toolsets exposed by tools/list + tools/call (defaults to `LLULL_TOOLSETS`).
+ * @param enabledToolsets - starting toolsets for each session (defaults to `LLULL_TOOLSETS`).
  */
 export function buildMcpRouter(
   exchange: ExchangeOptions = exchangeOptionsFromEnv(),
   enabledToolsets: ReadonlySet<ToolsetName> = toolsetsFromEnv(),
 ): Router {
-  // Start the background idle-TTL sweep (no-op if already running).
   startSessionSweep();
-
   const router = createRouter();
-  const auth = buildAuthMiddleware();
-  const limiter = buildMcpRateLimiter();
+  router.use(buildAuthMiddleware());
+  router.use(buildMcpRateLimiter());
 
-  // Apply auth + rate limit to all MCP routes
-  router.use(auth);
-  router.use(limiter);
+  /** Transport + bound `Server`; the session registers itself once the SDK assigns its id. */
+  const allocateSession = (): StreamableHTTPServerTransport => {
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (sessionId) => {
+        sessions.set(sessionId, { transport, lastSeenMs: Date.now() });
+      },
+      onsessionclosed: (sessionId) => {
+        sessions.delete(sessionId);
+      },
+    });
+    // Also forget the session on any other close path (dropped socket, client close, crash).
+    const priorOnClose = transport.onclose;
+    transport.onclose = (): void => {
+      priorOnClose?.();
+      if (transport.sessionId) sessions.delete(transport.sessionId);
+    };
+    return transport;
+  };
 
-  /**
-   * Route a request to an existing session's transport.
-   * Returns `true` if the session id header was present (response may be an error).
-   * Returns `false` if no session id header — caller handles as a new-session request.
-   */
+  /** Route to the session named by the header; false when the header is absent. */
   const routeToExistingSession = async (req: Request, res: Response): Promise<boolean> => {
     const sessionId = req.headers['mcp-session-id'];
     if (typeof sessionId !== 'string') return false;
-
     const entry = sessions.get(sessionId);
     if (!entry) {
       res.status(404).json({ error: `Unknown or expired session: ${sessionId}` });
-      return true; // handled (with error response)
+      return true;
     }
-
-    // Touch the session so the idle-TTL sweep never evicts an active session.
-    entry.lastSeenMs = Date.now();
-
+    entry.lastSeenMs = Date.now(); // keeps the idle sweep away from active sessions
     try {
       await entry.transport.handleRequest(req, res, req.body as unknown);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown MCP error';
-      console.error(`[/mcp] session ${sessionId} error:`, msg);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'MCP internal error.' });
-      }
+      console.error(`[/mcp] session ${sessionId} error:`, errorMessage(err));
+      if (!res.headersSent) res.status(500).json({ error: 'MCP internal error.' });
     }
     return true;
   };
 
-  /**
-   * POST handler:
-   * - If `mcp-session-id` is present → route to existing session.
-   * - Otherwise → allocate a new session (the `initialize` handshake).
-   */
   router.post('/', (req: Request, res: Response) => {
     void (async () => {
-      // Route to existing session if session id header is present.
-      const handled = await routeToExistingSession(req, res);
-      if (handled) return;
-
-      // No session id → this is an `initialize` request; allocate a new session.
-      const { transport, server } = allocateSession(exchange, enabledToolsets);
-
+      if (await routeToExistingSession(req, res)) return;
+      const transport = allocateSession();
       try {
-        await server.connect(transport as Transport);
+        await buildMcpServer(exchange, enabledToolsets).connect(transport as Transport);
         await transport.handleRequest(req, res, req.body as unknown);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Unknown MCP error';
-        console.error('[/mcp] new session error:', msg);
-        // Release the connected transport/server to avoid an orphaned SSE stream
-        // or Server instance when initialization fails mid-flight.
-        await transport.close().catch(() => {});
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'MCP internal error.' });
+        console.error('[/mcp] new session error:', errorMessage(err));
+        await transport.close().catch(() => {}); // no orphaned stream/Server after a failed init
+        if (!res.headersSent) res.status(500).json({ error: 'MCP internal error.' });
+      }
+    })();
+  });
+
+  const requireSession =
+    (method: 'GET' | 'DELETE') =>
+    (req: Request, res: Response): void => {
+      void (async () => {
+        if (!(await routeToExistingSession(req, res))) {
+          res.status(400).json({ error: `mcp-session-id header required for ${method}.` });
         }
-      }
-    })();
-  });
-
-  /**
-   * GET handler — SSE stream for server-initiated notifications.
-   * Requires an existing session id (SSE is only valid for live sessions).
-   */
-  router.get('/', (req: Request, res: Response) => {
-    void (async () => {
-      const sessionId = req.headers['mcp-session-id'];
-      if (typeof sessionId !== 'string') {
-        res.status(400).json({ error: 'mcp-session-id header required for GET.' });
-        return;
-      }
-      await routeToExistingSession(req, res);
-    })();
-  });
-
-  /**
-   * DELETE handler — close session and free its document.
-   * The SDK's handleDeleteRequest calls onsessionclosed → removes from sessions map.
-   */
-  router.delete('/', (req: Request, res: Response) => {
-    void (async () => {
-      const sessionId = req.headers['mcp-session-id'];
-      if (typeof sessionId !== 'string') {
-        res.status(400).json({ error: 'mcp-session-id header required for DELETE.' });
-        return;
-      }
-      await routeToExistingSession(req, res);
-    })();
-  });
+      })();
+    };
+  router.get('/', requireSession('GET'));
+  router.delete('/', requireSession('DELETE'));
 
   return router;
 }

@@ -8,13 +8,8 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { listCommands } from '@core/commands/registry';
-import {
-  buildMcpTools,
-  applyMcpToolCall,
-  listMcpResources,
-  readMcpResource,
-  CAD_RESOURCE_URIS,
-} from '@mcp/index';
+import { buildMcpTools, listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from '@mcp/index';
+import { applyToolCall } from '../helpers/applyToolCall';
 
 // ---------------------------------------------------------------------------
 // buildMcpTools
@@ -57,13 +52,13 @@ describe('buildMcpTools()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// applyMcpToolCall — happy path
+// applyToolCall — happy path
 // ---------------------------------------------------------------------------
 
-describe('applyMcpToolCall() — known command', () => {
+describe('applyToolCall() — known command', () => {
   it('add_box: returns a new document containing the box', () => {
     const doc = createEmptyDocument();
-    const result = applyMcpToolCall(doc, 'add_box', { size: [2, 2, 2] });
+    const result = applyToolCall(doc, 'add_box', { size: [2, 2, 2] });
 
     expect(result.isError).toBe(false);
     expect(result.document).not.toBe(doc);
@@ -75,7 +70,7 @@ describe('applyMcpToolCall() — known command', () => {
 
   it('add_box: affected contains the new entity id', () => {
     const doc = createEmptyDocument();
-    const result = applyMcpToolCall(doc, 'add_box', { size: [2, 2, 2] });
+    const result = applyToolCall(doc, 'add_box', { size: [2, 2, 2] });
 
     expect(result.affected).toHaveLength(1);
     expect(result.document.order).toContain(result.affected[0]);
@@ -83,7 +78,7 @@ describe('applyMcpToolCall() — known command', () => {
 
   it('add_box: first content block is summary text mentioning "box"', () => {
     const doc = createEmptyDocument();
-    const result = applyMcpToolCall(doc, 'add_box', { size: [1, 1, 1] });
+    const result = applyToolCall(doc, 'add_box', { size: [1, 1, 1] });
 
     // add_box produces affected ids → content has 2 blocks: summary + affected
     expect(result.content.length).toBeGreaterThanOrEqual(1);
@@ -95,7 +90,7 @@ describe('applyMcpToolCall() — known command', () => {
 
   it('add_box: second content block carries the affected entity id', () => {
     const doc = createEmptyDocument();
-    const result = applyMcpToolCall(doc, 'add_box', { size: [1, 1, 1] });
+    const result = applyToolCall(doc, 'add_box', { size: [1, 1, 1] });
 
     // shapeToolCallContent appends an "Affected entity ids: ..." block when affected is non-empty
     expect(result.content).toHaveLength(2);
@@ -104,31 +99,31 @@ describe('applyMcpToolCall() — known command', () => {
 });
 
 // ---------------------------------------------------------------------------
-// applyMcpToolCall — unknown tool
+// applyToolCall — unknown tool
 // ---------------------------------------------------------------------------
 
-describe('applyMcpToolCall() — unknown tool name', () => {
+describe('applyToolCall() — unknown tool name', () => {
   it('returns isError true', () => {
     const doc = createEmptyDocument();
-    const result = applyMcpToolCall(doc, 'nonexistent_tool', {});
+    const result = applyToolCall(doc, 'nonexistent_tool', {});
     expect(result.isError).toBe(true);
   });
 
   it('document is the same reference as input (unchanged)', () => {
     const doc = createEmptyDocument();
-    const result = applyMcpToolCall(doc, 'nonexistent_tool', {});
+    const result = applyToolCall(doc, 'nonexistent_tool', {});
     expect(result.document).toBe(doc);
   });
 
   it('affected is empty', () => {
     const doc = createEmptyDocument();
-    const result = applyMcpToolCall(doc, 'nonexistent_tool', {});
+    const result = applyToolCall(doc, 'nonexistent_tool', {});
     expect(result.affected).toHaveLength(0);
   });
 
   it('content text describes the unknown command', () => {
     const doc = createEmptyDocument();
-    const result = applyMcpToolCall(doc, 'nonexistent_tool', {});
+    const result = applyToolCall(doc, 'nonexistent_tool', {});
     expect(result.content[0]!.text).toMatch(/unknown command/i);
   });
 });
@@ -137,18 +132,18 @@ describe('applyMcpToolCall() — unknown tool name', () => {
 // Purity
 // ---------------------------------------------------------------------------
 
-describe('applyMcpToolCall() — purity', () => {
+describe('applyToolCall() — purity', () => {
   it('input document is not mutated by a successful command', () => {
     const doc = createEmptyDocument();
     const snapshot = JSON.stringify(doc);
-    applyMcpToolCall(doc, 'add_box', { size: [3, 3, 3] });
+    applyToolCall(doc, 'add_box', { size: [3, 3, 3] });
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
   it('input document is not mutated by an unknown command', () => {
     const doc = createEmptyDocument();
     const snapshot = JSON.stringify(doc);
-    applyMcpToolCall(doc, 'unknown_xyz', {});
+    applyToolCall(doc, 'unknown_xyz', {});
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });
@@ -269,7 +264,7 @@ describe('readMcpResource() — cad://scene', () => {
 
   it('reflects the entity count after a box is added', () => {
     const doc = createEmptyDocument();
-    const afterAdd = applyMcpToolCall(doc, 'add_box', { size: [1, 1, 1] }).document;
+    const afterAdd = applyToolCall(doc, 'add_box', { size: [1, 1, 1] }).document;
     const content = readMcpResource(afterAdd, 'cad://scene');
     const parsed = JSON.parse(content!.text) as Record<string, unknown>;
     expect(parsed['entityCount']).toBe(1);

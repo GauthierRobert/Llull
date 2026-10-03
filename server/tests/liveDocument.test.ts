@@ -4,7 +4,7 @@
  * Unit tests for liveDocument.ts
  *
  * Covers:
- *   (a) A mutating MCP tools/call (via applyMcpToolCall + setLiveDoc) updates the
+ *   (a) A mutating MCP tools/call (via applyToolCall + setLiveDoc) updates the
  *       shared live document: getLiveDoc() reflects the new state.
  *   (b) subscribeLive immediately emits the current snapshot; setLiveDoc broadcasts
  *       a fresh snapshot to every subscriber.
@@ -20,7 +20,7 @@ import {
   _resetLiveDoc,
   _subscriberCount,
 } from '../src/liveDocument';
-import { applyMcpToolCall } from '@mcp/dispatch';
+import { applyToolCall } from '../../tests/helpers/applyToolCall';
 import { createEmptyDocument } from '@core/model/types';
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ beforeEach(() => {
 // (a) Mutating MCP tool call updates the shared live document
 // ---------------------------------------------------------------------------
 
-describe('setLiveDoc via applyMcpToolCall', () => {
+describe('setLiveDoc via applyToolCall', () => {
   it('starts with an empty document (0 entities)', () => {
     const doc = getLiveDoc();
     expect(Object.keys(doc.entities)).toHaveLength(0);
@@ -69,7 +69,7 @@ describe('setLiveDoc via applyMcpToolCall', () => {
 
   it('after an add_box tool call, getLiveDoc() contains 1 entity', () => {
     const doc = getLiveDoc();
-    const result = applyMcpToolCall(doc, 'add_box', {
+    const result = applyToolCall(doc, 'add_box', {
       size: [1, 1, 1],
       position: [0, 0, 0],
     });
@@ -85,14 +85,14 @@ describe('setLiveDoc via applyMcpToolCall', () => {
 
   it('successive tool calls accumulate entities in the shared doc', () => {
     // First call
-    const r1 = applyMcpToolCall(getLiveDoc(), 'add_box', {
+    const r1 = applyToolCall(getLiveDoc(), 'add_box', {
       size: [1, 1, 1],
       position: [0, 0, 0],
     });
     setLiveDoc(r1.document);
 
     // Second call reads the updated live doc
-    const r2 = applyMcpToolCall(getLiveDoc(), 'add_box', {
+    const r2 = applyToolCall(getLiveDoc(), 'add_box', {
       size: [2, 2, 2],
       position: [5, 0, 0],
     });
@@ -104,7 +104,7 @@ describe('setLiveDoc via applyMcpToolCall', () => {
 
   it('unknown tool name leaves the live document unchanged', () => {
     const before = getLiveDoc();
-    const result = applyMcpToolCall(before, 'no_such_tool', {});
+    const result = applyToolCall(before, 'no_such_tool', {});
     setLiveDoc(result.document);
 
     expect(result.isError).toBe(true);
@@ -120,7 +120,7 @@ describe('setLiveDoc via applyMcpToolCall', () => {
 describe('subscribeLive', () => {
   it('immediately writes the current document as an SSE data event on subscribe', () => {
     // Seed the live doc with one entity so the snapshot is non-trivial.
-    const r = applyMcpToolCall(getLiveDoc(), 'add_box', {
+    const r = applyToolCall(getLiveDoc(), 'add_box', {
       size: [1, 1, 1],
       position: [0, 0, 0],
     });
@@ -154,7 +154,7 @@ describe('subscribeLive', () => {
     expect(resB.written).toHaveLength(1);
 
     // Now a mutation arrives.
-    const r = applyMcpToolCall(getLiveDoc(), 'add_box', {
+    const r = applyToolCall(getLiveDoc(), 'add_box', {
       size: [1, 1, 1],
       position: [0, 0, 0],
     });
@@ -181,7 +181,7 @@ describe('subscribeLive', () => {
     // Unsubscribe before the mutation.
     unsubscribe();
 
-    const r = applyMcpToolCall(getLiveDoc(), 'add_box', {
+    const r = applyToolCall(getLiveDoc(), 'add_box', {
       size: [1, 1, 1],
       position: [0, 0, 0],
     });
@@ -204,7 +204,7 @@ describe('subscribeLive', () => {
   });
 
   it('_resetLiveDoc restores an empty document', () => {
-    const r = applyMcpToolCall(getLiveDoc(), 'add_box', {
+    const r = applyToolCall(getLiveDoc(), 'add_box', {
       size: [1, 1, 1],
       position: [0, 0, 0],
     });
