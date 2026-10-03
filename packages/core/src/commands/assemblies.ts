@@ -24,6 +24,7 @@ import { nextId } from '../lib/id';
 import { pruneGroupMembers } from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { noOp } from './commandResult';
+import { add3 } from '../lib/vec3';
 
 /**
  * Build a deterministic expanded-entity id from the instance id and the
@@ -35,6 +36,9 @@ import { noOp } from './commandResult';
  *
  * @pure
  */
+const ORIGIN: Vec3 = [0, 0, 0];
+const UNIT_SCALE: Vec3 = [1, 1, 1];
+
 function expandedId(instanceId: string, sourceEntityId: string): string {
   return `expanded::${instanceId}::${sourceEntityId}`;
 }
@@ -75,19 +79,11 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
       const rotatedPos: Vec3 = hasRotation ? applyEulerXYZ(localPos, [0, 0, 0], rot) : localPos;
 
       // 3. Translate by the instance world position.
-      const worldPos: Vec3 = [
-        rotatedPos[0] + pos[0],
-        rotatedPos[1] + pos[1],
-        rotatedPos[2] + pos[2],
-      ];
+      const worldPos = add3(rotatedPos, pos);
 
       // 4. Accumulate rotation (add Euler angles — approximate but consistent with the
       //    rest of the command layer which uses additive Euler).
-      const worldRot: Vec3 = [
-        childEntity.rotation[0] + rot[0],
-        childEntity.rotation[1] + rot[1],
-        childEntity.rotation[2] + rot[2],
-      ];
+      const worldRot = add3(childEntity.rotation, rot);
 
       return {
         ...childEntity,
@@ -207,21 +203,13 @@ export const createComponent = defineCommand({
   },
 });
 
-function toVec3(value: readonly unknown[] | undefined, fallback: Vec3): Vec3 {
-  if (value === undefined) return fallback;
-  const [x, y, z] = value;
-  return [Number(x), Number(y), Number(z)];
-}
-
 /**
  * @command insert_instance
  * @pure
  * @layer core/commands
  * @affects [newInstanceId]
  * @invariant componentId must exist in doc.components
- * @invariant position, rotation, scale components must be finite; non-finite values -> no-op
  * @failure unknown componentId -> no-op, affected:[]
- * @failure non-finite transform values -> no-op, affected:[]
  */
 export const insertInstance = defineCommand({
   name: 'insert_instance',
@@ -246,21 +234,12 @@ export const insertInstance = defineCommand({
     doc,
     { componentId, position: rawPosition, rotation: rawRotation, scale: rawScale },
   ): CommandResult => {
-    const position = toVec3(rawPosition, [0, 0, 0]);
-    const rotation = toVec3(rawRotation, [0, 0, 0]);
-    const scale = toVec3(rawScale, [1, 1, 1]);
+    const position = rawPosition ?? ORIGIN;
+    const rotation = rawRotation ?? ORIGIN;
+    const scale = rawScale ?? UNIT_SCALE;
     const component = doc.components[componentId];
     if (!component) {
       return noOp(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
-    }
-
-    // Validate all transform values are finite
-    const allFinite = (...vs: number[]): boolean => vs.every((v) => Number.isFinite(v));
-    if (!allFinite(...position) || !allFinite(...rotation) || !allFinite(...scale)) {
-      return noOp(
-        doc,
-        `insert_instance: position, rotation, and scale must contain only finite numbers.`,
-      );
     }
 
     const instanceId = nextId('instance');
