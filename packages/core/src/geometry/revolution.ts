@@ -7,7 +7,7 @@
 
 import type { Vec3 } from '../model/types';
 
-export type RevolutionProfile = ReadonlyArray<readonly [number, number]>;
+type RevolutionProfile = ReadonlyArray<readonly [number, number]>;
 
 /**
  * @pure

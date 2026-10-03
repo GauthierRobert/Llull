@@ -2,7 +2,7 @@ import type { CadDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { MAX_BATCH_IDS } from './limits';
 
-export type BatchIds =
+type BatchIds =
   | { readonly ok: true; readonly existing: string[]; readonly missing: string[] }
   | { readonly ok: false; readonly result: CommandResult };
 

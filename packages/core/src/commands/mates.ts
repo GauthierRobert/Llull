@@ -18,29 +18,6 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { expandInstance } from './assemblies';
 
-// ---------------------------------------------------------------------------
-// MateRef — a reference to a named frame on an instance
-// ---------------------------------------------------------------------------
-
-/**
- * A reference to a geometric frame on an InstanceEntity.
- *
- * `instanceId` is the id of an `InstanceEntity` in `doc.entities`.
- * `frame` selects which frame to expose:
- *   'origin'  — world position of the instance origin (instance.position). Default.
- *   'axis-x'  — world direction of the instance's local +X axis after rotation.
- *   'axis-y'  — world direction of the instance's local +Y axis after rotation.
- *   'axis-z'  — world direction of the instance's local +Z axis after rotation.
- */
-export interface MateRef {
-  readonly instanceId: string;
-  readonly frame?: 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
-}
-
-// ---------------------------------------------------------------------------
-// add_mate
-// ---------------------------------------------------------------------------
-
 /**
  * @command add_mate
  * @pure
@@ -241,12 +218,8 @@ export const addMate = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// bill_of_materials
-// ---------------------------------------------------------------------------
-
 /** One row in the bill of materials output. */
-export interface BomRow {
+interface BomRow {
   /** Id of the component in doc.components. Absent for orphan instances. */
   componentId: string;
   /** Human-readable component name. '(missing)' for orphan instances (componentId not in doc.components). */

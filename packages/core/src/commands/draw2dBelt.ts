@@ -9,10 +9,6 @@ import { DEFAULT_DRAW_COLOR, fmtN, workPlanePositionField } from './draw2dShared
 import { withEntity } from './entityOps';
 import { pointsExtent } from './sceneBounds';
 
-// ---------------------------------------------------------------------------
-// draw_belt_around
-// ---------------------------------------------------------------------------
-
 /** One pulley/sprocket specification: center in local 2D frame + radius. */
 interface PulleySpec {
   center: [number, number];

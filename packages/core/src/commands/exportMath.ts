@@ -7,15 +7,7 @@ export function facetNormal(v0: Vec3, v1: Vec3, v2: Vec3): Vec3 {
   return normalize3(cross3(sub3(v1, v0), sub3(v2, v0)));
 }
 
-// ---------------------------------------------------------------------------
-// Triangle soup: a list of [v0, v1, v2] world-space triangles
-// ---------------------------------------------------------------------------
-
 export type Triangle = readonly [Vec3, Vec3, Vec3];
-
-// ---------------------------------------------------------------------------
-// Geometry helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Triangulate a convex polygon as a fan from the first vertex.
@@ -44,7 +36,3 @@ export function earClipTriangulateVerts(verts: Vec3[]): Triangle[] {
   const indexTris = earClipTriangulate(pts2d);
   return indexTris.map(([ia, ib, ic]) => [verts[ia]!, verts[ib]!, verts[ic]!] as Triangle);
 }
-
-// ---------------------------------------------------------------------------
-// Per-kind world-space triangle tessellation
-// ---------------------------------------------------------------------------

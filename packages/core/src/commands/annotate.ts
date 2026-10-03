@@ -17,10 +17,6 @@ type TextAnchor = NonNullable<TextEntity['anchor']>;
 import { nextId } from '../lib/id';
 import { withEntity } from './entityOps';
 
-// ---------------------------------------------------------------------------
-// add_text
-// ---------------------------------------------------------------------------
-
 /**
  * @command add_text
  * @pure
@@ -126,10 +122,6 @@ export const addText = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// add_dimension
-// ---------------------------------------------------------------------------
 
 /** Entity kinds that are valid targets for a radial dimension. */
 const RADIAL_KINDS: ReadonlySet<string> = new Set(['circle', 'arc', 'ellipse']);

@@ -102,7 +102,7 @@ function bridge(
  * @returns the flat vertex list (outer, then each hole, all as given), CCW index triples into it,
  *          and whether the whole region was covered (false when ear clipping stalled)
  */
-export interface Triangulation {
+interface Triangulation {
   readonly vertices: Point2[];
   readonly triangles: Array<[number, number, number]>;
   readonly complete: boolean;

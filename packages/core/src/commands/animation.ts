@@ -10,10 +10,6 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Resolve `targetId` to its kind: 'group' if found in doc.groups, 'entity' if
  * found in doc.entities, or null when absent (caller must handle null as no-op).
@@ -72,10 +68,6 @@ function withAnimation(doc: CadDocument, anim: Animation): CadDocument {
     animations: { ...doc.animations, [anim.id]: anim },
   };
 }
-
-// ---------------------------------------------------------------------------
-// animate_spin
-// ---------------------------------------------------------------------------
 
 /**
  * @command animate_spin
@@ -156,10 +148,6 @@ export const animateSpin = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// animate_oscillate
-// ---------------------------------------------------------------------------
 
 /**
  * @command animate_oscillate
@@ -264,10 +252,6 @@ export const animateOscillate = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// stop_animation
-// ---------------------------------------------------------------------------
 
 /**
  * @command stop_animation

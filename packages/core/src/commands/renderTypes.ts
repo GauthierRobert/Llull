@@ -1,10 +1,6 @@
 import type { Vec3 } from '../model/types';
 import { Bounds } from './sceneTypes';
 
-// ---------------------------------------------------------------------------
-// Public result type — a second agent depends on these field names exactly.
-// ---------------------------------------------------------------------------
-
 export interface RenderViewData {
   /** The resolved view name ('top'|'bottom'|'front'|'back'|'left'|'right'|'iso'). */
   view: string;
@@ -25,10 +21,6 @@ export interface RenderViewData {
   /** Complete, self-contained SVG document string. */
   svg: string;
 }
-
-// ---------------------------------------------------------------------------
-// Types used during rendering (internal only)
-// ---------------------------------------------------------------------------
 
 /** Polygon before depth is computed (all tessellation helpers return this). */
 export interface PreDepthPolygon {

@@ -11,10 +11,6 @@ function withNearerEndpointAt(line: LineEntity, point: Vec2): LineEntity {
   return distToStart <= distToEnd ? { ...line, start: point } : { ...line, end: point };
 }
 
-// ---------------------------------------------------------------------------
-// trim
-// ---------------------------------------------------------------------------
-
 /**
  * @command trim
  * @pure
@@ -112,10 +108,6 @@ export const trim = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// extend
-// ---------------------------------------------------------------------------
 
 /**
  * @command extend

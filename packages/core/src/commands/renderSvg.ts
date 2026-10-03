@@ -4,10 +4,6 @@ import { r2 } from './renderMath';
 import { add3, scale3 } from '../lib/vec3';
 import { type Camera, projectPoint, toScreenCoords, shade } from './renderCamera';
 
-// ---------------------------------------------------------------------------
-// SVG composition
-// ---------------------------------------------------------------------------
-
 export const MAX_POLYGONS = 4000;
 
 /** Build the complete SVG string. */

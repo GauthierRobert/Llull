@@ -11,10 +11,6 @@
 
 import type { Vec3 } from '../model/types';
 
-// ---------------------------------------------------------------------------
-// Segmentation constants (shared between render.ts and export.ts)
-// ---------------------------------------------------------------------------
-
 /** Segments used for circular cross-sections (cylinder, cone, torus ring). */
 export const SEG_CIRCLE = 24;
 
@@ -26,10 +22,6 @@ export const SEG_SPHERE_LON = 16;
 
 /** Tube cross-section segments for torus tessellation. */
 export const SEG_TORUS_TUBE = 12;
-
-// ---------------------------------------------------------------------------
-// circlePoints
-// ---------------------------------------------------------------------------
 
 /**
  * Generate `segs` equally-spaced vertices on a circle in the XY plane at height `cz` (Z-up).
@@ -52,10 +44,6 @@ export function circlePoints(cx: number, cy: number, cz: number, r: number, segs
   }
   return pts;
 }
-
-// ---------------------------------------------------------------------------
-// earClipTriangulate
-// ---------------------------------------------------------------------------
 
 /**
  * Ear-clipping triangulation for a simple (non-self-intersecting) 2D polygon.

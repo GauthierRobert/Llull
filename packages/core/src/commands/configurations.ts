@@ -16,10 +16,6 @@ import { defineCommand, z } from './schema';
 import { reEvaluateAll } from './parameters';
 import { replayHistory } from './history';
 
-// ---------------------------------------------------------------------------
-// create_configuration
-// ---------------------------------------------------------------------------
-
 /**
  * @command create_configuration
  * @pure
@@ -96,10 +92,6 @@ export const createConfiguration = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// activate_configuration
-// ---------------------------------------------------------------------------
 
 /**
  * @command activate_configuration

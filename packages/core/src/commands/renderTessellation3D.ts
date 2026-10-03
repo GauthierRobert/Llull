@@ -27,10 +27,6 @@ function makePolygon(verts: Vec3[], color: string, stroke = false): PreDepthPoly
   return { verts, color, normal, stroke };
 }
 
-// ---------------------------------------------------------------------------
-// Per-kind tessellation (Z-up document space)
-// ---------------------------------------------------------------------------
-
 export function tessellateBox(e: { position: Vec3; size: Vec3; color: string }): PreDepthPolygon[] {
   const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
   const c = e.color;

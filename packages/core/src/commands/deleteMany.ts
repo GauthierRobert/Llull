@@ -4,31 +4,11 @@
  * @layer core/commands
  */
 
-import type { EntityGroup } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { MAX_BATCH_IDS } from './limits';
 import { resolveBatchIds } from './batchIds';
-
-/**
- * Remove `removedIds` from every group's `memberIds`; a group left with fewer than 2 members is
- * dissolved (omitted from `nextGroups`, listed in `dissolvedGroups`).
- *
- * @pure
- */
-export function pruneGroupMembers(
-  groups: Readonly<Record<string, EntityGroup>> | undefined,
-  removedIds: ReadonlySet<string>,
-): { nextGroups: Record<string, EntityGroup>; dissolvedGroups: string[] } {
-  const dissolvedGroups: string[] = [];
-  const nextGroups: Record<string, EntityGroup> = {};
-  for (const group of Object.values(groups ?? {})) {
-    const prunedIds = group.memberIds.filter((memberId) => !removedIds.has(memberId));
-    if (prunedIds.length < 2) dissolvedGroups.push(group.id);
-    else nextGroups[group.id] = { ...group, memberIds: prunedIds };
-  }
-  return { nextGroups, dissolvedGroups };
-}
+import { pruneGroupMembers } from './entityOps';
 
 /**
  * @command delete_entities

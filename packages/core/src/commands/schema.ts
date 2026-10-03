@@ -22,7 +22,7 @@ import type {
 
 export { z };
 
-export type ParamsObject = z.ZodObject;
+type ParamsObject = z.ZodObject;
 
 interface Unwrapped {
   readonly core: z.ZodType;

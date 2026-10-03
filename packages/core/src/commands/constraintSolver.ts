@@ -1,10 +1,6 @@
 import type { CadDocument, Constraint, EntityRef, Vec3 } from '../model/types';
 import { evaluateExpression } from './expression';
 
-// ---------------------------------------------------------------------------
-// Internal geometry helpers
-// ---------------------------------------------------------------------------
-
 /** Resolve a 2D point [x, y] from an EntityRef. Returns null when the entity is missing. */
 function resolvePoint(doc: CadDocument, ref: EntityRef): [number, number] | null {
   const entity = doc.entities[ref.entityId];
@@ -79,10 +75,6 @@ function resolveValue(doc: CadDocument, v: number | string): number | null {
   const result = evaluateExpression(v, env);
   return result.ok ? result.value : null;
 }
-
-// ---------------------------------------------------------------------------
-// Solver
-// ---------------------------------------------------------------------------
 
 /** Per-entity 2D position deltas accumulated in one solver iteration. */
 type Delta = Map<string, [number, number]>;
@@ -317,7 +309,3 @@ export function runSolver(doc: CadDocument): {
   const converged = residual < RESIDUAL_THRESHOLD;
   return { document: buildDoc(), residual, iterations, converged };
 }
-
-// ---------------------------------------------------------------------------
-// Validation helpers for constraint shape
-// ---------------------------------------------------------------------------

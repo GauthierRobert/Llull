@@ -1,10 +1,6 @@
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { formatLength } from './units';
-// ---------------------------------------------------------------------------
-// 3. measure_area
-// ---------------------------------------------------------------------------
-
 interface MeasureAreaData {
   area: number;
   unit: string;
@@ -134,10 +130,6 @@ export const measureArea = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// 4. measure_perimeter
-// ---------------------------------------------------------------------------
 
 interface MeasurePerimeterData {
   perimeter: number;

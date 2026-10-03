@@ -3,10 +3,6 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { detectCycleOnAdd, evaluateMotionInternal } from './jointsKinematics';
-// ---------------------------------------------------------------------------
-// add_drive_relation
-// ---------------------------------------------------------------------------
-
 /**
  * @command add_drive_relation
  * @pure
@@ -128,10 +124,6 @@ export const addDriveRelation = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// delete_drive_relation
-// ---------------------------------------------------------------------------
-
 /**
  * @command delete_drive_relation
  * @pure
@@ -181,10 +173,6 @@ export const deleteDriveRelation = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// evaluate_motion (read-only query)
-// ---------------------------------------------------------------------------
-
 /**
  * @command evaluate_motion
  * @pure
@@ -230,10 +218,6 @@ export const evaluateMotion = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// bake_motion
-// ---------------------------------------------------------------------------
 
 /**
  * @command bake_motion

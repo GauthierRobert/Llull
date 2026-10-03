@@ -28,10 +28,6 @@ import {
 } from './sceneTypes';
 import { instanceBoundsFromDoc, mergeBounds } from './sceneBounds';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
-// ---------------------------------------------------------------------------
-// Snapshot
-// ---------------------------------------------------------------------------
-
 /**
  * Build a structured, read-only snapshot of the document.
  *
@@ -89,10 +85,6 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     animations,
   };
 }
-
-// ---------------------------------------------------------------------------
-// describe_scene command (read-only)
-// ---------------------------------------------------------------------------
 
 /**
  * @command describe_scene

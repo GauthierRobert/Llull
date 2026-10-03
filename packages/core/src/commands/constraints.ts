@@ -61,10 +61,6 @@ function validateConstraintShape(v: unknown): string | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// add_constraint
-// ---------------------------------------------------------------------------
-
 /**
  * @command add_constraint
  * @pure
@@ -179,10 +175,6 @@ export const addConstraint = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// delete_constraint
-// ---------------------------------------------------------------------------
-
 /**
  * @command delete_constraint
  * @pure
@@ -232,10 +224,6 @@ export const deleteConstraint = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// update_constraint
-// ---------------------------------------------------------------------------
 
 /**
  * @command update_constraint
@@ -355,10 +343,6 @@ export const updateConstraint = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// solve_constraints
-// ---------------------------------------------------------------------------
 
 /**
  * @command solve_constraints
