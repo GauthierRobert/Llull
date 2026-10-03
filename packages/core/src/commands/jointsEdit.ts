@@ -208,7 +208,11 @@ export const deleteJoint = defineCommand({
         ? ` Also removed ${removedDrIds.length} drive relation(s): ${removedDrIds.join(', ')}.`
         : '';
 
-    return noOp(newDoc, `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`);
+    return {
+      document: newDoc,
+      summary: `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`,
+      affected: [],
+    };
   },
 });
 

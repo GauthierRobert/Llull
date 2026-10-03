@@ -166,43 +166,31 @@ export const motionStudy = defineCommand({
       return noOp(doc, 'motion_study: "target" must be a non-empty string.');
     }
 
-    // Validate start / end
-    if (!Number.isFinite(start)) {
-      return noOp(doc, `motion_study: "start" must be a finite number, got ${String(start)}.`);
-    }
-    if (!Number.isFinite(end)) {
-      return noOp(doc, `motion_study: "end" must be a finite number, got ${String(end)}.`);
-    }
+    const emptyStudy = {
+      steps: [],
+      interferences: [],
+      summary: { totalSteps: 0, framesWithInterference: 0 },
+    } satisfies MotionStudyData;
 
-    // Zero-length sweep
     if (start === end) {
       return {
         document: doc,
         summary: `motion_study: start === end (${start}). Sweep has zero length — no steps to evaluate.`,
         affected: [],
-        data: {
-          steps: [],
-          interferences: [],
-          summary: { totalSteps: 0, framesWithInterference: 0 },
-        } satisfies MotionStudyData,
+        data: emptyStudy,
       };
     }
 
-    // Validate and clamp steps
     const rawSteps = steps !== undefined ? Math.round(steps) : 24;
     if (rawSteps < 2) {
       return {
         document: doc,
         summary: `motion_study: steps must be at least 2 (got ${String(steps)}). No sweep performed.`,
         affected: [],
-        data: {
-          steps: [],
-          interferences: [],
-          summary: { totalSteps: 0, framesWithInterference: 0 },
-        } satisfies MotionStudyData,
+        data: emptyStudy,
       };
     }
-    const clampedSteps = Math.min(360, Math.max(2, rawSteps));
+    const clampedSteps = Math.min(360, rawSteps);
 
     // Mode-specific validation
     if (mode === 'joint') {
@@ -234,61 +222,18 @@ export const motionStudy = defineCommand({
       let baseValues: Record<string, number>;
 
       if (mode === 'joint') {
-        // Override the specific joint value
         baseValues = { [target]: sweepValue };
       } else {
-        // mode === 'parameter': apply the parameter value and then derive joint
-        // values from it. We build a virtual doc with the parameter updated, then
-        // collect all joint values as they would be resolved against that parameter.
-        // We patch the doc's parameter value for evaluation purposes (no mutation of
-        // input doc — we derive the effective joint values inline).
-        const updatedParam = {
-          ...doc.parameters[target]!,
-          value: sweepValue,
-          expression: String(sweepValue),
-        };
-        const virtualParameters = { ...doc.parameters, [target]: updatedParam };
-
-        // Compute overrides for all joints that use a parameter expression.
-        // We resolve each joint's raw expression against the virtual parameter env.
-        const env: Record<string, number> = {};
-        for (const [name, p] of Object.entries(virtualParameters)) {
-          env[name] = p.value;
-        }
-
+        // Joints whose stored value equals the parameter's current value follow the sweep;
+        // the rest keep their stored value (drive relations propagate in evaluateMotionInternal).
+        const currentParamValue = doc.parameters[target]!.value;
         baseValues = {};
         for (const [jid, joint] of Object.entries(doc.joints)) {
           const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
-          // Only override joints that are driven by expressions (numbers stay as-is).
-          // Since set_joint_value stores the resolved number in the joint, we need
-          // to check if the joint's raw value matches the current parameter value.
-          // Strategy: apply the override for ALL joints so drive-relation propagation
-          // from the virtual parameter is reflected. But we cannot trivially know which
-          // joints reference a specific parameter since values are stored as numbers.
-          // Instead we derive the override only for joints whose stored value
-          // numerically equals the current parameter value (direct coupling).
-          // For the general case, we rely on drive relations to propagate the effect.
-          // If the joint is NOT driven by drive relations, skip it (use stored value).
-          baseValues[jid] = typeof rawValue === 'number' ? rawValue : 0;
+          const stored = typeof rawValue === 'number' ? rawValue : 0;
+          baseValues[jid] =
+            currentParamValue !== 0 && stored === currentParamValue ? sweepValue : stored;
         }
-
-        // Now inject the sweep override: joints that are driven by the parameter
-        // via drive relations will be re-evaluated in evaluateMotionInternal's topo pass.
-        // For direct joint→parameter coupling we compute the correct value:
-        // find all joints whose stored (current doc) angle/displacement equals
-        // the current parameter value and scale them proportionally.
-        const currentParamValue = doc.parameters[target]!.value;
-        if (currentParamValue !== 0) {
-          for (const [jid, joint] of Object.entries(doc.joints)) {
-            const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
-            if (typeof rawValue === 'number' && rawValue === currentParamValue) {
-              baseValues[jid] = sweepValue;
-            }
-          }
-        }
-        // Also patch any joint that directly stores the parameter value (same reference).
-        // This covers the case where set_joint_value was called with the parameter's
-        // current numeric value — we scale it to the new sweep position.
       }
 
       const { instancePositions, instanceRotations, resolvedJoints } = evaluateMotionInternal(

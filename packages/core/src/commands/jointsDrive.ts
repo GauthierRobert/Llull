@@ -156,10 +156,11 @@ export const deleteDriveRelation = defineCommand({
       driveRelationOrder: doc.driveRelationOrder.filter((drid) => drid !== id),
     };
 
-    return noOp(
-      newDoc,
-      `delete_drive_relation: removed coupling '${dr.driver}' → '${dr.driven}' (id: '${id}').`,
-    );
+    return {
+      document: newDoc,
+      summary: `delete_drive_relation: removed coupling '${dr.driver}' → '${dr.driven}' (id: '${id}').`,
+      affected: [],
+    };
   },
 });
 
