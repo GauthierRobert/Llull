@@ -3,10 +3,6 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { resolveJointValue, isValidAxis, isValidMateRef } from './jointsKinematics';
-// ---------------------------------------------------------------------------
-// add_joint
-// ---------------------------------------------------------------------------
-
 /**
  * @command add_joint
  * @pure
@@ -169,10 +165,6 @@ export const addJoint = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// delete_joint
-// ---------------------------------------------------------------------------
-
 /**
  * @command delete_joint
  * @pure
@@ -241,10 +233,6 @@ export const deleteJoint = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// set_joint_value
-// ---------------------------------------------------------------------------
 
 /**
  * @command set_joint_value

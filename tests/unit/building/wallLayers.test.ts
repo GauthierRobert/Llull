@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildPlanDrawing } from '@aec/plan';
+import { buildPlanDrawing } from '@aec/planDrawing';
 import { buildingErrors } from '@aec/validate';
 import { layerBoundaries, parseWallLayers } from '@aec/wallLayers';
-import type { TakeoffLine } from '@aec/quantities';
-import type { IfcExport } from '@aec/ifc';
+import type { TakeoffLine } from '@aec/takeoffBasics';
+import type { IfcExport } from '@aec/ifcBuild';
 import type { WallElement } from '@core/model/building';
 
 const BUILD_UP = [

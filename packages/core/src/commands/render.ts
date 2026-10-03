@@ -49,15 +49,6 @@ import {
   tessellate2DPoint,
 } from './renderTessellation2D';
 import { MAX_POLYGONS, buildSvg } from './renderSvg';
-
-export { applyEulerXYZ } from '../lib/eulerRotation';
-
-export type { RenderViewData } from './renderTypes';
-
-// ---------------------------------------------------------------------------
-// Dispatch tessellation by entity kind
-// ---------------------------------------------------------------------------
-
 function tessellateEntity(e: Entity): PreDepthPolygon[] {
   switch (e.kind) {
     // 3D solids — apply entity rotation (three.js intrinsic XYZ Euler order)
@@ -111,10 +102,6 @@ function tessellateEntity(e: Entity): PreDepthPolygon[] {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Main render function
-// ---------------------------------------------------------------------------
 
 function renderDocument(
   doc: CadDocument,
@@ -183,10 +170,6 @@ function renderDocument(
     svg,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Command definition
-// ---------------------------------------------------------------------------
 
 /**
  * @command render_view

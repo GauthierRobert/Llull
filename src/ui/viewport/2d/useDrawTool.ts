@@ -31,7 +31,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export interface DrawToolState {
+interface DrawToolState {
   /** The currently active tool. */
   activeTool: DrawToolKind;
   /** Points collected so far in the current drawing operation. */

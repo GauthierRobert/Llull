@@ -30,10 +30,10 @@ import {
   followLevelHeight,
   withoutElements,
 } from './model';
-import { regenerateBuilding } from './evaluate';
+import { regenerateBuilding } from './evaluateElements';
 import { wallLoop } from './structure';
 import { openingFitIssues } from './walls';
-import { nextMemberMark } from './industrial/members';
+import { nextMemberMark } from './industrial/memberSupport';
 
 /**
  * @command add_room

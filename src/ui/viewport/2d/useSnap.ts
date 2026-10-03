@@ -11,8 +11,9 @@
 import { useMemo } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
-import { collectSnapCandidates, snap, applyOrthoPolar } from './snapping';
-import type { SnapResult, SnapPoint, CollectOpts, OrthoPolarOpts } from './snapping';
+import { snap, applyOrthoPolar } from './snapping/resolveSnap';
+import { collectSnapCandidates } from './snapping/candidates';
+import type { SnapResult, SnapPoint, CollectOpts, OrthoPolarOpts } from './snapping/types';
 
 /** Shared empty result — avoids per-render allocation when no cursor snaps apply. */
 const NO_CANDIDATES: readonly SnapPoint[] = [];

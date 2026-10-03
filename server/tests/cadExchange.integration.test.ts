@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import { entityToTriangles } from '@core/commands/export';
+import { entityToTriangles } from '@core/commands/exportTriangulate';
 import type { PythonLanguage } from '@mcp/index';
 import { installGeometryKernel } from '../src/geometryKernel';
 import { createPythonExchangePort } from '../src/pythonExchange';

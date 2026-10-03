@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import { entityToTriangles } from '@core/commands/export';
+import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 
 let kernel: GeometryKernel;

@@ -4,9 +4,8 @@
  * Auth and rate-limit middleware for the /mcp router.
  */
 
-import type { Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
-import { hasValidBearer } from '../security';
+import type { Request, RequestHandler, Response } from 'express';
+import { buildRateLimiter, hasValidBearer } from '../security';
 
 /**
  * Bearer-token auth guard.
@@ -32,26 +31,9 @@ export function buildAuthMiddleware(): (req: Request, res: Response, next: () =>
   };
 }
 
-// ---------------------------------------------------------------------------
-// Rate limiting
-// ---------------------------------------------------------------------------
-
-/**
- * Defaults: 60 requests per minute per IP.
- * Override via `MCP_RATE_LIMIT_MAX` (requests) and `MCP_RATE_LIMIT_WINDOW_MS`.
- */
-export function buildRateLimiter(): ReturnType<typeof rateLimit> {
-  const windowMs = process.env['MCP_RATE_LIMIT_WINDOW_MS']
-    ? parseInt(process.env['MCP_RATE_LIMIT_WINDOW_MS'], 10)
-    : 60_000;
-  const max = process.env['MCP_RATE_LIMIT_MAX']
-    ? parseInt(process.env['MCP_RATE_LIMIT_MAX'], 10)
-    : 60;
-  return rateLimit({
-    windowMs,
-    max,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many requests — please slow down.' },
-  });
+/** 60 requests per minute per IP; override via `MCP_RATE_LIMIT_MAX` / `MCP_RATE_LIMIT_WINDOW_MS`. */
+export function buildMcpRateLimiter(): RequestHandler {
+  const windowMs = Number.parseInt(process.env['MCP_RATE_LIMIT_WINDOW_MS'] ?? '', 10) || 60_000;
+  const max = Number.parseInt(process.env['MCP_RATE_LIMIT_MAX'] ?? '', 10) || 60;
+  return buildRateLimiter(max, windowMs);
 }

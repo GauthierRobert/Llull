@@ -19,7 +19,7 @@ import type { Parameter } from '../model/types';
 import { evaluateExpression } from './expression';
 
 /** A single expression-substitution failure. */
-export interface ResolveError {
+interface ResolveError {
   /** The path to the key that failed, e.g. `"size[0]"` or `"radius"`. */
   readonly path: string;
   /** The original `=expr` string (including the leading `=`). */
@@ -29,7 +29,7 @@ export interface ResolveError {
 }
 
 /** Outcome of resolving a step's params against the current parameter environment. */
-export interface ResolveResult {
+interface ResolveResult {
   /** Params with all resolvable `=expr` strings replaced by their numeric values. */
   readonly resolved: unknown;
   /** One entry for each `=expr` that could not be evaluated. */

@@ -1,11 +1,10 @@
 /**
- * runwayCheck: runwayBeamCheck.
  * @layer domain-aec
  */
 
 import type { SteelMemberElement } from '@core/model/building';
 import { findProfile, sectionProperties } from '../steel/profiles';
-import { craneActions, CRANE_FACTORS, type CraneModel } from './frameModel';
+import { craneActions, CRANE_FACTORS, type CraneModel } from './frameModelTypes';
 import { lateralTorsionalReduction, sectionResistance, yieldStrength } from './steelDesign';
 import {
   BUFFER_SPEED_RATIO,
@@ -30,11 +29,11 @@ import {
   type RunwayCheckRow,
   STATIC_TEST_FACTOR,
   bufferForce,
-  round,
   wheelDeflection,
   wheelMoment,
   wheelShear,
 } from './runwayCheckModel';
+import { round } from '../numeric';
 
 export function checkBeam(
   beam: SteelMemberElement,

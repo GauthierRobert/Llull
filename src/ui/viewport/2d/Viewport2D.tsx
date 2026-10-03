@@ -1,28 +1,9 @@
 /**
  * @layer ui/viewport/2d
- *
- * The 2D orthographic drafting viewport.
- *
- * - A single r3f <Canvas frameloop="demand"> with an OrthographicCamera
- *   looking straight down the -Z axis onto the XY plane (top-down drafting view).
- * - MapControls (drei) for 2D-appropriate pan + zoom (rotation disabled).
- *   Controls are disabled while a draw tool is active so clicks are not
- *   misinterpreted as panning.
- * - Adaptive grid: minor cell step scales with zoom so lines stay readable
- *   from very-zoomed-in to very-zoomed-out. Computed by adaptiveGridStep().
- * - ScaleBar HUD: an HTML overlay showing the real-world length of a fixed
- *   pixel segment, labeled with document.units / displayPrecision.
- * - Floating-origin rendering for the 2D view: RenderOriginSyncer2D runs
- *   inside useFrame and calls setRenderOrigin when the ortho camera target
- *   drifts beyond the rebase threshold. The entities group is offset by
- *   -renderOrigin (XY only, Z=0 for a top-down view). Snap raycasts are
- *   correct because three.js resolves hits via matrixWorld which includes the
- *   group transform.
- * - StoreInvalidator2D: under frameloop="demand", calls r3f invalidate()
- *   whenever document or renderOrigin change (zoom is covered by MapControls).
- *
- * Purely presentational: reads from the store, never mutates the document
- * (PRIME DIRECTIVE). All changes go through dispatch.
+ * 2D drafting viewport: the same three.js scene through an orthographic top-down camera
+ * (MapControls pan/zoom, disabled while a draw tool is active), an adaptive grid, a ScaleBar HUD
+ * and floating-origin rendering. `frameloop="demand"`; presentational only, changes go through
+ * dispatch.
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -30,7 +11,6 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera, MapControls } from '@react-three/drei';
 import { ZoomExtents2D } from './ZoomExtents2D';
 import * as THREE from 'three';
-import type { MapControls as MapControlsImpl } from 'three-stdlib';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { Entities2D } from './Entities2D';
@@ -46,71 +26,11 @@ import type { ModifyToolPhase } from './useModifyTool';
 import { ModifyPickInteraction } from './ModifyPickInteraction';
 import { SelectPickInteraction } from './SelectPickInteraction';
 import { ScaleBar } from './ScaleBar';
-import {
-  adaptiveGridStep,
-  majorGridStep,
-  localGridPatch,
-  shouldRebase2D,
-  snapOrigin2D,
-} from './gridHelpers';
+import { adaptiveGridStep, majorGridStep, localGridPatch } from './gridHelpers';
 import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator } from '../StoreInvalidator';
-
-// ---------------------------------------------------------------------------
-// RenderOriginSyncer2D — per-frame rebase for the ortho camera
-// ---------------------------------------------------------------------------
-
-/**
- * Checks the MapControls target each frame. When the XY pan target drifts
- * beyond the rebase threshold from the current renderOrigin, calls
- * setRenderOrigin once, leaving Z = 0 (the 2D top-down plane).
- *
- * Mirrors RenderOriginSyncer in Viewport3D.tsx but operates on the ortho
- * camera's pan target (MapControls.target.x / .y) instead of OrbitControls.
- *
- * The useFrame callback runs because MapControls already calls invalidate()
- * on every camera-change event — so demand-mode frames fire on each pan/zoom
- * and the rebase check runs on those frames.
- */
-function RenderOriginSyncer2D(): null {
-  const { camera, controls } = useThree();
-  const renderOrigin = useStore((s) => s.renderOrigin);
-  const setRenderOrigin = useStore((s) => s.setRenderOrigin);
-
-  const originRef = useRef<[number, number, number]>(renderOrigin);
-  useEffect(() => {
-    originRef.current = renderOrigin;
-  }, [renderOrigin]);
-
-  useFrame(() => {
-    if (!controls) return;
-    const mapTarget = (controls as MapControlsImpl).target;
-    if (!mapTarget) return;
-
-    const ox = originRef.current[0];
-    const oy = originRef.current[1];
-    // The pan target is render-space; its document position is target + origin.
-    const worldX = mapTarget.x + ox;
-    const worldY = mapTarget.y + oy;
-
-    if (shouldRebase2D(worldX, worldY, ox, oy)) {
-      const newOrigin = snapOrigin2D(worldX, worldY);
-      const dx = newOrigin[0] - ox;
-      const dy = newOrigin[1] - oy;
-      // Shift camera + target with the entity group so the view does not jump.
-      camera.position.x -= dx;
-      camera.position.y -= dy;
-      mapTarget.x -= dx;
-      mapTarget.y -= dy;
-      (controls as MapControlsImpl).update();
-      originRef.current = newOrigin;
-      setRenderOrigin(newOrigin);
-    }
-  });
-
-  return null;
-}
+import { RenderOriginSyncer } from '../RenderOriginSyncer';
 
 // ---------------------------------------------------------------------------
 // AdaptiveGrid2D — grid whose step scales with orthographic camera zoom
@@ -352,7 +272,7 @@ function SceneContents2D({
       <ZoomExtents2D />
 
       {/* ---- Per-frame rebase check — keeps float32 coords small ---- */}
-      <RenderOriginSyncer2D />
+      <RenderOriginSyncer />
 
       {/* ---- Zoom reader: surfaces zoom to the HTML ScaleBar overlay ---- */}
       <ZoomReader onZoom={onZoom} />

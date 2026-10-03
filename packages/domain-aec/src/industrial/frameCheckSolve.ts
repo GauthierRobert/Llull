@@ -1,5 +1,4 @@
 /**
- * frameCheck: frameCheckSolve.
  * @layer domain-aec
  */
 
@@ -8,7 +7,8 @@ import type { CadDocument } from '@core/model/types';
 import { solveFrame, type FrameResult } from '@lib/frame2d';
 import { fromMm } from '../model';
 import { buildingConnectionSolids } from './evaluate';
-import { solveCombination, type FrameModel, type WindCase, type LoadCase } from './frameModel';
+import { type FrameModel, type WindCase, type LoadCase } from './frameModelTypes';
+import { solveCombination } from './frameModelSolve';
 import { boltResistance } from './steelDesign';
 
 export interface CheckRow {

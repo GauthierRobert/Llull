@@ -30,10 +30,6 @@ import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { computeSceneSnapshot } from './scene';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Default half-FOV in radians used by the viewport PerspectiveCamera (fov=60°). */
 const DEFAULT_FOV_DEG = 60;
 const HALF_FOV_RAD = (DEFAULT_FOV_DEG / 2) * (Math.PI / 180);
@@ -51,10 +47,6 @@ const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
   bottom: { azimuth: Math.PI, polar: Math.PI - 0.01 },
   iso: { azimuth: (3 * Math.PI) / 4, polar: Math.PI / 4 },
 };
-
-// ---------------------------------------------------------------------------
-// set_camera
-// ---------------------------------------------------------------------------
 
 /**
  * @command set_camera
@@ -139,10 +131,6 @@ export const setCamera = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// look_at
-// ---------------------------------------------------------------------------
-
 /**
  * @command look_at
  * @pure
@@ -201,10 +189,6 @@ export const lookAt = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// fit_view
-// ---------------------------------------------------------------------------
 
 type FitDirection = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'iso' | 'current';
 

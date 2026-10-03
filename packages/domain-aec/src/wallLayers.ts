@@ -7,7 +7,7 @@ import type { WallElement, WallLayer, WallLayerFunction } from '@core/model/buil
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, getBuilding, isFiniteNumber, noChange, withElement } from './model';
-import { regenerateBuilding } from './evaluate';
+import { regenerateBuilding } from './evaluateElements';
 
 const WALL_LAYER_FUNCTIONS = [
   'structure',

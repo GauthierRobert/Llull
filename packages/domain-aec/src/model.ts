@@ -145,7 +145,7 @@ export function sortLevelOrder(levels: Record<string, BuildingLevel>): string[] 
     .map((level) => level.id);
 }
 
-export type LevelResolution =
+type LevelResolution =
   | { readonly ok: true; readonly building: BuildingModel; readonly level: BuildingLevel }
   | { readonly ok: false; readonly reason: string };
 

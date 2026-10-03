@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  consolidationSettlement,
-  foundationCheck,
-  type ClayLayer,
-  type FoundationRow,
-  ultimateCombinations,
-} from '@aec/industrial/foundationCheck';
-import { baseReactions } from '@aec/industrial/frameModel';
+import { ultimateCombinations } from '@aec/industrial/foundationCombinations';
+import { type ClayLayer, type FoundationRow } from '@aec/industrial/foundationModel';
+import { foundationCheck } from '@aec/industrial/foundationCheckRun';
+import { consolidationSettlement } from '@aec/industrial/foundationSettlement';
+import { baseReactions } from '@aec/industrial/frameModelSolve';
 import { anchorBoltResistance, boltResistance } from '@aec/industrial/steelDesign';
 
 const HALL = { span: 24000, length: 30000 };

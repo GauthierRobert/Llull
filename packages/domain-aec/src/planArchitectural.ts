@@ -1,12 +1,11 @@
 /**
- * plan: planArchitectural.
  * @layer domain-aec
  */
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, OpeningElement, WallElement } from '@core/model/building';
 import { fromMm, toMetres } from './model';
-import { openingsOf, pointAlong, wallExtent, wallFrame } from './evaluate';
+import { openingsOf, pointAlong, wallExtent, wallFrame } from './wallGeometry';
 import { layerBoundaries } from './wallLayers';
 import {
   DIMENSION_LAYER,

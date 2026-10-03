@@ -5,15 +5,11 @@
  */
 
 import type { Entity } from '@core/model/types';
-import type { RenderViewData } from '@core/commands/render';
-import { entityBounds } from '@core/commands/scene';
+import type { RenderViewData } from '@core/commands/renderTypes';
+import { entityBounds } from '@core/commands/sceneBounds';
 import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';
 import { computeOrthoHalf, makeProjector } from './svgHelpers';
-
-// ---------------------------------------------------------------------------
-// Entity labels: per-entity id/name labels + key-point markers + legend
-// ---------------------------------------------------------------------------
 
 /**
  * Category of an entity for colour-coding in the label overlay.

@@ -4,12 +4,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import { createEmptyDocument } from '@core/model/types';
 import type { Entity, Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { entityBounds, rotatedEntityBounds } from '@core/commands/scene';
-import { entityToTriangles } from '@core/commands/export';
+import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
+import { entityBounds } from '@core/commands/sceneBounds';
+import { entityToTriangles } from '@core/commands/exportTriangulate';
 import {
   buildConeGeometry,
   buildCylinderGeometry,

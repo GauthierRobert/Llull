@@ -1,12 +1,11 @@
 /**
- * dxf: dxfWriter.
  * @layer domain-aec
  */
 
 import type { DocumentUnit, Entity, Vec2 } from '@core/model/types';
 import { hatchSegments } from '@lib/hatch';
 import { triangulatePolygon } from '@lib/triangulate';
-import { DIMENSION_LAYER, type PlanFill, type PlanPrimitive } from './plan';
+import { DIMENSION_LAYER, type PlanFill, type PlanPrimitive } from './planModel';
 
 /** AutoCAD $INSUNITS codes. */
 export const INSUNITS: Readonly<Record<DocumentUnit, number>> = {

@@ -18,7 +18,7 @@ import { fitView } from '@core/commands/camera';
 
 type Step = (doc: CadDocument) => CommandResult;
 
-export type BuildingTemplate = 'house' | 'office';
+type BuildingTemplate = 'house' | 'office';
 
 /**
  * Template steps. Ids are looked up in `created` (filled by the run loop with the element / level ids

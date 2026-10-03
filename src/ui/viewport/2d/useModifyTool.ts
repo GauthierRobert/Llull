@@ -45,7 +45,7 @@ export type ModifyToolPhase =
   /** Enter a numeric value (distance for offset/chamfer, radius for fillet). */
   | 'enter-value';
 
-export interface ModifyToolState {
+interface ModifyToolState {
   activeTool: ModifyToolKind;
   phase: ModifyToolPhase;
   /** Id of the first picked entity (target to modify). */

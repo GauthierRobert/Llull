@@ -1,5 +1,4 @@
 /**
- * frameModel: frameModelTypes.
  * @layer domain-aec
  */
 
@@ -162,7 +161,7 @@ export function craneCapacityOf(member: SteelMemberElement): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-export type HoistingClass = 'HC1' | 'HC2' | 'HC3' | 'HC4';
+type HoistingClass = 'HC1' | 'HC2' | 'HC3' | 'HC4';
 
 /** EN 1991-3 Tab. 2.5: φ2 = φ2,min + β2 vh. */
 export const HOISTING_CLASSES: Readonly<
@@ -200,7 +199,7 @@ export interface CraneModel {
   readonly wheelBase?: number;
 }
 
-export interface CraneActions {
+interface CraneActions {
   /** Dynamic factor φ2 = φ2,min + β2 vh. */
   readonly phi2: number;
   /** Crane self-weight Gc, N. */

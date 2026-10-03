@@ -36,7 +36,7 @@ import {
   closeAllSubscribers,
   getLiveDoc,
 } from './liveDocument';
-import { closeAllSessions } from './mcp';
+import { closeAllSessions } from './mcp/sessions';
 import {
   getAllowedOrigins,
   guardMutation,
@@ -50,10 +50,6 @@ import {
 import type { Server } from 'http';
 import { applyCommand, undo, redo } from './commandBus';
 import type { ExportStlData } from '@core/commands/export';
-
-// ---------------------------------------------------------------------------
-// App setup
-// ---------------------------------------------------------------------------
 
 const app = express();
 
@@ -74,10 +70,6 @@ app.use(
 
 const restLimiter = buildRestRateLimiter();
 const mutationGuard = guardMutation();
-
-// ---------------------------------------------------------------------------
-// Routes
-// ---------------------------------------------------------------------------
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', kernel: getActiveKernelName() });
@@ -139,10 +131,6 @@ app.get('/live', (req: Request, res: Response) => {
 app.get('/live/snapshot', restLimiter, (_req: Request, res: Response) => {
   res.status(200).json(getLiveSnapshot());
 });
-
-// ---------------------------------------------------------------------------
-// REST command bus — OUTSIDE /mcp auth (browser sends no Authorization header)
-// ---------------------------------------------------------------------------
 
 /**
  * POST /command — apply a named command to the shared live document.
@@ -211,10 +199,8 @@ app.post('/redo', restLimiter, mutationGuard, (_req: Request, res: Response) => 
   res.status(200).json(redo());
 });
 
-// ---------------------------------------------------------------------------
 // Export download routes — OUTSIDE /mcp auth (browser downloads cannot send
 // Authorization headers — same rationale as /live and /command).
-// ---------------------------------------------------------------------------
 
 /**
  * GET /export/stl — stream the shared live document as a downloadable STL file.
@@ -338,10 +324,6 @@ app.use('/mcp', buildMcpRouter(exchange));
 
 app.use(jsonErrorHandler);
 
-// ---------------------------------------------------------------------------
-// Start
-// ---------------------------------------------------------------------------
-
 const PORT = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 3001;
 
 /**
@@ -361,7 +343,7 @@ const delay = (ms: number): Promise<void> =>
  * Stop accepting connections, end SSE/MCP streams, drain, flush autosave. Resolves when closed.
  * Autosave is switched to synchronous-write mode first so an edit finishing mid-drain is persisted.
  */
-export async function shutdown(server: Server): Promise<void> {
+async function shutdown(server: Server): Promise<void> {
   stopAutosave();
   const closed = new Promise<void>((resolve) => server.close(() => resolve()));
   closeAllSubscribers();
@@ -373,7 +355,7 @@ export async function shutdown(server: Server): Promise<void> {
 }
 
 /** Listen on HOST:PORT, log startup, install SIGTERM/SIGINT/uncaughtException handlers. */
-export function startServer(port: number = PORT, host: string = HOST): Server {
+function startServer(port: number = PORT, host: string = HOST): Server {
   const refusal = checkBindSafety(host);
   if (refusal !== null) throw new Error(refusal);
   if (!isLoopbackAddress(host) && !process.env['MCP_AUTH_TOKEN']) {

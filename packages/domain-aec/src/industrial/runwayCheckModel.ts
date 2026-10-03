@@ -1,9 +1,3 @@
-/**
- * runwayCheck: runwayCheckModel.
- * @layer domain-aec
- */
-
-import type { HoistingClass } from './frameModel';
 import { E_STEEL } from './steelDesign';
 
 export type CraneClass = 'S2' | 'S3' | 'S4';
@@ -23,22 +17,6 @@ export const RAILS: Readonly<
   A100: { height: 95, foot: 200, mass: 74.3, inertia: 856e4 },
   flat50x30: { height: 30, foot: 50, mass: 11.8, inertia: 11.25e4 },
 };
-
-export interface RunwayCheckParams {
-  railSize?: RailSize;
-  girder?: GirderType;
-  craneCapacity?: number;
-  wheelBase?: number;
-  craneClass?: CraneClass;
-  hoistingClass?: HoistingClass;
-  hoistingSpeed?: number;
-  craneSpan?: number;
-  craneSelfWeight?: number;
-  minHookApproach?: number;
-  travelSpeed?: number;
-  bufferStiffness?: number;
-  levelId?: string;
-}
 
 export interface RunwayCheckRow {
   readonly elementId: string;
@@ -144,8 +122,4 @@ export function wheelDeflection(
   const wheels = spacing < span ? 2 : 1;
   const x = wheels === 2 ? (span - spacing) / 2 : span / 2;
   return (wheels * load * x * (3 * span ** 2 - 4 * x ** 2)) / (48 * E_STEEL * inertia);
-}
-
-export function round(value: number, digits = 2): number {
-  return Math.round(value * 10 ** digits) / 10 ** digits;
 }

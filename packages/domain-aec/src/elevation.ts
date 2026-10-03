@@ -7,7 +7,8 @@
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { entityToTriangles, type Triangle } from '@core/commands/export';
+import { type Triangle } from '@core/commands/exportMath';
+import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { fileSlug, getBuilding, isFiniteNumber, noChange, toMetres } from './model';
 import {
   BINDING_MARGIN,
@@ -26,7 +27,7 @@ import {
 import { escapeXml } from '@lib/escapeXml';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 
-export type ElevationDirection = 'north' | 'south' | 'east' | 'west';
+type ElevationDirection = 'north' | 'south' | 'east' | 'west';
 
 const ELEVATION_DIRECTIONS = [
   'north',
@@ -59,15 +60,15 @@ interface DrawItem {
 }
 
 /** Poché class of a cut region. */
-export type CutMaterial = 'steel' | 'concrete' | 'other';
+type CutMaterial = 'steel' | 'concrete' | 'other';
 
 /** Filled cut face of one entity: closed loops (even-odd, so hollow sections stay hollow). */
-export interface CutRegion {
+interface CutRegion {
   readonly material: CutMaterial;
   readonly loops: Vec2[][];
 }
 
-export interface ElevationDrawing {
+interface ElevationDrawing {
   readonly items: DrawItem[];
   readonly cutLines: Array<readonly [Vec2, Vec2]>;
   readonly cutRegions: CutRegion[];

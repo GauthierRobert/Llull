@@ -8,18 +8,17 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { shapeToolCallContent } from '@mcp/index';
 import type { CadDocument } from '@core/model/types';
-import type { RenderViewData } from '@core/commands/render';
+import type { RenderViewData } from '@core/commands/renderTypes';
 import { applyCommand } from '../commandBus';
 import { stripSvgFromData, rasterizeSvg } from '../renderImage';
+import { type RenderViewEnrichParams } from '../renderViewEnrich/types';
+import { appendEntityLabels } from '../renderViewEnrich/entityLabels';
+import { appendDimensionLabels, appendAxesAndGrid } from '../renderViewEnrich/overlays';
 import {
   buildTurntableFrames,
   buildIsolateSvg,
-  appendDimensionLabels,
-  appendAxesAndGrid,
-  appendEntityLabels,
   buildSectionSvg,
-  type RenderViewEnrichParams,
-} from '../renderViewEnrich';
+} from '../renderViewEnrich/multiPassViews';
 import { r2 } from '@core/commands/renderMath';
 import { extractSvgInner } from '../renderViewEnrich/svgHelpers';
 

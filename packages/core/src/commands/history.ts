@@ -25,10 +25,6 @@ import { hashText } from '../lib/hash';
 import { remapIds } from './regenerate';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
 
-// ---------------------------------------------------------------------------
-// Internal replay helper
-// ---------------------------------------------------------------------------
-
 /** One successfully replayed step, reported to `replayHistory`'s optional `onStep` observer. */
 export interface ReplayStepEvent {
   readonly step: FeatureStep;
@@ -143,10 +139,6 @@ export function replayHistory(
   return doc;
 }
 
-// ---------------------------------------------------------------------------
-// replay_history
-// ---------------------------------------------------------------------------
-
 /**
  * @command replay_history
  * @pure
@@ -189,10 +181,6 @@ const replayHistory_cmd = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// set_step_suppressed
-// ---------------------------------------------------------------------------
 
 /**
  * @command set_step_suppressed
@@ -245,10 +233,6 @@ const setStepSuppressed = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// edit_step_params
-// ---------------------------------------------------------------------------
 
 /**
  * @command edit_step_params
@@ -307,10 +291,6 @@ const editStepParams = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// reorder_step
-// ---------------------------------------------------------------------------
-
 /**
  * @command reorder_step
  * @pure
@@ -368,10 +348,6 @@ const reorderStep = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// delete_step
-// ---------------------------------------------------------------------------
-
 /**
  * @command delete_step
  * @pure
@@ -413,10 +389,6 @@ const deleteStep = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// insert_step
-// ---------------------------------------------------------------------------
 
 /**
  * @command insert_step
@@ -508,10 +480,6 @@ const insertStep = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// Convenience re-export — typed as CommandDefinition<unknown> for registry.ts
-// ---------------------------------------------------------------------------
 
 export const historyCommands: ReadonlyArray<CommandDefinition<unknown>> = [
   replayHistory_cmd,

@@ -1,5 +1,4 @@
 /**
- * ifc: ifcBuild.
  * @layer domain-aec
  */
 
@@ -7,7 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
-import { openingsOf, wallExtent, wallFrame } from './evaluate';
+import { openingsOf, wallExtent, wallFrame } from './wallGeometry';
 import { curvedWallArc, curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
 import {

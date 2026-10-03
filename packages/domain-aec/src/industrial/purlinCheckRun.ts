@@ -1,5 +1,4 @@
 /**
- * purlinCheck: purlinCheckRun.
  * @layer domain-aec
  */
 
@@ -7,9 +6,9 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
-import { toCsv } from '../quantities';
+import { toCsv } from '../scheduleBuild';
 import { findProfile } from '../steel/profiles';
-import { ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from './frameModel';
+import { ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from './frameModelTypes';
 import { purlinWind } from './purlinWind';
 import { yieldStrength } from './steelDesign';
 import {
@@ -29,9 +28,10 @@ import {
   type Verdict,
   type WallZone,
   type ZoneSummary,
-  round,
 } from './purlinModel';
 import { beamVerdicts, freeFlangeReduction, governing } from './purlinSection';
+import { round } from '../numeric';
+import { failureSummary } from './checkReport';
 
 /**
  * @command check_purlins
@@ -435,12 +435,7 @@ export const checkPurlins = defineCommand({
         `max utilisation purlins ${maxOf(purlinRows)}, rails ${maxOf(rows.filter((row) => row.kind === 'rail'))} ` +
         `(governing ${worst?.mark ?? '—'} ${worst?.kind ?? ''} zone ${worst?.zone ?? '—'}: ${worst?.check ?? '—'}); ` +
         `e = ${round(eAcross / 1000, 1)} m across / ${round(eAlong / 1000, 1)} m along the ridge; ` +
-        (failures.length === 0
-          ? 'all OK (preliminary).'
-          : `${failures.length} failure(s): ${failures
-              .slice(0, 8)
-              .map((row) => `${row.mark} ${row.kind} ${round(row.utilisation)}`)
-              .join(', ')}${failures.length > 8 ? ', …' : ''}.`) +
+        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary).') +
         (skipped.length > 0 ? ` Not checked: ${skipped.join(', ')}.` : ''),
       affected: [],
       data: {

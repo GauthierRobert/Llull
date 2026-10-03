@@ -153,6 +153,11 @@ export function buildRestRateLimiter(): RequestHandler {
   const max = Number.parseInt(process.env['LLULL_REST_RATE_LIMIT_MAX'] ?? '', 10) || 600;
   const windowMs =
     Number.parseInt(process.env['LLULL_REST_RATE_LIMIT_WINDOW_MS'] ?? '', 10) || 60_000;
+  return buildRateLimiter(max, windowMs);
+}
+
+/** Per-IP express-rate-limit with the standard JSON 429 body. */
+export function buildRateLimiter(max: number, windowMs: number): RequestHandler {
   return rateLimit({
     windowMs,
     max,

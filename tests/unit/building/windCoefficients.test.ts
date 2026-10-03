@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { framesOf, windCasesOf, WIND_CASES, type FrameModel } from '@aec/industrial/frameModel';
+import { windCasesOf, WIND_CASES, type FrameModel } from '@aec/industrial/frameModelTypes';
+import { framesOf } from '@aec/industrial/frameModelFrames';
 import {
   FLAT_ROOF_LIMIT,
   frameRoofAverage,
@@ -10,7 +11,7 @@ import {
   type RoofZone,
   type WindDirection,
 } from '@aec/industrial/windCoefficients';
-import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlinCheck';
+import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlinModel';
 
 const cpe = (
   roofType: RoofType,

@@ -14,10 +14,6 @@ import { defineCommand, z } from './schema';
 import { evaluateExpression, extractReferences } from './expression';
 import { regenerateParameterDependents } from './dependents';
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Topological sort of parameter names by dependency order.
  * Returns both the sorted list and the set of names that are in a cycle
@@ -120,10 +116,6 @@ export function reEvaluateAll(
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// set_parameter
-// ---------------------------------------------------------------------------
-
 /**
  * @command set_parameter
  * @pure
@@ -224,10 +216,6 @@ export const setParameter = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// delete_parameter
-// ---------------------------------------------------------------------------
 
 /**
  * @command delete_parameter

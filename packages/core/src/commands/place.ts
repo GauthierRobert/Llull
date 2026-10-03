@@ -18,11 +18,7 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds } from './scene';
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
+import { entityBounds } from './sceneBounds';
 
 /** Return a clone of `e` with a new position (pure, never mutates). */
 function moveEntityTo(e: Entity, newPosition: Vec3): Entity {
@@ -37,10 +33,6 @@ function withEntities(doc: CadDocument, updates: Entity[]): CadDocument {
   }
   return { ...doc, entities: newEntities };
 }
-
-// ---------------------------------------------------------------------------
-// align
-// ---------------------------------------------------------------------------
 
 type AlignEdge =
   | 'min-x'
@@ -209,10 +201,6 @@ export const align = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// distribute
-// ---------------------------------------------------------------------------
-
 /**
  * @command distribute
  * @pure
@@ -353,10 +341,6 @@ export const distribute = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// stack_on
-// ---------------------------------------------------------------------------
 
 /**
  * @command stack_on

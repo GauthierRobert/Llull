@@ -160,7 +160,7 @@ export function lateralTorsionalReduction(
   );
 }
 
-export interface BucklingCheck {
+interface BucklingCheck {
   readonly utilisation: number;
   readonly chiMajor: number;
   readonly chiMinor: number;

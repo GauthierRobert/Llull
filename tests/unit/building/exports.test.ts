@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { buildPlanDrawing, boundsOf, dimensionLabel } from '@aec/plan';
-import { dxfLayerName, dxfText, type DxfExport } from '@aec/dxf';
+import { boundsOf, dimensionLabel } from '@aec/planArchitectural';
+import { buildPlanDrawing } from '@aec/planDrawing';
+import { type DxfExport } from '@aec/dxfExport';
+import { dxfLayerName, dxfText } from '@aec/dxfWriter';
 import { escapeXml } from '@lib/escapeXml';
 import { fitScale, type PlanSheet } from '@aec/sheet';
-import { ifcGuid, ifcReal, ifcString, type IfcExport } from '@aec/ifc';
+import { type IfcExport } from '@aec/ifcBuild';
+import { ifcGuid, ifcReal, ifcString } from '@aec/ifcStep';
 import { fileSlug } from '@aec/model';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {

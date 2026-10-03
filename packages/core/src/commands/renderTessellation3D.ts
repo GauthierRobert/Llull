@@ -12,7 +12,7 @@ import {
   wedgeCorners,
 } from './tessellation';
 import { type PreDepthPolygon } from './renderTypes';
-import { sub3, cross3, normalize3 } from './renderMath';
+import { sub3, cross3, normalize3 } from '../lib/vec3';
 
 /** Compute outward face normal for a polygon (using the first 3 verts). */
 function faceNormal(verts: Vec3[]): Vec3 {
@@ -26,10 +26,6 @@ function makePolygon(verts: Vec3[], color: string, stroke = false): PreDepthPoly
   const normal = faceNormal(verts);
   return { verts, color, normal, stroke };
 }
-
-// ---------------------------------------------------------------------------
-// Per-kind tessellation (Z-up document space)
-// ---------------------------------------------------------------------------
 
 export function tessellateBox(e: { position: Vec3; size: Vec3; color: string }): PreDepthPolygon[] {
   const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);

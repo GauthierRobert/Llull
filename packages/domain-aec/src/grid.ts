@@ -19,7 +19,7 @@ import {
   withElement,
   elementAffected,
 } from './model';
-import { regenerateBuilding } from './evaluate';
+import { regenerateBuilding } from './evaluateElements';
 
 export function gridLabels(building: BuildingModel): Set<string> {
   return new Set(

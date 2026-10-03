@@ -30,7 +30,7 @@ import {
   withElement,
   elementAffected,
 } from './model';
-import { regenerateBuilding } from './evaluate';
+import { regenerateBuilding } from './evaluateElements';
 
 const levelIdParam = (): z.ZodOptional<z.ZodString> =>
   z

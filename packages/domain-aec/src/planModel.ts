@@ -1,13 +1,13 @@
 /**
- * plan: planModel.
  * @layer domain-aec
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BimCategory, BuildingLevel, OpeningElement, WallElement } from '@core/model/building';
-import { CATEGORY_LAYER, pointAlong, wallFrame } from './evaluate';
+import { pointAlong, wallFrame } from './wallGeometry';
+import { CATEGORY_LAYER } from './entities';
 
-export type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
+type PlanStyle = 'cut' | 'thin' | 'hidden' | 'annotation';
 
 /** Area fill of a cut: concrete / masonry hatch (ANSI31) or solid (steel). */
 export type PlanFill = 'hatch' | 'solid';

@@ -21,6 +21,7 @@ import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
+import { pruneGroupMembers } from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 
 /**
@@ -36,10 +37,6 @@ import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 function expandedId(instanceId: string, sourceEntityId: string): string {
   return `expanded::${instanceId}::${sourceEntityId}`;
 }
-
-// ---------------------------------------------------------------------------
-// expandInstance — pure world-space bake helper
-// ---------------------------------------------------------------------------
 
 /**
  * Bake an instance into world-space copies of the component's entities.
@@ -99,10 +96,6 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
       } as Entity;
     });
 }
-
-// ---------------------------------------------------------------------------
-// create_component
-// ---------------------------------------------------------------------------
 
 /**
  * @command create_component
@@ -186,17 +179,7 @@ export const createComponent = defineCommand({
 
     const newOrder = doc.order.filter((id) => !entityIds.includes(id));
 
-    // Prune removed ids from groups
-    const newGroups = { ...doc.groups };
-    for (const [gid, group] of Object.entries(newGroups)) {
-      const filtered = group.memberIds.filter((mid) => !entityIds.includes(mid));
-      if (filtered.length < 2) {
-        // Dissolve groups that would have fewer than 2 members
-        delete newGroups[gid];
-      } else if (filtered.length !== group.memberIds.length) {
-        newGroups[gid] = { ...group, memberIds: filtered };
-      }
-    }
+    const newGroups = pruneGroupMembers(doc.groups, new Set(entityIds)).nextGroups;
 
     // Prune removed ids from selection
     const newSelection = doc.selection.filter((sid) => !entityIds.includes(sid));
@@ -233,10 +216,6 @@ function toVec3(value: readonly unknown[] | undefined, fallback: Vec3): Vec3 {
   const [x, y, z] = value;
   return [Number(x), Number(y), Number(z)];
 }
-
-// ---------------------------------------------------------------------------
-// insert_instance
-// ---------------------------------------------------------------------------
 
 /**
  * @command insert_instance
@@ -317,10 +296,6 @@ export const insertInstance = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// explode_instance
-// ---------------------------------------------------------------------------
-
 /**
  * @command explode_instance
  * @pure
@@ -382,18 +357,7 @@ export const explodeInstance = defineCommand({
       newEntities[e.id] = e;
     }
 
-    // Prune instance from groups
-    const newGroups = { ...doc.groups };
-    for (const [gid, group] of Object.entries(newGroups)) {
-      if (group.memberIds.includes(id)) {
-        const filtered = group.memberIds.filter((mid) => mid !== id);
-        if (filtered.length < 2) {
-          delete newGroups[gid];
-        } else {
-          newGroups[gid] = { ...group, memberIds: filtered };
-        }
-      }
-    }
+    const newGroups = pruneGroupMembers(doc.groups, new Set([id])).nextGroups;
 
     // Prune instance from selection
     const newSelection = doc.selection.filter((sid) => sid !== id);

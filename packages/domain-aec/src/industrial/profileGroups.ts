@@ -7,7 +7,7 @@
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import { withElement } from '../model';
 
-export interface ProfileGroup {
+interface ProfileGroup {
   role: string;
   profile: string;
 }

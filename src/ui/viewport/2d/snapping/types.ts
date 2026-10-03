@@ -50,11 +50,6 @@ export interface CollectOpts {
   nearest?: boolean;
 }
 
-export interface SnapOpts {
-  gridSize: number;
-  tolerance: number;
-}
-
 export interface OrthoPolarOpts {
   ortho: boolean;
   polar: boolean;

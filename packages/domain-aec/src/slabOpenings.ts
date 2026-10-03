@@ -25,7 +25,7 @@ import {
   withElement,
   elementAffected,
 } from './model';
-import { regenerateBuilding } from './evaluate';
+import { regenerateBuilding } from './evaluateElements';
 import { triangulatePolygon } from '@lib/triangulate';
 
 /** Plan footprint of a stair run, grown by `margin` on every side. */

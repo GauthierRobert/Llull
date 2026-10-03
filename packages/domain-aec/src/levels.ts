@@ -18,7 +18,7 @@ import {
   withLevel,
   withoutElements,
 } from './model';
-import { regenerateBuilding } from './evaluate';
+import { regenerateBuilding } from './evaluateElements';
 import { openingFitIssues } from './walls';
 
 /**

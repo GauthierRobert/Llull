@@ -1,16 +1,12 @@
 import type { CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { instanceBoundsFromDoc } from './scene';
-import type { Bounds } from './scene';
+import { instanceBoundsFromDoc } from './sceneBounds';
+import type { Bounds } from './sceneTypes';
 import { evaluateMotionInternal } from './jointsKinematics';
 
-// ---------------------------------------------------------------------------
-// Motion study result types
-// ---------------------------------------------------------------------------
-
 /** Per-step result of a motion study sweep. */
-export interface MotionStep {
+interface MotionStep {
   /** Step index (0-based). */
   stepIndex: number;
   /** The sweep value applied at this step. */
@@ -24,7 +20,7 @@ export interface MotionStep {
 }
 
 /** A pair of instance ids that overlap (AABB interference) at a given step. */
-export interface InterferencePair {
+interface InterferencePair {
   stepIndex: number;
   instanceIdA: string;
   instanceIdB: string;
@@ -39,10 +35,6 @@ export interface MotionStudyData {
     framesWithInterference: number;
   };
 }
-
-// ---------------------------------------------------------------------------
-// AABB interference helpers
-// ---------------------------------------------------------------------------
 
 /** Returns true when two world-space AABBs overlap. */
 function aabbOverlap(a: Bounds, b: Bounds): boolean {
@@ -99,10 +91,6 @@ function detectInterferences(bounds: Record<string, Bounds>): [string, string][]
   }
   return pairs;
 }
-
-// ---------------------------------------------------------------------------
-// motion_study command
-// ---------------------------------------------------------------------------
 
 /**
  * @command motion_study

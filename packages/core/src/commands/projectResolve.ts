@@ -12,14 +12,10 @@ import {
   type BuildProjectData,
 } from './projectTypes';
 
-// ---------------------------------------------------------------------------
-// Alias resolution
-// ---------------------------------------------------------------------------
-
 /** `$alias` or `$alias[N]` — references the affected ids bound by an earlier step. */
 const REF = /^\$([A-Za-z_]\w*)(?:\[(\d+)\])?$/;
 
-export interface Resolved {
+interface Resolved {
   value: unknown;
   error: string | null;
 }
@@ -53,10 +49,6 @@ export function findUndefinedRef(value: unknown, defined: ReadonlySet<string>): 
   });
   return firstError;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 export function isPlanAction(value: unknown): value is PlanAction {
   return (

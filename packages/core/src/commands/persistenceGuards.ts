@@ -1,10 +1,6 @@
 import type { DocumentUnit, EntityKind, Layer, CameraState, Vec3 } from '../model/types';
 import { isRecord } from '../lib/isRecord';
 
-// ---------------------------------------------------------------------------
-// Primitive type-narrowing helpers (no `any`)
-// ---------------------------------------------------------------------------
-
 export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
@@ -60,10 +56,6 @@ export const VALID_UNITS: ReadonlySet<string> = new Set<DocumentUnit>([
   'in',
   'ft',
 ]);
-
-// ---------------------------------------------------------------------------
-// Structural + value validators
-// ---------------------------------------------------------------------------
 
 export function validateCamera(v: unknown): v is CameraState {
   if (!isRecord(v)) return false;

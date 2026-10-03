@@ -1,9 +1,5 @@
 import type { Vec3 } from '../model/types';
-import { sub3, dot3, cross3, normalize3 } from './renderMath';
-
-// ---------------------------------------------------------------------------
-// Camera / view
-// ---------------------------------------------------------------------------
+import { sub3, dot3, cross3, normalize3 } from '../lib/vec3';
 
 export type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso';
 export const VALID_VIEWS: ReadonlySet<string> = new Set<ViewName>([
@@ -53,10 +49,6 @@ export function cameraForView(view: ViewName, center: Vec3, radius: number): Cam
   }
 }
 
-// ---------------------------------------------------------------------------
-// Projection (orthographic)
-// ---------------------------------------------------------------------------
-
 /** Build a right-hand orthographic camera basis (forward, right, up vectors). */
 export function cameraBasis(cam: Camera): { fwd: Vec3; right: Vec3; up: Vec3 } {
   const fwd = normalize3(sub3(cam.target, cam.position));
@@ -94,10 +86,6 @@ export function toScreenCoords(
   const sy = height / 2 - v * scale; // flip Y (SVG Y grows down)
   return [sx, sy];
 }
-
-// ---------------------------------------------------------------------------
-// Shading
-// ---------------------------------------------------------------------------
 
 /** Fixed directional light direction in world space (Z-up). */
 const LIGHT_DIR: Vec3 = normalize3([0.6, -0.8, 1.0]);

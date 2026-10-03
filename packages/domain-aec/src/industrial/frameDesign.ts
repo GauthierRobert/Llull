@@ -20,20 +20,16 @@ import {
   noChange,
   withElement,
 } from '../model';
-import { regenerateBuilding } from '../evaluate';
+import { regenerateBuilding } from '../evaluateElements';
 import { refitPlates } from './plates';
 import { designFixedPlates } from './plateDesign';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
 import { buildingConnectionSolids } from './evaluate';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
 import { sweepFrame } from '../mesh';
-import {
-  checkFrames,
-  connectionCheck,
-  describeLoads,
-  FRAME_LOAD_SHAPE,
-  resolveFrameLoads,
-} from './frameCheck';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
+import { connectionCheck } from './frameCheckSolve';
+import { checkFrames } from './frameCheckFrames';
 
 /**
  * Next heavier profile of the same family; at the top of the family, the lightest I-section

@@ -16,14 +16,10 @@
 import type { CadDocument, Entity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds } from './scene';
-
-// ---------------------------------------------------------------------------
-// Public types (part of the command result shape)
-// ---------------------------------------------------------------------------
+import { entityBounds } from './sceneBounds';
 
 /** Severity of a model issue. */
-export type IssueSeverity = 'error' | 'warning' | 'info';
+type IssueSeverity = 'error' | 'warning' | 'info';
 
 /**
  * A single model issue discovered by `check_model`.
@@ -45,14 +41,6 @@ export interface CheckResult {
   ok: boolean;
   issues: Issue[];
 }
-
-// ---------------------------------------------------------------------------
-// Check parameters
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Individual check functions — each returns Issue[] for its concern
-// ---------------------------------------------------------------------------
 
 /**
  * Degenerate geometry: sizes, radii, and depths that are ≤ 0.
@@ -430,10 +418,6 @@ function checkParameterErrors(doc: CadDocument): Issue[] {
   return issues;
 }
 
-// ---------------------------------------------------------------------------
-// Main validation runner
-// ---------------------------------------------------------------------------
-
 /**
  * Run all checks over the document and collect the full issue list.
  *
@@ -461,10 +445,6 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
   const ok = !issues.some((i) => i.severity === 'error');
   return { ok, issues };
 }
-
-// ---------------------------------------------------------------------------
-// check_model command definition
-// ---------------------------------------------------------------------------
 
 /**
  * @command check_model

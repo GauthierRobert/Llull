@@ -138,6 +138,6 @@ are still read and migrated.
 Types in `packages/core/src/model/building.ts` (levels, elements, project info, cost rates).
 Commands live in the building / industrial plugins (`packages/domain-aec/src`, `@aec/*`;
 industrial in `industrial/`, steel profiles in `steel/`). They edit the model and call
-`regenerateBuilding()` (`@aec/evaluate`), which replaces the evaluated entities (ids
+`regenerateBuilding()` (`@aec/evaluateElements`), which replaces the evaluated entities (ids
 `<elementId>:<part>`, tag `bim`). No new entity kinds. Generated entities are read-only (building
 derivation guard) and are not stored in v2 files. Guides: `docs/CONSTRUCTION.md`, `docs/INDUSTRIAL.md`.

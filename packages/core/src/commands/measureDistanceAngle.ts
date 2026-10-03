@@ -2,7 +2,8 @@ import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { formatLength } from './units';
-import { vec3Distance, centroid } from './measureShared';
+import { centroid } from './measureShared';
+import { distanceSq3 } from '../lib/vec3';
 interface MeasureDistanceData {
   distance: number;
   unit: string;
@@ -89,7 +90,7 @@ export const measureDistance = defineCommand({
       };
     }
 
-    const distance = vec3Distance(locA, locB);
+    const distance = Math.sqrt(distanceSq3(locA, locB));
     const data: MeasureDistanceData = { distance, unit: doc.units };
     return {
       document: doc,
@@ -99,10 +100,6 @@ export const measureDistance = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// 2. measure_angle
-// ---------------------------------------------------------------------------
 
 const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
 

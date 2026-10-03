@@ -1,5 +1,4 @@
 /**
- * ifc: ifcElementExport.
  * @layer domain-aec
  */
 
@@ -10,7 +9,7 @@ import type {
   OpeningElement,
   WallElement,
 } from '@core/model/building';
-import { wallFrame, type WallExtent } from './evaluate';
+import { wallFrame, type WallExtent } from './wallGeometry';
 import { curvedBandBetween } from './curvedWallGeometry';
 import type { SteelProfile } from './steel/profiles';
 import {

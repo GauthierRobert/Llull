@@ -21,8 +21,8 @@ import {
   toVec2,
   withElement,
 } from '../model';
-import { regenerateBuilding } from '../evaluate';
-import { toVec3 } from './members';
+import { regenerateBuilding } from '../evaluateElements';
+import { toVec3 } from './memberSupport';
 
 /**
  * @command add_equipment

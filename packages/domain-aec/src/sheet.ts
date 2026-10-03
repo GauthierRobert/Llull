@@ -8,7 +8,8 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, getBuilding, noChange, toMetres } from './model';
-import { buildPlanDrawing, type PlanDrawing, type PlanPrimitive } from './plan';
+import { type PlanDrawing, type PlanPrimitive } from './planModel';
+import { buildPlanDrawing } from './planDrawing';
 import { escapeXml } from '@lib/escapeXml';
 
 export type PaperSize = 'A4' | 'A3' | 'A2' | 'A1' | 'A0';

@@ -3,7 +3,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, colorField, untypedArray } from './schema';
 import { nextId } from '../lib/id';
-import { pruneGroupMembers } from './deleteMany';
+import { pruneGroupMembers } from './entityOps';
 import {
   DEFAULT_SOLID_COLOR,
   ORIGIN,

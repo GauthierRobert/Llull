@@ -33,7 +33,7 @@ export interface LiveSnapshotEvent {
   readonly document: CadDocument;
 }
 
-export type LiveApplyResult =
+type LiveApplyResult =
   | { readonly ok: true; readonly document: CadDocument }
   | { readonly ok: false; readonly reason: 'gap' | 'mismatch' };
 

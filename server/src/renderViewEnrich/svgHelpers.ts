@@ -1,11 +1,4 @@
-/**
- * @layer server
- *
- * Pure helpers shared by the render_view enrichments: world→screen projection math,
- * orthographic frustum sizing, and SVG composition utilities.
- */
-
-import type { RenderViewData } from '@core/commands/render';
+import type { RenderViewData } from '@core/commands/renderTypes';
 import { toScreenCoords } from '@core/commands/renderCamera';
 import { cross3, dot3, normalize3, sub3 } from '@lib/vec3';
 
@@ -22,10 +15,6 @@ export function computeOrthoHalf(data: RenderViewData): number {
   const radius = Math.max(dx, dy, dz) / 2 + 1e-3;
   return (radius < 0.1 ? 1 : radius) * 1.2 * 1.2;
 }
-
-// ---------------------------------------------------------------------------
-// SVG composition utilities
-// ---------------------------------------------------------------------------
 
 /**
  * Extract the inner content of an SVG string (strips outer `<svg ...>` and `</svg>` tags).

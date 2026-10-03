@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { checkBracing, type BracingRow } from '@aec/industrial/bracingCheck';
+import { type BracingRow } from '@aec/industrial/bracingModel';
+import { checkBracing } from '@aec/industrial/bracingCheckRun';
 
 function hall(params: Record<string, unknown> = {}, base = createEmptyDocument()): CadDocument {
   return execute(base, 'add_portal_frame_building', { span: 24000, length: 48000, ...params })

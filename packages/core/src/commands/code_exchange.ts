@@ -14,10 +14,6 @@ import { emitPython } from '../codegen/python';
 import { emitOpenScad } from '../codegen/openscad';
 import { emitFreeCad } from '../codegen/freecad';
 
-// ---------------------------------------------------------------------------
-// export_code
-// ---------------------------------------------------------------------------
-
 type CodeLanguage = 'cadquery' | 'build123d' | 'openscad' | 'freecad';
 
 const FILE_EXTENSIONS: Readonly<Record<CodeLanguage, string>> = {

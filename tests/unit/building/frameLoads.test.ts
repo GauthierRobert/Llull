@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { CheckRow } from '@aec/industrial/frameCheck';
+import type { CheckRow } from '@aec/industrial/frameCheckSolve';
 import {
   bucklingReduction,
   criticalMoment,
@@ -9,14 +9,14 @@ import {
   memberBuckling,
   sectionResistance,
 } from '@aec/industrial/steelDesign';
+import { framesOf } from '@aec/industrial/frameModelFrames';
 import {
-  baseReactions,
   craneActions,
-  framesOf,
   valleyLines,
   craneCapacityOf,
   DOWNWIND_ROOF_FACTOR,
-} from '@aec/industrial/frameModel';
+} from '@aec/industrial/frameModelTypes';
+import { baseReactions } from '@aec/industrial/frameModelSolve';
 import { frameRoofAverage } from '@aec/industrial/windCoefficients';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';

@@ -18,16 +18,15 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
-import type { RenderViewData } from '@core/commands/render';
+import type { RenderViewData } from '@core/commands/renderTypes';
 import { rasterizeSvg } from '../src/renderImage';
+import { appendEntityLabels } from '../src/renderViewEnrich/entityLabels';
+import { appendDimensionLabels, appendAxesAndGrid } from '../src/renderViewEnrich/overlays';
 import {
   buildTurntableFrames,
   buildIsolateSvg,
-  appendDimensionLabels,
-  appendAxesAndGrid,
-  appendEntityLabels,
   buildSectionSvg,
-} from '../src/renderViewEnrich';
+} from '../src/renderViewEnrich/multiPassViews';
 
 // ---------------------------------------------------------------------------
 // Constants

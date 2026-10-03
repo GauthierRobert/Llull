@@ -9,13 +9,13 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingModel } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { ELEMENT_TOOLS } from './elementTools';
 import {
-  ELEMENT_TOOLS,
   defaultValues,
   type ElementListKind,
   type ElementTool,
   type ToolField,
-} from './elementTools';
+} from './elementToolForm';
 import { INDUSTRIAL_TOOLS } from './industrialTools';
 
 const ALL_TOOLS: ReadonlyArray<ElementTool> = [...ELEMENT_TOOLS, ...INDUSTRIAL_TOOLS];

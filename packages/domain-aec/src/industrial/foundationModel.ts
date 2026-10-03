@@ -1,9 +1,4 @@
-/**
- * foundationCheck: foundationModel.
- * @layer domain-aec
- */
-
-import type { LoadCase } from './frameModel';
+import type { LoadCase } from './frameModelTypes';
 
 export interface FoundationRow {
   /** Column mark. */

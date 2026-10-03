@@ -11,46 +11,13 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, EntityGroup, MeshSolidEntity } from '../model/types';
+import type { CadDocument, Entity, MeshSolidEntity } from '../model/types';
 import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
-
-// ---------------------------------------------------------------------------
-// Internal helper — remove a single operand entity from the document and add
-// the result mesh entity, mirroring the boolean command pattern for groups.
-// ---------------------------------------------------------------------------
-
-function consumeOperandAndAdd(
-  doc: CadDocument,
-  sourceId: string,
-  result: MeshSolidEntity,
-): CadDocument {
-  const entities = { ...doc.entities };
-  delete entities[sourceId];
-  entities[result.id] = result;
-
-  const order = [...doc.order.filter((id) => id !== sourceId), result.id];
-  const selection = doc.selection.filter((id) => id !== sourceId);
-
-  // Prune source id from groups; dissolve groups that drop below 2 members.
-  const existingGroups = doc.groups ?? {};
-  const nextGroups: Record<string, EntityGroup> = {};
-  for (const group of Object.values(existingGroups)) {
-    const prunedIds = group.memberIds.filter((mid) => mid !== sourceId);
-    if (prunedIds.length >= 2) {
-      nextGroups[group.id] = { ...group, memberIds: prunedIds };
-    }
-  }
-
-  return { ...doc, entities, order, selection, groups: nextGroups };
-}
-
-// ---------------------------------------------------------------------------
-// Shared validation — returns a no-op result or null when valid.
-// ---------------------------------------------------------------------------
+import { replaceEntities } from './entityOps';
 
 type NoOp = { document: CadDocument; summary: string; affected: [] };
 
@@ -76,10 +43,6 @@ function validateSolidTarget(
   }
   return { entity };
 }
-
-// ---------------------------------------------------------------------------
-// fillet_edge
-// ---------------------------------------------------------------------------
 
 /**
  * @command fillet_edge
@@ -169,16 +132,12 @@ export const filletEdge = defineCommand({
 
     const triangleCount = filleted.indices.length / 3;
     return {
-      document: consumeOperandAndAdd(doc, id, meshEntity),
+      document: replaceEntities(doc, [id], meshEntity),
       summary: `fillet_edge: filleted '${id}' (kind '${entity.kind}', radius ${radius}) → mesh '${newId}' (${triangleCount} triangles). Source entity consumed.`,
       affected: [newId],
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// chamfer_edge
-// ---------------------------------------------------------------------------
 
 /**
  * @command chamfer_edge
@@ -268,7 +227,7 @@ export const chamferEdge = defineCommand({
 
     const triangleCount = chamfered.indices.length / 3;
     return {
-      document: consumeOperandAndAdd(doc, id, meshEntity),
+      document: replaceEntities(doc, [id], meshEntity),
       summary: `chamfer_edge: chamfered '${id}' (kind '${entity.kind}', distance ${distance}) → mesh '${newId}' (${triangleCount} triangles). Source entity consumed.`,
       affected: [newId],
     };

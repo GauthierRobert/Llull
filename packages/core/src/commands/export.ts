@@ -15,9 +15,6 @@ import { uint8ArrayToBase64 } from '../lib/base64';
 import { collectExportTriangles } from './exportTriangulate';
 import { facetNormal, type Triangle } from './exportMath';
 
-export type { Triangle } from './exportMath';
-export { entityToTriangles } from './exportTriangulate';
-
 function formatVec3(v: Vec3): string {
   return `${v[0]} ${v[1]} ${v[2]}`;
 }
@@ -37,10 +34,6 @@ function buildAsciiStl(tris: Triangle[], solidName: string): string {
   lines.push(`endsolid ${solidName}`);
   return lines.join('\n');
 }
-
-// ---------------------------------------------------------------------------
-// STL binary serialisation
-// ---------------------------------------------------------------------------
 
 function buildBinaryStl(tris: Triangle[], headerText: string): Uint8Array {
   const count = tris.length;
@@ -96,10 +89,6 @@ function buildBinaryStl(tris: Triangle[], headerText: string): Uint8Array {
   return buf;
 }
 
-// ---------------------------------------------------------------------------
-// ExportStl data shape (exported so tests can type-narrow)
-// ---------------------------------------------------------------------------
-
 export interface ExportStlData {
   /** Resolved format used ('ascii' | 'binary'). */
   format: 'ascii' | 'binary';
@@ -110,10 +99,6 @@ export interface ExportStlData {
   /** Present for format='binary': base64-encoded binary STL bytes. */
   stlBase64?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Command definition
-// ---------------------------------------------------------------------------
 
 /**
  * @command export_stl

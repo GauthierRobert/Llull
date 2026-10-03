@@ -1,5 +1,4 @@
 /**
- * evaluate: wallGeometry.
  * @layer domain-aec
  */
 
@@ -17,7 +16,7 @@ export interface EvaluationContext {
 // Walls
 // ---------------------------------------------------------------------------
 
-export interface WallFrame {
+interface WallFrame {
   readonly length: number;
   readonly angle: number;
   readonly direction: Vec2;

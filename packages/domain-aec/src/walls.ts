@@ -22,7 +22,8 @@ import {
   withElement,
   elementAffected,
 } from './model';
-import { openingsOf, regenerateBuilding, wallExtent, wallFrame, type WallExtent } from './evaluate';
+import { regenerateBuilding } from './evaluateElements';
+import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
 import { curvedWallExtent } from './curvedWallGeometry';
 
 /**

@@ -28,7 +28,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
 import { useSnap } from './useSnap';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
-import type { SnapType } from './snapping';
+import type { SnapType } from './snapping/types';
 import { useGroundPlane } from './useGroundPlane';
 
 // ---------------------------------------------------------------------------

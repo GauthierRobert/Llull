@@ -25,7 +25,7 @@ import {
   getAllowedOrigins,
 } from '../src/security';
 import { createAutosaver } from '../src/autosave';
-import { closeAllSessions, _sessionCount } from '../src/mcp';
+import { closeAllSessions, _sessionCount } from '../src/mcp/sessions';
 import { createEmptyDocument } from '@core/model/types';
 import * as registry from '@core/commands/registry';
 

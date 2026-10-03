@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { arcThrough, curvedWallBand, curvedWallLength } from '@aec/curvedWallGeometry';
-import { buildPlanDrawing } from '@aec/plan';
+import { buildPlanDrawing } from '@aec/planDrawing';
 import { buildingErrors } from '@aec/validate';
 import { serializeDocument } from '@core/commands/persistence';
 import type { CurvedWallElement } from '@core/model/building';
-import type { TakeoffLine } from '@aec/quantities';
-import type { IfcExport } from '@aec/ifc';
-import type { DxfExport } from '@aec/dxf';
+import type { TakeoffLine } from '@aec/takeoffBasics';
+import type { IfcExport } from '@aec/ifcBuild';
+import type { DxfExport } from '@aec/dxfExport';
 import type { Clash } from '@aec/industrial/clash';
 
 /** Half circle of radius 5000 from (−5000, 0) over (0, 5000) to (5000, 0). */
@@ -266,7 +266,7 @@ describe('curved wall opening review regressions', () => {
 
 describe('straight walls joining curved walls', () => {
   it('extends a straight wall over a curved wall end (L corner)', async () => {
-    const { wallExtent } = await import('@aec/evaluate');
+    const { wallExtent } = await import('@aec/wallGeometry');
     let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
     doc = execute(doc, 'add_wall', { start: [-5000, 0], end: [-9000, 0], thickness: 200 }).document;
     const wall = doc.building!.elements['wall-1']!;
@@ -277,7 +277,7 @@ describe('straight walls joining curved walls', () => {
   });
 
   it('stops a straight wall at the face of an arc (T junction)', async () => {
-    const { wallExtent } = await import('@aec/evaluate');
+    const { wallExtent } = await import('@aec/wallGeometry');
     let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
     doc = execute(doc, 'add_wall', { start: [0, 9000], end: [0, 5000], thickness: 200 }).document;
     const wall = doc.building!.elements['wall-1']!;
@@ -289,7 +289,7 @@ describe('straight walls joining curved walls', () => {
 
 describe('curved / straight corner review regressions', () => {
   it('closes the corner the same way in metre documents', async () => {
-    const { wallExtent } = await import('@aec/evaluate');
+    const { wallExtent } = await import('@aec/wallGeometry');
     let doc = execute(createEmptyDocument(), 'set_units', { units: 'm' }).document;
     doc = execute(doc, 'add_curved_wall', {
       start: [-5, 0],

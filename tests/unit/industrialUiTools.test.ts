@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultValues, type ElementTool } from '@ui/panels/building/elementTools';
+import { defaultValues, type ElementTool } from '@ui/panels/building/elementToolForm';
 import { INDUSTRIAL_TOOLS } from '@ui/panels/building/industrialTools';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';

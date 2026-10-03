@@ -66,20 +66,13 @@ import { applyCommand } from './commandBus';
 import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
 import { buildImageBlock, stripSvgFromData } from './renderImage';
 import { sessions, startSessionSweep } from './mcp/sessions';
-import { buildAuthMiddleware, buildRateLimiter } from './mcp/middleware';
+import { buildAuthMiddleware, buildMcpRateLimiter } from './mcp/middleware';
 import {
   applyRenderViewEnrichments,
   makeErrorResult,
   stripEnrichParams,
 } from './mcp/renderViewEnrichment';
 import { augmentRenderViewTool } from './mcp/renderViewSchema';
-
-export { closeAllSessions, _sessionCount } from './mcp/sessions';
-
-// ---------------------------------------------------------------------------
-// MCP Server factory
-// ---------------------------------------------------------------------------
-
 /**
  * Build a `Server` instance whose handlers are bound to the provided document
  * accessor functions.
@@ -278,10 +271,6 @@ function buildMcpServer(
   return server;
 }
 
-// ---------------------------------------------------------------------------
-// Session initialisation
-// ---------------------------------------------------------------------------
-
 /**
  * Allocate a new MCP session bound to the shared live document.
  *
@@ -336,10 +325,6 @@ function allocateSession(
   return { transport, server };
 }
 
-// ---------------------------------------------------------------------------
-// Router factory
-// ---------------------------------------------------------------------------
-
 /** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = core only, `all` = everything). Warns on unknown names. */
 export function toolsetsFromEnv(
   raw: string | undefined = process.env['LLULL_TOOLSETS'],
@@ -381,7 +366,7 @@ export function buildMcpRouter(
 
   const router = createRouter();
   const auth = buildAuthMiddleware();
-  const limiter = buildRateLimiter();
+  const limiter = buildMcpRateLimiter();
 
   // Apply auth + rate limit to all MCP routes
   router.use(auth);

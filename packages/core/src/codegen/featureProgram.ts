@@ -12,7 +12,7 @@ import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/history';
 import { buildParamEnv } from '../commands/regenerate';
 import { evaluateExpression, extractReferences } from '../commands/expression';
-import { entityToTriangles } from '../commands/export';
+import { entityToTriangles } from '../commands/exportTriangulate';
 import { Namer, translateExpression } from './identifiers';
 import type {
   Axis,

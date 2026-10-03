@@ -68,10 +68,6 @@ export const setUnits = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// Pure display helper — reusable by measure / annotation commands.
-// ---------------------------------------------------------------------------
-
 /**
  * Format a length value using the document's current units and displayPrecision.
  *

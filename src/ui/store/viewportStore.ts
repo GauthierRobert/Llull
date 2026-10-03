@@ -64,7 +64,7 @@ export interface ClipPlaneState {
 // ---------------------------------------------------------------------------
 
 /** Identifies a selected mechanism item for overlay rendering. */
-export type MechanismSelectionKind = 'constraint' | 'joint';
+type MechanismSelectionKind = 'constraint' | 'joint';
 
 /** Currently highlighted constraint or joint in the MechanismsPanel. */
 export interface MechanismSelection {

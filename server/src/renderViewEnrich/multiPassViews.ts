@@ -8,15 +8,11 @@
 
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { RenderViewData } from '@core/commands/render';
+import type { RenderViewData } from '@core/commands/renderTypes';
 import type { SectionParams } from './types';
 import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';
 import { extractSvgInner, makeProjector } from './svgHelpers';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /** Extract RenderViewData from an execute() result, or null on failure. */
 function extractRenderData(
@@ -31,10 +27,6 @@ function extractRenderData(
   if (typeof d['svg'] !== 'string') return null;
   return result.data as RenderViewData;
 }
-
-// ---------------------------------------------------------------------------
-// Turntable: N evenly-spaced rotations around Z axis
-// ---------------------------------------------------------------------------
 
 /**
  * Rotate all entities in a document around the scene center by `angleRad`
@@ -104,10 +96,6 @@ export function buildTurntableFrames(
   }
   return svgs;
 }
-
-// ---------------------------------------------------------------------------
-// Isolate: dim all entities not in the highlighted set
-// ---------------------------------------------------------------------------
 
 /**
  * Build two partial documents:
@@ -180,10 +168,6 @@ export function buildIsolateSvg(
   lines.push('</svg>');
   return lines.join('\n');
 }
-// ---------------------------------------------------------------------------
-// Section: overlay a section plane indicator
-// ---------------------------------------------------------------------------
-
 /**
  * Compose a section-plane overlay onto an existing SVG.
  *

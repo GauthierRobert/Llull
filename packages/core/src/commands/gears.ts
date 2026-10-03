@@ -12,13 +12,11 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
+import { rotatePoint2 } from '../lib/polygon';
+import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';
-import { rotatedEntityBounds } from './scene';
+import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { withEntity } from './entityOps';
-
-// ---------------------------------------------------------------------------
-// Internal involute geometry helpers (pure, no side effects)
-// ---------------------------------------------------------------------------
 
 /**
  * Sample points along the involute of a circle with base radius `baseR`.
@@ -54,15 +52,6 @@ export function sampleInvolute(
     pts.push([x, y]);
   }
   return pts;
-}
-
-/**
- * Rotate a 2D point by `angle` radians around the origin.
- */
-function rotate2D(pt: readonly [number, number], angle: number): readonly [number, number] {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  return [pt[0] * c - pt[1] * s, pt[0] * s + pt[1] * c];
 }
 
 /**
@@ -117,10 +106,6 @@ function fmt(v: number): string {
 function boundsText(b: { min: Vec3; max: Vec3 }): string {
   return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
 }
-
-// ---------------------------------------------------------------------------
-// Involute spur gear profile builder
-// ---------------------------------------------------------------------------
 
 /**
  * Build a closed CCW 2D involute spur gear profile centered at the origin.
@@ -183,7 +168,7 @@ export function buildSpurGearProfile(
 
     // --- Right flank (CCW order: approach from root, go outward) ---
     const rightFlank = sampleInvolute(baseRadius, tStart, tMax, flankSamples).map((pt) =>
-      rotate2D(pt, rightFlankRotation + toothCenter),
+      rotatePoint2(pt, rightFlankRotation + toothCenter),
     );
 
     // --- Tip arc: from right-flank tip to left-flank tip ---
@@ -195,7 +180,7 @@ export function buildSpurGearProfile(
     // Left flank = mirror of right flank about tooth center line, then rotate to tooth position.
     const leftFlankRotation = -halfToothPitchAngle + involuteAngleAtPitch;
     const leftFlank = leftFlankRaw.map((pt) =>
-      rotate2D(mirrorY(pt), leftFlankRotation + toothCenter),
+      rotatePoint2(mirrorY(pt), leftFlankRotation + toothCenter),
     );
     const leftTipAngle = Math.atan2(
       leftFlank[leftFlank.length - 1]![1],
@@ -218,7 +203,7 @@ export function buildSpurGearProfile(
       // Undercut: flank starts at rootRadius; the bottom of the flank IS on the root circle.
       leftRootAngle = Math.atan2(leftFlank[0]![1], leftFlank[0]![0]);
       const nextToothCenter = ((t + 1) % teeth) * toothAngle;
-      const nextRightFlankFirst = rotate2D(
+      const nextRightFlankFirst = rotatePoint2(
         sampleInvolute(baseRadius, tStart, tMax, 2)[0]!,
         rightFlankRotation + nextToothCenter,
       );
@@ -227,7 +212,7 @@ export function buildSpurGearProfile(
       // Root arc from root-circle intersection of left flank to that of next right flank.
       leftRootAngle = Math.atan2(leftFlank[0]![1], leftFlank[0]![0]);
       const nextToothCenter = ((t + 1) % teeth) * toothAngle;
-      const nextRightFlankRoot = rotate2D(
+      const nextRightFlankRoot = rotatePoint2(
         sampleInvolute(baseRadius, 0, 0, 1)[0]!,
         rightFlankRotation + nextToothCenter,
       );
@@ -262,10 +247,6 @@ export function buildSpurGearProfile(
 
   return profile;
 }
-
-// ---------------------------------------------------------------------------
-// Command definition
-// ---------------------------------------------------------------------------
 
 /**
  * @command add_spur_gear
@@ -413,8 +394,8 @@ export const addSpurGear = defineCommand({
     }
 
     // --- Validate position ---
-    const resolvedPosition = resolvePosition(position);
-    const resolvedRotation = resolveRotation(rotation);
+    const resolvedPosition = finiteVec3OrZero(position);
+    const resolvedRotation = finiteVec3OrZero(rotation);
 
     // --- Build profile ---
     const profile = buildSpurGearProfile(mod, teethInt, pressureAngle);
@@ -455,21 +436,3 @@ export const addSpurGear = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// Local helpers (mirrors of geometry.ts — kept here to avoid cross-file dep on internals)
-// ---------------------------------------------------------------------------
-
-function resolvePosition(position: unknown): Vec3 {
-  if (!Array.isArray(position) || position.length !== 3) return [0, 0, 0];
-  const [x, y, z] = position as unknown[];
-  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return [0, 0, 0];
-  return [x as number, y as number, z as number];
-}
-
-function resolveRotation(rotation: unknown): Vec3 {
-  if (!Array.isArray(rotation) || rotation.length !== 3) return [0, 0, 0];
-  const [rx, ry, rz] = rotation as unknown[];
-  if (!Number.isFinite(rx) || !Number.isFinite(ry) || !Number.isFinite(rz)) return [0, 0, 0];
-  return [rx as number, ry as number, rz as number];
-}

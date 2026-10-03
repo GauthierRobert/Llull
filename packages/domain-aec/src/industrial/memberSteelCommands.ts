@@ -1,5 +1,4 @@
 /**
- * members: memberSteelCommands.
  * @layer domain-aec
  */
 
@@ -16,7 +15,7 @@ import {
   toMetres,
   withElement,
 } from '../model';
-import { regenerateBuilding } from '../evaluate';
+import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, type SteelProfile } from '../steel/profiles';
 import { refitPlates } from './plates';
 import { dropStaleConnections } from './connections';

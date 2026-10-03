@@ -1,18 +1,13 @@
 /**
- * frameCheck: frameCheckFrames.
  * @layer domain-aec
  */
 
 import type { CadDocument } from '@core/model/types';
 import { getBuilding } from '../model';
 import { findProfile } from '../steel/profiles';
-import {
-  framesOf,
-  solveCombination,
-  windCasesOf,
-  type FrameLoads,
-  type LoadCase,
-} from './frameModel';
+import { windCasesOf, type FrameLoads, type LoadCase } from './frameModelTypes';
+import { solveCombination } from './frameModelSolve';
+import { framesOf } from './frameModelFrames';
 import { memberBuckling, sectionResistance, yieldStrength } from './steelDesign';
 import {
   type CheckRow,
