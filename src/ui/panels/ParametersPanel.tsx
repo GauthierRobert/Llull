@@ -15,7 +15,7 @@
  * (PRIME DIRECTIVE, architecture L1, react R1)
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useStore } from '@ui/store';
 import type { Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
@@ -28,10 +28,12 @@ interface ParameterRowProps {
 function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [editingExpression, setEditingExpression] = useState<string | null>(null);
+  /** Set by Escape so the blur that follows discards the edit instead of committing it. */
+  const cancelled = useRef(false);
 
   const commitExpression = (): void => {
     const trimmed = editingExpression?.trim() ?? '';
-    if (trimmed !== '' && editingExpression !== param.expression) {
+    if (!cancelled.current && trimmed !== '' && editingExpression !== param.expression) {
       dispatch('set_parameter', { name: param.name, expression: trimmed });
     }
     setEditingExpression(null);
@@ -54,12 +56,15 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
         type="text"
         className={`param-expression-input${hasError ? ' input--error' : ''}`}
         value={displayExpression}
-        onFocus={() => setEditingExpression(param.expression)}
+        onFocus={() => {
+          cancelled.current = false;
+          setEditingExpression(param.expression);
+        }}
         onChange={(e) => setEditingExpression(e.target.value)}
         onBlur={commitExpression}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commitExpression();
-          else if (e.key === 'Escape') setEditingExpression(null);
+          // Blur commits (once); Escape flags the blur as a cancel.
+          if (e.key === 'Escape') cancelled.current = true;
           if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
         }}
         aria-label={`Expression for parameter ${param.name}`}

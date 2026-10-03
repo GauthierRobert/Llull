@@ -179,7 +179,11 @@ export const makeTubeBetween = defineCommand({
       color,
     };
 
-    const fmtPoint = (p: Vec3): string => `[${p.map((v) => v.toFixed(3)).join(',')}]`;
+    const fmtPoint = (p: Vec3): string =>
+      `[${p
+        .slice(0, 3)
+        .map((v) => v.toFixed(3))
+        .join(',')}]`;
 
     return {
       document: withEntity(doc, entity),
