@@ -55,38 +55,7 @@ import {
 } from './gridHelpers';
 import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
-
-// ---------------------------------------------------------------------------
-// StoreInvalidator2D — calls r3f invalidate() when the store changes
-// ---------------------------------------------------------------------------
-
-/**
- * Subscribes to the Zustand store OUTSIDE the r3f render loop and calls
- * invalidate() whenever document or renderOrigin change (zoom is handled by
- * MapControls' own invalidate() call). Pattern mirrors
- * StoreInvalidator in Viewport3D.tsx (architecture L7: one model, two views).
- *
- * Must be mounted inside Canvas so useThree resolves.
- * Uses useEffect + subscribe (not a reactive selector) to avoid a React re-render.
- */
-function StoreInvalidator2D(): null {
-  const invalidate = useThree((s) => s.invalidate);
-
-  useEffect(() => {
-    let prevDocument = useStore.getState().document;
-    let prevOrigin = useStore.getState().renderOrigin;
-
-    return useStore.subscribe((state) => {
-      if (state.document !== prevDocument || state.renderOrigin !== prevOrigin) {
-        prevDocument = state.document;
-        prevOrigin = state.renderOrigin;
-        invalidate();
-      }
-    });
-  }, [invalidate]);
-
-  return null;
-}
+import { StoreInvalidator } from '../StoreInvalidator';
 
 // ---------------------------------------------------------------------------
 // RenderOriginSyncer2D — per-frame rebase for the ortho camera
@@ -377,7 +346,7 @@ function SceneContents2D({
       />
 
       {/* ---- Demand-mode invalidation: re-render on store/document changes ---- */}
-      <StoreInvalidator2D />
+      <StoreInvalidator />
 
       {/* ---- Frame the document on mount and on fit_view / camera changes ---- */}
       <ZoomExtents2D />

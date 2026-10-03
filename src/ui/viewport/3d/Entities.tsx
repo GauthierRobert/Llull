@@ -144,28 +144,28 @@ function EntityRenderer({
   pbrMaterial?: PbrMaterial;
   document?: CadDocument;
 }): React.ReactElement | null {
-  const pbr = pbrMaterial ? { pbrMaterial } : {};
+  const shared = { selected, onSelect, ...(pbrMaterial ? { pbrMaterial } : {}) };
   switch (entity.kind) {
     case 'box':
-      return <BoxMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <BoxMesh entity={entity} {...shared} />;
     case 'cylinder':
-      return <CylinderMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <CylinderMesh entity={entity} {...shared} />;
     case 'sphere':
-      return <SphereMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <SphereMesh entity={entity} {...shared} />;
     case 'extrusion':
-      return <ExtrusionMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <ExtrusionMesh entity={entity} {...shared} />;
     case 'mesh':
-      return <MeshSolidMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <MeshSolidMesh entity={entity} {...shared} />;
     case 'cone':
-      return <ConeMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <ConeMesh entity={entity} {...shared} />;
     case 'torus':
-      return <TorusMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <TorusMesh entity={entity} {...shared} />;
     case 'wedge':
-      return <WedgeMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <WedgeMesh entity={entity} {...shared} />;
     case 'pyramid':
-      return <PyramidMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <PyramidMesh entity={entity} {...shared} />;
     case 'revolution':
-      return <RevolutionMesh entity={entity} selected={selected} onSelect={onSelect} {...pbr} />;
+      return <RevolutionMesh entity={entity} {...shared} />;
     case 'text':
       return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
     case 'instance':

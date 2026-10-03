@@ -7,9 +7,10 @@
  * Geometry is memoized on the entity's points/closed fields; disposed on unmount.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { SplineEntity } from '@core/model/types';
+import { PlacedLineObject } from './PlacedLineObject';
 
 interface SplineRendererProps {
   entity: SplineEntity;
@@ -40,16 +41,5 @@ export function SplineRenderer({
     // `points` is a new reference only when the spline actually changes (pure commands, L3).
   }, [points, closed, color, selected]);
 
-  useEffect(() => {
-    return () => {
-      lineObject?.geometry.dispose();
-      (lineObject?.material as THREE.Material | undefined)?.dispose();
-    };
-  }, [lineObject]);
-
-  if (!lineObject) return null;
-
-  lineObject.position.set(position[0], position[1], position[2]);
-
-  return <primitive object={lineObject} />;
+  return <PlacedLineObject object={lineObject} position={position} />;
 }

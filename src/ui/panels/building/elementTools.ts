@@ -5,7 +5,14 @@
  * command + params (param-gathering only — the command does all document work, react R1).
  */
 
-import { FieldReader, num, onLevel, result, type ElementTool } from './elementToolForm';
+import {
+  FieldReader,
+  num,
+  onLevel,
+  result,
+  type ElementTool,
+  type ToolField,
+} from './elementToolForm';
 
 export {
   FieldReader,
@@ -30,6 +37,33 @@ const MATERIALS: ReadonlyArray<readonly [string, string]> = [
   ['steel', 'Steel'],
   ['gypsum', 'Gypsum board'],
 ];
+
+/** Thickness / optional height / material fields shared by every wall tool. */
+function wallSectionFields(thickness: string, material: string): ToolField[] {
+  return [
+    num('thickness', 'Thickness', thickness),
+    num('height', 'Height', '', true),
+    {
+      key: 'material',
+      label: 'Material',
+      kind: 'select',
+      defaultValue: material,
+      options: MATERIALS,
+    },
+  ];
+}
+
+function wallSection(reader: FieldReader): {
+  thickness: number;
+  height: number | undefined;
+  material: string;
+} {
+  return {
+    thickness: reader.number('thickness'),
+    height: reader.optionalNumber('height'),
+    material: reader.text('material'),
+  };
+}
 
 function rectangle(reader: FieldReader): Array<[number, number]> {
   const [x1, y1, x2, y2] = [
@@ -77,24 +111,14 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('y1', 'Y1', '0'),
       num('x2', 'X2', '10000'),
       num('y2', 'Y2', '8000'),
-      num('thickness', 'Thickness', '300'),
-      num('height', 'Height', '', true),
-      {
-        key: 'material',
-        label: 'Material',
-        kind: 'select',
-        defaultValue: 'masonry',
-        options: MATERIALS,
-      },
+      ...wallSectionFields('300', 'masonry'),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'draw_walls', {
         points: rectangle(reader),
         closed: true,
-        thickness: reader.number('thickness'),
-        height: reader.optionalNumber('height'),
-        material: reader.text('material'),
+        ...wallSection(reader),
         ...onLevel(context),
       });
     },
@@ -107,24 +131,14 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('y1', 'Start Y', '0'),
       num('x2', 'End X', '5000'),
       num('y2', 'End Y', '0'),
-      num('thickness', 'Thickness', '200'),
-      num('height', 'Height', '', true),
-      {
-        key: 'material',
-        label: 'Material',
-        kind: 'select',
-        defaultValue: 'concrete',
-        options: MATERIALS,
-      },
+      ...wallSectionFields('200', 'concrete'),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'add_wall', {
         start: [reader.number('x1'), reader.number('y1')],
         end: [reader.number('x2'), reader.number('y2')],
-        thickness: reader.number('thickness'),
-        height: reader.optionalNumber('height'),
-        material: reader.text('material'),
+        ...wallSection(reader),
         ...onLevel(context),
       });
     },
@@ -139,15 +153,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('ym', 'Through Y', '1500'),
       num('x2', 'End X', '6000'),
       num('y2', 'End Y', '0'),
-      num('thickness', 'Thickness', '200'),
-      num('height', 'Height', '', true),
-      {
-        key: 'material',
-        label: 'Material',
-        kind: 'select',
-        defaultValue: 'concrete',
-        options: MATERIALS,
-      },
+      ...wallSectionFields('200', 'concrete'),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
@@ -155,9 +161,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
         start: [reader.number('x1'), reader.number('y1')],
         through: [reader.number('xm'), reader.number('ym')],
         end: [reader.number('x2'), reader.number('y2')],
-        thickness: reader.number('thickness'),
-        height: reader.optionalNumber('height'),
-        material: reader.text('material'),
+        ...wallSection(reader),
         ...onLevel(context),
       });
     },

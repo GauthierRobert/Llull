@@ -50,6 +50,25 @@ export function collectSnapCandidates(
   // Collect all line segments first (needed for intersection computation).
   const allSegments: Array<[number, number, number, number]> = [];
 
+  /** Perpendicular / extension / nearest snaps for each segment, then register it for intersections. */
+  const addSegmentSnaps = (segments: ReadonlyArray<[number, number, number, number]>): void => {
+    for (const seg of segments) {
+      if (doPerpendiculars) {
+        const snap = snapPerpendicular(from, seg[0], seg[1], seg[2], seg[3]);
+        if (snap) candidates.push(snap);
+      }
+      if (doExtensions && cursor !== null) {
+        const snap = snapExtension(cursor[0], cursor[1], seg[0], seg[1], seg[2], seg[3]);
+        if (snap) candidates.push(snap);
+      }
+      if (doNearest && cursor !== null) {
+        const [nx, ny] = nearestOnSegment(cursor[0], cursor[1], seg[0], seg[1], seg[2], seg[3]);
+        candidates.push({ x: nx, y: ny, type: 'nearest' });
+      }
+    }
+    allSegments.push(...segments);
+  };
+
   for (const id of document.order) {
     const entity = document.entities[id];
     if (!entity || !is2D(entity)) continue;
@@ -72,19 +91,7 @@ export function collectSnapCandidates(
           const [mx, my] = mid(ax, ay, bx, by);
           candidates.push({ x: mx, y: my, type: 'midpoint' });
         }
-        if (doPerpendiculars) {
-          const snap = snapPerpendicular(from, ax, ay, bx, by);
-          if (snap) candidates.push(snap);
-        }
-        if (doExtensions && cursor !== null) {
-          const snap = snapExtension(cursor[0], cursor[1], ax, ay, bx, by);
-          if (snap) candidates.push(snap);
-        }
-        if (doNearest && cursor !== null) {
-          const [nx, ny] = nearestOnSegment(cursor[0], cursor[1], ax, ay, bx, by);
-          candidates.push({ x: nx, y: ny, type: 'nearest' });
-        }
-        allSegments.push([ax, ay, bx, by]);
+        addSegmentSnaps([[ax, ay, bx, by]]);
         break;
       }
 
@@ -111,21 +118,7 @@ export function collectSnapCandidates(
           candidates.push({ x: mx, y: my, type: 'midpoint' });
         }
         const segs = entityToSegments(entity);
-        for (const seg of segs) {
-          if (doPerpendiculars) {
-            const snap = snapPerpendicular(from, seg[0], seg[1], seg[2], seg[3]);
-            if (snap) candidates.push(snap);
-          }
-          if (doExtensions && cursor !== null) {
-            const snap = snapExtension(cursor[0], cursor[1], seg[0], seg[1], seg[2], seg[3]);
-            if (snap) candidates.push(snap);
-          }
-          if (doNearest && cursor !== null) {
-            const [nx, ny] = nearestOnSegment(cursor[0], cursor[1], seg[0], seg[1], seg[2], seg[3]);
-            candidates.push({ x: nx, y: ny, type: 'nearest' });
-          }
-        }
-        allSegments.push(...segs);
+        addSegmentSnaps(segs);
         break;
       }
 
@@ -230,21 +223,7 @@ export function collectSnapCandidates(
           candidates.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, type: 'center' });
         }
         const rectSegs = entityToSegments(entity);
-        for (const seg of rectSegs) {
-          if (doPerpendiculars) {
-            const snap = snapPerpendicular(from, seg[0], seg[1], seg[2], seg[3]);
-            if (snap) candidates.push(snap);
-          }
-          if (doExtensions && cursor !== null) {
-            const snap = snapExtension(cursor[0], cursor[1], seg[0], seg[1], seg[2], seg[3]);
-            if (snap) candidates.push(snap);
-          }
-          if (doNearest && cursor !== null) {
-            const [nx, ny] = nearestOnSegment(cursor[0], cursor[1], seg[0], seg[1], seg[2], seg[3]);
-            candidates.push({ x: nx, y: ny, type: 'nearest' });
-          }
-        }
-        allSegments.push(...rectSegs);
+        addSegmentSnaps(rectSegs);
         break;
       }
 

@@ -178,30 +178,24 @@ export function TransformGizmo({
     snapCandidatesRef.current = collectSnapCandidates3D(doc, selectedId);
   }, [selectedId]);
 
+  // ---- Place the gizmo target at the entity's render-space transform ----
+  function syncTargetFromEntity(): void {
+    if (!entity) return;
+    const t = targetRef.current;
+    if (!t) return;
+    const rp = toRenderPosition(entity.position, renderOrigin);
+    t.position.set(rp[0], rp[1], rp[2]);
+    t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
+    t.scale.set(1, 1, 1);
+    t.updateMatrixWorld(true);
+  }
+
   // ---- Sync target from entity on id change ----
   // Compute render-space position from entity's world position minus renderOrigin.
-  useEffect(() => {
-    if (!entity) return;
-    const t = targetRef.current;
-    if (!t) return;
-    const rp = toRenderPosition(entity.position, renderOrigin);
-    t.position.set(rp[0], rp[1], rp[2]);
-    t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
-    t.scale.set(1, 1, 1);
-    t.updateMatrixWorld(true);
-  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(syncTargetFromEntity, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Sync target from entity after a committed dispatch ----
-  useEffect(() => {
-    if (!entity) return;
-    const t = targetRef.current;
-    if (!t) return;
-    const rp = toRenderPosition(entity.position, renderOrigin);
-    t.position.set(rp[0], rp[1], rp[2]);
-    t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
-    t.scale.set(1, 1, 1);
-    t.updateMatrixWorld(true);
-  }, [entity, renderOrigin]);
+  useEffect(syncTargetFromEntity, [entity, renderOrigin]);
 
   // ---- Per-frame snap computation (translate only) ----
   // NOTE: this useFrame runs ONLY when a drag is in progress (isDraggingRef.current).

@@ -30,6 +30,28 @@ const PREVIEW_DASH_COLOR = '#94a3b8'; // slate-400
 // Preview geometry builders (pure helpers)
 // ---------------------------------------------------------------------------
 
+/** Small crosshair drawn at the cursor before the first point is placed. */
+function buildCrosshairGeo(cursor: Vec2): THREE.BufferGeometry {
+  const s = 0.15;
+  const verts = new Float32Array([
+    cursor[0] - s,
+    cursor[1],
+    0,
+    cursor[0] + s,
+    cursor[1],
+    0,
+    cursor[0],
+    cursor[1] - s,
+    0,
+    cursor[0],
+    cursor[1] + s,
+    0,
+  ]);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+  return geo;
+}
+
 /** Two-point line segment geometry. */
 function buildLineGeo(a: Vec2, b: Vec2): THREE.BufferGeometry {
   const geo = new THREE.BufferGeometry();
@@ -218,24 +240,7 @@ export function DrawPreview({
       if (collectedPoints.length >= 1) {
         geo = buildPolylineGeo(collectedPoints, cursor);
       } else {
-        // Show a small crosshair indicator at cursor position.
-        const s = 0.15;
-        const verts = new Float32Array([
-          cursor[0] - s,
-          cursor[1],
-          0,
-          cursor[0] + s,
-          cursor[1],
-          0,
-          cursor[0],
-          cursor[1] - s,
-          0,
-          cursor[0],
-          cursor[1] + s,
-          0,
-        ]);
-        geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+        geo = buildCrosshairGeo(cursor);
         useDash = true;
       }
     } else if (activeTool === 'circle') {
@@ -263,24 +268,7 @@ export function DrawPreview({
       if (collectedPoints.length >= 1) {
         geo = buildSplinePreviewGeo(collectedPoints, cursor);
       } else {
-        // Crosshair at cursor.
-        const s = 0.15;
-        const verts = new Float32Array([
-          cursor[0] - s,
-          cursor[1],
-          0,
-          cursor[0] + s,
-          cursor[1],
-          0,
-          cursor[0],
-          cursor[1] - s,
-          0,
-          cursor[0],
-          cursor[1] + s,
-          0,
-        ]);
-        geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+        geo = buildCrosshairGeo(cursor);
         useDash = true;
       }
     }

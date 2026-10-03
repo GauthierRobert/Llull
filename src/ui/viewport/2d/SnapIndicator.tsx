@@ -29,6 +29,7 @@ import type { Vec2 } from '@core/model/types';
 import { useSnap } from './useSnap';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { SnapType } from './snapping';
+import { useGroundPlane } from './useGroundPlane';
 
 // ---------------------------------------------------------------------------
 // Glyph colours per snap type
@@ -319,18 +320,7 @@ interface GroundPlaneProps {
 }
 
 function GroundPlane({ onMove, onLeave }: GroundPlaneProps): React.ReactElement {
-  const geo = useMemo(() => new THREE.PlaneGeometry(1e8, 1e8), []);
-  const mat = useMemo(
-    () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
-    [],
-  );
-
-  useEffect(() => {
-    return () => {
-      geo.dispose();
-      mat.dispose();
-    };
-  }, [geo, mat]);
+  const { geo, mat } = useGroundPlane();
 
   const handleMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {

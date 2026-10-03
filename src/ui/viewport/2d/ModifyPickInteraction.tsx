@@ -14,8 +14,7 @@
  * Presentation only — no document mutations (R1).
  */
 
-import { useMemo, useEffect, useCallback } from 'react';
-import * as THREE from 'three';
+import { useCallback } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useThree } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
@@ -24,6 +23,7 @@ import { useStore } from '@ui/store';
 import { nearestEntityId } from './modifyHelpers';
 import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
+import { useGroundPlane } from './useGroundPlane';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -50,18 +50,7 @@ export function ModifyPickInteraction({
   const document = useStore((s) => s.document);
   const { invalidate } = useThree();
 
-  const geo = useMemo(() => new THREE.PlaneGeometry(1e8, 1e8), []);
-  const mat = useMemo(
-    () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
-    [],
-  );
-
-  useEffect(() => {
-    return () => {
-      geo.dispose();
-      mat.dispose();
-    };
-  }, [geo, mat]);
+  const { geo, mat } = useGroundPlane();
 
   // Invalidate on pointer move so the cursor stays responsive under demand mode.
   const handleMove = useCallback(

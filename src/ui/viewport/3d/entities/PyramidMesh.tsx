@@ -4,90 +4,22 @@
  * Render branch for `kind:'pyramid'` entities.
  * Rectangular base centered at position (±baseWidth/2 in X, ±baseDepth/2 in Y),
  * apex at +Z*height (Z-up, matches core tessellation).
- *
- * Custom BufferGeometry: 4 triangular side faces + 2 base triangles.
- * Normals computed via computeVertexNormals() for correct lighting.
- * Geometry is memoized on geometric fields; disposed on unmount (r3f R9).
+ * Geometry is memoized on geometric fields; lifecycle handled by SolidMeshShell.
  */
 
-import { useEffect, useMemo, useRef } from 'react';
-import * as THREE from 'three';
-import type { ThreeEvent } from '@react-three/fiber';
+import { useMemo } from 'react';
 import type { PyramidEntity } from '@core/model/types';
-import { useMaterialProps } from '../useMaterialProps';
+import { SolidMeshShell, type SolidMeshKindProps } from './SolidMeshShell';
 import { buildPyramidGeometry } from './primitiveGeometry';
-
-interface PyramidMeshProps {
-  entity: PyramidEntity;
-  selected: boolean;
-  onSelect: (id: string, additive: boolean) => void;
-  /** Optional PBR material override from an assigned document material. */
-  pbrMaterial?: { color: string; metalness: number; roughness: number };
-}
 
 export function PyramidMesh({
   entity,
-  selected,
-  onSelect,
-  pbrMaterial,
-}: PyramidMeshProps): React.ReactElement {
-  const { baseWidth, baseDepth, height, position, rotation, color } = entity;
-
+  ...shell
+}: SolidMeshKindProps<PyramidEntity>): React.ReactElement {
+  const { baseWidth, baseDepth, height } = entity;
   const geometry = useMemo(
     () => buildPyramidGeometry(baseWidth, baseDepth, height),
     [baseWidth, baseDepth, height],
   );
-
-  const meshRef = useRef<THREE.Mesh>(null);
-
-  // Build BVH once per geometry for O(log n) raycasting; dispose with the geometry (R9).
-  useEffect(() => {
-    geometry.computeBoundsTree();
-    return () => {
-      geometry.disposeBoundsTree();
-      geometry.dispose();
-    };
-  }, [geometry]);
-
-  const matProps = useMaterialProps({
-    color,
-    selected,
-    roughness: 0.45,
-    metalness: 0.08,
-    envMapIntensity: 0.8,
-    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
-  });
-
-  function handleClick(e: ThreeEvent<MouseEvent>): void {
-    e.stopPropagation();
-    const additive = e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
-    onSelect(entity.id, additive);
-  }
-
-  return (
-    <mesh
-      ref={meshRef}
-      name={entity.id}
-      geometry={geometry}
-      position={[position[0], position[1], position[2]]}
-      rotation={[rotation[0], rotation[1], rotation[2]]}
-      onClick={handleClick}
-      castShadow
-      receiveShadow
-    >
-      <meshStandardMaterial
-        color={matProps.color}
-        emissive={matProps.emissive}
-        emissiveIntensity={matProps.emissiveIntensity}
-        roughness={matProps.roughness}
-        metalness={matProps.metalness}
-        envMapIntensity={matProps.envMapIntensity}
-        wireframe={matProps.wireframe}
-        transparent={matProps.transparent}
-        opacity={matProps.opacity}
-        depthWrite={matProps.depthWrite}
-        side={matProps.side}
-      />
-    </mesh>
-  );
+  return <SolidMeshShell entity={entity} geometry={geometry} {...shell} />;
 }
