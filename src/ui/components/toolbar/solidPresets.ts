@@ -10,7 +10,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
 import type { IconName } from '@ui/components/Icon';
 
-export type SolidCommand =
+type SolidCommand =
   | 'add_box'
   | 'add_cylinder'
   | 'add_sphere'

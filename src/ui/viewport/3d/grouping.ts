@@ -20,7 +20,7 @@ import type { Entity, EntityId, Material } from '@core/model/types';
 // ---------------------------------------------------------------------------
 
 /** Entity kinds that support InstancedMesh rendering in v1. */
-export type BatchableKind = 'box' | 'cylinder' | 'sphere';
+type BatchableKind = 'box' | 'cylinder' | 'sphere';
 
 /** A render batch: all entities in the array share the same geometry key. */
 export interface InstanceBatch {

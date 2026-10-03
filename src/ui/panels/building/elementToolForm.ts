@@ -5,7 +5,7 @@
  * specs (param-gathering only, react R1).
  */
 
-export type FieldKind = 'number' | 'text' | 'select' | 'checkbox';
+type FieldKind = 'number' | 'text' | 'select' | 'checkbox';
 
 /** Live element lists a select field can offer. */
 export type ElementListKind = 'walls' | 'hosts' | 'stairs' | 'slabs';
