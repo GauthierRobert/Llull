@@ -66,7 +66,7 @@ export const FRAME_LOAD_SHAPE = {
   levelId: z.string().optional().describe('Level id. Default: the active level.'),
 };
 
-export type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>>;
+type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>>;
 
 /** Validated loads + level, or the failure reason. */
 export function resolveFrameLoads(

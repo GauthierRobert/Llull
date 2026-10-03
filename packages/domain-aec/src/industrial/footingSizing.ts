@@ -157,7 +157,7 @@ function concreteShear(
   return { vRd: (stress * 1000 * effectiveMm) / 1000, stress, k, rho };
 }
 
-export interface Attempt {
+interface Attempt {
   readonly diameter: number;
   readonly spacing: number;
   readonly asRequired: number;

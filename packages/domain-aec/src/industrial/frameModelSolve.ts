@@ -9,7 +9,7 @@ import { solveFrame, type FrameResult } from '@lib/frame2d';
 import type { FrameLoads, FrameModel, LoadCase } from './frameModelTypes';
 import { framesOf } from './frameModelFrames';
 
-export type NodeForce = { readonly node: number; readonly fx: number };
+type NodeForce = { readonly node: number; readonly fx: number };
 
 /** Linear analysis of a frame under factored load cases (+ extra horizontal node forces). */
 export function solveCombination(

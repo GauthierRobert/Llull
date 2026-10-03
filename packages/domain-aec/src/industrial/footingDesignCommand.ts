@@ -52,8 +52,6 @@ const footingDesignParams = z.object({
     ),
 });
 
-export type FootingDesignParams = z.output<typeof footingDesignParams>;
-
 /**
  * @command design_footings
  * @pure

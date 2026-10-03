@@ -7,7 +7,7 @@ import type { Vec2, Vec3 } from '@core/model/types';
 import { panelFrame } from './evaluate';
 import type { HallGeometry, PortalProfiles } from './portalGeometry';
 
-export interface CladdingPanel {
+interface CladdingPanel {
   readonly corners: Vec3[];
   readonly role: 'roof' | 'wall';
   readonly outward: Vec3;

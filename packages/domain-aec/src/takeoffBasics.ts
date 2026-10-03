@@ -15,7 +15,7 @@ import { toMetres } from './model';
 import { openingsOf, wallExtent } from './wallGeometry';
 import type { ConnectionWelds } from './industrial/connections';
 
-export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
+type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
 export interface TakeoffLine {
   /** Stable rate key "<group>.<material>.<unit>", e.g. "wall.concrete.m3", "slab-roof.concrete.m2". */
@@ -44,7 +44,7 @@ export function scaleFor(doc: CadDocument): Scale {
   };
 }
 
-export interface WallQuantities {
+interface WallQuantities {
   readonly length: number;
   readonly grossArea: number;
   readonly openingArea: number;

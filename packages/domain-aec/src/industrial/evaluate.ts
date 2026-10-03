@@ -246,7 +246,7 @@ export function boltSize(doc: Pick<CadDocument, 'units'>, diameter: number): str
 }
 
 /** World placement of a base plate and its anchor bolts (null when the column is missing). */
-export interface PlateLayout {
+interface PlateLayout {
   /** Plate centre (world). */
   readonly center: Vec3;
   /** Plan angle of the plate length axis (the column depth direction). */

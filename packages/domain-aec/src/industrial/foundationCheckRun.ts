@@ -203,8 +203,6 @@ const foundationCheckParams = z.object({
     ),
 });
 
-export type FoundationCheckParams = z.output<typeof foundationCheckParams>;
-
 /**
  * @command check_foundations
  * @pure read-only

@@ -16,7 +16,7 @@ const GAMMA_CRANE = 1.35;
 export const DEFAULT_CRANE_SPAN = 20000;
 
 /** Crane longitudinal design force (kN) acting at rail level on the wall that carries one runway. */
-export interface CraneWallForce {
+interface CraneWallForce {
   /** 1.35 · HL,i (group 1/5 drive force of one rail), kN. */
   readonly driveGroup1: number;
   /** γ · HB,1 / nr (group 7 buffer force of one rail, accidental γ = 1.0), kN. */

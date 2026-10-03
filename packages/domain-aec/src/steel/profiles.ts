@@ -8,7 +8,7 @@
 
 import type { Vec2 } from '@core/model/types';
 
-export type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
+type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
 
 export interface SteelProfile {
   readonly name: string;
@@ -309,7 +309,7 @@ export function findProfile(name: unknown): SteelProfile | undefined {
   return typeof name === 'string' ? BY_NAME.get(name.replace(/\s+/g, '').toUpperCase()) : undefined;
 }
 
-export interface ProfileOutline {
+interface ProfileOutline {
   /** Outer boundary, counter-clockwise, mm, centred on the bounding box; +y = depth (h), +x = width (b). */
   readonly outer: Vec2[];
   readonly holes: Vec2[][];
@@ -411,7 +411,7 @@ export function profileOutline(profile: SteelProfile): ProfileOutline {
   }
 }
 
-export interface SectionProperties {
+interface SectionProperties {
   /** Area, mm². */
   readonly area: number;
   /** Second moment of area about the strong (horizontal) axis through the centroid, mm⁴. */
