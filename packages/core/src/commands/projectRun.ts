@@ -11,7 +11,7 @@ import {
   isRepeatStep,
   isForEachStep,
   budgetFailure,
-  noop,
+  rejectPlan,
   buildEnv,
   resolveCount,
   resolveForEachValues,
@@ -211,7 +211,11 @@ export function runProject(
   { actions, onError = 'abort', validate = false }: BuildProjectParams,
 ): CommandResult {
   const rejected = (summary: string): CommandResult =>
-    noop(doc, { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null }, summary);
+    rejectPlan(
+      doc,
+      { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null },
+      summary,
+    );
   if (actions.length === 0) return rejected('build_project: no actions provided.');
   if (actions.length > MAX_PROJECT_ACTIONS) {
     return rejected(
