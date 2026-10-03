@@ -30,6 +30,18 @@ export interface Exported {
   readonly material: string | null;
 }
 
+function addWall(
+  context: Context,
+  wall: WallElement | CurvedWallElement,
+  local: string,
+  profile: string,
+): string {
+  const body = shape(context, [extrusion(context, profile, context.mm(wall.height))]);
+  return context.writer.add(
+    `IFCWALL('${context.guid(wall.id)}',$,${ifcString(wall.mark)},$,$,${local},${body},${ifcString(wall.id)},.STANDARD.)`,
+  );
+}
+
 export function exportWall(
   context: Context,
   wall: WallElement,
@@ -52,9 +64,7 @@ export function exportWall(
     mm(extent.end - extent.start),
     mm(wall.thickness),
   );
-  const ref = context.writer.add(
-    `IFCWALL('${context.guid(wall.id)}',$,${ifcString(wall.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(wall.height))])},${ifcString(wall.id)},.STANDARD.)`,
-  );
+  const ref = addWall(context, wall, local, profile);
   return { ref, material: wall.material, placement: local };
 }
 
@@ -92,9 +102,7 @@ export function exportCurvedWall(
     context,
     band.map(([x, y]): Vec2 => [mm(x), mm(y)]),
   );
-  const ref = context.writer.add(
-    `IFCWALL('${context.guid(wall.id)}',$,${ifcString(wall.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(wall.height))])},${ifcString(wall.id)},.STANDARD.)`,
-  );
+  const ref = addWall(context, wall, local, profile);
   return { ref, material: wall.material };
 }
 

@@ -26,19 +26,19 @@ import {
   elementAffected,
 } from './model';
 import { regenerateBuilding } from './evaluateElements';
+import { stairPoint } from './stairGeometry';
 import { triangulatePolygon } from '@lib/triangulate';
 
 /** Plan footprint of a stair run, grown by `margin` on every side. */
 function stairFootprint(stair: StairElement, margin: number): Vec2[] {
-  const direction: Vec2 = [Math.cos(stair.angle), Math.sin(stair.angle)];
-  const normal: Vec2 = [-direction[1], direction[0]];
   const half = stair.width / 2 + margin;
-  const run = stair.riserCount * stair.treadDepth;
-  const at = (along: number, across: number): Vec2 => [
-    stair.start[0] + direction[0] * along + normal[0] * across,
-    stair.start[1] + direction[1] * along + normal[1] * across,
+  const run = stair.riserCount * stair.treadDepth + margin;
+  return [
+    stairPoint(stair, -margin, -half),
+    stairPoint(stair, run, -half),
+    stairPoint(stair, run, half),
+    stairPoint(stair, -margin, half),
   ];
-  return [at(-margin, -half), at(run + margin, -half), at(run + margin, half), at(-margin, half)];
 }
 
 function edges(polygon: ReadonlyArray<Vec2>): Array<[Vec2, Vec2]> {

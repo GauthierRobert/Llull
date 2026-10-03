@@ -59,9 +59,10 @@ import {
   pointAlong,
   wallExtent,
   wallFrame,
-  wallPieces,
 } from './wallGeometry';
 
+import { stairPoint } from './stairGeometry';
+import { wallPieces } from './wallPieces';
 function evaluateWall(
   context: EvaluationContext,
   wall: WallElement,
@@ -233,7 +234,6 @@ function evaluateBeam(beam: BeamElement, level: BuildingLevel): Entity[] {
 }
 
 function evaluateStair(stair: StairElement, level: BuildingLevel): Entity[] {
-  const direction: Vec2 = [Math.cos(stair.angle), Math.sin(stair.angle)];
   const color = colorForMaterial(stair.material, '#b4b2aa');
   const steps: Entity[] = [];
   for (let index = 0; index < stair.riserCount; index++) {
@@ -243,11 +243,7 @@ function evaluateStair(stair: StairElement, level: BuildingLevel): Entity[] {
       orientedBox(
         stair,
         { part: `step-${index}`, label: `Stair ${stair.mark} step ${index + 1}` },
-        [
-          stair.start[0] + direction[0] * along,
-          stair.start[1] + direction[1] * along,
-          level.elevation + stepHeight / 2,
-        ],
+        [...stairPoint(stair, along, 0), level.elevation + stepHeight / 2],
         stair.angle,
         [stair.treadDepth, stair.width, stepHeight],
         color,
