@@ -1,7 +1,7 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { z, looseVec3, tolerant } from './schema';
-import { rotatedEntityBounds } from './scene';
+import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { finiteVec3OrZero } from '../lib/vec3';
 import { withEntity } from './entityOps';
 

@@ -19,8 +19,8 @@ import {
   toMetres,
   withElement,
 } from '../model';
-import { regenerateBuilding } from '../evaluate';
-import { toVec3 } from './members';
+import { regenerateBuilding } from '../evaluateElements';
+import { toVec3 } from './memberSupport';
 
 export function trayLength(tray: CableTrayElement): number {
   return tray.points.reduce((sum, point, index) => {

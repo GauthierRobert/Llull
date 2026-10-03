@@ -8,12 +8,9 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  computeSceneSnapshot,
-  entityBounds,
-  rotatedEntityBounds,
-  instanceBoundsFromDoc,
-} from '@core/commands/scene';
+import { computeSceneSnapshot } from '@core/commands/scene';
+import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
+import { entityBounds, instanceBoundsFromDoc } from '@core/commands/sceneBounds';
 
 describe('describe_scene command', () => {
   it('returns a snapshot in data and leaves the document unchanged', () => {

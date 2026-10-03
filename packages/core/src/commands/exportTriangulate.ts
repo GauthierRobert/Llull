@@ -1,6 +1,6 @@
 import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
 import { is3D } from '../model/types';
-import { applyEulerXYZ } from './render';
+import { applyEulerXYZ } from '../lib/eulerRotation';
 import { expandInstance } from './assemblies';
 import { revolutionTriangles } from '../geometry/revolution';
 import {

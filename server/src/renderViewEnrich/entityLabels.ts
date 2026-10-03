@@ -5,8 +5,8 @@
  */
 
 import type { Entity } from '@core/model/types';
-import type { RenderViewData } from '@core/commands/render';
-import { entityBounds } from '@core/commands/scene';
+import { RenderViewData } from '@core/commands/renderTypes';
+import { entityBounds } from '@core/commands/sceneBounds';
 import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';
 import { computeOrthoHalf, makeProjector } from './svgHelpers';

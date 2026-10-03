@@ -11,7 +11,8 @@ import type {
 } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '../model';
-import { WIND_CASES, WIND_PRESSURE_CASES, type BaseReaction, type LoadCase } from './frameModel';
+import { type BaseReaction } from './frameModelSolve';
+import { WIND_CASES, WIND_PRESSURE_CASES, type LoadCase } from './frameModelTypes';
 import { type Combination, type Factors, TOLERANCE_METRES } from './foundationModel';
 
 /** Factored base reaction: vertical v and horizontal h in kN, base moment m in kN·m (CCW +). */

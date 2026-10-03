@@ -6,15 +6,10 @@
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { fromMm, toMetres } from '../model';
-import type { BaseReaction } from './frameModel';
-import {
-  combine,
-  footingMoment,
-  footingRows,
-  ultimateCombinations,
-  type ClayLayer,
-  type Combination,
-} from './foundationCheck';
+import { BaseReaction } from './frameModelSolve';
+import { type ClayLayer, type Combination } from './foundationModel';
+import { footingRows } from './foundationRows';
+import { combine, footingMoment, ultimateCombinations } from './foundationCombinations';
 import {
   BAR_DIAMETERS_MM,
   COVER_MM,

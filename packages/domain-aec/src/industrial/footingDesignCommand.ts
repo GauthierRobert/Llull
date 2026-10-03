@@ -15,19 +15,12 @@ import {
   withElement,
 } from '../model';
 import { findProfile } from '../steel/profiles';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheck';
-import { baseReactions } from './frameModel';
-import {
-  clayLayerError,
-  defaultThrustTie,
-  findFooting,
-  findPlate,
-  groundSlabWeight,
-  slidingHorizontalOf,
-  ultimateCombinations,
-  hasCase,
-  SOIL_SHAPE,
-} from './foundationCheck';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
+import { baseReactions } from './frameModelSolve';
+import { SOIL_SHAPE } from './foundationCheckRun';
+import { findFooting, findPlate, ultimateCombinations, hasCase } from './foundationCombinations';
+import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationRows';
+import { clayLayerError } from './foundationSettlement';
 import {
   COVER_MM,
   DEFAULT_SOIL_BEARING,

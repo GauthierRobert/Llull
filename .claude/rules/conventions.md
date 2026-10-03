@@ -108,9 +108,9 @@ Run `npm run format`. Never hand-format.
 
 ## C7 — File organization
 
-- One concern per file. Group commands by domain (`geometry.ts`, `boolean.ts`,
-  `transform.ts`); split a domain by concern when it grows (`geometryBasic.ts`,
-  `geometryRound.ts`, …). Core commands register in `registry.ts`; domain commands in their
+- One concern per file. Group commands by domain (`boolean.ts`, `transform.ts`); split a domain
+  by concern when it grows (`geometryBasic.ts`, `geometryRound.ts`, …) and import from the split
+  files directly — no re-export barrel modules (package entry `index.ts` files excepted). Core commands register in `registry.ts`; domain commands in their
   plugin's `commands` list (`packages/domain-aec/src/index.ts` → `plugin.ts`).
 - Max **500 code lines** per file (blank/comment lines excluded) — ESLint `max-lines` error on
   `src/**`, `packages/*/src/**`, `server/src/**`, no allowlist. Split by concern; never disable it.

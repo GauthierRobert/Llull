@@ -18,7 +18,7 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds } from './scene';
+import { entityBounds } from './sceneBounds';
 
 // ---------------------------------------------------------------------------
 // Internal helpers

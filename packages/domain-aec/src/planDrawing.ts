@@ -7,7 +7,7 @@ import type { Vec2 } from '@core/model/types';
 import type { WallElement } from '@core/model/building';
 import { polygonArea, polygonCentroid } from '@lib/polygon';
 import { fromMm, getBuilding, toMetres } from './model';
-import { openingsOf, wallFrame } from './evaluate';
+import { openingsOf, wallFrame } from './wallGeometry';
 import {
   curvedBandBetween,
   curvedWallExtent,

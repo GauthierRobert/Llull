@@ -12,7 +12,7 @@ import {
   wedgeCorners,
 } from './tessellation';
 import { type PreDepthPolygon } from './renderTypes';
-import { sub3, cross3, normalize3 } from './renderMath';
+import { sub3, cross3, normalize3 } from '../lib/vec3';
 
 /** Compute outward face normal for a polygon (using the first 3 verts). */
 function faceNormal(verts: Vec3[]): Vec3 {

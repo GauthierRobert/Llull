@@ -8,7 +8,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { RenderViewData } from '@core/commands/render';
+import { RenderViewData } from '@core/commands/renderTypes';
 import type { SectionParams } from './types';
 import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';

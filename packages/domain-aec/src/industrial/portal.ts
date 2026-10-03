@@ -21,16 +21,16 @@ import {
   toVec2,
   withElement,
 } from '../model';
-import { regenerateBuilding } from '../evaluate';
+import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, type SteelProfile } from '../steel/profiles';
+import { appendMembers } from './memberSupport';
 import {
   appendFootings,
-  appendMembers,
   appendPanel,
   columnFeet,
   MAX_GENERATED_MEMBERS,
   withoutFootings,
-} from './members';
+} from './memberFootingPanelCommands';
 import { buildHallGeometry, type MemberSpec, type PortalProfiles } from './portalGeometry';
 import { portalFrameParams } from './portalParams';
 import { hallMemberSpecs } from './portalMembers';

@@ -2,8 +2,6 @@ import type { Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { type PreDepthPolygon } from './renderTypes';
 
-export { add3, sub3, scale3, dot3, cross3, normalize3 } from '../lib/vec3';
-
 export function centroid3(verts: Vec3[]): Vec3 {
   if (verts.length === 0) return [0, 0, 0];
   let x = 0,

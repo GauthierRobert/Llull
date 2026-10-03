@@ -36,7 +36,7 @@ import {
   closeAllSubscribers,
   getLiveDoc,
 } from './liveDocument';
-import { closeAllSessions } from './mcp';
+import { closeAllSessions } from './mcp/sessions';
 import {
   getAllowedOrigins,
   guardMutation,

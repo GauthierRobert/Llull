@@ -2,15 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BasePlateElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import {
-  baseReactions,
-  framesOf,
-  solveCombination,
-  type FrameLoads,
-} from '@aec/industrial/frameModel';
+import { type FrameLoads } from '@aec/industrial/frameModelTypes';
+import { framesOf } from '@aec/industrial/frameModelFrames';
+import { baseReactions, solveCombination } from '@aec/industrial/frameModelSolve';
 import { BEARING_STRENGTH, checkPlateMN, sizeBasePlate } from '@aec/industrial/basePlateMN';
-import { footingMoment, type FoundationRow } from '@aec/industrial/foundationCheck';
-import type { FootingDesignRow } from '@aec/industrial/footingDesign';
+import { type FoundationRow } from '@aec/industrial/foundationModel';
+import { footingMoment } from '@aec/industrial/foundationCombinations';
+import { FootingDesignRow } from '@aec/industrial/footingModel';
 import { findProfile } from '@aec/steel/profiles';
 import { buildingErrors } from '@aec/validate';
 

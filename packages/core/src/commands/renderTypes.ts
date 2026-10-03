@@ -1,5 +1,5 @@
 import type { Vec3 } from '../model/types';
-import type { Bounds } from './scene';
+import { Bounds } from './sceneTypes';
 
 // ---------------------------------------------------------------------------
 // Public result type — a second agent depends on these field names exactly.

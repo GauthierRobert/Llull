@@ -12,8 +12,8 @@
 import type { CadDocument, Entity, EntityKind } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds } from './scene';
-import type { Bounds } from './scene';
+import { entityBounds } from './sceneBounds';
+import { Bounds } from './sceneTypes';
 import { distanceSq3 } from '../lib/vec3';
 
 // ---------------------------------------------------------------------------

@@ -1,8 +1,8 @@
 import type { CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { instanceBoundsFromDoc } from './scene';
-import type { Bounds } from './scene';
+import { instanceBoundsFromDoc } from './sceneBounds';
+import { Bounds } from './sceneTypes';
 import { evaluateMotionInternal } from './jointsKinematics';
 
 // ---------------------------------------------------------------------------

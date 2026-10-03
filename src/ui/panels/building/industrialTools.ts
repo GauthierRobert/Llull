@@ -13,7 +13,7 @@ import {
   result,
   type ElementTool,
   type ToolField,
-} from './elementTools';
+} from './elementToolForm';
 
 const GROUP = 'Industrial / steel';
 

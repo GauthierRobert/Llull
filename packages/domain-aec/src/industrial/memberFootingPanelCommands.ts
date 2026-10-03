@@ -20,7 +20,7 @@ import {
   toVec2,
   withElement,
 } from '../model';
-import { regenerateBuilding } from '../evaluate';
+import { regenerateBuilding } from '../evaluateElements';
 import { panelFrame } from './evaluate';
 import { levelIdSchema, toVec3 } from './memberSupport';
 

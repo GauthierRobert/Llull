@@ -28,18 +28,6 @@ import {
 } from './sceneTypes';
 import { instanceBoundsFromDoc, mergeBounds } from './sceneBounds';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
-
-export type {
-  Bounds,
-  EntitySummary,
-  LayerSummary,
-  GroupSummary,
-  AnimationSummary,
-  SceneSnapshot,
-} from './sceneTypes';
-export { entityBounds, instanceBoundsFromDoc } from './sceneBounds';
-export { rotatedEntityBounds } from './sceneRotatedBounds';
-
 // ---------------------------------------------------------------------------
 // Snapshot
 // ---------------------------------------------------------------------------

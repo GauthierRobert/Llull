@@ -1,11 +1,4 @@
-/**
- * @layer server
- *
- * Pure helpers shared by the render_view enrichments: world→screen projection math,
- * orthographic frustum sizing, and SVG composition utilities.
- */
-
-import type { RenderViewData } from '@core/commands/render';
+import { RenderViewData } from '@core/commands/renderTypes';
 import { toScreenCoords } from '@core/commands/renderCamera';
 import { cross3, dot3, normalize3, sub3 } from '@lib/vec3';
 

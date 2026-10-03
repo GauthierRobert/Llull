@@ -8,8 +8,9 @@ import type { CadDocument } from '@core/model/types';
 import { fromMm, withElement } from '../model';
 import { findProfile } from '../steel/profiles';
 import { sizeBasePlate, type PlateDemand } from './basePlateMN';
-import { plateDemands } from './foundationCheck';
-import { baseReactions, type FrameLoads } from './frameModel';
+import { plateDemands } from './foundationCombinations';
+import { type FrameLoads } from './frameModelTypes';
+import { baseReactions } from './frameModelSolve';
 import { yieldStrength } from './steelDesign';
 
 /**

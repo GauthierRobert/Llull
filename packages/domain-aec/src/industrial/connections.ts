@@ -22,7 +22,7 @@ import {
   withElement,
   withoutElements,
 } from '../model';
-import { regenerateBuilding } from '../evaluate';
+import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
 import { boltSize, buildingConnectionSolids } from './evaluate';
 import { polygonArea } from '@lib/polygon';

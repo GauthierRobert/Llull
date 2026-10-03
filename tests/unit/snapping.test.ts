@@ -16,9 +16,6 @@ import type {
   ArcEntity,
 } from '@core/model/types';
 import {
-  collectSnapCandidates,
-  snap,
-  applyOrthoPolar,
   snapPerpendicular,
   perpendicularFoot,
   tangentPointsToCircle,
@@ -26,7 +23,9 @@ import {
   snapExtension,
   nearestOnSegment,
   nearestOnArc,
-} from '../../src/ui/viewport/2d/snapping';
+} from '../../src/ui/viewport/2d/snapping/geometry';
+import { snap, applyOrthoPolar } from '../../src/ui/viewport/2d/snapping/resolveSnap';
+import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';
 
 // ---------------------------------------------------------------------------
 // Test document builders

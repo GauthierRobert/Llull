@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ELEMENT_TOOLS, defaultValues, type ElementTool } from '@ui/panels/building/elementTools';
+import { ELEMENT_TOOLS } from '@ui/panels/building/elementTools';
+import { defaultValues, type ElementTool } from '@ui/panels/building/elementToolForm';
 import { wallChainParams } from '@ui/viewport/2d/useDrawTool';
 import { execute, getCommand } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';

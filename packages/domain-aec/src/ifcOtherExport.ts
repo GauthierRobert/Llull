@@ -5,7 +5,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel, SlabElement } from '@core/model/building';
-import { wallFrame } from './evaluate';
+import { wallFrame } from './wallGeometry';
 import {
   type Context,
   extrusion,

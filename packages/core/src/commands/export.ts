@@ -15,9 +15,6 @@ import { uint8ArrayToBase64 } from '../lib/base64';
 import { collectExportTriangles } from './exportTriangulate';
 import { facetNormal, type Triangle } from './exportMath';
 
-export type { Triangle } from './exportMath';
-export { entityToTriangles } from './exportTriangulate';
-
 function formatVec3(v: Vec3): string {
   return `${v[0]} ${v[1]} ${v[2]}`;
 }

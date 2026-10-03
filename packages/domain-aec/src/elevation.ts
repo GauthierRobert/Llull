@@ -7,7 +7,8 @@
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { entityToTriangles, type Triangle } from '@core/commands/export';
+import { type Triangle } from '@core/commands/exportMath';
+import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { fileSlug, getBuilding, isFiniteNumber, noChange, toMetres } from './model';
 import {
   BINDING_MARGIN,

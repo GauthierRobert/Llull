@@ -2,12 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { findProfile } from '@aec/steel/profiles';
-import {
-  checkPurlins,
-  effectiveModulusRatio,
-  type PurlinRow,
-  type ZoneSummary,
-} from '@aec/industrial/purlinCheck';
+import { type PurlinRow, type ZoneSummary } from '@aec/industrial/purlinModel';
+import { effectiveModulusRatio } from '@aec/industrial/purlinSection';
+import { checkPurlins } from '@aec/industrial/purlinCheckRun';
 
 interface PurlinData {
   rows: PurlinRow[];

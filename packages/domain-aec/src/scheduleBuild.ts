@@ -12,7 +12,7 @@ import type {
 } from '@core/model/building';
 import { polygonArea, polygonPerimeter } from '@lib/polygon';
 import { getBuilding, lengthOf } from './model';
-import { openingsOf } from './evaluate';
+import { openingsOf } from './wallGeometry';
 import { boltSize } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
 import { plateMass } from './industrial/plates';

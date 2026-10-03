@@ -7,7 +7,7 @@ import { type CadDocument, type Vec2, is2D } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, fromMm, getBuilding, noChange } from './model';
-import { buildPlanDrawing } from './plan';
+import { buildPlanDrawing } from './planDrawing';
 import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, toWorld, writePrimitive } from './dxfWriter';
 
 function writeDrafting(writer: DxfWriter, doc: CadDocument): void {

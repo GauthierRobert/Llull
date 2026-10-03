@@ -6,7 +6,7 @@
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { isFiniteNumber, toMetres } from '../model';
-import type { BaseReaction } from './frameModel';
+import { BaseReaction } from './frameModelSolve';
 import { combine } from './foundationCombinations';
 import {
   BACKFILL_UNIT_WEIGHT,

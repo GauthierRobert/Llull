@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { rateFor, toCsv, type TakeoffLine, type CostLine } from '@aec/quantities';
+import { type TakeoffLine } from '@aec/takeoffBasics';
+import { toCsv } from '@aec/scheduleBuild';
+import { rateFor, type CostLine } from '@aec/costing';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;

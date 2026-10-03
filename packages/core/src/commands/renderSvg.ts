@@ -1,6 +1,7 @@
 import type { Vec3 } from '../model/types';
 import { type Polygon3D } from './renderTypes';
-import { add3, scale3, r2 } from './renderMath';
+import { r2 } from './renderMath';
+import { add3, scale3 } from '../lib/vec3';
 import { type Camera, projectPoint, toScreenCoords, shade } from './renderCamera';
 
 // ---------------------------------------------------------------------------

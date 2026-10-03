@@ -17,19 +17,15 @@ import { addWall, drawWalls, updateWall } from './walls';
 import { addDoor, addWindow, updateOpening } from './openings';
 import { addSlab, addColumn, addBeam, addStair } from './structure';
 import { addRoom, deleteBuildingElement, moveBuildingElement, copyLevelElements } from './elements';
-import { exportDxf } from './dxf';
+import { exportDxf } from './dxfExport';
 import { exportPlanSheet } from './sheet';
 import { exportElevationSheet } from './elevation';
-import { exportIfc } from './ifc';
+import { exportIfc } from './ifcBuild';
 import { addBuildingTemplate } from './templates';
 import { addSlabOpening, deleteSlabOpening } from './slabOpenings';
-import {
-  addFooting,
-  addPanel,
-  addSteelMember,
-  listSteelProfiles,
-  updateSteelMember,
-} from './industrial/members';
+import { listSteelProfiles } from './industrial/memberSupport';
+import { addSteelMember, updateSteelMember } from './industrial/memberSteelCommands';
+import { addFooting, addPanel } from './industrial/memberFootingPanelCommands';
 import { addEquipment, addPipeRun } from './industrial/equipment';
 import { addCraneRunway, addPortalFrameBuilding } from './industrial/portal';
 import { checkClashes } from './industrial/clash';
@@ -38,16 +34,16 @@ import { addBasePlates } from './industrial/plates';
 import { addCurvedWall } from './curvedWalls';
 import { setWallLayers } from './wallLayers';
 import { addMomentConnections } from './industrial/connections';
-import { checkPortalFrames } from './industrial/frameCheck';
+import { checkPortalFrames } from './industrial/frameCheckPortal';
 import { designPortalFrames } from './industrial/frameDesign';
-import { checkBracing } from './industrial/bracingCheck';
-import { foundationCheck } from './industrial/foundationCheck';
-import { designFootings } from './industrial/footingDesign';
+import { checkBracing } from './industrial/bracingCheckRun';
+import { foundationCheck } from './industrial/foundationCheckRun';
+import { designFootings } from './industrial/footingDesignCommand';
 import { exportNcFiles } from './industrial/ncExport';
-import { checkPurlins } from './industrial/purlinCheck';
+import { checkPurlins } from './industrial/purlinCheckRun';
 import { designPurlins } from './industrial/purlinDesign';
-import { exportAnchorPlan } from './industrial/anchorPlan';
-import { runwayCheck } from './industrial/runwayCheck';
+import { exportAnchorPlan } from './industrial/anchorPlanExport';
+import { runwayCheck } from './industrial/runwayCheckRun';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 /** AEC / BIM commands (levels, walls, openings, slabs, sheets, IFC, takeoff). */
@@ -115,10 +111,9 @@ export const industrialCommands = [
   addPortalFrameBuilding,
   checkClashes,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
-
-/** Public read-only building API for the UI (plans, layers, quantities, integrity). */
-export { buildPlanDrawing, type PlanPrimitive } from './plan';
-export { CATEGORY_LAYER } from './evaluate';
+export { type PlanPrimitive } from './planModel';
+export { buildPlanDrawing } from './planDrawing';
+export { CATEGORY_LAYER } from './entities';
 export { fromMm } from './model';
 export { buildingElementOf } from './integrity';
-export type { CostLine } from './quantities';
+export type { CostLine } from './costing';

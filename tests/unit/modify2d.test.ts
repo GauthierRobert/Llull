@@ -25,7 +25,7 @@ import {
   evalLine,
   offsetSegment,
   miterJoin,
-} from '@core/commands/modify2d';
+} from '@core/commands/modify2dGeometry';
 
 // ---------------------------------------------------------------------------
 // Geometry helper unit tests

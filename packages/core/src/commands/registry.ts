@@ -14,19 +14,12 @@ import type { ExecutionContext } from './context';
 import { currentContext, runInContext } from './context';
 import { formatIssues } from './schema';
 import { stepIdSource } from '../lib/id';
-import {
-  addBox,
-  addCylinder,
-  addSphere,
-  addCone,
-  addTorus,
-  addWedge,
-  addPyramid,
-  extrude,
-  move,
-  deleteEntity,
-} from './geometry';
+import { addWedge, addPyramid } from './geometryPrismatic';
+import { addCylinder, addSphere, addCone, addTorus } from './geometryRound';
+import { addBox, extrude, move, deleteEntity } from './geometryBasic';
 import { rotateEntity, scaleEntity, mirrorEntity, arrayLinear, arrayPolar } from './transform';
+import { drawBeltAround } from './draw2dBelt';
+import { drawEllipse, drawSpline, drawInvolute } from './draw2dCurves';
 import {
   drawLine,
   drawPolyline,
@@ -34,11 +27,7 @@ import {
   drawCircle,
   drawRectangle,
   drawPoint,
-  drawEllipse,
-  drawSpline,
-  drawInvolute,
-  drawBeltAround,
-} from './draw2d';
+} from './draw2dBasic';
 import { loadDocument } from './persistence';
 import { extrudeSketch, revolveProfile } from './profile';
 import { duplicateEntity, groupEntities, ungroupEntities, setEntityName } from './edit';
@@ -59,7 +48,9 @@ import { historyCommands } from './history';
 import { createConfiguration, activateConfiguration } from './configurations';
 import { createMaterial, assignMaterial } from './materials';
 import { saveRecipe, instantiateRecipe } from './recipes';
-import { explodePolyline, offset2D, trim, extend, fillet2D, chamfer2D } from './modify2d';
+import { fillet2D, chamfer2D } from './modify2dCorners';
+import { trim, extend } from './modify2dTrimExtend';
+import { explodePolyline, offset2D } from './modify2dBasic';
 import {
   addLayer,
   renameLayer,
@@ -68,15 +59,9 @@ import {
   setEntityLayer,
   deleteLayer,
 } from './layers';
-import {
-  measureDistance,
-  measureAngle,
-  measureArea,
-  measurePerimeter,
-  measureBoundingBox,
-  measureVolume,
-  massProperties,
-} from './measure';
+import { measureBoundingBox, measureVolume, massProperties } from './measureSolid';
+import { measureArea, measurePerimeter } from './measureAreaPerimeter';
+import { measureDistance, measureAngle } from './measureDistanceAngle';
 import { exportStl } from './export';
 import { exportObj, exportGltf } from './export_formats';
 import { exportCode } from './code_exchange';
@@ -89,15 +74,8 @@ import { align, distribute, stackOn } from './place';
 import { arrayAlongPath, distributeOnArc } from './array_along_path';
 import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } from './constraints';
 import { addMate, billOfMaterials } from './mates';
-import {
-  addJoint,
-  deleteJoint,
-  setJointValue,
-  addDriveRelation,
-  deleteDriveRelation,
-  evaluateMotion,
-  bakeMotion,
-} from './joints';
+import { addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './jointsDrive';
+import { addJoint, deleteJoint, setJointValue } from './jointsEdit';
 import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';

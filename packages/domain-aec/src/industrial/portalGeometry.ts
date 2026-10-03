@@ -4,7 +4,7 @@
  */
 
 import type { SteelProfile } from '../steel/profiles';
-import type { appendMembers } from './members';
+import { appendMembers } from './memberSupport';
 
 export type MemberSpecs = Parameters<typeof appendMembers>[2];
 export type MemberSpec = MemberSpecs[number];

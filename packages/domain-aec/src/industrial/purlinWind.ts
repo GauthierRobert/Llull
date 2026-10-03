@@ -4,7 +4,7 @@
  */
 
 import { FLAT_ROOF_LIMIT, roofCoefficients } from './windCoefficients';
-import { DOWNWIND_ROOF_FACTOR } from './frameModel';
+import { DOWNWIND_ROOF_FACTOR } from './frameModelTypes';
 import { pressureOf, suctionOf, TOLERANCE, zoneOf, round } from './purlinModel';
 import type { Located, WindOption } from './purlinModel';
 

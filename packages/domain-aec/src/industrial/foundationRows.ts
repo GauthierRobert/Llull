@@ -8,7 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import { getBuilding, toMetres } from '../model';
 import { findProfile } from '../steel/profiles';
 import { polygonArea } from '@lib/polygon';
-import type { BaseReaction } from './frameModel';
+import { BaseReaction } from './frameModelSolve';
 import { anchorBoltResistance, yieldStrength } from './steelDesign';
 import { BEARING_STRENGTH, checkPlateMN } from './basePlateMN';
 import {

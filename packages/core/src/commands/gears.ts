@@ -13,7 +13,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_GEAR_TEETH } from './limits';
-import { rotatedEntityBounds } from './scene';
+import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { withEntity } from './entityOps';
 
 // ---------------------------------------------------------------------------

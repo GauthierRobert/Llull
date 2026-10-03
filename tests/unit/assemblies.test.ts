@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import type { InstanceEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { rotatedEntityBounds } from '@core/commands/scene';
+import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
 import { expandInstance } from '@core/commands/assemblies';
 import type { Component } from '@core/model/types';
 

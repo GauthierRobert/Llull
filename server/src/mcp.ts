@@ -73,9 +73,6 @@ import {
   stripEnrichParams,
 } from './mcp/renderViewEnrichment';
 import { augmentRenderViewTool } from './mcp/renderViewSchema';
-
-export { closeAllSessions, _sessionCount } from './mcp/sessions';
-
 // ---------------------------------------------------------------------------
 // MCP Server factory
 // ---------------------------------------------------------------------------

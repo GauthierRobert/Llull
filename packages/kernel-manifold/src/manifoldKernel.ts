@@ -29,7 +29,7 @@
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
 import type { Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
-import { entityToTriangles } from '@core/commands/export';
+import { entityToTriangles } from '@core/commands/exportTriangulate';
 
 // ---------------------------------------------------------------------------
 // Minimal local interface for the Manifold WASM module (avoids `any`).

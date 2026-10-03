@@ -12,7 +12,7 @@ import type {
 } from '@core/model/building';
 import { polygonArea } from '@lib/polygon';
 import { toMetres } from './model';
-import { openingsOf, wallExtent } from './evaluate';
+import { openingsOf, wallExtent } from './wallGeometry';
 import type { ConnectionWelds } from './industrial/connections';
 
 export type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';

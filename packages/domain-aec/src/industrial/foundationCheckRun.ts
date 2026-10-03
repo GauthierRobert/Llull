@@ -8,9 +8,10 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding, isFiniteNumber, noChange } from '../model';
-import { toCsv } from '../quantities';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheck';
-import { baseReactions, type FrameLoads } from './frameModel';
+import { toCsv } from '../scheduleBuild';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
+import { type FrameLoads } from './frameModelTypes';
+import { baseReactions } from './frameModelSolve';
 import {
   type ClayLayer,
   DEFAULT_SOIL_MODULUS,

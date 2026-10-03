@@ -6,8 +6,8 @@
 import type { SteelMemberElement } from '@core/model/building';
 import { sectionProperties, type SteelProfile } from '../steel/profiles';
 import { bucklingReduction, E_STEEL } from './steelDesign';
-import { CRANE_FACTORS, craneActions } from './frameModel';
-import { bufferForce, GAMMA_BUFFER } from './runwayCheck';
+import { CRANE_FACTORS, craneActions } from './frameModelTypes';
+import { bufferForce, GAMMA_BUFFER } from './runwayCheckModel';
 
 /** ULS factor on the crane drive force HL (permanent-type variable crane action, groups 1 and 5). */
 const GAMMA_CRANE = 1.35;

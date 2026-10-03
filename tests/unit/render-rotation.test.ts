@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { applyEulerXYZ } from '@core/commands/render';
+import { applyEulerXYZ } from '@core/lib/eulerRotation';
 
 // ---------------------------------------------------------------------------
 // SVG bbox helpers

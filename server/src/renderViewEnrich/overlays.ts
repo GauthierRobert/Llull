@@ -1,11 +1,4 @@
-/**
- * @layer server
- *
- * SVG post-processing overlays for render_view: bounding-box dimension labels,
- * world-frame axis triad, and Z=0 ground grid.
- */
-
-import type { RenderViewData } from '@core/commands/render';
+import { RenderViewData } from '@core/commands/renderTypes';
 import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';
 import { computeOrthoHalf, makeProjector } from './svgHelpers';

@@ -1,5 +1,5 @@
 import type { Vec3 } from '../model/types';
-import { sub3, dot3, cross3, normalize3 } from './renderMath';
+import { sub3, dot3, cross3, normalize3 } from '../lib/vec3';
 
 // ---------------------------------------------------------------------------
 // Camera / view

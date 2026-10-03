@@ -7,7 +7,7 @@
  */
 
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { rotatedEntityBounds } from '@core/commands/scene';
+import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
 import type { IconName } from '@ui/components/Icon';
 
 export type SolidCommand =

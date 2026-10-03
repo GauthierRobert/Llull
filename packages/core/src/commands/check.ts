@@ -16,7 +16,7 @@
 import type { CadDocument, Entity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds } from './scene';
+import { entityBounds } from './sceneBounds';
 
 // ---------------------------------------------------------------------------
 // Public types (part of the command result shape)

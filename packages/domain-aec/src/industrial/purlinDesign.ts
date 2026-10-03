@@ -16,12 +16,13 @@ import {
   noChange,
   withElement,
 } from '../model';
-import { regenerateBuilding } from '../evaluate';
+import { regenerateBuilding } from '../evaluateElements';
 import { sweepFrame } from '../mesh';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
 import { nextProfile } from './frameDesign';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
-import { checkPurlins, type PurlinRow } from './purlinCheck';
+import { type PurlinRow } from './purlinModel';
+import { checkPurlins } from './purlinCheckRun';
 
 const MAX_ITERATIONS = 15;
 

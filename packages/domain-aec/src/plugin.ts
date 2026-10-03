@@ -11,7 +11,7 @@ import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { buildingCommands, industrialCommands } from './index';
 import { buildingDerivationGuard } from './derivationGuard';
 import { buildingErrors } from './validate';
-import { regenerateBuilding } from './evaluate';
+import { regenerateBuilding } from './evaluateElements';
 
 function derivedEntityIds(doc: CadDocument): Set<string> {
   const ids = new Set<string>();

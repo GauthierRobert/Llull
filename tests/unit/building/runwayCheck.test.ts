@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { runwayCheck } from '@aec/industrial/runwayCheckRun';
 import {
   bufferForce,
-  runwayCheck,
   wheelMoment,
   wheelShear,
   type RunwayCheckRow,
-} from '@aec/industrial/runwayCheck';
-import { craneActions } from '@aec/industrial/frameModel';
+} from '@aec/industrial/runwayCheckModel';
+import { craneActions } from '@aec/industrial/frameModelTypes';
 
 function hall(capacity = 10): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {

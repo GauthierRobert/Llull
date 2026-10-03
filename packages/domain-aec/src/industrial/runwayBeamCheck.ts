@@ -5,7 +5,7 @@
 
 import type { SteelMemberElement } from '@core/model/building';
 import { findProfile, sectionProperties } from '../steel/profiles';
-import { craneActions, CRANE_FACTORS, type CraneModel } from './frameModel';
+import { craneActions, CRANE_FACTORS, type CraneModel } from './frameModelTypes';
 import { lateralTorsionalReduction, sectionResistance, yieldStrength } from './steelDesign';
 import {
   BUFFER_SPEED_RATIO,

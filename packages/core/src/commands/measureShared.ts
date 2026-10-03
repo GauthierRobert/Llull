@@ -1,6 +1,7 @@
 import type { Entity, Vec3 } from '../model/types';
-import { entityBounds } from './scene';
-import type { Bounds } from './scene';
+import { entityBounds } from './sceneBounds';
+import { Bounds } from './sceneTypes';
+
 export function vec3Distance(a: Vec3, b: Vec3): number {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];

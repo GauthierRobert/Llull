@@ -1,9 +1,4 @@
-/**
- * runwayCheck: runwayCheckModel.
- * @layer domain-aec
- */
-
-import type { HoistingClass } from './frameModel';
+import { HoistingClass } from './frameModelTypes';
 import { E_STEEL } from './steelDesign';
 
 export type CraneClass = 'S2' | 'S3' | 'S4';
