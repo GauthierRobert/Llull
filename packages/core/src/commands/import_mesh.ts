@@ -10,6 +10,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_IMPORT_BODIES, MAX_IMPORT_TRIANGLES } from './limits';
+import { noOp } from './commandResult';
 
 interface MeshBodyParams {
   positions: number[];
@@ -55,7 +56,7 @@ function toTriangleSoup(body: MeshBodyParams): number[] | string {
 }
 
 function fail(doc: CadDocument, reason: string): CommandResult {
-  return { document: doc, summary: `import_mesh: ${reason}; no-op.`, affected: [] };
+  return noOp(doc, `import_mesh: ${reason}; no-op.`);
 }
 
 /**

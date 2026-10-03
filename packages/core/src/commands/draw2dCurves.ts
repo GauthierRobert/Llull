@@ -15,6 +15,7 @@ import {
 } from './draw2dShared';
 import { withEntity } from './entityOps';
 import { pointsExtent } from './sceneBounds';
+import { noOp } from './commandResult';
 
 /**
  * @command draw_ellipse
@@ -46,11 +47,10 @@ export const drawEllipse = defineCommand({
     { center, radiusX, radiusY, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (radiusX <= 0 || radiusY <= 0) {
-      return {
-        document: doc,
-        summary: `draw_ellipse: radiusX and radiusY must both be > 0 (got radiusX=${radiusX}, radiusY=${radiusY}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `draw_ellipse: radiusX and radiusY must both be > 0 (got radiusX=${radiusX}, radiusY=${radiusY}).`,
+      );
     }
     const id = nextId('ellipse');
     const safeCenter: Vec2 = [center[0], center[1]];
@@ -111,11 +111,10 @@ export const drawSpline = defineCommand({
     const tooFew = rejectTooFewPoints(doc, 'draw_spline', points);
     if (tooFew) return tooFew;
     if (points.length > MAX_SPLINE_CONTROL_POINTS) {
-      return {
-        document: doc,
-        summary: `draw_spline: ${points.length} points exceeds MAX_SPLINE_CONTROL_POINTS (${MAX_SPLINE_CONTROL_POINTS}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `draw_spline: ${points.length} points exceeds MAX_SPLINE_CONTROL_POINTS (${MAX_SPLINE_CONTROL_POINTS}).`,
+      );
     }
     const id = nextId('spline');
     const entity = pointSeriesEntity('spline', id, points, closed, position, color);
@@ -205,56 +204,34 @@ export const drawInvolute = defineCommand({
   ): CommandResult => {
     // --- Validate all numerics are finite ---
     if (!Number.isFinite(baseRadius)) {
-      return {
-        document: doc,
-        summary: `draw_involute: baseRadius must be finite, got ${String(baseRadius)}.`,
-        affected: [],
-      };
+      return noOp(doc, `draw_involute: baseRadius must be finite, got ${String(baseRadius)}.`);
     }
     if (!Number.isFinite(startAngle)) {
-      return {
-        document: doc,
-        summary: `draw_involute: startAngle must be finite, got ${String(startAngle)}.`,
-        affected: [],
-      };
+      return noOp(doc, `draw_involute: startAngle must be finite, got ${String(startAngle)}.`);
     }
     if (!Number.isFinite(endAngle)) {
-      return {
-        document: doc,
-        summary: `draw_involute: endAngle must be finite, got ${String(endAngle)}.`,
-        affected: [],
-      };
+      return noOp(doc, `draw_involute: endAngle must be finite, got ${String(endAngle)}.`);
     }
     if (!Number.isFinite(samples)) {
-      return {
-        document: doc,
-        summary: `draw_involute: samples must be finite, got ${String(samples)}.`,
-        affected: [],
-      };
+      return noOp(doc, `draw_involute: samples must be finite, got ${String(samples)}.`);
     }
 
     // --- Validate domain ---
     if (baseRadius <= 0) {
-      return {
-        document: doc,
-        summary: `draw_involute: baseRadius must be > 0, got ${baseRadius}.`,
-        affected: [],
-      };
+      return noOp(doc, `draw_involute: baseRadius must be > 0, got ${baseRadius}.`);
     }
     const samplesInt = Math.round(samples);
     if (samplesInt < 2 || samplesInt > MAX_CURVE_SAMPLES) {
-      return {
-        document: doc,
-        summary: `draw_involute: samples must be in [2, ${MAX_CURVE_SAMPLES}], got ${samples}.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `draw_involute: samples must be in [2, ${MAX_CURVE_SAMPLES}], got ${samples}.`,
+      );
     }
     if (endAngle <= startAngle) {
-      return {
-        document: doc,
-        summary: `draw_involute: endAngle (${endAngle}) must be > startAngle (${startAngle}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `draw_involute: endAngle (${endAngle}) must be > startAngle (${startAngle}).`,
+      );
     }
 
     // --- Resolve position/rotation (clamp non-finite to 0) ---

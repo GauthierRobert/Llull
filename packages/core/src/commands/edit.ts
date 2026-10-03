@@ -8,6 +8,7 @@ import type { Entity, EntityGroup, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
+import { noOp } from './commandResult';
 
 /**
  * Shallow-clone an entity with a new id and adjusted position.
@@ -39,7 +40,7 @@ export const duplicateEntity = defineCommand({
   run: (doc, { id, offset = [0, 0, 0] as const }): CommandResult => {
     const source = doc.entities[id];
     if (!source) {
-      return { document: doc, summary: `No entity ${id} to duplicate.`, affected: [] };
+      return noOp(doc, `No entity ${id} to duplicate.`);
     }
 
     const newId = nextId(source.kind);
@@ -93,11 +94,10 @@ export const groupEntities = defineCommand({
     const validIds = ids.filter((id) => id in doc.entities);
 
     if (validIds.length < 2) {
-      return {
-        document: doc,
-        summary: `group_entities requires >= 2 valid entity ids; got ${validIds.length} (from ${ids.length} provided).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `group_entities requires >= 2 valid entity ids; got ${validIds.length} (from ${ids.length} provided).`,
+      );
     }
 
     const groupId = nextId('group');
@@ -135,11 +135,7 @@ export const ungroupEntities = defineCommand({
     const group = existingGroups[groupId];
 
     if (!group) {
-      return {
-        document: doc,
-        summary: `No group ${groupId} to ungroup.`,
-        affected: [],
-      };
+      return noOp(doc, `No group ${groupId} to ungroup.`);
     }
 
     const nextGroups = { ...existingGroups };
@@ -190,11 +186,7 @@ export const setEntityName = defineCommand({
   run: (doc, { id, name, tags }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return {
-        document: doc,
-        summary: `No entity ${id} — set_entity_name is a no-op.`,
-        affected: [],
-      };
+      return noOp(doc, `No entity ${id} — set_entity_name is a no-op.`);
     }
 
     // Build a patched entity; only override fields that were provided.

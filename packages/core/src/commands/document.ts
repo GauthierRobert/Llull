@@ -16,6 +16,7 @@ import type { CadDocument } from '../model/types';
 import { createEmptyDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noOp } from './commandResult';
 
 export const clearDocument = defineCommand({
   name: 'clear_document',
@@ -71,11 +72,7 @@ export const clearDocument = defineCommand({
       (keepLayers || isLayersDefault);
 
     if (isAlreadyEmpty) {
-      return {
-        document: doc,
-        summary: 'Document is already empty.',
-        affected: [],
-      };
+      return noOp(doc, 'Document is already empty.');
     }
 
     const nextDoc: CadDocument = {
@@ -104,10 +101,9 @@ export const clearDocument = defineCommand({
       ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}`
       : `reset to default layer`;
 
-    return {
-      document: nextDoc,
-      summary: `Cleared ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'} and ${layerCount} layer${layerCount === 1 ? '' : 's'}; ${layerPart}; kept units (${doc.units}) and camera.`,
-      affected: [],
-    };
+    return noOp(
+      nextDoc,
+      `Cleared ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'} and ${layerCount} layer${layerCount === 1 ? '' : 's'}; ${layerPart}; kept units (${doc.units}) and camera.`,
+    );
   },
 });

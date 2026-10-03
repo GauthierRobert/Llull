@@ -3,6 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { resolveJointValue, isValidAxis, isValidMateRef } from './jointsKinematics';
+import { noOp } from './commandResult';
 /**
  * @command add_joint
  * @pure
@@ -72,52 +73,37 @@ export const addJoint = defineCommand({
   }),
   run: (doc, { kind, a, b, axis, id }): CommandResult => {
     if (!isValidMateRef(a)) {
-      return {
-        document: doc,
-        summary: 'add_joint: "a" must be an object with a non-empty instanceId string.',
-        affected: [],
-      };
+      return noOp(doc, 'add_joint: "a" must be an object with a non-empty instanceId string.');
     }
     if (!isValidMateRef(b)) {
-      return {
-        document: doc,
-        summary: 'add_joint: "b" must be an object with a non-empty instanceId string.',
-        affected: [],
-      };
+      return noOp(doc, 'add_joint: "b" must be an object with a non-empty instanceId string.');
     }
 
     if (!isValidAxis(axis)) {
-      return {
-        document: doc,
-        summary: `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`,
+      );
     }
 
     const entityA = doc.entities[a.instanceId];
     if (!entityA || entityA.kind !== 'instance') {
-      return {
-        document: doc,
-        summary: `add_joint: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_joint: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
+      );
     }
     const entityB = doc.entities[b.instanceId];
     if (!entityB || entityB.kind !== 'instance') {
-      return {
-        document: doc,
-        summary: `add_joint: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_joint: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
+      );
     }
 
     const jointId = typeof id === 'string' && id.length > 0 ? id : nextId('joint');
     if (jointId in doc.joints) {
-      return {
-        document: doc,
-        summary: `add_joint: joint id '${jointId}' already exists — no change made.`,
-        affected: [],
-      };
+      return noOp(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
     }
 
     type FrameValue = 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
@@ -190,11 +176,7 @@ export const deleteJoint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (!(id in doc.joints)) {
-      return {
-        document: doc,
-        summary: `delete_joint: joint '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
+      return noOp(doc, `delete_joint: joint '${String(id)}' does not exist — no change made.`);
     }
 
     const joint = doc.joints[id]!;
@@ -226,11 +208,7 @@ export const deleteJoint = defineCommand({
         ? ` Also removed ${removedDrIds.length} drive relation(s): ${removedDrIds.join(', ')}.`
         : '';
 
-    return {
-      document: newDoc,
-      summary: `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`,
-      affected: [],
-    };
+    return noOp(newDoc, `delete_joint: removed '${joint.kind}' joint '${id}'.${cascadeSummary}`);
   },
 });
 
@@ -263,11 +241,7 @@ export const setJointValue = defineCommand({
   }),
   run: (doc, { id, value }): CommandResult => {
     if (!(id in doc.joints)) {
-      return {
-        document: doc,
-        summary: `set_joint_value: joint '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
+      return noOp(doc, `set_joint_value: joint '${String(id)}' does not exist — no change made.`);
     }
 
     const existing = doc.joints[id]!;

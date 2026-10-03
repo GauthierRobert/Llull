@@ -4,6 +4,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { offsetSegment, miterJoin } from './modify2dGeometry';
 import { withEntity, withoutEntity } from './entityOps';
+import { noOp } from './commandResult';
 
 /**
  * @command explode_polyline
@@ -25,22 +26,20 @@ export const explodePolyline = defineCommand({
   run: (doc, { id }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return { document: doc, summary: `explode_polyline: entity ${id} not found.`, affected: [] };
+      return noOp(doc, `explode_polyline: entity ${id} not found.`);
     }
     if (entity.kind !== 'polyline') {
-      return {
-        document: doc,
-        summary: `explode_polyline: entity ${id} is kind '${entity.kind}', expected 'polyline'.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `explode_polyline: entity ${id} is kind '${entity.kind}', expected 'polyline'.`,
+      );
     }
     const poly = entity as PolylineEntity;
     if (poly.points.length < 2) {
-      return {
-        document: doc,
-        summary: `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`,
+      );
     }
 
     // Build segments
@@ -114,14 +113,10 @@ export const offset2D = defineCommand({
   run: (doc, { id, distance }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return { document: doc, summary: `offset_2d: entity ${id} not found.`, affected: [] };
+      return noOp(doc, `offset_2d: entity ${id} not found.`);
     }
     if (distance === 0) {
-      return {
-        document: doc,
-        summary: `offset_2d: distance is 0 — no-op.`,
-        affected: [],
-      };
+      return noOp(doc, `offset_2d: distance is 0 — no-op.`);
     }
 
     const newId = nextId('offset');
@@ -152,11 +147,7 @@ export const offset2D = defineCommand({
     if (entity.kind === 'polyline') {
       const poly = entity as PolylineEntity;
       if (poly.points.length < 2) {
-        return {
-          document: doc,
-          summary: `offset_2d: polyline ${id} has fewer than 2 points — no-op.`,
-          affected: [],
-        };
+        return noOp(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
       }
 
       // Offset each segment
@@ -213,11 +204,7 @@ export const offset2D = defineCommand({
         };
       const newRadius = circle.radius + distance;
       if (newRadius <= 0) {
-        return {
-          document: doc,
-          summary: `offset_2d: resulting circle radius ${newRadius} <= 0 — no-op.`,
-          affected: [],
-        };
+        return noOp(doc, `offset_2d: resulting circle radius ${newRadius} <= 0 — no-op.`);
       }
       const newEntity: Entity = {
         ...base,
@@ -240,11 +227,10 @@ export const offset2D = defineCommand({
       const newWidth = rect.width + 2 * distance;
       const newHeight = rect.height + 2 * distance;
       if (newWidth <= 0 || newHeight <= 0) {
-        return {
-          document: doc,
-          summary: `offset_2d: resulting rectangle ${newWidth}×${newHeight} is degenerate — no-op.`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `offset_2d: resulting rectangle ${newWidth}×${newHeight} is degenerate — no-op.`,
+        );
       }
       // The offset rectangle is centered on the same position but shifted by -distance on each side.
       // We shift the origin by -distance on X and Y (lower-left moves left/down for positive offset).
@@ -265,10 +251,9 @@ export const offset2D = defineCommand({
       };
     }
 
-    return {
-      document: doc,
-      summary: `offset_2d: entity ${id} has unsupported kind '${entity.kind}'. Supported: line, polyline, circle, rectangle.`,
-      affected: [],
-    };
+    return noOp(
+      doc,
+      `offset_2d: entity ${id} has unsupported kind '${entity.kind}'. Supported: line, polyline, circle, rectangle.`,
+    );
   },
 });

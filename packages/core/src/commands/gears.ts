@@ -17,6 +17,7 @@ import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { withEntity } from './entityOps';
+import { noOp } from './commandResult';
 
 /**
  * Sample points along the involute of a circle with base radius `baseR`.
@@ -341,56 +342,44 @@ export const addSpurGear = defineCommand({
   ): CommandResult => {
     // --- Validate module ---
     if (!Number.isFinite(mod) || mod <= 0) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`,
-        affected: [],
-      };
+      return noOp(doc, `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`);
     }
 
     // --- Validate teeth ---
     const teethInt = Math.round(teeth);
     if (!Number.isFinite(teeth) || teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_spur_gear failed: teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
+      );
     }
 
     // --- Validate pressureAngle ---
     if (!Number.isFinite(pressureAngle) || pressureAngle <= 0 || pressureAngle >= Math.PI / 2) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_spur_gear failed: pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`,
+      );
     }
 
     // --- Validate faceWidth ---
     if (!Number.isFinite(faceWidth) || faceWidth <= 0) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: faceWidth must be finite and > 0, got ${String(faceWidth)}.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_spur_gear failed: faceWidth must be finite and > 0, got ${String(faceWidth)}.`,
+      );
     }
 
     // --- Validate bore ---
     const pitchRadius = (mod * teethInt) / 2;
     if (!Number.isFinite(bore) || bore < 0) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`,
-        affected: [],
-      };
+      return noOp(doc, `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`);
     }
     if (bore >= pitchRadius) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: bore (${bore}) must be < pitchRadius (${pitchRadius}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_spur_gear failed: bore (${bore}) must be < pitchRadius (${pitchRadius}).`,
+      );
     }
 
     // --- Validate position ---

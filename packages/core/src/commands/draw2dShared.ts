@@ -3,6 +3,7 @@ import type { CommandResult } from './types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { z } from './schema';
 import { looseVec3 } from './schema';
+import { noOp } from './commandResult';
 
 /** Default stroke color of every drafted 2D shape. */
 export const DEFAULT_DRAW_COLOR = '#4a90d9';
@@ -54,9 +55,8 @@ export function rejectTooFewPoints(
   points: unknown,
 ): CommandResult | null {
   if (Array.isArray(points) && points.length >= 2) return null;
-  return {
-    document: doc,
-    summary: `${command}: requires at least 2 points (got ${Array.isArray(points) ? points.length : 0}).`,
-    affected: [],
-  };
+  return noOp(
+    doc,
+    `${command}: requires at least 2 points (got ${Array.isArray(points) ? points.length : 0}).`,
+  );
 }

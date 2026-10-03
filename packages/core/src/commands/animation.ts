@@ -9,6 +9,7 @@ import type { Animation, CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
+import { noOp } from './commandResult';
 
 /**
  * Resolve `targetId` to its kind: 'group' if found in doc.groups, 'entity' if
@@ -132,11 +133,7 @@ export const animateSpin = defineCommand({
   run: (doc, { targetId, speed, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) {
-      return {
-        document: doc,
-        summary: `animate_spin: no entity or group ${targetId}.`,
-        affected: [],
-      };
+      return noOp(doc, `animate_spin: no entity or group ${targetId}.`);
     }
 
     const anim = buildAnimation(
@@ -207,27 +204,21 @@ export const animateOscillate = defineCommand({
   run: (doc, { targetId, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) {
-      return {
-        document: doc,
-        summary: `animate_oscillate: no entity or group ${targetId}.`,
-        affected: [],
-      };
+      return noOp(doc, `animate_oscillate: no entity or group ${targetId}.`);
     }
 
     if (amplitude <= 0) {
-      return {
-        document: doc,
-        summary: `animate_oscillate: amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `animate_oscillate: amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`,
+      );
     }
 
     if (frequency <= 0) {
-      return {
-        document: doc,
-        summary: `animate_oscillate: frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `animate_oscillate: frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`,
+      );
     }
 
     const anim = buildAnimation(
@@ -284,11 +275,7 @@ export const stopAnimation = defineCommand({
     // --- by animationId ---
     if (animationId !== undefined) {
       if (existing[animationId] === undefined) {
-        return {
-          document: doc,
-          summary: `stop_animation: animation ${animationId} not found; nothing removed.`,
-          affected: [],
-        };
+        return noOp(doc, `stop_animation: animation ${animationId} not found; nothing removed.`);
       }
       const next = { ...existing };
       delete next[animationId];
@@ -303,11 +290,10 @@ export const stopAnimation = defineCommand({
     if (targetId !== undefined) {
       const toRemove = Object.values(existing).filter((a) => a.targetId === targetId);
       if (toRemove.length === 0) {
-        return {
-          document: doc,
-          summary: `stop_animation: no animations found for target ${targetId}; nothing removed.`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `stop_animation: no animations found for target ${targetId}; nothing removed.`,
+        );
       }
       const next = { ...existing };
       for (const a of toRemove) {
@@ -323,11 +309,7 @@ export const stopAnimation = defineCommand({
     // --- clear all ---
     const count = Object.keys(existing).length;
     if (count === 0) {
-      return {
-        document: doc,
-        summary: 'stop_animation: no animations to clear.',
-        affected: [],
-      };
+      return noOp(doc, 'stop_animation: no animations to clear.');
     }
     return {
       document: { ...doc, animations: {} },
