@@ -11,15 +11,10 @@ import { type Triangle } from '@core/commands/exportMath';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { fileSlug, getBuilding, isFiniteNumber, noChange, toMetres } from './model';
 import {
-  BINDING_MARGIN,
-  MARGIN,
   PAPER_MM,
-  SHEET_DEFS,
-  SHEET_STYLE,
+  composeSheetSvg,
   fitScale,
   sheetDrawingArea,
-  scaleBar,
-  titleBlock,
   PAPER_SIZES,
   type PaperSize,
   type Viewport,
@@ -422,21 +417,19 @@ function buildElevationSheet(
     (options.cutAt !== undefined
       ? `Section at ${drawing.projection.axis === 0 ? 'x' : 'y'} = ${options.cutAt}, viewed from ${options.direction}`
       : `${options.direction[0]?.toUpperCase() ?? ''}${options.direction.slice(1)} elevation`);
-  const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
-    `<title>${escapeXml(title)}</title>`,
-    SHEET_STYLE,
-    `<style>.edge{stroke:#000;stroke-width:0.18;stroke-linecap:round}.section{stroke:#000;stroke-width:0.5;stroke-linecap:round}.ground{stroke:#000;stroke-width:0.7}.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:4 1 1 1}.poche-steel{fill:#1a1a1a}.poche-concrete{fill:url(#hatch-concrete)}.poche-other{fill:#9a9a9a}</style>`,
-    SHEET_DEFS,
-    `<rect width="${width}" height="${height}" fill="#fff"/>`,
-    `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
-    `<g id="view">${view.join('')}</g>`,
-    `<g id="annotations">${annotations.join('')}</g>`,
-    scaleBar(BINDING_MARGIN + 8, height - MARGIN - 12, scale),
-    `<text x="${BINDING_MARGIN + 8}" y="${n(height - MARGIN - 16)}" font-size="2.6" text-anchor="start">${escapeXml(title)} · 1:${scale} · levels in m</text>`,
-    titleBlock(doc, { width, height, title, scale, paper }),
-    `</svg>`,
-  ].join('\n');
+  const svg = composeSheetSvg(doc, {
+    width,
+    height,
+    title,
+    scale,
+    paper,
+    caption: `${title} · 1:${scale} · levels in m`,
+    bodyId: 'view',
+    body: view.join(''),
+    style:
+      '.edge{stroke:#000;stroke-width:0.18;stroke-linecap:round}.section{stroke:#000;stroke-width:0.5;stroke-linecap:round}.ground{stroke:#000;stroke-width:0.7}.grid{stroke:#000;stroke-width:0.13;stroke-dasharray:4 1 1 1}.poche-steel{fill:#1a1a1a}.poche-concrete{fill:url(#hatch-concrete)}.poche-other{fill:#9a9a9a}',
+    overlays: [`<g id="annotations">${annotations.join('')}</g>`],
+  });
   const project = fileSlug(building.project.name, 'project');
   return {
     filename: `${project}_${fileSlug(title, 'elevation')}_${paper}_1-${scale}.svg`,
