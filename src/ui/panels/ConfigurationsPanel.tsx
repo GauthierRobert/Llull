@@ -16,7 +16,7 @@ import React, { useState, useCallback } from 'react';
 import { useStore } from '@ui/store';
 import type { Configuration } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
-import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
+import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface ConfigurationRowProps {
   config: Configuration;
@@ -119,15 +119,14 @@ function ParameterValueRow({
         autoComplete="off"
       />
       {canRemove && (
-        <button
-          type="button"
-          className="icon-btn config-pv-remove-btn"
+        <IconButton
+          icon="close"
+          className="config-pv-remove-btn"
+          size={12}
           onClick={() => onRemove(index)}
-          aria-label={`Remove parameter row ${index + 1}`}
+          label={`Remove parameter row ${index + 1}`}
           title="Remove this parameter row"
-        >
-          <Icon name="close" size={12} />
-        </button>
+        />
       )}
     </div>
   );

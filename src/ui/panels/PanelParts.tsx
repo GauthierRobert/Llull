@@ -98,3 +98,44 @@ export function PanelSection({
     </section>
   );
 }
+
+interface IconButtonProps {
+  icon: IconName;
+  label: string;
+  title?: string;
+  size?: number;
+  danger?: boolean;
+  className?: string;
+  testId?: string;
+  disabled?: boolean;
+  pressed?: boolean;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}
+
+export function IconButton({
+  icon,
+  label,
+  title,
+  size = 13,
+  danger = false,
+  className,
+  testId,
+  disabled,
+  pressed,
+  onClick,
+}: IconButtonProps): React.ReactElement {
+  return (
+    <button
+      type="button"
+      className={['icon-btn', danger && 'icon-btn--danger', className].filter(Boolean).join(' ')}
+      data-testid={testId}
+      disabled={disabled}
+      aria-pressed={pressed}
+      aria-label={label}
+      title={title ?? label}
+      onClick={onClick}
+    >
+      <Icon name={icon} size={size} />
+    </button>
+  );
+}

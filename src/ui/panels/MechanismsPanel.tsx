@@ -16,12 +16,11 @@
  * Pure presentation — no document mutations except through store.dispatch (PRIME DIRECTIVE).
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import type { Constraint, Joint, DriveRelation } from '@core/model/types';
-import { Icon } from '@ui/components/Icon';
-import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
+import { PanelEmpty, PanelHeader, PanelSection, IconButton } from '@ui/panels/PanelParts';
 
 type ChipTone = 'accent' | 'success' | 'warning' | 'danger' | 'agent';
 
@@ -59,26 +58,6 @@ function ConstraintRow({
 }: ConstraintRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
-  const handleDelete = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      dispatch('delete_constraint', { id: constraint.id });
-    },
-    [dispatch, constraint.id],
-  );
-
-  const handleSolve = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      dispatch('solve_constraints', {});
-    },
-    [dispatch],
-  );
-
-  const handleClick = useCallback(() => {
-    onHighlight(constraint.id);
-  }, [onHighlight, constraint.id]);
-
   const chipTone = CONSTRAINT_CHIP_TONE[constraint.kind] ?? 'accent';
   const aRef = fmtEntityRef(constraint.a);
   const bRef = fmtEntityRef(constraint.b);
@@ -92,7 +71,7 @@ function ConstraintRow({
     <li
       className={`panel__row mechanisms-row${highlighted ? ' panel__row--selected mechanisms-row--highlighted' : ''}`}
       data-testid={`constraint-row-${constraint.id}`}
-      onClick={handleClick}
+      onClick={() => onHighlight(constraint.id)}
       aria-selected={highlighted}
       role="option"
     >
@@ -102,26 +81,27 @@ function ConstraintRow({
         {value}
       </span>
       <div className="panel__row-actions">
-        <button
-          type="button"
-          className="icon-btn"
-          data-testid={`constraint-solve-${constraint.id}`}
-          onClick={handleSolve}
+        <IconButton
+          icon="zap"
+          testId={`constraint-solve-${constraint.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            dispatch('solve_constraints', {});
+          }}
           title="Solve all constraints"
-          aria-label="Solve constraints"
-        >
-          <Icon name="zap" size={13} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn icon-btn--danger"
-          data-testid={`constraint-delete-${constraint.id}`}
-          onClick={handleDelete}
+          label="Solve constraints"
+        />
+        <IconButton
+          icon="trash"
+          danger
+          testId={`constraint-delete-${constraint.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            dispatch('delete_constraint', { id: constraint.id });
+          }}
           title="Delete this constraint"
-          aria-label={`Delete constraint ${constraint.id}`}
-        >
-          <Icon name="trash" size={13} />
-        </button>
+          label={`Delete constraint ${constraint.id}`}
+        />
       </div>
     </li>
   );
@@ -139,39 +119,11 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   const currentValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
   const [inputValue, setInputValue] = useState<string>(String(currentValue));
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-  }, []);
-
-  const handleInputCommit = useCallback(() => {
+  const commitInput = (): void => {
     const parsed = parseFloat(inputValue);
-    if (!isNaN(parsed)) {
-      dispatch('set_joint_value', { id: joint.id, value: parsed });
-    } else {
-      // Revert to current value on invalid input.
-      setInputValue(String(currentValue));
-    }
-  }, [dispatch, joint.id, inputValue, currentValue]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') handleInputCommit();
-      else if (e.key === 'Escape') setInputValue(String(currentValue));
-    },
-    [handleInputCommit, currentValue],
-  );
-
-  const handleDelete = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      dispatch('delete_joint', { id: joint.id });
-    },
-    [dispatch, joint.id],
-  );
-
-  const handleClick = useCallback(() => {
-    onHighlight(joint.id);
-  }, [onHighlight, joint.id]);
+    if (isNaN(parsed)) setInputValue(String(currentValue));
+    else dispatch('set_joint_value', { id: joint.id, value: parsed });
+  };
 
   const chipTone = JOINT_CHIP_TONE[joint.kind] ?? 'accent';
   const axisLabel = Array.isArray(joint.axis)
@@ -183,7 +135,7 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
     <li
       className={`panel__row mechanisms-row${highlighted ? ' panel__row--selected mechanisms-row--highlighted' : ''}`}
       data-testid={`joint-row-${joint.id}`}
-      onClick={handleClick}
+      onClick={() => onHighlight(joint.id)}
       aria-selected={highlighted}
       role="option"
     >
@@ -195,9 +147,12 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
         type="number"
         className="mechanisms-joint-input"
         value={inputValue}
-        onChange={handleInputChange}
-        onBlur={handleInputCommit}
-        onKeyDown={handleKeyDown}
+        onChange={(e) => setInputValue(e.target.value)}
+        onBlur={commitInput}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commitInput();
+          else if (e.key === 'Escape') setInputValue(String(currentValue));
+        }}
         aria-label={`Joint value for ${joint.id} (${unit})`}
         data-testid={`joint-value-${joint.id}`}
         title={`Current ${joint.kind === 'revolute' ? 'angle' : 'displacement'} in ${unit}`}
@@ -205,16 +160,17 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
       />
       <span className="panel__row-meta">{unit}</span>
       <div className="panel__row-actions">
-        <button
-          type="button"
-          className="icon-btn icon-btn--danger"
-          data-testid={`joint-delete-${joint.id}`}
-          onClick={handleDelete}
+        <IconButton
+          icon="trash"
+          danger
+          testId={`joint-delete-${joint.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            dispatch('delete_joint', { id: joint.id });
+          }}
           title="Delete this joint"
-          aria-label={`Delete joint ${joint.id}`}
-        >
-          <Icon name="trash" size={13} />
-        </button>
+          label={`Delete joint ${joint.id}`}
+        />
       </div>
     </li>
   );
@@ -226,14 +182,6 @@ interface DriveRelationRowProps {
 
 function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-
-  const handleDelete = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      dispatch('delete_drive_relation', { id: relation.id });
-    },
-    [dispatch, relation.id],
-  );
 
   const offsetLabel =
     relation.offset !== undefined && relation.offset !== 0
@@ -251,16 +199,17 @@ function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactEleme
         {offsetLabel}
       </span>
       <div className="panel__row-actions">
-        <button
-          type="button"
-          className="icon-btn icon-btn--danger"
-          data-testid={`drive-delete-${relation.id}`}
-          onClick={handleDelete}
+        <IconButton
+          icon="trash"
+          danger
+          testId={`drive-delete-${relation.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            dispatch('delete_drive_relation', { id: relation.id });
+          }}
           title="Delete this drive relation"
-          aria-label={`Delete drive relation ${relation.id}`}
-        >
-          <Icon name="trash" size={13} />
-        </button>
+          label={`Delete drive relation ${relation.id}`}
+        />
       </div>
     </li>
   );
@@ -281,22 +230,12 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
   const mechanismSelection = useViewportStore((s) => s.mechanismSelection);
   const setMechanismSelection = useViewportStore((s) => s.setMechanismSelection);
 
-  const handleHighlightConstraint = useCallback(
-    (id: string) => {
-      const alreadySelected =
-        mechanismSelection?.kind === 'constraint' && mechanismSelection.id === id;
-      setMechanismSelection(alreadySelected ? null : { kind: 'constraint', id });
-    },
-    [mechanismSelection, setMechanismSelection],
-  );
-
-  const handleHighlightJoint = useCallback(
-    (id: string) => {
-      const alreadySelected = mechanismSelection?.kind === 'joint' && mechanismSelection.id === id;
-      setMechanismSelection(alreadySelected ? null : { kind: 'joint', id });
-    },
-    [mechanismSelection, setMechanismSelection],
-  );
+  const isHighlighted = (kind: 'constraint' | 'joint', id: string): boolean =>
+    mechanismSelection?.kind === kind && mechanismSelection.id === id;
+  const highlight =
+    (kind: 'constraint' | 'joint') =>
+    (id: string): void =>
+      setMechanismSelection(isHighlighted(kind, id) ? null : { kind, id });
 
   const constraintList = constraintOrder
     .map((id) => constraints[id])
@@ -327,10 +266,8 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
               <ConstraintRow
                 key={c.id}
                 constraint={c}
-                highlighted={
-                  mechanismSelection?.kind === 'constraint' && mechanismSelection.id === c.id
-                }
-                onHighlight={handleHighlightConstraint}
+                highlighted={isHighlighted('constraint', c.id)}
+                onHighlight={highlight('constraint')}
               />
             ))}
           </ul>
@@ -352,8 +289,8 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
               <JointRow
                 key={j.id}
                 joint={j}
-                highlighted={mechanismSelection?.kind === 'joint' && mechanismSelection.id === j.id}
-                onHighlight={handleHighlightJoint}
+                highlighted={isHighlighted('joint', j.id)}
+                onHighlight={highlight('joint')}
               />
             ))}
           </ul>
