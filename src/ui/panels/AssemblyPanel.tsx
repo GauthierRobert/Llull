@@ -23,10 +23,6 @@ import type { Component, InstanceEntity } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 
-// ---------------------------------------------------------------------------
-// Section A: Component row
-// ---------------------------------------------------------------------------
-
 interface ComponentRowProps {
   component: Component;
 }
@@ -72,10 +68,6 @@ function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Section B: Instance row
-// ---------------------------------------------------------------------------
 
 interface InstanceRowProps {
   instance: InstanceEntity;
@@ -135,10 +127,6 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// AssemblyPanel — the exported panel
-// ---------------------------------------------------------------------------
 
 interface AssemblyPanelProps {
   className?: string;

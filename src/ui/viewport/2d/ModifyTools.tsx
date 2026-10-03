@@ -17,10 +17,6 @@ import type { IconName } from '@ui/components/Icon';
 import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface ModifyToolsProps {
   activeTool: ModifyToolKind;
   phase: ModifyToolPhase;
@@ -29,10 +25,6 @@ interface ModifyToolsProps {
   onSetValue: (v: number) => void;
   onCommitValue: () => void;
 }
-
-// ---------------------------------------------------------------------------
-// Tool definitions
-// ---------------------------------------------------------------------------
 
 interface ToolButton {
   tool: ModifyToolKind;
@@ -49,10 +41,6 @@ const TOOL_BUTTONS: ToolButton[] = [
   { tool: 'extend', label: 'Extend', hint: 'X', icon: 'modifyExtend' },
   { tool: 'explode', label: 'Explode', hint: 'E', icon: 'modifyExplode' },
 ];
-
-// ---------------------------------------------------------------------------
-// Phase hints
-// ---------------------------------------------------------------------------
 
 function phaseHint(tool: ModifyToolKind, phase: ModifyToolPhase): string | null {
   if (phase === 'idle' || tool === 'none') return null;
@@ -86,19 +74,11 @@ function phaseHint(tool: ModifyToolKind, phase: ModifyToolPhase): string | null 
   }
 }
 
-// ---------------------------------------------------------------------------
-// Value label (for the numeric input)
-// ---------------------------------------------------------------------------
-
 function valueLabel(tool: ModifyToolKind): string {
   if (tool === 'fillet') return 'Radius';
   if (tool === 'offset') return 'Distance';
   return 'Distance';
 }
-
-// ---------------------------------------------------------------------------
-// ModifyTools component
-// ---------------------------------------------------------------------------
 
 export function ModifyTools({
   activeTool,

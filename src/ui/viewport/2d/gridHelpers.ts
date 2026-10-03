@@ -15,10 +15,6 @@
  * visible and clearly coarser.
  */
 
-// ---------------------------------------------------------------------------
-// Adaptive grid step
-// ---------------------------------------------------------------------------
-
 /** Minimum target pixel width for a minor grid cell. */
 const MIN_CELL_PX = 20;
 
@@ -151,10 +147,6 @@ export function pixelsToWorld(pixels: number, zoom: number): number {
   if (zoom <= 0) return pixels;
   return pixels / zoom;
 }
-
-// ---------------------------------------------------------------------------
-// Scale-bar length
-// ---------------------------------------------------------------------------
 
 /**
  * Choose a "nice" real-world length for the scale-bar overlay.

@@ -33,10 +33,6 @@ function toDocumentPoint(point: { x: number; y: number }): Vec2 {
 /** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
 const SNAP_TOLERANCE_PX = 12;
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface DrawInteractionProps {
   activeTool: DrawToolKind;
   collectedPoints: Vec2[];
@@ -45,10 +41,6 @@ interface DrawInteractionProps {
   /** Current ortho camera zoom — drives the adaptive snap grid + tolerance. */
   zoom: number;
 }
-
-// ---------------------------------------------------------------------------
-// DrawInteraction
-// ---------------------------------------------------------------------------
 
 export function DrawInteraction({
   activeTool,

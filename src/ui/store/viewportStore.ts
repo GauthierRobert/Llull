@@ -20,10 +20,6 @@
 import { create } from 'zustand';
 import type { EntityId } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /** How all solid surfaces are rendered in the 3D viewport. */
 export type DisplayMode = 'shaded' | 'wireframe' | 'xray';
 
@@ -58,10 +54,6 @@ interface ClipPlaneState {
   /** When true the plane normal is flipped (cuts the other half). */
   flipped: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Store state
-// ---------------------------------------------------------------------------
 
 /** Identifies a selected mechanism item for overlay rendering. */
 type MechanismSelectionKind = 'constraint' | 'joint';
@@ -195,20 +187,12 @@ interface ViewportStoreState {
   setMechanismSelection(selection: MechanismSelection | null): void;
 }
 
-// ---------------------------------------------------------------------------
-// Defaults
-// ---------------------------------------------------------------------------
-
 const DEFAULT_CLIP_PLANE: ClipPlaneState = {
   enabled: false,
   axis: 'z',
   offset: 0,
   flipped: false,
 };
-
-// ---------------------------------------------------------------------------
-// Store
-// ---------------------------------------------------------------------------
 
 export const useViewportStore = create<ViewportStoreState>()((set) => ({
   displayMode: 'shaded',

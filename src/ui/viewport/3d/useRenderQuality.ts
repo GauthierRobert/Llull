@@ -26,10 +26,6 @@ import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import type { QualityTier, QualityOverride } from '@ui/store';
 
-// ---------------------------------------------------------------------------
-// Pure tier derivation — unit-tested in tests/unit/useRenderQuality.test.ts
-// ---------------------------------------------------------------------------
-
 /** Thresholds that map entity count to a quality tier (auto mode). */
 const HIGH_THRESHOLD = 50;
 const MEDIUM_THRESHOLD = 200;
@@ -58,10 +54,6 @@ export function resolveQualityTier(override: QualityOverride, entityCount: numbe
   if (override !== 'auto') return override;
   return deriveQualityTier(entityCount);
 }
-
-// ---------------------------------------------------------------------------
-// Per-tier render settings
-// ---------------------------------------------------------------------------
 
 /** Render settings derived from a quality tier. */
 interface RenderQualitySettings {

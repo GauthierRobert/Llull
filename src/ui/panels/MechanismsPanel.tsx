@@ -23,10 +23,6 @@ import type { Constraint, Joint, DriveRelation } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 type ChipTone = 'accent' | 'success' | 'warning' | 'danger' | 'agent';
 
 const CONSTRAINT_CHIP_TONE: Record<string, ChipTone> = {
@@ -49,10 +45,6 @@ function fmtEntityRef(ref: Constraint['a'] | Constraint['b']): string {
   if ('kind' in ref && ref.kind) return `${shortId}:${ref.kind}`;
   return shortId;
 }
-
-// ---------------------------------------------------------------------------
-// Section A — Constraints
-// ---------------------------------------------------------------------------
 
 interface ConstraintRowProps {
   constraint: Constraint;
@@ -134,10 +126,6 @@ function ConstraintRow({
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Section B — Joints
-// ---------------------------------------------------------------------------
 
 interface JointRowProps {
   joint: Joint;
@@ -232,10 +220,6 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   );
 }
 
-// ---------------------------------------------------------------------------
-// Section C — Drive Relations
-// ---------------------------------------------------------------------------
-
 interface DriveRelationRowProps {
   relation: DriveRelation;
 }
@@ -281,10 +265,6 @@ function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactEleme
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// MechanismsPanel — exported component
-// ---------------------------------------------------------------------------
 
 interface MechanismsPanelProps {
   className?: string;

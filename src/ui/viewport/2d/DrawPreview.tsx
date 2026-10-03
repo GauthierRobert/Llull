@@ -20,16 +20,8 @@ import {
   ellipseParamsFromCenterCorner,
 } from './drawHelpers';
 
-// ---------------------------------------------------------------------------
-// Shared preview material (not disposed — singleton)
-// ---------------------------------------------------------------------------
-
 const PREVIEW_COLOR = '#60a5fa'; // blue-400
 const PREVIEW_DASH_COLOR = '#94a3b8'; // slate-400
-
-// ---------------------------------------------------------------------------
-// Preview geometry builders (pure helpers)
-// ---------------------------------------------------------------------------
 
 /** Small crosshair drawn at the cursor before the first point is placed. */
 function buildCrosshairGeo(cursor: Vec2): THREE.BufferGeometry {
@@ -124,20 +116,12 @@ function buildSplinePreviewGeo(points: Vec2[], cursor: Vec2): THREE.BufferGeomet
   return buildPolylineGeo(points, cursor);
 }
 
-// ---------------------------------------------------------------------------
-// DrawPreview props
-// ---------------------------------------------------------------------------
-
 interface DrawPreviewProps {
   activeTool: DrawToolKind;
   collectedPoints: Vec2[];
   /** Current snapped cursor position; null when the cursor is off-canvas. */
   cursor: Vec2 | null;
 }
-
-// ---------------------------------------------------------------------------
-// DrawPreview — rendered inside r3f Canvas
-// ---------------------------------------------------------------------------
 
 /**
  * Imperative-style preview using a ref'ed THREE.LineSegments that is updated
@@ -269,10 +253,6 @@ export function DrawPreview({
   if (!segments) return null;
   return <primitive object={segments} />;
 }
-
-// ---------------------------------------------------------------------------
-// CollectedPointMarkers — dots at already-placed vertices
-// ---------------------------------------------------------------------------
 
 interface PointMarkerProps {
   points: Vec2[];

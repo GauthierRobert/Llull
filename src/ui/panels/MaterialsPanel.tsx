@@ -18,10 +18,6 @@ import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 
-// ---------------------------------------------------------------------------
-// MaterialRow — one row per existing material
-// ---------------------------------------------------------------------------
-
 interface MaterialRowProps {
   material: Material;
   selectedEntityIds: string[];
@@ -91,10 +87,6 @@ function MaterialRow({
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// CreateMaterialForm — inline form to create a new material
-// ---------------------------------------------------------------------------
 
 const DEFAULT_COLOR = '#b0b0b0';
 
@@ -255,10 +247,6 @@ function CreateMaterialForm(): React.ReactElement {
     </form>
   );
 }
-
-// ---------------------------------------------------------------------------
-// MaterialsPanel
-// ---------------------------------------------------------------------------
 
 interface MaterialsPanelProps {
   className?: string;

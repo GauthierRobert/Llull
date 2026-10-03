@@ -22,10 +22,6 @@ import type { FeatureStep } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 
-// ---------------------------------------------------------------------------
-// FeatureStepRow — one row in the timeline
-// ---------------------------------------------------------------------------
-
 interface FeatureStepRowProps {
   step: FeatureStep;
   index: number;
@@ -118,10 +114,6 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// FeatureHistoryPanel
-// ---------------------------------------------------------------------------
 
 interface FeatureHistoryPanelProps {
   className?: string;

@@ -7,10 +7,6 @@ const ARROWHEAD_SIZE = 0.3;
 const ANGULAR_ARC_SEGMENTS = 32;
 export const DEFAULT_OFFSET = 5;
 
-// ---------------------------------------------------------------------------
-// Pure geometry helpers (no React, no side effects)
-// ---------------------------------------------------------------------------
-
 /** Get the world-space centroid of a line or point entity as [x, y]. */
 export function entityCentroid(e: Entity): [number, number] | null {
   const [px, py] = e.position;
@@ -76,10 +72,6 @@ export function arrowheadPoints(
 export function formatValue(value: number, precision: number): string {
   return value.toFixed(precision);
 }
-
-// ---------------------------------------------------------------------------
-// Sub-renderers (each returns THREE.Object3D groups or null)
-// ---------------------------------------------------------------------------
 
 /** Build the geometry for a linear or aligned dimension. */
 export function buildLinearGeometry(

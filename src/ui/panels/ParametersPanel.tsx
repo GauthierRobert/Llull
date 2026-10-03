@@ -21,10 +21,6 @@ import type { Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 
-// ---------------------------------------------------------------------------
-// ParameterRow — one row per existing parameter
-// ---------------------------------------------------------------------------
-
 interface ParameterRowProps {
   param: Parameter;
 }
@@ -126,10 +122,6 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
   );
 }
 
-// ---------------------------------------------------------------------------
-// AddParameterRow — inline form to create a new parameter
-// ---------------------------------------------------------------------------
-
 function AddParameterRow(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [name, setName] = useState('');
@@ -189,10 +181,6 @@ function AddParameterRow(): React.ReactElement {
     </form>
   );
 }
-
-// ---------------------------------------------------------------------------
-// ParametersPanel
-// ---------------------------------------------------------------------------
 
 interface ParametersPanelProps {
   className?: string;

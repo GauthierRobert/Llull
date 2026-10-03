@@ -10,10 +10,6 @@
 import * as THREE from 'three';
 import type { Animation } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
-// Scalar evaluation
-// ---------------------------------------------------------------------------
-
 /**
  * Given an animation definition and the current accumulated phase (seconds),
  * return the scalar value for this frame.
@@ -38,10 +34,6 @@ export function evaluateAnimationScalar(
   return anim.amplitude * Math.sin(2 * Math.PI * anim.frequency * phase);
 }
 
-// ---------------------------------------------------------------------------
-// Pivot rotation
-// ---------------------------------------------------------------------------
-
 /**
  * Rotate `point` by `angle` radians about `axis` around `pivot`.
  *
@@ -64,10 +56,6 @@ export function rotatePointAboutPivot(
   result.add(pivot);
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// Composed pose
-// ---------------------------------------------------------------------------
 
 /** A position expressed as a plain triple (avoids THREE import at call sites). */
 type PositionTuple = [number, number, number];

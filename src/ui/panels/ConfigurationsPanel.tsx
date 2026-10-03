@@ -18,10 +18,6 @@ import type { Configuration } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 
-// ---------------------------------------------------------------------------
-// ConfigurationRow — one row per existing configuration
-// ---------------------------------------------------------------------------
-
 interface ConfigurationRowProps {
   config: Configuration;
 }
@@ -80,10 +76,6 @@ function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement
   );
 }
 
-// ---------------------------------------------------------------------------
-// ParameterValueRow — one row in the "create" form for a parameter→expression pair
-// ---------------------------------------------------------------------------
-
 interface ParameterValueRowProps {
   index: number;
   paramName: string;
@@ -140,10 +132,6 @@ function ParameterValueRow({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// CreateConfigurationForm — inline form to define a new configuration
-// ---------------------------------------------------------------------------
 
 interface PvEntry {
   paramName: string;
@@ -271,10 +259,6 @@ function CreateConfigurationForm(): React.ReactElement {
     </form>
   );
 }
-
-// ---------------------------------------------------------------------------
-// ConfigurationsPanel
-// ---------------------------------------------------------------------------
 
 interface ConfigurationsPanelProps {
   className?: string;

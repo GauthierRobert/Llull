@@ -24,10 +24,6 @@ import type { Layer } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelHeader } from '@ui/panels/PanelParts';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function useLayerEntityCounts(): Record<string, number> {
   const entities = useStore((s) => s.document.entities);
   const counts: Record<string, number> = {};
@@ -38,10 +34,6 @@ function useLayerEntityCounts(): Record<string, number> {
   }
   return counts;
 }
-
-// ---------------------------------------------------------------------------
-// Layer row — read-only with local viewport visibility toggle
-// ---------------------------------------------------------------------------
 
 interface LayerRowProps {
   layer: Layer;
@@ -119,10 +111,6 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// LayersPanel
-// ---------------------------------------------------------------------------
 
 interface LayersPanelProps {
   className?: string;

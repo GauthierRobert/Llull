@@ -39,27 +39,15 @@ import {
   buildAngularGeometry,
 } from './dimensionGeometry';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const SELECTION_COLOR = '#5b8dee';
 const DIM_LINE_COLOR = '#333333';
 const TEXT_HEIGHT = 0.5;
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
 
 interface DimensionRenderer2DProps {
   entity: DimensionEntity;
   doc: CadDocument;
   selected: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Geometry cleanup
-// ---------------------------------------------------------------------------
 
 function disposeGroup(group: THREE.Group | null): void {
   if (!group) return;
@@ -72,10 +60,6 @@ function disposeGroup(group: THREE.Group | null): void {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function DimensionRenderer2D({
   entity,
   doc,
@@ -86,16 +70,10 @@ export function DimensionRenderer2D({
   const dimColor = selected ? SELECTION_COLOR : color || DIM_LINE_COLOR;
   const effectivePrecision = precision ?? doc.displayPrecision;
 
-  // ---------------------------------------------------------------------------
-  // Resolve referenced entities
-  // ---------------------------------------------------------------------------
   const refs = useMemo(() => {
     return entityIds.map((id) => doc.entities[id] ?? null);
   }, [entityIds, doc.entities]);
 
-  // ---------------------------------------------------------------------------
-  // Linear / Aligned
-  // ---------------------------------------------------------------------------
   const linearData = useMemo(() => {
     if (dimensionKind !== 'linear' && dimensionKind !== 'aligned') return null;
     if (refs.length < 2) return null;
@@ -148,11 +126,6 @@ export function DimensionRenderer2D({
     return () => disposeGroup(linearData?.group ?? null);
   }, [linearData]);
 
-  // ---------------------------------------------------------------------------
-  // Radial
-  // @invariant entity.offset is interpreted as an angle in radians (0, 2π) here,
-  //            not as a perpendicular distance — unlike the linear/aligned branches.
-  // ---------------------------------------------------------------------------
   const radialData = useMemo(() => {
     if (dimensionKind !== 'radial') return null;
     if (refs.length < 1) return null;
@@ -194,9 +167,6 @@ export function DimensionRenderer2D({
     return () => disposeGroup(radialData?.group ?? null);
   }, [radialData]);
 
-  // ---------------------------------------------------------------------------
-  // Angular
-  // ---------------------------------------------------------------------------
   const angularData = useMemo(() => {
     if (dimensionKind !== 'angular') return null;
     if (refs.length < 3) return null;
@@ -246,9 +216,6 @@ export function DimensionRenderer2D({
     return () => disposeGroup(angularData?.group ?? null);
   }, [angularData]);
 
-  // ---------------------------------------------------------------------------
-  // Compute the display text
-  // ---------------------------------------------------------------------------
   const data = linearData ?? radialData ?? angularData;
   if (!data) return null;
 

@@ -20,10 +20,6 @@ import { ProjectIO } from '@ui/components/ProjectIO';
 import { ModelExport } from '@ui/components/ModelExport';
 import { McpConnectButton } from '@ui/components/McpConnect';
 
-// ---------------------------------------------------------------------------
-// AgentPill — warm agent color when connected, neutral otherwise
-// ---------------------------------------------------------------------------
-
 interface AgentPillProps {
   status: 'connected' | 'connecting' | 'disconnected';
 }
@@ -58,10 +54,6 @@ function AgentPill({ status }: AgentPillProps): React.ReactElement {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Dock toggles
-// ---------------------------------------------------------------------------
-
 function SidebarToggle(): React.ReactElement {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen);
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
@@ -95,10 +87,6 @@ function InspectorToggle(): React.ReactElement {
     </button>
   );
 }
-
-// ---------------------------------------------------------------------------
-// TopBar
-// ---------------------------------------------------------------------------
 
 export function TopBar(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);

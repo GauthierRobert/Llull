@@ -16,10 +16,6 @@
 
 import { create } from 'zustand';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /** Minimal camera bookmark: eye position + orbit target in world space. */
 export interface NamedViewCamera {
   position: readonly [number, number, number];
@@ -35,10 +31,6 @@ interface NamedView {
   /** Camera state captured at save time. */
   camera: NamedViewCamera;
 }
-
-// ---------------------------------------------------------------------------
-// Persistence helpers
-// ---------------------------------------------------------------------------
 
 const STORAGE_KEY = 'llull-named-views';
 
@@ -75,10 +67,6 @@ function generateId(): string {
   return `nv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Store state
-// ---------------------------------------------------------------------------
-
 interface NamedViewStoreState {
   /** Current list of saved named views, in creation order. */
   namedViews: NamedView[];
@@ -112,10 +100,6 @@ interface NamedViewStoreState {
    */
   deleteNamedView(id: string): void;
 }
-
-// ---------------------------------------------------------------------------
-// Store
-// ---------------------------------------------------------------------------
 
 export const useNamedViewStore = create<NamedViewStoreState>()((set, get) => ({
   namedViews: readStoredViews(),

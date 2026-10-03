@@ -32,10 +32,6 @@ import type { SnapType } from './snapping/types';
 import { useGroundPlane } from './useGroundPlane';
 import { ellipseSegmentsGeometry } from './ellipseSegments';
 
-// ---------------------------------------------------------------------------
-// Glyph colours per snap type
-// ---------------------------------------------------------------------------
-
 const SNAP_COLORS: Record<SnapType, string> = {
   endpoint: '#e040fb', // magenta
   midpoint: '#00e5ff', // cyan
@@ -62,10 +58,6 @@ const GLYPH_TARGET_PX = 11;
 
 /** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
 const SNAP_TOLERANCE_PX = 12;
-
-// ---------------------------------------------------------------------------
-// Helper: build glyph geometry for each snap type
-// ---------------------------------------------------------------------------
 
 function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
   const s = GLYPH_SIZE;
@@ -255,10 +247,6 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Per-type glyph (memoized, disposed on unmount)
-// ---------------------------------------------------------------------------
-
 interface GlyphProps {
   snapType: SnapType;
   x: number;
@@ -301,10 +289,6 @@ function SnapGlyph({ snapType, x, y, zoom }: GlyphProps): React.ReactElement {
   return <primitive object={segments} />;
 }
 
-// ---------------------------------------------------------------------------
-// Ground plane: invisible mesh that captures pointer events
-// ---------------------------------------------------------------------------
-
 interface GroundPlaneProps {
   onMove: (worldX: number, worldY: number) => void;
   onLeave: () => void;
@@ -341,10 +325,6 @@ function GroundPlane({ onMove, onLeave }: GroundPlaneProps): React.ReactElement 
     />
   );
 }
-
-// ---------------------------------------------------------------------------
-// SnapIndicator — the exported component
-// ---------------------------------------------------------------------------
 
 /**
  * Mount inside the r3f scene (inside <Canvas>) in Viewport2D.

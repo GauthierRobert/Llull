@@ -46,10 +46,6 @@ interface EntitiesProps {
   document: CadDocument;
 }
 
-// ---------------------------------------------------------------------------
-// InstanceEntityRenderer — renders one InstanceEntity as its expanded children
-// ---------------------------------------------------------------------------
-
 /**
  * Renders a single InstanceEntity by expanding it into world-space entities via
  * `expandInstance` and delegating to the same per-kind EntityRenderer branches.

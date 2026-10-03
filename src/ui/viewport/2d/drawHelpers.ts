@@ -11,10 +11,6 @@
 
 import type { Vec2, Vec3 } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
-// Rectangle from two corners
-// ---------------------------------------------------------------------------
-
 interface RectParams {
   width: number;
   height: number;
@@ -45,10 +41,6 @@ export function rectParamsFromCorners(a: Vec2, b: Vec2): RectParams | null {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Circle from two points
-// ---------------------------------------------------------------------------
-
 /**
  * Compute the radius for draw_circle from a center point and a rim point.
  *
@@ -61,10 +53,6 @@ export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
   const r = Math.sqrt(dx * dx + dy * dy);
   return r > 0 ? r : null;
 }
-
-// ---------------------------------------------------------------------------
-// Ellipse from center + corner
-// ---------------------------------------------------------------------------
 
 interface EllipseParams {
   center: Vec2;
@@ -87,10 +75,6 @@ export function ellipseParamsFromCenterCorner(center: Vec2, corner: Vec2): Ellip
   if (radiusX === 0 || radiusY === 0) return null;
   return { center, radiusX, radiusY };
 }
-
-// ---------------------------------------------------------------------------
-// Spline point collection helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Validate that a candidate spline point list meets the minimum length for dispatch.

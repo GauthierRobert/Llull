@@ -22,10 +22,6 @@ import type { Entity } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 
-// ---------------------------------------------------------------------------
-// Field primitives
-// ---------------------------------------------------------------------------
-
 const AXES = ['x', 'y', 'z'] as const;
 
 function formatNumber(n: number): string {
@@ -178,10 +174,6 @@ function ScalarRow({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Entity-visibility toggle (purely local render override — no dispatch)
-// ---------------------------------------------------------------------------
-
 function EntityVisibilityToggle({ entityId }: { entityId: string }): React.ReactElement {
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
   const toggleVisibility = useViewportStore((s) => s.toggleEntityVisibility);
@@ -200,10 +192,6 @@ function EntityVisibilityToggle({ entityId }: { entityId: string }): React.React
     </button>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Kind-specific dimension rows
-// ---------------------------------------------------------------------------
 
 const DIMENSIONED_KINDS: ReadonlySet<Entity['kind']> = new Set<Entity['kind']>([
   'box',
@@ -281,10 +269,6 @@ function EntityDimensions({ entity }: { entity: Entity }): React.ReactElement | 
       return null;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Selected-entity detail
-// ---------------------------------------------------------------------------
 
 function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -385,10 +369,6 @@ function SelectionActions(): React.ReactElement {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// PropertiesPanel
-// ---------------------------------------------------------------------------
 
 interface PropertiesPanelProps {
   className?: string;
