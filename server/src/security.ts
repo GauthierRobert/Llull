@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 
-export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
+const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:3000',

@@ -20,7 +20,7 @@ import { type Triangle, fanTriangulate, earClipTriangulateVerts } from './export
 // Per-kind world-space triangle tessellation
 // ---------------------------------------------------------------------------
 
-export function triangulateBox(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Triangle[] {
+function triangulateBox(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Triangle[] {
   const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
 
   // Counter-clockwise seen from outside (outward normals).
@@ -73,7 +73,7 @@ export function triangulateBox(e: { position: Vec3; size: Vec3; rotation: Vec3 }
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-export function triangulateCylinder(e: {
+function triangulateCylinder(e: {
   position: Vec3;
   radius: number;
   height: number;
@@ -112,11 +112,7 @@ export function triangulateCylinder(e: {
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-export function triangulateSphere(e: {
-  position: Vec3;
-  radius: number;
-  rotation: Vec3;
-}): Triangle[] {
+function triangulateSphere(e: { position: Vec3; radius: number; rotation: Vec3 }): Triangle[] {
   const tris: Triangle[] = sphereQuads(e.position, e.radius).flatMap(
     ([v00, v01, v11, v10]): Triangle[] => [
       [v00, v01, v11],
@@ -127,7 +123,7 @@ export function triangulateSphere(e: {
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-export function triangulateCone(e: {
+function triangulateCone(e: {
   position: Vec3;
   radius: number;
   height: number;
@@ -156,7 +152,7 @@ export function triangulateCone(e: {
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-export function triangulateTorus(e: {
+function triangulateTorus(e: {
   position: Vec3;
   ringRadius: number;
   tubeRadius: number;
@@ -172,7 +168,7 @@ export function triangulateTorus(e: {
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-export function tessellateWedge(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Triangle[] {
+function tessellateWedge(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Triangle[] {
   const { f00, f10, f11, f01, b00, b10 } = wedgeCorners(e.position, e.size);
 
   // Counter-clockwise seen from outside (outward normals).
@@ -195,7 +191,7 @@ export function tessellateWedge(e: { position: Vec3; size: Vec3; rotation: Vec3 
   return applyRotationToTriangles(triPairs, e.position, e.rotation);
 }
 
-export function triangulatePyramid(e: {
+function triangulatePyramid(e: {
   position: Vec3;
   baseWidth: number;
   baseDepth: number;
@@ -217,7 +213,7 @@ export function triangulatePyramid(e: {
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-export function triangulateExtrusion(e: {
+function triangulateExtrusion(e: {
   position: Vec3;
   profile: ReadonlyArray<readonly [number, number]>;
   depth: number;
@@ -243,7 +239,7 @@ export function triangulateExtrusion(e: {
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-export function triangulateMesh(e: {
+function triangulateMesh(e: {
   position: Vec3;
   mesh: { positions: readonly number[]; indices: readonly number[] };
   rotation: Vec3;
@@ -256,11 +252,7 @@ export function triangulateMesh(e: {
 // Rotation application (mirrors render.ts applyEulerXYZ)
 // ---------------------------------------------------------------------------
 
-export function applyRotationToTriangles(
-  tris: Triangle[],
-  position: Vec3,
-  rotation: Vec3,
-): Triangle[] {
+function applyRotationToTriangles(tris: Triangle[], position: Vec3, rotation: Vec3): Triangle[] {
   const [rx, ry, rz] = rotation;
   if (rx === 0 && ry === 0 && rz === 0) return tris;
   return tris.map(
@@ -273,7 +265,7 @@ export function applyRotationToTriangles(
   );
 }
 
-export function triangulateRevolution(e: {
+function triangulateRevolution(e: {
   position: Vec3;
   profile: ReadonlyArray<readonly [number, number]>;
   axis: Vec3;

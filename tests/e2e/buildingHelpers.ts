@@ -33,7 +33,7 @@ export function elementRows(page: Page, prefix: string): ReturnType<Page['locato
 }
 
 /** Records the text of every blob download the app triggers (read back in-page; no Node APIs). */
-export async function captureDownloads(page: Page): Promise<void> {
+async function captureDownloads(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const captured: Array<Promise<string>> = [];
     Object.assign(window, { __downloads: captured });

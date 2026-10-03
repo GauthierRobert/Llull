@@ -155,7 +155,7 @@ export function replayHistory(
  * @invariant featureHistory is preserved unchanged; entities are re-evaluated
  * @failure empty history -> returns doc unchanged, affected:[]
  */
-export const replayHistory_cmd = defineCommand({
+const replayHistory_cmd = defineCommand({
   name: 'replay_history',
   description:
     'Recompute the document from scratch by replaying all non-suppressed steps in ' +
@@ -202,7 +202,7 @@ export const replayHistory_cmd = defineCommand({
  * @invariant featureHistory length is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-export const setStepSuppressed = defineCommand({
+const setStepSuppressed = defineCommand({
   name: 'set_step_suppressed',
   description:
     'Toggle the suppressed flag of a feature history step by its stepId. ' +
@@ -258,7 +258,7 @@ export const setStepSuppressed = defineCommand({
  * @invariant featureHistory length is unchanged; step name is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-export const editStepParams = defineCommand({
+const editStepParams = defineCommand({
   name: 'edit_step_params',
   description:
     'Replace the params of a feature history step by its stepId, then regenerate ' +
@@ -319,7 +319,7 @@ export const editStepParams = defineCommand({
  * @invariant featureHistory length is unchanged
  * @failure unknown stepId -> no-op, affected:[]
  */
-export const reorderStep = defineCommand({
+const reorderStep = defineCommand({
   name: 'reorder_step',
   description:
     'Move a feature history step to a new position (0-based index) in the featureHistory ' +
@@ -380,7 +380,7 @@ export const reorderStep = defineCommand({
  * @invariant featureHistory length decreases by 1
  * @failure unknown stepId -> no-op, affected:[]
  */
-export const deleteStep = defineCommand({
+const deleteStep = defineCommand({
   name: 'delete_step',
   description:
     'Permanently remove a feature history step by its stepId from featureHistory, ' +
@@ -426,7 +426,7 @@ export const deleteStep = defineCommand({
  * @invariant featureHistory length increases by 1
  * @failure afterStepId provided but not found -> no-op, affected:[]
  */
-export const insertStep = defineCommand({
+const insertStep = defineCommand({
   name: 'insert_step',
   description:
     'Splice a new feature history step into featureHistory immediately after the step ' +

@@ -8,7 +8,7 @@
 export type PresetName = 'front' | 'top' | 'right' | 'iso';
 export type PresetDirection = readonly [number, number, number];
 
-export const TOP_TILT = 1e-3;
+const TOP_TILT = 1e-3;
 
 export const PRESET_DIRECTIONS: Record<PresetName, PresetDirection> = {
   front: [0, -1, 0],

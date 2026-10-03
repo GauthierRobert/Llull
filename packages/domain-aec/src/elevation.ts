@@ -15,20 +15,20 @@ import {
   PAPER_MM,
   SHEET_DEFS,
   SHEET_STYLE,
-  TITLE_HEIGHT,
-  escapeXml,
   fitScale,
+  sheetDrawingArea,
   scaleBar,
   titleBlock,
   PAPER_SIZES,
   type PaperSize,
   type Viewport,
 } from './sheet';
-import { cross, dot, sub } from './vec3';
+import { escapeXml } from '@lib/escapeXml';
+import { cross3, dot3, sub3 } from '@lib/vec3';
 
 export type ElevationDirection = 'north' | 'south' | 'east' | 'west';
 
-export const ELEVATION_DIRECTIONS = [
+const ELEVATION_DIRECTIONS = [
   'north',
   'south',
   'east',
@@ -85,7 +85,7 @@ const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => [
 ];
 
 function unitNormal(triangle: Triangle): Vec3 | null {
-  const normal = cross(sub(triangle[1], triangle[0]), sub(triangle[2], triangle[0]));
+  const normal = cross3(sub3(triangle[1], triangle[0]), sub3(triangle[2], triangle[0]));
   const length = Math.hypot(normal[0], normal[1], normal[2]);
   return length > 1e-12 ? [normal[0] / length, normal[1] / length, normal[2] / length] : null;
 }
@@ -148,7 +148,7 @@ function faceEdges(faces: ReadonlyArray<Face>): Map<number, Array<readonly [Vec3
       fronts.length === 1 ||
       (first !== undefined &&
         second !== undefined &&
-        dot(first.normal, second.normal) < FEATURE_COS);
+        dot3(first.normal, second.normal) < FEATURE_COS);
     if (!feature) continue;
     edges.set(owner, [...(edges.get(owner) ?? []), [a, b]]);
   }
@@ -244,7 +244,7 @@ export function buildElevationDrawing(
     const faces: Face[] = [];
     for (const triangle of entityToTriangles(entity, doc)) {
       const normal = unitNormal(triangle);
-      if (normal) faces.push({ triangle, normal, front: dot(normal, toViewer) > 1e-6 });
+      if (normal) faces.push({ triangle, normal, front: dot3(normal, toViewer) > 1e-6 });
     }
     const edges = faceEdges(faces);
     const entityCuts: Array<readonly [Vec2, Vec2]> = [];
@@ -278,7 +278,7 @@ export function buildElevationDrawing(
       items.push({
         depth: clipped.reduce((sum, point) => sum + depth(point), 0) / clipped.length,
         polygon,
-        shade: Math.round(225 + 30 * dot(face.normal, toViewer)),
+        shade: Math.round(225 + 30 * dot3(face.normal, toViewer)),
         edges: visibleEdges,
       });
     });
@@ -314,7 +314,7 @@ const ANNOTATION_RIGHT = 34;
  * @pure
  * @failure no 3D geometry / invalid scale -> null
  */
-export function buildElevationSheet(
+function buildElevationSheet(
   doc: CadDocument,
   options: {
     direction: ElevationDirection;
@@ -332,12 +332,7 @@ export function buildElevationSheet(
   if (options.scale !== undefined && !(Number.isFinite(options.scale) && options.scale > 0))
     return null;
   const [width, height] = size;
-  const outer: Viewport = {
-    x: BINDING_MARGIN + 4,
-    y: MARGIN + 4,
-    width: width - BINDING_MARGIN - MARGIN - 8,
-    height: height - 2 * MARGIN - TITLE_HEIGHT - 8,
-  };
+  const outer = sheetDrawingArea(width, height);
   const viewport: Viewport = {
     x: outer.x,
     y: outer.y + ANNOTATION_TOP,

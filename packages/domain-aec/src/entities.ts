@@ -48,7 +48,7 @@ const LAYER_COLOR: ReadonlyMap<string, string> = new Map(
   ]),
 );
 
-export function layerIdFor(category: BimCategory): string {
+function layerIdFor(category: BimCategory): string {
   return `layer-${CATEGORY_LAYER[category].name}`;
 }
 

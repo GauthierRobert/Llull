@@ -6,5 +6,5 @@
  */
 
 export { ifcGuid, ifcString, ifcReal } from './ifcStep';
-export { buildIfc, exportIfc } from './ifcBuild';
+export { exportIfc } from './ifcBuild';
 export type { IfcExport } from './ifcBuild';

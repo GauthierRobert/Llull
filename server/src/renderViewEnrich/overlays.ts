@@ -6,7 +6,9 @@
  */
 
 import type { RenderViewData } from '@core/commands/render';
-import { computeOrthoHalf, escapeXml, makeProjector, r2 } from './svgHelpers';
+import { escapeXml } from '@lib/escapeXml';
+import { r2 } from '@core/commands/renderMath';
+import { computeOrthoHalf, makeProjector } from './svgHelpers';
 
 // ---------------------------------------------------------------------------
 // ShowDimensions: overlay W × D × H as SVG text

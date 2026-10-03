@@ -211,7 +211,7 @@ export interface DxfExport {
  * Builds the DXF text. @pure
  * @failure unknown level -> null
  */
-export function buildDxf(
+function buildDxf(
   doc: CadDocument,
   options: { levelId?: string; includeDrafting?: boolean },
 ): DxfExport | null {

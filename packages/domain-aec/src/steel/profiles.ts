@@ -286,6 +286,9 @@ const COLD_FORMED: SteelProfile[] = (
   ),
 );
 
+/** Structural steel density, kg/m³. */
+export const STEEL_DENSITY_KG_PER_M3 = 7850;
+
 export const STEEL_PROFILES: ReadonlyArray<SteelProfile> = [
   ...IPE,
   ...HEA,

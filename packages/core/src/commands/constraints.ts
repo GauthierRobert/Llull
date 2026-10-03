@@ -19,8 +19,6 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { runSolver } from './constraintSolver';
 
-export { runSolver };
-
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
   'coincident',
   'parallel',

@@ -32,7 +32,7 @@ export type CoefficientSet = keyof ZoneCpe;
 export const FLAT_ROOF_LIMIT = 5;
 
 /** Share of a leeward slope covered by the ridge strip J (e/10 on a slope about b/2 wide, e ≤ b). */
-export const RIDGE_STRIP_SHARE = 0.1;
+const RIDGE_STRIP_SHARE = 0.1;
 
 type Row = {
   readonly pitch: number;

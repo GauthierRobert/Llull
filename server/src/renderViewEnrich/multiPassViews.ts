@@ -10,7 +10,9 @@ import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { RenderViewData } from '@core/commands/render';
 import type { SectionParams } from './types';
-import { escapeXml, extractSvgInner, makeProjector, r2 } from './svgHelpers';
+import { escapeXml } from '@lib/escapeXml';
+import { r2 } from '@core/commands/renderMath';
+import { extractSvgInner, makeProjector } from './svgHelpers';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -11,7 +11,7 @@ import { evaluateExpression } from './expression';
 // ---------------------------------------------------------------------------
 
 /** Normalize a string axis shorthand ('x'|'y'|'z') to a Vec3 unit vector. */
-export function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
+function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
   if (axis === 'x') return [1, 0, 0];
   if (axis === 'y') return [0, 1, 0];
   if (axis === 'z') return [0, 0, 1];
@@ -22,7 +22,7 @@ export function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
  * Rotate a Vec3 about an axis by an angle (Rodrigues' rotation formula).
  * @pure
  */
-export function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
+function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
   const [ux, uy, uz] = axis;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
@@ -72,7 +72,7 @@ export function isValidMateRef(v: unknown): v is { instanceId: string; frame?: s
 }
 
 /** Resolve a JointMateRef to the InstanceEntity, returning null on missing/wrong kind. */
-export function resolveInstance(ref: JointMateRef, doc: CadDocument): InstanceEntity | null {
+function resolveInstance(ref: JointMateRef, doc: CadDocument): InstanceEntity | null {
   const e = doc.entities[ref.instanceId];
   if (!e || e.kind !== 'instance') return null;
   return e as InstanceEntity;
@@ -88,7 +88,7 @@ export function resolveInstance(ref: JointMateRef, doc: CadDocument): InstanceEn
  *
  * @pure
  */
-export function driveTopoSort(driveRelations: Record<string, DriveRelation>): {
+function driveTopoSort(driveRelations: Record<string, DriveRelation>): {
   sorted: string[];
   cycleSet: Set<string>;
 } {

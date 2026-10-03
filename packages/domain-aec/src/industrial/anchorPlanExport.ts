@@ -9,12 +9,12 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import {
-  BINDING_MARGIN,
   MARGIN,
   PAPER_MM,
   composeSheetSvg,
   TITLE_HEIGHT,
   fitScale,
+  sheetDrawingArea,
   type PaperSize,
   type Viewport,
 } from '../sheet';
@@ -112,11 +112,12 @@ export const exportAnchorPlan = defineCommand({
 
     const sheetPaper: PaperSize = paper ?? 'A3';
     const [width, height] = PAPER_MM[sheetPaper];
+    const area = sheetDrawingArea(width, height);
     const viewport: Viewport = {
-      x: BINDING_MARGIN + 4 + INSET,
-      y: MARGIN + 4 + INSET,
-      width: width - BINDING_MARGIN - MARGIN - 8 - TABLE_WIDTH - 2 * INSET,
-      height: height - 2 * MARGIN - TITLE_HEIGHT - 8 - 2 * INSET - 6,
+      x: area.x + INSET,
+      y: area.y + INSET,
+      width: area.width - TABLE_WIDTH - 2 * INSET,
+      height: area.height - 2 * INSET - 6,
     };
     const extent: Vec2[] = [
       ...plates.flatMap((placed) => [...placed.corners, ...placed.bolts]),

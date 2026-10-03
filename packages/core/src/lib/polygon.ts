@@ -101,7 +101,7 @@ export function offsetPolygon(points: ReadonlyArray<Point2>, delta: number): Poi
 }
 
 /** Intersection of the infinite lines a1→a2 and b1→b2, or null when parallel. */
-export function lineIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point2 | null {
+function lineIntersection(a1: Point2, a2: Point2, b1: Point2, b2: Point2): Point2 | null {
   const d1x = a2[0] - a1[0];
   const d1y = a2[1] - a1[1];
   const d2x = b2[0] - b1[0];

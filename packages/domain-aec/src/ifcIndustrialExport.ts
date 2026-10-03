@@ -18,7 +18,7 @@ import type {
 } from '@core/model/building';
 import { sweepFrame } from './mesh';
 import {
-  connectionSolids,
+  buildingConnectionSolids,
   panelFrame,
   plateLayout,
   trayOutline,
@@ -44,7 +44,7 @@ import {
   framePlacement,
   steelProfileDef,
 } from './ifcElementExport';
-import { dot } from './vec3';
+import { dot3 } from '@lib/vec3';
 
 /** One extruded-area solid per non-degenerate segment of a polyline, the profile swept along it. */
 function sweptSolids(context: Context, profileRef: string, points: ReadonlyArray<Vec3>): string[] {
@@ -115,7 +115,7 @@ export function exportIndustrial(
           corner[1] - frame.origin[1],
           corner[2] - frame.origin[2],
         ];
-        return [dot(offset, frame.e1), dot(offset, frame.e2)];
+        return [dot3(offset, frame.e1), dot3(offset, frame.e2)];
       });
       const local = framePlacement(context, storeyPlacement, frame.origin, frame.normal, frame.e1);
       const solid = extrusion(context, polygonProfile(context, outline), mm(element.thickness));
@@ -179,12 +179,7 @@ export function exportConnection(
   storeyPlacement: string,
 ): Exported[] {
   const { mm, writer } = context;
-  const members: Record<string, SteelMemberElement | undefined> = {};
-  for (const id of [connection.rafterId, connection.otherId]) {
-    const member = building.elements[id];
-    if (member?.category === 'member') members[id] = member;
-  }
-  const solids = connectionSolids(units, connection, members, level);
+  const solids = buildingConnectionSolids(units, building, connection);
   if (!solids) return [];
   const solidOf = (solid: ConnectionSolid): { placement: string; body: string } => ({
     placement: framePlacement(

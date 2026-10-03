@@ -20,13 +20,12 @@ import {
   nextMark,
   noChange,
   withElement,
+  withoutElements,
 } from '../model';
 import { regenerateBuilding } from '../evaluate';
-import { findProfile } from '../steel/profiles';
-import { boltSize, connectionSolids } from './evaluate';
+import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
+import { boltSize, buildingConnectionSolids } from './evaluate';
 import { polygonArea } from '@lib/polygon';
-
-const STEEL_DENSITY_KG_PER_M3 = 7850;
 
 /** Steel mass of a connection in kg: its modelled end plate(s) + haunch (half the rafter section per metre). */
 export function connectionMass(
@@ -34,15 +33,9 @@ export function connectionMass(
   building: BuildingModel,
   connection: MomentConnectionElement,
 ): number {
-  const level = building.levels[connection.levelId];
-  const members: Record<string, SteelMemberElement | undefined> = {};
-  for (const id of [connection.rafterId, connection.otherId]) {
-    const member = building.elements[id];
-    if (member?.category === 'member') members[id] = member;
-  }
-  const rafter = members[connection.rafterId];
-  const profile = rafter ? findProfile(rafter.profile) : undefined;
-  const solids = level ? connectionSolids(doc, connection, members, level) : null;
+  const rafter = building.elements[connection.rafterId];
+  const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
+  const solids = buildingConnectionSolids(doc, building, connection);
   if (!profile || !solids) return 0;
   const cubicMetres = (value: number): number => value / fromMm(doc, 1000) ** 3;
   const plates = solids
@@ -262,16 +255,7 @@ export function dropStaleConnections(
   );
   if (stale.length === 0) return { building, removed: [] };
   const removed = new Set(stale.map((element) => element.id));
-  const elements = { ...building.elements };
-  for (const id of removed) delete elements[id];
-  return {
-    building: {
-      ...building,
-      elements,
-      elementOrder: building.elementOrder.filter((id) => !removed.has(id)),
-    },
-    removed: [...removed],
-  };
+  return { building: withoutElements(building, removed), removed: [...removed] };
 }
 
 export interface ConnectionWelds {

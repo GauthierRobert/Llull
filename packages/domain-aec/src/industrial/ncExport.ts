@@ -15,10 +15,10 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, fromMm, getBuilding, noChange } from '../model';
 import { sweepFrame } from '../mesh';
-import { findProfile, type SteelProfile } from '../steel/profiles';
+import { distanceSq3, dot3, sub3 } from '@lib/vec3';
+import { findProfile, STEEL_DENSITY_KG_PER_M3, type SteelProfile } from '../steel/profiles';
 import { atLevel, connectionSolids, plateLayout } from './evaluate';
 
-const STEEL_DENSITY_KG_PER_M3 = 7850;
 const END_PLATE_HOLE_CLEARANCE_MM = 2;
 const ANCHOR_HOLE_CLEARANCE_MM = 4;
 
@@ -83,14 +83,6 @@ function round2(value: number): number {
   return rounded === 0 ? 0 : rounded;
 }
 
-function dot(a: Vec3, b: Vec3): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-function minus(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-}
-
 /** Rafter end cut: the end plate is vertical, so the cut equals the roof pitch. */
 function pitchCut(member: SteelMemberElement): number {
   if (member.role !== 'rafter') return 0;
@@ -118,7 +110,6 @@ function endPlateCutback(
     atLevel(levels[member.levelId] as BuildingLevel, member.start),
     atLevel(levels[member.levelId] as BuildingLevel, member.end),
   ];
-  const squaredDistance = (a: Vec3, b: Vec3): number => dot(minus(a, b), minus(a, b));
   for (const connection of connections) {
     const level = levels[connection.levelId];
     if (!level || (connection.rafterId !== member.id && connection.otherId !== member.id)) continue;
@@ -126,17 +117,17 @@ function endPlateCutback(
       solid.part.startsWith('plate'),
     );
     for (const solid of plates ?? []) {
-      const atStart = squaredDistance(solid.origin, start) <= squaredDistance(solid.origin, end);
+      const atStart = distanceSq3(solid.origin, start) <= distanceSq3(solid.origin, end);
       const into: Vec3 = atStart ? direction : [-direction[0], -direction[1], -direction[2]];
       const joint = atStart ? start : end;
-      const slope = dot(into, solid.along);
+      const slope = dot3(into, solid.along);
       if (slope <= 1e-6) continue;
       const hosted =
         connection.rafterId === member.id
           ? solid.part === 'plate'
           : connection.kind === 'apex' && solid.part === 'plate-2';
       if (!hosted) continue;
-      const cutback = dot(minus(solid.origin, joint), into) + solid.depth / slope;
+      const cutback = dot3(sub3(solid.origin, joint), into) + solid.depth / slope;
       ends[atStart ? 'start' : 'end'] = Math.max(ends[atStart ? 'start' : 'end'], cutback);
     }
   }
@@ -172,23 +163,23 @@ function memberHoles(
         solid.origin[1] + solid.x[1] * cx + solid.y[1] * cy,
         solid.origin[2] + solid.x[2] * cx + solid.y[2] * cy,
       ];
-      const offset = minus(centre, start);
+      const offset = sub3(centre, start);
       const throughFlange =
-        Math.abs(dot(solid.along, frame.v)) >= Math.abs(dot(solid.along, frame.u));
+        Math.abs(dot3(solid.along, frame.v)) >= Math.abs(dot3(solid.along, frame.u));
       const diameter = round2(mm(connection.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM);
-      const x = round2(mm(dot(offset, frame.d)));
+      const x = round2(mm(dot3(offset, frame.d)));
       holes.push(
         throughFlange
           ? {
-              face: dot(solid.along, frame.v) > 0 ? 'o' : 'u',
+              face: dot3(solid.along, frame.v) > 0 ? 'o' : 'u',
               x,
-              y: round2(mm(dot(offset, frame.u)) + profile.b / 2),
+              y: round2(mm(dot3(offset, frame.u)) + profile.b / 2),
               diameter,
             }
           : {
               face: 'v',
               x,
-              y: round2(mm(dot(offset, frame.v)) + profile.h / 2),
+              y: round2(mm(dot3(offset, frame.v)) + profile.h / 2),
               diameter,
             },
       );

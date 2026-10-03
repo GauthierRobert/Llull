@@ -11,7 +11,7 @@ import {
 } from './persistenceGuards';
 
 /** All legal constraint kinds (must stay in sync with ConstraintKind union in types.ts). */
-export const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
+const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
   'coincident',
   'parallel',
   'perpendicular',
@@ -21,12 +21,12 @@ export const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKin
 ]);
 
 /** All legal joint kinds (must stay in sync with JointKind union in types.ts). */
-export const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>(['revolute', 'prismatic']);
+const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>(['revolute', 'prismatic']);
 
 /**
  * Validate a JointMateRef embedded object. Returns error string or null.
  */
-export function validateJointMateRef(id: string, field: string, v: unknown): string | null {
+function validateJointMateRef(id: string, field: string, v: unknown): string | null {
   if (!isRecord(v)) return `joint '${id}': ${field} must be an object`;
   if (typeof v['instanceId'] !== 'string' || (v['instanceId'] as string).length === 0) {
     return `joint '${id}': ${field}.instanceId must be a non-empty string`;
@@ -44,7 +44,7 @@ export function validateJointMateRef(id: string, field: string, v: unknown): str
  * Validate an axis field ('x'|'y'|'z' or a 3-element finite-number array).
  * Returns error string or null.
  */
-export function validateJointAxis(id: string, axis: unknown): string | null {
+function validateJointAxis(id: string, axis: unknown): string | null {
   if (axis === 'x' || axis === 'y' || axis === 'z') return null;
   if (
     Array.isArray(axis) &&
@@ -59,7 +59,7 @@ export function validateJointAxis(id: string, axis: unknown): string | null {
 /**
  * Validate a Joint entry. Returns a descriptive error string on failure, or `null` on success.
  */
-export function validateJointValue(id: string, v: unknown): string | null {
+function validateJointValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `joint '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `joint '${id}': id field must be a string`;
   const kind = v['kind'];
@@ -87,7 +87,7 @@ export function validateJointValue(id: string, v: unknown): string | null {
 /**
  * Validate a DriveRelation entry. Returns a descriptive error string on failure, or `null` on success.
  */
-export function validateDriveRelationValue(id: string, v: unknown): string | null {
+function validateDriveRelationValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `driveRelation '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `driveRelation '${id}': id field must be a string`;
   if (typeof v['driver'] !== 'string' || (v['driver'] as string).length === 0)
@@ -106,7 +106,7 @@ export function validateDriveRelationValue(id: string, v: unknown): string | nul
 /**
  * Validate a Constraint entry. Returns a descriptive error string on failure, or `null` on success.
  */
-export function validateConstraintValue(id: string, v: unknown): string | null {
+function validateConstraintValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `constraint '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `constraint '${id}': id field must be a string`;
   const kind = v['kind'];
@@ -140,7 +140,7 @@ export function validateConstraintValue(id: string, v: unknown): string | null {
 /**
  * Validate a Recipe entry. Returns a descriptive error string on failure, or `null` on success.
  */
-export function validateRecipeValue(name: string, v: unknown): string | null {
+function validateRecipeValue(name: string, v: unknown): string | null {
   if (!isRecord(v)) return `recipe '${name}' is not an object`;
   if (typeof v['name'] !== 'string') return `recipe '${name}': name field must be a string`;
   if (!Array.isArray(v['steps'])) return `recipe '${name}': steps must be an array`;

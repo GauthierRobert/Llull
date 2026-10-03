@@ -43,7 +43,7 @@ function roundNumber(n: number): number {
   return Object.is(rounded, -0) ? 0 : rounded;
 }
 
-export function normalizeJson(parsed: unknown): unknown {
+function normalizeJson(parsed: unknown): unknown {
   const known = new Set<string>();
   collectStructuralIds(parsed, known);
   const alternatives = [...known].sort((a, b) => b.length - a.length).map(escapeRegExp);

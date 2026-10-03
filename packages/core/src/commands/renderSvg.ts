@@ -73,7 +73,7 @@ export function buildSvg(
 }
 
 /** A faint 5-line ground grid in the XY plane (Z=0). */
-export function buildGroundGrid(
+function buildGroundGrid(
   cam: Camera,
   basis: { fwd: Vec3; right: Vec3; up: Vec3 },
   orthoHalf: number,
@@ -112,7 +112,7 @@ export function buildGroundGrid(
 }
 
 /** Small RGB axis triad at the bottom-left corner. */
-export function buildAxisTriad(
+function buildAxisTriad(
   cam: Camera,
   basis: { fwd: Vec3; right: Vec3; up: Vec3 },
   width: number,

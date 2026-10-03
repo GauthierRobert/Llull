@@ -8,24 +8,18 @@ export type { FoundationRow, ClayLayer, Factors, Combination } from './foundatio
 export {
   combine,
   footingMoment,
-  hasMoment,
   plateDemands,
   hasCase,
   ultimateCombinations,
   findFooting,
   findPlate,
 } from './foundationCombinations';
-export {
-  clayLayerError,
-  consolidationSettlement,
-  footingSettlement,
-  footingSettlementParts,
-} from './foundationSettlement';
+export { clayLayerError, consolidationSettlement } from './foundationSettlement';
 export {
   footingRows,
   groundSlabWeight,
   slidingHorizontalOf,
   defaultThrustTie,
 } from './foundationRows';
-export { checkFoundations, SOIL_SHAPE, foundationCheck } from './foundationCheckRun';
+export { SOIL_SHAPE, foundationCheck } from './foundationCheckRun';
 export type { FoundationCheckParams } from './foundationCheckRun';

@@ -21,38 +21,13 @@ import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { withEntity } from './entityOps';
-
-// ---------------------------------------------------------------------------
-// Internal math helpers
-// ---------------------------------------------------------------------------
-
-function vecAdd(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-}
-
-function vecSub(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-}
-
-function vecScale(v: Vec3, s: number): Vec3 {
-  return [v[0] * s, v[1] * s, v[2] * s];
-}
-
-function vecLength(v: Vec3): number {
-  return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-}
-
-function vecNormalize(v: Vec3): Vec3 {
-  const len = vecLength(v);
-  if (len < 1e-12) return [1, 0, 0];
-  return [v[0] / len, v[1] / len, v[2] / len];
-}
+import { add3, cross3, distanceSq3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 
 /** Total arc length of the polyline. */
 function polylineLength(path: Vec3[]): number {
   let total = 0;
   for (let i = 1; i < path.length; i++) {
-    total += vecLength(vecSub(path[i]!, path[i - 1]!));
+    total += Math.sqrt(distanceSq3(path[i]!, path[i - 1]!));
   }
   return total;
 }
@@ -64,10 +39,10 @@ function polylineLength(path: Vec3[]): number {
 function pointAtArcLength(path: Vec3[], t: number): Vec3 {
   let remaining = t;
   for (let i = 1; i < path.length; i++) {
-    const seg = vecSub(path[i]!, path[i - 1]!);
-    const segLen = vecLength(seg);
+    const seg = sub3(path[i]!, path[i - 1]!);
+    const segLen = Math.sqrt(distanceSq3(path[i]!, path[i - 1]!));
     if (remaining <= segLen + 1e-10) {
-      return vecAdd(path[i - 1]!, vecScale(vecNormalize(seg), remaining));
+      return add3(path[i - 1]!, scale3(normalize3(seg), remaining));
     }
     remaining -= segLen;
   }
@@ -118,9 +93,7 @@ export const arrayAlongPath = defineCommand({
         '"place" (default): independent copies. "instance": treated as place in the current version.',
       ),
   }),
-  run: (doc, { sourceId, path, count, mode = 'place' }): CommandResult => {
-    void mode; // reserved for future instance mode; currently always places copies
-
+  run: (doc, { sourceId, path, count }): CommandResult => {
     const source = doc.entities[sourceId];
     if (!source) {
       return {
@@ -272,12 +245,12 @@ export const distributeOnArc = defineCommand({
     }
 
     const c: Vec3 = [center[0] as number, center[1] as number, center[2] as number];
-    const n: Vec3 = vecNormalize([normal[0] as number, normal[1] as number, normal[2] as number]);
+    const n: Vec3 = normalize3([normal[0] as number, normal[1] as number, normal[2] as number]);
 
     // Build a local coordinate frame in the arc plane.
     // u = local +X (from which startAngle is measured), v = local +Y = n × u.
     const u = buildPerpendicularInPlane(n);
-    const v = cross(n, u);
+    const v = cross3(n, u);
 
     const intCount = Math.max(1, Math.round(count));
     const angleRange = endAngle - startAngle;
@@ -302,22 +275,13 @@ export const distributeOnArc = defineCommand({
       const sinA = Math.sin(angle);
 
       // World position on the arc.
-      const radial: Vec3 = vecAdd(vecScale(u, cosA), vecScale(v, sinA));
-      const pos: Vec3 = vecAdd(c, vecScale(radial, radius));
+      const radial: Vec3 = add3(scale3(u, cosA), scale3(v, sinA));
+      const pos: Vec3 = add3(c, scale3(radial, radius));
 
-      // Rotation: align entity's local +X to the radial outward direction.
-      // We derive Euler angles from the radial direction. Simple approach:
-      // atan2 gives the rotation about the normal axis (Z for XY plane).
-      const rotationAboutNormal = Math.atan2(
-        radial[1] * n[2] - radial[2] * n[1], // cross(radial, n).x-ish... use angle directly
-        cosA * u[0] + sinA * v[0], // projection — just use angle directly
-      );
-      void rotationAboutNormal; // computed above, replaced by cleaner approach below
-
-      // Cleaner radial rotation: derive Euler ZYX from radial direction.
+      // Radial rotation: derive Euler ZYX from radial direction.
       // For the common case of normal=[0,0,1] (XY plane), the entity rotates
       // about Z by `angle`. For other normals we compute a general rotation.
-      const rotation = rotationForRadial(radial, n, angle);
+      const rotation = rotationForRadial(n, angle);
 
       const id = nextId('e');
       const newEntity = cloneEntityAt(source, id, pos, rotation);
@@ -337,11 +301,6 @@ export const distributeOnArc = defineCommand({
 // Rotation helpers for distribute_on_arc
 // ---------------------------------------------------------------------------
 
-/** Cross product of two Vec3. */
-function cross(a: Vec3, b: Vec3): Vec3 {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
 /**
  * Build a unit vector that is perpendicular to `n` and lies in the plane
  * defined by `n`. This is the local +X axis of the arc plane.
@@ -349,25 +308,19 @@ function cross(a: Vec3, b: Vec3): Vec3 {
 function buildPerpendicularInPlane(n: Vec3): Vec3 {
   // Pick a vector not parallel to n, then project out the n component.
   const candidate: Vec3 = Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-  const dot = candidate[0] * n[0] + candidate[1] * n[1] + candidate[2] * n[2];
-  const proj: Vec3 = [
-    candidate[0] - dot * n[0],
-    candidate[1] - dot * n[1],
-    candidate[2] - dot * n[2],
-  ];
-  return vecNormalize(proj);
+  return normalize3(sub3(candidate, scale3(n, dot3(candidate, n))));
 }
 
 /**
  * Compute an Euler XYZ rotation (in radians) such that the entity's local +X
- * points in the `radial` direction. For the common case of normal=[0,0,1] this
+ * points radially outward at `angle`. For the common case of normal=[0,0,1] this
  * reduces to a pure Z rotation of `angle`.
  *
  * We use the convention: rotation about [normal axis] by `angle` degrees.
  * The axis-angle → Euler conversion is done via the rotation matrix of
  * Rodrigues' formula projected to intrinsic XYZ Euler angles.
  */
-function rotationForRadial(radial: Vec3, normal: Vec3, angle: number): Vec3 {
+function rotationForRadial(normal: Vec3, angle: number): Vec3 {
   // For simplicity, for the common XY-plane case (normal ≈ Z), rotate about Z.
   // For Y-axis normal, rotate about Y. For X-axis normal, rotate about X.
   // For other normals, compose the rotation.
@@ -375,7 +328,6 @@ function rotationForRadial(radial: Vec3, normal: Vec3, angle: number): Vec3 {
   const abx = Math.abs(nx),
     aby = Math.abs(ny),
     abz = Math.abs(nz);
-  void radial; // radial direction is captured by the angle parameter
 
   if (abz >= abx && abz >= aby) {
     // Normal is mostly Z — rotate about Z.

@@ -57,7 +57,7 @@ function bareExpressionRefs(params: unknown, into: Set<string>): void {
  * Parameters a step reads: its own `=expr` params, the steps of an instantiated recipe, and the
  * bare dimensional expressions of constraint steps.
  */
-export function parametersReadByStep(
+function parametersReadByStep(
   step: FeatureStep,
   doc: Pick<CadDocument, 'recipes'>,
   depth = 0,

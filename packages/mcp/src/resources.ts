@@ -117,7 +117,7 @@ export function listMcpResources(): McpResourceDescriptor[] {
  * @pure over doc
  * @layer mcp
  */
-export function readDocumentResource(doc: CadDocument): McpResourceContent {
+function readDocumentResource(doc: CadDocument): McpResourceContent {
   return {
     uri: CAD_RESOURCE_URIS.document,
     mimeType: 'application/json',
@@ -131,7 +131,7 @@ export function readDocumentResource(doc: CadDocument): McpResourceContent {
  * @pure over doc
  * @layer mcp
  */
-export function readSceneResource(doc: CadDocument): McpResourceContent {
+function readSceneResource(doc: CadDocument): McpResourceContent {
   const snapshot = computeSceneSnapshot(doc);
   return {
     uri: CAD_RESOURCE_URIS.scene,
@@ -146,7 +146,7 @@ export function readSceneResource(doc: CadDocument): McpResourceContent {
  * @pure over doc
  * @layer mcp
  */
-export function readSelectionResource(doc: CadDocument): McpResourceContent {
+function readSelectionResource(doc: CadDocument): McpResourceContent {
   const selected = doc.selection.map((id) => {
     const e = doc.entities[id];
     if (!e) return { id, kind: 'unknown', position: null };

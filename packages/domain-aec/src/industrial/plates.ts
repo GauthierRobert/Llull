@@ -16,12 +16,11 @@ import {
   nextMark,
   noChange,
   withElement,
+  withoutElements,
 } from '../model';
 import { regenerateBuilding } from '../evaluate';
-import { findProfile } from '../steel/profiles';
+import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
 import { boltSize } from './evaluate';
-
-const STEEL_DENSITY_KG_PER_M3 = 7850;
 
 /** Plate mass in kg (sizes in document units). */
 export function plateMass(doc: Pick<CadDocument, 'units'>, plate: BasePlateElement): number {
@@ -93,17 +92,7 @@ export function refitPlates(
   );
   if (member.role !== 'column') {
     const removed = new Set(plates.map((plate) => plate.id));
-    const elements = { ...building.elements };
-    for (const id of removed) delete elements[id];
-    return {
-      building: {
-        ...building,
-        elements,
-        elementOrder: building.elementOrder.filter((id) => !removed.has(id)),
-      },
-      resized: [],
-      removed: [...removed],
-    };
+    return { building: withoutElements(building, removed), resized: [], removed: [...removed] };
   }
   const [before, after] = [findProfile(previousProfile), findProfile(member.profile)];
   if (!before || !after || before.name === after.name) {

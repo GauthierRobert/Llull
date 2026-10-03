@@ -19,7 +19,7 @@ export interface SolidSurface {
 }
 
 /** Default surface used by most solid kinds. */
-export const DEFAULT_SOLID_SURFACE: SolidSurface = {
+const DEFAULT_SOLID_SURFACE: SolidSurface = {
   roughness: 0.45,
   metalness: 0.08,
   envMapIntensity: 0.8,

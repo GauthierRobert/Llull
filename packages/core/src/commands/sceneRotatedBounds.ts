@@ -13,7 +13,7 @@ import { entityBounds, pointsExtent, positionsExtent } from './sceneBounds';
  *
  * @pure
  */
-export function localEntityCorners(e: Entity): Vec3[] {
+function localEntityCorners(e: Entity): Vec3[] {
   switch (e.kind) {
     case 'box': {
       const [w, h, d] = e.size;

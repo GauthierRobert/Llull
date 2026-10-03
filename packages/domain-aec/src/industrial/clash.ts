@@ -14,7 +14,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import { sweepFrame } from '../mesh';
-import { cross, dot, midpoint } from '../vec3';
+import { cross3, dot3 } from '@lib/vec3';
+import { midpoint } from '../vec3';
 import { findProfile } from '../steel/profiles';
 import { atLevel } from './evaluate';
 import { arcPoints, curvedWallArc, curvedWallBand } from '../curvedWallGeometry';
@@ -34,7 +35,7 @@ export function boxOverlap(a: OrientedBox, b: OrientedBox): number {
   const axes: Vec3[] = [...a.axes, ...b.axes];
   for (const u of a.axes)
     for (const v of b.axes) {
-      const axis = cross(u, v);
+      const axis = cross3(u, v);
       const length = Math.hypot(...axis);
       if (length > 1e-9) axes.push([axis[0] / length, axis[1] / length, axis[2] / length]);
     }
@@ -44,12 +45,12 @@ export function boxOverlap(a: OrientedBox, b: OrientedBox): number {
     b.center[2] - a.center[2],
   ];
   const radius = (box: OrientedBox, axis: Vec3): number =>
-    box.half[0] * Math.abs(dot(box.axes[0], axis)) +
-    box.half[1] * Math.abs(dot(box.axes[1], axis)) +
-    box.half[2] * Math.abs(dot(box.axes[2], axis));
+    box.half[0] * Math.abs(dot3(box.axes[0], axis)) +
+    box.half[1] * Math.abs(dot3(box.axes[1], axis)) +
+    box.half[2] * Math.abs(dot3(box.axes[2], axis));
   let depth = Infinity;
   for (const axis of axes) {
-    const overlap = radius(a, axis) + radius(b, axis) - Math.abs(dot(delta, axis));
+    const overlap = radius(a, axis) + radius(b, axis) - Math.abs(dot3(delta, axis));
     if (overlap <= 0) return overlap;
     depth = Math.min(depth, overlap);
   }
@@ -219,7 +220,7 @@ function pointInBox(point: Vec3, box: OrientedBox, margin: number): boolean {
     point[2] - box.center[2],
   ];
   return box.axes.every(
-    (axis, index) => Math.abs(dot(offset, axis)) <= (box.half[index] as number) + margin,
+    (axis, index) => Math.abs(dot3(offset, axis)) <= (box.half[index] as number) + margin,
   );
 }
 
@@ -229,7 +230,7 @@ function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number 
     const [a, b] = [polyline[index] as Vec3, polyline[index + 1] as Vec3];
     const ab: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
     const ap: Vec3 = [point[0] - a[0], point[1] - a[1], point[2] - a[2]];
-    const t = Math.max(0, Math.min(1, dot(ap, ab) / (dot(ab, ab) || 1)));
+    const t = Math.max(0, Math.min(1, dot3(ap, ab) / (dot3(ab, ab) || 1)));
     best = Math.min(best, Math.hypot(ap[0] - ab[0] * t, ap[1] - ab[1] * t, ap[2] - ab[2] * t));
   }
   return best;
@@ -263,7 +264,7 @@ function connected(
 }
 
 /** All clashes on the given levels (or every level). @pure */
-export function findClashes(
+function findClashes(
   doc: CadDocument,
   levelIds: ReadonlySet<string> | null,
   tolerance: number,

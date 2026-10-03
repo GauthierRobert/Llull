@@ -16,6 +16,7 @@ import {
   noChange,
   sortLevelOrder,
   withLevel,
+  withoutElements,
 } from './model';
 import { regenerateBuilding } from './evaluate';
 import { openingFitIssues } from './walls';
@@ -191,21 +192,14 @@ export const deleteLevel = defineCommand({
     }
     const levels = { ...building.levels };
     delete levels[levelId];
-    const elements = { ...building.elements };
-    const removedEntityIds: string[] = [];
-    for (const id of onLevel) {
-      removedEntityIds.push(...(elements[id]?.entityIds ?? []));
-      delete elements[id];
-    }
+    const removedEntityIds = [...onLevel].flatMap((id) => building.elements[id]?.entityIds ?? []);
     const levelOrder = sortLevelOrder(levels);
     const next: BuildingModel = {
-      ...building,
+      ...withoutElements(building, onLevel),
       levels,
       levelOrder,
       activeLevelId:
         building.activeLevelId === levelId ? (levelOrder[0] ?? null) : building.activeLevelId,
-      elements,
-      elementOrder: building.elementOrder.filter((id) => !onLevel.has(id)),
     };
     return {
       document: regenerateBuilding(doc, next),
