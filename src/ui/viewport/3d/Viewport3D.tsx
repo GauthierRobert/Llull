@@ -1,49 +1,9 @@
 /**
  * @layer ui/viewport/3d
- *
- * The 3D perspective viewport.
- *
- * FRAME-TIME BUDGET
- * ─────────────────
- * Target: ≤ 16 ms median frame time on a 500-entity document on a mid-range
- * laptop (Intel UHD / Apple M1-class GPU, 1080p, Chrome).
- *
- * Per-frame cost is auto-scaled to scene size via quality tiers (useRenderQuality):
- *   High   (≤ 50 entities)   — PCSS 16 samples, 2048² shadow map, ContactShadows.
- *   Medium (51–200 entities) — PCSS 8 samples, 1024² shadow map, ContactShadows.
- *   Low    (> 200 entities)  — SoftShadows off, 1024² shadow map, no ContactShadows.
- * User can override via the Quality selector in ViewportControls (default: Auto).
- * The override is a viewer preference; it is never stored in CadDocument.
- *
- * - A single r3f <Canvas frameloop="demand"> — renders only when invalidated,
- *   so idle scenes consume no GPU/CPU. Invalidation sources:
- *     • OrbitControls / TransformControls: drei calls invalidate() on 'change'.
- *     • Document / selection / renderOrigin: StoreInvalidator subscribes to the
- *       Zustand store and calls invalidate() whenever those slices change.
- *     • Viewport render state (displayMode / clipPlane / hiddenEntityIds):
- *       ViewportStoreInvalidator subscribes to the viewport store and calls
- *       invalidate() on any render-state change.
- * - OrbitControls (drei) for pan/orbit/zoom — disabled while a TransformGizmo
- *   drag is in progress so the camera does not fight the gizmo.
- * - Ground grid + axes for spatial reference.
- * - Ambient + directional lighting.
- * - An <Entities> group that renders every entity in the document.
- * - <TransformGizmo> appears when exactly one entity is selected and lets the
- *   user translate/rotate/scale by dispatching the matching command on drag end.
- *   Its mode comes from useToolStore (main toolbar Move/Rotate/Scale + G/R/S shortcuts).
- * - Floating-origin rendering: entities + gizmo are wrapped in a group offset by
- *   -renderOrigin so that float32 vertex positions stay small regardless of true
- *   world coordinates (avoids jitter for geometry far from world origin).
- *   RenderOriginSyncer runs inside useFrame; because OrbitControls already calls
- *   invalidate() on every camera change event, useFrame fires on each orbit frame
- *   and the rebase check continues to work correctly under demand mode.
- * - <ClippingPlane> (inside Canvas): syncs the viewport-store clip state to the
- *   three.js renderer's clippingPlanes + localClippingEnabled.
- * - <ViewportControls> (outside Canvas): display-mode segmented button + section
- *   plane UI + quality selector; state is render-only in the viewport store.
- *
- * This component is purely presentational: it reads from the store and never
- * mutates the document (PRIME DIRECTIVE). All changes go through dispatch.
+ * 3D perspective viewport: one r3f <Canvas frameloop="demand"> repainted by the store
+ * invalidators. Quality tier (useRenderQuality) scales shadows/environment to the entity count.
+ * Entities + gizmo sit in a group offset by -renderOrigin (float32-safe floating origin).
+ * Presentational only: changes go through dispatch.
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -69,7 +29,7 @@ import { useStore } from '@ui/store';
 import { useToolStore, useViewportStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo } from './TransformGizmo';
-import { shouldRebase, snapOriginToTarget } from './floatingOrigin';
+import { RenderOriginSyncer } from '../RenderOriginSyncer';
 import type { GizmoMode } from '@ui/store';
 import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
 import { NamedViewsInner } from './NamedViews';
@@ -221,64 +181,6 @@ function AdaptiveClipping(): null {
     perspective.far = Math.max(distance * 2000, 1e3);
     perspective.updateProjectionMatrix();
   });
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// RenderOriginSyncer — per-frame rebase check (inside Canvas, no setState/frame)
-// ---------------------------------------------------------------------------
-
-/**
- * Checks the OrbitControls target each frame. When the camera target drifts
- * beyond the rebase threshold from the current renderOrigin, calls
- * setRenderOrigin once. Uses a ref to gate calls — only fires when the
- * threshold is newly crossed, not every frame (react.md R6/R9).
- */
-function RenderOriginSyncer(): null {
-  const { camera, controls } = useThree();
-  const renderOrigin = useStore((s) => s.renderOrigin);
-  const setRenderOrigin = useStore((s) => s.setRenderOrigin);
-
-  // Mirror renderOrigin into a ref so useFrame can read the latest value without
-  // being in useFrame's dependency closure (per-frame closure capture avoidance).
-  const originRef = useRef<[number, number, number]>(renderOrigin);
-  useEffect(() => {
-    originRef.current = renderOrigin;
-  }, [renderOrigin]);
-
-  useFrame(() => {
-    if (!controls) return;
-    // drei's <OrbitControls makeDefault> registers an OrbitControls instance here;
-    // it extends EventDispatcher (the store's `controls` type) and exposes `target`.
-    // COUPLING: ViewPresets.applyPreset() must call invalidate() + controls.update()
-    // before returning so that this useFrame fires on the next demand frame and the
-    // rebase check runs against the new target position.
-    const orbitTarget = (controls as OrbitControlsImpl).target;
-    if (!orbitTarget) return;
-
-    // Orbit target is render-space; its world position is target + renderOrigin.
-    const origin = originRef.current;
-    const worldTarget: [number, number, number] = [
-      orbitTarget.x + origin[0],
-      orbitTarget.y + origin[1],
-      orbitTarget.z + origin[2],
-    ];
-    if (shouldRebase(worldTarget, origin)) {
-      const newOrigin = snapOriginToTarget(worldTarget);
-      const delta = new THREE.Vector3(
-        newOrigin[0] - origin[0],
-        newOrigin[1] - origin[1],
-        newOrigin[2] - origin[2],
-      );
-      // Shift camera + target with the entity group so the view does not jump.
-      camera.position.sub(delta);
-      orbitTarget.sub(delta);
-      (controls as OrbitControlsImpl).update();
-      originRef.current = newOrigin; // update ref immediately to prevent repeat calls
-      setRenderOrigin(newOrigin);
-    }
-  });
-
   return null;
 }
 
