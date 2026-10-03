@@ -49,24 +49,18 @@ function listTools(enabledToolsets: ReadonlySet<ToolsetName>): {
   tools: { name: string; description: string; inputSchema: { type: 'object' } }[];
 } {
   const registryTools = buildMcpTools().map((t) =>
-    t.name === 'render_view'
-      ? augmentRenderViewTool(t)
-      : {
-          name: t.name,
-          description: t.description,
-          inputSchema: t.inputSchema as { type: 'object' },
-        },
+    t.name === 'render_view' ? augmentRenderViewTool(t) : t,
   );
-  const metaTools = [...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()].map(
-    (t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema as { type: 'object' },
-      ...(t.annotations ? { annotations: t.annotations } : {}),
-    }),
-  );
+  const metaTools = [...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()];
   return {
-    tools: [...registryTools, ...metaTools].filter((t) => isToolEnabled(t.name, enabledToolsets)),
+    tools: [...registryTools, ...metaTools]
+      .filter((t) => isToolEnabled(t.name, enabledToolsets))
+      .map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema as { type: 'object' },
+        ...(t.annotations ? { annotations: t.annotations } : {}),
+      })),
   };
 }
 

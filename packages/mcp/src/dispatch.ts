@@ -1,13 +1,10 @@
 /**
  * @layer mcp
  * MCP result shaping. `shapeToolCallContent` is the single place CallToolResult content blocks are
- * assembled (the server calls it after `commandBus.applyCommand`); `applyMcpToolCall` is the
- * document-in/document-out form (`execute` + shape) used by unit tests, not by the server.
+ * assembled (the server calls it after `commandBus.applyCommand`).
  * @pure no network, no DOM, no SDK imports.
  */
 
-import type { CadDocument } from '@core/model/types';
-import { execute, getCommand } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
 
 /** A single content block in an MCP tool result (text variant). */
@@ -22,13 +19,6 @@ export interface McpShapedResult {
   content: McpTextContent[];
   isError: boolean;
   structuredContent?: Record<string, unknown>;
-}
-
-/** `document` is the same reference as the input when the command was a no-op or unknown. */
-export interface McpToolCallResult extends McpShapedResult {
-  affected: string[];
-  document: CadDocument;
-  data?: unknown;
 }
 
 /** The `text` of a `{ format: 'code', text }` data record, else null. */
@@ -80,32 +70,4 @@ export function shapeToolCallContent(result: {
   }
 
   return { content, isError: result.isError };
-}
-
-/**
- * @pure over doc
- * @failure unknown toolName -> isError true, affected:[], document === input doc
- */
-export function applyMcpToolCall(
-  doc: CadDocument,
-  toolName: string,
-  args: unknown,
-): McpToolCallResult {
-  const isUnknown = getCommand(toolName) === undefined;
-  const result = execute(doc, toolName, args);
-
-  const shaped = shapeToolCallContent({
-    summary: result.summary,
-    affected: result.affected,
-    isError: isUnknown,
-    data: result.data,
-  });
-
-  const toolCallResult: McpToolCallResult = {
-    ...shaped,
-    affected: result.affected,
-    document: result.document,
-  };
-  if (result.data !== undefined) toolCallResult.data = result.data;
-  return toolCallResult;
 }
