@@ -5,13 +5,7 @@
  * @layer core/commands
  */
 
-import type {
-  Animation,
-  AnimationChannel,
-  AnimationTrigger,
-  CadDocument,
-  Vec3,
-} from '../model/types';
+import type { Animation, CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
@@ -34,6 +28,41 @@ function resolveTargetKind(doc: CadDocument, targetId: string): 'entity' | 'grou
 function toAxis(raw: number[] | undefined): Vec3 {
   if (!raw || raw.length < 3) return [0, 1, 0];
   return [raw[0] ?? 0, raw[1] ?? 1, raw[2] ?? 0];
+}
+
+/** Raw (possibly malformed) target/channel/axis/trigger/pivot inputs shared by the animate_* commands. */
+interface AnimationInput {
+  readonly targetId: string;
+  readonly targetKind: 'entity' | 'group';
+  readonly axis: number[] | undefined;
+  readonly channel: string | undefined;
+  readonly trigger: string | undefined;
+  readonly pivot: number[] | undefined;
+}
+
+/** A fresh animation (new id) from raw inputs; unknown channel/trigger fall back to rotation/auto. */
+function buildAnimation(
+  input: AnimationInput,
+  motion:
+    | { mode: 'spin'; speed: number }
+    | { mode: 'oscillate'; amplitude: number; frequency: number },
+): Animation {
+  const { pivot } = input;
+  return {
+    id: nextId('anim'),
+    targetId: input.targetId,
+    targetKind: input.targetKind,
+    channel: input.channel === 'position' ? 'position' : 'rotation',
+    axis: toAxis(input.axis),
+    mode: motion.mode,
+    speed: motion.mode === 'spin' ? motion.speed : 0,
+    amplitude: motion.mode === 'oscillate' ? motion.amplitude : 0,
+    frequency: motion.mode === 'oscillate' ? motion.frequency : 0,
+    trigger: input.trigger === 'click' ? 'click' : 'auto',
+    ...(pivot && pivot.length >= 3
+      ? { pivot: [pivot[0] ?? 0, pivot[1] ?? 0, pivot[2] ?? 0] as Vec3 }
+      : {}),
+  };
 }
 
 /** Append an Animation to the document, returning a new document (pure). */
@@ -114,27 +143,11 @@ export const animateSpin = defineCommand({
       };
     }
 
-    const resolvedAxis = toAxis(axis);
-    const resolvedChannel: AnimationChannel = channel === 'position' ? 'position' : 'rotation';
-    const resolvedTrigger: AnimationTrigger = trigger === 'click' ? 'click' : 'auto';
-
-    const id = nextId('anim');
-
-    const anim: Animation = {
-      id,
-      targetId,
-      targetKind,
-      channel: resolvedChannel,
-      axis: resolvedAxis,
-      mode: 'spin',
-      speed,
-      amplitude: 0,
-      frequency: 0,
-      trigger: resolvedTrigger,
-      ...(pivot && pivot.length >= 3
-        ? { pivot: [pivot[0] ?? 0, pivot[1] ?? 0, pivot[2] ?? 0] as Vec3 }
-        : {}),
-    };
+    const anim = buildAnimation(
+      { targetId, targetKind, axis, channel, trigger, pivot },
+      { mode: 'spin', speed },
+    );
+    const { id, axis: resolvedAxis, channel: resolvedChannel, trigger: resolvedTrigger } = anim;
 
     return {
       document: withAnimation(doc, anim),
@@ -238,27 +251,11 @@ export const animateOscillate = defineCommand({
       };
     }
 
-    const resolvedAxis = toAxis(axis);
-    const resolvedChannel: AnimationChannel = channel === 'position' ? 'position' : 'rotation';
-    const resolvedTrigger: AnimationTrigger = trigger === 'click' ? 'click' : 'auto';
-
-    const id = nextId('anim');
-
-    const anim: Animation = {
-      id,
-      targetId,
-      targetKind,
-      channel: resolvedChannel,
-      axis: resolvedAxis,
-      mode: 'oscillate',
-      speed: 0,
-      amplitude,
-      frequency,
-      trigger: resolvedTrigger,
-      ...(pivot && pivot.length >= 3
-        ? { pivot: [pivot[0] ?? 0, pivot[1] ?? 0, pivot[2] ?? 0] as Vec3 }
-        : {}),
-    };
+    const anim = buildAnimation(
+      { targetId, targetKind, axis, channel, trigger, pivot },
+      { mode: 'oscillate', amplitude, frequency },
+    );
+    const { id, axis: resolvedAxis, channel: resolvedChannel, trigger: resolvedTrigger } = anim;
 
     return {
       document: withAnimation(doc, anim),

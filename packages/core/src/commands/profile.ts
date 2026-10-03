@@ -1,55 +1,12 @@
-/**
- * @command extrude_sketch
- * @command revolve_profile
- * @pure
- * @layer core/commands
- * @affects extrude_sketch: creates 1 extrusion entity from a closed 2D shape entity
- * @affects revolve_profile: creates 1 revolution entity — surface of revolution from a closed 2D polygon profile
- * @invariant extrude_sketch: source entity remains in document; only depth > 0 is accepted
- * @invariant revolve_profile: profile.length >= 3; angle in (0, 2π]; segments >= 3
- * @failure missing id -> no-op, affected:[]
- * @failure non-closed or non-2D entity -> no-op, affected:[]
- * @failure depth <= 0 -> no-op, affected:[]
- * @failure revolve_profile: profile < 3 points, angle <= 0, invalid axis -> no-op, affected:[]
- */
-
-import type { CadDocument, Entity, ExtrusionEntity, RevolutionEntity, Vec3 } from '../model/types';
+import type { ExtrusionEntity, RevolutionEntity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
 import { nextId } from '../lib/id';
-import { rotatedEntityBounds } from './scene';
-
-const ORIGIN: Vec3 = [0, 0, 0];
-
-/**
- * Validate an optional rotation param (shared convention with geometry.ts).
- * Returns [0,0,0] if rotation is absent, not length-3, or contains non-finite values.
- */
-function resolveRotation(rotation: unknown): Vec3 {
-  if (!Array.isArray(rotation) || rotation.length !== 3) return [0, 0, 0];
-  const [rx, ry, rz] = rotation as unknown[];
-  if (!Number.isFinite(rx) || !Number.isFinite(ry) || !Number.isFinite(rz)) return [0, 0, 0];
-  return [rx as number, ry as number, rz as number];
-}
-
-/** Format an AABB for inclusion in a command summary. */
-function boundsText(b: { min: Vec3; max: Vec3 }): string {
-  const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
-  return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
-}
+import { ORIGIN, commitSolid, resolveRotation } from './geometryShared';
 
 /** Number of polygon segments used to approximate a circle. */
 const CIRCLE_SEGMENTS = 32;
-
-/** Helper: clone the document shallowly adding a new entity. */
-function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
-}
 
 // ---------------------------------------------------------------------------
 // extrude_sketch
@@ -171,13 +128,11 @@ export const extrudeSketch = defineCommand({
       color: '#c8553d',
     };
 
-    const newDoc = withEntity(doc, extrusion);
-    const b = rotatedEntityBounds(newDoc.entities[extId] as Entity);
-    return {
-      document: newDoc,
-      summary: `extrude_sketch: created extrusion "${extId}" from ${source.kind} "${id}" (${profile.length}-point profile, depth=${depth}); ${boundsText(b)}.`,
-      affected: [extId],
-    };
+    return commitSolid(
+      doc,
+      extrusion,
+      `extrude_sketch: created extrusion "${extId}" from ${source.kind} "${id}" (${profile.length}-point profile, depth=${depth})`,
+    );
   },
 });
 
@@ -344,18 +299,14 @@ export const revolveProfile = defineCommand({
       color,
     };
 
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
-    const boundsStr = `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
     const axisLabel =
       rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z'
         ? rawAxis
         : `[${axis.map((v) => parseFloat(v.toFixed(3))).join(', ')}]`;
-    return {
-      document: newDoc,
-      summary: `revolve_profile: created revolution "${id}" — ${profile.length}-point profile, axis=${axisLabel}, angle=${parseFloat(angle.toFixed(4))} rad, segments=${segments}; ${boundsStr}.`,
-      affected: [id],
-    };
+    return commitSolid(
+      doc,
+      entity,
+      `revolve_profile: created revolution "${id}" — ${profile.length}-point profile, axis=${axisLabel}, angle=${parseFloat(angle.toFixed(4))} rad, segments=${segments}`,
+    );
   },
 });

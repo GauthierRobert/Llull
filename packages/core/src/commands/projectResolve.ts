@@ -2,6 +2,7 @@ import type { CadDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { evaluateExpression, extractReferences } from './expression';
 import { MAX_PROJECT_STEPS } from './limits';
+import { mapStringLeaves } from './regenerate';
 import { isRecord } from '../lib/isRecord';
 import {
   type PlanAction,
@@ -42,26 +43,15 @@ export function resolveRef(text: string, bindings: Record<string, string[]>): Re
 
 /** Validate-mode walk: every `$alias` ref must name an alias defined by an earlier step. */
 export function findUndefinedRef(value: unknown, defined: ReadonlySet<string>): string | null {
-  if (typeof value === 'string') {
-    const m = REF.exec(value);
-    if (m && m[1] !== undefined && !defined.has(m[1])) return `references undefined alias $${m[1]}`;
-    return null;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const e = findUndefinedRef(item, defined);
-      if (e) return e;
+  let firstError: string | null = null;
+  mapStringLeaves(value, (text) => {
+    const m = REF.exec(text);
+    if (firstError === null && m && m[1] !== undefined && !defined.has(m[1])) {
+      firstError = `references undefined alias $${m[1]}`;
     }
-    return null;
-  }
-  if (value !== null && typeof value === 'object') {
-    for (const v of Object.values(value)) {
-      const e = findUndefinedRef(v, defined);
-      if (e) return e;
-    }
-    return null;
-  }
-  return null;
+    return text;
+  });
+  return firstError;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,40 +173,29 @@ export function resolveExprInParam(
   bindings: Record<string, string[]>,
   env: Record<string, number>,
 ): Resolved {
-  if (typeof value === 'string') {
+  let firstError: string | null = null;
+  const resolved = mapStringLeaves(value, (text) => {
+    if (firstError !== null) return text;
     // First try $alias resolution.
-    if (REF.test(value)) return resolveRef(value, bindings);
-    // Then try expression (= prefix).
-    if (value.startsWith('=')) {
-      // Inside an expression body, `$name` references the loop variable as a
-      // numeric value (e.g. `=$r * 2`). Strip the `$` so the expression parser
-      // sees the bare identifier — which is what env binds.
-      const expr = value.slice(1).replace(/\$([A-Za-z_]\w*)/g, '$1');
-      const r = evaluateExpression(expr, env);
-      if (!r.ok) return { value: undefined, error: `expression "${expr}": ${r.error}` };
-      return { value: r.value, error: null };
+    if (REF.test(text)) {
+      const ref = resolveRef(text, bindings);
+      firstError = ref.error;
+      return ref.value;
     }
-    return { value, error: null };
-  }
-  if (Array.isArray(value)) {
-    const out: unknown[] = [];
-    for (const item of value) {
-      const r = resolveExprInParam(item, bindings, env);
-      if (r.error) return r;
-      out.push(r.value);
+    if (!text.startsWith('=')) return text;
+    // Inside an expression body, `$name` references the loop variable as a numeric value
+    // (e.g. `=$r * 2`); strip the `$` so the parser sees the bare identifier env binds.
+    const expr = text.slice(1).replace(/\$([A-Za-z_]\w*)/g, '$1');
+    const r = evaluateExpression(expr, env);
+    if (!r.ok) {
+      firstError = `expression "${expr}": ${r.error}`;
+      return undefined;
     }
-    return { value: out, error: null };
-  }
-  if (value !== null && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) {
-      const r = resolveExprInParam(v, bindings, env);
-      if (r.error) return r;
-      out[k] = r.value;
-    }
-    return { value: out, error: null };
-  }
-  return { value, error: null };
+    return r.value;
+  });
+  return firstError === null
+    ? { value: resolved, error: null }
+    : { value: undefined, error: firstError };
 }
 
 /**

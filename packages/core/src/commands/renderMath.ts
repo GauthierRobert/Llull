@@ -2,38 +2,7 @@ import type { Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { type PreDepthPolygon } from './renderTypes';
 
-// ---------------------------------------------------------------------------
-// Math helpers (pure, no dependencies on any external library)
-// ---------------------------------------------------------------------------
-
-export function add3(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-}
-
-export function sub3(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-}
-
-export function scale3(a: Vec3, s: number): Vec3 {
-  return [a[0] * s, a[1] * s, a[2] * s];
-}
-
-export function dot3(a: Vec3, b: Vec3): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-export function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-export function len3(a: Vec3): number {
-  return Math.sqrt(dot3(a, a));
-}
-
-export function normalize3(a: Vec3): Vec3 {
-  const l = len3(a);
-  return l > 1e-10 ? scale3(a, 1 / l) : [0, 0, 1];
-}
+export { add3, sub3, scale3, dot3, cross3, len3, normalize3 } from '../lib/vec3';
 
 export function centroid3(verts: Vec3[]): Vec3 {
   if (verts.length === 0) return [0, 0, 0];

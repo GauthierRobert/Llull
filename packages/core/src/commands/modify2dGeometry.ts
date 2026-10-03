@@ -1,4 +1,4 @@
-import type { CadDocument, Entity, Vec2 } from '../model/types';
+import type { Vec2 } from '../model/types';
 
 // ---------------------------------------------------------------------------
 // Internal pure geometry helpers (exported for unit-testing)
@@ -94,22 +94,3 @@ export function miterJoin(a0: Vec2, a1: Vec2, b0: Vec2, b1: Vec2): Vec2 {
 // ---------------------------------------------------------------------------
 // Document helpers
 // ---------------------------------------------------------------------------
-
-export function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
-}
-
-export function withoutEntity(doc: CadDocument, id: string): CadDocument {
-  const entities = { ...doc.entities };
-  delete entities[id];
-  return {
-    ...doc,
-    entities,
-    order: doc.order.filter((eid) => eid !== id),
-    selection: doc.selection.filter((eid) => eid !== id),
-  };
-}

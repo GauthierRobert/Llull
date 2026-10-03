@@ -1,17 +1,32 @@
-import type { Entity, EntityGroup } from '../model/types';
+import type { Entity } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
+import { defineCommand, z, looseVec3, colorField, untypedArray } from './schema';
 import { nextId } from '../lib/id';
-import { rotatedEntityBounds } from './scene';
+import { pruneGroupMembers } from './deleteMany';
 import {
+  DEFAULT_SOLID_COLOR,
   ORIGIN,
+  anchorField,
+  commitSolid,
+  positionField,
+  rejectBadSize,
   resolveRotation,
   resolvePosition,
-  boundsText,
+  rotationField,
   translated,
-  withEntity,
 } from './geometryShared';
+
+/**
+ * @command add_box
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 box entity
+ * @invariant all size components > 0
+ * @failure any size component <= 0 or non-finite -> no-op, affected:[]
+ * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'center', no throw
+ */
 export const addBox = defineCommand({
   name: 'add_box',
   description:
@@ -22,50 +37,25 @@ export const addBox = defineCommand({
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   params: z.object({
     size: looseVec3('[width, height, depth] in document units. All three components must be > 0.'),
-    position: looseVec3(
-      'World-space location of the anchor point [x, y, z] in document units. ' +
-        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-    ).optional(),
-    anchor: tolerant(
-      z
-        .enum(['center', 'min', 'base-center'])
-        .describe(
-          'Which point on the box the position refers to. ' +
-            '"center" (default): geometric center. ' +
-            '"min": min-XYZ corner of the AABB. ' +
-            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-            'Unknown values fall back to "center". ' +
-            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        ),
-    ).optional(),
-    rotation: tolerant(
-      looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      ),
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
-      .optional(),
+    position: positionField(),
+    anchor: anchorField(
+      'Which point on the box the position refers to. ' +
+        '"center" (default): geometric center. ' +
+        '"min": min-XYZ corner of the AABB. ' +
+        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+        'Unknown values fall back to "center". ' +
+        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+    ),
+    rotation: rotationField(),
+    color: colorField(DEFAULT_SOLID_COLOR),
   }),
-  run: (doc, { size, position = ORIGIN, rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
+  ): CommandResult => {
     const [w, h, d] = size;
-    if (
-      !Number.isFinite(w) ||
-      !Number.isFinite(h) ||
-      !Number.isFinite(d) ||
-      w <= 0 ||
-      h <= 0 ||
-      d <= 0
-    ) {
-      return {
-        document: doc,
-        summary: `add_box failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
-        affected: [],
-      };
-    }
+    const rejected = rejectBadSize(doc, 'add_box', size);
+    if (rejected) return rejected;
     // Default anchor for box is 'center': stored position IS the geometric center.
     // Half-extents from center: [w/2, h/2, d/2].
     const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'center', anchor, position);
@@ -79,13 +69,7 @@ export const addBox = defineCommand({
       layerId: DEFAULT_LAYER_ID,
       color,
     };
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    return {
-      document: newDoc,
-      summary: `Added box ${id} of size ${size.join('×')}; ${boundsText(b)}.`,
-      affected: [id],
-    };
+    return commitSolid(doc, entity, `Added box ${id} of size ${size.join('×')}`);
   },
 });
 
@@ -116,17 +100,8 @@ export const extrude = defineCommand({
       'World-space origin of the profile plane [x, y, z] in document units. ' +
         'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
     ).optional(),
-    rotation: tolerant(
-      looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      ),
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#c8553d".')
-      .optional(),
+    rotation: rotationField(),
+    color: colorField('#c8553d'),
   }),
   run: (doc, { profile, depth, position = ORIGIN, rotation, color = '#c8553d' }): CommandResult => {
     if (!Array.isArray(profile) || profile.length < 3) {
@@ -154,13 +129,7 @@ export const extrude = defineCommand({
       layerId: DEFAULT_LAYER_ID,
       color,
     };
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    return {
-      document: newDoc,
-      summary: `Extruded a ${profile.length}-point profile by ${depth}; ${boundsText(b)}.`,
-      affected: [id],
-    };
+    return commitSolid(doc, entity, `Extruded a ${profile.length}-point profile by ${depth}`);
   },
 });
 
@@ -183,20 +152,6 @@ export const move = defineCommand({
     };
   },
 });
-
-/**
- * @command add_cylinder
- * @pure
- * @layer core/commands
- * @affects creates 1 cylinder entity; stored position is the geometric center of the cylinder
- * @invariant radius > 0; height > 0
- * @failure radius <= 0 or height <= 0 -> no-op, affected:[]
- * @failure malformed rotation -> entity still created with rotation [0,0,0]
- * @failure unknown anchor value -> falls back to default anchor 'center', no throw
- *
- * NOTE: the viewport renders via three.js CylinderGeometry (Y-axis centered). The document
- * frame is +Z up, so entityBounds uses ±height/2 on the Y axis. Default anchor is 'center'.
- */
 
 /**
  * @command delete_entity
@@ -224,19 +179,7 @@ export const deleteEntity = defineCommand({
     const entities = { ...doc.entities };
     delete entities[id];
 
-    // Prune id from all groups; dissolve groups that drop below 2 members.
-    const existingGroups = doc.groups ?? {};
-    const dissolvedGroups: string[] = [];
-    const nextGroups: Record<string, EntityGroup> = {};
-    for (const group of Object.values(existingGroups)) {
-      const prunedIds = group.memberIds.filter((mid) => mid !== id);
-      if (prunedIds.length < 2) {
-        dissolvedGroups.push(group.id);
-        // group omitted — dissolved
-      } else {
-        nextGroups[group.id] = { ...group, memberIds: prunedIds };
-      }
-    }
+    const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, new Set([id]));
 
     const dissolveSuffix =
       dissolvedGroups.length > 0

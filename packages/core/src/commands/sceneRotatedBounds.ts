@@ -1,7 +1,7 @@
 import type { Entity, Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { type Bounds } from './sceneTypes';
-import { entityBounds } from './sceneBounds';
+import { entityBounds, pointsExtent, positionsExtent } from './sceneBounds';
 
 /**
  * Return the local-space corners of an entity's oriented bounding box — i.e.
@@ -60,12 +60,7 @@ export function localEntityCorners(e: Entity): Vec3[] {
       ];
     }
     case 'extrusion': {
-      const xs = e.profile.map((pt) => pt[0]);
-      const ys = e.profile.map((pt) => pt[1]);
-      const minX = xs.length ? Math.min(...xs) : 0;
-      const maxX = xs.length ? Math.max(...xs) : 0;
-      const minY = ys.length ? Math.min(...ys) : 0;
-      const maxY = ys.length ? Math.max(...ys) : 0;
+      const { minX, minY, maxX, maxY } = pointsExtent(e.profile);
       return [
         [minX, minY, 0],
         [maxX, minY, 0],
@@ -81,23 +76,9 @@ export function localEntityCorners(e: Entity): Vec3[] {
       const p = e.mesh.positions;
       // @invariant positions is a flat Float32-style array of xyz triples; one triangle = 9 floats minimum.
       if (p.length < 9 || p.length % 3 !== 0) return [[0, 0, 0]];
-      let minX = Infinity,
-        minY = Infinity,
-        minZ = Infinity;
-      let maxX = -Infinity,
-        maxY = -Infinity,
-        maxZ = -Infinity;
-      for (let i = 0; i + 2 < p.length; i += 3) {
-        const x = p[i] as number,
-          y = p[i + 1] as number,
-          z = p[i + 2] as number;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-        if (z < minZ) minZ = z;
-        if (z > maxZ) maxZ = z;
-      }
+      const { min, max } = positionsExtent(p);
+      const [minX, minY, minZ] = min;
+      const [maxX, maxY, maxZ] = max;
       // @invariant positions are world-space; subtract position so rotatedEntityBounds
       // round-trips correctly (it adds position back for every corner).
       const px = e.position[0],

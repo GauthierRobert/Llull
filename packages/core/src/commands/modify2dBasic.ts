@@ -2,7 +2,8 @@ import type { Entity, Vec2, Vec3, LineEntity, PolylineEntity } from '../model/ty
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { offsetSegment, miterJoin, withEntity, withoutEntity } from './modify2dGeometry';
+import { offsetSegment, miterJoin } from './modify2dGeometry';
+import { withEntity, withoutEntity } from './entityOps';
 
 // ---------------------------------------------------------------------------
 // explode_polyline

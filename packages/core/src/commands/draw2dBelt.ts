@@ -1,10 +1,13 @@
 import type { Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec3 as vec3 } from './schema';
+import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
+import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_CURVE_SAMPLES } from './limits';
-import { withEntity, fmtN } from './draw2dShared';
+import { DEFAULT_DRAW_COLOR, fmtN, workPlanePositionField } from './draw2dShared';
+import { withEntity } from './entityOps';
+import { pointsExtent } from './sceneBounds';
 
 // ---------------------------------------------------------------------------
 // draw_belt_around
@@ -116,9 +119,7 @@ export const drawBeltAround = defineCommand({
           'Must be >= 2. Default 12. Higher values give smoother arcs.',
       )
       .optional(),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-    ).optional(),
+    position: workPlanePositionField(),
     rotation: z
       .array(z.number())
       .describe(
@@ -141,7 +142,7 @@ export const drawBeltAround = defineCommand({
       arcSamples = 12,
       position = [0, 0, 0] as const,
       rotation = [0, 0, 0],
-      color = '#4a90d9',
+      color = DEFAULT_DRAW_COLOR,
       name,
     },
   ): CommandResult => {
@@ -305,35 +306,12 @@ export const drawBeltAround = defineCommand({
     }
 
     // --- Resolve position / rotation ---
-    const resolvedPos: Vec3 =
-      Array.isArray(position) &&
-      position.length >= 3 &&
-      Number.isFinite((position as number[])[0]) &&
-      Number.isFinite((position as number[])[1]) &&
-      Number.isFinite((position as number[])[2])
-        ? [(position as number[])[0]!, (position as number[])[1]!, (position as number[])[2]!]
-        : [0, 0, 0];
+    const resolvedPos: Vec3 = finiteVec3OrZero(position, true);
 
-    const resolvedRot: Vec3 =
-      Array.isArray(rotation) &&
-      rotation.length >= 3 &&
-      Number.isFinite((rotation as number[])[0]) &&
-      Number.isFinite((rotation as number[])[1]) &&
-      Number.isFinite((rotation as number[])[2])
-        ? [(rotation as number[])[0]!, (rotation as number[])[1]!, (rotation as number[])[2]!]
-        : [0, 0, 0];
+    const resolvedRot: Vec3 = finiteVec3OrZero(rotation, true);
 
     // --- Compute AABB for summary ---
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-    for (const [x, y] of points) {
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-    }
+    const { minX, minY, maxX, maxY } = pointsExtent(points);
 
     // --- Build entity ---
     const id = nextId('belt');

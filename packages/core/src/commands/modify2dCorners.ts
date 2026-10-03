@@ -1,8 +1,69 @@
-import type { Entity, Vec2, PolylineEntity } from '../model/types';
+import type { CadDocument, Entity, Vec2, PolylineEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { cross2, dot2, len2, normalize2, withEntity } from './modify2dGeometry';
+import { cross2, dot2, len2, normalize2 } from './modify2dGeometry';
+import { withEntity } from './entityOps';
+
+type CornerResolution =
+  | {
+      ok: true;
+      vertex: Vec2;
+      toPrev: Vec2;
+      toNext: Vec2;
+      lenPrev: number;
+      lenNext: number;
+    }
+  | { ok: false; result: CommandResult };
+
+/**
+ * The corner of `poly` at `vertexIndex` (vertex, vectors to its two neighbours, their lengths), or
+ * the no-op result when the index is out of range or a neighbouring segment has zero length.
+ * Requires `poly.points.length >= 3`.
+ */
+function resolveCorner(
+  doc: CadDocument,
+  command: string,
+  poly: PolylineEntity,
+  vertexIndex: number,
+): CornerResolution {
+  const n = poly.points.length;
+  const isValidIndex = poly.closed
+    ? vertexIndex >= 0 && vertexIndex < n
+    : vertexIndex >= 1 && vertexIndex <= n - 2;
+  if (!isValidIndex) {
+    return {
+      ok: false,
+      result: {
+        document: doc,
+        summary:
+          `${command}: vertexIndex ${vertexIndex} is out of range for a ${poly.closed ? 'closed' : 'open'} polyline with ${n} points. ` +
+          `Valid range: ${poly.closed ? `0..${n - 1}` : `1..${n - 2}`}.`,
+        affected: [],
+      },
+    };
+  }
+  const prevIdx = poly.closed ? (vertexIndex - 1 + n) % n : vertexIndex - 1;
+  const nextIdx = poly.closed ? (vertexIndex + 1) % n : vertexIndex + 1;
+  const prev = poly.points[prevIdx]!;
+  const vertex = poly.points[vertexIndex]!;
+  const next = poly.points[nextIdx]!;
+  const toPrev: Vec2 = [prev[0] - vertex[0], prev[1] - vertex[1]];
+  const toNext: Vec2 = [next[0] - vertex[0], next[1] - vertex[1]];
+  const lenPrev = len2(toPrev);
+  const lenNext = len2(toNext);
+  if (lenPrev < 1e-12 || lenNext < 1e-12) {
+    return {
+      ok: false,
+      result: {
+        document: doc,
+        summary: `${command}: degenerate segment at vertex ${vertexIndex} — zero-length segment.`,
+        affected: [],
+      },
+    };
+  }
+  return { ok: true, vertex, toPrev, toNext, lenPrev, lenNext };
+}
 
 // ---------------------------------------------------------------------------
 // fillet_2d
@@ -73,42 +134,9 @@ export const fillet2D = defineCommand({
       };
     }
 
-    // Validate vertexIndex
-    const isValidIndex = poly.closed
-      ? vertexIndex >= 0 && vertexIndex < n
-      : vertexIndex >= 1 && vertexIndex <= n - 2;
-
-    if (!isValidIndex) {
-      return {
-        document: doc,
-        summary:
-          `fillet_2d: vertexIndex ${vertexIndex} is out of range for a ${poly.closed ? 'closed' : 'open'} polyline with ${n} points. ` +
-          `Valid range: ${poly.closed ? `0..${n - 1}` : `1..${n - 2}`}.`,
-        affected: [],
-      };
-    }
-
-    // Get the three points: prev, vertex, next
-    const prevIdx = poly.closed ? (vertexIndex - 1 + n) % n : vertexIndex - 1;
-    const nextIdx = poly.closed ? (vertexIndex + 1) % n : vertexIndex + 1;
-
-    const prev = poly.points[prevIdx]!;
-    const vertex = poly.points[vertexIndex]!;
-    const next = poly.points[nextIdx]!;
-
-    // Direction vectors from vertex to prev and next
-    const toPrev: Vec2 = [prev[0] - vertex[0], prev[1] - vertex[1]];
-    const toNext: Vec2 = [next[0] - vertex[0], next[1] - vertex[1]];
-    const lenPrev = len2(toPrev);
-    const lenNext = len2(toNext);
-
-    if (lenPrev < 1e-12 || lenNext < 1e-12) {
-      return {
-        document: doc,
-        summary: `fillet_2d: degenerate segment at vertex ${vertexIndex} — zero-length segment.`,
-        affected: [],
-      };
-    }
+    const corner = resolveCorner(doc, 'fillet_2d', poly, vertexIndex);
+    if (!corner.ok) return corner.result;
+    const { vertex, toPrev, toNext, lenPrev, lenNext } = corner;
 
     const dirPrev = normalize2(toPrev);
     const dirNext = normalize2(toNext);
@@ -331,39 +359,9 @@ export const chamfer2D = defineCommand({
       };
     }
 
-    const isValidIndex = poly.closed
-      ? vertexIndex >= 0 && vertexIndex < n
-      : vertexIndex >= 1 && vertexIndex <= n - 2;
-
-    if (!isValidIndex) {
-      return {
-        document: doc,
-        summary:
-          `chamfer_2d: vertexIndex ${vertexIndex} is out of range for a ${poly.closed ? 'closed' : 'open'} polyline with ${n} points. ` +
-          `Valid range: ${poly.closed ? `0..${n - 1}` : `1..${n - 2}`}.`,
-        affected: [],
-      };
-    }
-
-    const prevIdx = poly.closed ? (vertexIndex - 1 + n) % n : vertexIndex - 1;
-    const nextIdx = poly.closed ? (vertexIndex + 1) % n : vertexIndex + 1;
-
-    const prev = poly.points[prevIdx]!;
-    const vertex = poly.points[vertexIndex]!;
-    const next = poly.points[nextIdx]!;
-
-    const toPrev: Vec2 = [prev[0] - vertex[0], prev[1] - vertex[1]];
-    const toNext: Vec2 = [next[0] - vertex[0], next[1] - vertex[1]];
-    const lenPrev = len2(toPrev);
-    const lenNext = len2(toNext);
-
-    if (lenPrev < 1e-12 || lenNext < 1e-12) {
-      return {
-        document: doc,
-        summary: `chamfer_2d: degenerate segment at vertex ${vertexIndex} — zero-length segment.`,
-        affected: [],
-      };
-    }
+    const corner = resolveCorner(doc, 'chamfer_2d', poly, vertexIndex);
+    if (!corner.ok) return corner.result;
+    const { vertex, toPrev, toNext, lenPrev, lenNext } = corner;
 
     if (distance > lenPrev - 1e-9 || distance > lenNext - 1e-9) {
       return {

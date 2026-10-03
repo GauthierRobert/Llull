@@ -16,6 +16,7 @@ import {
   numberRows,
   provenance,
   quote,
+  parameterLines,
   stepHeading,
 } from './format';
 
@@ -115,12 +116,14 @@ export function emitOpenScad(program: FeatureProgram): string {
     '',
     '/* [Parameters] */',
   ];
-  if (program.parameters.length === 0) lines.push('// (none)');
-  for (const p of program.parameters) {
-    lines.push(
-      `${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${commentText(p.name)}`,
-    );
-  }
+  lines.push(
+    ...parameterLines(
+      program,
+      '//',
+      (p) =>
+        `${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${commentText(p.name)}`,
+    ),
+  );
   lines.push('', '/* [Hidden] */', '');
 
   const version = new Map<string, number>();

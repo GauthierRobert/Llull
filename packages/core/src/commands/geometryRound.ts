@@ -1,10 +1,31 @@
 import type { Entity } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec3, tolerant } from './schema';
+import { defineCommand, z, colorField } from './schema';
 import { nextId } from '../lib/id';
-import { rotatedEntityBounds } from './scene';
-import { ORIGIN, resolveRotation, resolvePosition, boundsText, withEntity } from './geometryShared';
+import {
+  DEFAULT_SOLID_COLOR,
+  ORIGIN,
+  anchorField,
+  commitSolid,
+  positionField,
+  rejectNonPositive,
+  resolveRotation,
+  resolvePosition,
+  rotationField,
+} from './geometryShared';
+
+/**
+ * @command add_cylinder
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 cylinder entity; stored position is the geometric center of the cylinder
+ * @invariant radius > 0; height > 0
+ * @failure radius <= 0 or height <= 0 -> no-op, affected:[]
+ * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'center', no throw
+ */
+
 export const addCylinder = defineCommand({
   name: 'add_cylinder',
   description:
@@ -20,52 +41,27 @@ export const addCylinder = defineCommand({
       .number()
       .describe('Radius of the cylinder cross-section in document units. Must be > 0.'),
     height: z.number().describe('Total height of the cylinder in document units. Must be > 0.'),
-    position: looseVec3(
-      'World-space location of the anchor point [x, y, z] in document units. ' +
-        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-    ).optional(),
-    anchor: tolerant(
-      z
-        .enum(['center', 'min', 'base-center'])
-        .describe(
-          'Which point on the cylinder the position refers to. ' +
-            '"center" (default): geometric center. ' +
-            '"min": min-XYZ corner of the AABB. ' +
-            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-            'Unknown values fall back to "center". ' +
-            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        ),
-    ).optional(),
-    rotation: tolerant(
-      looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      ),
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
-      .optional(),
+    position: positionField(),
+    anchor: anchorField(
+      'Which point on the cylinder the position refers to. ' +
+        '"center" (default): geometric center. ' +
+        '"min": min-XYZ corner of the AABB. ' +
+        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+        'Unknown values fall back to "center". ' +
+        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+    ),
+    rotation: rotationField(),
+    color: colorField(DEFAULT_SOLID_COLOR),
   }),
   run: (
     doc,
-    { radius, height, position = ORIGIN, rotation, color = '#6b8f9c', anchor },
+    { radius, height, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    if (!Number.isFinite(radius) || radius <= 0) {
-      return {
-        document: doc,
-        summary: `add_cylinder failed: radius must be finite and > 0, got ${radius}.`,
-        affected: [],
-      };
-    }
-    if (!Number.isFinite(height) || height <= 0) {
-      return {
-        document: doc,
-        summary: `add_cylinder failed: height must be finite and > 0, got ${height}.`,
-        affected: [],
-      };
-    }
+    const rejected = rejectNonPositive(doc, 'add_cylinder', [
+      ['radius', radius],
+      ['height', height],
+    ]);
+    if (rejected) return rejected;
     // Default anchor for cylinder is 'center': stored position is the geometric center.
     // AABB half-extents from center: [radius, radius, height/2] (axis along +Z).
     const storedPosition = resolvePosition(
@@ -85,13 +81,11 @@ export const addCylinder = defineCommand({
       layerId: DEFAULT_LAYER_ID,
       color,
     };
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    return {
-      document: newDoc,
-      summary: `Added cylinder ${id} with radius ${radius} and height ${height}; ${boundsText(b)}.`,
-      affected: [id],
-    };
+    return commitSolid(
+      doc,
+      entity,
+      `Added cylinder ${id} with radius ${radius} and height ${height}`,
+    );
   },
 });
 
@@ -117,42 +111,24 @@ export const addSphere = defineCommand({
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   params: z.object({
     radius: z.number().describe('Radius of the sphere in document units. Must be > 0.'),
-    position: looseVec3(
-      'World-space location of the anchor point [x, y, z] in document units. ' +
-        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-    ).optional(),
-    anchor: tolerant(
-      z
-        .enum(['center', 'min', 'base-center'])
-        .describe(
-          'Which point on the sphere the position refers to. ' +
-            '"center" (default): geometric center. ' +
-            '"min": min-XYZ corner of the AABB. ' +
-            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-            'Unknown values fall back to "center". ' +
-            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        ),
-    ).optional(),
-    rotation: tolerant(
-      looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
-          'Stored for uniformity; geometrically moot for a sphere. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      ),
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
-      .optional(),
+    position: positionField(),
+    anchor: anchorField(
+      'Which point on the sphere the position refers to. ' +
+        '"center" (default): geometric center. ' +
+        '"min": min-XYZ corner of the AABB. ' +
+        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+        'Unknown values fall back to "center". ' +
+        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+    ),
+    rotation: rotationField('Stored for uniformity; geometrically moot for a sphere.'),
+    color: colorField(DEFAULT_SOLID_COLOR),
   }),
-  run: (doc, { radius, position = ORIGIN, rotation, color = '#6b8f9c', anchor }): CommandResult => {
-    if (!Number.isFinite(radius) || radius <= 0) {
-      return {
-        document: doc,
-        summary: `add_sphere failed: radius must be finite and > 0, got ${radius}.`,
-        affected: [],
-      };
-    }
+  run: (
+    doc,
+    { radius, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
+  ): CommandResult => {
+    const rejected = rejectNonPositive(doc, 'add_sphere', [['radius', radius]]);
+    if (rejected) return rejected;
     // Default anchor for sphere is 'center': stored position is the geometric center.
     // Half-extents from center: [radius, radius, radius].
     const storedPosition = resolvePosition([radius, radius, radius], 'center', anchor, position);
@@ -166,13 +142,7 @@ export const addSphere = defineCommand({
       layerId: DEFAULT_LAYER_ID,
       color,
     };
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    return {
-      document: newDoc,
-      summary: `Added sphere ${id} with radius ${radius}; ${boundsText(b)}.`,
-      affected: [id],
-    };
+    return commitSolid(doc, entity, `Added sphere ${id} with radius ${radius}`);
   },
 });
 
@@ -207,52 +177,27 @@ export const addCone = defineCommand({
       .describe(
         'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
       ),
-    position: looseVec3(
-      'World-space location of the anchor point [x, y, z] in document units. ' +
-        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-    ).optional(),
-    anchor: tolerant(
-      z
-        .enum(['center', 'min', 'base-center'])
-        .describe(
-          'Which point on the cone the position refers to. ' +
-            '"base-center" (default): center of the circular base; apex at position+[0,0,height]. ' +
-            '"center": geometric center of the AABB (mid X/Y/Z). ' +
-            '"min": min-XYZ corner of the AABB. ' +
-            'Unknown values fall back to "base-center". ' +
-            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        ),
-    ).optional(),
-    rotation: tolerant(
-      looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      ),
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
-      .optional(),
+    position: positionField(),
+    anchor: anchorField(
+      'Which point on the cone the position refers to. ' +
+        '"base-center" (default): center of the circular base; apex at position+[0,0,height]. ' +
+        '"center": geometric center of the AABB (mid X/Y/Z). ' +
+        '"min": min-XYZ corner of the AABB. ' +
+        'Unknown values fall back to "base-center". ' +
+        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+    ),
+    rotation: rotationField(),
+    color: colorField(DEFAULT_SOLID_COLOR),
   }),
   run: (
     doc,
-    { radius, height, position = ORIGIN, rotation, color = '#6b8f9c', anchor },
+    { radius, height, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    if (!Number.isFinite(radius) || radius <= 0) {
-      return {
-        document: doc,
-        summary: `add_cone failed: radius must be finite and > 0, got ${radius}.`,
-        affected: [],
-      };
-    }
-    if (!Number.isFinite(height) || height <= 0) {
-      return {
-        document: doc,
-        summary: `add_cone failed: height must be finite and > 0, got ${height}.`,
-        affected: [],
-      };
-    }
+    const rejected = rejectNonPositive(doc, 'add_cone', [
+      ['radius', radius],
+      ['height', height],
+    ]);
+    if (rejected) return rejected;
     // Default anchor for cone is 'base-center': stored position IS the base center.
     // AABB from base-center origin: spans [−radius..+radius, −radius..+radius, 0..height].
     // To use resolvePosition (which works from center), we express the base-center origin
@@ -276,13 +221,11 @@ export const addCone = defineCommand({
       layerId: DEFAULT_LAYER_ID,
       color,
     };
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    return {
-      document: newDoc,
-      summary: `Added cone ${id} with base radius ${radius} and height ${height}; ${boundsText(b)}.`,
-      affected: [id],
-    };
+    return commitSolid(
+      doc,
+      entity,
+      `Added cone ${id} with base radius ${radius} and height ${height}`,
+    );
   },
 });
 
@@ -323,52 +266,27 @@ export const addTorus = defineCommand({
         'Radius of the circular tube cross-section (minor radius) in document units. Must be > 0. ' +
           'Should be less than ringRadius for a non-self-intersecting torus.',
       ),
-    position: looseVec3(
-      'World-space location of the anchor point [x, y, z] in document units. ' +
-        'Right-handed frame, +Z up. The ring lies in the XY plane. Defaults to [0, 0, 0].',
-    ).optional(),
-    anchor: tolerant(
-      z
-        .enum(['center', 'min', 'base-center'])
-        .describe(
-          'Which point on the torus the position refers to. ' +
-            '"center" (default): geometric center. ' +
-            '"min": min-XYZ corner of the AABB. ' +
-            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-            'Unknown values fall back to "center". ' +
-            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        ),
-    ).optional(),
-    rotation: tolerant(
-      looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      ),
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
-      .optional(),
+    position: positionField('The ring lies in the XY plane. '),
+    anchor: anchorField(
+      'Which point on the torus the position refers to. ' +
+        '"center" (default): geometric center. ' +
+        '"min": min-XYZ corner of the AABB. ' +
+        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+        'Unknown values fall back to "center". ' +
+        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+    ),
+    rotation: rotationField(),
+    color: colorField(DEFAULT_SOLID_COLOR),
   }),
   run: (
     doc,
-    { ringRadius, tubeRadius, position = ORIGIN, rotation, color = '#6b8f9c', anchor },
+    { ringRadius, tubeRadius, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    if (!Number.isFinite(ringRadius) || ringRadius <= 0) {
-      return {
-        document: doc,
-        summary: `add_torus failed: ringRadius must be finite and > 0, got ${ringRadius}.`,
-        affected: [],
-      };
-    }
-    if (!Number.isFinite(tubeRadius) || tubeRadius <= 0) {
-      return {
-        document: doc,
-        summary: `add_torus failed: tubeRadius must be finite and > 0, got ${tubeRadius}.`,
-        affected: [],
-      };
-    }
+    const rejected = rejectNonPositive(doc, 'add_torus', [
+      ['ringRadius', ringRadius],
+      ['tubeRadius', tubeRadius],
+    ]);
+    if (rejected) return rejected;
     // Default anchor for torus is 'center': stored position is the geometric center.
     // AABB half-extents from center: [ringRadius+tubeRadius, ringRadius+tubeRadius, tubeRadius].
     const outerRadius = ringRadius + tubeRadius;
@@ -389,26 +307,10 @@ export const addTorus = defineCommand({
       layerId: DEFAULT_LAYER_ID,
       color,
     };
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    return {
-      document: newDoc,
-      summary: `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}; ${boundsText(b)}.`,
-      affected: [id],
-    };
+    return commitSolid(
+      doc,
+      entity,
+      `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}`,
+    );
   },
 });
-
-/**
- * @command add_wedge
- * @pure
- * @layer core/commands
- * @affects creates 1 wedge entity; stored position is the lower-front-left corner of the bounding box
- * @invariant all size components > 0
- * @failure any size component <= 0 -> no-op, affected:[]
- * @failure malformed rotation -> entity still created with rotation [0,0,0]
- * @failure unknown anchor value -> falls back to default anchor 'min', no throw
- *
- * Default anchor is 'min': the stored position is the lower-front-left (min-XYZ) corner.
- * AABB: [position..position+size] in all axes.
- */

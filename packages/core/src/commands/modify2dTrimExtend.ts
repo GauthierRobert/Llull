@@ -1,7 +1,15 @@
 import type { Entity, LineEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import type { Vec2 } from '../model/types';
 import { len2, segIntersect, evalLine } from './modify2dGeometry';
+
+/** `line` with its endpoint nearer to `point` moved onto `point` (a tie moves the start). */
+function withNearerEndpointAt(line: LineEntity, point: Vec2): LineEntity {
+  const distToStart = len2([point[0] - line.start[0], point[1] - line.start[1]]);
+  const distToEnd = len2([point[0] - line.end[0], point[1] - line.end[1]]);
+  return distToStart <= distToEnd ? { ...line, start: point } : { ...line, end: point };
+}
 
 // ---------------------------------------------------------------------------
 // trim
@@ -92,27 +100,7 @@ export const trim = defineCommand({
 
     const intersectionPt = evalLine(line.start, line.end, hit.t);
 
-    // Determine which endpoint is closer to the intersection
-    const distToStart = len2([
-      intersectionPt[0] - line.start[0],
-      intersectionPt[1] - line.start[1],
-    ]);
-    const distToEnd = len2([intersectionPt[0] - line.end[0], intersectionPt[1] - line.end[1]]);
-
-    // The closer endpoint moves to the intersection (trim that side)
-    let newStart = line.start;
-    let newEnd = line.end;
-    if (distToStart <= distToEnd) {
-      newStart = intersectionPt;
-    } else {
-      newEnd = intersectionPt;
-    }
-
-    const trimmed: Entity = {
-      ...line,
-      start: newStart,
-      end: newEnd,
-    };
+    const trimmed: Entity = withNearerEndpointAt(line, intersectionPt);
 
     return {
       document: {
@@ -204,26 +192,7 @@ export const extend = defineCommand({
 
     const intersectionPt = evalLine(line.start, line.end, hit.t);
 
-    // Determine which endpoint is closer to the intersection
-    const distToStart = len2([
-      intersectionPt[0] - line.start[0],
-      intersectionPt[1] - line.start[1],
-    ]);
-    const distToEnd = len2([intersectionPt[0] - line.end[0], intersectionPt[1] - line.end[1]]);
-
-    let newStart = line.start;
-    let newEnd = line.end;
-    if (distToStart <= distToEnd) {
-      newStart = intersectionPt;
-    } else {
-      newEnd = intersectionPt;
-    }
-
-    const extended: Entity = {
-      ...line,
-      start: newStart,
-      end: newEnd,
-    };
+    const extended: Entity = withNearerEndpointAt(line, intersectionPt);
 
     return {
       document: {

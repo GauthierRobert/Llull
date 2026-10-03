@@ -8,7 +8,13 @@
  */
 
 import type { Feature, FeatureProgram } from './program';
-import { formatNumber, provenance, quote, stepHeading } from './format';
+import {
+  featureLinesWithHeadings,
+  formatNumber,
+  parameterLines,
+  provenance,
+  quote,
+} from './format';
 import { placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
 
@@ -61,18 +67,15 @@ export function emitPython(program: FeatureProgram, backend: PythonBackend): str
   lines.push(`# ── llull runtime (${LIBRARY[backend]}) · keep unchanged ${'─'.repeat(30)}`);
   lines.push(pythonRuntime(backend));
   lines.push(`# ── PARAMETERS ${'─'.repeat(50)}`);
-  if (program.parameters.length === 0) lines.push('# (none)');
-  for (const p of program.parameters) {
-    lines.push(
-      `${p.identifier} = param(${quote(p.name)}, ${p.expression ?? formatNumber(p.value)})`,
-    );
-  }
+  lines.push(
+    ...parameterLines(
+      program,
+      '#',
+      (p) => `${p.identifier} = param(${quote(p.name)}, ${p.expression ?? formatNumber(p.value)})`,
+    ),
+  );
   lines.push('', `# ── MODEL ${'─'.repeat(55)}`);
-  program.features.forEach((feature, i) => {
-    const heading = stepHeading(feature, program.features[i - 1]);
-    if (heading !== null) lines.push(`# ${heading}`);
-    lines.push(featureLine(feature));
-  });
+  lines.push(...featureLinesWithHeadings(program, '#', featureLine));
   lines.push(
     '',
     'result = finish()',

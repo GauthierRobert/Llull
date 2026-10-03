@@ -11,13 +11,6 @@
  * bounds used for framing come from computeSceneSnapshot which uses scene.ts
  * entityBounds — the slight inconsistency only affects framing; rendering is
  * Z-up throughout.
- *
- * @command render_view
- * @pure
- * @layer core/commands
- * @affects nothing — read-only; document returned unchanged, affected:[]
- * @invariant data.svg is a complete <svg> document; document === input doc
- * @failure invalid params are clamped; empty doc returns a valid empty SVG
  */
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';

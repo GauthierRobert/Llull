@@ -2,31 +2,17 @@ import type { Vec3 } from '../model/types';
 import { revolutionPolygons } from '../geometry/revolution';
 import {
   SEG_CIRCLE,
-  SEG_SPHERE_LAT,
-  SEG_SPHERE_LON,
-  SEG_TORUS_TUBE,
-  circlePoints as _circlePoints,
+  boxExtents,
+  circlePoints,
+  extrusionRings,
   meshTriangles,
+  pyramidCorners,
+  sphereQuads,
+  torusQuads,
+  wedgeCorners,
 } from './tessellation';
 import { type PreDepthPolygon } from './renderTypes';
 import { sub3, cross3, normalize3 } from './renderMath';
-
-// ---------------------------------------------------------------------------
-// Tessellation helpers
-// ---------------------------------------------------------------------------
-
-// SEG_CIRCLE, SEG_SPHERE_LAT, SEG_SPHERE_LON, SEG_TORUS_TUBE imported from tessellation.ts
-
-/** Points on a circle in the XY plane at height `cz` (Z-up). Delegates to shared tessellation helper. */
-export function circlePoints(
-  cx: number,
-  cy: number,
-  cz: number,
-  r: number,
-  segments: number,
-): Vec3[] {
-  return _circlePoints(cx, cy, cz, r, segments);
-}
 
 /** Compute outward face normal for a polygon (using the first 3 verts). */
 export function faceNormal(verts: Vec3[]): Vec3 {
@@ -46,14 +32,7 @@ export function makePolygon(verts: Vec3[], color: string, stroke = false): PreDe
 // ---------------------------------------------------------------------------
 
 export function tessellateBox(e: { position: Vec3; size: Vec3; color: string }): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
-  const [w, h, d] = e.size;
-  const x0 = px - w / 2,
-    x1 = px + w / 2;
-  const y0 = py - h / 2,
-    y1 = py + h / 2;
-  const z0 = pz - d / 2,
-    z1 = pz + d / 2;
+  const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
   const c = e.color;
   // 6 quads (CCW when viewed from outside, Z-up)
   return [
@@ -152,40 +131,7 @@ export function tessellateSphere(e: {
   radius: number;
   color: string;
 }): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
-  const { radius, color } = e;
-  const polys: PreDepthPolygon[] = [];
-
-  for (let lat = 0; lat < SEG_SPHERE_LAT; lat++) {
-    const a0 = (Math.PI * lat) / SEG_SPHERE_LAT - Math.PI / 2;
-    const a1 = (Math.PI * (lat + 1)) / SEG_SPHERE_LAT - Math.PI / 2;
-    for (let lon = 0; lon < SEG_SPHERE_LON; lon++) {
-      const b0 = (2 * Math.PI * lon) / SEG_SPHERE_LON;
-      const b1 = (2 * Math.PI * (lon + 1)) / SEG_SPHERE_LON;
-      const v00: Vec3 = [
-        px + radius * Math.cos(a0) * Math.cos(b0),
-        py + radius * Math.cos(a0) * Math.sin(b0),
-        pz + radius * Math.sin(a0),
-      ];
-      const v01: Vec3 = [
-        px + radius * Math.cos(a0) * Math.cos(b1),
-        py + radius * Math.cos(a0) * Math.sin(b1),
-        pz + radius * Math.sin(a0),
-      ];
-      const v10: Vec3 = [
-        px + radius * Math.cos(a1) * Math.cos(b0),
-        py + radius * Math.cos(a1) * Math.sin(b0),
-        pz + radius * Math.sin(a1),
-      ];
-      const v11: Vec3 = [
-        px + radius * Math.cos(a1) * Math.cos(b1),
-        py + radius * Math.cos(a1) * Math.sin(b1),
-        pz + radius * Math.sin(a1),
-      ];
-      polys.push(makePolygon([v00, v01, v11, v10], color));
-    }
-  }
-  return polys;
+  return sphereQuads(e.position, e.radius).map((quad) => makePolygon(quad, e.color));
 }
 
 /** Z-up cone: base circle in XY at position, apex at position+[0,0,height]. */
@@ -218,52 +164,9 @@ export function tessellateTorus(e: {
   tubeRadius: number;
   color: string;
 }): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
-  const { ringRadius, tubeRadius, color } = e;
-  const RING_SEGS = SEG_CIRCLE;
-  const TUBE_SEGS = SEG_TORUS_TUBE;
-  const polys: PreDepthPolygon[] = [];
-
-  for (let i = 0; i < RING_SEGS; i++) {
-    const a0 = (2 * Math.PI * i) / RING_SEGS;
-    const a1 = (2 * Math.PI * (i + 1)) / RING_SEGS;
-    const ca0 = Math.cos(a0),
-      sa0 = Math.sin(a0);
-    const ca1 = Math.cos(a1),
-      sa1 = Math.sin(a1);
-    for (let j = 0; j < TUBE_SEGS; j++) {
-      const b0 = (2 * Math.PI * j) / TUBE_SEGS;
-      const b1 = (2 * Math.PI * (j + 1)) / TUBE_SEGS;
-      // tube cross-section: radial direction in XY + Z
-      const cb0 = Math.cos(b0),
-        sb0 = Math.sin(b0);
-      const cb1 = Math.cos(b1),
-        sb1 = Math.sin(b1);
-
-      const v00: Vec3 = [
-        px + (ringRadius + tubeRadius * cb0) * ca0,
-        py + (ringRadius + tubeRadius * cb0) * sa0,
-        pz + tubeRadius * sb0,
-      ];
-      const v01: Vec3 = [
-        px + (ringRadius + tubeRadius * cb1) * ca0,
-        py + (ringRadius + tubeRadius * cb1) * sa0,
-        pz + tubeRadius * sb1,
-      ];
-      const v10: Vec3 = [
-        px + (ringRadius + tubeRadius * cb0) * ca1,
-        py + (ringRadius + tubeRadius * cb0) * sa1,
-        pz + tubeRadius * sb0,
-      ];
-      const v11: Vec3 = [
-        px + (ringRadius + tubeRadius * cb1) * ca1,
-        py + (ringRadius + tubeRadius * cb1) * sa1,
-        pz + tubeRadius * sb1,
-      ];
-      polys.push(makePolygon([v00, v10, v11, v01], color));
-    }
-  }
-  return polys;
+  return torusQuads(e.position, e.ringRadius, e.tubeRadius).map((quad) =>
+    makePolygon(quad, e.color),
+  );
 }
 
 /**
@@ -278,16 +181,7 @@ export function tessellateWedge(e: {
   size: Vec3;
   color: string;
 }): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
-  const [w, h, d] = e.size;
-  const p = (dx: number, dy: number, dz: number): Vec3 => [px + dx, py + dy, pz + dz];
-  // 8 possible corners but top-back edge collapses:
-  const f00 = p(0, 0, 0);
-  const f10 = p(w, 0, 0);
-  const f11 = p(w, h, 0);
-  const f01 = p(0, h, 0);
-  const b00 = p(0, 0, d);
-  const b10 = p(w, 0, d);
+  const { f00, f10, f11, f01, b00, b10 } = wedgeCorners(e.position, e.size);
   // back top = same as back bottom (wedge tapers to zero height at z=d)
   return [
     // front face
@@ -314,14 +208,7 @@ export function tessellatePyramid(e: {
   height: number;
   color: string;
 }): PreDepthPolygon[] {
-  const [px, py, pz] = e.position;
-  const hw = e.baseWidth / 2,
-    hd = e.baseDepth / 2;
-  const b00: Vec3 = [px - hw, py - hd, pz];
-  const b10: Vec3 = [px + hw, py - hd, pz];
-  const b11: Vec3 = [px + hw, py + hd, pz];
-  const b01: Vec3 = [px - hw, py + hd, pz];
-  const apex: Vec3 = [px, py, pz + e.height];
+  const { b00, b10, b11, b01, apex } = pyramidCorners(e);
   return [
     // base (CCW looking down = face down)
     makePolygon([b00, b01, b11, b10], e.color),
@@ -366,10 +253,8 @@ export function tessellateExtrusion(e: {
   color: string;
 }): PreDepthPolygon[] {
   if (e.profile.length < 3) return [];
-  const [px, py, pz] = e.position;
   const n = e.profile.length;
-  const bottom: Vec3[] = e.profile.map(([x, y]) => [px + x, py + y, pz]);
-  const top: Vec3[] = e.profile.map(([x, y]) => [px + x, py + y, pz + e.depth]);
+  const { bottom, top } = extrusionRings(e);
   const polys: PreDepthPolygon[] = [];
 
   // Bottom cap (reversed for outward-facing normal)

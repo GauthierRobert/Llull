@@ -260,17 +260,14 @@ export const fitView = defineCommand({
     const snapshot = computeSceneSnapshot(doc);
     const bounds = snapshot.bounds;
 
-    let target: Vec3;
-    let distance: number;
+    const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
+    const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
+    const polar = preset ? preset.polar : doc.camera.polar;
 
     if (!bounds) {
       // Empty document — use a sensible default view.
-      target = [0, 0, 0];
-      distance = 10;
-      const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
-      const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
-      const polar = preset ? preset.polar : doc.camera.polar;
-      const next: CameraState = { target, azimuth, polar, distance };
+      const distance = 10;
+      const next: CameraState = { target: [0, 0, 0], azimuth, polar, distance };
       return {
         document: { ...doc, camera: next },
         summary: `fit_view (${direction}): document is empty — applied default framing: target=[0,0,0], distance=${distance}. azimuth=${azimuth.toFixed(3)}, polar=${polar.toFixed(3)}.`,
@@ -282,7 +279,7 @@ export const fitView = defineCommand({
     const cx = (bounds.min[0] + bounds.max[0]) / 2;
     const cy = (bounds.min[1] + bounds.max[1]) / 2;
     const cz = (bounds.min[2] + bounds.max[2]) / 2;
-    target = [cx, cy, cz];
+    const target: Vec3 = [cx, cy, cz];
 
     const dx = (bounds.max[0] - bounds.min[0]) / 2;
     const dy = (bounds.max[1] - bounds.min[1]) / 2;
@@ -290,11 +287,7 @@ export const fitView = defineCommand({
     const boundsRadius = Math.sqrt(dx * dx + dy * dy + dz * dz);
     // Avoid degenerate distance for a single-point scene (e.g. lone PointEntity).
     const safeRadius = boundsRadius < 0.001 ? 1 : boundsRadius;
-    distance = (safeRadius / Math.sin(HALF_FOV_RAD)) * padding;
-
-    const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
-    const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
-    const polar = preset ? preset.polar : doc.camera.polar;
+    const distance = (safeRadius / Math.sin(HALF_FOV_RAD)) * padding;
 
     const next: CameraState = { target, azimuth, polar, distance };
     return {

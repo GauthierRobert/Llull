@@ -52,7 +52,7 @@ import {
   ServerCommandError,
 } from './serverCommands';
 import { execute } from '@core/commands/registry';
-import { remapIds } from '@core/commands/regenerate';
+import { extendIdMap, remapIds } from '@core/commands/regenerate';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import { applyLiveCommand } from '@mcp/liveSync';
 
@@ -478,17 +478,6 @@ function withLocalSelection(doc: CadDocument, selection: readonly EntityId[]): C
   return { ...doc, selection: selection.filter((id) => id in doc.entities) };
 }
 
-function extendFlushIdMap(local: readonly string[], server: readonly string[]): void {
-  const length = Math.min(local.length, server.length);
-  for (let index = 0; index < length; index++) {
-    const localId = local[index];
-    const serverId = server[index];
-    if (localId !== undefined && serverId !== undefined && localId !== serverId) {
-      flushIdMap.set(localId, serverId);
-    }
-  }
-}
-
 /**
  * Offline -> online reconcile: replay the outbox to the server as ordinary commands, in
  * order (the server rebases them onto whatever happened meanwhile), then adopt the server
@@ -510,7 +499,7 @@ function flushOutbox(set: StoreSet, get: StoreGet): void {
         next.commandId,
       );
       sent.push(response.summary);
-      extendFlushIdMap(next.affected, response.affected);
+      extendIdMap(flushIdMap, next.affected, response.affected);
       set((state) => ({
         localOutbox: state.localOutbox.filter((entry) => entry.commandId !== next.commandId),
       }));

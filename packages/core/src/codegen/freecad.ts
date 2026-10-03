@@ -7,7 +7,14 @@
  */
 
 import type { Feature, FeatureProgram } from './program';
-import { commentText, formatNumber, provenance, quote, stepHeading } from './format';
+import {
+  commentText,
+  featureLinesWithHeadings,
+  formatNumber,
+  parameterLines,
+  provenance,
+  quote,
+} from './format';
 import { placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 
 const HELPERS = String.raw`
@@ -148,18 +155,15 @@ export function emitFreeCad(program: FeatureProgram): string {
     '',
     `# ── PARAMETERS ${'─'.repeat(50)}`,
   ];
-  if (program.parameters.length === 0) lines.push('# (none)');
-  for (const p of program.parameters) {
-    lines.push(
-      `${p.identifier} = ${p.expression ?? formatNumber(p.value)}  # ${commentText(p.name)}`,
-    );
-  }
+  lines.push(
+    ...parameterLines(
+      program,
+      '#',
+      (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}  # ${commentText(p.name)}`,
+    ),
+  );
   lines.push('', `# ── MODEL ${'─'.repeat(55)}`);
-  program.features.forEach((feature, i) => {
-    const heading = stepHeading(feature, program.features[i - 1]);
-    if (heading !== null) lines.push(`# ${heading}`);
-    lines.push(featureLine(feature));
-  });
+  lines.push(...featureLinesWithHeadings(program, '#', featureLine));
   lines.push('', `# ── RESULT ${'─'.repeat(54)}`);
   program.outputs.forEach((output, i) => {
     const name = output.name ?? `solid_${i + 1}`;

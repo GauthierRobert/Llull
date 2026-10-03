@@ -12,6 +12,7 @@
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { MAX_BATCH_IDS } from './limits';
+import { resolveBatchIds } from './batchIds';
 import { translated } from './geometryShared';
 
 export const moveEntities = defineCommand({
@@ -29,30 +30,9 @@ export const moveEntities = defineCommand({
     delta: vec3('Translation [dx, dy, dz] in document units applied to every entity.'),
   }),
   run: (doc, { ids, delta }): CommandResult => {
-    if (ids.length === 0) {
-      return {
-        document: doc,
-        summary: 'move_entities: ids must be a non-empty array.',
-        affected: [],
-      };
-    }
-    if (ids.length > MAX_BATCH_IDS) {
-      return {
-        document: doc,
-        summary: `move_entities: ${ids.length} ids exceeds MAX_BATCH_IDS (${MAX_BATCH_IDS}).`,
-        affected: [],
-      };
-    }
-    const unique = [...new Set(ids)];
-    const existing = unique.filter((id) => Object.hasOwn(doc.entities, id));
-    const missing = unique.filter((id) => !Object.hasOwn(doc.entities, id));
-    if (existing.length === 0) {
-      return {
-        document: doc,
-        summary: `move_entities: no listed entity exists (missing: [${missing.join(', ')}]).`,
-        affected: [],
-      };
-    }
+    const batch = resolveBatchIds(doc, 'move_entities', ids, 'ids must be a non-empty array.');
+    if (!batch.ok) return batch.result;
+    const { existing, missing } = batch;
     const entities = { ...doc.entities };
     for (const id of existing) {
       const target = entities[id];

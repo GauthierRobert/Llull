@@ -1,11 +1,20 @@
 import type { Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec2 as vec2, looseVec3 as vec3 } from './schema';
+import { defineCommand, z, colorField, looseVec2 as vec2 } from './schema';
 import { nextId } from '../lib/id';
+import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from './limits';
 import { sampleInvolute } from './gears';
-import { withEntity, fmtN } from './draw2dShared';
+import {
+  DEFAULT_DRAW_COLOR,
+  fmtN,
+  pointSeriesEntity,
+  rejectTooFewPoints,
+  workPlanePositionField,
+} from './draw2dShared';
+import { withEntity } from './entityOps';
+import { pointsExtent } from './sceneBounds';
 
 // ---------------------------------------------------------------------------
 // draw_ellipse
@@ -33,17 +42,12 @@ export const drawEllipse = defineCommand({
     radiusY: z
       .number()
       .describe('Semi-axis length along the local Y axis (half-height). Must be greater than 0.'),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
-      .optional(),
+    position: workPlanePositionField(),
+    color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (
     doc,
-    { center, radiusX, radiusY, position = [0, 0, 0] as const, color = '#4a90d9' },
+    { center, radiusX, radiusY, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (radiusX <= 0 || radiusY <= 0) {
       return {
@@ -105,25 +109,15 @@ export const drawSpline = defineCommand({
         'When true, the spline loops back from the last point to the first, forming a closed curve. Defaults to false.',
       )
       .optional(),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
-      .optional(),
+    position: workPlanePositionField(),
+    color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (
     doc,
-    { points, closed = false, position = [0, 0, 0] as const, color = '#4a90d9' },
+    { points, closed = false, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
-    if (!Array.isArray(points) || points.length < 2) {
-      return {
-        document: doc,
-        summary: `draw_spline: requires at least 2 points (got ${Array.isArray(points) ? points.length : 0}).`,
-        affected: [],
-      };
-    }
+    const tooFew = rejectTooFewPoints(doc, 'draw_spline', points);
+    if (tooFew) return tooFew;
     if (points.length > MAX_SPLINE_CONTROL_POINTS) {
       return {
         document: doc,
@@ -132,22 +126,10 @@ export const drawSpline = defineCommand({
       };
     }
     const id = nextId('spline');
-    const safePoints: ReadonlyArray<Vec2> = points.map(
-      (p) => [(p as number[])[0] ?? 0, (p as number[])[1] ?? 0] as Vec2,
-    );
-    const entity: Entity = {
-      id,
-      kind: 'spline',
-      points: safePoints,
-      closed,
-      position,
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    const entity = pointSeriesEntity('spline', id, points, closed, position, color);
     return {
       document: withEntity(doc, entity),
-      summary: `Drew spline ${id} with ${safePoints.length} points${closed ? ' (closed)' : ''}.`,
+      summary: `Drew spline ${id} with ${points.length} points${closed ? ' (closed)' : ''}.`,
       affected: [id],
     };
   },
@@ -204,9 +186,7 @@ export const drawInvolute = defineCommand({
           'Minimum 2. Default 24. Higher values give a smoother polyline.',
       )
       .optional(),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-    ).optional(),
+    position: workPlanePositionField(),
     rotation: z
       .array(z.number())
       .describe(
@@ -231,7 +211,7 @@ export const drawInvolute = defineCommand({
       samples = 24,
       position = [0, 0, 0] as const,
       rotation = [0, 0, 0],
-      color = '#4a90d9',
+      color = DEFAULT_DRAW_COLOR,
       name,
     },
   ): CommandResult => {
@@ -290,39 +270,16 @@ export const drawInvolute = defineCommand({
     }
 
     // --- Resolve position/rotation (clamp non-finite to 0) ---
-    const resolvedPos: Vec3 =
-      Array.isArray(position) &&
-      position.length === 3 &&
-      Number.isFinite((position as number[])[0]) &&
-      Number.isFinite((position as number[])[1]) &&
-      Number.isFinite((position as number[])[2])
-        ? [(position as number[])[0]!, (position as number[])[1]!, (position as number[])[2]!]
-        : [0, 0, 0];
+    const resolvedPos: Vec3 = finiteVec3OrZero(position);
 
-    const resolvedRot: Vec3 =
-      Array.isArray(rotation) &&
-      rotation.length === 3 &&
-      Number.isFinite((rotation as number[])[0]) &&
-      Number.isFinite((rotation as number[])[1]) &&
-      Number.isFinite((rotation as number[])[2])
-        ? [(rotation as number[])[0]!, (rotation as number[])[1]!, (rotation as number[])[2]!]
-        : [0, 0, 0];
+    const resolvedRot: Vec3 = finiteVec3OrZero(rotation);
 
     // --- Sample the involute using the shared helper from gears.ts ---
     const rawPoints = sampleInvolute(baseRadius, startAngle, endAngle, samplesInt);
     const pts: ReadonlyArray<Vec2> = rawPoints.map(([x, y]) => [x, y] as Vec2);
 
     // --- Compute 2D AABB for summary ---
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-    for (const [x, y] of pts) {
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-    }
+    const { minX, minY, maxX, maxY } = pointsExtent(pts);
 
     // --- Mint entity id and build open polyline ---
     const id = nextId('inv');

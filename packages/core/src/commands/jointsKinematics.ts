@@ -197,21 +197,30 @@ export interface EvaluatedMotion {
 /**
  * Evaluate all joints + drive relations and compute new instance positions/rotations.
  *
- * 1. Collect base joint values (resolving expression strings via doc.parameters).
- * 2. Topo-sort drive relations and propagate: driven = driver * ratio + offset.
+ * 1. Collect base joint values (resolving expression strings via doc.parameters); a joint named
+ *    in `overrides` takes the override value instead (used by motion_study sweeps).
+ * 2. Topo-sort drive relations and propagate: driven = driver * ratio + offset (never into an
+ *    overridden joint).
  * 3. Apply each joint to instance b's position/rotation relative to instance a.
  *
  * Returns EvaluatedMotion. Never mutates doc.
  *
  * @pure
  */
-export function evaluateMotionInternal(doc: CadDocument): EvaluatedMotion {
+export function evaluateMotionInternal(
+  doc: CadDocument,
+  overrides: Readonly<Record<string, number>> = {},
+): EvaluatedMotion {
   // Step 1: collect base joint values
   const resolvedJoints: Record<string, number> = {};
   for (const [jid, joint] of Object.entries(doc.joints)) {
+    const override = overrides[jid];
+    if (override !== undefined) {
+      resolvedJoints[jid] = override;
+      continue;
+    }
     const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
-    const resolved = resolveJointValue(rawValue, doc);
-    resolvedJoints[jid] = resolved ?? rawValue;
+    resolvedJoints[jid] = resolveJointValue(rawValue, doc) ?? rawValue;
   }
 
   // Step 2: propagate drive relations in topo order
@@ -226,7 +235,7 @@ export function evaluateMotionInternal(doc: CadDocument): EvaluatedMotion {
     const dr = drivenBy.get(jid);
     if (!dr) continue;
     const driverValue = resolvedJoints[dr.driver];
-    if (driverValue === undefined) continue;
+    if (driverValue === undefined || overrides[jid] !== undefined) continue;
     resolvedJoints[jid] = driverValue * dr.ratio + (dr.offset ?? 0);
   }
 

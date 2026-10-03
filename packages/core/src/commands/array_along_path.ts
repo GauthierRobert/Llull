@@ -14,12 +14,13 @@
  * fresh ids via nextId(). The source entity is NOT removed or altered.
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { DEFAULT_LAYER_ID } from '../model/types';
+import { withEntity } from './entityOps';
 
 // ---------------------------------------------------------------------------
 // Internal math helpers
@@ -79,15 +80,6 @@ function pointAtArcLength(path: Vec3[], t: number): Vec3 {
  */
 function cloneEntityAt(source: Entity, newId: string, position: Vec3, rotation: Vec3): Entity {
   return { ...source, id: newId, position, rotation } as Entity;
-}
-
-/** Insert one entity into the document (pure helper). */
-function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
 }
 
 // ---------------------------------------------------------------------------

@@ -295,24 +295,12 @@ export const distribute = defineCommand({
     const lastCenter = entities[entities.length - 1]!.center;
     const n = entities.length;
 
-    const moved: Entity[] = [];
-
+    // Target center per entity index (the first and last entity never move).
+    const targetCenters: number[] = [];
     if (mode === 'equal-spacing') {
       // Equal center-to-center step.
       const step = (lastCenter - firstCenter) / (n - 1);
-      for (let i = 1; i < n - 1; i++) {
-        const item = entities[i]!;
-        const targetCenter = firstCenter + step * i;
-        const delta = targetCenter - item.center;
-        if (Math.abs(delta) < 1e-10) continue;
-        const pos = item.e.position;
-        const newPos: Vec3 = [
-          pos[0] + (axisIndex === 0 ? delta : 0),
-          pos[1] + (axisIndex === 1 ? delta : 0),
-          pos[2] + (axisIndex === 2 ? delta : 0),
-        ];
-        moved.push(moveEntityTo(item.e, newPos));
-      }
+      for (let i = 0; i < n; i++) targetCenters.push(firstCenter + step * i);
     } else {
       // Equal-gap: gap between AABBs is uniform.
       // Total span = lastMax - firstMin; subtract all entity widths; divide remaining gap.
@@ -321,27 +309,31 @@ export const distribute = defineCommand({
       const totalSpan =
         lastItem.center + lastItem.halfExtent - (firstItem.center - firstItem.halfExtent);
       const totalEntityWidths = entities.reduce((sum, item) => sum + item.halfExtent * 2, 0);
-      const remaining = totalSpan - totalEntityWidths;
-      const gap = remaining / (n - 1);
+      const gap = (totalSpan - totalEntityWidths) / (n - 1);
 
       // Place each entity starting from the right edge of the previous.
       let cursor = firstItem.center - firstItem.halfExtent; // left edge of first entity
       cursor += firstItem.halfExtent * 2 + gap; // advance past first entity + first gap
-
+      targetCenters.push(firstItem.center);
       for (let i = 1; i < n - 1; i++) {
         const item = entities[i]!;
-        const targetCenter = cursor + item.halfExtent;
-        const delta = targetCenter - item.center;
+        targetCenters.push(cursor + item.halfExtent);
         cursor += item.halfExtent * 2 + gap;
-        if (Math.abs(delta) < 1e-10) continue;
-        const pos = item.e.position;
-        const newPos: Vec3 = [
-          pos[0] + (axisIndex === 0 ? delta : 0),
-          pos[1] + (axisIndex === 1 ? delta : 0),
-          pos[2] + (axisIndex === 2 ? delta : 0),
-        ];
-        moved.push(moveEntityTo(item.e, newPos));
       }
+    }
+
+    const moved: Entity[] = [];
+    for (let i = 1; i < n - 1; i++) {
+      const item = entities[i]!;
+      const delta = targetCenters[i]! - item.center;
+      if (Math.abs(delta) < 1e-10) continue;
+      const pos = item.e.position;
+      const newPos: Vec3 = [
+        pos[0] + (axisIndex === 0 ? delta : 0),
+        pos[1] + (axisIndex === 1 ? delta : 0),
+        pos[2] + (axisIndex === 2 ? delta : 0),
+      ];
+      moved.push(moveEntityTo(item.e, newPos));
     }
 
     if (moved.length === 0) {

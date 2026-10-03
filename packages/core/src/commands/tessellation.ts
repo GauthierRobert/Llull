@@ -189,3 +189,113 @@ export function meshTriangles(mesh: {
   }
   return triangles;
 }
+
+/** Axis-aligned extents of a box centred at `position`. */
+export function boxExtents(
+  position: Vec3,
+  size: Vec3,
+): { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number } {
+  const [px, py, pz] = position;
+  const [w, h, d] = size;
+  return {
+    x0: px - w / 2,
+    x1: px + w / 2,
+    y0: py - h / 2,
+    y1: py + h / 2,
+    z0: pz - d / 2,
+    z1: pz + d / 2,
+  };
+}
+
+/** The six corners of a wedge whose lower-front-left corner is at `position` (size = [w, h, d]). */
+export function wedgeCorners(
+  position: Vec3,
+  size: Vec3,
+): { f00: Vec3; f10: Vec3; f11: Vec3; f01: Vec3; b00: Vec3; b10: Vec3 } {
+  const [px, py, pz] = position;
+  const [w, h, d] = size;
+  const p = (dx: number, dy: number, dz: number): Vec3 => [px + dx, py + dy, pz + dz];
+  return {
+    f00: p(0, 0, 0),
+    f10: p(w, 0, 0),
+    f11: p(w, h, 0),
+    f01: p(0, h, 0),
+    b00: p(0, 0, d),
+    b10: p(w, 0, d),
+  };
+}
+
+/** Base corners (`bXY`, X/Y = low/high) and apex of a pyramid whose base centre is `position`. */
+export function pyramidCorners(e: {
+  position: Vec3;
+  baseWidth: number;
+  baseDepth: number;
+  height: number;
+}): { b00: Vec3; b10: Vec3; b11: Vec3; b01: Vec3; apex: Vec3 } {
+  const [px, py, pz] = e.position;
+  const hw = e.baseWidth / 2,
+    hd = e.baseDepth / 2;
+  return {
+    b00: [px - hw, py - hd, pz],
+    b10: [px + hw, py - hd, pz],
+    b11: [px + hw, py + hd, pz],
+    b01: [px - hw, py + hd, pz],
+    apex: [px, py, pz + e.height],
+  };
+}
+
+/** Bottom (z = position.z) and top (z + depth) vertex rings of an extruded profile. */
+export function extrusionRings(e: {
+  position: Vec3;
+  profile: ReadonlyArray<readonly [number, number]>;
+  depth: number;
+}): { bottom: Vec3[]; top: Vec3[] } {
+  const [px, py, pz] = e.position;
+  return {
+    bottom: e.profile.map(([x, y]): Vec3 => [px + x, py + y, pz]),
+    top: e.profile.map(([x, y]): Vec3 => [px + x, py + y, pz + e.depth]),
+  };
+}
+
+/** One quad per lat/lon cell of a sphere, as [v00, v01, v11, v10] (lat-major, lon-minor). */
+export function sphereQuads(position: Vec3, radius: number): Array<[Vec3, Vec3, Vec3, Vec3]> {
+  const [px, py, pz] = position;
+  const quads: Array<[Vec3, Vec3, Vec3, Vec3]> = [];
+  const at = (lat: number, lon: number): Vec3 => {
+    const a = (Math.PI * lat) / SEG_SPHERE_LAT - Math.PI / 2;
+    const b = (2 * Math.PI * lon) / SEG_SPHERE_LON;
+    return [
+      px + radius * Math.cos(a) * Math.cos(b),
+      py + radius * Math.cos(a) * Math.sin(b),
+      pz + radius * Math.sin(a),
+    ];
+  };
+  for (let lat = 0; lat < SEG_SPHERE_LAT; lat++) {
+    for (let lon = 0; lon < SEG_SPHERE_LON; lon++) {
+      quads.push([at(lat, lon), at(lat, lon + 1), at(lat + 1, lon + 1), at(lat + 1, lon)]);
+    }
+  }
+  return quads;
+}
+
+/** One quad per ring/tube cell of a torus (ring in XY, tube in Z), as [v00, v10, v11, v01]. */
+export function torusQuads(
+  position: Vec3,
+  ringRadius: number,
+  tubeRadius: number,
+): Array<[Vec3, Vec3, Vec3, Vec3]> {
+  const [px, py, pz] = position;
+  const quads: Array<[Vec3, Vec3, Vec3, Vec3]> = [];
+  const at = (ring: number, tube: number): Vec3 => {
+    const a = (2 * Math.PI * ring) / SEG_CIRCLE;
+    const b = (2 * Math.PI * tube) / SEG_TORUS_TUBE;
+    const radial = ringRadius + tubeRadius * Math.cos(b);
+    return [px + radial * Math.cos(a), py + radial * Math.sin(a), pz + tubeRadius * Math.sin(b)];
+  };
+  for (let i = 0; i < SEG_CIRCLE; i++) {
+    for (let j = 0; j < SEG_TORUS_TUBE; j++) {
+      quads.push([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)]);
+    }
+  }
+  return quads;
+}

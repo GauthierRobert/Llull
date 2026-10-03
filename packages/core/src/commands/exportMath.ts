@@ -1,22 +1,6 @@
 import type { Vec3 } from '../model/types';
+import { cross3, normalize3, sub3 } from '../lib/vec3';
 import { earClipTriangulate } from './tessellation';
-
-export function sub3(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-}
-
-export function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-export function len3(a: Vec3): number {
-  return Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
-}
-
-export function normalize3(a: Vec3): Vec3 {
-  const l = len3(a);
-  return l > 1e-10 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 1];
-}
 
 /** Compute the outward facet normal from 3 vertices (right-hand rule). */
 export function facetNormal(v0: Vec3, v1: Vec3, v2: Vec3): Vec3 {
