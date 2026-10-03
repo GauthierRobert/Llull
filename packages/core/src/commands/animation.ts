@@ -26,6 +26,23 @@ function toAxis(raw: number[] | undefined): Vec3 {
   return [raw[0] ?? 0, raw[1] ?? 1, raw[2] ?? 0];
 }
 
+const pivotField = z
+  .array(z.number())
+  .optional()
+  .describe(
+    'World-space pivot point [x, y, z] for the rotation axis. ' +
+      'Only meaningful for the rotation channel. ' +
+      'When omitted the player uses the target entity/group position as the pivot.',
+  );
+
+const triggerField = z
+  .string()
+  .optional()
+  .describe(
+    "When to run the animation: 'auto' (default) starts under the global Play button; " +
+      "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
+  );
+
 /** Raw (possibly malformed) target/channel/axis/trigger/pivot inputs shared by the animate_* commands. */
 interface AnimationInput {
   readonly targetId: string;
@@ -109,21 +126,8 @@ export const animateSpin = defineCommand({
       .describe(
         "Transform channel to drive: 'rotation' (default) spins the part; 'position' translates it at constant speed.",
       ),
-    pivot: z
-      .array(z.number())
-      .optional()
-      .describe(
-        'World-space pivot point [x, y, z] for the rotation axis. ' +
-          'Only meaningful for the rotation channel. ' +
-          'When omitted the player uses the target entity/group position as the pivot.',
-      ),
-    trigger: z
-      .string()
-      .optional()
-      .describe(
-        "When to run the animation: 'auto' (default) starts under the global Play button; " +
-          "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
-      ),
+    pivot: pivotField,
+    trigger: triggerField,
   }),
   run: (doc, { targetId, speed, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
@@ -197,21 +201,8 @@ export const animateOscillate = defineCommand({
       .describe(
         "Transform channel to drive: 'rotation' (default) rocks the part; 'position' slides it back and forth.",
       ),
-    pivot: z
-      .array(z.number())
-      .optional()
-      .describe(
-        'World-space pivot point [x, y, z] for the rotation axis. ' +
-          'Only meaningful for the rotation channel. ' +
-          'When omitted the player uses the target entity/group position as the pivot.',
-      ),
-    trigger: z
-      .string()
-      .optional()
-      .describe(
-        "When to run the animation: 'auto' (default) starts under the global Play button; " +
-          "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
-      ),
+    pivot: pivotField,
+    trigger: triggerField,
   }),
   run: (doc, { targetId, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
