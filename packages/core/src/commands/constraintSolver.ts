@@ -100,6 +100,26 @@ function applyConstraintGradient(
     deltas.set(entityId, [existing[0] + dx, existing[1] + dy]);
   }
 
+  /** Gradient of (|pa - pb| - target)²; returns the squared error. */
+  function pullToDistance(
+    idA: string,
+    idB: string,
+    pa: readonly [number, number],
+    pb: readonly [number, number],
+    target: number,
+  ): number {
+    const dx = pa[0] - pb[0];
+    const dy = pa[1] - pb[1];
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1e-12) return 0;
+    const err = dist - target;
+    const ux = dx / dist;
+    const uy = dy / dist;
+    addDelta(idA, -stepSize * err * ux, -stepSize * err * uy);
+    addDelta(idB, stepSize * err * ux, stepSize * err * uy);
+    return err * err;
+  }
+
   switch (c.kind) {
     case 'coincident': {
       const pa = resolvePoint(doc, c.a);
@@ -120,18 +140,7 @@ function applyConstraintGradient(
       if (!pa || !pb) return 0;
       const target = resolveValue(doc, c.value);
       if (target === null) return 0;
-      const dx = pa[0] - pb[0];
-      const dy = pa[1] - pb[1];
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 1e-12) return 0;
-      const err = dist - target;
-      const err2 = err * err;
-      // Gradient of (dist - target)²: move each entity half the signed error.
-      const ux = dx / dist;
-      const uy = dy / dist;
-      addDelta(c.a.entityId, -stepSize * err * ux, -stepSize * err * uy);
-      addDelta(c.b.entityId, stepSize * err * ux, stepSize * err * uy);
-      return err2;
+      return pullToDistance(c.a.entityId, c.b.entityId, pa, pb, target);
     }
 
     case 'angle': {
@@ -184,18 +193,7 @@ function applyConstraintGradient(
         const pa = resolvePoint(doc, c.a);
         const pb = resolvePoint(doc, c.b);
         if (!pa || !pb) return 0;
-        const dx = pa[0] - pb[0];
-        const dy = pa[1] - pb[1];
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 1e-12) return 0;
-        const target = rA + rB;
-        const err = dist - target;
-        const err2 = err * err;
-        const ux = dx / dist;
-        const uy = dy / dist;
-        addDelta(c.a.entityId, -stepSize * err * ux, -stepSize * err * uy);
-        addDelta(c.b.entityId, stepSize * err * ux, stepSize * err * uy);
-        return err2;
+        return pullToDistance(c.a.entityId, c.b.entityId, pa, pb, rA + rB);
       }
 
       // Line ↔ circle: |distance from circle center to line| == radius.
