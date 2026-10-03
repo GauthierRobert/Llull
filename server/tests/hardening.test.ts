@@ -25,7 +25,7 @@ import {
   getAllowedOrigins,
 } from '../src/security';
 import { createAutosaver } from '../src/autosave';
-import { closeAllSessions, _sessionCount } from '../src/mcp/sessions';
+import { closeAllSessions, sessions } from '../src/mcp/sessions';
 import { createEmptyDocument } from '@core/model/types';
 import * as registry from '@core/commands/registry';
 
@@ -251,6 +251,6 @@ describe('shutdown helpers', () => {
 
   it('closeAllSessions leaves no sessions', async () => {
     await closeAllSessions();
-    expect(_sessionCount()).toBe(0);
+    expect(sessions.size).toBe(0);
   });
 });
