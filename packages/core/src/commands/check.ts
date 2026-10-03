@@ -42,205 +42,83 @@ export interface CheckResult {
   issues: Issue[];
 }
 
-/**
- * Degenerate geometry: sizes, radii, and depths that are ≤ 0.
- * A solid with a zero/negative dimension cannot be rendered or exported.
- */
+const errorIssue = (code: string, message: string, entityId: string): Issue => ({
+  severity: 'error',
+  code,
+  message,
+  entityId,
+});
+
+/** Degenerate geometry: sizes, radii, and depths that are ≤ 0. */
 function checkDegenerateGeometry(e: Entity): Issue[] {
   const issues: Issue[] = [];
+  const label = e.kind.charAt(0).toUpperCase() + e.kind.slice(1);
+  const nonPositive = (field: string, value: number, rule: string): void => {
+    if (value <= 0) {
+      issues.push(
+        errorIssue(
+          'degenerate_size',
+          `${label} entity '${e.id}' has ${field} ${value} ≤ 0. ${rule}`,
+          e.id,
+        ),
+      );
+    }
+  };
+  const checkSize = (size: readonly number[]): void => {
+    if (size.some((c) => c <= 0)) {
+      issues.push(
+        errorIssue(
+          'degenerate_size',
+          `${label} entity '${e.id}' has a zero or negative size component [${size.join(', ')}]. All dimensions must be > 0.`,
+          e.id,
+        ),
+      );
+    }
+  };
 
   switch (e.kind) {
-    case 'box': {
-      const [w, h, d] = e.size;
-      if (w <= 0 || h <= 0 || d <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Box entity '${e.id}' has a zero or negative size component [${w}, ${h}, ${d}]. All dimensions must be > 0.`,
-          entityId: e.id,
-        });
-      }
+    case 'box':
+    case 'wedge':
+      checkSize(e.size);
       break;
-    }
-    case 'cylinder': {
-      if (e.radius <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Cylinder entity '${e.id}' has radius ${e.radius} ≤ 0. Radius must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      if (e.height <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Cylinder entity '${e.id}' has height ${e.height} ≤ 0. Height must be > 0.`,
-          entityId: e.id,
-        });
-      }
+    case 'cylinder':
+    case 'cone':
+      nonPositive('radius', e.radius, 'Radius must be > 0.');
+      nonPositive('height', e.height, 'Height must be > 0.');
       break;
-    }
-    case 'sphere': {
-      if (e.radius <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Sphere entity '${e.id}' has radius ${e.radius} ≤ 0. Radius must be > 0.`,
-          entityId: e.id,
-        });
-      }
+    case 'sphere':
+    case 'circle':
+    case 'arc':
+      nonPositive('radius', e.radius, 'Radius must be > 0.');
       break;
-    }
-    case 'extrusion': {
-      if (e.depth <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Extrusion entity '${e.id}' has depth ${e.depth} ≤ 0. Depth must be > 0.`,
-          entityId: e.id,
-        });
-      }
+    case 'extrusion':
+      nonPositive('depth', e.depth, 'Depth must be > 0.');
       break;
-    }
-    case 'circle': {
-      if (e.radius <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Circle entity '${e.id}' has radius ${e.radius} ≤ 0. Radius must be > 0.`,
-          entityId: e.id,
-        });
-      }
+    case 'ellipse':
+      nonPositive('radiusX', e.radiusX, 'Both radii must be > 0.');
+      nonPositive('radiusY', e.radiusY, 'Both radii must be > 0.');
       break;
-    }
-    case 'arc': {
-      if (e.radius <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Arc entity '${e.id}' has radius ${e.radius} ≤ 0. Radius must be > 0.`,
-          entityId: e.id,
-        });
-      }
+    case 'torus':
+      nonPositive('ringRadius', e.ringRadius, 'ringRadius must be > 0.');
+      nonPositive('tubeRadius', e.tubeRadius, 'tubeRadius must be > 0.');
       break;
-    }
-    case 'ellipse': {
-      if (e.radiusX <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Ellipse entity '${e.id}' has radiusX ${e.radiusX} ≤ 0. Both radii must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      if (e.radiusY <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Ellipse entity '${e.id}' has radiusY ${e.radiusY} ≤ 0. Both radii must be > 0.`,
-          entityId: e.id,
-        });
-      }
+    case 'pyramid':
+      nonPositive('baseWidth', e.baseWidth, 'baseWidth must be > 0.');
+      nonPositive('baseDepth', e.baseDepth, 'baseDepth must be > 0.');
+      nonPositive('height', e.height, 'Height must be > 0.');
       break;
-    }
-    case 'cone': {
-      if (e.radius <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Cone entity '${e.id}' has radius ${e.radius} ≤ 0. Radius must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      if (e.height <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Cone entity '${e.id}' has height ${e.height} ≤ 0. Height must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      break;
-    }
-    case 'torus': {
-      if (e.ringRadius <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Torus entity '${e.id}' has ringRadius ${e.ringRadius} ≤ 0. ringRadius must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      if (e.tubeRadius <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Torus entity '${e.id}' has tubeRadius ${e.tubeRadius} ≤ 0. tubeRadius must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      break;
-    }
-    case 'wedge': {
-      const [ww, wh, wd] = e.size;
-      if (ww <= 0 || wh <= 0 || wd <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Wedge entity '${e.id}' has a zero or negative size component [${ww}, ${wh}, ${wd}]. All dimensions must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      break;
-    }
-    case 'pyramid': {
-      if (e.baseWidth <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Pyramid entity '${e.id}' has baseWidth ${e.baseWidth} ≤ 0. baseWidth must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      if (e.baseDepth <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Pyramid entity '${e.id}' has baseDepth ${e.baseDepth} ≤ 0. baseDepth must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      if (e.height <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Pyramid entity '${e.id}' has height ${e.height} ≤ 0. Height must be > 0.`,
-          entityId: e.id,
-        });
-      }
-      break;
-    }
-    case 'text': {
-      if (e.height <= 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Text entity '${e.id}' has height ${e.height} ≤ 0. Height must be > 0.`,
-          entityId: e.id,
-        });
-      }
+    case 'text':
+      nonPositive('height', e.height, 'Height must be > 0.');
       if (e.content.trim().length === 0) {
-        issues.push({
-          severity: 'error',
-          code: 'degenerate_size',
-          message: `Text entity '${e.id}' has empty content. Content must be a non-empty string.`,
-          entityId: e.id,
-        });
+        issues.push(
+          errorIssue(
+            'degenerate_size',
+            `Text entity '${e.id}' has empty content. Content must be a non-empty string.`,
+            e.id,
+          ),
+        );
       }
       break;
-    }
-    // 'line', 'polyline', 'rectangle', 'point', 'spline', 'mesh' handled elsewhere or N/A
   }
 
   return issues;
@@ -265,31 +143,16 @@ function checkOpenProfile(e: Entity): Issue[] {
   return [];
 }
 
-/**
- * Insufficient points: spline with < 2 points, polyline with < 2 points.
- */
 function checkInsufficientPoints(e: Entity): Issue[] {
-  if (e.kind === 'polyline' && e.points.length < 2) {
-    return [
-      {
-        severity: 'error',
-        code: 'insufficient_points',
-        message: `Polyline entity '${e.id}' has ${e.points.length} point(s); minimum is 2.`,
-        entityId: e.id,
-      },
-    ];
-  }
-  if (e.kind === 'spline' && e.points.length < 2) {
-    return [
-      {
-        severity: 'error',
-        code: 'insufficient_points',
-        message: `Spline entity '${e.id}' has ${e.points.length} point(s); minimum is 2.`,
-        entityId: e.id,
-      },
-    ];
-  }
-  return [];
+  if ((e.kind !== 'polyline' && e.kind !== 'spline') || e.points.length >= 2) return [];
+  const label = e.kind === 'polyline' ? 'Polyline' : 'Spline';
+  return [
+    errorIssue(
+      'insufficient_points',
+      `${label} entity '${e.id}' has ${e.points.length} point(s); minimum is 2.`,
+      e.id,
+    ),
+  ];
 }
 
 /**
