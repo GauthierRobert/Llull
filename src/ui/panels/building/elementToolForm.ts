@@ -21,12 +21,12 @@ export interface ToolField {
   readonly optional?: boolean;
 }
 
-export interface ToolContext {
+interface ToolContext {
   readonly levelId: string | null;
   readonly wallIds: ReadonlyArray<string>;
 }
 
-export type ToolCommand =
+type ToolCommand =
   | { readonly ok: true; readonly command: string; readonly params: Record<string, unknown> }
   | { readonly ok: false; readonly reason: string };
 

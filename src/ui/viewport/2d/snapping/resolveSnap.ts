@@ -8,10 +8,6 @@ import type { Vec2 } from '@core/model/types';
 import type { OrthoPolarOpts, SnapPoint, SnapResult, SnapType } from './types';
 import { dist } from './geometry';
 
-// ---------------------------------------------------------------------------
-// snap
-// ---------------------------------------------------------------------------
-
 /**
  * Snap type priority order — geometric snaps beat grid.
  * Lower index = higher priority when distances are equal.
@@ -80,10 +76,6 @@ export function snap(
 
   return { x: cx, y: cy, type: null, snapped: false };
 }
-
-// ---------------------------------------------------------------------------
-// applyOrthoPolar
-// ---------------------------------------------------------------------------
 
 /**
  * Apply ortho / polar tracking to a raw cursor position relative to an origin.

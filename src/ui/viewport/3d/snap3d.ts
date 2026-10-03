@@ -25,10 +25,6 @@
 import type { Entity, CadDocument } from '@core/model/types';
 import { is3D } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
 export type Snap3DType = 'vertex' | 'edge' | 'face-center' | 'grid' | 'none';
 
 export interface SnapPoint3D {
@@ -39,7 +35,7 @@ export interface SnapPoint3D {
   readonly type: Snap3DType;
 }
 
-export interface SnapResult3D {
+interface SnapResult3D {
   /** The snapped world position. */
   readonly x: number;
   readonly y: number;
@@ -50,10 +46,6 @@ export interface SnapResult3D {
   readonly snapped: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Priority order — lower index = higher priority
-// ---------------------------------------------------------------------------
-
 const SNAP3D_PRIORITY: Record<Snap3DType, number> = {
   vertex: 0,
   edge: 1,
@@ -62,10 +54,6 @@ const SNAP3D_PRIORITY: Record<Snap3DType, number> = {
   none: 4,
 };
 
-// ---------------------------------------------------------------------------
-// Internal geometry helpers
-// ---------------------------------------------------------------------------
-
 /** Euclidean distance between two 3D points. */
 function dist3(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
   const dx = bx - ax;
@@ -73,10 +61,6 @@ function dist3(ax: number, ay: number, az: number, bx: number, by: number, bz: n
   const dz = bz - az;
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
-
-// ---------------------------------------------------------------------------
-// AABB helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Axis-aligned bounding box defined by its min/max corners.
@@ -254,10 +238,6 @@ function aabbEdgeMidpoints(bb: AABB): Array<[number, number, number]> {
   ];
 }
 
-// ---------------------------------------------------------------------------
-// Per-kind key point extraction
-// ---------------------------------------------------------------------------
-
 /**
  * Cylinder snap points: top & bottom disc centres (vertex) +
  * 8 rim points on each disc at 45° increments (vertex).
@@ -303,10 +283,6 @@ function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
     { x: px, y: py, z: pz - radius, type: 'vertex' }, // -Z
   ];
 }
-
-// ---------------------------------------------------------------------------
-// collectSnapCandidates3D
-// ---------------------------------------------------------------------------
 
 /**
  * Derive all 3D snap candidate points from solid entities in a document.
@@ -354,10 +330,6 @@ export function collectSnapCandidates3D(
 
   return candidates;
 }
-
-// ---------------------------------------------------------------------------
-// snap3d
-// ---------------------------------------------------------------------------
 
 /**
  * Find the best 3D snap for a candidate world position.

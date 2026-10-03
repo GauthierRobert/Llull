@@ -15,10 +15,6 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
 interface StatusItemProps {
   label: string;
   value: string;
@@ -65,10 +61,6 @@ function LiveIndicator(): React.ReactElement {
     </span>
   );
 }
-
-// ---------------------------------------------------------------------------
-// StatusBar
-// ---------------------------------------------------------------------------
 
 export function StatusBar(): React.ReactElement {
   const units = useStore((s) => s.document.units);

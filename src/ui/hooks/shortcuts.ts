@@ -8,7 +8,7 @@
 
 import type { DrawToolKind, GizmoMode, ViewMode } from '@ui/store';
 
-export type ShortcutAction =
+type ShortcutAction =
   | { kind: 'draw'; tool: DrawToolKind }
   | { kind: 'gizmo'; mode: GizmoMode }
   | { kind: 'view'; viewMode: ViewMode };
@@ -72,7 +72,7 @@ export function resolveShortcut(viewMode: ViewMode, key: string): ShortcutAction
   return gizmoMode === undefined ? null : { kind: 'gizmo', mode: gizmoMode };
 }
 
-export interface ShortcutGroup {
+interface ShortcutGroup {
   title: string;
   entries: ReadonlyArray<{ keys: string; action: string }>;
 }

@@ -25,10 +25,6 @@ import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
 import { useGroundPlane } from './useGroundPlane';
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface ModifyPickInteractionProps {
   activeTool: ModifyToolKind;
   phase: ModifyToolPhase;
@@ -36,10 +32,6 @@ interface ModifyPickInteractionProps {
   tolerance?: number;
   onEntityPick: (entityId: string, worldPoint: Vec2, entityPoints?: ReadonlyArray<Vec2>) => void;
 }
-
-// ---------------------------------------------------------------------------
-// ModifyPickInteraction
-// ---------------------------------------------------------------------------
 
 export function ModifyPickInteraction({
   activeTool,

@@ -17,10 +17,6 @@ import React from 'react';
 import { useStore } from '@ui/store';
 import { Icon } from './Icon';
 
-// ---------------------------------------------------------------------------
-// Typed data shapes (local — mirror the command data interfaces for narrowing)
-// ---------------------------------------------------------------------------
-
 interface DistanceData {
   distance: number;
   unit: string;
@@ -52,10 +48,6 @@ interface MassPropertiesData {
   mass: number;
   unit: string;
 }
-
-// ---------------------------------------------------------------------------
-// Type-guard helpers (narrow `unknown` data without unsafe casts)
-// ---------------------------------------------------------------------------
 
 function isDistanceData(d: unknown): d is DistanceData {
   return (
@@ -100,10 +92,6 @@ function isMassPropertiesData(d: unknown): d is MassPropertiesData {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Formatters — keep display clean
-// ---------------------------------------------------------------------------
-
 function fmt(n: number, precision = 3): string {
   return n.toFixed(precision);
 }
@@ -111,10 +99,6 @@ function fmt(n: number, precision = 3): string {
 function fmtVec3(v: readonly [number, number, number], precision = 3): string {
   return `(${fmt(v[0], precision)}, ${fmt(v[1], precision)}, ${fmt(v[2], precision)})`;
 }
-
-// ---------------------------------------------------------------------------
-// Per-command result renderers
-// ---------------------------------------------------------------------------
 
 interface RowProps {
   label: string;
@@ -187,10 +171,6 @@ function MassPropertiesResult({ data }: { data: MassPropertiesData }): React.Rea
   );
 }
 
-// ---------------------------------------------------------------------------
-// Title per command
-// ---------------------------------------------------------------------------
-
 const COMMAND_TITLES: Record<string, string> = {
   measure_distance: 'Distance',
   measure_angle: 'Angle',
@@ -200,10 +180,6 @@ const COMMAND_TITLES: Record<string, string> = {
   measure_volume: 'Volume',
   mass_properties: 'Mass Properties',
 };
-
-// ---------------------------------------------------------------------------
-// MeasurementHUD — the exported component
-// ---------------------------------------------------------------------------
 
 export function MeasurementHUD(): React.ReactElement | null {
   const lastMeasure = useStore((s) => s.lastMeasure);

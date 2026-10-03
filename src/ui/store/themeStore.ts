@@ -34,7 +34,7 @@ function persistTheme(theme: Theme): void {
   }
 }
 
-export interface ThemeStoreState {
+interface ThemeStoreState {
   /** Active color theme. */
   theme: Theme;
   /** Toggle between 'dark' and 'light'. */

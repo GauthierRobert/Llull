@@ -15,10 +15,6 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { SERVER_BASE } from '@ui/serverConfig';
 import { Icon } from '@ui/components/Icon';
 
-// ---------------------------------------------------------------------------
-// Static constants (no registry import — pure UI)
-// ---------------------------------------------------------------------------
-
 const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server run dev';
 const SERVER_START_CMD = 'npm --prefix server run dev';
 const ENDPOINT_URL = `${SERVER_BASE}/mcp`;
@@ -71,10 +67,6 @@ const AGENT_LOOP_STEPS: readonly AgentLoopStep[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Return every focusable element inside a container, in DOM order. */
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(
@@ -83,10 +75,6 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
     ),
   ).filter((el) => !el.hasAttribute('hidden'));
 }
-
-// ---------------------------------------------------------------------------
-// CopyButton
-// ---------------------------------------------------------------------------
 
 interface CopyButtonProps {
   readonly text: string;
@@ -116,10 +104,6 @@ function CopyButton({ text, label }: CopyButtonProps): React.ReactElement {
   );
 }
 
-// ---------------------------------------------------------------------------
-// McpAgentLoop — the recommended reliable-modeling loop as ordered steps
-// ---------------------------------------------------------------------------
-
 function McpAgentLoop(): React.ReactElement {
   return (
     <section className="mcp-connect__section" aria-label="Recommended agent loop">
@@ -142,11 +126,7 @@ function McpAgentLoop(): React.ReactElement {
   );
 }
 
-// ---------------------------------------------------------------------------
-// McpConnect modal
-// ---------------------------------------------------------------------------
-
-export interface McpConnectProps {
+interface McpConnectProps {
   /** Called when the dialog requests close (Esc, backdrop click, close button). */
   readonly onClose: () => void;
 }
@@ -296,10 +276,6 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// McpConnectButton — launcher for the TopBar
-// ---------------------------------------------------------------------------
 
 export function McpConnectButton(): React.ReactElement {
   const [open, setOpen] = useState(false);

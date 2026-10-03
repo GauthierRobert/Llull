@@ -23,19 +23,11 @@
  *   viewport width, producing ~8–25 lines across the view at any zoom.
  */
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 /** Target minimum fraction of the viewport width a major cell should span. */
 const MIN_STEP_FRACTION = 0.04; // ~8 major lines across a 100 % view
 
 /** Nice step candidates per decade (the "1-2-5 sequence"). */
 const NICE_STEPS = [1, 2, 5] as const;
-
-// ---------------------------------------------------------------------------
-// Core 1-2-5 step picker
-// ---------------------------------------------------------------------------
 
 /**
  * Snap a raw (non-round) world length up to the nearest value in the
@@ -61,10 +53,6 @@ export function snapToNiceStep(raw: number): number {
   // 5 × decade < raw → step up to 10 × decade (= 1 × 10^(exp+1))
   return 10 * decade;
 }
-
-// ---------------------------------------------------------------------------
-// Adaptive grid step for the 3D perspective viewport
-// ---------------------------------------------------------------------------
 
 /**
  * Compute the adaptive major grid cell size (in world units) for the 3D
@@ -100,10 +88,6 @@ export function adaptiveGridStep3D(distance: number, fovDeg = 45): number {
   return snapToNiceStep(idealStep);
 }
 
-// ---------------------------------------------------------------------------
-// Grid fade distance
-// ---------------------------------------------------------------------------
-
 /**
  * Compute a sensible fade distance for drei's <Grid> so minor lines fade
  * smoothly before they become sub-pixel noise at the current zoom level.
@@ -118,10 +102,6 @@ export function gridFadeDistance3D(distance: number): number {
   if (distance <= 0) return 100;
   return Math.max(distance * 6, 50);
 }
-
-// ---------------------------------------------------------------------------
-// Scale-bar world length
-// ---------------------------------------------------------------------------
 
 /**
  * Choose a "nice" real-world length for the 3D scale-bar overlay.

@@ -75,7 +75,7 @@ function persistLayout(layout: PersistedLayout): void {
   }
 }
 
-export interface LayoutStoreState extends PersistedLayout {
+interface LayoutStoreState extends PersistedLayout {
   /** Open `tab`; selecting the already-open tab collapses the sidebar. */
   selectSidebarTab(tab: SidebarTab): void;
   toggleSidebar(): void;

@@ -26,10 +26,6 @@ import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import type { QualityTier, QualityOverride } from '@ui/store';
 
-// ---------------------------------------------------------------------------
-// Pure tier derivation — unit-tested in tests/unit/useRenderQuality.test.ts
-// ---------------------------------------------------------------------------
-
 /** Thresholds that map entity count to a quality tier (auto mode). */
 const HIGH_THRESHOLD = 50;
 const MEDIUM_THRESHOLD = 200;
@@ -59,12 +55,8 @@ export function resolveQualityTier(override: QualityOverride, entityCount: numbe
   return deriveQualityTier(entityCount);
 }
 
-// ---------------------------------------------------------------------------
-// Per-tier render settings
-// ---------------------------------------------------------------------------
-
 /** Render settings derived from a quality tier. */
-export interface RenderQualitySettings {
+interface RenderQualitySettings {
   /** Active quality tier (resolved from override + entity count). */
   tier: QualityTier;
   /** PCSS sample count for <SoftShadows>; 0 means SoftShadows is disabled. */

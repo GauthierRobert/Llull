@@ -31,10 +31,6 @@ import { useStore, useViewportStore } from '@ui/store';
 import type { Entity, Vec3 } from '@core/model/types';
 import { evaluateAnimationScalar } from './animationMath';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Normalise a Vec3 direction. Returns a zero vector if the input is near-zero. */
 function normalise(v: Vec3): THREE.Vector3 {
   const vec = new THREE.Vector3(v[0], v[1], v[2]);
@@ -57,10 +53,6 @@ function centroid(positions: Vec3[]): Vec3 {
   const n = positions.length;
   return [x / n, y / n, z / n];
 }
-
-// ---------------------------------------------------------------------------
-// AnimationPlayer
-// ---------------------------------------------------------------------------
 
 /** Mounted inside the Canvas; renders null. Drives transforms per-frame via useFrame. */
 export function AnimationPlayer(): null {

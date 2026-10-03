@@ -9,7 +9,7 @@
 import { useThemeStore } from '@ui/store';
 import type { Theme } from '@ui/store';
 
-export interface ViewportPalette {
+interface ViewportPalette {
   /** WebGL clear color behind the scene. */
   background: string;
   /** 3D ground grid — fine cells / major sections. */

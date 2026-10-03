@@ -17,10 +17,6 @@ import { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
 
-// ---------------------------------------------------------------------------
-// RectLines2D — XY rectangle rendered as a LineLoop on Z=0.1 (above entities)
-// ---------------------------------------------------------------------------
-
 interface RectLines2DProps {
   min: readonly [number, number, number];
   max: readonly [number, number, number];
@@ -59,10 +55,6 @@ function RectLines2D({ min, max }: RectLines2DProps): React.ReactElement | null 
   // lineLoop closes the last→first segment automatically.
   return <lineLoop geometry={geometry} material={material} renderOrder={999} />;
 }
-
-// ---------------------------------------------------------------------------
-// MeasureBBoxRect2D — exported; mounts inside the floating-origin group
-// ---------------------------------------------------------------------------
 
 export function MeasureBBoxRect2D(): React.ReactElement | null {
   const bbox = useBoundingBoxMeasure();

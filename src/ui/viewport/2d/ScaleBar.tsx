@@ -16,20 +16,12 @@ import type { CadDocument } from '@core/model/types';
 import { formatLength } from '@core/commands/units';
 import { scaleBarLength } from './gridHelpers';
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface ScaleBarProps {
   /** OrthographicCamera.zoom value (pixels per world unit). */
   zoom: number;
   /** The live CAD document — used for units + displayPrecision. */
   document: CadDocument;
 }
-
-// ---------------------------------------------------------------------------
-// ScaleBar
-// ---------------------------------------------------------------------------
 
 /**
  * Renders as an absolutely-positioned HTML element.

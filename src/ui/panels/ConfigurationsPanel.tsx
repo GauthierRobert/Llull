@@ -12,15 +12,11 @@
  * (PRIME DIRECTIVE, architecture L1, react R1)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { Configuration } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
-import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
-
-// ---------------------------------------------------------------------------
-// ConfigurationRow — one row per existing configuration
-// ---------------------------------------------------------------------------
+import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface ConfigurationRowProps {
   config: Configuration;
@@ -29,10 +25,6 @@ interface ConfigurationRowProps {
 function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const paramEntries = Object.entries(config.parameterValues);
-
-  const handleActivate = useCallback(() => {
-    dispatch('activate_configuration', { name: config.name });
-  }, [dispatch, config.name]);
 
   return (
     <li
@@ -47,7 +39,7 @@ function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement
         <button
           type="button"
           className="btn btn--ghost btn--sm"
-          onClick={handleActivate}
+          onClick={() => dispatch('activate_configuration', { name: config.name })}
           aria-label={`Activate configuration ${config.name}`}
           title={`Apply "${config.name}" to the document`}
         >
@@ -79,10 +71,6 @@ function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// ParameterValueRow — one row in the "create" form for a parameter→expression pair
-// ---------------------------------------------------------------------------
 
 interface ParameterValueRowProps {
   index: number;
@@ -127,23 +115,18 @@ function ParameterValueRow({
         autoComplete="off"
       />
       {canRemove && (
-        <button
-          type="button"
-          className="icon-btn config-pv-remove-btn"
+        <IconButton
+          icon="close"
+          className="config-pv-remove-btn"
+          size={12}
           onClick={() => onRemove(index)}
-          aria-label={`Remove parameter row ${index + 1}`}
+          label={`Remove parameter row ${index + 1}`}
           title="Remove this parameter row"
-        >
-          <Icon name="close" size={12} />
-        </button>
+        />
       )}
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// CreateConfigurationForm — inline form to define a new configuration
-// ---------------------------------------------------------------------------
 
 interface PvEntry {
   paramName: string;
@@ -155,55 +138,34 @@ function CreateConfigurationForm(): React.ReactElement {
   const [configName, setConfigName] = useState('');
   const [pvRows, setPvRows] = useState<PvEntry[]>([{ paramName: '', expression: '' }]);
 
-  const handleParamNameChange = useCallback((index: number, value: string) => {
-    setPvRows((prev) => prev.map((row, i) => (i === index ? { ...row, paramName: value } : row)));
-  }, []);
-
-  const handleExpressionChange = useCallback((index: number, value: string) => {
-    setPvRows((prev) => prev.map((row, i) => (i === index ? { ...row, expression: value } : row)));
-  }, []);
-
-  const handleAddRow = useCallback(() => {
+  const updateRow = (index: number, patch: Partial<PvEntry>): void =>
+    setPvRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  const handleParamNameChange = (index: number, value: string): void =>
+    updateRow(index, { paramName: value });
+  const handleExpressionChange = (index: number, value: string): void =>
+    updateRow(index, { expression: value });
+  const handleAddRow = (): void =>
     setPvRows((prev) => [...prev, { paramName: '', expression: '' }]);
-  }, []);
-
-  const handleRemoveRow = useCallback((index: number) => {
+  const handleRemoveRow = (index: number): void =>
     setPvRows((prev) => prev.filter((_, i) => i !== index));
-  }, []);
 
-  const isSubmittable = useCallback((): boolean => {
-    const trimName = configName.trim();
-    if (trimName === '') return false;
-    // Every row must have both a param name and expression, or be fully empty.
-    // At least one non-empty row must exist.
-    const nonEmptyRows = pvRows.filter(
-      (r) => r.paramName.trim() !== '' || r.expression.trim() !== '',
-    );
-    if (nonEmptyRows.length === 0) return false;
-    return nonEmptyRows.every((r) => r.paramName.trim() !== '' && r.expression.trim() !== '');
-  }, [configName, pvRows]);
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!isSubmittable()) return;
-
-      const trimmedName = configName.trim();
-      const parameterValues: Record<string, string> = {};
-      for (const row of pvRows) {
-        const k = row.paramName.trim();
-        const v = row.expression.trim();
-        if (k !== '' && v !== '') {
-          parameterValues[k] = v;
-        }
-      }
-
-      dispatch('create_configuration', { name: trimmedName, parameterValues });
-      setConfigName('');
-      setPvRows([{ paramName: '', expression: '' }]);
-    },
-    [dispatch, configName, pvRows, isSubmittable],
+  const nonEmptyRows = pvRows.filter(
+    (r) => r.paramName.trim() !== '' || r.expression.trim() !== '',
   );
+  const isSubmittable =
+    configName.trim() !== '' &&
+    nonEmptyRows.length > 0 &&
+    nonEmptyRows.every((r) => r.paramName.trim() !== '' && r.expression.trim() !== '');
+
+  const handleSubmit = (e: React.FormEvent): void => {
+    e.preventDefault();
+    if (!isSubmittable) return;
+    const parameterValues: Record<string, string> = {};
+    for (const row of nonEmptyRows) parameterValues[row.paramName.trim()] = row.expression.trim();
+    dispatch('create_configuration', { name: configName.trim(), parameterValues });
+    setConfigName('');
+    setPvRows([{ paramName: '', expression: '' }]);
+  };
 
   return (
     <form
@@ -262,7 +224,7 @@ function CreateConfigurationForm(): React.ReactElement {
       <button
         type="submit"
         className="btn btn--primary btn--block"
-        disabled={!isSubmittable()}
+        disabled={!isSubmittable}
         aria-label="Create configuration"
         title="Create configuration"
       >
@@ -272,11 +234,7 @@ function CreateConfigurationForm(): React.ReactElement {
   );
 }
 
-// ---------------------------------------------------------------------------
-// ConfigurationsPanel
-// ---------------------------------------------------------------------------
-
-export interface ConfigurationsPanelProps {
+interface ConfigurationsPanelProps {
   className?: string;
 }
 

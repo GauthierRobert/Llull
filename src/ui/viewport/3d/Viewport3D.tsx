@@ -42,10 +42,6 @@ import { MechanismOverlay } from './MechanismOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator } from '../StoreInvalidator';
 
-// ---------------------------------------------------------------------------
-// ViewportStoreInvalidator — calls r3f invalidate() when viewport render state changes
-// ---------------------------------------------------------------------------
-
 /**
  * Subscribes to the viewport store (displayMode, clipPlane, hiddenEntityIds)
  * and calls r3f invalidate() on any change so the Canvas repaints under
@@ -79,10 +75,6 @@ function ViewportStoreInvalidator(): null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Camera initializer
-// ---------------------------------------------------------------------------
-
 /** drei Grid/ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
 const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
 
@@ -107,10 +99,6 @@ function sphericalToCartesian(
     target[2] + distance * Math.cos(polar),
   ];
 }
-
-// ---------------------------------------------------------------------------
-// CameraReactor — syncs document.camera changes to the live three.js camera
-// ---------------------------------------------------------------------------
 
 /**
  * Reacts to `document.camera` changes written by commands (`set_camera`, `fit_view`)
@@ -158,10 +146,6 @@ function CameraReactor(): null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// AdaptiveClipping — near/far planes that follow the orbit distance
-// ---------------------------------------------------------------------------
-
 /**
  * Keeps depth precision usable from millimetre parts to building-scale models (1e4–1e5 units in
  * mm): near/far track the camera→target distance at a fixed 1:4e6 ratio. Updates the projection
@@ -183,10 +167,6 @@ function AdaptiveClipping(): null {
   });
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Scene contents (inside Canvas)
-// ---------------------------------------------------------------------------
 
 interface SceneContentsProps {
   /** When false, OrbitControls is disabled (gizmo drag in progress). */
@@ -392,10 +372,6 @@ function SceneContents({
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Viewport3D — the exported component
-// ---------------------------------------------------------------------------
 
 export function Viewport3D(): React.ReactElement {
   const clearSelection = useStore((s) => s.clearSelection);

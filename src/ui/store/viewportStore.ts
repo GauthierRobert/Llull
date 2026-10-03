@@ -20,10 +20,6 @@
 import { create } from 'zustand';
 import type { EntityId } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /** How all solid surfaces are rendered in the 3D viewport. */
 export type DisplayMode = 'shaded' | 'wireframe' | 'xray';
 
@@ -45,7 +41,7 @@ export type QualityOverride = QualityTier | 'auto';
 export type ClipAxis = 'x' | 'y' | 'z';
 
 /** Section-plane state — all fields are render-only. */
-export interface ClipPlaneState {
+interface ClipPlaneState {
   /** Whether the clipping plane is active. */
   enabled: boolean;
   /** Axis the plane is normal to. Default: 'z' (horizontal cut, Z-up). */
@@ -59,20 +55,16 @@ export interface ClipPlaneState {
   flipped: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Store state
-// ---------------------------------------------------------------------------
-
 /** Identifies a selected mechanism item for overlay rendering. */
 type MechanismSelectionKind = 'constraint' | 'joint';
 
 /** Currently highlighted constraint or joint in the MechanismsPanel. */
-export interface MechanismSelection {
+interface MechanismSelection {
   kind: MechanismSelectionKind;
   id: string;
 }
 
-export interface ViewportStoreState {
+interface ViewportStoreState {
   /** Active render style for all 3D solid entities. Default: 'shaded'. */
   displayMode: DisplayMode;
 
@@ -195,20 +187,12 @@ export interface ViewportStoreState {
   setMechanismSelection(selection: MechanismSelection | null): void;
 }
 
-// ---------------------------------------------------------------------------
-// Defaults
-// ---------------------------------------------------------------------------
-
 const DEFAULT_CLIP_PLANE: ClipPlaneState = {
   enabled: false,
   axis: 'z',
   offset: 0,
   flipped: false,
 };
-
-// ---------------------------------------------------------------------------
-// Store
-// ---------------------------------------------------------------------------
 
 export const useViewportStore = create<ViewportStoreState>()((set) => ({
   displayMode: 'shaded',

@@ -10,10 +10,6 @@
 import * as THREE from 'three';
 import type { Animation } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
-// Scalar evaluation
-// ---------------------------------------------------------------------------
-
 /**
  * Given an animation definition and the current accumulated phase (seconds),
  * return the scalar value for this frame.
@@ -38,10 +34,6 @@ export function evaluateAnimationScalar(
   return anim.amplitude * Math.sin(2 * Math.PI * anim.frequency * phase);
 }
 
-// ---------------------------------------------------------------------------
-// Pivot rotation
-// ---------------------------------------------------------------------------
-
 /**
  * Rotate `point` by `angle` radians about `axis` around `pivot`.
  *
@@ -65,20 +57,16 @@ export function rotatePointAboutPivot(
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// Composed pose
-// ---------------------------------------------------------------------------
-
 /** A position expressed as a plain triple (avoids THREE import at call sites). */
-export type PositionTuple = [number, number, number];
+type PositionTuple = [number, number, number];
 
 /** A quaternion expressed as [x, y, z, w]. */
-export type QuaternionTuple = [number, number, number, number];
+type QuaternionTuple = [number, number, number, number];
 
 /**
  * One animation contribution that may be composed onto an existing pose.
  */
-export interface AnimationContribution {
+interface AnimationContribution {
   /** 'rotation' applies an axis-angle on top of the current quaternion and
    *  also rotates the position around `pivot`. */
   channel: 'rotation' | 'position';

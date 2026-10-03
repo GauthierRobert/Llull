@@ -15,10 +15,6 @@
 
 import type { Entity, EntityId, Material } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /** Entity kinds that support InstancedMesh rendering in v1. */
 type BatchableKind = 'box' | 'cylinder' | 'sphere';
 
@@ -48,10 +44,6 @@ export interface InstanceBatch {
     roughness: number;
   };
 }
-
-// ---------------------------------------------------------------------------
-// Geometry key extraction (pure)
-// ---------------------------------------------------------------------------
 
 /**
  * Returns a stable string key encoding the geometry + color + layer of an
@@ -93,10 +85,6 @@ export function entityRenderKey(entity: Entity): string | null {
 export function isBatchable(entity: Entity): boolean {
   return entityRenderKey(entity) !== null;
 }
-
-// ---------------------------------------------------------------------------
-// Grouping (pure)
-// ---------------------------------------------------------------------------
 
 /**
  * Groups a flat array of visible entities into InstancedMesh batches.
@@ -161,10 +149,6 @@ export function groupEntitiesForInstancing(
 
   return map;
 }
-
-// ---------------------------------------------------------------------------
-// Instance index lookup (pure)
-// ---------------------------------------------------------------------------
 
 /**
  * Given a batch and an instanceId (from InstancedMesh.raycast), returns the

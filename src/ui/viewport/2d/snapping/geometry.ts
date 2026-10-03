@@ -95,10 +95,6 @@ export function entityToSegments(entity: Entity): Array<[number, number, number,
   }
 }
 
-// ---------------------------------------------------------------------------
-// Advanced snap pure functions
-// ---------------------------------------------------------------------------
-
 /**
  * Compute the foot of the perpendicular from point P to the infinite line
  * through (ax,ay)→(bx,by). Returns null when the segment has zero length.
