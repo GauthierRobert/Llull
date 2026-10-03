@@ -6,6 +6,7 @@ import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, OpeningElement, WallElement } from '@core/model/building';
 import { fromMm, toMetres } from './model';
 import { openingsOf, pointAlong, wallExtent, wallFrame } from './wallGeometry';
+import { stairPoint } from './stairGeometry';
 import { layerBoundaries } from './wallLayers';
 import {
   DIMENSION_LAYER,
@@ -238,13 +239,8 @@ export function stairPrimitives(
   doc: PlanSource,
   stair: Extract<BuildingModel['elements'][string], { category: 'stair' }>,
 ): PlanPrimitive[] {
-  const direction: Vec2 = [Math.cos(stair.angle), Math.sin(stair.angle)];
-  const normal: Vec2 = [-direction[1], direction[0]];
   const half = stair.width / 2;
-  const at = (along: number, across: number): Vec2 => [
-    stair.start[0] + direction[0] * along + normal[0] * across,
-    stair.start[1] + direction[1] * along + normal[1] * across,
-  ];
+  const at = (along: number, across: number): Vec2 => stairPoint(stair, along, across);
   const run = stair.riserCount * stair.treadDepth;
   const layer = layerName('stair');
   const primitives: PlanPrimitive[] = [
