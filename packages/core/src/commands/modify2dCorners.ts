@@ -4,6 +4,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { cross2, dot2, len2, normalize2 } from './modify2dGeometry';
 import { withEntity } from './entityOps';
+import { noOp } from './commandResult';
 
 type CornerResolution =
   | {
@@ -102,32 +103,23 @@ export const fillet2D = defineCommand({
   run: (doc, { id, radius, vertexIndex }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return { document: doc, summary: `fillet_2d: entity ${id} not found.`, affected: [] };
+      return noOp(doc, `fillet_2d: entity ${id} not found.`);
     }
     if (entity.kind !== 'polyline') {
-      return {
-        document: doc,
-        summary: `fillet_2d: entity ${id} is kind '${entity.kind}', expected 'polyline'.`,
-        affected: [],
-      };
+      return noOp(doc, `fillet_2d: entity ${id} is kind '${entity.kind}', expected 'polyline'.`);
     }
     if (radius <= 0) {
-      return {
-        document: doc,
-        summary: `fillet_2d: radius must be > 0 (got ${radius}).`,
-        affected: [],
-      };
+      return noOp(doc, `fillet_2d: radius must be > 0 (got ${radius}).`);
     }
 
     const poly = entity as PolylineEntity;
     const n = poly.points.length;
 
     if (n < 3) {
-      return {
-        document: doc,
-        summary: `fillet_2d: polyline ${id} needs at least 3 points to fillet a corner (got ${n}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `fillet_2d: polyline ${id} needs at least 3 points to fillet a corner (got ${n}).`,
+      );
     }
 
     const corner = resolveCorner(doc, 'fillet_2d', poly, vertexIndex);
@@ -144,21 +136,16 @@ export const fillet2D = defineCommand({
 
     if (halfAngle < 1e-9 || Math.abs(halfAngle - Math.PI / 2) < 1e-9) {
       // Lines are collinear or form a 180° angle — no fillet needed / not possible
-      return {
-        document: doc,
-        summary: `fillet_2d: segments at vertex ${vertexIndex} are collinear — no fillet possible.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `fillet_2d: segments at vertex ${vertexIndex} are collinear — no fillet possible.`,
+      );
     }
 
     // Distance from vertex to tangent points = radius / tan(halfAngle)
     const tanHalf = Math.tan(halfAngle);
     if (!isFinite(tanHalf) || tanHalf < 1e-12) {
-      return {
-        document: doc,
-        summary: `fillet_2d: degenerate angle at vertex ${vertexIndex}.`,
-        affected: [],
-      };
+      return noOp(doc, `fillet_2d: degenerate angle at vertex ${vertexIndex}.`);
     }
     const tangentDist = radius / tanHalf;
 
@@ -323,32 +310,23 @@ export const chamfer2D = defineCommand({
   run: (doc, { id, distance, vertexIndex }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return { document: doc, summary: `chamfer_2d: entity ${id} not found.`, affected: [] };
+      return noOp(doc, `chamfer_2d: entity ${id} not found.`);
     }
     if (entity.kind !== 'polyline') {
-      return {
-        document: doc,
-        summary: `chamfer_2d: entity ${id} is kind '${entity.kind}', expected 'polyline'.`,
-        affected: [],
-      };
+      return noOp(doc, `chamfer_2d: entity ${id} is kind '${entity.kind}', expected 'polyline'.`);
     }
     if (distance <= 0) {
-      return {
-        document: doc,
-        summary: `chamfer_2d: distance must be > 0 (got ${distance}).`,
-        affected: [],
-      };
+      return noOp(doc, `chamfer_2d: distance must be > 0 (got ${distance}).`);
     }
 
     const poly = entity as PolylineEntity;
     const n = poly.points.length;
 
     if (n < 3) {
-      return {
-        document: doc,
-        summary: `chamfer_2d: polyline ${id} needs at least 3 points to chamfer a corner (got ${n}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `chamfer_2d: polyline ${id} needs at least 3 points to chamfer a corner (got ${n}).`,
+      );
     }
 
     const corner = resolveCorner(doc, 'chamfer_2d', poly, vertexIndex);

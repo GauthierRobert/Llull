@@ -12,6 +12,7 @@ import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { cross3, dot3, normalize3 } from '../lib/vec3';
 import { withEntity } from './entityOps';
+import { noOp } from './commandResult';
 
 /**
  * Convert a unit-axis / angle rotation (Rodrigues) to an intrinsic XYZ Euler triple
@@ -147,29 +148,17 @@ export const makeTubeBetween = defineCommand({
       p1.length < 3 ||
       p1.some((v) => typeof v !== 'number' || !isFinite(v))
     ) {
-      return {
-        document: doc,
-        summary: 'make_tube_between failed: p1 must be a numeric [x, y, z] array.',
-        affected: [],
-      };
+      return noOp(doc, 'make_tube_between failed: p1 must be a numeric [x, y, z] array.');
     }
     if (
       !Array.isArray(p2) ||
       p2.length < 3 ||
       p2.some((v) => typeof v !== 'number' || !isFinite(v))
     ) {
-      return {
-        document: doc,
-        summary: 'make_tube_between failed: p2 must be a numeric [x, y, z] array.',
-        affected: [],
-      };
+      return noOp(doc, 'make_tube_between failed: p2 must be a numeric [x, y, z] array.');
     }
     if (typeof radius !== 'number' || !isFinite(radius) || radius <= 0) {
-      return {
-        document: doc,
-        summary: `make_tube_between failed: radius must be > 0, got ${radius}.`,
-        affected: [],
-      };
+      return noOp(doc, `make_tube_between failed: radius must be > 0, got ${radius}.`);
     }
 
     // --- Compute direction and length ---
@@ -179,11 +168,10 @@ export const makeTubeBetween = defineCommand({
     const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
     if (length < 1e-9) {
-      return {
-        document: doc,
-        summary: `make_tube_between failed: p1 and p2 are the same point (distance ${length.toFixed(9)} < 1e-9).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `make_tube_between failed: p1 and p2 are the same point (distance ${length.toFixed(9)} < 1e-9).`,
+      );
     }
 
     // --- Solve orientation ---

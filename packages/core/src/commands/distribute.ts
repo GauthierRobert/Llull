@@ -33,6 +33,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
 import { rotatePoint2 } from '../lib/polygon';
 import { MAX_COPIES_PER_COMMAND } from './limits';
+import { noOp } from './commandResult';
 
 function vec2Add(a: Vec2, b: Vec2): Vec2 {
   return [a[0] + b[0], a[1] + b[1]];
@@ -233,39 +234,32 @@ export const distributeAlongPath = defineCommand({
     // --- Validate path entity ---
     const pathEntity = doc.entities[pathId];
     if (!pathEntity) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: path entity "${pathId}" not found.`,
-        affected: [],
-      };
+      return noOp(doc, `distribute_along_path: path entity "${pathId}" not found.`);
     }
     if (pathEntity.kind !== 'polyline' && pathEntity.kind !== 'spline') {
-      return {
-        document: doc,
-        summary: `distribute_along_path: entity "${pathId}" has kind "${pathEntity.kind}"; must be "polyline" or "spline".`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `distribute_along_path: entity "${pathId}" has kind "${pathEntity.kind}"; must be "polyline" or "spline".`,
+      );
     }
 
     const pathPoints = pathEntity.points as ReadonlyArray<Vec2>;
     const pathClosed: boolean = pathEntity.closed;
 
     if (!Array.isArray(pathPoints) || pathPoints.length < 2) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: path "${pathId}" has fewer than 2 points (got ${Array.isArray(pathPoints) ? pathPoints.length : 0}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `distribute_along_path: path "${pathId}" has fewer than 2 points (got ${Array.isArray(pathPoints) ? pathPoints.length : 0}).`,
+      );
     }
 
     // --- Validate component ---
     const component = doc.components[componentId];
     if (!component) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: component "${componentId}" not found in doc.components.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `distribute_along_path: component "${componentId}" not found in doc.components.`,
+      );
     }
 
     // --- Validate count ---
@@ -275,38 +269,31 @@ export const distributeAlongPath = defineCommand({
       !Number.isInteger(count) ||
       count > MAX_COPIES_PER_COMMAND
     ) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
+      );
     }
 
     // --- Validate offsets ---
     if (!Number.isFinite(startOffset) || startOffset < 0) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: startOffset must be a finite non-negative number (got ${startOffset}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `distribute_along_path: startOffset must be a finite non-negative number (got ${startOffset}).`,
+      );
     }
     if (!Number.isFinite(endOffset) || endOffset < 0) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: endOffset must be a finite non-negative number (got ${endOffset}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `distribute_along_path: endOffset must be a finite non-negative number (got ${endOffset}).`,
+      );
     }
 
     // --- Compute arc length ---
     const totalLength = totalArcLength(pathPoints, pathClosed);
 
     if (!Number.isFinite(totalLength) || totalLength < 1e-12) {
-      return {
-        document: doc,
-        summary: `distribute_along_path: path "${pathId}" has zero or degenerate length.`,
-        affected: [],
-      };
+      return noOp(doc, `distribute_along_path: path "${pathId}" has zero or degenerate length.`);
     }
 
     // --- Compute placement arc-length positions ---

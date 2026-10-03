@@ -18,6 +18,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { runSolver } from './constraintSolver';
+import { noOp } from './commandResult';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
   'coincident',
@@ -141,21 +142,16 @@ export const addConstraint = defineCommand({
   run: (doc, { constraint, id }): CommandResult => {
     const err = validateConstraintShape(constraint);
     if (err !== null) {
-      return {
-        document: doc,
-        summary: `add_constraint failed: ${err}.`,
-        affected: [],
-      };
+      return noOp(doc, `add_constraint failed: ${err}.`);
     }
 
     const constraintId = typeof id === 'string' && id.length > 0 ? id : nextId('con');
 
     if (constraintId in doc.constraints) {
-      return {
-        document: doc,
-        summary: `add_constraint: constraint id '${constraintId}' already exists — no change made.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_constraint: constraint id '${constraintId}' already exists — no change made.`,
+      );
     }
 
     // Build the typed Constraint. validateConstraintShape already confirmed the shape.
@@ -200,11 +196,10 @@ export const deleteConstraint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (!(id in doc.constraints)) {
-      return {
-        document: doc,
-        summary: `delete_constraint: constraint '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `delete_constraint: constraint '${String(id)}' does not exist — no change made.`,
+      );
     }
 
     const constraint = doc.constraints[id]!;
@@ -217,11 +212,7 @@ export const deleteConstraint = defineCommand({
       constraintOrder: doc.constraintOrder.filter((cid) => cid !== id),
     };
 
-    return {
-      document: newDoc,
-      summary: `delete_constraint: removed '${constraint.kind}' constraint '${id}'.`,
-      affected: [],
-    };
+    return noOp(newDoc, `delete_constraint: removed '${constraint.kind}' constraint '${id}'.`);
   },
 });
 
@@ -278,11 +269,10 @@ export const updateConstraint = defineCommand({
   }),
   run: (doc, { id, patch }): CommandResult => {
     if (!(id in doc.constraints)) {
-      return {
-        document: doc,
-        summary: `update_constraint: constraint '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `update_constraint: constraint '${String(id)}' does not exist — no change made.`,
+      );
     }
 
     const existing = doc.constraints[id]!;
@@ -290,40 +280,30 @@ export const updateConstraint = defineCommand({
 
     if ('a' in patch && patch.a !== undefined) {
       if (!isEntityRef(patch.a)) {
-        return {
-          document: doc,
-          summary: `update_constraint: patch.a is not a valid EntityRef — no change made.`,
-          affected: [],
-        };
+        return noOp(doc, `update_constraint: patch.a is not a valid EntityRef — no change made.`);
       }
       (updates as Record<string, unknown>)['a'] = patch.a;
     }
 
     if ('b' in patch && patch.b !== undefined) {
       if (!isEntityRef(patch.b)) {
-        return {
-          document: doc,
-          summary: `update_constraint: patch.b is not a valid EntityRef — no change made.`,
-          affected: [],
-        };
+        return noOp(doc, `update_constraint: patch.b is not a valid EntityRef — no change made.`);
       }
       (updates as Record<string, unknown>)['b'] = patch.b;
     }
 
     if ('value' in patch && patch.value !== undefined) {
       if (existing.kind !== 'distance' && existing.kind !== 'angle') {
-        return {
-          document: doc,
-          summary: `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`,
+        );
       }
       if (!isValidValue(patch.value)) {
-        return {
-          document: doc,
-          summary: `update_constraint: patch.value must be a number or string — no change made.`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `update_constraint: patch.value must be a number or string — no change made.`,
+        );
       }
       (updates as Record<string, unknown>)['value'] = patch.value;
     }

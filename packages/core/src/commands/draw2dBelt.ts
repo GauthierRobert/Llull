@@ -8,6 +8,7 @@ import { MAX_CURVE_SAMPLES } from './limits';
 import { DEFAULT_DRAW_COLOR, fmtN, workPlanePositionField } from './draw2dShared';
 import { withEntity } from './entityOps';
 import { pointsExtent } from './sceneBounds';
+import { noOp } from './commandResult';
 
 /** One pulley/sprocket specification: center in local 2D frame + radius. */
 interface PulleySpec {
@@ -145,20 +146,15 @@ export const drawBeltAround = defineCommand({
     // --- Validate pulleys array ---
     const pulleys = pulleyInput as unknown as PulleySpec[];
     if (pulleys.length < 2) {
-      return {
-        document: doc,
-        summary: `draw_belt_around: requires at least 2 pulleys (got ${pulleys.length}).`,
-        affected: [],
-      };
+      return noOp(doc, `draw_belt_around: requires at least 2 pulleys (got ${pulleys.length}).`);
     }
 
     // --- Validate arcSamples ---
     if (!Number.isFinite(arcSamples) || arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
-      return {
-        document: doc,
-        summary: `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
+      );
     }
     const samplesInt = Math.round(arcSamples);
 
@@ -166,26 +162,20 @@ export const drawBeltAround = defineCommand({
     for (let i = 0; i < pulleys.length; i++) {
       const p = pulleys[i]!;
       if (!p || !Array.isArray(p.center) || p.center.length < 2) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulley[${i}] center must be a [x, y] array.`,
-          affected: [],
-        };
+        return noOp(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
       }
       const [cx, cy] = p.center;
       if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulley[${i}] center contains non-finite coordinate (${cx}, ${cy}).`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `draw_belt_around: pulley[${i}] center contains non-finite coordinate (${cx}, ${cy}).`,
+        );
       }
       if (!Number.isFinite(p.radius) || p.radius <= 0) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulley[${i}] radius must be a finite positive number (got ${String(p.radius)}).`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `draw_belt_around: pulley[${i}] radius must be a finite positive number (got ${String(p.radius)}).`,
+        );
       }
     }
 
@@ -199,18 +189,16 @@ export const drawBeltAround = defineCommand({
       const dy = p2.center[1]! - p1.center[1]!;
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d === 0) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`,
+        );
       }
       if (d < Math.abs(p1.radius - p2.radius)) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${fmtN(d)} < |r1−r2|=${fmtN(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${fmtN(d)} < |r1−r2|=${fmtN(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
+        );
       }
     }
 
@@ -236,11 +224,10 @@ export const drawBeltAround = defineCommand({
       );
       if (result === null) {
         // Shouldn't happen since we checked above, but guard for safety
-        return {
-          document: doc,
-          summary: `draw_belt_around: failed to compute tangent between pulleys[${i}] and pulleys[${ni}].`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `draw_belt_around: failed to compute tangent between pulleys[${i}] and pulleys[${ni}].`,
+        );
       }
       tangentPairs.push(result);
     }

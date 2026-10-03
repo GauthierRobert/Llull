@@ -23,6 +23,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
 import { pruneGroupMembers } from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
+import { noOp } from './commandResult';
 
 /**
  * Build a deterministic expanded-entity id from the instance id and the
@@ -138,21 +139,16 @@ export const createComponent = defineCommand({
   run: (doc, { name, entityIds, componentId }): CommandResult => {
     // Validate: non-empty list
     if (entityIds.length === 0) {
-      return {
-        document: doc,
-        summary: 'create_component: entityIds must be a non-empty array.',
-        affected: [],
-      };
+      return noOp(doc, 'create_component: entityIds must be a non-empty array.');
     }
 
     // Validate: all ids exist
     const missing = entityIds.filter((id) => !(id in doc.entities));
     if (missing.length > 0) {
-      return {
-        document: doc,
-        summary: `create_component: entity id(s) not found: [${missing.join(', ')}]. Document unchanged.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `create_component: entity id(s) not found: [${missing.join(', ')}]. Document unchanged.`,
+      );
     }
 
     // Snapshot the promoted entities as component-local (positions kept as-is;
@@ -255,21 +251,16 @@ export const insertInstance = defineCommand({
     const scale = toVec3(rawScale, [1, 1, 1]);
     const component = doc.components[componentId];
     if (!component) {
-      return {
-        document: doc,
-        summary: `insert_instance: component "${componentId}" not found in doc.components.`,
-        affected: [],
-      };
+      return noOp(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
     }
 
     // Validate all transform values are finite
     const allFinite = (...vs: number[]): boolean => vs.every((v) => Number.isFinite(v));
     if (!allFinite(...position) || !allFinite(...rotation) || !allFinite(...scale)) {
-      return {
-        document: doc,
-        summary: `insert_instance: position, rotation, and scale must contain only finite numbers.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `insert_instance: position, rotation, and scale must contain only finite numbers.`,
+      );
     }
 
     const instanceId = nextId('instance');
@@ -321,21 +312,16 @@ export const explodeInstance = defineCommand({
   run: (doc, { id }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity || entity.kind !== 'instance') {
-      return {
-        document: doc,
-        summary: `explode_instance: entity "${id}" is not an instance or does not exist.`,
-        affected: [],
-      };
+      return noOp(doc, `explode_instance: entity "${id}" is not an instance or does not exist.`);
     }
 
     const instance = entity as InstanceEntity;
     const component = doc.components[instance.componentId];
     if (!component) {
-      return {
-        document: doc,
-        summary: `explode_instance: component "${instance.componentId}" referenced by instance "${id}" not found.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `explode_instance: component "${instance.componentId}" referenced by instance "${id}" not found.`,
+      );
     }
 
     const bakedEntities = expandInstance(instance, component);

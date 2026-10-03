@@ -4,6 +4,7 @@ import { defineCommand, z } from './schema';
 import { instanceBoundsFromDoc } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { evaluateMotionInternal } from './jointsKinematics';
+import { noOp } from './commandResult';
 
 /** Per-step result of a motion study sweep. */
 interface MotionStep {
@@ -162,27 +163,15 @@ export const motionStudy = defineCommand({
   run: (doc, { mode, target, start, end, steps, interferenceCheck }): CommandResult => {
     // Validate target
     if (target.length === 0) {
-      return {
-        document: doc,
-        summary: 'motion_study: "target" must be a non-empty string.',
-        affected: [],
-      };
+      return noOp(doc, 'motion_study: "target" must be a non-empty string.');
     }
 
     // Validate start / end
     if (!Number.isFinite(start)) {
-      return {
-        document: doc,
-        summary: `motion_study: "start" must be a finite number, got ${String(start)}.`,
-        affected: [],
-      };
+      return noOp(doc, `motion_study: "start" must be a finite number, got ${String(start)}.`);
     }
     if (!Number.isFinite(end)) {
-      return {
-        document: doc,
-        summary: `motion_study: "end" must be a finite number, got ${String(end)}.`,
-        affected: [],
-      };
+      return noOp(doc, `motion_study: "end" must be a finite number, got ${String(end)}.`);
     }
 
     // Zero-length sweep
@@ -218,28 +207,19 @@ export const motionStudy = defineCommand({
     // Mode-specific validation
     if (mode === 'joint') {
       if (!(target in doc.joints)) {
-        return {
-          document: doc,
-          summary: `motion_study: joint '${target}' does not exist in doc.joints.`,
-          affected: [],
-        };
+        return noOp(doc, `motion_study: joint '${target}' does not exist in doc.joints.`);
       }
     } else {
       // mode === 'parameter'
       if (!(target in doc.parameters)) {
-        return {
-          document: doc,
-          summary: `motion_study: parameter '${target}' does not exist in doc.parameters.`,
-          affected: [],
-        };
+        return noOp(doc, `motion_study: parameter '${target}' does not exist in doc.parameters.`);
       }
       const param = doc.parameters[target]!;
       if (typeof param.value !== 'number' || !Number.isFinite(param.value)) {
-        return {
-          document: doc,
-          summary: `motion_study: parameter '${target}' is not numeric (value: ${String(param.value)}).`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `motion_study: parameter '${target}' is not numeric (value: ${String(param.value)}).`,
+        );
       }
     }
 

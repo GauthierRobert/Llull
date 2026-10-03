@@ -18,46 +18,36 @@ import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { replaceEntities } from './entityOps';
+import { noOp, type NoOpResult } from './commandResult';
 
-type NoOp = { document: CadDocument; summary: string; affected: [] };
-
-function validateOperands(doc: CadDocument, opName: string, a: string, b: string): NoOp | null {
+function validateOperands(
+  doc: CadDocument,
+  opName: string,
+  a: string,
+  b: string,
+): NoOpResult | null {
   if (a === b) {
-    return {
-      document: doc,
-      summary: `${opName}: operands a and b must be different ids (got '${a}').`,
-      affected: [],
-    };
+    return noOp(doc, `${opName}: operands a and b must be different ids (got '${a}').`);
   }
   const entA = doc.entities[a];
   if (!entA) {
-    return {
-      document: doc,
-      summary: `${opName}: entity '${a}' not found.`,
-      affected: [],
-    };
+    return noOp(doc, `${opName}: entity '${a}' not found.`);
   }
   const entB = doc.entities[b];
   if (!entB) {
-    return {
-      document: doc,
-      summary: `${opName}: entity '${b}' not found.`,
-      affected: [],
-    };
+    return noOp(doc, `${opName}: entity '${b}' not found.`);
   }
   if (!is3D(entA)) {
-    return {
-      document: doc,
-      summary: `${opName}: entity '${a}' is a 2D shape; boolean operations require 3D solids.`,
-      affected: [],
-    };
+    return noOp(
+      doc,
+      `${opName}: entity '${a}' is a 2D shape; boolean operations require 3D solids.`,
+    );
   }
   if (!is3D(entB)) {
-    return {
-      document: doc,
-      summary: `${opName}: entity '${b}' is a 2D shape; boolean operations require 3D solids.`,
-      affected: [],
-    };
+    return noOp(
+      doc,
+      `${opName}: entity '${b}' is a 2D shape; boolean operations require 3D solids.`,
+    );
   }
   return null;
 }
@@ -70,28 +60,26 @@ function runBoolean(
   b: string,
   ctx: ExecutionContext | undefined,
 ): CommandResult {
-  const noOp = validateOperands(doc, opName, a, b);
-  if (noOp) return noOp;
+  const invalid = validateOperands(doc, opName, a, b);
+  if (invalid) return invalid;
 
   const entA = doc.entities[a] as Entity;
   const entB = doc.entities[b] as Entity;
 
   const k = (ctx ?? currentContext()).kernel;
   if (!k) {
-    return {
-      document: doc,
-      summary: `${opName}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
-      affected: [],
-    };
+    return noOp(
+      doc,
+      `${opName}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
+    );
   }
 
   const meshData = k.booleanOp(op, entA, entB);
   if (!meshData) {
-    return {
-      document: doc,
-      summary: `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`,
-      affected: [],
-    };
+    return noOp(
+      doc,
+      `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`,
+    );
   }
 
   const newId = nextId('mesh');

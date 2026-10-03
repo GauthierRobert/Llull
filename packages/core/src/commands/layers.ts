@@ -18,6 +18,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
+import { noOp } from './commandResult';
 
 /**
  * @command add_layer
@@ -47,11 +48,7 @@ export const addLayer = defineCommand({
   run: (doc, { name, color }): CommandResult => {
     const trimmed = name.trim();
     if (!trimmed) {
-      return {
-        document: doc,
-        summary: 'add_layer requires a non-empty name.',
-        affected: [],
-      };
+      return noOp(doc, 'add_layer requires a non-empty name.');
     }
 
     const id = nextId('layer');
@@ -96,20 +93,12 @@ export const renameLayer = defineCommand({
   run: (doc, { id, name }): CommandResult => {
     const layer = doc.layers[id];
     if (!layer) {
-      return {
-        document: doc,
-        summary: `No layer ${id} — rename_layer is a no-op.`,
-        affected: [],
-      };
+      return noOp(doc, `No layer ${id} — rename_layer is a no-op.`);
     }
 
     const trimmed = name.trim();
     if (!trimmed) {
-      return {
-        document: doc,
-        summary: 'rename_layer requires a non-empty name.',
-        affected: [],
-      };
+      return noOp(doc, 'rename_layer requires a non-empty name.');
     }
 
     const prevName = layer.name;
@@ -148,11 +137,7 @@ export const setLayerVisibility = defineCommand({
   run: (doc, { id, visible }): CommandResult => {
     const layer = doc.layers[id];
     if (!layer) {
-      return {
-        document: doc,
-        summary: `No layer ${id} — set_layer_visibility is a no-op.`,
-        affected: [],
-      };
+      return noOp(doc, `No layer ${id} — set_layer_visibility is a no-op.`);
     }
 
     return {
@@ -191,11 +176,7 @@ export const setLayerLock = defineCommand({
   run: (doc, { id, locked }): CommandResult => {
     const layer = doc.layers[id];
     if (!layer) {
-      return {
-        document: doc,
-        summary: `No layer ${id} — set_layer_lock is a no-op.`,
-        affected: [],
-      };
+      return noOp(doc, `No layer ${id} — set_layer_lock is a no-op.`);
     }
 
     return {
@@ -236,20 +217,12 @@ export const setEntityLayer = defineCommand({
   run: (doc, { entityId, layerId }): CommandResult => {
     const entity = doc.entities[entityId];
     if (!entity) {
-      return {
-        document: doc,
-        summary: `No entity ${entityId} — set_entity_layer is a no-op.`,
-        affected: [],
-      };
+      return noOp(doc, `No entity ${entityId} — set_entity_layer is a no-op.`);
     }
 
     const targetLayer = doc.layers[layerId];
     if (!targetLayer) {
-      return {
-        document: doc,
-        summary: `No layer ${layerId} — set_entity_layer is a no-op.`,
-        affected: [],
-      };
+      return noOp(doc, `No layer ${layerId} — set_entity_layer is a no-op.`);
     }
 
     // Locked-layer guard: refuse to move an entity off a locked source layer.
@@ -305,20 +278,12 @@ export const deleteLayer = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (id === DEFAULT_LAYER_ID) {
-      return {
-        document: doc,
-        summary: `Cannot delete the default layer (${DEFAULT_LAYER_ID}).`,
-        affected: [],
-      };
+      return noOp(doc, `Cannot delete the default layer (${DEFAULT_LAYER_ID}).`);
     }
 
     const layer = doc.layers[id];
     if (!layer) {
-      return {
-        document: doc,
-        summary: `No layer ${id} — delete_layer is a no-op.`,
-        affected: [],
-      };
+      return noOp(doc, `No layer ${id} — delete_layer is a no-op.`);
     }
 
     // Reassign orphaned entities to the default layer.

@@ -17,6 +17,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { expandInstance } from './assemblies';
+import { noOp } from './commandResult';
 
 /**
  * @command add_mate
@@ -97,57 +98,45 @@ export const addMate = defineCommand({
   run: (doc, { kind, a, b, value, id }): CommandResult => {
     // Validate ref shapes
     if (a.instanceId.length === 0) {
-      return {
-        document: doc,
-        summary: `add_mate: a must be an object with a non-empty instanceId string.`,
-        affected: [],
-      };
+      return noOp(doc, `add_mate: a must be an object with a non-empty instanceId string.`);
     }
     if (b.instanceId.length === 0) {
-      return {
-        document: doc,
-        summary: `add_mate: b must be an object with a non-empty instanceId string.`,
-        affected: [],
-      };
+      return noOp(doc, `add_mate: b must be an object with a non-empty instanceId string.`);
     }
 
     // Validate both instance ids exist and are instances
     const entityA = doc.entities[a.instanceId];
     if (!entityA || entityA.kind !== 'instance') {
-      return {
-        document: doc,
-        summary: `add_mate: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_mate: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
+      );
     }
     const entityB = doc.entities[b.instanceId];
     if (!entityB || entityB.kind !== 'instance') {
-      return {
-        document: doc,
-        summary: `add_mate: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_mate: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
+      );
     }
 
     // Validate value for distance
     if (kind === 'distance') {
       if (value === undefined) {
-        return {
-          document: doc,
-          summary: `add_mate: kind='distance' requires a 'value' field (number or expression string).`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `add_mate: kind='distance' requires a 'value' field (number or expression string).`,
+        );
       }
     }
 
     const constraintId = typeof id === 'string' && id.length > 0 ? id : nextId('mate');
 
     if (constraintId in doc.constraints) {
-      return {
-        document: doc,
-        summary: `add_mate: constraint id '${constraintId}' already exists — no change made.`,
-        affected: [],
-      };
+      return noOp(
+        doc,
+        `add_mate: constraint id '${constraintId}' already exists — no change made.`,
+      );
     }
 
     // Build the constraint. Mates are stored as ordinary Constraint objects.

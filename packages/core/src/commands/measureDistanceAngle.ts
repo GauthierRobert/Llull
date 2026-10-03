@@ -4,6 +4,7 @@ import { defineCommand, vec3, z } from './schema';
 import { formatLength } from './units';
 import { centroid } from './measureShared';
 import { distanceSq3 } from '../lib/vec3';
+import { noOp } from './commandResult';
 interface MeasureDistanceData {
   distance: number;
   unit: string;
@@ -55,11 +56,7 @@ export const measureDistance = defineCommand({
     } else if (entityId1) {
       const e = doc.entities[entityId1];
       if (!e) {
-        return {
-          document: doc,
-          summary: `measure_distance: entity '${entityId1}' not found.`,
-          affected: [],
-        };
+        return noOp(doc, `measure_distance: entity '${entityId1}' not found.`);
       }
       locA = centroid(e);
     }
@@ -71,11 +68,7 @@ export const measureDistance = defineCommand({
     } else if (entityId2) {
       const e = doc.entities[entityId2];
       if (!e) {
-        return {
-          document: doc,
-          summary: `measure_distance: entity '${entityId2}' not found.`,
-          affected: [],
-        };
+        return noOp(doc, `measure_distance: entity '${entityId2}' not found.`);
       }
       locB = centroid(e);
     }
@@ -151,32 +144,22 @@ export const measureAngle = defineCommand({
       const e1 = doc.entities[lineId1];
       const e2 = doc.entities[lineId2];
       if (!e1) {
-        return {
-          document: doc,
-          summary: `measure_angle: entity '${lineId1}' not found.`,
-          affected: [],
-        };
+        return noOp(doc, `measure_angle: entity '${lineId1}' not found.`);
       }
       if (!e2) {
-        return {
-          document: doc,
-          summary: `measure_angle: entity '${lineId2}' not found.`,
-          affected: [],
-        };
+        return noOp(doc, `measure_angle: entity '${lineId2}' not found.`);
       }
       if (e1.kind !== 'line') {
-        return {
-          document: doc,
-          summary: `measure_angle: entity '${lineId1}' is kind '${e1.kind}', expected 'line'.`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `measure_angle: entity '${lineId1}' is kind '${e1.kind}', expected 'line'.`,
+        );
       }
       if (e2.kind !== 'line') {
-        return {
-          document: doc,
-          summary: `measure_angle: entity '${lineId2}' is kind '${e2.kind}', expected 'line'.`,
-          affected: [],
-        };
+        return noOp(
+          doc,
+          `measure_angle: entity '${lineId2}' is kind '${e2.kind}', expected 'line'.`,
+        );
       }
       vA = [e1.end[0] - e1.start[0], e1.end[1] - e1.start[1], 0];
       vB = [e2.end[0] - e2.start[0], e2.end[1] - e2.start[1], 0];
@@ -192,11 +175,7 @@ export const measureAngle = defineCommand({
     const lenA = Math.sqrt(vA[0] * vA[0] + vA[1] * vA[1] + vA[2] * vA[2]);
     const lenB = Math.sqrt(vB[0] * vB[0] + vB[1] * vB[1] + vB[2] * vB[2]);
     if (lenA < 1e-12 || lenB < 1e-12) {
-      return {
-        document: doc,
-        summary: 'measure_angle: degenerate vector (zero length) — cannot compute angle.',
-        affected: [],
-      };
+      return noOp(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
     }
 
     const dot = vA[0] * vB[0] + vA[1] * vB[1] + vA[2] * vB[2];

@@ -4,6 +4,7 @@ import { z, looseVec3, tolerant } from './schema';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { finiteVec3OrZero } from '../lib/vec3';
 import { withEntity } from './entityOps';
+import { noOp } from './commandResult';
 
 export const ORIGIN: Vec3 = [0, 0, 0];
 
@@ -175,11 +176,7 @@ export function rejectNonPositive(
 ): CommandResult | null {
   for (const [name, value] of dimensions) {
     if (!Number.isFinite(value) || value <= 0) {
-      return {
-        document: doc,
-        summary: `${command} failed: ${name} must be finite and > 0, got ${value}.`,
-        affected: [],
-      };
+      return noOp(doc, `${command} failed: ${name} must be finite and > 0, got ${value}.`);
     }
   }
   return null;
@@ -188,11 +185,10 @@ export function rejectNonPositive(
 /** Same as `rejectNonPositive` for a `[w, h, d]` size vector (one combined summary). */
 export function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandResult | null {
   if (size.every((component) => Number.isFinite(component) && component > 0)) return null;
-  return {
-    document: doc,
-    summary: `${command} failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
-    affected: [],
-  };
+  return noOp(
+    doc,
+    `${command} failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
+  );
 }
 
 /** Append `entity` and report it: `<description>; world AABB ...` with `affected: [entity.id]`. */
