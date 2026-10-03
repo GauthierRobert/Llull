@@ -21,16 +21,6 @@ export function r2(n: number): number {
 }
 
 /**
- * Apply the same intrinsic XYZ Euler rotation to a direction vector (normal).
- * No translation — normals transform by the same rotation matrix.
- *
- * @pure
- */
-function rotateNormalXYZ(n: Vec3, euler: Vec3): Vec3 {
-  return applyEulerXYZ(n, [0, 0, 0], euler);
-}
-
-/**
  * Apply entity rotation to every polygon produced by a tessellator.
  * Verts are rotated about `position`; normals are rotated without translation.
  * No-op when rotation is [0,0,0].
@@ -46,6 +36,7 @@ export function applyRotation(
   return polys.map((poly) => ({
     ...poly,
     verts: poly.verts.map((v) => applyEulerXYZ(v, position, rotation)),
-    normal: rotateNormalXYZ(poly.normal, rotation),
+    // Normals rotate by the same matrix, without translation.
+    normal: applyEulerXYZ(poly.normal, [0, 0, 0], rotation),
   }));
 }

@@ -18,25 +18,28 @@ export function cameraForView(view: ViewName, center: Vec3, radius: number): Cam
   const [cx, cy, cz] = center;
   const target: [number, number, number] = [cx, cy, cz];
 
+  const at = (offset: Vec3, up: Camera['up']): Camera => ({
+    position: [cx + offset[0] * d, cy + offset[1] * d, cz + offset[2] * d],
+    target,
+    up,
+    ortho: radius,
+  });
   switch (view) {
     case 'top':
-      return { position: [cx, cy, cz + d], target, up: [0, 1, 0], ortho: radius };
+      return at([0, 0, 1], [0, 1, 0]);
     case 'bottom':
-      return { position: [cx, cy, cz - d], target, up: [0, 1, 0], ortho: radius };
+      return at([0, 0, -1], [0, 1, 0]);
     case 'front':
-      return { position: [cx, cy - d, cz], target, up: [0, 0, 1], ortho: radius };
+      return at([0, -1, 0], [0, 0, 1]);
     case 'back':
-      return { position: [cx, cy + d, cz], target, up: [0, 0, 1], ortho: radius };
+      return at([0, 1, 0], [0, 0, 1]);
     case 'left':
-      return { position: [cx - d, cy, cz], target, up: [0, 0, 1], ortho: radius };
+      return at([-1, 0, 0], [0, 0, 1]);
     case 'right':
-      return { position: [cx + d, cy, cz], target, up: [0, 0, 1], ortho: radius };
-    case 'iso': {
+      return at([1, 0, 0], [0, 0, 1]);
+    case 'iso':
       // Fixed isometric direction: roughly from (+1, -1.4, +1) relative to center.
-      const iso = normalize3([1, -1.4, 1]);
-      const pos: [number, number, number] = [cx + iso[0] * d, cy + iso[1] * d, cz + iso[2] * d];
-      return { position: pos, target, up: [0, 0, 1], ortho: radius };
-    }
+      return at(normalize3([1, -1.4, 1]), [0, 0, 1]);
   }
 }
 

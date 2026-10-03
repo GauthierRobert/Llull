@@ -1,11 +1,9 @@
 import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
+import { add3, sub3 } from '../lib/vec3';
 import { type Bounds } from './sceneTypes';
 
 const ORIGIN: Vec3 = [0, 0, 0];
-
-const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const subtract = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
 /** Min/max of a flat xyz position array (`[x0, y0, z0, x1, ...]`); needs at least one full triple. */
 export function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
@@ -60,7 +58,7 @@ function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
   const p = e.mesh.positions;
   if (p.length < 3) return bounds(ORIGIN, ORIGIN);
   const { min, max } = positionsExtent(p);
-  return bounds(subtract(min, e.position), subtract(max, e.position));
+  return bounds(sub3(min, e.position), sub3(max, e.position));
 }
 
 /**
@@ -157,7 +155,7 @@ export function entityBounds(e: Entity): Bounds {
     return p.length < 3 ? bounds(e.position, e.position) : positionsExtent(p);
   }
   const { min, max } = localBounds(e);
-  return bounds(add(e.position, min), add(e.position, max));
+  return bounds(add3(e.position, min), add3(e.position, max));
 }
 
 /** The 8 corners of an AABB. */
@@ -202,7 +200,7 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
       const scaled: Vec3 = [c[0] * scale[0], c[1] * scale[1], c[2] * scale[2]];
       // Rotate around the component origin, then translate.
       const rotated = hasRotation ? applyEulerXYZ(scaled, ORIGIN, rotation) : scaled;
-      worldPoints.push(add(rotated, position));
+      worldPoints.push(add3(rotated, position));
     }
   }
   return worldPoints.length > 0 ? boundsOfPoints(worldPoints) : bounds(position, position);
