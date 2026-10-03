@@ -17,7 +17,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { ParametersPanel } from '@ui/panels/ParametersPanel';
@@ -131,10 +131,11 @@ describe('ParametersPanel — editing expression', () => {
     render(<ParametersPanel />);
 
     const input = screen.getByRole('textbox', { name: /expression for parameter base/i });
-    fireEvent.focus(input);
+    act(() => input.focus());
     fireEvent.change(input, { target: { value: '10' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
     expect(dispatchSpy).toHaveBeenCalledWith('set_parameter', { name: 'base', expression: '10' });
   });
 
@@ -146,11 +147,12 @@ describe('ParametersPanel — editing expression', () => {
     render(<ParametersPanel />);
 
     const input = screen.getByRole('textbox', { name: /expression for parameter x/i });
-    fireEvent.focus(input);
+    act(() => input.focus());
     fireEvent.change(input, { target: { value: '99' } });
     fireEvent.keyDown(input, { key: 'Escape' });
 
     expect(dispatchSpy).not.toHaveBeenCalled();
+    expect(input).toHaveValue('1');
   });
 
   it('dispatches set_parameter on blur when expression changed', () => {

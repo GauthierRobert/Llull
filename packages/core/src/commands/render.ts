@@ -127,15 +127,16 @@ function renderDocument(
   const basis = cameraBasis(cam);
   const orthoHalf = (cam.ortho ?? radius) * 1.2;
 
-  // Collect and tessellate all entities (stable order = doc.order)
-  const rawPolys: PreDepthPolygon[] = [];
-  for (const id of doc.order) {
+  // Tessellate in doc.order up to MAX_POLYGONS (no spread: a mesh can exceed the argument limit).
+  const capped: PreDepthPolygon[] = [];
+  collect: for (const id of doc.order) {
     const e = doc.entities[id];
-    if (e) rawPolys.push(...tessellateEntity(e));
+    if (!e) continue;
+    for (const p of tessellateEntity(e)) {
+      if (capped.length >= MAX_POLYGONS) break collect;
+      capped.push(p);
+    }
   }
-
-  // Cap polygon count
-  const capped = rawPolys.length > MAX_POLYGONS ? rawPolys.slice(0, MAX_POLYGONS) : rawPolys;
 
   // Project depth and shade
   const polygons: Polygon3D[] = capped.map((p) => {

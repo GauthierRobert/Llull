@@ -217,7 +217,12 @@ function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | nu
     case 'sphere':
     case 'extrusion': {
       const prim = primitiveOf(m, entity);
-      return prim && applyTransform(prim, entity.position, entity.rotation);
+      if (!prim) return null;
+      try {
+        return applyTransform(prim, entity.position, entity.rotation);
+      } finally {
+        prim.delete();
+      }
     }
     default:
       return null;
