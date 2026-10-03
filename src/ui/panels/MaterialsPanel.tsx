@@ -13,7 +13,7 @@
  * (PRIME DIRECTIVE, architecture L1, react R1)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
@@ -33,14 +33,10 @@ function MaterialRow({
 }: MaterialRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
-  const handleAssign = useCallback(() => {
+  const handleAssign = (): void => {
     if (selectedEntityIds.length === 0) return;
     dispatch('assign_material', { materialName: material.name, entityIds: selectedEntityIds });
-  }, [dispatch, material.name, selectedEntityIds]);
-
-  const handleRowClick = useCallback(() => {
-    onSelect(material.name);
-  }, [onSelect, material.name]);
+  };
 
   return (
     <li
@@ -52,7 +48,7 @@ function MaterialRow({
       <button
         type="button"
         className="material-row-btn"
-        onClick={handleRowClick}
+        onClick={() => onSelect(material.name)}
         aria-label={`Select material ${material.name}`}
         title={material.name}
       >
@@ -114,25 +110,22 @@ function CreateMaterialForm(): React.ReactElement {
     roughnessNum >= 0 &&
     roughnessNum <= 1;
 
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!isValid) return;
-      dispatch('create_material', {
-        name: name.trim(),
-        density: densityNum,
-        color,
-        metalness: metalnessNum,
-        roughness: roughnessNum,
-      });
-      setName('');
-      setDensity('');
-      setColor(DEFAULT_COLOR);
-      setMetalness('0.08');
-      setRoughness('0.45');
-    },
-    [dispatch, isValid, name, densityNum, color, metalnessNum, roughnessNum],
-  );
+  const handleSubmit = (e: React.FormEvent): void => {
+    e.preventDefault();
+    if (!isValid) return;
+    dispatch('create_material', {
+      name: name.trim(),
+      density: densityNum,
+      color,
+      metalness: metalnessNum,
+      roughness: roughnessNum,
+    });
+    setName('');
+    setDensity('');
+    setColor(DEFAULT_COLOR);
+    setMetalness('0.08');
+    setRoughness('0.45');
+  };
 
   return (
     <form
@@ -257,13 +250,10 @@ export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactE
   const selection = useStore((s) => s.document.selection);
   const materialList = Object.values(materials).filter((m): m is Material => m != null);
 
-  // Local state: which material row is highlighted (for keyboard/mouse affordance).
-  // This does NOT affect the document — it is purely a UI selection hint.
   const [activeMaterialName, setActiveMaterialName] = useState<string | null>(null);
 
-  const handleMaterialSelect = useCallback((name: string) => {
+  const handleMaterialSelect = (name: string): void =>
     setActiveMaterialName((prev) => (prev === name ? null : name));
-  }, []);
 
   return (
     <aside
