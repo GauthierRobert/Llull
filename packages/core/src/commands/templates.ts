@@ -18,10 +18,6 @@ import { defineCommand, z, looseVec3 } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Append multiple entities to a document in one pass. Keeps the command pure. */
 function withEntities(doc: CadDocument, entities: Entity[]): CadDocument {
   const newEntitiesMap = { ...doc.entities };
@@ -63,10 +59,6 @@ function makeRectangle(width: number, height: number, position: Vec3, color: str
   };
 }
 
-// ---------------------------------------------------------------------------
-// Template param types — one interface per template (ISP / S4)
-// ---------------------------------------------------------------------------
-
 interface BoltHolePatternParams {
   count: number;
   boltCircleRadius: number;
@@ -90,10 +82,6 @@ interface RectangularPlateWithHolesParams {
   marginX: number;
   marginY: number;
 }
-
-// ---------------------------------------------------------------------------
-// Template registry — add entry here to extend (OCP)
-// ---------------------------------------------------------------------------
 
 type TemplateName = 'bolt_hole_pattern' | 'flange' | 'rectangular_plate_with_holes';
 
@@ -254,10 +242,6 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
     },
   } as TemplateEntry<never>,
 };
-
-// ---------------------------------------------------------------------------
-// instantiate_template command
-// ---------------------------------------------------------------------------
 
 const ORIGIN: Vec3 = [0, 0, 0];
 

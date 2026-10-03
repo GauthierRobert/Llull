@@ -18,10 +18,6 @@
  *   - Divide-by-zero yields Infinity (IEEE 754); callers may treat as an error.
  */
 
-// ---------------------------------------------------------------------------
-// Public result types
-// ---------------------------------------------------------------------------
-
 /** Successful evaluation result. */
 interface EvalOk {
   readonly ok: true;
@@ -35,10 +31,6 @@ interface EvalErr {
 }
 
 type EvalResult = EvalOk | EvalErr;
-
-// ---------------------------------------------------------------------------
-// Tokenizer
-// ---------------------------------------------------------------------------
 
 type TokenKind = 'number' | 'ident' | 'op' | 'lparen' | 'rparen' | 'eof';
 
@@ -112,10 +104,6 @@ function tokenize(src: string): Token[] | string {
   }
   return tokens;
 }
-
-// ---------------------------------------------------------------------------
-// Recursive-descent parser + evaluator
-// ---------------------------------------------------------------------------
 
 /** Mutable parser state (stays private to this module). */
 interface ParseState {
@@ -208,10 +196,6 @@ function parsePrimary(s: ParseState): EvalResult {
 
   return { ok: false, error: `unexpected token '${t.text}'` };
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Evaluate a single expression string against a flat `env` map of name→value.

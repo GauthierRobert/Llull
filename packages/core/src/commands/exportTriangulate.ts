@@ -16,10 +16,6 @@ import {
 } from './tessellation';
 import { type Triangle, fanTriangulate, earClipTriangulateVerts } from './exportMath';
 
-// ---------------------------------------------------------------------------
-// Per-kind world-space triangle tessellation
-// ---------------------------------------------------------------------------
-
 function triangulateBox(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Triangle[] {
   const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
 
@@ -248,10 +244,6 @@ function triangulateMesh(e: {
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
-// ---------------------------------------------------------------------------
-// Rotation application (mirrors render.ts applyEulerXYZ)
-// ---------------------------------------------------------------------------
-
 function applyRotationToTriangles(tris: Triangle[], position: Vec3, rotation: Vec3): Triangle[] {
   const [rx, ry, rz] = rotation;
   if (rx === 0 && ry === 0 && rz === 0) return tris;
@@ -276,10 +268,6 @@ function triangulateRevolution(e: {
   const tris = revolutionTriangles(e.profile, e.axis, e.angle, e.segments, e.position);
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
-
-// ---------------------------------------------------------------------------
-// Entity → triangles dispatch
-// ---------------------------------------------------------------------------
 
 /**
  * Convert a single entity to a world-space triangle list.

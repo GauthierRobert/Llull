@@ -13,18 +13,10 @@ import type { CadDocument, Material } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Validates a CSS hex color string: #rrggbb (6 hex digits). */
 function isValidHexColor(s: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(s);
 }
-
-// ---------------------------------------------------------------------------
-// create_material
-// ---------------------------------------------------------------------------
 
 /**
  * @command create_material
@@ -137,10 +129,6 @@ export const createMaterial = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// assign_material
-// ---------------------------------------------------------------------------
 
 /**
  * @command assign_material

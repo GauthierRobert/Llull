@@ -8,10 +8,6 @@ import { ORIGIN, commitSolid, resolveRotation } from './geometryShared';
 /** Number of polygon segments used to approximate a circle. */
 const CIRCLE_SEGMENTS = 32;
 
-// ---------------------------------------------------------------------------
-// extrude_sketch
-// ---------------------------------------------------------------------------
-
 /**
  * @command extrude_sketch
  * @pure
@@ -135,10 +131,6 @@ export const extrudeSketch = defineCommand({
     );
   },
 });
-
-// ---------------------------------------------------------------------------
-// revolve_profile
-// ---------------------------------------------------------------------------
 
 /**
  * Normalise a raw axis param to a unit Vec3, or return null if invalid.

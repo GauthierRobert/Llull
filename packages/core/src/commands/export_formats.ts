@@ -16,10 +16,6 @@ import { uint8ArrayToBase64 } from '../lib/base64';
 import { collectExportTriangles } from './exportTriangulate';
 import { facetNormal, type Triangle } from './exportMath';
 
-// ---------------------------------------------------------------------------
-// OBJ serialisation
-// ---------------------------------------------------------------------------
-
 /**
  * Build a Wavefront OBJ text string from a triangle list.
  * Each triangle becomes 3 vertices + 1 face.  Normals are per-facet.
@@ -54,10 +50,6 @@ function buildObjText(tris: Triangle[], objectName: string): string {
   return lines.join('\n');
 }
 
-// ---------------------------------------------------------------------------
-// ExportObj public data shape
-// ---------------------------------------------------------------------------
-
 interface ExportObjData {
   /** Always 'obj'. */
   format: 'obj';
@@ -66,10 +58,6 @@ interface ExportObjData {
   /** Total triangles exported. */
   triangleCount: number;
 }
-
-// ---------------------------------------------------------------------------
-// export_obj command
-// ---------------------------------------------------------------------------
 
 /**
  * @command export_obj
@@ -131,10 +119,6 @@ export const exportObj = defineCommand({
     return { document: doc, summary: parts.join(' '), affected: [], data };
   },
 });
-
-// ---------------------------------------------------------------------------
-// glTF 2.0 serialisation
-// ---------------------------------------------------------------------------
 
 /**
  * Build a Float32Array of interleaved position+normal data for all triangles.
@@ -330,10 +314,6 @@ function buildBinPayload(tris: Triangle[]): Uint8Array {
   return combined;
 }
 
-// ---------------------------------------------------------------------------
-// ExportGltf public data shape
-// ---------------------------------------------------------------------------
-
 interface ExportGltfData {
   /** 'gltf' for JSON output, 'glb' for binary container. */
   format: 'gltf' | 'glb';
@@ -344,10 +324,6 @@ interface ExportGltfData {
   /** Present when format='glb': base64-encoded GLB binary blob. */
   base64?: string;
 }
-
-// ---------------------------------------------------------------------------
-// export_gltf command
-// ---------------------------------------------------------------------------
 
 /**
  * @command export_gltf

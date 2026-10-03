@@ -109,14 +109,6 @@ function directionToEulerXYZ(dir: Vec3): Vec3 {
   return axisAngleToEulerXYZ(axis, angle);
 }
 
-// ---------------------------------------------------------------------------
-// Helper shared by geometry.ts pattern — keep commands pure (withEntity clone)
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// make_tube_between
-// ---------------------------------------------------------------------------
-
 /**
  * @command make_tube_between
  * @pure

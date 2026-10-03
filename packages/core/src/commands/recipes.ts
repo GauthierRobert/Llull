@@ -6,10 +6,6 @@ import { defineCommand, z } from './schema';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
 
-// ---------------------------------------------------------------------------
-// Internal replay helper — additive instantiation
-// ---------------------------------------------------------------------------
-
 /**
  * Replay `steps` ADDITIVELY on top of `base` (not from createEmptyDocument).
  *
@@ -61,10 +57,6 @@ function replayRecipeAdditive(
 
   return { doc, allAffected };
 }
-
-// ---------------------------------------------------------------------------
-// save_recipe
-// ---------------------------------------------------------------------------
 
 /**
  * @command save_recipe
@@ -135,10 +127,6 @@ export const saveRecipe = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// instantiate_recipe
-// ---------------------------------------------------------------------------
 
 /**
  * @command instantiate_recipe

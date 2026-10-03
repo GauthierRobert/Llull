@@ -11,10 +11,6 @@ import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 
-// ---------------------------------------------------------------------------
-// rotate_entity
-// ---------------------------------------------------------------------------
-
 /**
  * @command rotate_entity
  * @pure
@@ -52,10 +48,6 @@ export const rotateEntity = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// scale_entity
-// ---------------------------------------------------------------------------
 
 /**
  * @command scale_entity
@@ -286,10 +278,6 @@ export const scaleEntity = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// mirror_entity
-// ---------------------------------------------------------------------------
-
 type MirrorAxis = 'x' | 'y' | 'z';
 
 const VALID_AXES: ReadonlySet<string> = new Set<MirrorAxis>(['x', 'y', 'z']);
@@ -339,10 +327,6 @@ export const mirrorEntity = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// Shared helper — clone entity with a new id and new position
-// ---------------------------------------------------------------------------
-
 function cloneEntityAt(source: Entity, newPosition: Vec3): Entity {
   const id = nextId(source.kind);
   return { ...source, id, position: newPosition };
@@ -357,10 +341,6 @@ function withEntities(doc: CadDocument, copies: Entity[]): CadDocument {
   }
   return { ...doc, entities: newEntities, order: newOrder };
 }
-
-// ---------------------------------------------------------------------------
-// array_linear
-// ---------------------------------------------------------------------------
 
 /**
  * @command array_linear
@@ -422,10 +402,6 @@ export const arrayLinear = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// array_polar
-// ---------------------------------------------------------------------------
 
 /**
  * @command array_polar

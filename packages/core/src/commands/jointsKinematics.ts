@@ -6,10 +6,6 @@ import type {
   Vec3,
 } from '../model/types';
 import { evaluateExpression } from './expression';
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
 /** Normalize a string axis shorthand ('x'|'y'|'z') to a Vec3 unit vector. */
 function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
   if (axis === 'x') return [1, 0, 0];
@@ -77,10 +73,6 @@ function resolveInstance(ref: JointMateRef, doc: CadDocument): InstanceEntity | 
   if (!e || e.kind !== 'instance') return null;
   return e as InstanceEntity;
 }
-
-// ---------------------------------------------------------------------------
-// Drive relation topo-sort (Kahn's algorithm) for cycle detection
-// ---------------------------------------------------------------------------
 
 /**
  * Topological sort of all drive relation ids by dependency (driver → driven).
@@ -180,10 +172,6 @@ export function detectCycleOnAdd(
   }
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Motion evaluation — shared logic for evaluate_motion and bake_motion
-// ---------------------------------------------------------------------------
 
 interface EvaluatedMotion {
   /** Resolved joint values (joint id → numeric value) after propagating drive relations. */

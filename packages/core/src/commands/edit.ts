@@ -9,10 +9,6 @@ import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 
-// ---------------------------------------------------------------------------
-// Local helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Shallow-clone an entity with a new id and adjusted position.
  * Written locally to avoid cross-command-file coupling (transform.ts is off-limits).
@@ -20,10 +16,6 @@ import { nextId } from '../lib/id';
 function cloneEntity(source: Entity, newId: string, position: Vec3): Entity {
   return { ...source, id: newId, position } as Entity;
 }
-
-// ---------------------------------------------------------------------------
-// duplicate_entity
-// ---------------------------------------------------------------------------
 
 /**
  * @command duplicate_entity
@@ -69,10 +61,6 @@ export const duplicateEntity = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// group_entities
-// ---------------------------------------------------------------------------
 
 /**
  * @command group_entities
@@ -126,10 +114,6 @@ export const groupEntities = defineCommand({
   },
 });
 
-// ---------------------------------------------------------------------------
-// ungroup_entities
-// ---------------------------------------------------------------------------
-
 /**
  * @command ungroup_entities
  * @pure
@@ -168,10 +152,6 @@ export const ungroupEntities = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// set_entity_name
-// ---------------------------------------------------------------------------
 
 /**
  * @command set_entity_name

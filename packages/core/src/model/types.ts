@@ -412,10 +412,6 @@ export type Entity =
   | DimensionEntity
   | InstanceEntity;
 
-// ---------------------------------------------------------------------------
-// Kind helpers
-// ---------------------------------------------------------------------------
-
 const SHAPE2D_KINDS: ReadonlySet<string> = new Set<Shape2DKind>([
   'line',
   'polyline',
@@ -762,10 +758,6 @@ export type Constraint =
   | TangentConstraint
   | DistanceConstraint
   | AngleConstraint;
-
-// ---------------------------------------------------------------------------
-// Kinematic joints — connect two InstanceEntity frames to form a mechanism.
-// ---------------------------------------------------------------------------
 
 /**
  * A MateRef used by a joint: identifies an InstanceEntity and its named frame.

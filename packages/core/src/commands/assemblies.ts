@@ -38,10 +38,6 @@ function expandedId(instanceId: string, sourceEntityId: string): string {
   return `expanded::${instanceId}::${sourceEntityId}`;
 }
 
-// ---------------------------------------------------------------------------
-// expandInstance — pure world-space bake helper
-// ---------------------------------------------------------------------------
-
 /**
  * Bake an instance into world-space copies of the component's entities.
  *
@@ -100,10 +96,6 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
       } as Entity;
     });
 }
-
-// ---------------------------------------------------------------------------
-// create_component
-// ---------------------------------------------------------------------------
 
 /**
  * @command create_component
@@ -225,10 +217,6 @@ function toVec3(value: readonly unknown[] | undefined, fallback: Vec3): Vec3 {
   return [Number(x), Number(y), Number(z)];
 }
 
-// ---------------------------------------------------------------------------
-// insert_instance
-// ---------------------------------------------------------------------------
-
 /**
  * @command insert_instance
  * @pure
@@ -307,10 +295,6 @@ export const insertInstance = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// explode_instance
-// ---------------------------------------------------------------------------
 
 /**
  * @command explode_instance

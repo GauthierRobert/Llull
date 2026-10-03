@@ -1,9 +1,5 @@
 import type { Vec2 } from '../model/types';
 
-// ---------------------------------------------------------------------------
-// Internal pure geometry helpers (exported for unit-testing)
-// ---------------------------------------------------------------------------
-
 /**
  * 2D cross product (scalar z-component of a × b).
  * Positive → b is CCW from a; negative → CW.
@@ -90,7 +86,3 @@ export function miterJoin(a0: Vec2, a1: Vec2, b0: Vec2, b1: Vec2): Vec2 {
   if (hit === null) return a1; // parallel — butt join
   return evalLine(a0, a1, hit.t);
 }
-
-// ---------------------------------------------------------------------------
-// Document helpers
-// ---------------------------------------------------------------------------

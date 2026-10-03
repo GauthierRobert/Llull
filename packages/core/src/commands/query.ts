@@ -16,10 +16,6 @@ import { entityBounds } from './sceneBounds';
 import { Bounds } from './sceneTypes';
 import { distanceSq3 } from '../lib/vec3';
 
-// ---------------------------------------------------------------------------
-// Result types
-// ---------------------------------------------------------------------------
-
 /** A compact descriptor of one matched entity, safe to return in `data`. */
 interface EntityMatch {
   id: string;
@@ -33,10 +29,6 @@ interface FindEntitiesResult {
   matches: EntityMatch[];
   count: number;
 }
-
-// ---------------------------------------------------------------------------
-// Bbox / spatial helper functions (pure)
-// ---------------------------------------------------------------------------
 
 /** Returns the centroid of a world-space AABB. */
 function bboxCentroid(b: Bounds): readonly [number, number, number] {
@@ -87,10 +79,6 @@ function overlapsBbox(
 const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
 
 const vec3Exact = (description: string): typeof POINT_3D => POINT_3D.describe(description);
-
-// ---------------------------------------------------------------------------
-// find_entities
-// ---------------------------------------------------------------------------
 
 /**
  * Resolve the touching-id filter: compute the bbox of the reference entity and

@@ -19,10 +19,6 @@ import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { replaceEntities } from './entityOps';
 
-// ---------------------------------------------------------------------------
-// Shared validation helper — returns an error result or null on success.
-// ---------------------------------------------------------------------------
-
 type NoOp = { document: CadDocument; summary: string; affected: [] };
 
 function validateOperands(doc: CadDocument, opName: string, a: string, b: string): NoOp | null {
@@ -65,10 +61,6 @@ function validateOperands(doc: CadDocument, opName: string, a: string, b: string
   }
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Shared kernel invocation — returns NoOp or new entity.
-// ---------------------------------------------------------------------------
 
 function runBoolean(
   doc: CadDocument,
@@ -121,10 +113,6 @@ function runBoolean(
   };
 }
 
-// ---------------------------------------------------------------------------
-// boolean_union
-// ---------------------------------------------------------------------------
-
 /**
  * @command boolean_union
  * @pure
@@ -146,10 +134,6 @@ export const booleanUnion = defineCommand({
   }),
   run: (doc, { a, b }, ctx): CommandResult => runBoolean(doc, 'boolean_union', 'union', a, b, ctx),
 });
-
-// ---------------------------------------------------------------------------
-// boolean_subtract
-// ---------------------------------------------------------------------------
 
 /**
  * @command boolean_subtract
@@ -174,10 +158,6 @@ export const booleanSubtract = defineCommand({
   run: (doc, { a, b }, ctx): CommandResult =>
     runBoolean(doc, 'boolean_subtract', 'subtract', a, b, ctx),
 });
-
-// ---------------------------------------------------------------------------
-// boolean_intersect
-// ---------------------------------------------------------------------------
 
 /**
  * @command boolean_intersect

@@ -18,9 +18,6 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { expandInstance } from './assemblies';
 
-// add_mate
-// ---------------------------------------------------------------------------
-
 /**
  * @command add_mate
  * @pure
@@ -220,10 +217,6 @@ export const addMate = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// bill_of_materials
-// ---------------------------------------------------------------------------
 
 /** One row in the bill of materials output. */
 interface BomRow {

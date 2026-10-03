@@ -5,10 +5,6 @@ import { instanceBoundsFromDoc } from './sceneBounds';
 import { Bounds } from './sceneTypes';
 import { evaluateMotionInternal } from './jointsKinematics';
 
-// ---------------------------------------------------------------------------
-// Motion study result types
-// ---------------------------------------------------------------------------
-
 /** Per-step result of a motion study sweep. */
 interface MotionStep {
   /** Step index (0-based). */
@@ -39,10 +35,6 @@ export interface MotionStudyData {
     framesWithInterference: number;
   };
 }
-
-// ---------------------------------------------------------------------------
-// AABB interference helpers
-// ---------------------------------------------------------------------------
 
 /** Returns true when two world-space AABBs overlap. */
 function aabbOverlap(a: Bounds, b: Bounds): boolean {
@@ -99,10 +91,6 @@ function detectInterferences(bounds: Record<string, Bounds>): [string, string][]
   }
   return pairs;
 }
-
-// ---------------------------------------------------------------------------
-// motion_study command
-// ---------------------------------------------------------------------------
 
 /**
  * @command motion_study

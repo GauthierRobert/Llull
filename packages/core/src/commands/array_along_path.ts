@@ -57,10 +57,6 @@ function cloneEntityAt(source: Entity, newId: string, position: Vec3, rotation: 
   return { ...source, id: newId, position, rotation } as Entity;
 }
 
-// ---------------------------------------------------------------------------
-// array_along_path
-// ---------------------------------------------------------------------------
-
 /**
  * @command array_along_path
  * @pure
@@ -170,10 +166,6 @@ export const arrayAlongPath = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// distribute_on_arc
-// ---------------------------------------------------------------------------
 
 /**
  * @command distribute_on_arc
@@ -296,10 +288,6 @@ export const distributeOnArc = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// Rotation helpers for distribute_on_arc
-// ---------------------------------------------------------------------------
 
 /**
  * Build a unit vector that is perpendicular to `n` and lies in the plane

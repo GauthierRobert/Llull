@@ -5,10 +5,6 @@ import { nextId } from '../lib/id';
 import { offsetSegment, miterJoin } from './modify2dGeometry';
 import { withEntity, withoutEntity } from './entityOps';
 
-// ---------------------------------------------------------------------------
-// explode_polyline
-// ---------------------------------------------------------------------------
-
 /**
  * @command explode_polyline
  * @pure
@@ -82,10 +78,6 @@ export const explodePolyline = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// offset_2d
-// ---------------------------------------------------------------------------
 
 /**
  * @command offset_2d

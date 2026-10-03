@@ -19,10 +19,6 @@ import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { replaceEntities } from './entityOps';
 
-// ---------------------------------------------------------------------------
-// Shared validation — returns a no-op result or null when valid.
-// ---------------------------------------------------------------------------
-
 type NoOp = { document: CadDocument; summary: string; affected: [] };
 
 function validateSolidTarget(
@@ -47,10 +43,6 @@ function validateSolidTarget(
   }
   return { entity };
 }
-
-// ---------------------------------------------------------------------------
-// fillet_edge
-// ---------------------------------------------------------------------------
 
 /**
  * @command fillet_edge
@@ -146,10 +138,6 @@ export const filletEdge = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// chamfer_edge
-// ---------------------------------------------------------------------------
 
 /**
  * @command chamfer_edge

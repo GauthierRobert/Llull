@@ -35,10 +35,6 @@ function buildAsciiStl(tris: Triangle[], solidName: string): string {
   return lines.join('\n');
 }
 
-// ---------------------------------------------------------------------------
-// STL binary serialisation
-// ---------------------------------------------------------------------------
-
 function buildBinaryStl(tris: Triangle[], headerText: string): Uint8Array {
   const count = tris.length;
   // 80-byte header + 4-byte count + count × 50-byte triangles
@@ -93,10 +89,6 @@ function buildBinaryStl(tris: Triangle[], headerText: string): Uint8Array {
   return buf;
 }
 
-// ---------------------------------------------------------------------------
-// ExportStl data shape (exported so tests can type-narrow)
-// ---------------------------------------------------------------------------
-
 export interface ExportStlData {
   /** Resolved format used ('ascii' | 'binary'). */
   format: 'ascii' | 'binary';
@@ -107,10 +99,6 @@ export interface ExportStlData {
   /** Present for format='binary': base64-encoded binary STL bytes. */
   stlBase64?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Command definition
-// ---------------------------------------------------------------------------
 
 /**
  * @command export_stl

@@ -34,10 +34,6 @@ import { nextId } from '../lib/id';
 import { rotatePoint2 } from '../lib/polygon';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 
-// ---------------------------------------------------------------------------
-// Path math helpers (Vec2 only — all 2D, world-space via entity transform)
-// ---------------------------------------------------------------------------
-
 function vec2Add(a: Vec2, b: Vec2): Vec2 {
   return [a[0] + b[0], a[1] + b[1]];
 }
@@ -162,10 +158,6 @@ function samplePath(points: ReadonlyArray<Vec2>, closed: boolean, s: number): Pa
     tangent: vec2Normalize(vec2Sub(last, secondLast)),
   };
 }
-
-// ---------------------------------------------------------------------------
-// distribute_along_path
-// ---------------------------------------------------------------------------
 
 /**
  * @command distribute_along_path

@@ -2,10 +2,6 @@ import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { type Bounds } from './sceneTypes';
 
-// ---------------------------------------------------------------------------
-// Bounds
-// ---------------------------------------------------------------------------
-
 function offset(p: Vec3, dx: number, dy: number, dz: number): Vec3 {
   return [p[0] + dx, p[1] + dy, p[2] + dz];
 }

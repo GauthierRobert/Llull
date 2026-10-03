@@ -18,10 +18,6 @@ import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { withEntity } from './entityOps';
 
-// ---------------------------------------------------------------------------
-// Internal involute geometry helpers (pure, no side effects)
-// ---------------------------------------------------------------------------
-
 /**
  * Sample points along the involute of a circle with base radius `baseR`.
  *
@@ -110,10 +106,6 @@ function fmt(v: number): string {
 function boundsText(b: { min: Vec3; max: Vec3 }): string {
   return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
 }
-
-// ---------------------------------------------------------------------------
-// Involute spur gear profile builder
-// ---------------------------------------------------------------------------
 
 /**
  * Build a closed CCW 2D involute spur gear profile centered at the origin.
@@ -255,10 +247,6 @@ export function buildSpurGearProfile(
 
   return profile;
 }
-
-// ---------------------------------------------------------------------------
-// Command definition
-// ---------------------------------------------------------------------------
 
 /**
  * @command add_spur_gear

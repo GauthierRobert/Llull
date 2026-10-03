@@ -29,10 +29,6 @@ import { documentExtensions } from '../plugins/host';
 import { VALID_UNITS } from './persistenceGuards';
 import { validateDocumentShape, validateDocumentValues } from './persistenceValidation';
 
-// ---------------------------------------------------------------------------
-// Envelope types
-// ---------------------------------------------------------------------------
-
 interface DocumentEnvelope {
   format: 'llull-document';
   version: 2;
@@ -51,10 +47,6 @@ const CURRENT_SCHEMA_VERSION = 2;
  * unchanged — their legacy ids stay valid; new steps use the step counter from 1.
  */
 const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2]);
-
-// ---------------------------------------------------------------------------
-// Serialization
-// ---------------------------------------------------------------------------
 
 interface SerializeOptions {
   /**
@@ -115,10 +107,6 @@ function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unkno
 function restoreDerivedEntities(raw: Record<string, unknown>): Record<string, unknown> {
   return documentExtensions().reduce((current, extension) => extension.restore(current), raw);
 }
-
-// ---------------------------------------------------------------------------
-// Migration seam
-// ---------------------------------------------------------------------------
 
 /**
  * Upgrade a raw document object from an older schema version to the current one.
@@ -229,10 +217,6 @@ function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<str
   };
 }
 
-// ---------------------------------------------------------------------------
-// Public deserialization API
-// ---------------------------------------------------------------------------
-
 /**
  * Parse and validate a JSON string produced by `serializeDocument`.
  *
@@ -298,10 +282,6 @@ export function deserializeDocument(json: string): CadDocument {
 
   return migratedDoc as unknown as CadDocument;
 }
-
-// ---------------------------------------------------------------------------
-// load_document command
-// ---------------------------------------------------------------------------
 
 export const loadDocument = defineCommand({
   name: 'load_document',

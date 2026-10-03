@@ -20,10 +20,6 @@ export function r2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-// ---------------------------------------------------------------------------
-// Euler rotation helpers (three.js 'XYZ' intrinsic order = M = Rx·Ry·Rz)
-// ---------------------------------------------------------------------------
-
 /**
  * Apply the same intrinsic XYZ Euler rotation to a direction vector (normal).
  * No translation — normals transform by the same rotation matrix.

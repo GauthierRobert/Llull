@@ -5,10 +5,6 @@ import { entityBounds, mergeBounds } from './sceneBounds';
 import { Bounds } from './sceneTypes';
 import { formatLength } from './units';
 import { polygonArea } from './measureAreaPerimeter';
-// ---------------------------------------------------------------------------
-// 5. measure_bounding_box
-// ---------------------------------------------------------------------------
-
 interface MeasureBoundingBoxData {
   min: Vec3;
   max: Vec3;
@@ -97,10 +93,6 @@ export const measureBoundingBox = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// 6. measure_volume
-// ---------------------------------------------------------------------------
 
 interface MeasureVolumeData {
   volume: number;
@@ -288,10 +280,6 @@ export const measureVolume = defineCommand({
     };
   },
 });
-
-// ---------------------------------------------------------------------------
-// 7. mass_properties
-// ---------------------------------------------------------------------------
 
 interface MassPropertiesData {
   volume: number;
