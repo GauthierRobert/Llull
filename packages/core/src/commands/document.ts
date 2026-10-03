@@ -101,9 +101,10 @@ export const clearDocument = defineCommand({
       ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}`
       : `reset to default layer`;
 
-    return noOp(
-      nextDoc,
-      `Cleared ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'} and ${layerCount} layer${layerCount === 1 ? '' : 's'}; ${layerPart}; kept units (${doc.units}) and camera.`,
-    );
+    return {
+      document: nextDoc,
+      summary: `Cleared ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'} and ${layerCount} layer${layerCount === 1 ? '' : 's'}; ${layerPart}; kept units (${doc.units}) and camera.`,
+      affected: [],
+    };
   },
 });

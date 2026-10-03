@@ -81,10 +81,11 @@ export const createConfiguration = defineCommand({
     };
 
     const paramCount = Object.keys(parameterValues).length;
-    return noOp(
-      newDoc,
-      `create_configuration '${name}': stored with ${paramCount} parameter${paramCount === 1 ? '' : 's'} (${Object.keys(parameterValues).join(', ')}).`,
-    );
+    return {
+      document: newDoc,
+      summary: `create_configuration '${name}': stored with ${paramCount} parameter${paramCount === 1 ? '' : 's'} (${Object.keys(parameterValues).join(', ')}).`,
+      affected: [],
+    };
   },
 });
 

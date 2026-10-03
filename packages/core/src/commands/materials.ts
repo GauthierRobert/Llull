@@ -115,10 +115,11 @@ export const createMaterial = defineCommand({
     };
 
     const action = doc.materials[name] ? 'replaced' : 'created';
-    return noOp(
-      newDoc,
-      `create_material '${name}': ${action} (density=${density} g/${doc.units}³, color=${color}, metalness=${metalness}, roughness=${roughness}).`,
-    );
+    return {
+      document: newDoc,
+      summary: `create_material '${name}': ${action} (density=${density} g/${doc.units}³, color=${color}, metalness=${metalness}, roughness=${roughness}).`,
+      affected: [],
+    };
   },
 });
 

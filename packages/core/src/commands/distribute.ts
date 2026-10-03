@@ -34,6 +34,7 @@ import { nextId } from '../lib/id';
 import { rotatePoint2 } from '../lib/polygon';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { noOp } from './commandResult';
+import { withEntity } from './entityOps';
 
 function vec2Add(a: Vec2, b: Vec2): Vec2 {
   return [a[0] + b[0], a[1] + b[1]];
@@ -61,11 +62,6 @@ function vec2Scale(v: Vec2, s: number): Vec2 {
 function toWorld3D(local: Vec2, entityPos: Vec3, entityRotZ: number): Vec3 {
   const rotated = rotatePoint2(local, entityRotZ);
   return [rotated[0] + entityPos[0], rotated[1] + entityPos[1], entityPos[2]];
-}
-
-/** Rotate a 2D tangent by the entity's Z rotation to get the world tangent. */
-function toWorldTangent(localTangent: Vec2, entityRotZ: number): Vec2 {
-  return rotatePoint2(localTangent, entityRotZ);
 }
 
 /**
@@ -244,12 +240,12 @@ export const distributeAlongPath = defineCommand({
     }
 
     const pathPoints = pathEntity.points as ReadonlyArray<Vec2>;
-    const pathClosed: boolean = pathEntity.closed;
+    const pathClosed = pathEntity.closed;
 
-    if (!Array.isArray(pathPoints) || pathPoints.length < 2) {
+    if (pathPoints.length < 2) {
       return noOp(
         doc,
-        `distribute_along_path: path "${pathId}" has fewer than 2 points (got ${Array.isArray(pathPoints) ? pathPoints.length : 0}).`,
+        `distribute_along_path: path "${pathId}" has fewer than 2 points (got ${pathPoints.length}).`,
       );
     }
 
@@ -263,12 +259,7 @@ export const distributeAlongPath = defineCommand({
     }
 
     // --- Validate count ---
-    if (
-      !Number.isFinite(count) ||
-      count < 1 ||
-      !Number.isInteger(count) ||
-      count > MAX_COPIES_PER_COMMAND
-    ) {
+    if (count < 1 || !Number.isInteger(count) || count > MAX_COPIES_PER_COMMAND) {
       return noOp(
         doc,
         `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
@@ -332,11 +323,8 @@ export const distributeAlongPath = defineCommand({
     }
 
     // --- Extract entity position and Z-rotation ---
-    const entityPos: Vec3 = pathEntity.position ?? [0, 0, 0];
-    const entityRotZ: number =
-      Array.isArray(pathEntity.rotation) && pathEntity.rotation.length >= 3
-        ? (pathEntity.rotation[2] as number)
-        : 0;
+    const entityPos = pathEntity.position;
+    const entityRotZ = pathEntity.rotation[2];
 
     // --- Create instances ---
     const instanceName = name ?? component.name;
@@ -350,16 +338,12 @@ export const distributeAlongPath = defineCommand({
       // Convert local 2D point to world 3D position
       const worldPos: Vec3 = toWorld3D(sample.point, entityPos, entityRotZ);
 
-      // Compute rotation
-      let instanceRotation: Vec3;
-      if (tangentAlign) {
-        // World tangent = rotate local tangent by entity's Z rotation
-        const worldTangent = toWorldTangent(sample.tangent, entityRotZ);
-        const rz = Math.atan2(worldTangent[1], worldTangent[0]);
-        instanceRotation = [0, 0, rz];
-      } else {
-        instanceRotation = [0, 0, 0];
-      }
+      const worldTangent = rotatePoint2(sample.tangent, entityRotZ);
+      const instanceRotation: Vec3 = [
+        0,
+        0,
+        tangentAlign ? Math.atan2(worldTangent[1], worldTangent[0]) : 0,
+      ];
 
       const instanceId = nextId('instance');
       const instance: InstanceEntity = {
@@ -373,11 +357,7 @@ export const distributeAlongPath = defineCommand({
         name: `${instanceName}_${i}`,
       } as InstanceEntity & { name: string };
 
-      newDoc = {
-        ...newDoc,
-        entities: { ...newDoc.entities, [instanceId]: instance },
-        order: [...newDoc.order, instanceId],
-      };
+      newDoc = withEntity(newDoc, instance);
       createdIds.push(instanceId);
     }
 
