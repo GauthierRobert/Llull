@@ -48,18 +48,15 @@ export const extrudeSketch = defineCommand({
       .optional(),
   }),
   run: (doc, { id, depth, rotation }): CommandResult => {
-    // --- guard: depth ---
-    if (typeof depth !== 'number' || depth <= 0) {
+    if (depth <= 0) {
       return noop(doc, `extrude_sketch: depth must be > 0 (got ${depth}); entity ${id} unchanged.`);
     }
 
-    // --- guard: entity exists ---
     const source = doc.entities[id];
     if (!source) {
       return noop(doc, `extrude_sketch: no entity with id "${id}".`);
     }
 
-    // --- derive profile polygon ---
     let profile: ReadonlyArray<readonly [number, number]> | null = null;
 
     if (source.kind === 'circle') {
@@ -101,7 +98,6 @@ export const extrudeSketch = defineCommand({
       );
     }
 
-    // --- build new extrusion ---
     const extId = nextId('ext');
     const extrusion: ExtrusionEntity = {
       id: extId,
@@ -222,15 +218,13 @@ export const revolveProfile = defineCommand({
       id: explicitId,
     },
   ): CommandResult => {
-    // --- guard: profile ---
-    if (!Array.isArray(profile) || profile.length < 3) {
+    if (profile.length < 3) {
       return noop(
         doc,
-        `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${Array.isArray(profile) ? profile.length : 'non-array'}); no-op.`,
+        `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${profile.length}); no-op.`,
       );
     }
 
-    // --- guard: angle ---
     const TWO_PI = 2 * Math.PI;
     const angle = rawAngle !== undefined ? rawAngle : TWO_PI;
     if (!Number.isFinite(angle) || angle <= 0) {
@@ -240,7 +234,6 @@ export const revolveProfile = defineCommand({
       );
     }
 
-    // --- guard: axis ---
     const axis = resolveAxis(rawAxis);
     if (axis === null) {
       return noop(
@@ -249,7 +242,6 @@ export const revolveProfile = defineCommand({
       );
     }
 
-    // --- segments: clamp to minimum 3 ---
     const segments = Math.max(
       3,
       Math.round(
@@ -257,13 +249,11 @@ export const revolveProfile = defineCommand({
       ),
     );
 
-    // --- resolve layer ---
     const resolvedLayerId =
       typeof layerId === 'string' && doc.layers[layerId] !== undefined
         ? layerId
         : (Object.keys(doc.layers)[0] ?? 'layer-default');
 
-    // --- build entity ---
     const id = typeof explicitId === 'string' && explicitId.length > 0 ? explicitId : nextId('rev');
     const entity: RevolutionEntity = {
       id,
