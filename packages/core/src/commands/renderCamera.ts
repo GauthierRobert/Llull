@@ -2,15 +2,6 @@ import type { Vec3 } from '../model/types';
 import { sub3, dot3, cross3, normalize3 } from '../lib/vec3';
 
 export type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso';
-export const VALID_VIEWS: ReadonlySet<string> = new Set<ViewName>([
-  'top',
-  'bottom',
-  'front',
-  'back',
-  'left',
-  'right',
-  'iso',
-]);
 
 /** Camera described in world space (all Z-up). */
 export interface Camera {

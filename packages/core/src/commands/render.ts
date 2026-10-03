@@ -19,13 +19,7 @@ import { defineCommand, z } from './schema';
 import { computeSceneSnapshot } from './scene';
 import { type RenderViewData, type PreDepthPolygon, type Polygon3D } from './renderTypes';
 import { centroid3, applyRotation } from './renderMath';
-import {
-  type ViewName,
-  VALID_VIEWS,
-  cameraForView,
-  cameraBasis,
-  projectPoint,
-} from './renderCamera';
+import { type ViewName, cameraForView, cameraBasis, projectPoint } from './renderCamera';
 import {
   tessellateBox,
   tessellateCylinder,
@@ -137,11 +131,7 @@ function renderDocument(
   const rawPolys: PreDepthPolygon[] = [];
   for (const id of doc.order) {
     const e = doc.entities[id];
-    if (!e) continue;
-    const tess = tessellateEntity(e);
-    for (const p of tess) {
-      rawPolys.push(p);
-    }
+    if (e) rawPolys.push(...tessellateEntity(e));
   }
 
   // Cap polygon count
@@ -213,15 +203,9 @@ export const renderView = defineCommand({
       .describe('Output image height in pixels. Clamped to [64, 2000]. Default: 600.'),
   }),
   run: (doc, params): CommandResult => {
-    const rawParams = params;
-
-    // Resolve view
-    const rawView = rawParams.view ?? 'iso';
-    const view: ViewName = VALID_VIEWS.has(rawView) ? (rawView as ViewName) : 'iso';
-
-    // Clamp dimensions
-    const width = Math.max(64, Math.min(2000, Math.round(rawParams.width ?? 800)));
-    const height = Math.max(64, Math.min(2000, Math.round(rawParams.height ?? 600)));
+    const view: ViewName = params.view ?? 'iso';
+    const width = Math.max(64, Math.min(2000, Math.round(params.width ?? 800)));
+    const height = Math.max(64, Math.min(2000, Math.round(params.height ?? 600)));
 
     const data = renderDocument(doc, view, width, height);
 
