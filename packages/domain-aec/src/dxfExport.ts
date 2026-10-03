@@ -1,5 +1,4 @@
 /**
- * dxf: dxfExport.
  * @layer domain-aec
  */
 

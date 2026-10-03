@@ -1,5 +1,4 @@
 /**
- * quantities: takeoffBasics.
  * @layer domain-aec
  */
 

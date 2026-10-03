@@ -1,5 +1,4 @@
 /**
- * foundationCheck: foundationCheckRun.
  * @layer domain-aec
  */
 

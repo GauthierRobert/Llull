@@ -1,5 +1,4 @@
 /**
- * foundationCheck: foundationSettlement.
  * @layer domain-aec
  */
 

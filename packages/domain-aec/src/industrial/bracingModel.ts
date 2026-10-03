@@ -1,5 +1,4 @@
 /**
- * bracingCheck: bracingModel.
  * @layer domain-aec
  */
 

@@ -1,5 +1,4 @@
 /**
- * purlinCheck: purlinCheckRun.
  * @layer domain-aec
  */
 

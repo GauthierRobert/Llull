@@ -1,5 +1,4 @@
 /**
- * plan: planModel.
  * @layer domain-aec
  */
 

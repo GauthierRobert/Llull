@@ -1,5 +1,4 @@
 /**
- * evaluate: wallGeometry.
  * @layer domain-aec
  */
 

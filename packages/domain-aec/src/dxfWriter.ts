@@ -1,5 +1,4 @@
 /**
- * dxf: dxfWriter.
  * @layer domain-aec
  */
 

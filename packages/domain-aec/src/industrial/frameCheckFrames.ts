@@ -1,5 +1,4 @@
 /**
- * frameCheck: frameCheckFrames.
  * @layer domain-aec
  */
 

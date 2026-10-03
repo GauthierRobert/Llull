@@ -1,5 +1,4 @@
 /**
- * footingDesign: footingSizing.
  * @layer domain-aec
  */
 

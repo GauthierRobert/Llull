@@ -1,5 +1,4 @@
 /**
- * ifc: ifcOtherExport.
  * @layer domain-aec
  */
 

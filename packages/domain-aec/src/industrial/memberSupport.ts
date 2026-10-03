@@ -1,5 +1,4 @@
 /**
- * members: memberSupport.
  * @layer domain-aec
  */
 

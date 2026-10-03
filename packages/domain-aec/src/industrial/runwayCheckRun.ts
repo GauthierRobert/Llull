@@ -1,5 +1,4 @@
 /**
- * runwayCheck: runwayCheckRun.
  * @layer domain-aec
  */
 

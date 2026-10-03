@@ -1,5 +1,4 @@
 /**
- * frameModel: frameModelSolve.
  * @layer domain-aec
  */
 

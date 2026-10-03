@@ -1,5 +1,4 @@
 /**
- * frameModel: frameModelTypes.
  * @layer domain-aec
  */
 

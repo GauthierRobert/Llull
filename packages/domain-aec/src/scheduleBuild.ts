@@ -1,5 +1,4 @@
 /**
- * quantities: scheduleBuild.
  * @layer domain-aec
  */
 
