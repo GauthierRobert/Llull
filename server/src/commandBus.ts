@@ -21,10 +21,6 @@ import type { CadDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 
-// ---------------------------------------------------------------------------
-// History stacks
-// ---------------------------------------------------------------------------
-
 /** Maximum undo/redo depth — mirrors MAX_UNDO_DEPTH in the UI store. */
 const MAX_UNDO_DEPTH = 100;
 
@@ -41,10 +37,6 @@ function withMonotonicStepCounter(restored: CadDocument, current: CadDocument): 
   return restored.nextStepNumber === nextStepNumber ? restored : { ...restored, nextStepNumber };
 }
 
-// ---------------------------------------------------------------------------
-// Result type
-// ---------------------------------------------------------------------------
-
 /**
  * The value returned by `applyCommand`, `undo`, and `redo`.
  *
@@ -56,7 +48,7 @@ function withMonotonicStepCounter(restored: CadDocument, current: CadDocument): 
  * - `canUndo`  — whether undo is currently available.
  * - `canRedo`  — whether redo is currently available.
  */
-export interface CommandBusResult {
+interface CommandBusResult {
   summary: string;
   affected: string[];
   isError: boolean;
@@ -64,10 +56,6 @@ export interface CommandBusResult {
   canUndo: boolean;
   canRedo: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Apply a command to the shared live document.

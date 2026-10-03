@@ -22,10 +22,6 @@ interface SessionEntry {
  */
 export const sessions = new Map<string, SessionEntry>();
 
-// ---------------------------------------------------------------------------
-// Idle-TTL sweep
-// ---------------------------------------------------------------------------
-
 /**
  * Default TTL / sweep interval (overridden by env vars).
  *

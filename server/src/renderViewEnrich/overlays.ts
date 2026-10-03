@@ -3,10 +3,6 @@ import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';
 import { computeOrthoHalf, makeProjector } from './svgHelpers';
 
-// ---------------------------------------------------------------------------
-// ShowDimensions: overlay W × D × H as SVG text
-// ---------------------------------------------------------------------------
-
 /**
  * Append bounding-box dimension labels to an existing SVG string.
  *
@@ -51,10 +47,6 @@ export function appendDimensionLabels(svgString: string, data: RenderViewData): 
   // Insert dimension labels just before the closing </svg> tag
   return svgString.replace('</svg>', `${dimensionSvg}\n</svg>`);
 }
-
-// ---------------------------------------------------------------------------
-// Axes + Grid: world-frame triad and Z=0 ground grid overlay
-// ---------------------------------------------------------------------------
 
 /**
  * Compute axis tip length in world units — scaled to be visible relative to

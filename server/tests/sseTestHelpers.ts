@@ -6,7 +6,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
-export interface ParsedSseFrame {
+interface ParsedSseFrame {
   event: string;
   data: Record<string, unknown>;
 }

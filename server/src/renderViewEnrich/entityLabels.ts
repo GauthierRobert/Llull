@@ -11,10 +11,6 @@ import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';
 import { computeOrthoHalf, makeProjector } from './svgHelpers';
 
-// ---------------------------------------------------------------------------
-// Entity labels: per-entity id/name labels + key-point markers + legend
-// ---------------------------------------------------------------------------
-
 /**
  * Category of an entity for colour-coding in the label overlay.
  *   point    — PointEntity

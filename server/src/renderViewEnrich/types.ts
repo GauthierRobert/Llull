@@ -4,7 +4,7 @@
  * Server-only render_view enrichment param types (never passed to core).
  */
 
-export interface TurntableParams {
+interface TurntableParams {
   /** Number of evenly-spaced frames (1..12). */
   frames: number;
 }

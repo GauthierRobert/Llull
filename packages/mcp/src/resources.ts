@@ -22,10 +22,6 @@ import { serializeDocument } from '@core/commands/persistence';
 import { computeSceneSnapshot } from '@core/commands/scene';
 import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 
-// ---------------------------------------------------------------------------
-// Resource descriptor type (minimal — mirrors MCP ResourceSchema fields)
-// ---------------------------------------------------------------------------
-
 /**
  * A single resource listing entry, matching the MCP `Resource` schema.
  * The transport layer casts this to the SDK's type; we keep no SDK dep here.
@@ -46,10 +42,6 @@ export interface McpResourceContent {
   mimeType: string;
   text: string;
 }
-
-// ---------------------------------------------------------------------------
-// Static resource list (URIs + metadata, document-independent)
-// ---------------------------------------------------------------------------
 
 /** The URIs this module exposes. */
 export const CAD_RESOURCE_URIS = {
@@ -106,10 +98,6 @@ export function listMcpResources(): McpResourceDescriptor[] {
     },
   ];
 }
-
-// ---------------------------------------------------------------------------
-// Resource read handlers
-// ---------------------------------------------------------------------------
 
 /**
  * Read `cad://document` — full serialized CadDocument.

@@ -62,11 +62,9 @@
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
 import type { Entity } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
 // Minimal type-narrowing interface for the OCC WASM API.
 // Only models the subset this kernel uses. `any` is isolated to the one
 // boundary cast at init — identical pattern to manifoldKernel.ts.
-// ---------------------------------------------------------------------------
 
 interface OccShape {
   ShapeType(): unknown;
@@ -185,10 +183,6 @@ export interface OcctKernelOptions {
 
 export type OcctFactory = (moduleOptions: Record<string, unknown>) => Promise<OccApi>;
 
-// ---------------------------------------------------------------------------
-// Module-level singleton — WASM init is expensive; run it once.
-// ---------------------------------------------------------------------------
-
 let _modulePromise: Promise<OccApi> | null = null;
 
 /**
@@ -217,10 +211,6 @@ async function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
 
   return _modulePromise;
 }
-
-// ---------------------------------------------------------------------------
-// Helper: tessellate an OCC shape into our MeshData format.
-// ---------------------------------------------------------------------------
 
 function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   const mesher = new api.BRepMesh_IncrementalMesh_2(
@@ -283,7 +273,6 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   return { positions, indices };
 }
 
-// ---------------------------------------------------------------------------
 // Helper: reconstruct a TopoDS_Shape from arbitrary MeshData.
 //
 // Approach 2 — BRepBuilderAPI_Sewing:
@@ -298,7 +287,6 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
 //   - BRepBuilderAPI_MakeSolid.IsDone() is false.
 //
 // @pure (does not mutate mesh; all OCC objects are .delete()d before return)
-// ---------------------------------------------------------------------------
 
 function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   const { positions, indices } = mesh;
@@ -413,10 +401,8 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   return solid;
 }
 
-// ---------------------------------------------------------------------------
 // Entity → OCC TopoDS_Shape conversion.
 // Supports box only; every other kind returns null.
-// ---------------------------------------------------------------------------
 
 function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   switch (entity.kind) {
@@ -445,10 +431,6 @@ function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
       return null;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Kernel factory — the only public export.
-// ---------------------------------------------------------------------------
 
 /**
  * Create an OCC-backed geometry kernel.
@@ -633,12 +615,4 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
       }
     },
   };
-}
-
-/**
- * Reset the cached OCC module (for tests that need a clean slate).
- * Do NOT call in production code.
- */
-export function __resetOccModule(): void {
-  _modulePromise = null;
 }
