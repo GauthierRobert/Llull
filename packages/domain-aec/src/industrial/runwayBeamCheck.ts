@@ -30,11 +30,11 @@ import {
   type RunwayCheckRow,
   STATIC_TEST_FACTOR,
   bufferForce,
-  round,
   wheelDeflection,
   wheelMoment,
   wheelShear,
 } from './runwayCheckModel';
+import { round } from '../numeric';
 
 export function checkBeam(
   beam: SteelMemberElement,

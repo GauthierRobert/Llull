@@ -107,9 +107,6 @@ export interface Located {
   readonly end: Point;
 }
 
-export const round = (value: number, digits = 2): number =>
-  Math.round(value * 10 ** digits) / 10 ** digits;
-
 export const near = (a: number, b: number): boolean => Math.abs(a - b) <= TOLERANCE;
 
 /** Flexural buckling imperfection factor about the minor axis (EN 1993-1-1 Tab. 6.1/6.2). */

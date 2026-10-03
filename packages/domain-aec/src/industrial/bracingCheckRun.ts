@@ -30,8 +30,8 @@ import {
   bucklingResistance,
   craneWallForce,
   near,
-  round,
 } from './bracingModel';
+import { round } from '../numeric';
 
 /**
  * @command check_bracing

@@ -251,9 +251,6 @@ export function netLoads(
   });
 }
 
-export const round = (value: number, digits = 2): number =>
-  Math.round(value * 10 ** digits) / 10 ** digits;
-
 const roundUp = (value: number, step: number): number => Math.ceil(value / step - 1e-9) * step;
 
 export const sizeText = (size: PadSize): string => size.map((value) => Math.round(value)).join('×');

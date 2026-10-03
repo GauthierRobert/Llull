@@ -29,9 +29,9 @@ import {
   type Verdict,
   type WallZone,
   type ZoneSummary,
-  round,
 } from './purlinModel';
 import { beamVerdicts, freeFlangeReduction, governing } from './purlinSection';
+import { round } from '../numeric';
 
 /**
  * @command check_purlins

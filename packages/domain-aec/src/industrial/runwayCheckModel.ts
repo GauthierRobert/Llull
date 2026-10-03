@@ -123,7 +123,3 @@ export function wheelDeflection(
   const x = wheels === 2 ? (span - spacing) / 2 : span / 2;
   return (wheels * load * x * (3 * span ** 2 - 4 * x ** 2)) / (48 * E_STEEL * inertia);
 }
-
-export function round(value: number, digits = 2): number {
-  return Math.round(value * 10 ** digits) / 10 ** digits;
-}

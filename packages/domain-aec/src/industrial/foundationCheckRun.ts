@@ -25,7 +25,6 @@ import {
   footingRows,
   groundSlabWeight,
   plateRows,
-  round,
   slidingHorizontalOf,
 } from './foundationRows';
 import {
@@ -36,6 +35,7 @@ import {
   ultimateCombinations,
 } from './foundationCombinations';
 import { clayLayerError, footingSettlementParts } from './foundationSettlement';
+import { round } from '../numeric';
 
 /**
  * Checks footings and base plates of the columns of a level.

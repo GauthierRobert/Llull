@@ -11,6 +11,7 @@ import { toCsv } from '../scheduleBuild';
 import { CraneModel, FrameLoads } from './frameModelTypes';
 import { checkFrames } from './frameCheckFrames';
 import type { CheckRow } from './frameCheckSolve';
+import { round } from '../numeric';
 
 /** Load parameters shared by check_portal_frames and design_portal_frames. */
 export const FRAME_LOAD_SHAPE = {
@@ -177,8 +178,6 @@ export const checkPortalFrames = defineCommand({
       (best, row) => (best === null || row.utilisation > best.utilisation ? row : best),
       null,
     );
-    const round = (value: number, digits = 2): number =>
-      Math.round(value * 10 ** digits) / 10 ** digits;
     const columns = [
       'Frame',
       'Mark',

@@ -17,9 +17,9 @@ import {
   LOCAL_CATEGORIES,
   RAILS,
   type RunwayCheckRow,
-  round,
 } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
+import { round } from '../numeric';
 
 /**
  * @command check_crane_runways

@@ -36,10 +36,10 @@ import {
   evaluatePad,
   geometryOf,
   netLoads,
-  round,
   sizeText,
   trialSizes,
 } from './footingSizing';
+import { round } from '../numeric';
 
 const footingDesignParams = z.object({
   ...FRAME_LOAD_SHAPE,

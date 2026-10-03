@@ -40,6 +40,7 @@ import {
   worst,
 } from './foundationCombinations';
 import { footingSettlementParts } from './foundationSettlement';
+import { round } from '../numeric';
 
 /** Footing check rows (bearing, uplift, overturning, sliding, settlement) of one column's pad. */
 export function footingRows(
@@ -399,6 +400,3 @@ export function defaultThrustTie(doc: CadDocument, levelId: string): boolean {
     (element) => element.category === 'slab' && element.levelId === levelId,
   );
 }
-
-export const round = (value: number, digits = 2): number =>
-  Math.round(value * 10 ** digits) / 10 ** digits;
