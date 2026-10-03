@@ -5,7 +5,9 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { getBuilding, isFiniteNumber, noChange } from './model';
+import { getBuilding } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { priceTakeoff } from './costing';
 import { computeTakeoff } from './takeoffCompute';
 import { buildSchedule, toCsv, type ScheduleKind } from './scheduleBuild';
@@ -131,7 +133,7 @@ export const setCostRates = defineCommand({
   }),
   run: (doc, { rates, currency, replace = false }): CommandResult => {
     if (!validRates(rates) || Object.keys(rates).length === 0) {
-      return noChange(
+      return noop(
         doc,
         'set_cost_rates failed: rates must be a non-empty map of key → number >= 0.',
       );
@@ -172,7 +174,7 @@ export const estimateCost = defineCommand({
   }),
   run: (doc, { rates, currency }): CommandResult => {
     if (rates !== undefined && !validRates(rates)) {
-      return noChange(doc, 'estimate_cost failed: rates must be a map of key → number >= 0.');
+      return noop(doc, 'estimate_cost failed: rates must be a map of key → number >= 0.');
     }
     const building = getBuilding(doc);
     const resolvedCurrency = currency?.trim() || building.currency || 'EUR';

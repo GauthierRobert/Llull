@@ -4,15 +4,9 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import {
-  elementAffected,
-  fromMm,
-  getBuilding,
-  isFiniteNumber,
-  noChange,
-  toMetres,
-  withElement,
-} from '../model';
+import { elementAffected, fromMm, getBuilding, toMetres, withElement } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { findProfile } from '../steel/profiles';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
 import { baseReactions } from './frameModelSolve';
@@ -87,17 +81,17 @@ export const designFootings = defineCommand({
     const soilBearing = params.soilBearing ?? DEFAULT_SOIL_BEARING;
     const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
     if (!isFiniteNumber(soilBearing) || soilBearing <= 0) {
-      return noChange(doc, 'design_footings failed: soilBearing must be a number > 0 (kPa).');
+      return noop(doc, 'design_footings failed: soilBearing must be a number > 0 (kPa).');
     }
     if (!isFiniteNumber(soilModulus) || soilModulus <= 0) {
-      return noChange(doc, 'design_footings failed: soilModulus must be a number > 0 (MPa).');
+      return noop(doc, 'design_footings failed: soilModulus must be a number > 0 (MPa).');
     }
     if (params.clayLayer !== undefined) {
       const clayError = clayLayerError(params.clayLayer);
-      if (clayError) return noChange(doc, `design_footings failed: ${clayError}.`);
+      if (clayError) return noop(doc, `design_footings failed: ${clayError}.`);
     }
     const resolved = resolveFrameLoads(doc, params);
-    if ('reason' in resolved) return noChange(doc, `design_footings failed: ${resolved.reason}.`);
+    if ('reason' in resolved) return noop(doc, `design_footings failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     const allowShrink = params.allowShrink ?? false;
     const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
@@ -255,7 +249,7 @@ export const designFootings = defineCommand({
       });
     }
     if (rows.length === 0) {
-      return noChange(
+      return noop(
         doc,
         `design_footings failed: no portal frame column with a footing on level '${levelId}'.`,
       );

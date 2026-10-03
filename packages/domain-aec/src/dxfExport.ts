@@ -5,7 +5,8 @@
 import { type CadDocument, type Vec2, is2D } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, fromMm, getBuilding, noChange } from './model';
+import { fileSlug, fromMm, getBuilding } from './model';
+import { noop } from '@core/commands/noop';
 import { buildPlanDrawing } from './planDrawing';
 import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, toWorld, writePrimitive } from './dxfWriter';
 
@@ -275,9 +276,9 @@ export const exportDxf = defineCommand({
       ...(levelId !== undefined ? { levelId } : {}),
       ...(includeDrafting !== undefined ? { includeDrafting } : {}),
     });
-    if (!result) return noChange(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
+    if (!result) return noop(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
     if (result.entityCount === 0) {
-      return noChange(doc, 'export_dxf: nothing to export (no building elements or 2D drafting).');
+      return noop(doc, 'export_dxf: nothing to export (no building elements or 2D drafting).');
     }
     return {
       document: doc,

@@ -5,7 +5,9 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
+import { fromMm, getBuilding } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { toCsv } from '../scheduleBuild';
 import { findProfile } from '../steel/profiles';
 import { sectionResistance, yieldStrength } from './steelDesign';
@@ -113,7 +115,7 @@ export const checkBracing = defineCommand({
     const { windPressure = 0.6, deadLoad = 0.5, snowLoad = 0.8 } = params;
     const nonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
     if (!nonNegative(windPressure) || !nonNegative(deadLoad) || !nonNegative(snowLoad)) {
-      return noChange(doc, 'check_bracing failed: windPressure, deadLoad, snowLoad must be >= 0.');
+      return noop(doc, 'check_bracing failed: windPressure, deadLoad, snowLoad must be >= 0.');
     }
     const { travelSpeed = DEFAULT_TRAVEL_SPEED, bufferStiffness = DEFAULT_BUFFER_STIFFNESS } =
       params;
@@ -124,13 +126,13 @@ export const checkBracing = defineCommand({
       ['bufferStiffness', bufferStiffness],
     ] as const) {
       if (value !== undefined && !(isFiniteNumber(value) && value > 0)) {
-        return noChange(doc, `check_bracing failed: ${name} must be a number > 0.`);
+        return noop(doc, `check_bracing failed: ${name} must be a number > 0.`);
       }
     }
     const building = getBuilding(doc);
     const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
     if (levelId === undefined || !building.levels[levelId]) {
-      return noChange(doc, `check_bracing failed: no level '${params.levelId ?? ''}'.`);
+      return noop(doc, `check_bracing failed: no level '${params.levelId ?? ''}'.`);
     }
     const unit = fromMm(doc, 1);
     const members: Located[] = [];
@@ -154,10 +156,10 @@ export const checkBracing = defineCommand({
     const braces = members.filter(({ member }) => member.role === 'brace');
     const rafters = members.filter(({ member }) => member.role === 'rafter');
     if (braces.length === 0) {
-      return noChange(doc, `check_bracing: no bracing (role brace) on level '${levelId}'.`);
+      return noop(doc, `check_bracing: no bracing (role brace) on level '${levelId}'.`);
     }
     if (rafters.length === 0) {
-      return noChange(doc, `check_bracing failed: no rafters on level '${levelId}' (no gable).`);
+      return noop(doc, `check_bracing failed: no rafters on level '${levelId}' (no gable).`);
     }
 
     // Hall envelope from the end frame (rafter plane y0) and the frame columns.

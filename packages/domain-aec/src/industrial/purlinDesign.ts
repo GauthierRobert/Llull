@@ -8,14 +8,9 @@ import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import {
-  elementAffected,
-  fromMm,
-  getBuilding,
-  isFiniteNumber,
-  noChange,
-  withElement,
-} from '../model';
+import { elementAffected, fromMm, getBuilding, withElement } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { sweepFrame } from '../mesh';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
@@ -92,7 +87,7 @@ export const designPurlins = defineCommand({
     if (
       !(isFiniteNumber(targetUtilisation) && targetUtilisation >= 0.5 && targetUtilisation <= 1)
     ) {
-      return noChange(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
+      return noop(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
     }
     const analyse = (document: CadDocument): { rows: PurlinRow[]; summary: string } => {
       const result = checkPurlins.run(document, loadParams);
@@ -101,7 +96,7 @@ export const designPurlins = defineCommand({
     };
     const first = analyse(doc);
     if (first.rows.length === 0) {
-      return noChange(doc, `design_purlins failed: ${first.summary}`);
+      return noop(doc, `design_purlins failed: ${first.summary}`);
     }
     let current = doc;
     let limited = false;

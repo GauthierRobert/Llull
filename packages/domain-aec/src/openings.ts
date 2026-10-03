@@ -16,14 +16,14 @@ import { projectOntoSegment } from '@lib/polygon';
 import {
   fromMm,
   getBuilding,
-  isFiniteNumber,
   isVec2,
   nextElementId,
   nextMark,
-  noChange,
   withElement,
   elementAffected,
 } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
 import { arcOffsetOf, curvedWallExtent, curvedWallLength } from './curvedWallGeometry';
@@ -61,7 +61,7 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
   const building = getBuilding(doc);
   const wall = building.elements[params.wallId];
   if (!wall || (wall.category !== 'wall' && wall.category !== 'curvedWall')) {
-    return noChange(
+    return noop(
       doc,
       `${name} failed: no wall '${params.wallId}'. Use describe_building to list walls.`,
     );
@@ -91,10 +91,7 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     height <= 0 ||
     sillHeight < 0
   ) {
-    return noChange(
-      doc,
-      `${name} failed: width/height must be > 0, sillHeight >= 0, offset finite.`,
-    );
+    return noop(doc, `${name} failed: width/height must be > 0, sillHeight >= 0, offset finite.`);
   }
   const opening: OpeningElement = {
     id: nextElementId(building, kind),
@@ -115,7 +112,7 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     openingsOf(building, wall.id),
     hostExtent(building, wall),
   );
-  if (fitError) return noChange(doc, `${name} failed: ${fitError}.`);
+  if (fitError) return noop(doc, `${name} failed: ${fitError}.`);
   const document = regenerateBuilding(doc, withElement(building, opening));
   return {
     document,
@@ -237,11 +234,11 @@ export const updateOpening = defineCommand({
     const building = getBuilding(doc);
     const opening = building.elements[openingId];
     if (!opening || (opening.category !== 'door' && opening.category !== 'window')) {
-      return noChange(doc, `update_opening failed: no door or window '${openingId}'.`);
+      return noop(doc, `update_opening failed: no door or window '${openingId}'.`);
     }
     const wall = building.elements[opening.hostId];
     if (!wall || (wall.category !== 'wall' && wall.category !== 'curvedWall')) {
-      return noChange(doc, `update_opening failed: host wall '${opening.hostId}' is missing.`);
+      return noop(doc, `update_opening failed: host wall '${opening.hostId}' is missing.`);
     }
     const updated: OpeningElement = {
       ...opening,
@@ -262,7 +259,7 @@ export const updateOpening = defineCommand({
       updated.height <= 0 ||
       updated.sillHeight < 0
     ) {
-      return noChange(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
+      return noop(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
     }
     const fitError = openingFitError(
       wall,
@@ -270,7 +267,7 @@ export const updateOpening = defineCommand({
       openingsOf(building, wall.id),
       hostExtent(building, wall),
     );
-    if (fitError) return noChange(doc, `update_opening refused: ${fitError}.`);
+    if (fitError) return noop(doc, `update_opening refused: ${fitError}.`);
     const document = regenerateBuilding(doc, withElement(building, updated));
     return {
       document,

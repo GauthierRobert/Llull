@@ -17,14 +17,14 @@ import {
 import {
   fromMm,
   getBuilding,
-  isFiniteNumber,
   isVec2List,
-  noChange,
   toMetres,
   toVec2,
   withElement,
   elementAffected,
 } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { stairPoint } from './stairGeometry';
 import { triangulatePolygon } from '@lib/triangulate';
@@ -142,10 +142,10 @@ export const addSlabOpening = defineCommand({
     if (stairId !== undefined) {
       const stair = building.elements[stairId];
       if (stair?.category !== 'stair')
-        return noChange(doc, `add_slab_opening failed: no stair '${stairId}'.`);
+        return noop(doc, `add_slab_opening failed: no stair '${stairId}'.`);
       const clearance = margin ?? fromMm(doc, 100);
       if (!isFiniteNumber(clearance) || clearance < 0) {
-        return noChange(doc, 'add_slab_opening failed: margin must be >= 0.');
+        return noop(doc, 'add_slab_opening failed: margin must be >= 0.');
       }
       outline = stairFootprint(stair, clearance);
       slab = slabId === undefined ? slabAboveStair(building, stair, outline) : undefined;
@@ -153,7 +153,7 @@ export const addSlabOpening = defineCommand({
       outline = boundary.map(toVec2);
     }
     if (!outline) {
-      return noChange(
+      return noop(
         doc,
         'add_slab_opening failed: give a boundary of ≥ 3 [x, y] points or a stairId.',
       );
@@ -163,7 +163,7 @@ export const addSlabOpening = defineCommand({
       slab = candidate?.category === 'slab' ? candidate : undefined;
     }
     if (!slab) {
-      return noChange(
+      return noop(
         doc,
         slabId !== undefined
           ? `add_slab_opening failed: no slab '${slabId}'.`
@@ -171,7 +171,7 @@ export const addSlabOpening = defineCommand({
       );
     }
     const error = slabOpeningError(slab, outline);
-    if (error) return noChange(doc, `add_slab_opening refused: ${error}.`);
+    if (error) return noop(doc, `add_slab_opening refused: ${error}.`);
     const updated: SlabElement = { ...slab, openings: [...(slab.openings ?? []), outline] };
     const document = regenerateBuilding(doc, withElement(building, updated));
     const area = polygonArea(outline) * toMetres(doc, 1) ** 2;
@@ -201,10 +201,10 @@ export const deleteSlabOpening = defineCommand({
     const building = getBuilding(doc);
     const slab = building.elements[slabId];
     if (slab?.category !== 'slab')
-      return noChange(doc, `delete_slab_opening failed: no slab '${slabId}'.`);
+      return noop(doc, `delete_slab_opening failed: no slab '${slabId}'.`);
     const openings = slab.openings ?? [];
     if (!Number.isInteger(index) || index < 0 || index >= openings.length) {
-      return noChange(
+      return noop(
         doc,
         `delete_slab_opening failed: slab ${slab.mark} has ${openings.length} opening(s).`,
       );

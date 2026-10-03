@@ -11,14 +11,14 @@ import {
   elementAffected,
   fromMm,
   getBuilding,
-  isFiniteNumber,
   nextElementId,
   nextMark,
-  noChange,
   resolveLevel,
   toMetres,
   withElement,
 } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { toVec3 } from './memberSupport';
 
@@ -55,7 +55,7 @@ export const addCableTray = defineCommand({
   run: (doc, { points, width, height, system, levelId }): CommandResult => {
     const route = Array.isArray(points) ? points.map(toVec3) : [];
     if (route.length < 2 || route.some((point) => point === null)) {
-      return noChange(doc, 'add_cable_tray failed: points must be ≥ 2 [x, y, z] points.');
+      return noop(doc, 'add_cable_tray failed: points must be ≥ 2 [x, y, z] points.');
     }
     const path = route as Vec3[];
     const repeated = path.some((point, index) => {
@@ -74,13 +74,13 @@ export const addCableTray = defineCommand({
       !(isFiniteNumber(resolvedWidth) && resolvedWidth > 0) ||
       !(isFiniteNumber(resolvedHeight) && resolvedHeight > 0)
     ) {
-      return noChange(
+      return noop(
         doc,
         'add_cable_tray failed: consecutive points must differ, width and height be > 0.',
       );
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
-    if (!resolution.ok) return noChange(doc, `add_cable_tray failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_cable_tray failed: ${resolution.reason}.`);
     const tray: CableTrayElement = {
       id: nextElementId(resolution.building, 'tray'),
       category: 'tray',

@@ -6,7 +6,9 @@ import type { GridElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
+import { fileSlug, getBuilding, toMetres } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import {
   MARGIN,
   PAPER_MM,
@@ -81,16 +83,16 @@ export const exportAnchorPlan = defineCommand({
   }),
   run: (doc, { levelId, scale, paper, embedment }): CommandResult => {
     if (scale !== undefined && !(isFiniteNumber(scale) && scale > 0)) {
-      return noChange(doc, 'export_anchor_plan failed: scale must be a number > 0.');
+      return noop(doc, 'export_anchor_plan failed: scale must be a number > 0.');
     }
     if (embedment !== undefined && !(isFiniteNumber(embedment) && embedment > 0)) {
-      return noChange(doc, 'export_anchor_plan failed: embedment must be a number > 0.');
+      return noop(doc, 'export_anchor_plan failed: embedment must be a number > 0.');
     }
     const building = getBuilding(doc);
     const resolvedId = levelId ?? building.activeLevelId ?? building.levelOrder[0];
     const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;
     if (!level) {
-      return noChange(
+      return noop(
         doc,
         `export_anchor_plan failed: no such level${levelId !== undefined ? ` '${levelId}'` : ''} (add_level / add_portal_frame_building first).`,
       );
@@ -98,7 +100,7 @@ export const exportAnchorPlan = defineCommand({
     const mm = (value: number): number => toMetres(doc, value) * 1000;
     const plates = placePlates(doc, level, mm);
     if (plates.length === 0) {
-      return noChange(
+      return noop(
         doc,
         `export_anchor_plan failed: no base plates on level ${level.id} (add_base_plates first).`,
       );

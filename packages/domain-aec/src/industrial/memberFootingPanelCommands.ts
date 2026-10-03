@@ -10,15 +10,15 @@ import {
   elementAffected,
   fromMm,
   getBuilding,
-  isFiniteNumber,
   isVec2,
   nextElementId,
   nextMark,
-  noChange,
   resolveLevel,
   toVec2,
   withElement,
 } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { panelFrame } from './evaluate';
 import { levelIdSchema, toVec3 } from './memberSupport';
@@ -144,13 +144,13 @@ export const addFooting = defineCommand({
     const positive = (value: number | undefined): boolean =>
       value === undefined || (isFiniteNumber(value) && value > 0);
     if (!positive(params.width) || !positive(params.length) || !positive(params.thickness)) {
-      return noChange(doc, 'add_footing failed: width, length and thickness must be > 0.');
+      return noop(doc, 'add_footing failed: width, length and thickness must be > 0.');
     }
     if (params.topOffset !== undefined && !isFiniteNumber(params.topOffset)) {
-      return noChange(doc, 'add_footing failed: topOffset must be finite.');
+      return noop(doc, 'add_footing failed: topOffset must be finite.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
-    if (!resolution.ok) return noChange(doc, `add_footing failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_footing failed: ${resolution.reason}.`);
     const feet = params.underColumns
       ? columnFeet(resolution.building, resolution.level.id, fromMm(doc, 10))
       : [];
@@ -160,7 +160,7 @@ export const addFooting = defineCommand({
         ? [toVec2(params.location)]
         : [];
     if (locations.length === 0) {
-      return noChange(
+      return noop(
         doc,
         !params.underColumns
           ? 'add_footing failed: location must be [x, y] (or set underColumns).'
@@ -230,20 +230,20 @@ export const addPanel = defineCommand({
   run: (doc, { corners, role = 'wall', thickness, levelId, material }): CommandResult => {
     const points = Array.isArray(corners) ? corners.map(toVec3) : [];
     if (points.length < 3 || points.some((point) => point === null)) {
-      return noChange(doc, 'add_panel failed: corners must be ≥ 3 [x, y, z] points.');
+      return noop(doc, 'add_panel failed: corners must be ≥ 3 [x, y, z] points.');
     }
     if (thickness !== undefined && !(isFiniteNumber(thickness) && thickness > 0)) {
-      return noChange(doc, 'add_panel failed: thickness must be > 0.');
+      return noop(doc, 'add_panel failed: thickness must be > 0.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
-    if (!resolution.ok) return noChange(doc, `add_panel failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_panel failed: ${resolution.reason}.`);
     const added = appendPanel(doc, resolution.building, resolution.level.id, {
       corners: points as Vec3[],
       role: role === 'roof' ? 'roof' : 'wall',
       ...(thickness !== undefined ? { thickness } : {}),
       ...(material !== undefined ? { material } : {}),
     });
-    if (!added) return noChange(doc, 'add_panel failed: the corners do not span a plane.');
+    if (!added) return noop(doc, 'add_panel failed: the corners do not span a plane.');
     const document = regenerateBuilding(doc, added.building);
     return {
       document,

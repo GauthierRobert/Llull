@@ -1,8 +1,8 @@
 import type { ConstraintKind, JointKind } from '../model/types';
 import { isRecord } from '../lib/isRecord';
+import { isFiniteNumber } from '../lib/isFiniteNumber';
 import { documentExtensions } from '../plugins/host';
 import {
-  isFiniteNumber,
   isStringArray,
   validateCamera,
   validateLayer,
