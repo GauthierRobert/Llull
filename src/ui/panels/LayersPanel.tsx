@@ -18,15 +18,11 @@
  * (architecture L1, react R1)
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useStore, useViewportStore } from '@ui/store';
 import type { Layer } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelHeader } from '@ui/panels/PanelParts';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function useLayerEntityCounts(): Record<string, number> {
   const entities = useStore((s) => s.document.entities);
@@ -38,10 +34,6 @@ function useLayerEntityCounts(): Record<string, number> {
   }
   return counts;
 }
-
-// ---------------------------------------------------------------------------
-// Layer row — read-only with local viewport visibility toggle
-// ---------------------------------------------------------------------------
 
 interface LayerRowProps {
   layer: Layer;
@@ -57,10 +49,6 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
   const isLocallyHidden = hiddenLayerIds.has(layer.id);
   const effectivelyVisible = layer.visible && !isLocallyHidden;
 
-  const handleLocalVisibilityToggle = useCallback(() => {
-    toggleLayerVisibility(layer.id);
-  }, [layer.id, toggleLayerVisibility]);
-
   return (
     <li
       className={`panel__row layer-row${effectivelyVisible ? '' : ' layer-row--hidden'}`}
@@ -70,7 +58,7 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
       <button
         type="button"
         className={`icon-btn layer-visibility-btn${effectivelyVisible ? '' : ' layer-visibility-btn--hidden'}`}
-        onClick={handleLocalVisibilityToggle}
+        onClick={() => toggleLayerVisibility(layer.id)}
         aria-pressed={effectivelyVisible}
         aria-label={
           effectivelyVisible
@@ -120,11 +108,7 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
   );
 }
 
-// ---------------------------------------------------------------------------
-// LayersPanel
-// ---------------------------------------------------------------------------
-
-export interface LayersPanelProps {
+interface LayersPanelProps {
   className?: string;
 }
 

@@ -20,12 +20,15 @@ backed by the server's Python bridge).
 
 ## Layout
 - `packages/mcp/src` (`@mcp/*`, pure, no transport): `tools.ts` (`buildMcpTools` from
-  `toToolSchemas`), `dispatch.ts` (`applyMcpToolCall`, result shaping), `toolsets.ts`
+  `toToolSchemas`), `dispatch.ts` (`shapeToolCallContent`, result shaping), `toolsets.ts`
   (`TOOLSETS`, `parseToolsets`, `isToolEnabled`), `discovery.ts` (`search_tools`,
   `enable_toolset`), `resources.ts`, `prompts.ts`, `conventions.ts`, `liveSync.ts`.
-- `server/src` (transport only): `mcp.ts` (Streamable HTTP router, per-session `Server`),
-  `mcp/sessions.ts`, `liveDocument.ts` (the shared document + command log), `index.ts` (REST +
-  `/live`), `geometryKernel.ts` (`LLULL_KERNEL`), `plugins.ts` (installs default plugins first).
+- `server/src` (transport only): `index.ts` (middleware + route mounting), `mcp.ts` (Streamable HTTP
+  router, session routing), `mcp/server.ts` (per-session `Server`: tools/resources/prompts
+  handlers), `mcp/sessions.ts`, `liveRoutes.ts` (`/live`, `/command`, `/undo`, `/redo`),
+  `exportRoutes.ts` (`/export/*`), `lifecycle.ts` (bind + graceful shutdown), `liveDocument.ts`
+  (the shared document + command log), `geometryKernel.ts` (`LLULL_KERNEL`), `plugins.ts`
+  (installs default plugins first).
 
 ## Tool exposure
 1. Default session = `core` toolset + `search_tools` / `enable_toolset`. `search_tools { query,

@@ -25,7 +25,7 @@ export interface FrameMember {
   readonly load?: { readonly qx: number; readonly qy: number };
 }
 
-export interface MemberResult {
+interface MemberResult {
   /** Axial force (tension +) at end a and b. */
   readonly axial: readonly [number, number];
   /** Shear at end a and b (local y). */
@@ -151,6 +151,11 @@ function toGlobal(c: number, s: number, local: ReadonlyArray<number>): number[] 
   ];
 }
 
+function memberDofs(member: FrameMember): number[] {
+  const [a, b] = [3 * member.a, 3 * member.b];
+  return [a, a + 1, a + 2, b, b + 1, b + 2];
+}
+
 /**
  * @returns displacements and member forces, or null for a mechanism / invalid model
  */
@@ -166,23 +171,14 @@ export function solveFrame(
     const local = localOf(nodes, member);
     if (!local) return null;
     locals.push(local);
-    const dofs = [
-      3 * member.a,
-      3 * member.a + 1,
-      3 * member.a + 2,
-      3 * member.b,
-      3 * member.b + 1,
-      3 * member.b + 2,
-    ];
+    const dofs = memberDofs(member);
     // Kg = Tᵀ k T, built column by column from unit vectors.
     for (let j = 0; j < 6; j++) {
       const unit = new Array<number>(6).fill(0);
       unit[j] = 1;
+      const localUnit = toLocal(local.c, local.s, unit);
       const kLocal = local.k.map((row) =>
-        row.reduce(
-          (sum, value, index) => sum + value * (toLocal(local.c, local.s, unit)[index] as number),
-          0,
-        ),
+        row.reduce((sum, value, index) => sum + value * (localUnit[index] as number), 0),
       );
       const column = toGlobal(local.c, local.s, kLocal);
       for (let i = 0; i < 6; i++) {
@@ -233,14 +229,7 @@ export function solveFrame(
   });
   const results = members.map((member, index): MemberResult => {
     const local = locals[index] as Local;
-    const global = [
-      3 * member.a,
-      3 * member.a + 1,
-      3 * member.a + 2,
-      3 * member.b,
-      3 * member.b + 1,
-      3 * member.b + 2,
-    ].map((dof) => u[dof] as number);
+    const global = memberDofs(member).map((dof) => u[dof] as number);
     const d = toLocal(local.c, local.s, global);
     const end = local.k.map(
       (row, i) =>

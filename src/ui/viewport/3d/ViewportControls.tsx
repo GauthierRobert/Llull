@@ -17,10 +17,6 @@ function Divider(): React.ReactElement {
   return <span className="vp-divider" aria-hidden="true" />;
 }
 
-// ---------------------------------------------------------------------------
-// 3D snap toggle
-// ---------------------------------------------------------------------------
-
 function Snap3DToggle(): React.ReactElement {
   const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
   const toggleSnap3d = useViewportStore((s) => s.toggleSnap3d);
@@ -39,10 +35,6 @@ function Snap3DToggle(): React.ReactElement {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Display mode segmented button
-// ---------------------------------------------------------------------------
 
 const DISPLAY_MODES: { value: DisplayMode; label: string; title: string; icon: IconName }[] = [
   { value: 'shaded', label: 'Shaded', title: 'Shaded — standard PBR rendering', icon: 'shaded' },
@@ -78,10 +70,6 @@ function DisplayModeControl(): React.ReactElement {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Section / clipping plane — toggle (in toolbar) + options popover (under it)
-// ---------------------------------------------------------------------------
 
 const CLIP_AXES: { value: ClipAxis; label: string }[] = [
   { value: 'x', label: 'X' },
@@ -190,11 +178,6 @@ function SectionPopover(): React.ReactElement | null {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Animation transport controls — Play/Pause + Reset
-// Only rendered when the document declares at least one animation.
-// ---------------------------------------------------------------------------
-
 function AnimationTransportControls(): React.ReactElement | null {
   const animations = useStore((s) => s.document.animations);
   const animationPlaying = useViewportStore((s) => s.animationPlaying);
@@ -230,10 +213,6 @@ function AnimationTransportControls(): React.ReactElement | null {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Quality selector — Auto / High / Medium / Low
-// ---------------------------------------------------------------------------
 
 const QUALITY_OPTIONS: { value: QualityOverride; label: string; title: string }[] = [
   { value: 'auto', label: 'Auto', title: 'Auto — tier scales with scene size (recommended)' },
@@ -284,10 +263,6 @@ function QualityControl(): React.ReactElement {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Exported overlay
-// ---------------------------------------------------------------------------
 
 export function ViewportControls(): React.ReactElement {
   return (

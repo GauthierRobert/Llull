@@ -183,6 +183,19 @@ describe('MCP toolsets', () => {
     expect(names).not.toContain('import_step');
   });
 
+  it('tools/list advertises registry annotations', async () => {
+    const sessionId = await openSession();
+    const { tools } = (await rpc(sessionId, 'tools/list', {})) as {
+      tools: { name: string; annotations?: { readOnlyHint?: boolean } }[];
+    };
+    expect(tools.find((tool) => tool.name === 'describe_scene')?.annotations?.readOnlyHint).toBe(
+      true,
+    );
+    expect(
+      tools.find((tool) => tool.name === 'add_box')?.annotations?.readOnlyHint,
+    ).toBeUndefined();
+  });
+
   it('tools/call refuses a tool of a disabled toolset and names it', async () => {
     const sessionId = await openSession();
     const result = (await rpc(sessionId, 'tools/call', {

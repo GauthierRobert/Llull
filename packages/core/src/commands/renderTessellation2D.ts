@@ -6,14 +6,41 @@ function place2D(localPt: Vec2, position: Vec3): Vec3 {
   return [position[0] + localPt[0], position[1] + localPt[1], position[2]];
 }
 
+const stroke = (verts: Vec3[], color: string): PreDepthPolygon => ({
+  verts,
+  color,
+  normal: [0, 0, 1],
+  stroke: true,
+});
+
+/** SEG_CIRCLE+1 samples of an ellipse arc from `startAngle` sweeping `span` radians. */
+function strokeEllipseArc(
+  e: { position: Vec3; center: Vec2; color: string },
+  radiusX: number,
+  radiusY: number,
+  startAngle: number,
+  span: number,
+): PreDepthPolygon[] {
+  const verts: Vec3[] = [];
+  for (let i = 0; i <= SEG_CIRCLE; i++) {
+    const a = startAngle + (span * i) / SEG_CIRCLE;
+    verts.push(
+      place2D(
+        [e.center[0] + radiusX * Math.cos(a), e.center[1] + radiusY * Math.sin(a)],
+        e.position,
+      ),
+    );
+  }
+  return [stroke(verts, e.color)];
+}
+
 export function tessellate2DLine(e: {
   position: Vec3;
   start: Vec2;
   end: Vec2;
   color: string;
 }): PreDepthPolygon[] {
-  const verts: Vec3[] = [place2D(e.start, e.position), place2D(e.end, e.position)];
-  return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
+  return [stroke([place2D(e.start, e.position), place2D(e.end, e.position)], e.color)];
 }
 
 export function tessellate2DPolyline(e: {
@@ -23,9 +50,9 @@ export function tessellate2DPolyline(e: {
   color: string;
 }): PreDepthPolygon[] {
   if (e.points.length < 2) return [];
-  const verts: Vec3[] = e.points.map((pt) => place2D(pt, e.position));
+  const verts = e.points.map((pt) => place2D(pt, e.position));
   if (e.closed) verts.push(verts[0]!);
-  return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
+  return [stroke(verts, e.color)];
 }
 
 export function tessellate2DArc(e: {
@@ -36,17 +63,9 @@ export function tessellate2DArc(e: {
   endAngle: number;
   color: string;
 }): PreDepthPolygon[] {
-  const segs = SEG_CIRCLE;
-  const { startAngle, endAngle, radius, color } = e;
-  let span = endAngle - startAngle;
+  let span = e.endAngle - e.startAngle;
   if (span <= 0) span += 2 * Math.PI;
-  const verts: Vec3[] = [];
-  for (let i = 0; i <= segs; i++) {
-    const a = startAngle + (span * i) / segs;
-    const local: Vec2 = [e.center[0] + radius * Math.cos(a), e.center[1] + radius * Math.sin(a)];
-    verts.push(place2D(local, e.position));
-  }
-  return [{ verts, color, normal: [0, 0, 1], stroke: true }];
+  return strokeEllipseArc(e, e.radius, e.radius, e.startAngle, span);
 }
 
 export function tessellate2DCircle(e: {
@@ -55,14 +74,7 @@ export function tessellate2DCircle(e: {
   radius: number;
   color: string;
 }): PreDepthPolygon[] {
-  const { radius, color } = e;
-  const verts: Vec3[] = [];
-  for (let i = 0; i <= SEG_CIRCLE; i++) {
-    const a = (2 * Math.PI * i) / SEG_CIRCLE;
-    const local: Vec2 = [e.center[0] + radius * Math.cos(a), e.center[1] + radius * Math.sin(a)];
-    verts.push(place2D(local, e.position));
-  }
-  return [{ verts, color, normal: [0, 0, 1], stroke: true }];
+  return strokeEllipseArc(e, e.radius, e.radius, 0, 2 * Math.PI);
 }
 
 export function tessellate2DRectangle(e: {
@@ -77,9 +89,9 @@ export function tessellate2DRectangle(e: {
     [px + e.width, py, pz],
     [px + e.width, py + e.height, pz],
     [px, py + e.height, pz],
-    [px, py, pz], // close
+    [px, py, pz],
   ];
-  return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
+  return [stroke(verts, e.color)];
 }
 
 export function tessellate2DEllipse(e: {
@@ -89,16 +101,7 @@ export function tessellate2DEllipse(e: {
   radiusY: number;
   color: string;
 }): PreDepthPolygon[] {
-  const verts: Vec3[] = [];
-  for (let i = 0; i <= SEG_CIRCLE; i++) {
-    const a = (2 * Math.PI * i) / SEG_CIRCLE;
-    const local: Vec2 = [
-      e.center[0] + e.radiusX * Math.cos(a),
-      e.center[1] + e.radiusY * Math.sin(a),
-    ];
-    verts.push(place2D(local, e.position));
-  }
-  return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
+  return strokeEllipseArc(e, e.radiusX, e.radiusY, 0, 2 * Math.PI);
 }
 
 /**
@@ -113,7 +116,7 @@ export function tessellate2DSpline(e: {
 }): PreDepthPolygon[] {
   if (e.points.length < 2) return [];
   const pts = [...e.points];
-  if (e.closed) pts.push(pts[0]!); // close loop
+  if (e.closed) pts.push(pts[0]!);
 
   const STEPS = 8; // subdivisions per segment
   const verts: Vec3[] = [];
@@ -145,31 +148,27 @@ export function tessellate2DSpline(e: {
       verts.push(place2D([x, y], e.position));
     }
   }
-  return [{ verts, color: e.color, normal: [0, 0, 1], stroke: true }];
+  return [stroke(verts, e.color)];
 }
 
 export function tessellate2DPoint(e: { position: Vec3; color: string }): PreDepthPolygon[] {
-  // Render as a tiny cross (4 short line segments)
+  // A tiny cross: two short segments.
   const [px, py, pz] = e.position;
-  const s = 0.1; // small cross arm
+  const s = 0.1;
   return [
-    {
-      verts: [
+    stroke(
+      [
         [px - s, py, pz],
         [px + s, py, pz],
       ],
-      color: e.color,
-      normal: [0, 0, 1],
-      stroke: true,
-    },
-    {
-      verts: [
+      e.color,
+    ),
+    stroke(
+      [
         [px, py - s, pz],
         [px, py + s, pz],
       ],
-      color: e.color,
-      normal: [0, 0, 1],
-      stroke: true,
-    },
+      e.color,
+    ),
   ];
 }

@@ -10,8 +10,7 @@ import { useStore } from '@ui/store';
 import type { BuildingElement } from '@core/model/building';
 import type { DocumentUnit } from '@core/model/types';
 import { boltSize } from '@aec/industrial/evaluate';
-import { Icon } from '@ui/components/Icon';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { PanelSection, IconButton } from '@ui/panels/PanelParts';
 
 const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string>> = {
   grid: 'Grid',
@@ -99,14 +98,13 @@ function ElementRow({ element, selected }: ElementRowProps): React.ReactElement 
         <span className="panel__row-meta">{describe(element, units)}</span>
       </button>
       <span className="panel__row-actions">
-        <button
-          type="button"
-          className="icon-btn icon-btn--danger"
-          aria-label={`Delete ${CATEGORY_LABEL[element.category]} ${element.mark}`}
+        <IconButton
+          icon="close"
+          danger
+          size={12}
+          label={`Delete ${CATEGORY_LABEL[element.category]} ${element.mark}`}
           onClick={() => dispatch('delete_building_element', { elementIds: [element.id] })}
-        >
-          <Icon name="close" size={12} />
-        </button>
+        />
       </span>
     </li>
   );

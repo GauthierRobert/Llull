@@ -8,6 +8,7 @@
 import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
+import { noop } from './noop';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 
@@ -31,7 +32,7 @@ export const rotateEntity = defineCommand({
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `No entity ${id} to rotate.`, affected: [] };
+      return noop(doc, `No entity ${id} to rotate.`);
     }
     const rotated: Entity = {
       ...target,
@@ -48,6 +49,123 @@ export const rotateEntity = defineCommand({
     };
   },
 });
+
+const scaleVec2 = ([x, y]: readonly [number, number], f: number): Vec2 => [x * f, y * f];
+const scaleVec3 = ([x, y, z]: readonly [number, number, number], f: number): Vec3 => [
+  x * f,
+  y * f,
+  z * f,
+];
+
+/** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
+function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
+  switch (e.kind) {
+    case 'box':
+    case 'wedge': {
+      const size = scaleVec3(e.size, f);
+      return { scaled: { ...e, size }, dims: `new size [${size.join(', ')}]` };
+    }
+    case 'cylinder':
+    case 'cone': {
+      const radius = e.radius * f;
+      const height = e.height * f;
+      return { scaled: { ...e, radius, height }, dims: `new radius ${radius}, height ${height}` };
+    }
+    case 'sphere': {
+      const radius = e.radius * f;
+      return { scaled: { ...e, radius }, dims: `new radius ${radius}` };
+    }
+    case 'extrusion': {
+      const depth = e.depth * f;
+      return {
+        scaled: { ...e, profile: e.profile.map((p) => scaleVec2(p, f)), depth },
+        dims: `new depth ${depth}`,
+      };
+    }
+    case 'line': {
+      const start = scaleVec2(e.start, f);
+      const end = scaleVec2(e.end, f);
+      return {
+        scaled: { ...e, start, end },
+        dims: `new start [${start.join(', ')}] end [${end.join(', ')}]`,
+      };
+    }
+    case 'polyline':
+    case 'spline':
+      return {
+        scaled: { ...e, points: e.points.map((p) => scaleVec2(p, f)) },
+        dims: `scaled ${e.points.length} points`,
+      };
+    case 'arc':
+    case 'circle': {
+      const center = scaleVec2(e.center, f);
+      const radius = e.radius * f;
+      return {
+        scaled: { ...e, center, radius },
+        dims: `new center [${center.join(', ')}] radius ${radius}`,
+      };
+    }
+    case 'rectangle': {
+      const width = e.width * f;
+      const height = e.height * f;
+      return { scaled: { ...e, width, height }, dims: `new size ${width}×${height}` };
+    }
+    case 'ellipse': {
+      const center = scaleVec2(e.center, f);
+      const radiusX = e.radiusX * f;
+      const radiusY = e.radiusY * f;
+      return {
+        scaled: { ...e, center, radiusX, radiusY },
+        dims: `new center [${center.join(', ')}] radiusX ${radiusX} radiusY ${radiusY}`,
+      };
+    }
+    case 'text': {
+      const height = e.height * f;
+      return { scaled: { ...e, height }, dims: `new height ${height}` };
+    }
+    case 'point':
+      return { scaled: { ...e }, dims: 'point unchanged' };
+    case 'dimension':
+      // References stay attached; only the witness-line offset is scaled.
+      return e.offset === undefined
+        ? { scaled: { ...e }, dims: 'offset unchanged (no offset set)' }
+        : { scaled: { ...e, offset: e.offset * f }, dims: `new offset ${e.offset * f}` };
+    case 'mesh': {
+      const positions = e.mesh.positions.map((v) => v * f);
+      return {
+        scaled: { ...e, mesh: { ...e.mesh, positions } },
+        dims: `scaled ${positions.length / 3} vertices`,
+      };
+    }
+    case 'torus': {
+      const ringRadius = e.ringRadius * f;
+      const tubeRadius = e.tubeRadius * f;
+      return {
+        scaled: { ...e, ringRadius, tubeRadius },
+        dims: `new ringRadius ${ringRadius}, tubeRadius ${tubeRadius}`,
+      };
+    }
+    case 'pyramid': {
+      const baseWidth = e.baseWidth * f;
+      const baseDepth = e.baseDepth * f;
+      const height = e.height * f;
+      return {
+        scaled: { ...e, baseWidth, baseDepth, height },
+        dims: `new baseWidth ${baseWidth}, baseDepth ${baseDepth}, height ${height}`,
+      };
+    }
+    case 'revolution':
+      // Radial and axial profile offsets scale; axis direction is unchanged.
+      return {
+        scaled: { ...e, profile: e.profile.map((p) => scaleVec2(p, f)) },
+        dims: `scaled ${e.profile.length}-point profile`,
+      };
+    case 'instance': {
+      const scale = scaleVec3(e.scale ?? [1, 1, 1], f);
+      return { scaled: { ...e, scale }, dims: `new scale [${scale.join(', ')}]` };
+    }
+  }
+}
 
 /**
  * @command scale_entity
@@ -71,205 +189,13 @@ export const scaleEntity = defineCommand({
   run: (doc, { id, factor }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `No entity ${id} to scale.`, affected: [] };
+      return noop(doc, `No entity ${id} to scale.`);
     }
     if (factor <= 0) {
-      return {
-        document: doc,
-        summary: `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(doc, `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`);
     }
 
-    let scaled: Entity;
-    switch (target.kind) {
-      case 'box':
-        scaled = {
-          ...target,
-          size: [target.size[0] * factor, target.size[1] * factor, target.size[2] * factor],
-        };
-        break;
-      case 'cylinder':
-        scaled = {
-          ...target,
-          radius: target.radius * factor,
-          height: target.height * factor,
-        };
-        break;
-      case 'sphere':
-        scaled = { ...target, radius: target.radius * factor };
-        break;
-      case 'extrusion':
-        scaled = {
-          ...target,
-          profile: target.profile.map(([x, y]) => [x * factor, y * factor] as const),
-          depth: target.depth * factor,
-        };
-        break;
-      case 'line':
-        scaled = {
-          ...target,
-          start: [target.start[0] * factor, target.start[1] * factor] as Vec2,
-          end: [target.end[0] * factor, target.end[1] * factor] as Vec2,
-        };
-        break;
-      case 'polyline':
-        scaled = {
-          ...target,
-          points: target.points.map(([x, y]) => [x * factor, y * factor] as Vec2),
-        };
-        break;
-      case 'arc':
-        scaled = {
-          ...target,
-          center: [target.center[0] * factor, target.center[1] * factor] as Vec2,
-          radius: target.radius * factor,
-        };
-        break;
-      case 'circle':
-        scaled = {
-          ...target,
-          center: [target.center[0] * factor, target.center[1] * factor] as Vec2,
-          radius: target.radius * factor,
-        };
-        break;
-      case 'rectangle':
-        scaled = {
-          ...target,
-          width: target.width * factor,
-          height: target.height * factor,
-        };
-        break;
-      case 'ellipse':
-        scaled = {
-          ...target,
-          center: [target.center[0] * factor, target.center[1] * factor] as Vec2,
-          radiusX: target.radiusX * factor,
-          radiusY: target.radiusY * factor,
-        };
-        break;
-      case 'spline':
-        scaled = {
-          ...target,
-          points: target.points.map(([x, y]) => [x * factor, y * factor] as Vec2),
-        };
-        break;
-      case 'text':
-        scaled = { ...target, height: target.height * factor };
-        break;
-      case 'point':
-        // A point has no local geometry beyond position; return it unchanged.
-        scaled = { ...target };
-        break;
-      case 'dimension':
-        // References stay attached; only the witness-line offset is scaled.
-        scaled = {
-          ...target,
-          ...(target.offset !== undefined ? { offset: target.offset * factor } : {}),
-        };
-        break;
-      case 'mesh':
-        // Scale all world-space position triples in the flat positions array.
-        scaled = {
-          ...target,
-          mesh: {
-            ...target.mesh,
-            positions: target.mesh.positions.map((v) => v * factor),
-          },
-        };
-        break;
-      case 'cone':
-        scaled = {
-          ...target,
-          radius: target.radius * factor,
-          height: target.height * factor,
-        };
-        break;
-      case 'torus':
-        scaled = {
-          ...target,
-          ringRadius: target.ringRadius * factor,
-          tubeRadius: target.tubeRadius * factor,
-        };
-        break;
-      case 'wedge':
-        scaled = {
-          ...target,
-          size: [target.size[0] * factor, target.size[1] * factor, target.size[2] * factor],
-        };
-        break;
-      case 'pyramid':
-        scaled = {
-          ...target,
-          baseWidth: target.baseWidth * factor,
-          baseDepth: target.baseDepth * factor,
-          height: target.height * factor,
-        };
-        break;
-      case 'revolution':
-        // Scale the profile radial and axial offsets; axis direction is unchanged.
-        scaled = {
-          ...target,
-          profile: target.profile.map(([x, y]) => [x * factor, y * factor] as const),
-        };
-        break;
-      case 'instance':
-        // Scale an instance by multiplying its per-axis scale field.
-        scaled = {
-          ...target,
-          scale: [
-            (target.scale?.[0] ?? 1) * factor,
-            (target.scale?.[1] ?? 1) * factor,
-            (target.scale?.[2] ?? 1) * factor,
-          ],
-        };
-        break;
-    }
-
-    const dims =
-      scaled.kind === 'box'
-        ? `new size [${scaled.size.join(', ')}]`
-        : scaled.kind === 'cylinder'
-          ? `new radius ${scaled.radius}, height ${scaled.height}`
-          : scaled.kind === 'sphere'
-            ? `new radius ${scaled.radius}`
-            : scaled.kind === 'extrusion'
-              ? `new depth ${scaled.depth}`
-              : scaled.kind === 'mesh'
-                ? `scaled ${scaled.mesh.positions.length / 3} vertices`
-                : scaled.kind === 'cone'
-                  ? `new radius ${scaled.radius}, height ${scaled.height}`
-                  : scaled.kind === 'torus'
-                    ? `new ringRadius ${scaled.ringRadius}, tubeRadius ${scaled.tubeRadius}`
-                    : scaled.kind === 'wedge'
-                      ? `new size [${scaled.size.join(', ')}]`
-                      : scaled.kind === 'pyramid'
-                        ? `new baseWidth ${scaled.baseWidth}, baseDepth ${scaled.baseDepth}, height ${scaled.height}`
-                        : scaled.kind === 'line'
-                          ? `new start [${scaled.start.join(', ')}] end [${scaled.end.join(', ')}]`
-                          : scaled.kind === 'polyline'
-                            ? `scaled ${scaled.points.length} points`
-                            : scaled.kind === 'arc'
-                              ? `new center [${scaled.center.join(', ')}] radius ${scaled.radius}`
-                              : scaled.kind === 'circle'
-                                ? `new center [${scaled.center.join(', ')}] radius ${scaled.radius}`
-                                : scaled.kind === 'rectangle'
-                                  ? `new size ${scaled.width}×${scaled.height}`
-                                  : scaled.kind === 'ellipse'
-                                    ? `new center [${scaled.center.join(', ')}] radiusX ${scaled.radiusX} radiusY ${scaled.radiusY}`
-                                    : scaled.kind === 'spline'
-                                      ? `scaled ${scaled.points.length} points`
-                                      : scaled.kind === 'text'
-                                        ? `new height ${scaled.height}`
-                                        : scaled.kind === 'dimension'
-                                          ? scaled.offset !== undefined
-                                            ? `new offset ${scaled.offset}`
-                                            : 'offset unchanged (no offset set)'
-                                          : scaled.kind === 'revolution'
-                                            ? `scaled ${scaled.profile.length}-point profile`
-                                            : scaled.kind === 'instance'
-                                              ? `new scale [${scaled.scale?.join(', ') ?? '1, 1, 1'}]`
-                                              : 'point unchanged';
+    const { scaled, dims } = scaleGeometry(target, factor);
     return {
       document: { ...doc, entities: { ...doc.entities, [id]: scaled } },
       summary: `Scaled ${id} by factor ${factor}; ${dims}.`,
@@ -304,14 +230,13 @@ export const mirrorEntity = defineCommand({
   run: (doc, { id, axis }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `No entity ${id} to mirror.`, affected: [] };
+      return noop(doc, `No entity ${id} to mirror.`);
     }
     if (!VALID_AXES.has(axis)) {
-      return {
-        document: doc,
-        summary: `mirror_entity: axis must be 'x', 'y', or 'z' (got '${axis}'); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `mirror_entity: axis must be 'x', 'y', or 'z' (got '${axis}'); entity ${id} unchanged.`,
+      );
     }
 
     const [px, py, pz] = target.position;
@@ -368,21 +293,19 @@ export const arrayLinear = defineCommand({
   run: (doc, { id, count, offset }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `array_linear: No entity ${id}.`, affected: [] };
+      return noop(doc, `array_linear: No entity ${id}.`);
     }
     if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
-      return {
-        document: doc,
-        summary: `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
+      );
     }
     if (!Number.isFinite(offset[0]) || !Number.isFinite(offset[1]) || !Number.isFinite(offset[2])) {
-      return {
-        document: doc,
-        summary: `array_linear: offset must be finite (got [${offset.join(', ')}]); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `array_linear: offset must be finite (got [${offset.join(', ')}]); entity ${id} unchanged.`,
+      );
     }
 
     const [ox, oy, oz] = target.position;
@@ -439,14 +362,13 @@ export const arrayPolar = defineCommand({
   run: (doc, { id, count, center, angle = 2 * Math.PI }): CommandResult => {
     const target = doc.entities[id];
     if (!target) {
-      return { document: doc, summary: `array_polar: No entity ${id}.`, affected: [] };
+      return noop(doc, `array_polar: No entity ${id}.`);
     }
     if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
-      return {
-        document: doc,
-        summary: `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
+      );
     }
 
     const [px, py] = target.position;

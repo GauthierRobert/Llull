@@ -17,15 +17,11 @@
  * @see create_component, insert_instance, explode_instance
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useStore } from '@ui/store';
 import type { Component, InstanceEntity } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
-
-// ---------------------------------------------------------------------------
-// Section A: Component row
-// ---------------------------------------------------------------------------
 
 interface ComponentRowProps {
   component: Component;
@@ -33,10 +29,6 @@ interface ComponentRowProps {
 
 function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-
-  const handleInsert = useCallback(() => {
-    dispatch('insert_instance', { componentId: component.id });
-  }, [dispatch, component.id]);
 
   const entityCount = component.order.length;
 
@@ -62,7 +54,7 @@ function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
       <button
         type="button"
         className="btn btn--ghost btn--sm"
-        onClick={handleInsert}
+        onClick={() => dispatch('insert_instance', { componentId: component.id })}
         aria-label={`Insert instance of ${component.name}`}
         title="Insert instance at origin"
       >
@@ -72,10 +64,6 @@ function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
     </li>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Section B: Instance row
-// ---------------------------------------------------------------------------
 
 interface InstanceRowProps {
   instance: InstanceEntity;
@@ -90,17 +78,10 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
   const [px, py, pz] = instance.position;
   const posLabel = `[${px.toFixed(1)}, ${py.toFixed(1)}, ${pz.toFixed(1)}]`;
 
-  const handleClick = useCallback(() => {
-    select([instance.id]);
-  }, [select, instance.id]);
-
-  const handleExplode = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      dispatch('explode_instance', { id: instance.id });
-    },
-    [dispatch, instance.id],
-  );
+  const handleExplode = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    dispatch('explode_instance', { id: instance.id });
+  };
 
   return (
     <li
@@ -108,7 +89,7 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
       data-testid={`assembly-instance-${instance.id}`}
       aria-label={`Instance of ${componentName}`}
       aria-selected={selected}
-      onClick={handleClick}
+      onClick={() => select([instance.id])}
       role="option"
     >
       <span className="panel__row-icon" aria-hidden="true">
@@ -136,11 +117,7 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
   );
 }
 
-// ---------------------------------------------------------------------------
-// AssemblyPanel — the exported panel
-// ---------------------------------------------------------------------------
-
-export interface AssemblyPanelProps {
+interface AssemblyPanelProps {
   className?: string;
 }
 

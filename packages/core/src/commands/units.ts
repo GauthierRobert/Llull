@@ -10,6 +10,7 @@
 import type { CadDocument, DocumentUnit } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 
 const UNITS = ['mm', 'cm', 'm', 'in', 'ft'] as const satisfies readonly DocumentUnit[];
 
@@ -39,20 +40,15 @@ export const setUnits = defineCommand({
   run: (doc, { units, displayPrecision }): CommandResult => {
     if (displayPrecision !== undefined) {
       if (displayPrecision < 0 || !Number.isInteger(displayPrecision)) {
-        return {
-          document: doc,
-          summary: `Invalid displayPrecision ${String(displayPrecision)}. Must be a non-negative integer.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `Invalid displayPrecision ${String(displayPrecision)}. Must be a non-negative integer.`,
+        );
       }
     }
 
     if (units === undefined && displayPrecision === undefined) {
-      return {
-        document: doc,
-        summary: 'No changes: provide at least one of units or displayPrecision.',
-        affected: [],
-      };
+      return noop(doc, 'No changes: provide at least one of units or displayPrecision.');
     }
 
     const nextUnits: DocumentUnit = units ?? doc.units;

@@ -69,6 +69,22 @@ export function collectSnapCandidates(
     allSegments.push(...segments);
   };
 
+  /** Tangent + nearest snaps shared by arcs (full = false) and circles (full = true). */
+  const addCurveSnaps = (
+    cx: number,
+    cy: number,
+    r: number,
+    startAngle: number,
+    endAngle: number,
+    full: boolean,
+  ): void => {
+    if (doTangents) candidates.push(...snapTangentToCircle(from, cx, cy, r));
+    if (doNearest && cursor !== null) {
+      const [nx, ny] = nearestOnArc(cursor[0], cursor[1], cx, cy, r, startAngle, endAngle, full);
+      candidates.push({ x: nx, y: ny, type: 'nearest' });
+    }
+  };
+
   for (const id of document.order) {
     const entity = document.entities[id];
     if (!entity || !is2D(entity)) continue;
@@ -155,23 +171,7 @@ export function collectSnapCandidates(
             type: 'midpoint',
           });
         }
-        if (doTangents) {
-          const snaps = snapTangentToCircle(from, cx, cy, r);
-          candidates.push(...snaps);
-        }
-        if (doNearest && cursor !== null) {
-          const [nx, ny] = nearestOnArc(
-            cursor[0],
-            cursor[1],
-            cx,
-            cy,
-            r,
-            entity.startAngle,
-            entity.endAngle,
-            false,
-          );
-          candidates.push({ x: nx, y: ny, type: 'nearest' });
-        }
+        addCurveSnaps(cx, cy, r, entity.startAngle, entity.endAngle, false);
         break;
       }
 
@@ -190,14 +190,7 @@ export function collectSnapCandidates(
           candidates.push({ x: cx, y: cy + r, type: 'endpoint' });
           candidates.push({ x: cx, y: cy - r, type: 'endpoint' });
         }
-        if (doTangents) {
-          const snaps = snapTangentToCircle(from, cx, cy, r);
-          candidates.push(...snaps);
-        }
-        if (doNearest && cursor !== null) {
-          const [nx, ny] = nearestOnArc(cursor[0], cursor[1], cx, cy, r, 0, 0, true);
-          candidates.push({ x: nx, y: ny, type: 'nearest' });
-        }
+        addCurveSnaps(cx, cy, r, 0, 0, true);
         break;
       }
 

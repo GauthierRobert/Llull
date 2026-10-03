@@ -29,12 +29,10 @@ import { useNamedViewStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import type { NamedViewCamera } from '@ui/store';
 
-// ---------------------------------------------------------------------------
 // Module-level bridge between inner (Canvas) and outer (DOM) layers.
 // Pattern mirrors ViewPresets._innerRef — intentional architectural exception
 // for the Canvas boundary (r3f does not support portals/context across it).
 // Holds ONLY imperative callbacks — never mutates the document.
-// ---------------------------------------------------------------------------
 
 const _namedViewsRef: {
   /** Capture current camera position + target. Returns null if controls not ready. */
@@ -50,10 +48,6 @@ const _namedViewsRef: {
   getCameraSnapshot: null,
   applyCamera: null,
 };
-
-// ---------------------------------------------------------------------------
-// Inner component (must be inside <Canvas> to access useThree)
-// ---------------------------------------------------------------------------
 
 /**
  * Mounted INSIDE the r3f Canvas so it can call useThree().
@@ -110,10 +104,6 @@ export function NamedViewsInner(): null {
 
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Outer overlay (outside the Canvas)
-// ---------------------------------------------------------------------------
 
 /**
  * Rendered OUTSIDE the Canvas as a DOM overlay.

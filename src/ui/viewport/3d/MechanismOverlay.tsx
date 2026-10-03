@@ -29,10 +29,6 @@ import { useViewportStore } from '@ui/store';
 import type { Constraint, Joint, Vec3 } from '@core/model/types';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const REVOLUTE_COLOR = '#00e5ff';
 const PRISMATIC_COLOR = '#e040fb';
 const CONSTRAINT_COLOR = '#ffd740';
@@ -54,10 +50,6 @@ function entityPosition(
   if (!e) return new THREE.Vector3(0, 0, 0);
   return new THREE.Vector3(e.position[0], e.position[1], e.position[2]);
 }
-
-// ---------------------------------------------------------------------------
-// ConstraintLine — line between the two entity positions + label
-// ---------------------------------------------------------------------------
 
 interface ConstraintLineProps {
   constraint: Constraint;
@@ -128,10 +120,6 @@ function ConstraintLine({ constraint, entities }: ConstraintLineProps): React.Re
   );
 }
 
-// ---------------------------------------------------------------------------
-// JointArrow — axis arrow at instance a's position
-// ---------------------------------------------------------------------------
-
 interface JointArrowProps {
   joint: Joint;
   entities: Record<string, { position: Vec3 }>;
@@ -170,10 +158,6 @@ function JointArrow({ joint, entities }: JointArrowProps): React.ReactElement | 
 
   return <primitive object={arrowHelper} renderOrder={998} />;
 }
-
-// ---------------------------------------------------------------------------
-// MechanismOverlay — exported; mount inside the floating-origin group
-// ---------------------------------------------------------------------------
 
 /**
  * Reads the viewport-store `mechanismSelection` and renders the appropriate

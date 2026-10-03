@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { Icon } from '@ui/components/Icon';
 import type { IconName } from '@ui/components/Icon';
 
-export interface PanelHeaderProps {
+interface PanelHeaderProps {
   title: string;
   count?: number;
   countLabel?: string;
@@ -34,7 +34,7 @@ export function PanelHeader({
   );
 }
 
-export interface PanelEmptyProps {
+interface PanelEmptyProps {
   icon: IconName;
   message: string;
   hint?: string;
@@ -51,7 +51,7 @@ export function PanelEmpty({ icon, message, hint, compact }: PanelEmptyProps): R
   );
 }
 
-export interface PanelSectionProps {
+interface PanelSectionProps {
   title: string;
   count?: number;
   countLabel?: string;
@@ -96,5 +96,46 @@ export function PanelSection({
       )}
       {open && <div className="panel__section-body">{children}</div>}
     </section>
+  );
+}
+
+interface IconButtonProps {
+  icon: IconName;
+  label: string;
+  title?: string;
+  size?: number;
+  danger?: boolean;
+  className?: string;
+  testId?: string;
+  disabled?: boolean;
+  pressed?: boolean;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}
+
+export function IconButton({
+  icon,
+  label,
+  title,
+  size = 13,
+  danger = false,
+  className,
+  testId,
+  disabled,
+  pressed,
+  onClick,
+}: IconButtonProps): React.ReactElement {
+  return (
+    <button
+      type="button"
+      className={['icon-btn', danger && 'icon-btn--danger', className].filter(Boolean).join(' ')}
+      data-testid={testId}
+      disabled={disabled}
+      aria-pressed={pressed}
+      aria-label={label}
+      title={title ?? label}
+      onClick={onClick}
+    >
+      <Icon name={icon} size={size} />
+    </button>
   );
 }

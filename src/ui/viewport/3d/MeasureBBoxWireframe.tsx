@@ -16,10 +16,6 @@ import { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { useBoundingBoxMeasure } from '../useBoundingBoxMeasure';
 
-// ---------------------------------------------------------------------------
-// BBoxLines — renders the 12 edges of the AABB as a LineSegments object
-// ---------------------------------------------------------------------------
-
 interface BBoxLinesProps {
   min: readonly [number, number, number];
   max: readonly [number, number, number];
@@ -93,10 +89,6 @@ function BBoxLines({ min, max }: BBoxLinesProps): React.ReactElement | null {
 
   return <lineSegments geometry={geometry} material={material} renderOrder={999} />;
 }
-
-// ---------------------------------------------------------------------------
-// MeasureBBoxWireframe — exported; mounts inside the floating-origin group
-// ---------------------------------------------------------------------------
 
 /**
  * Reads the last measure result and, if it is a bounding-box result, renders

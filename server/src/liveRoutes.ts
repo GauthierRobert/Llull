@@ -1,0 +1,73 @@
+/**
+ * @layer server
+ * The shared live document over REST + SSE (protocol: `@mcp/liveSync`).
+ *
+ *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation.
+ *                        Unauthenticated: EventSource cannot send Authorization headers.
+ *   GET  /live/snapshot  `{ seq, stateHash, document }` for resync after a gap or hash mismatch
+ *   POST /command        `{ name, params?, commandId? }`; a repeated `commandId` is idempotent
+ *   POST /undo, /redo    "Nothing to undo/redo." is a normal result, not an error
+ */
+
+import { Router, type RequestHandler } from 'express';
+import { applyCommand, undo, redo } from './commandBus';
+import { subscribeLive, getLiveSnapshot } from './liveDocument';
+import { guardMutation } from './security';
+
+const KEEPALIVE_MS = 25_000;
+
+/** @param restLimiter shared REST rate limiter (one counter across every REST route). */
+export function buildLiveRouter(restLimiter: RequestHandler): Router {
+  const router = Router();
+  const mutationGuard = guardMutation();
+
+  router.get('/live', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+    const unsubscribe = subscribeLive(res);
+    const keepaliveTimer = setInterval(() => res.write(':keepalive\n\n'), KEEPALIVE_MS);
+    req.on('close', () => {
+      clearInterval(keepaliveTimer);
+      unsubscribe();
+      res.end();
+    });
+  });
+
+  router.get('/live/snapshot', restLimiter, (_req, res) => {
+    res.status(200).json(getLiveSnapshot());
+  });
+
+  router.post('/command', restLimiter, mutationGuard, (req, res) => {
+    const body = req.body as unknown;
+    if (typeof body !== 'object' || body === null || !('name' in body)) {
+      res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
+      return;
+    }
+    const { name, params, commandId } = body as {
+      name: unknown;
+      params?: unknown;
+      commandId?: unknown;
+    };
+    if (typeof name !== 'string' || name.length === 0) {
+      res.status(400).json({ error: '"name" must be a non-empty string.' });
+      return;
+    }
+    if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
+      res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
+      return;
+    }
+    res.status(200).json(applyCommand(name, params ?? {}, commandId));
+  });
+
+  router.post('/undo', restLimiter, mutationGuard, (_req, res) => {
+    res.status(200).json(undo());
+  });
+
+  router.post('/redo', restLimiter, mutationGuard, (_req, res) => {
+    res.status(200).json(redo());
+  });
+
+  return router;
+}

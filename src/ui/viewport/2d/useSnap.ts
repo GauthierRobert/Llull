@@ -18,7 +18,7 @@ import type { SnapResult, SnapPoint, CollectOpts, OrthoPolarOpts } from './snapp
 /** Shared empty result — avoids per-render allocation when no cursor snaps apply. */
 const NO_CANDIDATES: readonly SnapPoint[] = [];
 
-export interface UseSnapOpts {
+interface UseSnapOpts {
   /** Grid cell size in world units. Default 1. */
   gridSize?: number;
   /** Snap tolerance in world units. Default 0.5. */

@@ -58,29 +58,23 @@ export function isPlanAction(value: unknown): value is PlanAction {
   );
 }
 
-export function isRepeatStep(value: unknown): value is RepeatStep {
+/** `{ [key]: {...}, step: { command: string } }` — shared shape of repeat / for_each steps. */
+function isControlStep(value: unknown, key: 'repeat' | 'for_each'): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
-    typeof v['repeat'] === 'object' &&
-    v['repeat'] !== null &&
+    typeof v[key] === 'object' &&
+    v[key] !== null &&
     typeof v['step'] === 'object' &&
     v['step'] !== null &&
     typeof (v['step'] as Record<string, unknown>)['command'] === 'string'
   );
 }
 
-export function isForEachStep(value: unknown): value is ForEachStep {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v['for_each'] === 'object' &&
-    v['for_each'] !== null &&
-    typeof v['step'] === 'object' &&
-    v['step'] !== null &&
-    typeof (v['step'] as Record<string, unknown>)['command'] === 'string'
-  );
-}
+export const isRepeatStep = (value: unknown): value is RepeatStep => isControlStep(value, 'repeat');
+
+export const isForEachStep = (value: unknown): value is ForEachStep =>
+  isControlStep(value, 'for_each');
 
 export function budgetFailure(index: number): StepReport {
   return {
@@ -92,7 +86,12 @@ export function budgetFailure(index: number): StepReport {
   };
 }
 
-export function noop(doc: CadDocument, data: BuildProjectData, summary: string): CommandResult {
+/** A rejected `build_project` run: unchanged doc plus the plan report. */
+export function rejectPlan(
+  doc: CadDocument,
+  data: BuildProjectData,
+  summary: string,
+): CommandResult {
   return { document: doc, summary, affected: [], data };
 }
 
