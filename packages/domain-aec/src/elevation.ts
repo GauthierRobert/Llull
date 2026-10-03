@@ -24,6 +24,7 @@ import {
   type PaperSize,
   type Viewport,
 } from './sheet';
+import { cross, dot, sub } from './vec3';
 
 export type ElevationDirection = 'north' | 'south' | 'east' | 'west';
 
@@ -77,13 +78,6 @@ export interface ElevationDrawing {
 
 const FEATURE_COS = Math.cos((25 * Math.PI) / 180);
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => [
   a[0] + (b[0] - a[0]) * t,
   a[1] + (b[1] - a[1]) * t,

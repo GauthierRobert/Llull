@@ -8,6 +8,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { shapeToolCallContent } from '@mcp/index';
 import type { CadDocument } from '@core/model/types';
+import type { RenderViewData } from '@core/commands/render';
 import { applyCommand } from '../commandBus';
 import { stripSvgFromData, rasterizeSvg } from '../renderImage';
 import {
@@ -19,6 +20,7 @@ import {
   buildSectionSvg,
   type RenderViewEnrichParams,
 } from '../renderViewEnrich';
+import { extractSvgInner, r2 } from '../renderViewEnrich/svgHelpers';
 
 /** The set of param keys that are handled server-side (not forwarded to core). */
 const ENRICH_PARAM_KEYS = new Set([
@@ -94,7 +96,28 @@ export function applyRenderViewEnrichments(
       : 600;
 
   const doc = getDoc();
-  const docUnits: string = doc.units ?? 'mm';
+  const overlayFlags: OverlayFlags = {
+    showDimensions: params.showDimensions === true,
+    wantAxes,
+    wantGrid,
+    wantLabels,
+  };
+
+  /** Overlays (per the flags) on a base SVG, rasterized to a PNG result; one path for isolate and section. */
+  const overlaidImage = (label: string, baseSvg: string, summary: string): CallToolResult => {
+    const baseResult = applyCommand('render_view', {
+      view: baseView,
+      width: baseWidth,
+      height: baseHeight,
+    });
+    const svg = baseResult.data
+      ? composeOverlays(baseSvg, baseResult.data as RenderViewData, doc, overlayFlags)
+      : baseSvg;
+    const base64 = rasterizeSvg(svg, baseWidth);
+    return base64 === null
+      ? makeErrorResult(`render_view ${label}: rasterization failed.`)
+      : imageResult(summary, base64);
+  };
 
   // ------------------------------------------------------------------
   // turntable: N-frame horizontal strip
@@ -115,14 +138,14 @@ export function applyRenderViewEnrichments(
     );
     stripLines.push(`  <rect width="${totalWidth}" height="${baseHeight}" fill="#1a1a2e"/>`);
     for (let i = 0; i < svgs.length; i++) {
-      const inner = extractSvgInnerPublic(svgs[i] as string);
+      const inner = extractSvgInner(svgs[i] as string);
       stripLines.push(`  <g transform="translate(${i * baseWidth}, 0)">${inner}</g>`);
     }
     // Frame number labels
     for (let i = 0; i < svgs.length; i++) {
       const angle = Math.round((360 * i) / svgs.length);
       stripLines.push(
-        `  <text x="${r2Public(i * baseWidth + 4)}" y="32" font-family="monospace" font-size="13" fill="#aaaacc">${angle}°</text>`,
+        `  <text x="${r2(i * baseWidth + 4)}" y="32" font-family="monospace" font-size="13" fill="#aaaacc">${angle}°</text>`,
       );
     }
     stripLines.push('</svg>');
@@ -134,13 +157,7 @@ export function applyRenderViewEnrichments(
     }
 
     const summary = `Rendered turntable strip: ${frames} frame(s), ${totalWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({
-      summary,
-      affected: [],
-      isError: false,
-    }) as CallToolResult;
-    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-    return shaped;
+    return imageResult(summary, base64);
   }
 
   // ------------------------------------------------------------------
@@ -154,56 +171,16 @@ export function applyRenderViewEnrichments(
         ? [rawIsolate]
         : [];
 
-    let svg = buildIsolateSvg(doc, ids, baseView, baseWidth, baseHeight);
+    const svg = buildIsolateSvg(doc, ids, baseView, baseWidth, baseHeight);
     if (svg === null) {
       return makeErrorResult('render_view isolate: render failed.');
     }
 
-    // Compose overlay enrichments on top
-    const baseResult = applyCommand('render_view', {
-      view: baseView,
-      width: baseWidth,
-      height: baseHeight,
-    });
-    if (params.showDimensions === true && baseResult.data) {
-      svg = appendDimensionLabels(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-      );
-    }
-    if ((wantAxes || wantGrid) && baseResult.data) {
-      svg = appendAxesAndGrid(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-        docUnits,
-        wantAxes,
-        wantGrid,
-      );
-    }
-    if (wantLabels && baseResult.data) {
-      const allEntities = Object.values(doc.entities).filter(
-        (e): e is NonNullable<typeof e> => e !== undefined,
-      );
-      svg = appendEntityLabels(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-        allEntities,
-      );
-    }
-
-    const base64 = rasterizeSvg(svg, baseWidth);
-    if (base64 === null) {
-      return makeErrorResult('render_view isolate: rasterization failed.');
-    }
-
-    const summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${baseWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({
-      summary,
-      affected: [],
-      isError: false,
-    }) as CallToolResult;
-    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-    return shaped;
+    return overlaidImage(
+      'isolate',
+      svg,
+      `Rendered isolated view: ${ids.length} entity/entities highlighted, ${baseWidth}×${baseHeight}.`,
+    );
   }
 
   // ------------------------------------------------------------------
@@ -217,56 +194,16 @@ export function applyRenderViewEnrichments(
       );
     }
 
-    let svg = buildSectionSvg(doc, { axis, offset }, baseView, baseWidth, baseHeight);
+    const svg = buildSectionSvg(doc, { axis, offset }, baseView, baseWidth, baseHeight);
     if (svg === null) {
       return makeErrorResult('render_view section: render failed.');
     }
 
-    // Compose overlay enrichments on top
-    const baseResult = applyCommand('render_view', {
-      view: baseView,
-      width: baseWidth,
-      height: baseHeight,
-    });
-    if (params.showDimensions === true && baseResult.data) {
-      svg = appendDimensionLabels(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-      );
-    }
-    if ((wantAxes || wantGrid) && baseResult.data) {
-      svg = appendAxesAndGrid(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-        docUnits,
-        wantAxes,
-        wantGrid,
-      );
-    }
-    if (wantLabels && baseResult.data) {
-      const allEntities = Object.values(doc.entities).filter(
-        (e): e is NonNullable<typeof e> => e !== undefined,
-      );
-      svg = appendEntityLabels(
-        svg,
-        baseResult.data as import('@core/commands/render').RenderViewData,
-        allEntities,
-      );
-    }
-
-    const base64 = rasterizeSvg(svg, baseWidth);
-    if (base64 === null) {
-      return makeErrorResult('render_view section: rasterization failed.');
-    }
-
-    const summary = `Rendered section view: cut at ${axis}=${offset}, ${baseWidth}×${baseHeight}.`;
-    const shaped = shapeToolCallContent({
-      summary,
-      affected: [],
-      isError: false,
-    }) as CallToolResult;
-    (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-    return shaped;
+    return overlaidImage(
+      'section',
+      svg,
+      `Rendered section view: cut at ${axis}=${offset}, ${baseWidth}×${baseHeight}.`,
+    );
   }
 
   // ------------------------------------------------------------------
@@ -280,22 +217,9 @@ export function applyRenderViewEnrichments(
   if (!busResult.data) {
     return makeErrorResult('render_view enrichment: base render returned no data.');
   }
-  const baseData = busResult.data as import('@core/commands/render').RenderViewData;
+  const baseData = busResult.data as RenderViewData;
 
-  let enrichedSvg = baseData.svg;
-
-  if (params.showDimensions === true) {
-    enrichedSvg = appendDimensionLabels(enrichedSvg, baseData);
-  }
-  if (wantAxes || wantGrid) {
-    enrichedSvg = appendAxesAndGrid(enrichedSvg, baseData, docUnits, wantAxes, wantGrid);
-  }
-  if (wantLabels) {
-    const allEntities = Object.values(doc.entities).filter(
-      (e): e is NonNullable<typeof e> => e !== undefined,
-    );
-    enrichedSvg = appendEntityLabels(enrichedSvg, baseData, allEntities);
-  }
+  const enrichedSvg = composeOverlays(baseData.svg, baseData, doc, overlayFlags);
 
   const base64 = rasterizeSvg(enrichedSvg, baseWidth);
   if (base64 === null) {
@@ -303,14 +227,7 @@ export function applyRenderViewEnrichments(
   }
 
   const summary = `Rendered view: ${baseData.entityCount} entit${baseData.entityCount === 1 ? 'y' : 'ies'}, ${baseWidth}×${baseHeight}.`;
-  const shaped = shapeToolCallContent({
-    summary,
-    affected: [],
-    isError: false,
-    data: stripSvgFromData(busResult.data),
-  }) as CallToolResult;
-  (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
-  return shaped;
+  return imageResult(summary, base64, stripSvgFromData(busResult.data));
 }
 
 /** Build an error CallToolResult for enrichment failures. */
@@ -318,16 +235,45 @@ export function makeErrorResult(message: string): CallToolResult {
   return shapeToolCallContent({ summary: message, affected: [], isError: true }) as CallToolResult;
 }
 
-/** Extract SVG inner content (strips outer svg tags). Used by enrichment functions. */
-function extractSvgInnerPublic(svgString: string): string {
-  const openEnd = svgString.indexOf('>');
-  if (openEnd === -1) return svgString;
-  const closeStart = svgString.lastIndexOf('</svg>');
-  if (closeStart === -1) return svgString.substring(openEnd + 1);
-  return svgString.substring(openEnd + 1, closeStart);
+interface OverlayFlags {
+  showDimensions: boolean;
+  wantAxes: boolean;
+  wantGrid: boolean;
+  wantLabels: boolean;
 }
 
-/** Round to 2 decimal places (used in SVG coordinate output). */
-function r2Public(n: number): number {
-  return Math.round(n * 100) / 100;
+/** The single overlay pipeline (dimensions, axes/grid, entity labels) applied on top of any base SVG. */
+function composeOverlays(
+  svg: string,
+  baseData: RenderViewData,
+  doc: CadDocument,
+  flags: OverlayFlags,
+): string {
+  let composed = svg;
+  if (flags.showDimensions) composed = appendDimensionLabels(composed, baseData);
+  if (flags.wantAxes || flags.wantGrid) {
+    composed = appendAxesAndGrid(
+      composed,
+      baseData,
+      doc.units ?? 'mm',
+      flags.wantAxes,
+      flags.wantGrid,
+    );
+  }
+  if (flags.wantLabels) {
+    composed = appendEntityLabels(composed, baseData, Object.values(doc.entities));
+  }
+  return composed;
+}
+
+/** A shaped (single-implementation) tool result with the rasterized PNG appended as an image block. */
+function imageResult(summary: string, base64: string, data?: unknown): CallToolResult {
+  const shaped = shapeToolCallContent({
+    summary,
+    affected: [],
+    isError: false,
+    ...(data !== undefined ? { data } : {}),
+  }) as CallToolResult;
+  (shaped.content as unknown[]).push({ type: 'image', data: base64, mimeType: 'image/png' });
+  return shaped;
 }

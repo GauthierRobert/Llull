@@ -29,6 +29,7 @@ import { fromMm } from '../model';
 import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../entities';
 import { prismMesh, sweepFrame, sweepMesh } from '../mesh';
 import { findProfile, profileOutline } from '../steel/profiles';
+import { cross, dot, normalize, sub } from '../vec3';
 
 export const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
   column: 'Column',
@@ -93,17 +94,6 @@ export function evaluateFooting(footing: FootingElement, level: BuildingLevel): 
   ];
 }
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const crossProduct = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-const unit = (a: Vec3): Vec3 => {
-  const length = Math.hypot(a[0], a[1], a[2]) || 1;
-  return [a[0] / length, a[1] / length, a[2] / length];
-};
-
 /** Newell normal of a planar 3D polygon (zero vector when degenerate). */
 export function polygonNormal(points: ReadonlyArray<Vec3>): Vec3 {
   const normal: [number, number, number] = [0, 0, 0];
@@ -125,10 +115,10 @@ export function panelFrame(corners: ReadonlyArray<Vec3>): {
 } | null {
   const normalVector = polygonNormal(corners);
   if (Math.hypot(...normalVector) < 1e-9 || corners.length < 3) return null;
-  const normal = unit(normalVector);
+  const normal = normalize(normalVector);
   const origin = corners[0] as Vec3;
-  const e1 = unit(sub(corners[1] as Vec3, origin));
-  const e2 = crossProduct(normal, e1);
+  const e1 = normalize(sub(corners[1] as Vec3, origin));
+  const e2 = cross(normal, e1);
   return { origin, e1, e2, normal };
 }
 
@@ -136,7 +126,6 @@ export function evaluatePanel(panel: PanelElement, level: BuildingLevel): Entity
   const world = panel.corners.map((corner) => atLevel(level, corner));
   const frame = panelFrame(world);
   if (!frame) return [];
-  const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const local = world.map((point): Vec2 => {
     const offset = sub(point, frame.origin);
     return [dot(offset, frame.e1), dot(offset, frame.e2)];

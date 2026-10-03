@@ -37,6 +37,25 @@ export function extractSvgInner(svgString: string): string {
   return svgString.substring(openEnd + 1, closeStart);
 }
 
+/**
+ * World→screen projector for an orthographic render camera (basis re-derived from the camera).
+ * @pure
+ */
+export function makeProjector(
+  camera: RenderViewData['camera'],
+  orthoHalf: number,
+  width: number,
+  height: number,
+): (p: [number, number, number]) => [number, number] {
+  const fwd = normalize3(sub3(camera.target, camera.position));
+  const right = normalize3(cross3(fwd, camera.up));
+  const up = normalize3(cross3(right, fwd));
+  return (p) => {
+    const offset = sub3(p, camera.position);
+    return toScreenCoords(dot3(offset, right), dot3(offset, up), orthoHalf, width, height);
+  };
+}
+
 /** Escape XML special characters for safe text embedding. */
 export function escapeXml(s: string): string {
   return s

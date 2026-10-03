@@ -25,6 +25,7 @@ import { refitPlates } from './plates';
 import { designFixedPlates } from './plateDesign';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
 import { connectionSolids } from './evaluate';
+import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
 import { sweepFrame } from '../mesh';
 import {
   checkFrames,
@@ -108,14 +109,10 @@ export const designPortalFrames = defineCommand({
       }
       const building = getBuilding(current);
       for (const row of rows) if (row.kind !== 'connection') analysed.add(row.elementId);
-      const groups = new Map<string, { role: string; profile: string }>();
+      const groups: ProfileGroups = new Map();
       const addGroup = (elementId: string): void => {
         const member = building.elements[elementId];
-        if (member?.category !== 'member') return;
-        groups.set(`${member.role}:${member.profile}`, {
-          role: member.role,
-          profile: member.profile,
-        });
+        if (member?.category === 'member') addProfileGroup(groups, member);
       };
       for (const row of rows) {
         if (row.kind === 'connection' || row.utilisation <= targetUtilisation) continue;
@@ -138,20 +135,17 @@ export const designPortalFrames = defineCommand({
         }
         progressed = true;
         changes.push(`${role}s ${profile} → ${larger}`);
-        const resizedIds: string[] = [];
-        for (const element of Object.values(next.elements)) {
-          if (
-            element.category !== 'member' ||
-            !analysed.has(element.id) ||
-            element.role !== role ||
-            element.profile !== profile
-          )
-            continue;
-          const resized: SteelMemberElement = { ...element, profile: larger };
-          next = refitPlates(current, withElement(next, resized), resized, profile).building;
-          changed.add(element.id);
-          resizedIds.push(element.id);
-        }
+        const resizedGroup = resizeProfileGroup(
+          next,
+          { role, profile },
+          larger,
+          (element) => analysed.has(element.id),
+          (building, resized) =>
+            refitPlates(current, withElement(building, resized), resized, profile).building,
+        );
+        next = resizedGroup.building;
+        const resizedIds = resizedGroup.resizedIds;
+        for (const id of resizedIds) changed.add(id);
         const reseated = reseatDependents(current, next, resizedIds, profile, larger, analysed);
         next = reseated.building;
         for (const id of reseated.moved) changed.add(id);

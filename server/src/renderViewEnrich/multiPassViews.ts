@@ -10,16 +10,7 @@ import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { RenderViewData } from '@core/commands/render';
 import type { SectionParams } from './types';
-import {
-  cross3,
-  dot3,
-  escapeXml,
-  extractSvgInner,
-  normalize3,
-  r2,
-  sub3,
-  toScreenCoords,
-} from './svgHelpers';
+import { escapeXml, extractSvgInner, makeProjector, r2 } from './svgHelpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -281,9 +272,6 @@ function buildSectionPlaneOverlay(
   height: number,
 ): string {
   const { camera } = data;
-  const fwd = normalize3(sub3(camera.target, camera.position));
-  const right = normalize3(cross3(fwd, camera.up));
-  const up = normalize3(cross3(right, fwd));
 
   const bounds = data.bounds;
   const ext = bounds
@@ -317,12 +305,7 @@ function buildSectionPlaneOverlay(
     p1 = [offset, cy + ext, cz];
   }
 
-  function project(p: [number, number, number]): [number, number] {
-    const d = sub3(p, camera.position);
-    const u = dot3(d, right);
-    const v = dot3(d, up);
-    return toScreenCoords(u, v, orthoHalf, width, height);
-  }
+  const project = makeProjector(camera, orthoHalf, width, height);
 
   const s0 = project(p0);
   const s1 = project(p1);

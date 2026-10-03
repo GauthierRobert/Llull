@@ -251,22 +251,34 @@ app.get('/export/stl', restLimiter, (req: Request, res: Response) => {
 
   const data = result.data as ExportStlData;
 
-  res.setHeader('Content-Disposition', `attachment; filename="${name}.stl"`);
-  res.setHeader('Content-Type', 'model/stl');
-
-  if (data.format === 'binary') {
-    if (!data.stlBase64) {
-      res.status(500).json({ error: 'export_stl binary result missing stlBase64.' });
-      return;
-    }
-    const buf = Buffer.from(data.stlBase64, 'base64');
-    res.setHeader('Content-Length', buf.length);
-    res.status(200).end(buf);
-  } else {
-    const body = data.stl ?? '';
-    res.status(200).send(body);
+  if (data.format === 'binary' && !data.stlBase64) {
+    res.status(500).json({ error: 'export_stl binary result missing stlBase64.' });
+    return;
   }
+  sendDownload(
+    res,
+    `${name}.stl`,
+    'model/stl',
+    data.format === 'binary' ? Buffer.from(data.stlBase64 ?? '', 'base64') : (data.stl ?? ''),
+  );
 });
+
+/** The one file-download responder: attachment headers + a text (send) or binary (end) body. */
+function sendDownload(
+  res: Response,
+  fileName: string,
+  contentType: string,
+  body: string | Buffer,
+): void {
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Content-Type', contentType);
+  if (typeof body === 'string') {
+    res.status(200).send(body);
+    return;
+  }
+  res.setHeader('Content-Length', body.length);
+  res.status(200).end(body);
+}
 
 /** Python bridge for STEP / parametric code (shared by /export/step and the MCP exchange tools). */
 const exchange = exchangeOptionsFromEnv();
@@ -290,8 +302,7 @@ app.get('/export/code', restLimiter, (req: Request, res: Response) => {
     res.status(500).json({ error: result.summary });
     return;
   }
-  res.setHeader('Content-Disposition', `attachment; filename="${data.fileName}"`);
-  res.type('text/plain; charset=utf-8').status(200).send(data.text);
+  sendDownload(res, data.fileName, 'text/plain; charset=utf-8', data.text);
 });
 
 /**
@@ -312,11 +323,7 @@ app.get('/export/step', restLimiter, (req: Request, res: Response) => {
         res.status(500).json({ error: file.error });
         return;
       }
-      const body = Buffer.from(file.stepBase64, 'base64');
-      res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
-      res.setHeader('Content-Type', 'model/step');
-      res.setHeader('Content-Length', body.length);
-      res.status(200).end(body);
+      sendDownload(res, file.fileName, 'model/step', Buffer.from(file.stepBase64, 'base64'));
     })
     .catch((error: unknown) => {
       res.status(500).json({
