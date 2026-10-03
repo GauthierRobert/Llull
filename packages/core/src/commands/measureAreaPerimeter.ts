@@ -1,3 +1,4 @@
+import { distance, polygonPerimeter } from '../lib/polygon';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { formatLength } from './units';
@@ -150,31 +151,14 @@ export const measurePerimeter = defineCommand({
 
     let perimeter: number;
     switch (e.kind) {
-      case 'line': {
-        const dx = e.end[0] - e.start[0];
-        const dy = e.end[1] - e.start[1];
-        perimeter = Math.sqrt(dx * dx + dy * dy);
+      case 'line':
+        perimeter = distance(e.start, e.end);
         break;
-      }
-      case 'polyline': {
-        perimeter = 0;
-        const pts = e.points;
-        for (let i = 0; i + 1 < pts.length; i++) {
-          const a = pts[i]!;
-          const b = pts[i + 1]!;
-          const dx = b[0] - a[0];
-          const dy = b[1] - a[1];
-          perimeter += Math.sqrt(dx * dx + dy * dy);
-        }
-        if (e.closed && pts.length >= 2) {
-          const last = pts[pts.length - 1]!;
-          const first = pts[0]!;
-          const dx = first[0] - last[0];
-          const dy = first[1] - last[1];
-          perimeter += Math.sqrt(dx * dx + dy * dy);
-        }
+      case 'polyline':
+        perimeter = e.closed
+          ? polygonPerimeter(e.points)
+          : e.points.reduce((sum, p, i, pts) => (i === 0 ? 0 : sum + distance(pts[i - 1]!, p)), 0);
         break;
-      }
       case 'rectangle':
         perimeter = 2 * (e.width + e.height);
         break;

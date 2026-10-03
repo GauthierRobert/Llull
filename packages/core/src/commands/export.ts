@@ -12,7 +12,7 @@ import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { uint8ArrayToBase64 } from '../lib/base64';
-import { collectExportTriangles } from './exportTriangulate';
+import { collectExportTriangles, exportSummary } from './exportTriangulate';
 import { facetNormal, type Triangle } from './exportMath';
 
 function formatVec3(v: Vec3): string {
@@ -162,17 +162,10 @@ export const exportStl = defineCommand({
     const solidName = params.name ?? 'llull';
     const requestedIds = params.entityIds;
 
-    const { tris: allTris, skipped2D, unknownIds } = collectExportTriangles(doc, requestedIds);
-
+    const collected = collectExportTriangles(doc, requestedIds);
+    const allTris = collected.tris;
     const triangleCount = allTris.length;
-
-    // Build summary
-    const parts: string[] = [
-      `export_stl: ${triangleCount} triangle${triangleCount !== 1 ? 's' : ''} exported (format=${fmt}).`,
-    ];
-    if (skipped2D > 0) parts.push(`${skipped2D} 2D entit${skipped2D !== 1 ? 'ies' : 'y'} skipped.`);
-    if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
-    const summary = parts.join(' ');
+    const summary = exportSummary('export_stl', fmt, collected);
 
     if (fmt === 'ascii') {
       const stl = buildAsciiStl(allTris, solidName);
