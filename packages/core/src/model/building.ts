@@ -58,6 +58,10 @@ interface ElementBase {
   entityIds: string[];
 }
 
+interface LevelElementBase extends ElementBase {
+  levelId: string;
+}
+
 /** A structural grid axis (not level-bound). `mark` is the bubble label. */
 export interface GridElement extends ElementBase {
   readonly category: 'grid';
@@ -65,7 +69,6 @@ export interface GridElement extends ElementBase {
   end: Vec2;
 }
 
-/** A straight wall. `start`/`end` are the plan centerline; height is measured from the level + baseOffset. */
 export type WallLayerFunction = 'structure' | 'insulation' | 'membrane' | 'air' | 'finish';
 
 /** One layer of a wall build-up. */
@@ -75,9 +78,9 @@ export interface WallLayer {
   function: WallLayerFunction;
 }
 
-export interface WallElement extends ElementBase {
+/** A straight wall. `start`/`end` are the plan centerline; height is measured from the level + baseOffset. */
+export interface WallElement extends LevelElementBase {
   readonly category: 'wall';
-  levelId: string;
   start: Vec2;
   end: Vec2;
   /** Equals the sum of `layers` thicknesses when a build-up is set. */
@@ -106,9 +109,8 @@ export interface OpeningElement extends ElementBase {
 export type SlabRole = 'floor' | 'roof' | 'foundation';
 
 /** A horizontal slab. Its TOP face sits at level elevation + `offset`. */
-export interface SlabElement extends ElementBase {
+export interface SlabElement extends LevelElementBase {
   readonly category: 'slab';
-  levelId: string;
   boundary: Vec2[];
   thickness: number;
   offset: number;
@@ -119,9 +121,8 @@ export interface SlabElement extends ElementBase {
 }
 
 /** A vertical column standing on its level. */
-export interface ColumnElement extends ElementBase {
+export interface ColumnElement extends LevelElementBase {
   readonly category: 'column';
-  levelId: string;
   location: Vec2;
   shape: 'rectangular' | 'circular';
   /** Width (or diameter for circular). */
@@ -132,9 +133,8 @@ export interface ColumnElement extends ElementBase {
 }
 
 /** A horizontal beam. Its TOP face sits at level elevation + level height + `topOffset`. */
-export interface BeamElement extends ElementBase {
+export interface BeamElement extends LevelElementBase {
   readonly category: 'beam';
-  levelId: string;
   start: Vec2;
   end: Vec2;
   width: number;
@@ -144,9 +144,8 @@ export interface BeamElement extends ElementBase {
 }
 
 /** A straight-run stair rising from its level. `angle` is the run direction (radians, CCW from +X). */
-export interface StairElement extends ElementBase {
+export interface StairElement extends LevelElementBase {
   readonly category: 'stair';
-  levelId: string;
   start: Vec2;
   angle: number;
   width: number;
@@ -157,9 +156,8 @@ export interface StairElement extends ElementBase {
 }
 
 /** A room / space. `mark` is the room number. */
-export interface RoomElement extends ElementBase {
+export interface RoomElement extends LevelElementBase {
   readonly category: 'room';
-  levelId: string;
   name: string;
   boundary: Vec2[];
 }
@@ -171,9 +169,8 @@ export type MemberRole = 'column' | 'rafter' | 'beam' | 'brace' | 'purlin' | 'ra
  * A steel member: a catalogue section swept from `start` to `end` (z relative to the level).
  * `roll` rotates the section about its axis (radians).
  */
-export interface SteelMemberElement extends ElementBase {
+export interface SteelMemberElement extends LevelElementBase {
   readonly category: 'member';
-  levelId: string;
   role: MemberRole;
   profile: string;
   start: Vec3;
@@ -185,9 +182,8 @@ export interface SteelMemberElement extends ElementBase {
 }
 
 /** A concrete pad footing; its TOP sits at level elevation + `topOffset` (usually negative). */
-export interface FootingElement extends ElementBase {
+export interface FootingElement extends LevelElementBase {
   readonly category: 'footing';
-  levelId: string;
   location: Vec2;
   width: number;
   length: number;
@@ -199,9 +195,8 @@ export interface FootingElement extends ElementBase {
 }
 
 /** A planar cladding / roofing / sandwich panel through 3D `corners` (z relative to the level). */
-export interface PanelElement extends ElementBase {
+export interface PanelElement extends LevelElementBase {
   readonly category: 'panel';
-  levelId: string;
   role: 'roof' | 'wall';
   corners: Vec3[];
   thickness: number;
@@ -209,9 +204,8 @@ export interface PanelElement extends ElementBase {
 }
 
 /** A machine / process equipment footprint with its maintenance clearance zone. */
-export interface EquipmentElement extends ElementBase {
+export interface EquipmentElement extends LevelElementBase {
   readonly category: 'equipment';
-  levelId: string;
   name: string;
   location: Vec2;
   /** Plan rotation (radians). */
@@ -225,9 +219,8 @@ export interface EquipmentElement extends ElementBase {
 }
 
 /** A pipe run through 3D points (z relative to the level). */
-export interface PipeElement extends ElementBase {
+export interface PipeElement extends LevelElementBase {
   readonly category: 'pipe';
-  levelId: string;
   points: Vec3[];
   diameter: number;
   /** Fluid / service, e.g. "compressed air", "cooling water". */
@@ -236,9 +229,8 @@ export interface PipeElement extends ElementBase {
 }
 
 /** A cable tray run through 3D points (z = tray centre, relative to the level). */
-export interface CableTrayElement extends ElementBase {
+export interface CableTrayElement extends LevelElementBase {
   readonly category: 'tray';
-  levelId: string;
   points: Vec3[];
   width: number;
   /** Side height of the U section. */
@@ -248,9 +240,8 @@ export interface CableTrayElement extends ElementBase {
 }
 
 /** A steel base plate with anchor bolts under the foot of a steel column (follows the column). */
-export interface BasePlateElement extends ElementBase {
+export interface BasePlateElement extends LevelElementBase {
   readonly category: 'plate';
-  levelId: string;
   /** The steel column (member) it carries. */
   memberId: string;
   /** Plate size along the column depth. */
@@ -267,9 +258,8 @@ export interface BasePlateElement extends ElementBase {
 }
 
 /** A curved wall: centreline arc from `start` through `through` to `end` (plan). */
-export interface CurvedWallElement extends ElementBase {
+export interface CurvedWallElement extends LevelElementBase {
   readonly category: 'curvedWall';
-  levelId: string;
   start: Vec2;
   through: Vec2;
   end: Vec2;
@@ -283,9 +273,8 @@ export interface CurvedWallElement extends ElementBase {
  * A bolted end-plate moment connection of a portal frame: at the eaves (rafter → column, with a
  * haunch under the rafter) or the apex (rafter → rafter). Geometry follows the rafter.
  */
-export interface MomentConnectionElement extends ElementBase {
+export interface MomentConnectionElement extends LevelElementBase {
   readonly category: 'connection';
-  levelId: string;
   kind: 'eaves' | 'apex';
   /** The rafter whose end is connected (host). */
   rafterId: string;
