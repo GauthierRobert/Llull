@@ -11,16 +11,16 @@ import {
   elementAffected,
   fromMm,
   getBuilding,
-  isFiniteNumber,
   isVec2,
   nextElementId,
   nextMark,
-  noChange,
   resolveLevel,
   toMetres,
   toVec2,
   withElement,
 } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, type SteelProfile } from '../steel/profiles';
 import { appendMembers } from './memberSupport';
@@ -148,7 +148,7 @@ export const addCraneRunway = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     if (!isVec2(params.start) || !isVec2(params.end)) {
-      return noChange(doc, 'add_crane_runway failed: start and end must be [x, y].');
+      return noop(doc, 'add_crane_runway failed: start and end must be [x, y].');
     }
     const length = Math.hypot(params.end[0] - params.start[0], params.end[1] - params.start[1]);
     const spacing = params.supportSpacing ?? fromMm(doc, 6000);
@@ -157,29 +157,28 @@ export const addCraneRunway = defineCommand({
       !(isFiniteNumber(params.railHeight) && params.railHeight > 0) ||
       !(isFiniteNumber(spacing) && spacing > 0)
     ) {
-      return noChange(
+      return noop(
         doc,
         'add_crane_runway failed: distinct points, railHeight > 0 and supportSpacing > 0 required.',
       );
     }
     const profile = findProfile(params.profile ?? 'HEB300');
     const bracket = findProfile(params.bracketProfile ?? 'HEB200');
-    if (!profile || !bracket)
-      return noChange(doc, 'add_crane_runway failed: unknown steel profile.');
+    if (!profile || !bracket) return noop(doc, 'add_crane_runway failed: unknown steel profile.');
     if (params.railHeight <= fromMm(doc, profile.h + bracket.h)) {
-      return noChange(
+      return noop(
         doc,
         `add_crane_runway failed: railHeight must exceed the runway beam + bracket depth (${profile.h + bracket.h} mm).`,
       );
     }
     if (length / spacing > MAX_GENERATED_MEMBERS) {
-      return noChange(
+      return noop(
         doc,
         `add_crane_runway failed: supportSpacing too small (over ${MAX_GENERATED_MEMBERS} segments).`,
       );
     }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
-    if (!resolution.ok) return noChange(doc, `add_crane_runway failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_crane_runway failed: ${resolution.reason}.`);
     const supports: number[] = [];
     for (let distance = spacing; distance < length; distance += spacing) supports.push(distance);
     const capacity = params.capacity ?? 10;
@@ -193,7 +192,7 @@ export const addCraneRunway = defineCommand({
       note: `Crane ${capacity} t, rail top ${params.railHeight}`,
     });
     const added = appendMembers(resolution.building, resolution.level.id, specs);
-    if ('reason' in added) return noChange(doc, `add_crane_runway failed: ${added.reason}.`);
+    if ('reason' in added) return noop(doc, `add_crane_runway failed: ${added.reason}.`);
     const document = regenerateBuilding(doc, added.building);
     return {
       document,
@@ -240,41 +239,32 @@ export const addPortalFrameBuilding = defineCommand({
         params.spans.every((width) => isFiniteNumber(width) && width > 0)
       )
     ) {
-      return noChange(
-        doc,
-        'add_portal_frame_building failed: spans must be 1–10 widths, each > 0.',
-      );
+      return noop(doc, 'add_portal_frame_building failed: spans must be 1–10 widths, each > 0.');
     }
     const spanCount = params.spans?.length ?? 1;
     const sizes = [span, hallLength, targetBay, eave, purlinSpacing, railSpacing];
     if (!isVec2(origin) || sizes.some((value) => !(isFiniteNumber(value) && value > 0))) {
-      return noChange(
+      return noop(
         doc,
         'add_portal_frame_building failed: origin [x, y] and all sizes > 0 required.',
       );
     }
     if (!(isFiniteNumber(pitchDegrees) && pitchDegrees >= 0 && pitchDegrees < 45)) {
-      return noChange(
-        doc,
-        'add_portal_frame_building failed: roofPitch must be in [0, 45) degrees.',
-      );
+      return noop(doc, 'add_portal_frame_building failed: roofPitch must be in [0, 45) degrees.');
     }
     const roofType = params.roofType ?? 'duopitch';
     if (roofType !== 'duopitch' && roofType !== 'monopitch') {
-      return noChange(
+      return noop(
         doc,
         "add_portal_frame_building failed: roofType must be 'duopitch' or 'monopitch'.",
       );
     }
     const columnBase = params.columnBase ?? 'pinned';
     if (columnBase !== 'pinned' && columnBase !== 'fixed') {
-      return noChange(
-        doc,
-        "add_portal_frame_building failed: columnBase must be 'pinned' or 'fixed'.",
-      );
+      return noop(doc, "add_portal_frame_building failed: columnBase must be 'pinned' or 'fixed'.");
     }
     if (columnBase === 'fixed' && params.basePlates === false) {
-      return noChange(
+      return noop(
         doc,
         "add_portal_frame_building failed: columnBase 'fixed' needs base plates (basePlates must not be false).",
       );
@@ -292,7 +282,7 @@ export const addPortalFrameBuilding = defineCommand({
     ) as Record<keyof typeof names, SteelProfile | undefined>;
     const missing = Object.entries(profiles).filter(([, profile]) => !profile);
     if (missing.length > 0) {
-      return noChange(
+      return noop(
         doc,
         `add_portal_frame_building failed: unknown profile(s) ${missing.map(([key]) => names[key as keyof typeof names]).join(', ')} (see list_steel_profiles).`,
       );
@@ -306,14 +296,13 @@ export const addPortalFrameBuilding = defineCommand({
         params.crane.railHeight < eave
       )
     ) {
-      return noChange(
+      return noop(
         doc,
         'add_portal_frame_building failed: crane.railHeight must be > 0 and below the eaves.',
       );
     }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
-    if (!resolution.ok)
-      return noChange(doc, `add_portal_frame_building failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_portal_frame_building failed: ${resolution.reason}.`);
     const levelId = resolution.level.id;
 
     const bays = Math.max(1, Math.round(hallLength / targetBay));
@@ -325,7 +314,7 @@ export const addPortalFrameBuilding = defineCommand({
         2 * spanCount * (Math.ceil(span / 2 / Math.cos(pitch) / purlinSpacing) + 1) +
         2 * Math.ceil(eave / railSpacing));
     if (estimatedMembers > MAX_GENERATED_MEMBERS) {
-      return noChange(
+      return noop(
         doc,
         `add_portal_frame_building failed: about ${estimatedMembers} members — over the ${MAX_GENERATED_MEMBERS} limit; increase baySpacing, purlinSpacing or railSpacing.`,
       );
@@ -364,7 +353,7 @@ export const addPortalFrameBuilding = defineCommand({
     }
     const membersAdded = appendMembers(building, levelId, specs);
     if ('reason' in membersAdded)
-      return noChange(doc, `add_portal_frame_building failed: ${membersAdded.reason}.`);
+      return noop(doc, `add_portal_frame_building failed: ${membersAdded.reason}.`);
     building = membersAdded.building;
     ids.push(...membersAdded.ids);
     if (params.connections !== false) {
@@ -399,7 +388,7 @@ export const addPortalFrameBuilding = defineCommand({
       const craneProfile = findProfile(params.crane.profile ?? 'HEB300');
       const bracket = findProfile('HEB200') as SteelProfile;
       if (!craneProfile)
-        return noChange(
+        return noop(
           doc,
           `add_portal_frame_building failed: unknown crane profile '${params.crane.profile ?? ''}'.`,
         );
@@ -420,7 +409,7 @@ export const addPortalFrameBuilding = defineCommand({
       }
       const craneAdded = appendMembers(building, levelId, runway);
       if ('reason' in craneAdded)
-        return noChange(doc, `add_portal_frame_building failed: ${craneAdded.reason}.`);
+        return noop(doc, `add_portal_frame_building failed: ${craneAdded.reason}.`);
       building = craneAdded.building;
       ids.push(...craneAdded.ids);
     }

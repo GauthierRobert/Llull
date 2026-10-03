@@ -6,7 +6,9 @@
 import type { WallElement, WallLayer, WallLayerFunction } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, getBuilding, isFiniteNumber, noChange, withElement } from './model';
+import { elementAffected, getBuilding, withElement } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 
 const WALL_LAYER_FUNCTIONS = [
@@ -95,7 +97,7 @@ export const setWallLayers = defineCommand({
       .map((id) => building.elements[id])
       .filter((element): element is WallElement => element?.category === 'wall');
     if (walls.length === 0 || walls.length !== wallIds.length) {
-      return noChange(doc, 'set_wall_layers failed: wallIds must list existing walls.');
+      return noop(doc, 'set_wall_layers failed: wallIds must list existing walls.');
     }
     if (layers === null) {
       let next = building;
@@ -115,7 +117,7 @@ export const setWallLayers = defineCommand({
       };
     }
     const parsed = parseWallLayers(layers);
-    if (typeof parsed === 'string') return noChange(doc, `set_wall_layers failed: ${parsed}.`);
+    if (typeof parsed === 'string') return noop(doc, `set_wall_layers failed: ${parsed}.`);
     const thickness = parsed.reduce((sum, layer) => sum + layer.thickness, 0);
     const material = structuralMaterial(parsed);
     let next = building;

@@ -13,7 +13,8 @@ import type {
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, fromMm, getBuilding, noChange } from '../model';
+import { fileSlug, fromMm, getBuilding } from '../model';
+import { noop } from '@core/commands/noop';
 import { sweepFrame } from '../mesh';
 import { distanceSq3, dot3, sub3 } from '@lib/vec3';
 import { findProfile, STEEL_DENSITY_KG_PER_M3, type SteelProfile } from '../steel/profiles';
@@ -375,7 +376,7 @@ export const exportNcFiles = defineCommand({
     const { memberIds, includePlates = true, levelId } = params;
     const building = getBuilding(doc);
     if (levelId !== undefined && !building.levels[levelId]) {
-      return noChange(doc, `export_nc_files failed: no level '${String(levelId)}'.`);
+      return noop(doc, `export_nc_files failed: no level '${String(levelId)}'.`);
     }
     const elements = building.elementOrder.flatMap((id) => {
       const element = building.elements[id];
@@ -422,7 +423,7 @@ export const exportNcFiles = defineCommand({
       });
     }
     if (pieces.length === 0) {
-      return noChange(
+      return noop(
         doc,
         'export_nc_files: no steel members to export (add_steel_member / add_portal_frame_building first, or check memberIds / levelId).',
       );

@@ -9,7 +9,9 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { type Triangle } from '@core/commands/exportMath';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
-import { fileSlug, getBuilding, isFiniteNumber, noChange, toMetres } from './model';
+import { fileSlug, getBuilding, toMetres } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import {
   PAPER_MM,
   composeSheetSvg,
@@ -481,7 +483,7 @@ export const exportElevationSheet = defineCommand({
   }),
   run: (doc, { direction = 'south', cutAt, exclude, paper, scale, title }): CommandResult => {
     if (cutAt !== undefined && !isFiniteNumber(cutAt)) {
-      return noChange(doc, 'export_elevation_sheet failed: cutAt must be a finite number.');
+      return noop(doc, 'export_elevation_sheet failed: cutAt must be a finite number.');
     }
     const sheet = buildElevationSheet(doc, {
       direction,
@@ -492,7 +494,7 @@ export const exportElevationSheet = defineCommand({
       ...(title !== undefined ? { title } : {}),
     });
     if (!sheet) {
-      return noChange(
+      return noop(
         doc,
         'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.',
       );

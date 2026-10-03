@@ -12,7 +12,9 @@ import type {
 } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fromMm, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
+import { fromMm, getBuilding, toMetres } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { sweepFrame } from '../mesh';
 import { cross3, dot3 } from '@lib/vec3';
 import { midpoint } from '../vec3';
@@ -362,10 +364,10 @@ export const checkClashes = defineCommand({
   run: (doc, { levelId, tolerance }): CommandResult => {
     const building = getBuilding(doc);
     if (levelId !== undefined && !building.levels[levelId])
-      return noChange(doc, `check_clashes failed: no level '${levelId}'.`);
+      return noop(doc, `check_clashes failed: no level '${levelId}'.`);
     const resolvedTolerance = tolerance ?? fromMm(doc, 5);
     if (!(isFiniteNumber(resolvedTolerance) && resolvedTolerance >= 0)) {
-      return noChange(doc, 'check_clashes failed: tolerance must be >= 0.');
+      return noop(doc, 'check_clashes failed: tolerance must be >= 0.');
     }
     const clashes = findClashes(
       doc,

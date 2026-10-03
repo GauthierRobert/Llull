@@ -5,7 +5,9 @@
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
+import { fromMm, getBuilding } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { toCsv } from '../scheduleBuild';
 import { craneCapacityOf, HOISTING_CLASSES, type CraneModel } from './frameModelTypes';
 import {
@@ -137,28 +139,22 @@ export const runwayCheck = defineCommand({
       girder = 'rolled',
     } = params;
     if (craneCapacity !== undefined && !(isFiniteNumber(craneCapacity) && craneCapacity > 0)) {
-      return noChange(doc, 'check_crane_runways failed: craneCapacity must be a number > 0 (t).');
+      return noop(doc, 'check_crane_runways failed: craneCapacity must be a number > 0 (t).');
     }
     if (!(isFiniteNumber(wheelBase) && wheelBase > 0)) {
-      return noChange(doc, 'check_crane_runways failed: wheelBase must be a number > 0 (mm).');
+      return noop(doc, 'check_crane_runways failed: wheelBase must be a number > 0 (mm).');
     }
     if (!(hoistingClass in HOISTING_CLASSES)) {
-      return noChange(
+      return noop(
         doc,
         "check_crane_runways failed: hoistingClass must be 'HC1', 'HC2', 'HC3' or 'HC4'.",
       );
     }
     if (!(isFiniteNumber(hoistingSpeed) && hoistingSpeed >= 0)) {
-      return noChange(
-        doc,
-        'check_crane_runways failed: hoistingSpeed must be a number >= 0 (m/s).',
-      );
+      return noop(doc, 'check_crane_runways failed: hoistingSpeed must be a number >= 0 (m/s).');
     }
     if (!(isFiniteNumber(minHookApproach) && minHookApproach >= 0)) {
-      return noChange(
-        doc,
-        'check_crane_runways failed: minHookApproach must be a number >= 0 (m).',
-      );
+      return noop(doc, 'check_crane_runways failed: minHookApproach must be a number >= 0 (m).');
     }
     for (const [name, value] of [
       ['craneSpan', craneSpan],
@@ -167,20 +163,20 @@ export const runwayCheck = defineCommand({
       ['bufferStiffness', bufferStiffness],
     ] as const) {
       if (value !== undefined && !(isFiniteNumber(value) && value > 0)) {
-        return noChange(doc, `check_crane_runways failed: ${name} must be a number > 0.`);
+        return noop(doc, `check_crane_runways failed: ${name} must be a number > 0.`);
       }
     }
     if (!(craneClass in CLASSES)) {
-      return noChange(doc, "check_crane_runways failed: craneClass must be 'S2', 'S3' or 'S4'.");
+      return noop(doc, "check_crane_runways failed: craneClass must be 'S2', 'S3' or 'S4'.");
     }
     if (!(railSize in RAILS)) {
-      return noChange(
+      return noop(
         doc,
         "check_crane_runways failed: railSize must be 'A45', 'A55', 'A65', 'A75', 'A100' or 'flat50x30'.",
       );
     }
     if (!(girder in LOCAL_CATEGORIES)) {
-      return noChange(
+      return noop(
         doc,
         "check_crane_runways failed: girder must be 'rolled', 'welded-full' or 'welded-fillet'.",
       );
@@ -188,7 +184,7 @@ export const runwayCheck = defineCommand({
     const building = getBuilding(doc);
     const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
     if (levelId === undefined || !building.levels[levelId]) {
-      return noChange(doc, `check_crane_runways failed: no level '${params.levelId ?? ''}'.`);
+      return noop(doc, `check_crane_runways failed: no level '${params.levelId ?? ''}'.`);
     }
     const mm = (value: number): number => value / fromMm(doc, 1);
     const rows: RunwayCheckRow[] = [];
@@ -249,7 +245,7 @@ export const runwayCheck = defineCommand({
       rows.push(...beamRows);
     }
     if (beams === 0) {
-      return noChange(
+      return noop(
         doc,
         `check_crane_runways failed: no crane runway beam with a known capacity on level '${levelId}' (add_crane_runway first, or pass craneCapacity).`,
       );

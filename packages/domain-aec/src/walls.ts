@@ -10,18 +10,18 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import {
   fromMm,
   getBuilding,
-  isFiniteNumber,
   isVec2,
   isVec2List,
   lengthOf,
   nextElementId,
   nextMark,
-  noChange,
   resolveLevel,
   toVec2,
   withElement,
   elementAffected,
 } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
 import { curvedWallExtent } from './curvedWallGeometry';
@@ -169,10 +169,10 @@ export const addWall = defineCommand({
   }),
   run: (doc, { start, end, ...options }): CommandResult => {
     if (!isVec2(start) || !isVec2(end)) {
-      return noChange(doc, 'add_wall failed: start and end must be [x, y] points.');
+      return noop(doc, 'add_wall failed: start and end must be [x, y] points.');
     }
     const build = buildWalls(doc, [[start, end]], options);
-    return build.ok ? wallResult(doc, build) : noChange(doc, `add_wall failed: ${build.reason}.`);
+    return build.ok ? wallResult(doc, build) : noop(doc, `add_wall failed: ${build.reason}.`);
   },
 });
 
@@ -197,7 +197,7 @@ export const drawWalls = defineCommand({
   }),
   run: (doc, { points, closed = false, ...options }): CommandResult => {
     if (!isVec2List(points, 2) || (closed && points.length < 3)) {
-      return noChange(
+      return noop(
         doc,
         'draw_walls failed: points must be a list of [x, y] (at least 2, or 3 when closed).',
       );
@@ -208,7 +208,7 @@ export const drawWalls = defineCommand({
     }
     if (closed) segments.push([points[points.length - 1] as Vec2, points[0] as Vec2]);
     const build = buildWalls(doc, segments, options);
-    return build.ok ? wallResult(doc, build) : noChange(doc, `draw_walls failed: ${build.reason}.`);
+    return build.ok ? wallResult(doc, build) : noop(doc, `draw_walls failed: ${build.reason}.`);
   },
 });
 
@@ -240,10 +240,10 @@ export const updateWall = defineCommand({
     const building = getBuilding(doc);
     const wall = building.elements[wallId];
     if (!wall || wall.category !== 'wall') {
-      return noChange(doc, `update_wall failed: no wall '${wallId}'.`);
+      return noop(doc, `update_wall failed: no wall '${wallId}'.`);
     }
     if ((start !== undefined && !isVec2(start)) || (end !== undefined && !isVec2(end))) {
-      return noChange(doc, 'update_wall failed: start/end must be [x, y].');
+      return noop(doc, 'update_wall failed: start/end must be [x, y].');
     }
     const positive = (value: number | undefined): boolean =>
       value === undefined || (isFiniteNumber(value) && value > 0);
@@ -252,13 +252,10 @@ export const updateWall = defineCommand({
       !positive(height) ||
       (baseOffset !== undefined && !isFiniteNumber(baseOffset))
     ) {
-      return noChange(
-        doc,
-        'update_wall failed: thickness/height must be > 0 and baseOffset finite.',
-      );
+      return noop(doc, 'update_wall failed: thickness/height must be > 0 and baseOffset finite.');
     }
     if (levelId !== undefined && !building.levels[levelId]) {
-      return noChange(doc, `update_wall failed: no level '${levelId}'.`);
+      return noop(doc, `update_wall failed: no level '${levelId}'.`);
     }
     // A new overall thickness or material no longer matches a build-up: the wall becomes
     // single-layer.
@@ -279,11 +276,11 @@ export const updateWall = defineCommand({
       levelId: levelId ?? wall.levelId,
     };
     if (lengthOf(updated.start, updated.end) <= 0) {
-      return noChange(doc, 'update_wall failed: start and end would coincide.');
+      return noop(doc, 'update_wall failed: start and end would coincide.');
     }
     const next = withElement(building, updated);
     const issues = openingFitIssues(next, new Set([wall.levelId, updated.levelId]));
-    if (issues.length > 0) return noChange(doc, `update_wall refused: ${issues[0]}.`);
+    if (issues.length > 0) return noop(doc, `update_wall refused: ${issues[0]}.`);
     const document = regenerateBuilding(doc, next);
     return {
       document,

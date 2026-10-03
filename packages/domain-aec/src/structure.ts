@@ -18,18 +18,18 @@ import { distance, isValidPolygon, offsetPolygon, polygonArea } from '@lib/polyg
 import {
   fromMm,
   getBuilding,
-  isFiniteNumber,
   isVec2,
   isVec2List,
   lengthOf,
   nextElementId,
   nextMark,
-  noChange,
   resolveLevel,
   toVec2,
   withElement,
   elementAffected,
 } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 
 const levelIdParam = (): z.ZodOptional<z.ZodString> =>
@@ -184,19 +184,19 @@ export const addSlab = defineCommand({
       (half) => (wallFace === 'outer' ? half : wallFace === 'inner' ? -half : 0),
       true,
     );
-    if (failure) return noChange(doc, `add_slab failed: ${failure}.`);
+    if (failure) return noop(doc, `add_slab failed: ${failure}.`);
     if (!outline || !isValidPolygon(outline)) {
-      return noChange(
+      return noop(
         doc,
         'add_slab failed: give a boundary polygon of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.',
       );
     }
     const resolvedThickness = thickness ?? fromMm(doc, 200);
     if (!isFiniteNumber(resolvedThickness) || resolvedThickness <= 0 || !isFiniteNumber(offset)) {
-      return noChange(doc, 'add_slab failed: thickness must be > 0 and offset finite.');
+      return noop(doc, 'add_slab failed: thickness must be > 0 and offset finite.');
     }
     const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
-    if (!resolution.ok) return noChange(doc, `add_slab failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_slab failed: ${resolution.reason}.`);
     const slab: SlabElement = {
       id: nextElementId(resolution.building, 'slab'),
       category: 'slab',
@@ -278,7 +278,7 @@ export const addColumn = defineCommand({
         ? [toVec2(params.location)]
         : [];
     if (locations.length === 0) {
-      return noChange(
+      return noop(
         doc,
         params.atGridIntersections
           ? 'add_column failed: the structural grid has no intersections (add_grid_system first).'
@@ -292,10 +292,10 @@ export const addColumn = defineCommand({
       !positiveOrUndefined(depth) ||
       !positiveOrUndefined(params.height)
     ) {
-      return noChange(doc, 'add_column failed: width, depth and height must be > 0.');
+      return noop(doc, 'add_column failed: width, depth and height must be > 0.');
     }
     const resolution = resolveLevel(doc, building, params.levelId);
-    if (!resolution.ok) return noChange(doc, `add_column failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_column failed: ${resolution.reason}.`);
     let next = resolution.building;
     const ids: string[] = [];
     for (const location of locations) {
@@ -350,7 +350,7 @@ export const addBeam = defineCommand({
   }),
   run: (doc, { start, end, width, depth, topOffset = 0, levelId, material }): CommandResult => {
     if (!isVec2(start) || !isVec2(end) || lengthOf(start, end) <= 0) {
-      return noChange(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
+      return noop(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
     }
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedDepth = depth ?? fromMm(doc, 500);
@@ -359,10 +359,10 @@ export const addBeam = defineCommand({
       !positiveOrUndefined(resolvedDepth) ||
       !isFiniteNumber(topOffset)
     ) {
-      return noChange(doc, 'add_beam failed: width and depth must be > 0, topOffset finite.');
+      return noop(doc, 'add_beam failed: width and depth must be > 0, topOffset finite.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
-    if (!resolution.ok) return noChange(doc, `add_beam failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_beam failed: ${resolution.reason}.`);
     const beam: BeamElement = {
       id: nextElementId(resolution.building, 'beam'),
       category: 'beam',
@@ -417,10 +417,10 @@ export const addStair = defineCommand({
     { start, angle = 0, width, riserCount, treadDepth, levelId, material },
   ): CommandResult => {
     if (!isVec2(start) || !isFiniteNumber(angle)) {
-      return noChange(doc, 'add_stair failed: start must be [x, y] and angle finite.');
+      return noop(doc, 'add_stair failed: start must be [x, y] and angle finite.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
-    if (!resolution.ok) return noChange(doc, `add_stair failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_stair failed: ${resolution.reason}.`);
     const levelHeight = resolution.level.height;
     const count = riserCount ?? Math.ceil(levelHeight / fromMm(doc, 175));
     const resolvedWidth = width ?? fromMm(doc, 1000);
@@ -431,7 +431,7 @@ export const addStair = defineCommand({
       !positiveOrUndefined(resolvedWidth) ||
       !positiveOrUndefined(resolvedTread)
     ) {
-      return noChange(
+      return noop(
         doc,
         'add_stair failed: riserCount must be an integer ≥ 2, width and treadDepth > 0.',
       );

@@ -5,7 +5,8 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, noChange, toMetres } from './model';
+import { fileSlug, getBuilding, toMetres } from './model';
+import { noop } from '@core/commands/noop';
 import { openingsOf, wallExtent, wallFrame } from './wallGeometry';
 import { curvedWallArc, curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
@@ -271,7 +272,7 @@ export const exportIfc = defineCommand({
   run: (doc, { timestamp }): CommandResult => {
     const building = getBuilding(doc);
     if (building.levelOrder.length === 0) {
-      return noChange(
+      return noop(
         doc,
         'export_ifc: the building model has no levels (add_level / add_wall first).',
       );

@@ -1,12 +1,10 @@
 import type { DocumentUnit, EntityKind, Layer, CameraState, Vec3 } from '../model/types';
 import { isRecord } from '../lib/isRecord';
+import { isFiniteNumber } from '../lib/isFiniteNumber';
 
 export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
-
-export const isFiniteNumber = (v: unknown): v is number =>
-  typeof v === 'number' && Number.isFinite(v);
 
 const isPositiveNumber = (v: unknown): v is number => isFiniteNumber(v) && v > 0;
 

@@ -12,7 +12,7 @@ import type {
 } from '@core/model/building';
 import { createEmptyBuilding } from '@core/model/building';
 import { uniqueId } from '@lib/id';
-import type { CommandResult } from '@core/commands/types';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 
 const METRES_PER_UNIT: Readonly<Record<DocumentUnit, number>> = {
   mm: 0.001,
@@ -34,14 +34,6 @@ export function toMetres(doc: Pick<CadDocument, 'units'>, value: number): number
 
 export function getBuilding(doc: Pick<CadDocument, 'building'>): BuildingModel {
   return doc.building ?? createEmptyBuilding();
-}
-
-export function noChange(doc: CadDocument, summary: string): CommandResult {
-  return { document: doc, summary, affected: [] };
-}
-
-export function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }
 
 export function isVec2(value: unknown): value is Vec2 {

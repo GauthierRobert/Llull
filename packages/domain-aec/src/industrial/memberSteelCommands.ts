@@ -9,12 +9,12 @@ import {
   elementAffected,
   fromMm,
   getBuilding,
-  isFiniteNumber,
-  noChange,
   resolveLevel,
   toMetres,
   withElement,
 } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, type SteelProfile } from '../steel/profiles';
 import { refitPlates } from './plates';
@@ -60,13 +60,12 @@ export const addSteelMember = defineCommand({
   ): CommandResult => {
     const from = toVec3(start);
     const to = toVec3(end);
-    if (!from || !to)
-      return noChange(doc, 'add_steel_member failed: start and end must be [x, y, z].');
+    if (!from || !to) return noop(doc, 'add_steel_member failed: start and end must be [x, y, z].');
     if (!isFiniteNumber(roll)) {
-      return noChange(doc, 'add_steel_member failed: roll must be finite.');
+      return noop(doc, 'add_steel_member failed: roll must be finite.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
-    if (!resolution.ok) return noChange(doc, `add_steel_member failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_steel_member failed: ${resolution.reason}.`);
     const added = appendMembers(resolution.building, resolution.level.id, [
       {
         role,
@@ -78,7 +77,7 @@ export const addSteelMember = defineCommand({
         ...(note !== undefined ? { note } : {}),
       },
     ]);
-    if ('reason' in added) return noChange(doc, `add_steel_member failed: ${added.reason}.`);
+    if ('reason' in added) return noop(doc, `add_steel_member failed: ${added.reason}.`);
     const document = regenerateBuilding(doc, added.building);
     const member = document.building?.elements[added.ids[0] as string];
     const section = findProfile(profile) as SteelProfile;
@@ -119,20 +118,17 @@ export const updateSteelMember = defineCommand({
     const building = getBuilding(doc);
     const member = building.elements[memberId];
     if (member?.category !== 'member')
-      return noChange(doc, `update_steel_member failed: no member '${memberId}'.`);
+      return noop(doc, `update_steel_member failed: no member '${memberId}'.`);
     const section = profile !== undefined ? findProfile(profile) : findProfile(member.profile);
     if (!section)
-      return noChange(doc, `update_steel_member failed: unknown steel profile '${profile ?? ''}'.`);
+      return noop(doc, `update_steel_member failed: unknown steel profile '${profile ?? ''}'.`);
     const from = start !== undefined ? toVec3(start) : member.start;
     const to = end !== undefined ? toVec3(end) : member.end;
     if (!from || !to || (roll !== undefined && !isFiniteNumber(roll))) {
-      return noChange(
-        doc,
-        'update_steel_member failed: start/end must be [x, y, z] and roll finite.',
-      );
+      return noop(doc, 'update_steel_member failed: start/end must be [x, y, z] and roll finite.');
     }
     if (Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]) === 0) {
-      return noChange(doc, 'update_steel_member failed: start and end would coincide.');
+      return noop(doc, 'update_steel_member failed: start and end would coincide.');
     }
     const updated: SteelMemberElement = {
       ...member,

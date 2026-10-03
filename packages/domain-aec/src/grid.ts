@@ -10,15 +10,15 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import {
   fromMm,
   getBuilding,
-  isFiniteNumber,
   isVec2,
   lengthOf,
   nextElementId,
-  noChange,
   toVec2,
   withElement,
   elementAffected,
 } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 
 export function gridLabels(building: BuildingModel): Set<string> {
@@ -83,13 +83,13 @@ export const addGridLine = defineCommand({
   }),
   run: (doc, { start, end, label }): CommandResult => {
     if (!isVec2(start) || !isVec2(end) || lengthOf(start, end) <= 0) {
-      return noChange(doc, 'add_grid_line failed: start and end must be distinct [x, y] points.');
+      return noop(doc, 'add_grid_line failed: start and end must be distinct [x, y] points.');
     }
     const building = getBuilding(doc);
     const used = gridLabels(building);
     const resolvedLabel = label?.trim() || nextFreeLabel(used, true);
     if (used.has(resolvedLabel)) {
-      return noChange(doc, `add_grid_line failed: grid label "${resolvedLabel}" already exists.`);
+      return noop(doc, `add_grid_line failed: grid label "${resolvedLabel}" already exists.`);
     }
     const next = addGrid(building, resolvedLabel, start, end);
     const id = next.elementOrder[next.elementOrder.length - 1] as string;
@@ -136,14 +136,14 @@ export const addGridSystem = defineCommand({
       !validSpacings(ySpacings) ||
       xSpacings.length + ySpacings.length === 0
     ) {
-      return noChange(
+      return noop(
         doc,
         'add_grid_system failed: xSpacings / ySpacings must be lists of numbers > 0.',
       );
     }
     const overrun = extension ?? fromMm(doc, 1500);
     if (!isFiniteNumber(overrun) || overrun < 0) {
-      return noChange(doc, 'add_grid_system failed: extension must be >= 0.');
+      return noop(doc, 'add_grid_system failed: extension must be >= 0.');
     }
     const origin: Vec2 = originInput ?? [0, 0];
     const xs = [origin[0]];

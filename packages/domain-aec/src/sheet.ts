@@ -7,7 +7,8 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, noChange, toMetres } from './model';
+import { fileSlug, getBuilding, toMetres } from './model';
+import { noop } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
 import { escapeXml } from '@lib/escapeXml';
@@ -414,7 +415,7 @@ export const exportPlanSheet = defineCommand({
       ...(title !== undefined ? { title } : {}),
     });
     if (!sheet) {
-      return noChange(
+      return noop(
         doc,
         'export_plan_sheet failed: no such level (add_level / add_wall first) or invalid scale (must be > 0).',
       );

@@ -15,7 +15,6 @@ import {
   isVec2,
   nextElementId,
   nextMark,
-  noChange,
   resolveLevel,
   toMetres,
   withElement,
@@ -23,6 +22,7 @@ import {
   followLevelHeight,
   withoutElements,
 } from './model';
+import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
 import { resolveOutline } from './structure';
 import { openingFitIssues } from './walls';
@@ -55,7 +55,7 @@ export const addRoom = defineCommand({
   }),
   run: (doc, { name, number, boundary, wallIds, levelId }): CommandResult => {
     if (name.trim() === '') {
-      return noChange(doc, 'add_room failed: name is required.');
+      return noop(doc, 'add_room failed: name is required.');
     }
     const building = getBuilding(doc);
     const { outline, wallLevelId, failure } = resolveOutline(
@@ -63,15 +63,15 @@ export const addRoom = defineCommand({
       { boundary, wallIds },
       (half) => -half,
     );
-    if (failure) return noChange(doc, `add_room failed: ${failure}.`);
+    if (failure) return noop(doc, `add_room failed: ${failure}.`);
     if (!outline || !isValidPolygon(outline)) {
-      return noChange(
+      return noop(
         doc,
         'add_room failed: give a boundary of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.',
       );
     }
     const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
-    if (!resolution.ok) return noChange(doc, `add_room failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_room failed: ${resolution.reason}.`);
     const levelIndex = resolution.building.levelOrder.indexOf(resolution.level.id);
     const roomsOnLevel = Object.values(resolution.building.elements).filter(
       (element) => element.category === 'room' && element.levelId === resolution.level.id,
@@ -124,7 +124,7 @@ export const deleteBuildingElement = defineCommand({
     const building = getBuilding(doc);
     const known = elementIds.filter((id) => building.elements[id] !== undefined);
     if (known.length === 0) {
-      return noChange(doc, 'delete_building_element: none of the given ids is a building element.');
+      return noop(doc, 'delete_building_element: none of the given ids is a building element.');
     }
     const doomed = withHostedOpenings(building, known);
     const removedEntityIds = [...doomed].flatMap((id) => building.elements[id]?.entityIds ?? []);
@@ -202,12 +202,11 @@ export const moveBuildingElement = defineCommand({
     delta: vec2('Plan translation [dx, dy].'),
   }),
   run: (doc, { elementIds, delta }): CommandResult => {
-    if (!isVec2(delta))
-      return noChange(doc, 'move_building_element failed: delta must be [dx, dy].');
+    if (!isVec2(delta)) return noop(doc, 'move_building_element failed: delta must be [dx, dy].');
     const building = getBuilding(doc);
     const known = elementIds.filter((id) => building.elements[id] !== undefined);
     if (known.length === 0) {
-      return noChange(doc, 'move_building_element: none of the given ids is a building element.');
+      return noop(doc, 'move_building_element: none of the given ids is a building element.');
     }
     const strayOpenings = known.filter((id) => {
       const element = building.elements[id];
@@ -215,7 +214,7 @@ export const moveBuildingElement = defineCommand({
       return host !== null && !known.includes(host);
     });
     if (strayOpenings.length > 0) {
-      return noChange(
+      return noop(
         doc,
         `move_building_element refused: ${strayOpenings.join(', ')} follow their host (a wall, a steel column or a rafter) — slide openings with update_opening (offset) or move the host.`,
       );
@@ -228,7 +227,7 @@ export const moveBuildingElement = defineCommand({
         !known.includes(element.rafterId),
     );
     if (detached.length > 0) {
-      return noChange(
+      return noop(
         doc,
         `move_building_element refused: moment connection(s) ${detached.map((element) => element.id).join(', ')} tie the moved member(s) to rafters that are not moved — move the rafters too, or delete the connections first.`,
       );
@@ -245,7 +244,7 @@ export const moveBuildingElement = defineCommand({
       }),
     );
     const issues = openingFitIssues(next, movedLevels);
-    if (issues.length > 0) return noChange(doc, `move_building_element refused: ${issues[0]}.`);
+    if (issues.length > 0) return noop(doc, `move_building_element refused: ${issues[0]}.`);
     const document = regenerateBuilding(doc, next);
     const moved = withHostedOpenings(building, known);
     return {
@@ -320,7 +319,7 @@ export const copyLevelElements = defineCommand({
     const targets = targetLevelIds;
     const missing = [sourceLevelId, ...targets].filter((id) => !building.levels[id]);
     if (missing.length > 0 || targets.length === 0) {
-      return noChange(
+      return noop(
         doc,
         `copy_level_elements failed: unknown or missing level(s) ${missing.join(', ') || '(no targets)'}.`,
       );
@@ -339,7 +338,7 @@ export const copyLevelElements = defineCommand({
           allowed.has(element.category),
       );
     if (sourceElements.length === 0) {
-      return noChange(doc, `copy_level_elements: level ${sourceLevelId} has nothing to copy.`);
+      return noop(doc, `copy_level_elements: level ${sourceLevelId} has nothing to copy.`);
     }
     let next = building;
     const created: string[] = [];
@@ -411,7 +410,7 @@ export const copyLevelElements = defineCommand({
       }
     }
     const issues = openingFitIssues(next, new Set(targets));
-    if (issues.length > 0) return noChange(doc, `copy_level_elements refused: ${issues[0]}.`);
+    if (issues.length > 0) return noop(doc, `copy_level_elements refused: ${issues[0]}.`);
     const document = regenerateBuilding(doc, next);
     return {
       document,

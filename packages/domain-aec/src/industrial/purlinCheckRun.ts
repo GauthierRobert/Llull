@@ -5,7 +5,9 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fromMm, getBuilding, isFiniteNumber, noChange } from '../model';
+import { fromMm, getBuilding } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { toCsv } from '../scheduleBuild';
 import { findProfile } from '../steel/profiles';
 import { ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from './frameModelTypes';
@@ -90,7 +92,7 @@ export const checkPurlins = defineCommand({
     const { windPressure = 0.6, snowLoad = 0.8, roofDeadLoad = 0.3 } = params;
     const nonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
     if (!nonNegative(windPressure) || !nonNegative(snowLoad) || !nonNegative(roofDeadLoad)) {
-      return noChange(
+      return noop(
         doc,
         'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.',
       );
@@ -98,7 +100,7 @@ export const checkPurlins = defineCommand({
     const building = getBuilding(doc);
     const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
     if (levelId === undefined || !building.levels[levelId]) {
-      return noChange(doc, `check_purlins failed: no level '${params.levelId ?? ''}'.`);
+      return noop(doc, `check_purlins failed: no level '${params.levelId ?? ''}'.`);
     }
     const unit = fromMm(doc, 1);
     const toMm = (point: readonly number[]): Point => [
@@ -131,7 +133,7 @@ export const checkPurlins = defineCommand({
     const purlins = members.filter(({ member }) => member.role === 'purlin');
     const rails = members.filter(({ member }) => member.role === 'rail');
     if (purlins.length === 0) {
-      return noChange(doc, `check_purlins: no purlins (role purlin) on level '${levelId}'.`);
+      return noop(doc, `check_purlins: no purlins (role purlin) on level '${levelId}'.`);
     }
 
     // Hall envelope: plan extents of every member, ridge height, eaves level.

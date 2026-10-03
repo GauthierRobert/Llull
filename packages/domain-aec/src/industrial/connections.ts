@@ -15,13 +15,13 @@ import {
   elementAffected,
   fromMm,
   getBuilding,
-  isFiniteNumber,
   nextElementId,
   nextMark,
-  noChange,
   withElement,
   withoutElements,
 } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
 import { boltSize, buildingConnectionSolids } from './evaluate';
@@ -174,14 +174,14 @@ export const addMomentConnections = defineCommand({
       !positive(params.boltDiameter) ||
       !positive(params.haunchLength)
     ) {
-      return noChange(
+      return noop(
         doc,
         'add_moment_connections failed: plateThickness, boltDiameter and haunchLength must be > 0.',
       );
     }
     const building = getBuilding(doc);
     if (params.levelId !== undefined && !building.levels[params.levelId]) {
-      return noChange(doc, `add_moment_connections failed: no level '${params.levelId}'.`);
+      return noop(doc, `add_moment_connections failed: no level '${params.levelId}'.`);
     }
     const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0] ?? '';
     const joints = findMomentJoints(
@@ -191,7 +191,7 @@ export const addMomentConnections = defineCommand({
       fromMm(doc, 10),
     );
     if (joints.length === 0) {
-      return noChange(
+      return noop(
         doc,
         'add_moment_connections failed: no unconnected rafter-to-column or rafter-to-rafter joint found.',
       );
