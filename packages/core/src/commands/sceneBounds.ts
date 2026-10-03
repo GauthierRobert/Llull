@@ -6,7 +6,7 @@ import { type Bounds } from './sceneTypes';
 const ORIGIN: Vec3 = [0, 0, 0];
 
 /** Min/max of a flat xyz position array (`[x0, y0, z0, x1, ...]`); needs at least one full triple. */
-export function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
+function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
   let minX = Infinity,
     minY = Infinity,
     minZ = Infinity;

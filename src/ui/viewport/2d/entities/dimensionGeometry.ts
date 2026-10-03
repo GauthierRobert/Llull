@@ -22,7 +22,7 @@ export function entityCentroid(e: Entity): [number, number] | null {
 }
 
 /** Build arrowhead vertices at tip pointing toward direction (dx, dy). Returns 6 floats (2 pts). */
-export function arrowheadPoints(
+function arrowheadPoints(
   tipX: number,
   tipY: number,
   dx: number,
