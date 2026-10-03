@@ -16,7 +16,7 @@ import { defineCommand, z, looseVec3 as vec3 } from './schema';
 type TextAnchor = NonNullable<TextEntity['anchor']>;
 import { nextId } from '../lib/id';
 import { withEntity } from './entityOps';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /**
  * @command add_text
@@ -72,11 +72,11 @@ export const addText = defineCommand({
     { content, position, height, rotation = [0, 0, 0], anchor = 'left', color = '#333333', layer },
   ): CommandResult => {
     if (typeof content !== 'string' || content.trim().length === 0) {
-      return noOp(doc, 'add_text: content must be a non-empty string; entity not created.');
+      return noop(doc, 'add_text: content must be a non-empty string; entity not created.');
     }
 
     if (typeof height !== 'number' || height <= 0) {
-      return noOp(doc, `add_text: height must be > 0 (got ${height}); entity not created.`);
+      return noop(doc, `add_text: height must be > 0 (got ${height}); entity not created.`);
     }
 
     if (
@@ -86,7 +86,7 @@ export const addText = defineCommand({
       typeof position[1] !== 'number' ||
       typeof position[2] !== 'number'
     ) {
-      return noOp(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
+      return noop(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
     }
 
     const layerId = layer !== undefined && layer in doc.layers ? layer : DEFAULT_LAYER_ID;
@@ -192,19 +192,19 @@ export const addDimension = defineCommand({
   }),
   run: (doc, { dimensionKind, entityIds, offset, precision, label, layer }): CommandResult => {
     if (!VALID_DIMENSION_KINDS.has(dimensionKind)) {
-      return noOp(
+      return noop(
         doc,
         `add_dimension: unknown dimensionKind '${dimensionKind}'. Must be one of: ${[...VALID_DIMENSION_KINDS].join(', ')}.`,
       );
     }
 
     if (!Array.isArray(entityIds) || entityIds.length === 0) {
-      return noOp(doc, `add_dimension: entityIds must be a non-empty array of entity ids.`);
+      return noop(doc, `add_dimension: entityIds must be a non-empty array of entity ids.`);
     }
 
     const required = REQUIRED_IDS[dimensionKind]!;
     if (entityIds.length !== required) {
-      return noOp(
+      return noop(
         doc,
         `add_dimension: dimensionKind '${dimensionKind}' requires exactly ${required} entityId(s), got ${entityIds.length}.`,
       );
@@ -212,7 +212,7 @@ export const addDimension = defineCommand({
 
     for (const refId of entityIds) {
       if (!(refId in doc.entities)) {
-        return noOp(
+        return noop(
           doc,
           `add_dimension: referenced entity '${refId}' does not exist in the document.`,
         );
@@ -222,7 +222,7 @@ export const addDimension = defineCommand({
     if (dimensionKind === 'radial') {
       const refEntity = doc.entities[entityIds[0]!]!;
       if (!RADIAL_KINDS.has(refEntity.kind)) {
-        return noOp(
+        return noop(
           doc,
           `add_dimension: radial dimension requires a circle, arc, or ellipse entity; got '${refEntity.kind}' (id: '${entityIds[0]}').`,
         );
@@ -231,7 +231,7 @@ export const addDimension = defineCommand({
       for (const refId of entityIds) {
         const refEntity = doc.entities[refId]!;
         if (!LINEAR_KINDS.has(refEntity.kind)) {
-          return noOp(
+          return noop(
             doc,
             `add_dimension: linear/aligned dimension requires line or point entities; entity '${refId}' has kind '${refEntity.kind}'.`,
           );
@@ -241,7 +241,7 @@ export const addDimension = defineCommand({
       for (const refId of entityIds) {
         const refEntity = doc.entities[refId]!;
         if (!ANGULAR_KINDS.has(refEntity.kind)) {
-          return noOp(
+          return noop(
             doc,
             `add_dimension: angular dimension requires line or point entities; entity '${refId}' has kind '${refEntity.kind}'.`,
           );

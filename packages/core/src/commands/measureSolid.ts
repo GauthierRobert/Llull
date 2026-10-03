@@ -5,7 +5,7 @@ import { entityBounds, mergeBounds } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { formatLength } from './units';
 import { polygonArea } from './measureAreaPerimeter';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 interface MeasureBoundingBoxData {
   min: Vec3;
   max: Vec3;
@@ -51,7 +51,7 @@ export const measureBoundingBox = defineCommand({
     if (entityId) {
       const e = doc.entities[entityId];
       if (!e) {
-        return noOp(doc, `measure_bounding_box: entity '${entityId}' not found.`);
+        return noop(doc, `measure_bounding_box: entity '${entityId}' not found.`);
       }
       bounds = entityBounds(e);
     } else {
@@ -65,7 +65,7 @@ export const measureBoundingBox = defineCommand({
       }
 
       if (!bounds) {
-        return noOp(doc, 'measure_bounding_box: document is empty — no bounds to compute.');
+        return noop(doc, 'measure_bounding_box: document is empty — no bounds to compute.');
       }
     }
 
@@ -158,7 +158,7 @@ export const measureVolume = defineCommand({
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) {
-      return noOp(doc, `measure_volume: entity '${entityId}' not found.`);
+      return noop(doc, `measure_volume: entity '${entityId}' not found.`);
     }
 
     const volumeUnit = `${doc.units}³`;
@@ -323,12 +323,12 @@ export const massProperties = defineCommand({
     // Validate the fallback density param even if it may not be used — caller must
     // supply a valid number so the API stays consistent.
     if (density <= 0) {
-      return noOp(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
+      return noop(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
     }
 
     const e = doc.entities[entityId];
     if (!e) {
-      return noOp(doc, `mass_properties: entity '${entityId}' not found.`);
+      return noop(doc, `mass_properties: entity '${entityId}' not found.`);
     }
 
     // Resolve the effective density: prefer assigned material over the param.
@@ -345,7 +345,7 @@ export const massProperties = defineCommand({
     const volumeResult = measureVolume.run(doc, { entityId });
     if (!volumeResult.data) {
       // measureVolume returned a no-op — propagate its summary.
-      return noOp(doc, volumeResult.summary);
+      return noop(doc, volumeResult.summary);
     }
 
     const { volume } = volumeResult.data as MeasureVolumeData;

@@ -12,7 +12,7 @@
 import type { CadDocument, Material } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /** Validates a CSS hex color string: #rrggbb (6 hex digits). */
 function isValidHexColor(s: string): boolean {
@@ -77,32 +77,32 @@ export const createMaterial = defineCommand({
   annotations: { idempotent: true },
   run: (doc, { name, density, color, metalness, roughness }): CommandResult => {
     if (name.trim() === '') {
-      return noOp(doc, 'create_material failed: name must be a non-empty string.');
+      return noop(doc, 'create_material failed: name must be a non-empty string.');
     }
 
     if (density <= 0) {
-      return noOp(
+      return noop(
         doc,
         `create_material '${name}' failed: density must be a finite number > 0, got ${String(density)}.`,
       );
     }
 
     if (metalness < 0 || metalness > 1) {
-      return noOp(
+      return noop(
         doc,
         `create_material '${name}' failed: metalness must be in [0, 1], got ${String(metalness)}.`,
       );
     }
 
     if (roughness < 0 || roughness > 1) {
-      return noOp(
+      return noop(
         doc,
         `create_material '${name}' failed: roughness must be in [0, 1], got ${String(roughness)}.`,
       );
     }
 
     if (!isValidHexColor(color)) {
-      return noOp(
+      return noop(
         doc,
         `create_material '${name}' failed: color must be a 6-digit hex string like "#b0b0b0", got "${String(color)}".`,
       );
@@ -158,7 +158,7 @@ export const assignMaterial = defineCommand({
   annotations: { idempotent: true },
   run: (doc, { materialName, entityIds }): CommandResult => {
     if (materialName.trim() === '') {
-      return noOp(doc, 'assign_material failed: materialName must be a non-empty string.');
+      return noop(doc, 'assign_material failed: materialName must be a non-empty string.');
     }
 
     if (!doc.materials[materialName]) {
@@ -167,11 +167,11 @@ export const assignMaterial = defineCommand({
         available.length > 0
           ? ` Available materials: ${available.join(', ')}.`
           : ' No materials defined yet — call create_material first.';
-      return noOp(doc, `assign_material failed: material '${materialName}' not found.${hint}`);
+      return noop(doc, `assign_material failed: material '${materialName}' not found.${hint}`);
     }
 
     if (entityIds.length === 0) {
-      return noOp(
+      return noop(
         doc,
         'assign_material failed: entityIds must be a non-empty array of entity ids.',
       );
@@ -195,7 +195,7 @@ export const assignMaterial = defineCommand({
     }
 
     if (assigned.length === 0) {
-      return noOp(
+      return noop(
         doc,
         `assign_material '${materialName}': no valid entity ids found — missing: ${missing.join(', ')}.`,
       );

@@ -12,7 +12,7 @@ import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { withEntity } from './entityOps';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /**
  * Convert a unit-axis / angle rotation (Rodrigues) to an intrinsic XYZ Euler triple
@@ -145,19 +145,19 @@ export const makeTubeBetween = defineCommand({
     const isPoint = (p: unknown): boolean =>
       Array.isArray(p) && p.length >= 3 && p.every((v) => typeof v === 'number' && isFinite(v));
     if (!isPoint(p1)) {
-      return noOp(doc, 'make_tube_between failed: p1 must be a numeric [x, y, z] array.');
+      return noop(doc, 'make_tube_between failed: p1 must be a numeric [x, y, z] array.');
     }
     if (!isPoint(p2)) {
-      return noOp(doc, 'make_tube_between failed: p2 must be a numeric [x, y, z] array.');
+      return noop(doc, 'make_tube_between failed: p2 must be a numeric [x, y, z] array.');
     }
     if (radius <= 0) {
-      return noOp(doc, `make_tube_between failed: radius must be > 0, got ${radius}.`);
+      return noop(doc, `make_tube_between failed: radius must be > 0, got ${radius}.`);
     }
 
     const delta = sub3(p2, p1);
     const length = Math.sqrt(dot3(delta, delta));
     if (length < 1e-9) {
-      return noOp(
+      return noop(
         doc,
         `make_tube_between failed: p1 and p2 are the same point (distance ${length.toFixed(9)} < 1e-9).`,
       );

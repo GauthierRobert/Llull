@@ -17,7 +17,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { expandInstance } from './assemblies';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /**
  * @command add_mate
@@ -97,22 +97,22 @@ export const addMate = defineCommand({
   }),
   run: (doc, { kind, a, b, value, id }): CommandResult => {
     if (a.instanceId.length === 0) {
-      return noOp(doc, `add_mate: a must be an object with a non-empty instanceId string.`);
+      return noop(doc, `add_mate: a must be an object with a non-empty instanceId string.`);
     }
     if (b.instanceId.length === 0) {
-      return noOp(doc, `add_mate: b must be an object with a non-empty instanceId string.`);
+      return noop(doc, `add_mate: b must be an object with a non-empty instanceId string.`);
     }
 
     const entityA = doc.entities[a.instanceId];
     if (!entityA || entityA.kind !== 'instance') {
-      return noOp(
+      return noop(
         doc,
         `add_mate: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
       );
     }
     const entityB = doc.entities[b.instanceId];
     if (!entityB || entityB.kind !== 'instance') {
-      return noOp(
+      return noop(
         doc,
         `add_mate: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
       );
@@ -120,7 +120,7 @@ export const addMate = defineCommand({
 
     if (kind === 'distance') {
       if (value === undefined) {
-        return noOp(
+        return noop(
           doc,
           `add_mate: kind='distance' requires a 'value' field (number or expression string).`,
         );
@@ -130,7 +130,7 @@ export const addMate = defineCommand({
     const constraintId = typeof id === 'string' && id.length > 0 ? id : nextId('mate');
 
     if (constraintId in doc.constraints) {
-      return noOp(
+      return noop(
         doc,
         `add_mate: constraint id '${constraintId}' already exists — no change made.`,
       );

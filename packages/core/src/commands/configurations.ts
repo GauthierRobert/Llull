@@ -15,7 +15,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { reEvaluateAll } from './parameters';
 import { replayHistory } from './history';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /**
  * @command create_configuration
@@ -54,7 +54,7 @@ export const createConfiguration = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, parameterValues }): CommandResult => {
     if (typeof name !== 'string' || name.trim() === '') {
-      return noOp(doc, 'create_configuration failed: name must be a non-empty string.');
+      return noop(doc, 'create_configuration failed: name must be a non-empty string.');
     }
 
     const expressions: Record<string, string> = {};
@@ -62,7 +62,7 @@ export const createConfiguration = defineCommand({
       if (typeof v === 'string') {
         expressions[k] = v;
       } else {
-        return noOp(
+        return noop(
           doc,
           `create_configuration '${name}' failed: parameterValues['${k}'] must be a string expression, got ${typeof v}.`,
         );
@@ -119,7 +119,7 @@ export const activateConfiguration = defineCommand({
   annotations: { idempotent: true, metaHistory: true },
   run: (doc, { name }): CommandResult => {
     if (name.trim() === '') {
-      return noOp(doc, 'activate_configuration failed: name must be a non-empty string.');
+      return noop(doc, 'activate_configuration failed: name must be a non-empty string.');
     }
 
     const config = doc.configurations[name];
@@ -129,7 +129,7 @@ export const activateConfiguration = defineCommand({
         available.length > 0
           ? ` Available configurations: ${available.join(', ')}.`
           : ' No configurations have been defined yet (use create_configuration first).';
-      return noOp(doc, `activate_configuration failed: configuration '${name}' not found.${hint}`);
+      return noop(doc, `activate_configuration failed: configuration '${name}' not found.${hint}`);
     }
 
     // Apply this configuration's parameter expressions to the current parameters record.
@@ -172,7 +172,7 @@ export const activateConfiguration = defineCommand({
     const warnings: string[] = [];
     const refused = kernelRefusal(baseDoc, doc.featureHistory);
     if (refused !== null) {
-      return noOp(doc, `activate_configuration: ${refused}`);
+      return noop(doc, `activate_configuration: ${refused}`);
     }
     const regenerated = replayHistory(
       baseDoc,

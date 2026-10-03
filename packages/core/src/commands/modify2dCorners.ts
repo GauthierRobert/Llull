@@ -4,7 +4,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { cross2, dot2, len2, normalize2 } from './modify2dGeometry';
 import { withEntity } from './entityOps';
-import { noOp, type NoOpResult } from './commandResult';
+import { noop } from './noop';
 
 type CornerResolution =
   | {
@@ -16,17 +16,17 @@ type CornerResolution =
       lenPrev: number;
       lenNext: number;
     }
-  | { ok: false; result: NoOpResult };
+  | { ok: false; result: CommandResult };
 
 function resolvePolyline(
   doc: CadDocument,
   command: string,
   id: string,
-): PolylineEntity | NoOpResult {
+): PolylineEntity | CommandResult {
   const entity = doc.entities[id];
-  if (!entity) return noOp(doc, `${command}: entity ${id} not found.`);
+  if (!entity) return noop(doc, `${command}: entity ${id} not found.`);
   if (entity.kind !== 'polyline') {
-    return noOp(doc, `${command}: entity ${id} is kind '${entity.kind}', expected 'polyline'.`);
+    return noop(doc, `${command}: entity ${id} is kind '${entity.kind}', expected 'polyline'.`);
   }
   return entity;
 }
@@ -64,7 +64,7 @@ function resolveCorner(
   if (n < 3) {
     return {
       ok: false,
-      result: noOp(
+      result: noop(
         doc,
         `${command}: polyline ${poly.id} needs at least 3 points to ${verb} a corner (got ${n}).`,
       ),
@@ -76,7 +76,7 @@ function resolveCorner(
   if (!isValidIndex) {
     return {
       ok: false,
-      result: noOp(
+      result: noop(
         doc,
         `${command}: vertexIndex ${vertexIndex} is out of range for a ${poly.closed ? 'closed' : 'open'} polyline with ${n} points. ` +
           `Valid range: ${poly.closed ? `0..${n - 1}` : `1..${n - 2}`}.`,
@@ -95,7 +95,7 @@ function resolveCorner(
   if (lenPrev < 1e-12 || lenNext < 1e-12) {
     return {
       ok: false,
-      result: noOp(
+      result: noop(
         doc,
         `${command}: degenerate segment at vertex ${vertexIndex} — zero-length segment.`,
       ),
@@ -141,7 +141,7 @@ export const fillet2D = defineCommand({
   run: (doc, { id, radius, vertexIndex }): CommandResult => {
     const found = resolvePolyline(doc, 'fillet_2d', id);
     if ('summary' in found) return found;
-    if (radius <= 0) return noOp(doc, `fillet_2d: radius must be > 0 (got ${radius}).`);
+    if (radius <= 0) return noop(doc, `fillet_2d: radius must be > 0 (got ${radius}).`);
     const corner = resolveCorner(doc, 'fillet_2d', 'fillet', found, vertexIndex);
     if (!corner.ok) return corner.result;
     const { poly, vertex, toPrev, toNext, lenPrev, lenNext } = corner;
@@ -156,7 +156,7 @@ export const fillet2D = defineCommand({
 
     if (halfAngle < 1e-9 || Math.abs(halfAngle - Math.PI / 2) < 1e-9) {
       // Lines are collinear or form a 180° angle — no fillet needed / not possible
-      return noOp(
+      return noop(
         doc,
         `fillet_2d: segments at vertex ${vertexIndex} are collinear — no fillet possible.`,
       );
@@ -165,7 +165,7 @@ export const fillet2D = defineCommand({
     // Distance from vertex to tangent points = radius / tan(halfAngle)
     const tanHalf = Math.tan(halfAngle);
     if (!isFinite(tanHalf) || tanHalf < 1e-12) {
-      return noOp(doc, `fillet_2d: degenerate angle at vertex ${vertexIndex}.`);
+      return noop(doc, `fillet_2d: degenerate angle at vertex ${vertexIndex}.`);
     }
     const tangentDist = radius / tanHalf;
 
@@ -299,7 +299,7 @@ export const chamfer2D = defineCommand({
   run: (doc, { id, distance, vertexIndex }): CommandResult => {
     const found = resolvePolyline(doc, 'chamfer_2d', id);
     if ('summary' in found) return found;
-    if (distance <= 0) return noOp(doc, `chamfer_2d: distance must be > 0 (got ${distance}).`);
+    if (distance <= 0) return noop(doc, `chamfer_2d: distance must be > 0 (got ${distance}).`);
     const corner = resolveCorner(doc, 'chamfer_2d', 'chamfer', found, vertexIndex);
     if (!corner.ok) return corner.result;
     const { poly, vertex, toPrev, toNext, lenPrev, lenNext } = corner;

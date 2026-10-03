@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { detectCycleOnAdd, evaluateMotionInternal } from './jointsKinematics';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 /**
  * @command add_drive_relation
  * @pure
@@ -53,31 +53,31 @@ export const addDriveRelation = defineCommand({
   }),
   run: (doc, { driver, driven, ratio, offset, id }): CommandResult => {
     if (!(driver in doc.joints)) {
-      return noOp(
+      return noop(
         doc,
         `add_drive_relation: driver joint '${String(driver)}' does not exist in doc.joints.`,
       );
     }
     if (!(driven in doc.joints)) {
-      return noOp(
+      return noop(
         doc,
         `add_drive_relation: driven joint '${String(driven)}' does not exist in doc.joints.`,
       );
     }
     if (driver === driven) {
-      return noOp(
+      return noop(
         doc,
         `add_drive_relation: driver and driven cannot be the same joint ('${driver}').`,
       );
     }
     if (!Number.isFinite(ratio)) {
-      return noOp(doc, `add_drive_relation: ratio must be a finite number, got ${String(ratio)}.`);
+      return noop(doc, `add_drive_relation: ratio must be a finite number, got ${String(ratio)}.`);
     }
 
     // Cycle detection
     const cyclePath = detectCycleOnAdd(doc.driveRelations, driver, driven);
     if (cyclePath !== null) {
-      return noOp(
+      return noop(
         doc,
         `add_drive_relation: adding this relation would create a cycle: ${cyclePath}. No change made.`,
       );
@@ -85,7 +85,7 @@ export const addDriveRelation = defineCommand({
 
     const drId = typeof id === 'string' && id.length > 0 ? id : nextId('dr');
     if (drId in doc.driveRelations) {
-      return noOp(
+      return noop(
         doc,
         `add_drive_relation: drive relation id '${drId}' already exists — no change made.`,
       );
@@ -140,7 +140,7 @@ export const deleteDriveRelation = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (!(id in doc.driveRelations)) {
-      return noOp(
+      return noop(
         doc,
         `delete_drive_relation: drive relation '${String(id)}' does not exist — no change made.`,
       );
@@ -231,7 +231,7 @@ export const bakeMotion = defineCommand({
   params: z.object({}),
   run: (doc, _params): CommandResult => {
     if (Object.keys(doc.joints).length === 0) {
-      return noOp(doc, 'bake_motion: no joints defined. Nothing to bake.');
+      return noop(doc, 'bake_motion: no joints defined. Nothing to bake.');
     }
 
     const { resolvedJoints, instancePositions, instanceRotations } = evaluateMotionInternal(doc);

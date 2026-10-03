@@ -18,19 +18,19 @@ import { defineCommand, z } from './schema';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { replaceEntities } from './entityOps';
-import { noOp, type NoOpResult } from './commandResult';
+import { noop } from './noop';
 
 function validateSolidTarget(
   doc: CadDocument,
   opName: string,
   id: string,
-): { entity: Entity } | NoOpResult {
+): { entity: Entity } | CommandResult {
   const entity = doc.entities[id];
   if (!entity) {
-    return noOp(doc, `${opName}: entity '${id}' not found.`);
+    return noop(doc, `${opName}: entity '${id}' not found.`);
   }
   if (!is3D(entity)) {
-    return noOp(
+    return noop(
       doc,
       `${opName}: entity '${id}' is a 2D shape (kind '${entity.kind}'); only 3D solids can be filleted or chamfered.`,
     );
@@ -73,7 +73,7 @@ export const filletEdge = defineCommand({
   }),
   run: (doc, { id, edgeIndices = [], radius }, ctx): CommandResult => {
     if (radius <= 0) {
-      return noOp(doc, `fillet_edge: radius must be > 0 (got ${radius}).`);
+      return noop(doc, `fillet_edge: radius must be > 0 (got ${radius}).`);
     }
 
     const validation = validateSolidTarget(doc, 'fillet_edge', id);
@@ -82,7 +82,7 @@ export const filletEdge = defineCommand({
 
     const k = (ctx ?? currentContext()).kernel;
     if (!k) {
-      return noOp(
+      return noop(
         doc,
         `fillet_edge: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
       );
@@ -90,7 +90,7 @@ export const filletEdge = defineCommand({
 
     const meshData = k.tessellate(entity);
     if (!meshData) {
-      return noOp(
+      return noop(
         doc,
         `fillet_edge: kernel could not tessellate entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
       );
@@ -162,7 +162,7 @@ export const chamferEdge = defineCommand({
   }),
   run: (doc, { id, edgeIndices = [], distance }, ctx): CommandResult => {
     if (distance <= 0) {
-      return noOp(doc, `chamfer_edge: distance must be > 0 (got ${distance}).`);
+      return noop(doc, `chamfer_edge: distance must be > 0 (got ${distance}).`);
     }
 
     const validation = validateSolidTarget(doc, 'chamfer_edge', id);
@@ -171,7 +171,7 @@ export const chamferEdge = defineCommand({
 
     const k = (ctx ?? currentContext()).kernel;
     if (!k) {
-      return noOp(
+      return noop(
         doc,
         `chamfer_edge: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
       );
@@ -179,7 +179,7 @@ export const chamferEdge = defineCommand({
 
     const meshData = k.tessellate(entity);
     if (!meshData) {
-      return noOp(
+      return noop(
         doc,
         `chamfer_edge: kernel could not tessellate entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
       );

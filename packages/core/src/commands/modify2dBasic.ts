@@ -4,7 +4,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { offsetSegment, miterJoin } from './modify2dGeometry';
 import { withEntity, withoutEntity } from './entityOps';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /**
  * @command explode_polyline
@@ -26,17 +26,17 @@ export const explodePolyline = defineCommand({
   run: (doc, { id }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return noOp(doc, `explode_polyline: entity ${id} not found.`);
+      return noop(doc, `explode_polyline: entity ${id} not found.`);
     }
     if (entity.kind !== 'polyline') {
-      return noOp(
+      return noop(
         doc,
         `explode_polyline: entity ${id} is kind '${entity.kind}', expected 'polyline'.`,
       );
     }
     const poly = entity as PolylineEntity;
     if (poly.points.length < 2) {
-      return noOp(
+      return noop(
         doc,
         `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`,
       );
@@ -112,10 +112,10 @@ export const offset2D = defineCommand({
   run: (doc, { id, distance }): CommandResult => {
     const entity = doc.entities[id];
     if (!entity) {
-      return noOp(doc, `offset_2d: entity ${id} not found.`);
+      return noop(doc, `offset_2d: entity ${id} not found.`);
     }
     if (distance === 0) {
-      return noOp(doc, `offset_2d: distance is 0 — no-op.`);
+      return noop(doc, `offset_2d: distance is 0 — no-op.`);
     }
 
     const newId = nextId('offset');
@@ -138,7 +138,7 @@ export const offset2D = defineCommand({
       case 'polyline': {
         const pts = entity.points;
         if (pts.length < 2) {
-          return noOp(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
+          return noop(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
         }
         const segs = pts.slice(0, -1).map((p, i) => offsetSegment(p, pts[i + 1]!, distance));
         if (entity.closed) segs.push(offsetSegment(pts[pts.length - 1]!, pts[0]!, distance));
@@ -156,7 +156,7 @@ export const offset2D = defineCommand({
       case 'circle': {
         const radius = entity.radius + distance;
         if (radius <= 0) {
-          return noOp(doc, `offset_2d: resulting circle radius ${radius} <= 0 — no-op.`);
+          return noop(doc, `offset_2d: resulting circle radius ${radius} <= 0 — no-op.`);
         }
         newEntity = { ...base, id: newId, kind: 'circle', center: entity.center, radius };
         summary = `Offset circle ${id} by ${distance} → new circle ${newId} radius ${radius}.`;
@@ -166,7 +166,7 @@ export const offset2D = defineCommand({
         const width = entity.width + 2 * distance;
         const height = entity.height + 2 * distance;
         if (width <= 0 || height <= 0) {
-          return noOp(
+          return noop(
             doc,
             `offset_2d: resulting rectangle ${width}×${height} is degenerate — no-op.`,
           );
@@ -185,7 +185,7 @@ export const offset2D = defineCommand({
         break;
       }
       default:
-        return noOp(
+        return noop(
           doc,
           `offset_2d: entity ${id} has unsupported kind '${entity.kind}'. Supported: line, polyline, circle, rectangle.`,
         );

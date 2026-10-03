@@ -29,7 +29,7 @@ import type { CameraState, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { computeSceneSnapshot } from './scene';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /** Default half-FOV in radians used by the viewport PerspectiveCamera (fov=60°). */
 const DEFAULT_FOV_DEG = 60;
@@ -94,7 +94,7 @@ export const setCamera = defineCommand({
   }),
   run: (doc, p): CommandResult => {
     if (p.distance !== undefined && p.distance <= 0) {
-      return noOp(doc, `set_camera: distance must be > 0 (got ${p.distance}). Camera unchanged.`);
+      return noop(doc, `set_camera: distance must be > 0 (got ${p.distance}). Camera unchanged.`);
     }
 
     const prev: CameraState = doc.camera;
@@ -113,7 +113,7 @@ export const setCamera = defineCommand({
     );
 
     if (changed.length === 0) {
-      return noOp(doc, 'set_camera: no fields specified; camera unchanged.');
+      return noop(doc, 'set_camera: no fields specified; camera unchanged.');
     }
 
     return {
@@ -160,7 +160,7 @@ export const lookAt = defineCommand({
   }),
   run: (doc, p): CommandResult => {
     if ((p.target as Vec3).some((v) => !isFinite(v))) {
-      return noOp(doc, `look_at: target must be a finite [x,y,z] array. Camera unchanged.`);
+      return noop(doc, `look_at: target must be a finite [x,y,z] array. Camera unchanged.`);
     }
 
     const prev: CameraState = doc.camera;
@@ -222,7 +222,7 @@ export const fitView = defineCommand({
     const padding: number = p.padding ?? 1.2;
 
     if (padding <= 0) {
-      return noOp(doc, `fit_view: padding must be > 0 (got ${padding}). Camera unchanged.`);
+      return noop(doc, `fit_view: padding must be > 0 (got ${padding}). Camera unchanged.`);
     }
 
     // Compute scene bounds using the shared scene snapshot helper.

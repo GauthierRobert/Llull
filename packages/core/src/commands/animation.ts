@@ -9,7 +9,7 @@ import type { Animation, CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { noOp } from './commandResult';
+import { noop } from './noop';
 
 /**
  * Resolve `targetId` to its kind: 'group' if found in doc.groups, 'entity' if
@@ -133,7 +133,7 @@ export const animateSpin = defineCommand({
   run: (doc, { targetId, speed, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) {
-      return noOp(doc, `animate_spin: no entity or group ${targetId}.`);
+      return noop(doc, `animate_spin: no entity or group ${targetId}.`);
     }
 
     const anim = buildAnimation(
@@ -204,18 +204,18 @@ export const animateOscillate = defineCommand({
   run: (doc, { targetId, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) {
-      return noOp(doc, `animate_oscillate: no entity or group ${targetId}.`);
+      return noop(doc, `animate_oscillate: no entity or group ${targetId}.`);
     }
 
     if (amplitude <= 0) {
-      return noOp(
+      return noop(
         doc,
         `animate_oscillate: amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`,
       );
     }
 
     if (frequency <= 0) {
-      return noOp(
+      return noop(
         doc,
         `animate_oscillate: frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`,
       );
@@ -274,7 +274,7 @@ export const stopAnimation = defineCommand({
 
     if (animationId !== undefined) {
       if (existing[animationId] === undefined) {
-        return noOp(doc, `stop_animation: animation ${animationId} not found; nothing removed.`);
+        return noop(doc, `stop_animation: animation ${animationId} not found; nothing removed.`);
       }
       const next = { ...existing };
       delete next[animationId];
@@ -288,7 +288,7 @@ export const stopAnimation = defineCommand({
     if (targetId !== undefined) {
       const toRemove = Object.values(existing).filter((a) => a.targetId === targetId);
       if (toRemove.length === 0) {
-        return noOp(
+        return noop(
           doc,
           `stop_animation: no animations found for target ${targetId}; nothing removed.`,
         );
@@ -306,7 +306,7 @@ export const stopAnimation = defineCommand({
 
     const count = Object.keys(existing).length;
     if (count === 0) {
-      return noOp(doc, 'stop_animation: no animations to clear.');
+      return noop(doc, 'stop_animation: no animations to clear.');
     }
     return {
       document: { ...doc, animations: {} },

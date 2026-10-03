@@ -1,6 +1,7 @@
 import type { CadDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { MAX_BATCH_IDS } from './limits';
+import { noop } from './noop';
 
 type BatchIds =
   | { readonly ok: true; readonly existing: string[]; readonly missing: string[] }
@@ -22,7 +23,7 @@ export function resolveBatchIds(
 ): BatchIds {
   const fail = (summary: string): BatchIds => ({
     ok: false,
-    result: { document: doc, summary: `${command}: ${summary}`, affected: [] },
+    result: noop(doc, `${command}: ${summary}`),
   });
   if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== 'string')) {
     return fail(emptyDetail);
