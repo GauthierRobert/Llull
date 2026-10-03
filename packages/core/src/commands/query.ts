@@ -14,6 +14,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { entityBounds } from './scene';
 import type { Bounds } from './scene';
+import { distanceSq3 } from '../lib/vec3';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -40,17 +41,6 @@ export interface FindEntitiesResult {
 /** Returns the centroid of a world-space AABB. */
 function bboxCentroid(b: Bounds): readonly [number, number, number] {
   return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
-}
-
-/** 3D euclidean distance squared between two points. */
-function distSq(
-  a: readonly [number, number, number],
-  b: readonly [number, number, number],
-): number {
-  const dx = a[0] - b[0];
-  const dy = a[1] - b[1];
-  const dz = a[2] - b[2];
-  return dx * dx + dy * dy + dz * dz;
 }
 
 /** Returns true when AABB `b` is fully inside `[qMin, qMax]`. */
@@ -367,7 +357,7 @@ export const findEntities = defineCommand({
       if (npPoint !== null) {
         const b = entityBounds(e);
         const centroid = bboxCentroid(b);
-        if (distSq(centroid, npPoint) > npRadiusSq) continue;
+        if (distanceSq3(centroid, npPoint) > npRadiusSq) continue;
       }
 
       // insideBBox filter

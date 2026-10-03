@@ -30,6 +30,12 @@ export function len3(a: Vec3): number {
   return Math.sqrt(dot3(a, a));
 }
 
+/** @pure squared Euclidean distance (no sqrt — for threshold comparisons) */
+export function distanceSq3(a: Vec3, b: Vec3): number {
+  const delta = sub3(a, b);
+  return dot3(delta, delta);
+}
+
 /** @pure unit vector; `[0, 0, 1]` for (near-)zero-length input */
 export function normalize3(a: Vec3): Vec3 {
   const l = len3(a);

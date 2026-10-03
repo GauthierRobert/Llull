@@ -11,16 +11,7 @@
  * These are pure functions so they can be unit-tested without a DOM/canvas.
  */
 
-/** Euclidean distance² between two Vec3 triples — avoids sqrt for threshold checks. */
-function distanceSq(
-  a: readonly [number, number, number],
-  b: readonly [number, number, number],
-): number {
-  const dx = a[0] - b[0];
-  const dy = a[1] - b[1];
-  const dz = a[2] - b[2];
-  return dx * dx + dy * dy + dz * dz;
-}
+import { distanceSq3 } from '@lib/vec3';
 
 /**
  * Returns true when the camera target has drifted far enough from the current
@@ -35,7 +26,7 @@ export function shouldRebase(
   currentOrigin: readonly [number, number, number],
   threshold = 1e4,
 ): boolean {
-  return distanceSq(cameraTarget, currentOrigin) > threshold * threshold;
+  return distanceSq3(cameraTarget, currentOrigin) > threshold * threshold;
 }
 
 /**
