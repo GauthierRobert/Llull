@@ -227,39 +227,29 @@ export function plateRows(
   const bearingWorst = worst(bearing);
   if (bearingWorst) rows.push(row('plate concrete bearing fjd (C25/30)', bearingWorst, 'N/mm²'));
 
-  const favourable = ultimateCombinations(wind, crane, true);
   const tension: Candidate[] = [];
   const interaction: Candidate[] = [];
-  for (const combination of favourable) {
-    const { v, h } = combine(reaction, combination.factors);
-    const perBoltTension = Math.max(0, -v) / bolts;
-    const perBoltShear = Math.abs(h) / bolts;
-    tension.push({
-      value: perBoltTension,
-      limit: tensionLimit,
-      combination: combination.name,
-      utilisation: Math.min(perBoltTension / tensionLimit, MAX_UTILISATION),
-    });
-    const combined = perBoltShear / shearLimit + perBoltTension / (1.4 * tensionLimit);
-    interaction.push({
-      value: combined,
-      limit: 1,
-      combination: combination.name,
-      utilisation: Math.min(Math.max(combined, perBoltShear / shearLimit), MAX_UTILISATION),
-    });
-  }
-  const ultimate = ultimateCombinations(wind, crane, false);
-  for (const combination of ultimate) {
-    const { v, h } = combine(reaction, combination.factors);
-    const perBoltShear = Math.abs(h) / bolts;
-    const perBoltTension = Math.max(0, -v) / bolts;
-    const combined = perBoltShear / shearLimit + perBoltTension / (1.4 * tensionLimit);
-    interaction.push({
-      value: combined,
-      limit: 1,
-      combination: combination.name,
-      utilisation: Math.min(Math.max(combined, perBoltShear / shearLimit), MAX_UTILISATION),
-    });
+  for (const favourable of [true, false]) {
+    for (const combination of ultimateCombinations(wind, crane, favourable)) {
+      const { v, h } = combine(reaction, combination.factors);
+      const perBoltTension = Math.max(0, -v) / bolts;
+      const perBoltShear = Math.abs(h) / bolts;
+      if (favourable) {
+        tension.push({
+          value: perBoltTension,
+          limit: tensionLimit,
+          combination: combination.name,
+          utilisation: Math.min(perBoltTension / tensionLimit, MAX_UTILISATION),
+        });
+      }
+      const combined = perBoltShear / shearLimit + perBoltTension / (1.4 * tensionLimit);
+      interaction.push({
+        value: combined,
+        limit: 1,
+        combination: combination.name,
+        utilisation: Math.min(Math.max(combined, perBoltShear / shearLimit), MAX_UTILISATION),
+      });
+    }
   }
   const tensionWorst = worst(tension);
   if (wind && tensionWorst) {

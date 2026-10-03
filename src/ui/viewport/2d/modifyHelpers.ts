@@ -23,11 +23,7 @@ import type {
   SplineEntity,
 } from '@core/model/types';
 
-// ---------------------------------------------------------------------------
-// Nearest-vertex picking for polylines (fillet / chamfer)
-// ---------------------------------------------------------------------------
-
-export interface NearestVertexResult {
+interface NearestVertexResult {
   /** 0-based index of the nearest vertex. */
   vertexIndex: number;
   /** World-space position of that vertex. */
@@ -68,10 +64,6 @@ export function nearestVertex(points: ReadonlyArray<Vec2>, pick: Vec2): NearestV
   };
 }
 
-// ---------------------------------------------------------------------------
-// Offset side determination
-// ---------------------------------------------------------------------------
-
 /**
  * Determine the sign of the offset distance from a pick point relative to a line.
  *
@@ -91,10 +83,6 @@ export function offsetSideSign(start: Vec2, end: Vec2, pick: Vec2): 1 | -1 {
   return cross >= 0 ? 1 : -1;
 }
 
-// ---------------------------------------------------------------------------
-// Distance between two 2D points
-// ---------------------------------------------------------------------------
-
 /**
  * Euclidean distance between two 2D points.
  * @pure
@@ -104,10 +92,6 @@ export function dist2(a: Vec2, b: Vec2): number {
   const dy = b[1] - a[1];
   return Math.sqrt(dx * dx + dy * dy);
 }
-
-// ---------------------------------------------------------------------------
-// Entity pick distance (for ModifyPickInteraction)
-// ---------------------------------------------------------------------------
 
 /**
  * Squared distance from point P to the segment AB.

@@ -28,10 +28,6 @@ import type { ModifyToolKind } from '@ui/store';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import { nearestVertex, offsetSideSign } from './modifyHelpers';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /** Describes what the user should do next for the active modify tool. */
 export type ModifyToolPhase =
   /** No modify tool active. */
@@ -58,7 +54,7 @@ interface ModifyToolState {
   pendingValue: number;
 }
 
-export interface UseModifyToolResult extends ModifyToolState {
+interface UseModifyToolResult extends ModifyToolState {
   setActiveTool: (tool: ModifyToolKind) => void;
   /**
    * Handle a click on an entity in the viewport.
@@ -79,10 +75,6 @@ export interface UseModifyToolResult extends ModifyToolState {
   cancel: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// Keyboard shortcut → tool mapping (O/F/K/T/X/E)
-// ---------------------------------------------------------------------------
-
 const KEY_TO_TOOL: Readonly<Record<string, ModifyToolKind>> = {
   o: 'offset',
   f: 'fillet',
@@ -91,10 +83,6 @@ const KEY_TO_TOOL: Readonly<Record<string, ModifyToolKind>> = {
   x: 'extend',
   e: 'explode',
 };
-
-// ---------------------------------------------------------------------------
-// Initial state helper
-// ---------------------------------------------------------------------------
 
 function initialState(): Omit<ModifyToolState, 'activeTool'> {
   return {
@@ -105,10 +93,6 @@ function initialState(): Omit<ModifyToolState, 'activeTool'> {
     pendingValue: 1,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
 
 export function useModifyTool(): UseModifyToolResult {
   const dispatch = useStore((s) => s.dispatch);

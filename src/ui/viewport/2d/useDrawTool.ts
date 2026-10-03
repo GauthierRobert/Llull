@@ -27,10 +27,6 @@ import {
   ellipseParamsFromCenterCorner,
 } from './drawHelpers';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface DrawToolState {
   /** The currently active tool. */
   activeTool: DrawToolKind;
@@ -38,7 +34,7 @@ interface DrawToolState {
   collectedPoints: Vec2[];
 }
 
-export interface UseDrawToolResult extends DrawToolState {
+interface UseDrawToolResult extends DrawToolState {
   /** Set the active draw tool; resets in-progress state. */
   setActiveTool: (tool: DrawToolKind) => void;
   /**
@@ -78,10 +74,6 @@ export function wallChainParams(
     ? { points: distinct.slice(0, -1), closed: true }
     : { points: distinct, closed };
 }
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
 
 interface DrawProgress {
   tool: DrawToolKind;

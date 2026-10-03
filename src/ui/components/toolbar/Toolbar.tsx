@@ -17,10 +17,6 @@ import { DRAW_TOOL_KEYS, GIZMO_KEYS } from '@ui/hooks/shortcuts';
 import { SOLID_PRESETS } from './solidPresets';
 import { createSolid } from '@ui/actions/createSolid';
 
-// ---------------------------------------------------------------------------
-// Button primitive
-// ---------------------------------------------------------------------------
-
 interface ToolButtonProps {
   label: string;
   icon: IconName;
@@ -74,10 +70,6 @@ function ToolGroup({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Groups
-// ---------------------------------------------------------------------------
 
 interface DrawToolSpec {
   tool: DrawToolKind;
@@ -273,10 +265,6 @@ function EditGroup(): React.ReactElement {
     </ToolGroup>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Toolbar
-// ---------------------------------------------------------------------------
 
 export function Toolbar(): React.ReactElement {
   const setShortcutsOpen = useToolStore((s) => s.setShortcutsOpen);

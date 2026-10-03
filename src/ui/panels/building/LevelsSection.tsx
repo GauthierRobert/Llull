@@ -8,8 +8,7 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
-import { Icon } from '@ui/components/Icon';
-import { PanelSection } from '@ui/panels/PanelParts';
+import { PanelSection, IconButton } from '@ui/panels/PanelParts';
 
 const EMPTY_LEVELS: ReadonlyArray<BuildingLevel> = [];
 
@@ -39,15 +38,14 @@ function LevelRow({ level, active, units }: LevelRowProps): React.ReactElement {
         </span>
       </button>
       <span className="panel__row-actions">
-        <button
-          type="button"
-          className="icon-btn icon-btn--danger"
-          aria-label={`Delete level ${level.name}`}
+        <IconButton
+          icon="close"
+          danger
+          size={12}
+          label={`Delete level ${level.name}`}
           title="Delete level (and its elements)"
           onClick={() => dispatch('delete_level', { levelId: level.id, deleteElements: true })}
-        >
-          <Icon name="close" size={12} />
-        </button>
+        />
       </span>
     </li>
   );

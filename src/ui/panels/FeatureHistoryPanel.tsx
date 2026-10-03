@@ -16,15 +16,11 @@
  * (PRIME DIRECTIVE, architecture L1, react R1)
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useStore } from '@ui/store';
 import type { FeatureStep } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
-import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
-
-// ---------------------------------------------------------------------------
-// FeatureStepRow — one row in the timeline
-// ---------------------------------------------------------------------------
+import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface FeatureStepRowProps {
   step: FeatureStep;
@@ -34,24 +30,6 @@ interface FeatureStepRowProps {
 
 function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-
-  const handleToggleSuppress = useCallback(() => {
-    dispatch('set_step_suppressed', { stepId: step.id, suppressed: !step.suppressed });
-  }, [dispatch, step.id, step.suppressed]);
-
-  const handleMoveUp = useCallback(() => {
-    if (index === 0) return;
-    dispatch('reorder_step', { stepId: step.id, newIndex: index - 1 });
-  }, [dispatch, step.id, index]);
-
-  const handleMoveDown = useCallback(() => {
-    if (index >= totalCount - 1) return;
-    dispatch('reorder_step', { stepId: step.id, newIndex: index + 1 });
-  }, [dispatch, step.id, index, totalCount]);
-
-  const handleDelete = useCallback(() => {
-    dispatch('delete_step', { stepId: step.id });
-  }, [dispatch, step.id]);
 
   const isSuppressed = step.suppressed === true;
   const displayLabel = step.label ?? step.name;
@@ -74,41 +52,35 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
       {isSuppressed && <span className="chip chip--warning">off</span>}
 
       <div className="panel__row-actions">
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={handleMoveUp}
+        <IconButton
+          icon="arrowUp"
+          onClick={() => dispatch('reorder_step', { stepId: step.id, newIndex: index - 1 })}
           disabled={index === 0}
-          aria-label={`Move step ${displayLabel} up`}
+          label={`Move step ${displayLabel} up`}
           title="Move up"
-        >
-          <Icon name="arrowUp" size={13} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={handleMoveDown}
+        />
+        <IconButton
+          icon="arrowDown"
+          onClick={() => dispatch('reorder_step', { stepId: step.id, newIndex: index + 1 })}
           disabled={index >= totalCount - 1}
-          aria-label={`Move step ${displayLabel} down`}
+          label={`Move step ${displayLabel} down`}
           title="Move down"
-        >
-          <Icon name="arrowDown" size={13} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn icon-btn--danger"
-          onClick={handleDelete}
-          aria-label={`Delete step ${displayLabel}`}
+        />
+        <IconButton
+          icon="trash"
+          danger
+          onClick={() => dispatch('delete_step', { stepId: step.id })}
+          label={`Delete step ${displayLabel}`}
           title="Delete step"
-        >
-          <Icon name="trash" size={13} />
-        </button>
+        />
       </div>
 
       <button
         type="button"
         className={`icon-btn history-suppress-btn${isSuppressed ? ' history-suppress-btn--suppressed' : ''}`}
-        onClick={handleToggleSuppress}
+        onClick={() =>
+          dispatch('set_step_suppressed', { stepId: step.id, suppressed: !step.suppressed })
+        }
         aria-pressed={isSuppressed}
         aria-label={isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`}
         title={isSuppressed ? 'Restore (un-suppress)' : 'Suppress (skip during replay)'}
@@ -119,21 +91,13 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
   );
 }
 
-// ---------------------------------------------------------------------------
-// FeatureHistoryPanel
-// ---------------------------------------------------------------------------
-
-export interface FeatureHistoryPanelProps {
+interface FeatureHistoryPanelProps {
   className?: string;
 }
 
 export function FeatureHistoryPanel({ className }: FeatureHistoryPanelProps): React.ReactElement {
   const featureHistory = useStore((s) => s.document.featureHistory);
   const dispatch = useStore((s) => s.dispatch);
-
-  const handleReplay = useCallback(() => {
-    dispatch('replay_history', {});
-  }, [dispatch]);
 
   const stepCount = featureHistory.length;
   const suppressedCount = featureHistory.filter((s) => s.suppressed === true).length;
@@ -152,7 +116,7 @@ export function FeatureHistoryPanel({ className }: FeatureHistoryPanelProps): Re
         <button
           type="button"
           className="btn btn--ghost btn--sm"
-          onClick={handleReplay}
+          onClick={() => dispatch('replay_history', {})}
           disabled={stepCount === 0}
           aria-label="Replay feature history"
           title="Regenerate document from history"

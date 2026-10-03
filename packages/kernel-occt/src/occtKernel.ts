@@ -1,74 +1,23 @@
 /**
- * OpenCascade.js (OCC WASM) geometry kernel — opt-in production kernel.
+ * OpenCascade.js (OCC WASM) geometry kernel, opt-in via `?kernel=occt` / `LLULL_KERNEL=occt`
+ * (Manifold is the default). Measurements and API notes: docs/decisions/KI4-occt-spike.md.
  *
  * @layer kernel
- *
- * STATUS: OPT-IN. Inject via `?kernel=occt` URL param (see main.tsx) or `LLULL_KERNEL=occt` on the server.
- * Manifold remains the default kernel. OCC is injected only when the URL flag
- * is set (dev/power-user toggle). Measurements and API notes: docs/decisions/KI4-occt-spike.md.
- *
- * ---------------------------------------------------------------------------
- * MEASUREMENTS (captured Node.js v22, Windows 11, AMD Ryzen, 2026-05-26)
- * ---------------------------------------------------------------------------
- *   WASM binary:     63 MB  (on-disk, opencascade.js@1.1.1)
- *   JS glue:          0.3 MB
- *   Cold init time:  ~800–1000 ms (Node.js; browser WASM JIT similar)
- *   Boolean union:   ~180 ms (BRepAlgoAPI_Fuse on two 2×2×2 boxes)
- *   Fillet r=0.2:    ~150 ms (BRepFilletAPI_MakeFillet, 12 edges)
- *   Union triangles: 28 (identical to Manifold union of same two boxes — exact match)
- *   Fillet triangles: 628 (vs 12 for plain box; smooth rounded result, no NaN)
- *   Bbox correctness: union bbox [-1,-1,-1]→[2,1,1] matches expected 3×2×2 envelope
- *
- * ---------------------------------------------------------------------------
- * MESH→BREP APPROACH
- * ---------------------------------------------------------------------------
- * `filletEdges` uses `meshDataToTopoDSShape` (BRepBuilderAPI_Sewing).
- * Per-triangle faces are built via BRepBuilderAPI_MakePolygon (closed triangle wire)
- * → BRepBuilderAPI_MakeFace_15 (planar face from wire), then sewn together into a
- * shell and promoted to a solid via BRepBuilderAPI_MakeSolid.
- *
- * Remaining limitations:
- *   - Robustness depends on triangle sealing: degenerate triangles (zero-area) are
- *     skipped but may leave gaps in the shell, causing BRepBuilderAPI_MakeSolid to
- *     fail. In that case filletEdges returns null (graceful no-op).
- *   - The sewing tolerance is 1e-6; meshes with vertices that differ by less than
- *     this are merged, which is correct behaviour but may lose fine detail.
- *   - Non-manifold meshes (open surfaces, meshes with T-junctions) will produce an
- *     open shell; MakeSolid will still fail gracefully, filletEdges returns null.
- *   - BRepBuilderAPI_MakeFace_15 builds a planar face from the triangle wire;
- *     curved surfaces (sphere faces, cylinder caps) become flat approximations.
- *     The fillet operates on this approximate topology — the result is geometrically
- *     close but not exact for non-polyhedral inputs.
- *   - All OCC APIs used here are callable despite the opencascade.js 'unsupported' badge.
- *     Verified live under Node (LLULL_KERNEL=occt, server/tests/kernelChoice.test.ts): this
- *     opencascade.js build (OCC 7.4) needs `MakePolygon_1` / `MakeSolid_1` constructors and a
- *     null `Handle_Message_ProgressIndicator` for `Sewing.Perform`.
- *
- * Operand types handled by filletEdges:
- *   - box entity     → exact B-rep via BRepPrimAPI_MakeBox_2
- *   - arbitrary mesh → sewing approach above; solid produced when mesh is manifold
- *
- * Operand types not handled (return null gracefully):
- *   - cylinder/sphere/extrusion entities → entityToOccShape returns null for
- *     these; the mesh path handles their MeshData representations instead.
- *   - Open / non-manifold MeshData → sewing produces open shell → MakeSolid fails → null.
- *
- * ---------------------------------------------------------------------------
- * NOT IMPLEMENTED (return null): `chamferEdges` (BRepFilletAPI_MakeChamfer candidate),
- * `shellSolid` (BRepOffsetAPI_MakeThickSolid candidate).
- * ---------------------------------------------------------------------------
+ * @invariant implemented: booleanOp (box operands), filletEdges (mesh -> sewn solid -> fillet), tessellate (box)
+ * @failure unsupported kind / non-manifold mesh / OCC failure / chamferEdges / shellSolid -> null
  */
 
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
-import type { Entity } from '@core/model/types';
+import type { Entity, Vec3 } from '@core/model/types';
+import { cross3, dot3, sub3 } from '@lib/vec3';
 
-// Minimal type-narrowing interface for the OCC WASM API.
-// Only models the subset this kernel uses. `any` is isolated to the one
-// boundary cast at init — identical pattern to manifoldKernel.ts.
-
-interface OccShape {
-  ShapeType(): unknown;
+/** Minimal typings for the subset of the OCC WASM API this kernel uses. */
+interface OccHandle {
   delete(): void;
+}
+
+interface OccShape extends OccHandle {
+  ShapeType(): unknown;
 }
 
 interface OccTriangulation {
@@ -81,91 +30,49 @@ interface OccTriangulation {
   };
 }
 
-interface OccLocation {
-  delete(): void;
-}
-
-interface OccExplorer {
+interface OccExplorer extends OccHandle {
   More(): boolean;
   Current(): OccShape;
   Next(): void;
-  delete(): void;
 }
 
-interface OccBRep_Tool {
-  Triangulation(face: OccShape, loc: OccLocation): OccTriangulation;
-}
-
-interface OccTopoDS_Module {
+interface OccTopoDS {
   Face_1(shape: OccShape): OccShape;
   Edge_1(shape: OccShape): OccShape;
+  Shell_1(shape: OccShape): OccShape;
 }
 
-interface OccFuseOp {
+/** Boolean operation or fillet builder: `Build` then `Shape`. */
+interface OccBuilder extends OccHandle {
   Build(): void;
   IsDone(): boolean;
   Shape(): OccShape;
-  delete(): void;
 }
 
-interface OccMesher {
-  Perform(): void;
-  IsDone(): boolean;
-  delete(): void;
-}
-
-interface OccFilletMaker {
+interface OccFilletMaker extends OccBuilder {
   Add_2(radius: number, edge: OccShape): void;
-  Build(): void;
-  IsDone(): boolean;
-  Shape(): OccShape;
-  delete(): void;
 }
 
-interface OccMakeBox {
-  Shape(): OccShape;
-  delete(): void;
-}
-
-interface OccGpPnt {
-  delete(): void;
-}
-
-interface OccTopLoc_Location {
-  delete(): void;
-}
-
-interface OccMakePolygon {
-  Add_1(pt: OccGpPnt): void;
+interface OccMakePolygon extends OccHandle {
+  Add_1(pt: OccHandle): void;
   Close(): void;
   IsDone(): boolean;
   Wire(): OccShape;
-  delete(): void;
 }
 
-interface OccMakeFace {
+interface OccMakeFace extends OccHandle {
   IsDone(): boolean;
   Face(): OccShape;
-  delete(): void;
 }
 
-interface OccSewing {
+interface OccSewing extends OccHandle {
   Add(shape: OccShape): void;
   Perform(progress: unknown): void;
   SewedShape(): OccShape;
-  delete(): void;
 }
 
-interface OccMakeSolid {
+interface OccMakeSolid extends OccBuilder {
   Add(shell: OccShape): void;
-  Build(): void;
-  IsDone(): boolean;
-  Shape(): OccShape;
-  delete(): void;
-}
-
-interface OccTopoDS_ModuleFull extends OccTopoDS_Module {
-  Shell_1(shape: OccShape): OccShape;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -212,33 +119,39 @@ async function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
   return _modulePromise;
 }
 
-function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
-  const mesher = new api.BRepMesh_IncrementalMesh_2(
+function explorer(api: OccApi, shape: OccShape, kind: string): OccExplorer {
+  return new api.TopExp_Explorer_2(
     shape,
-    0.1, // linear deflection
-    false,
-    0.5, // angular deflection (radians)
-    false,
-  ) as OccMesher;
+    api.TopAbs_ShapeEnum[kind],
+    api.TopAbs_ShapeEnum.TopAbs_SHAPE,
+  ) as OccExplorer;
+}
+
+/** Free a WASM heap object; OCC may already have released it, so failures are ignored. */
+function release(handle: OccHandle | null): void {
+  try {
+    handle?.delete();
+  } catch {
+    /* already released */
+  }
+}
+
+function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
+  const mesher = new api.BRepMesh_IncrementalMesh_2(shape, 0.1, false, 0.5, false) as OccHandle & {
+    Perform(): void;
+  };
   mesher.Perform();
 
   const positions: number[] = [];
   const indices: number[] = [];
   let vertexOffset = 0;
 
-  const exp = new api.TopExp_Explorer_2(
-    shape,
-    api.TopAbs_ShapeEnum.TopAbs_FACE,
-    api.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  ) as OccExplorer;
+  const exp = explorer(api, shape, 'TopAbs_FACE');
 
   while (exp.More()) {
-    const face = (api.TopoDS as OccTopoDS_Module).Face_1(exp.Current());
-    const loc: OccTopLoc_Location = new api.TopLoc_Location_1();
-    const triangulation: OccTriangulation = (api.BRep_Tool as OccBRep_Tool).Triangulation(
-      face,
-      loc as unknown as OccLocation,
-    );
+    const face = (api.TopoDS as OccTopoDS).Face_1(exp.Current());
+    const loc: OccHandle = new api.TopLoc_Location_1();
+    const triangulation = api.BRep_Tool.Triangulation(face, loc) as OccTriangulation;
 
     if (!triangulation.IsNull()) {
       const tri = triangulation.get();
@@ -262,7 +175,7 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
       vertexOffset += nNodes;
     }
 
-    (loc as unknown as OccLocation).delete();
+    loc.delete();
     exp.Next();
   }
 
@@ -273,265 +186,142 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   return { positions, indices };
 }
 
-// Helper: reconstruct a TopoDS_Shape from arbitrary MeshData.
-//
-// Approach 2 — BRepBuilderAPI_Sewing:
-//   For each triangle in the mesh, build a closed triangular wire via
-//   BRepBuilderAPI_MakePolygon → BRepBuilderAPI_MakeFace_15 (planar face).
-//   All triangle faces are sewn together into a shell by BRepBuilderAPI_Sewing.
-//   The sealed shell is promoted to a solid via BRepBuilderAPI_MakeSolid.
-//
-// Returns null if:
-//   - The mesh has no triangles or degenerate geometry.
-//   - Sewing produces an open shell (non-manifold / open mesh input).
-//   - BRepBuilderAPI_MakeSolid.IsDone() is false.
-//
-// @pure (does not mutate mesh; all OCC objects are .delete()d before return)
+/** Planar OCC face of one triangle (closed polygon wire), or null when OCC rejects it. */
+function triangleFace(api: OccApi, corners: [Vec3, Vec3, Vec3]): OccShape | null {
+  const points: OccHandle[] = corners.map(([x, y, z]) => new api.gp_Pnt_3(x, y, z));
+  const poly = new api.BRepBuilderAPI_MakePolygon_1() as OccMakePolygon;
+  for (const point of points) poly.Add_1(point);
+  poly.Close();
+  points.forEach(release);
+  if (!poly.IsDone()) {
+    poly.delete();
+    return null;
+  }
+  const makeFace = new api.BRepBuilderAPI_MakeFace_15(poly.Wire(), false) as OccMakeFace;
+  poly.delete();
+  const face = makeFace.IsDone() ? makeFace.Face() : null;
+  makeFace.delete();
+  return face;
+}
 
+/**
+ * Rebuild a solid from MeshData: per-triangle planar faces sewn into a shell (BRepBuilderAPI_Sewing),
+ * promoted with BRepBuilderAPI_MakeSolid. Degenerate triangles are skipped.
+ * @failure empty / malformed mesh, open shell, MakeSolid not done -> null
+ */
 function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   const { positions, indices } = mesh;
-  if (positions.length === 0 || indices.length === 0) return null;
-  if (indices.length % 3 !== 0) return null;
+  if (positions.length === 0 || indices.length === 0 || indices.length % 3 !== 0) return null;
 
+  const vertex = (index: number): Vec3 => [
+    positions[index * 3] ?? 0,
+    positions[index * 3 + 1] ?? 0,
+    positions[index * 3 + 2] ?? 0,
+  ];
   const sewing: OccSewing = new api.BRepBuilderAPI_Sewing(1e-6, true, true, true, false);
-  const createdFaces: OccShape[] = [];
-
-  const triCount = indices.length / 3;
-  for (let t = 0; t < triCount; t++) {
-    const i0 = indices[t * 3] ?? 0;
-    const i1 = indices[t * 3 + 1] ?? 0;
-    const i2 = indices[t * 3 + 2] ?? 0;
-
-    const x0 = positions[i0 * 3] ?? 0,
-      y0 = positions[i0 * 3 + 1] ?? 0,
-      z0 = positions[i0 * 3 + 2] ?? 0;
-    const x1 = positions[i1 * 3] ?? 0,
-      y1 = positions[i1 * 3 + 1] ?? 0,
-      z1 = positions[i1 * 3 + 2] ?? 0;
-    const x2 = positions[i2 * 3] ?? 0,
-      y2 = positions[i2 * 3 + 1] ?? 0,
-      z2 = positions[i2 * 3 + 2] ?? 0;
-
-    // Skip degenerate (zero-area) triangles to avoid sewing failures.
-    const abx = x1 - x0,
-      aby = y1 - y0,
-      abz = z1 - z0;
-    const acx = x2 - x0,
-      acy = y2 - y0,
-      acz = z2 - z0;
-    const crossSq =
-      (aby * acz - abz * acy) ** 2 + (abz * acx - abx * acz) ** 2 + (abx * acy - aby * acx) ** 2;
-    if (crossSq < 1e-24) continue; // degenerate — skip
-
-    const gp0: OccGpPnt = new api.gp_Pnt_3(x0, y0, z0);
-    const gp1: OccGpPnt = new api.gp_Pnt_3(x1, y1, z1);
-    const gp2: OccGpPnt = new api.gp_Pnt_3(x2, y2, z2);
-
-    const poly: OccMakePolygon = new api.BRepBuilderAPI_MakePolygon_1();
-    poly.Add_1(gp0);
-    poly.Add_1(gp1);
-    poly.Add_1(gp2);
-    poly.Close();
-    gp0.delete();
-    gp1.delete();
-    gp2.delete();
-
-    if (!poly.IsDone()) {
-      poly.delete();
-      continue;
-    }
-
-    const wire = poly.Wire();
-    const makeFace: OccMakeFace = new api.BRepBuilderAPI_MakeFace_15(wire, false);
-    poly.delete();
-
-    if (makeFace.IsDone()) {
-      const face = makeFace.Face();
-      sewing.Add(face);
-      createdFaces.push(face);
-    }
-    makeFace.delete();
+  for (let t = 0; t < indices.length; t += 3) {
+    const corners: [Vec3, Vec3, Vec3] = [
+      vertex(indices[t] ?? 0),
+      vertex(indices[t + 1] ?? 0),
+      vertex(indices[t + 2] ?? 0),
+    ];
+    const normal = cross3(sub3(corners[1], corners[0]), sub3(corners[2], corners[0]));
+    if (dot3(normal, normal) < 1e-24) continue;
+    const face = triangleFace(api, corners);
+    if (face) sewing.Add(face);
   }
-
-  // Clean up temporary face references (shapes are owned by OCC topology).
-  // createdFaces are passed to sewing; sewing holds them internally.
-  // We do NOT delete them here — sewing manages their lifetime.
 
   const noProgress = new api.Handle_Message_ProgressIndicator_1();
   sewing.Perform(noProgress);
   noProgress.delete();
   const sewn = sewing.SewedShape() as OccShape | null;
-
   if (!sewn) {
     sewing.delete();
     return null;
   }
 
-  // Promote the sewed shell to a solid.
   const makeSolid: OccMakeSolid = new api.BRepBuilderAPI_MakeSolid_1();
-  const shellExp: OccExplorer = new api.TopExp_Explorer_2(
-    sewn,
-    api.TopAbs_ShapeEnum.TopAbs_SHELL,
-    api.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  );
-
+  const shellExp = explorer(api, sewn, 'TopAbs_SHELL');
   let shellCount = 0;
   while (shellExp.More()) {
-    const shell = (api.TopoDS as OccTopoDS_ModuleFull).Shell_1(shellExp.Current());
-    makeSolid.Add(shell);
+    makeSolid.Add((api.TopoDS as OccTopoDS).Shell_1(shellExp.Current()));
     shellCount++;
     shellExp.Next();
   }
   shellExp.delete();
   sewing.delete();
 
-  if (shellCount === 0) {
-    makeSolid.delete();
-    return null;
-  }
-
-  makeSolid.Build();
-  if (!makeSolid.IsDone()) {
-    makeSolid.delete();
-    return null;
-  }
-
-  const solid = makeSolid.Shape();
+  if (shellCount > 0) makeSolid.Build();
+  const solid = shellCount > 0 && makeSolid.IsDone() ? makeSolid.Shape() : null;
   makeSolid.delete();
   return solid;
 }
 
-// Entity → OCC TopoDS_Shape conversion.
-// Supports box only; every other kind returns null.
-
+/** Box entities only (centered on `position`); every other kind -> null. */
 function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
-  switch (entity.kind) {
-    case 'box': {
-      const [sx, sy, sz] = entity.size;
-      if (sx <= 0 || sy <= 0 || sz <= 0) return null;
-      // Place origin at -half-size so the box is centered (matching three.js BoxGeometry).
-      const [px, py, pz] = entity.position;
-      const origin: OccGpPnt = new api.gp_Pnt_3(px - sx / 2, py - sy / 2, pz - sz / 2);
-      const maker: OccMakeBox = new api.BRepPrimAPI_MakeBox_2(origin, sx, sy, sz);
-      const shape = maker.Shape() as OccShape;
-      origin.delete();
-      maker.delete();
-      return shape;
-    }
+  if (entity.kind !== 'box') return null;
+  const [sx, sy, sz] = entity.size;
+  if (sx <= 0 || sy <= 0 || sz <= 0) return null;
+  const [px, py, pz] = entity.position;
+  const origin: OccHandle = new api.gp_Pnt_3(px - sx / 2, py - sy / 2, pz - sz / 2);
+  const maker = new api.BRepPrimAPI_MakeBox_2(origin, sx, sy, sz) as {
+    Shape(): OccShape;
+    delete(): void;
+  };
+  const shape = maker.Shape();
+  origin.delete();
+  maker.delete();
+  return shape;
+}
 
-    case 'cylinder':
-    case 'sphere':
-    case 'extrusion':
-    case 'mesh':
-      // Not converted to B-rep; callers fall back to the MeshData path or no-op.
-      return null;
+const BOOLEAN_BUILDERS: Readonly<Record<BooleanOp, string>> = {
+  union: 'BRepAlgoAPI_Fuse_3',
+  subtract: 'BRepAlgoAPI_Cut_3',
+  intersect: 'BRepAlgoAPI_Common_3',
+};
 
-    default:
-      // 2D shapes are not solids.
-      return null;
+/** Run `body`, mapping any OCC exception to null and releasing every handle it registered. */
+function withHandles(
+  body: (own: <T extends OccHandle | null>(handle: T) => T) => MeshData | null,
+): MeshData | null {
+  const owned: Array<OccHandle | null> = [];
+  try {
+    return body((handle) => {
+      owned.push(handle);
+      return handle;
+    });
+  } catch {
+    return null;
+  } finally {
+    owned.forEach(release);
   }
 }
 
 /**
  * Create an OCC-backed geometry kernel.
- *
- * @param options - Optional injected `wasmBinary` / `locateFile` (see OcctKernelOptions).
- *
- * Implements the full `GeometryKernel` interface:
- *   - `booleanOp` — union / subtract / intersect via BRepAlgoAPI.
- *   - `filletEdges` — real B-rep fillet via BRepFilletAPI_MakeFillet. Accepts a
- *     MeshData operand; rebuilds the OCC shape from it when the input is a prior
- *     boolean result (mesh-only path). For entity-based fillet, pass MeshData
- *     derived from a box/cylinder entity using `entityToOccShape`.
- *   - `chamferEdges` — not implemented; returns null.
- *   - `shellSolid`   — not implemented; returns null.
+ * @param options injected `wasmBinary` / `locateFile` (see OcctKernelOptions)
  */
 export async function createOcctKernel(options: OcctKernelOptions = {}): Promise<GeometryKernel> {
   const api = await getOccModule(options);
 
   return {
     booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null {
-      let shapeA: OccShape | null = null;
-      let shapeB: OccShape | null = null;
-      let resultShape: OccShape | null = null;
-      let fuseOp: OccFuseOp | null = null;
-
-      try {
-        shapeA = entityToOccShape(api, a);
-        if (!shapeA) return null;
-
-        shapeB = entityToOccShape(api, b);
-        if (!shapeB) return null;
-
-        switch (op) {
-          case 'union':
-            fuseOp = new api.BRepAlgoAPI_Fuse_3(shapeA, shapeB) as OccFuseOp;
-            break;
-          case 'subtract':
-            fuseOp = new api.BRepAlgoAPI_Cut_3(shapeA, shapeB) as OccFuseOp;
-            break;
-          case 'intersect':
-            fuseOp = new api.BRepAlgoAPI_Common_3(shapeA, shapeB) as OccFuseOp;
-            break;
-          default:
-            return null;
-        }
-
-        fuseOp.Build();
-        if (!fuseOp.IsDone()) return null;
-
-        resultShape = fuseOp.Shape();
-        return extractMeshData(api, resultShape);
-      } catch {
-        return null;
-      } finally {
-        // Free all WASM heap objects to prevent memory leaks.
-        try {
-          shapeA?.delete();
-        } catch {
-          /* ignore */
-        }
-        try {
-          shapeB?.delete();
-        } catch {
-          /* ignore */
-        }
-        try {
-          resultShape?.delete();
-        } catch {
-          /* ignore */
-        }
-        try {
-          fuseOp?.delete();
-        } catch {
-          /* ignore */
-        }
-      }
+      return withHandles((own) => {
+        const shapeA = own(entityToOccShape(api, a));
+        const shapeB = shapeA && own(entityToOccShape(api, b));
+        const builderName = BOOLEAN_BUILDERS[op];
+        if (!shapeA || !shapeB || !builderName) return null;
+        const builder = own(new api[builderName](shapeA, shapeB) as OccBuilder);
+        builder.Build();
+        return builder.IsDone() ? extractMeshData(api, own(builder.Shape())) : null;
+      });
     },
 
-    /**
-     * Fillet the specified edges of a mesh using BRepFilletAPI_MakeFillet.
-     *
-     * The `shape` operand is a MeshData (kernel-agnostic). We rebuild an OCC
-     * TopoDS_Shape from it via `meshDataToTopoDSShape` (BRepBuilderAPI_Sewing —
-     * per-triangle planar faces sewn into a shell, promoted to a solid).
-     *
-     * If `meshDataToTopoDSShape` returns null (non-manifold mesh, degenerate
-     * triangles, or sewing failure), `filletEdges` returns null as a graceful
-     * no-op and logs once via console.warn so the developer/user is informed.
-     *
-     * @param shape       - input mesh (world-space, any orientation)
-     * @param edgeIndices - 0-based edge indices to fillet; empty = all edges
-     * @param radius      - fillet radius; must be > 0
-     */
+    /** @param edgeIndices 0-based edge indices to fillet; empty = all edges */
     filletEdges(shape: MeshData, edgeIndices: number[], radius: number): MeshData | null {
       if (radius <= 0 || shape.positions.length === 0) return null;
-
-      let occShape: OccShape | null = null;
-      let filletMaker: OccFilletMaker | null = null;
-
-      try {
-        occShape = meshDataToTopoDSShape(api, shape);
+      return withHandles((own) => {
+        const occShape = own(meshDataToTopoDSShape(api, shape));
         if (!occShape) {
           console.warn(
             '[occtKernel] filletEdges: could not reconstruct a manifold solid from MeshData ' +
@@ -539,80 +329,37 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
           );
           return null;
         }
-
-        filletMaker = new api.BRepFilletAPI_MakeFillet(
-          occShape,
-          api.ChFi3d_FilletShape.ChFi3d_Rational,
-        ) as OccFilletMaker;
-
-        const edgeExp = new api.TopExp_Explorer_2(
-          occShape,
-          api.TopAbs_ShapeEnum.TopAbs_EDGE,
-          api.TopAbs_ShapeEnum.TopAbs_SHAPE,
-        ) as OccExplorer;
-
+        const filletMaker = own(
+          new api.BRepFilletAPI_MakeFillet(
+            occShape,
+            api.ChFi3d_FilletShape.ChFi3d_Rational,
+          ) as OccFilletMaker,
+        );
+        const edgeExp = explorer(api, occShape, 'TopAbs_EDGE');
         const edgeSet = edgeIndices.length > 0 ? new Set(edgeIndices) : null;
-        let edgeIdx = 0;
-        while (edgeExp.More()) {
-          if (!edgeSet || edgeSet.has(edgeIdx)) {
-            const edge = (api.TopoDS as OccTopoDS_Module).Edge_1(edgeExp.Current());
-            try {
-              filletMaker.Add_2(radius, edge);
-            } catch {
-              // Degenerate or seam edge — skip gracefully.
-            }
+        for (let edgeIdx = 0; edgeExp.More(); edgeIdx++, edgeExp.Next()) {
+          if (edgeSet && !edgeSet.has(edgeIdx)) continue;
+          try {
+            filletMaker.Add_2(radius, (api.TopoDS as OccTopoDS).Edge_1(edgeExp.Current()));
+          } catch {
+            // Degenerate or seam edge: skip.
           }
-          edgeIdx++;
-          edgeExp.Next();
         }
         edgeExp.delete();
-
         filletMaker.Build();
-        if (!filletMaker.IsDone()) return null;
-
-        const filletShape = filletMaker.Shape();
-        return extractMeshData(api, filletShape);
-      } catch {
-        return null;
-      } finally {
-        try {
-          occShape?.delete();
-        } catch {
-          /* ignore */
-        }
-        try {
-          filletMaker?.delete();
-        } catch {
-          /* ignore */
-        }
-      }
+        return filletMaker.IsDone() ? extractMeshData(api, filletMaker.Shape()) : null;
+      });
     },
 
-    // Not implemented: returns null, which callers treat as "kernel can't do this op" (no-op).
-    chamferEdges(_shape: MeshData, _edgeIndices: number[], _distance: number): MeshData | null {
-      return null;
-    },
+    chamferEdges: () => null,
 
-    // Not implemented: returns null (graceful no-op per the GeometryKernel contract).
-    shellSolid(_shape: MeshData, _thickness: number): MeshData | null {
-      return null;
-    },
+    shellSolid: () => null,
 
     tessellate(entity: Entity): MeshData | null {
-      let shape: OccShape | null = null;
-      try {
-        shape = entityToOccShape(api, entity);
-        if (!shape) return null;
-        return extractMeshData(api, shape);
-      } catch {
-        return null;
-      } finally {
-        try {
-          shape?.delete();
-        } catch {
-          /* ignore */
-        }
-      }
+      return withHandles((own) => {
+        const shape = own(entityToOccShape(api, entity));
+        return shape && extractMeshData(api, shape);
+      });
     },
   };
 }

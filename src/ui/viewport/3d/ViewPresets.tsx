@@ -26,10 +26,6 @@ import { Icon } from '@ui/components/Icon';
 import { NamedViewsOverlay } from './NamedViews';
 import { PRESET_DIRECTIONS, type PresetDirection, type PresetName } from './viewPresetDirections';
 
-// ---------------------------------------------------------------------------
-// Geometry helpers (pure — no three.js side-effects)
-// ---------------------------------------------------------------------------
-
 interface BoundingBox {
   center: THREE.Vector3;
   radius: number;
@@ -97,10 +93,6 @@ function computeSceneBounds(
   return { center, radius };
 }
 
-// ---------------------------------------------------------------------------
-// Preset definitions
-// ---------------------------------------------------------------------------
-
 interface Preset {
   name: PresetName;
   label: string;
@@ -115,16 +107,12 @@ const PRESETS: Preset[] = [
   { name: 'iso', label: 'Iso', direction: PRESET_DIRECTIONS.iso },
 ];
 
-// ---------------------------------------------------------------------------
-// Inner component (must be inside <Canvas> to access useThree)
-// ---------------------------------------------------------------------------
-
 /**
  * Mounted INSIDE the r3f Canvas so it can call useThree().
  * Receives the subset of store state it needs via props to avoid subscribing
  * to the store inside the Canvas (which would re-render the entire tree).
  */
-export interface ViewPresetsInnerProps {
+interface ViewPresetsInnerProps {
   entities: Record<string, { position: readonly [number, number, number] }>;
   selection: string[];
   allEntityIds: string[];
@@ -202,10 +190,6 @@ const _innerRef: {
   selection: [],
   allEntityIds: [],
 };
-
-// ---------------------------------------------------------------------------
-// Outer overlay (outside the Canvas)
-// ---------------------------------------------------------------------------
 
 /**
  * Rendered OUTSIDE the Canvas as a DOM overlay.

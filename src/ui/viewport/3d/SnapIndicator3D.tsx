@@ -27,10 +27,6 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Snap3DType } from './snap3d';
 
-// ---------------------------------------------------------------------------
-// Type colour map
-// ---------------------------------------------------------------------------
-
 const SNAP_COLOUR: Record<Snap3DType, string> = {
   vertex: '#f5c842',
   edge: '#42d4f5',
@@ -41,20 +37,12 @@ const SNAP_COLOUR: Record<Snap3DType, string> = {
 
 const INDICATOR_SIZE = 0.18;
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface SnapIndicator3DProps {
   /** Render-space position (world position minus renderOrigin). */
   position: readonly [number, number, number];
   /** Active snap type — component not rendered when 'none'. */
   snapType: Snap3DType;
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function SnapIndicator3D({
   position,

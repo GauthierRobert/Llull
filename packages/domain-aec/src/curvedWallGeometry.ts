@@ -15,6 +15,8 @@ import type { Entity, Vec2 } from '@core/model/types';
 import { toCounterClockwise } from '@lib/polygon';
 import { colorForMaterial, meshEntity } from './entities';
 import { prismMesh } from './mesh';
+import type { WallExtent } from './wallGeometry';
+import { wallPieces, type WallPiece } from './wallPieces';
 
 /** Circle arc through three points: centre, radius, start angle and signed sweep (radians). */
 export interface Arc {
@@ -84,21 +86,13 @@ export function curvedWallBand(wall: CurvedWallElement): Vec2[] | null {
 export function curvedWallPieces(
   wall: CurvedWallElement,
   openings: ReadonlyArray<OpeningElement>,
-  extent: { start: number; end: number } = { start: 0, end: curvedWallLength(wall) },
-): Array<{ s0: number; s1: number; z0: number; z1: number }> {
-  const length = extent.end;
-  const pieces: Array<{ s0: number; s1: number; z0: number; z1: number }> = [];
-  let cursor = extent.start;
-  for (const opening of [...openings].sort((a, b) => a.offset - b.offset)) {
-    const [left, right] = [opening.offset - opening.width / 2, opening.offset + opening.width / 2];
-    if (left > cursor) pieces.push({ s0: cursor, s1: left, z0: 0, z1: wall.height });
-    if (opening.sillHeight > 0) pieces.push({ s0: left, s1: right, z0: 0, z1: opening.sillHeight });
-    const head = opening.sillHeight + opening.height;
-    if (head < wall.height) pieces.push({ s0: left, s1: right, z0: head, z1: wall.height });
-    cursor = Math.max(cursor, right);
-  }
-  if (length > cursor) pieces.push({ s0: cursor, s1: length, z0: 0, z1: wall.height });
-  return pieces;
+  extent: WallExtent = { start: 0, end: curvedWallLength(wall) },
+): WallPiece[] {
+  return wallPieces(
+    wall,
+    [...openings].sort((a, b) => a.offset - b.offset),
+    extent,
+  );
 }
 
 export function evaluateCurvedWall(

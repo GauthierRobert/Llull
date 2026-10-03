@@ -1,7 +1,7 @@
 /**
  * Unit tests for the command-contract extension:
  *   - `CommandResult.data` (query channel) round-trips through `shapeToolCallContent`
- *     (the single shaping implementation) and through `applyMcpToolCall` (thin wrapper).
+ *     (the single shaping implementation) and through `applyToolCall` (thin wrapper).
  *   - `ParamSpec` supports `enum`, nested `object` properties, and array-of-objects
  *     `items` — and those shapes are preserved verbatim (the tool-schema generators
  *     map `paramsSchema` through unchanged).
@@ -9,7 +9,7 @@
  * The registry is mocked here so we can exercise the `data` passthrough without a
  * real query command.
  *
- * shapeToolCallContent is the authoritative shaping function — applyMcpToolCall
+ * shapeToolCallContent is the authoritative shaping function — applyToolCall
  * delegates to it.  Both are tested here; the shaper tests do NOT touch the
  * registry or a document (pure inputs only).
  */
@@ -36,7 +36,7 @@ vi.mock('@core/commands/registry', () => ({
 }));
 
 import { shapeToolCallContent } from '@mcp/dispatch';
-import { applyMcpToolCall } from '@mcp/dispatch';
+import { applyToolCall } from '../helpers/applyToolCall';
 
 // ---------------------------------------------------------------------------
 // shapeToolCallContent — the single shaping implementation
@@ -138,12 +138,12 @@ describe('shapeToolCallContent() — pure shaping', () => {
 });
 
 // ---------------------------------------------------------------------------
-// applyMcpToolCall — delegates to shapeToolCallContent (registry mock active)
+// applyToolCall — delegates to shapeToolCallContent (registry mock active)
 // ---------------------------------------------------------------------------
 
-describe('CommandResult.data — MCP passthrough via applyMcpToolCall', () => {
+describe('CommandResult.data — MCP passthrough via applyToolCall', () => {
   it('surfaces `data` when the command produced it', () => {
-    const result = applyMcpToolCall(createEmptyDocument(), 'fake_measure', {});
+    const result = applyToolCall(createEmptyDocument(), 'fake_measure', {});
     expect(result.isError).toBe(false);
     expect(result.data).toEqual({ distance: 5, unit: 'mm' });
     // the human summary is still carried in content
@@ -151,24 +151,24 @@ describe('CommandResult.data — MCP passthrough via applyMcpToolCall', () => {
   });
 
   it('omits the `data` field when the command produced none', () => {
-    const result = applyMcpToolCall(createEmptyDocument(), 'fake_noop', {});
+    const result = applyToolCall(createEmptyDocument(), 'fake_noop', {});
     expect(result.isError).toBe(false);
     expect('data' in result).toBe(false);
   });
 
   it('unknown tool is an error and carries no data', () => {
-    const result = applyMcpToolCall(createEmptyDocument(), 'not_a_command', {});
+    const result = applyToolCall(createEmptyDocument(), 'not_a_command', {});
     expect(result.isError).toBe(true);
     expect('data' in result).toBe(false);
   });
 
   it('fake_measure: structuredContent is set (record-type data)', () => {
-    const result = applyMcpToolCall(createEmptyDocument(), 'fake_measure', {});
+    const result = applyToolCall(createEmptyDocument(), 'fake_measure', {});
     expect(result.structuredContent).toEqual({ distance: 5, unit: 'mm' });
   });
 
   it('fake_noop: no structuredContent (no data)', () => {
-    const result = applyMcpToolCall(createEmptyDocument(), 'fake_noop', {});
+    const result = applyToolCall(createEmptyDocument(), 'fake_noop', {});
     expect(result.structuredContent).toBeUndefined();
   });
 });

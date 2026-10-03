@@ -15,15 +15,11 @@
  * (PRIME DIRECTIVE, architecture L1, react R1)
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
-import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
-
-// ---------------------------------------------------------------------------
-// ParameterRow — one row per existing parameter
-// ---------------------------------------------------------------------------
+import { PanelEmpty, PanelHeader, IconButton } from '@ui/panels/PanelParts';
 
 interface ParameterRowProps {
   param: Parameter;
@@ -32,43 +28,14 @@ interface ParameterRowProps {
 function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [editingExpression, setEditingExpression] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleExpressionFocus = useCallback(() => {
-    setEditingExpression(param.expression);
-  }, [param.expression]);
-
-  const handleExpressionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingExpression(e.target.value);
-  }, []);
-
-  const commitExpression = useCallback(() => {
-    if (
-      editingExpression !== null &&
-      editingExpression.trim() !== '' &&
-      editingExpression !== param.expression
-    ) {
-      dispatch('set_parameter', { name: param.name, expression: editingExpression.trim() });
+  const commitExpression = (): void => {
+    const trimmed = editingExpression?.trim() ?? '';
+    if (trimmed !== '' && editingExpression !== param.expression) {
+      dispatch('set_parameter', { name: param.name, expression: trimmed });
     }
     setEditingExpression(null);
-  }, [dispatch, editingExpression, param.expression, param.name]);
-
-  const handleExpressionKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        commitExpression();
-        inputRef.current?.blur();
-      } else if (e.key === 'Escape') {
-        setEditingExpression(null);
-        inputRef.current?.blur();
-      }
-    },
-    [commitExpression],
-  );
-
-  const handleDelete = useCallback(() => {
-    dispatch('delete_parameter', { name: param.name });
-  }, [dispatch, param.name]);
+  };
 
   const displayExpression = editingExpression !== null ? editingExpression : param.expression;
   const hasError = param.error != null;
@@ -84,14 +51,17 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
       </span>
 
       <input
-        ref={inputRef}
         type="text"
         className={`param-expression-input${hasError ? ' input--error' : ''}`}
         value={displayExpression}
-        onFocus={handleExpressionFocus}
-        onChange={handleExpressionChange}
+        onFocus={() => setEditingExpression(param.expression)}
+        onChange={(e) => setEditingExpression(e.target.value)}
         onBlur={commitExpression}
-        onKeyDown={handleExpressionKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commitExpression();
+          else if (e.key === 'Escape') setEditingExpression(null);
+          if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
+        }}
         aria-label={`Expression for parameter ${param.name}`}
         aria-invalid={hasError}
         aria-describedby={hasError ? `param-error-${param.name}` : undefined}
@@ -102,15 +72,14 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
         {hasError ? '—' : param.value.toPrecision(6).replace(/\.?0+$/, '')}
       </span>
 
-      <button
-        type="button"
-        className="icon-btn icon-btn--danger param-delete-btn"
-        onClick={handleDelete}
-        aria-label={`Delete parameter ${param.name}`}
+      <IconButton
+        icon="trash"
+        danger
+        className="param-delete-btn"
+        onClick={() => dispatch('delete_parameter', { name: param.name })}
+        label={`Delete parameter ${param.name}`}
         title={`Delete parameter ${param.name}`}
-      >
-        <Icon name="trash" size={13} />
-      </button>
+      />
 
       {hasError && (
         <p
@@ -126,27 +95,20 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
   );
 }
 
-// ---------------------------------------------------------------------------
-// AddParameterRow — inline form to create a new parameter
-// ---------------------------------------------------------------------------
-
 function AddParameterRow(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [name, setName] = useState('');
   const [expression, setExpression] = useState('');
 
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const trimmedName = name.trim();
-      const trimmedExpr = expression.trim();
-      if (trimmedName === '' || trimmedExpr === '') return;
-      dispatch('set_parameter', { name: trimmedName, expression: trimmedExpr });
-      setName('');
-      setExpression('');
-    },
-    [dispatch, name, expression],
-  );
+  const handleSubmit = (e: React.FormEvent): void => {
+    e.preventDefault();
+    const trimmedName = name.trim();
+    const trimmedExpr = expression.trim();
+    if (trimmedName === '' || trimmedExpr === '') return;
+    dispatch('set_parameter', { name: trimmedName, expression: trimmedExpr });
+    setName('');
+    setExpression('');
+  };
 
   const nameValid = name.trim() === '' || /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name.trim());
 
@@ -190,11 +152,7 @@ function AddParameterRow(): React.ReactElement {
   );
 }
 
-// ---------------------------------------------------------------------------
-// ParametersPanel
-// ---------------------------------------------------------------------------
-
-export interface ParametersPanelProps {
+interface ParametersPanelProps {
   className?: string;
 }
 

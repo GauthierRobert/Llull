@@ -28,10 +28,6 @@ import { execute } from '@core/commands/registry';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import { applyLiveCommand } from '@mcp/liveSync';
 
-// ---------------------------------------------------------------------------
-// State shape
-// ---------------------------------------------------------------------------
-
 /** The structured result of the most recently dispatched read-only/query command. */
 interface LastMeasure {
   /** The command name, e.g. 'measure_distance'. */
@@ -42,7 +38,7 @@ interface LastMeasure {
 
 type SyncState = 'idle' | 'syncing' | 'failed';
 
-export interface DispatchOptions {
+interface DispatchOptions {
   /** Replace the selection with the command's `affected` ids when it succeeds with any. */
   selectAffected?: boolean;
 }
@@ -102,10 +98,6 @@ export interface CadStoreState {
   /** Server process epoch of `liveSeq` (null before the first snapshot); seq compares only within one epoch. */
   liveEpoch: string | null;
 
-  // -------------------------------------------------------------------------
-  // Actions
-  // -------------------------------------------------------------------------
-
   /** Send a named command to the server (POST /command). */
   dispatch(name: string, params?: unknown, options?: DispatchOptions): void;
 
@@ -142,10 +134,6 @@ export interface CadStoreState {
   /** Update the live SSE connection status. */
   setLiveStatus(status: 'connecting' | 'connected' | 'disconnected'): void;
 }
-
-// ---------------------------------------------------------------------------
-// Store implementation
-// ---------------------------------------------------------------------------
 
 const LOCAL_HISTORY_LIMIT = 100;
 const LOCAL_SUFFIX = ' (ran locally — offline)';

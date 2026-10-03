@@ -1,29 +1,11 @@
 /**
- * Manifold-backed geometry kernel for boolean solid operations.
+ * Manifold (manifold-3d WASM) GeometryKernel: synchronous booleans and tessellation.
  *
- * @layer kernel (concrete adapter; injected by the app and the server — commands only
- *   see the GeometryKernel interface, architecture L9)
- *
- * Implements `GeometryKernel` using the manifold-3d WASM library.
- * Called once at startup via `createManifoldKernel()`; the returned kernel is
- * synchronous — Manifold operations are sync once WASM is loaded.
- *
- * Tessellation per entity kind:
- *   box       → Manifold.cube(size, center=true) — matches THREE.BoxGeometry centering
- *   cylinder  → Manifold.cylinder(height, radius, center=true) — llull cylinders run along +Z
- *   sphere    → Manifold.sphere(radius) — both three.js and Manifold center at origin
- *   extrusion → CrossSection(profile).extrude(depth) — both three.js ExtrudeGeometry and
- *               Manifold extrude along Z from z=0
- *   mesh      → Manifold mesh from MeshData (indexed or triangle soup), vertices welded
- *   cone, torus, wedge, pyramid, revolution → llull's own world-space tessellation
- *               (`entityToTriangles`, what the viewport and STL export use), welded
- *
- * Entity transform (position + Euler rotation in RADIANS) is applied AFTER
- * primitive construction: rotate about Z, then Y, then X (llull M = Rx·Ry·Rz), then translate.
- *
- * WASM boundary: `manifold-3d` types are loose; a minimal local interface
- * narrows the parts we use. The single `as ManifoldType` cast at init is the
- * only concession to the WASM boundary.
+ * @layer kernel (concrete adapter injected by the app / server; commands see only GeometryKernel)
+ * @invariant primitives are centred like three.js (box, cylinder along +Z, sphere) or extruded
+ *   along +Z from z=0; entity transform = rotate Z, then Y, then X (M = Rx·Ry·Rz), then translate
+ * @invariant cone, torus, wedge, pyramid, revolution, mesh: welded `entityToTriangles` geometry
+ * @failure unsupported kind / degenerate size / non-closed mesh / Manifold error -> null
  */
 
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
@@ -188,63 +170,56 @@ const WELD_SCALE = 1e6;
 /** Primitive tessellation never reads components; instances are not boolean operands. */
 const NO_COMPONENTS = createEmptyDocument();
 
-function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | null {
+/** Untransformed primitive of a solid entity, or null for degenerate / unsupported entities. */
+function primitiveOf(m: ManifoldModule, entity: Entity): ManifoldShape | null {
   switch (entity.kind) {
     case 'box': {
       const [sx, sy, sz] = entity.size;
-      if (sx <= 0 || sy <= 0 || sz <= 0) return null;
-      // THREE.BoxGeometry centers at origin — use center=true to match.
-      const prim = m.Manifold.cube([sx, sy, sz], true);
-      return applyTransform(prim, entity.position, entity.rotation);
+      return sx > 0 && sy > 0 && sz > 0 ? m.Manifold.cube([sx, sy, sz], true) : null;
     }
-
-    case 'cylinder': {
-      const { radius, height } = entity;
-      if (radius <= 0 || height <= 0) return null;
-      // llull cylinders run along +Z, centred on position — Manifold's native frame.
-      const prim = m.Manifold.cylinder(height, radius, -1, 0, true);
-      return applyTransform(prim, entity.position, entity.rotation);
-    }
-
-    case 'sphere': {
-      const { radius } = entity;
-      if (radius <= 0) return null;
-      // Both three.js SphereGeometry and Manifold sphere center at origin.
-      const prim = m.Manifold.sphere(radius, 32);
-      return applyTransform(prim, entity.position, entity.rotation);
-    }
-
+    case 'cylinder':
+      return entity.radius > 0 && entity.height > 0
+        ? m.Manifold.cylinder(entity.height, entity.radius, -1, 0, true)
+        : null;
+    case 'sphere':
+      return entity.radius > 0 ? m.Manifold.sphere(entity.radius, 32) : null;
     case 'extrusion': {
-      const { profile, depth } = entity;
-      if (profile.length < 3 || depth <= 0) return null;
-      // THREE.ExtrudeGeometry extrudes along Z from z=0 — CrossSection.extrude matches.
-      const polygons = [profile.map(([x, y]) => [x, y] as [number, number])];
-      const cs = new m.CrossSection(polygons);
-      const prim = cs.extrude(depth);
-      cs.delete();
-      return applyTransform(prim, entity.position, entity.rotation);
+      if (entity.profile.length < 3 || entity.depth <= 0) return null;
+      const section = new m.CrossSection([
+        entity.profile.map(([x, y]) => [x, y] as [number, number]),
+      ]);
+      const prim = section.extrude(entity.depth);
+      section.delete();
+      return prim;
     }
+    default:
+      return null;
+  }
+}
 
+function entityToManifold(m: ManifoldModule, entity: Entity): ManifoldShape | null {
+  switch (entity.kind) {
     case 'mesh':
-      // World-space geometry (position is [0,0,0]); indexed or triangle soup.
       return weldedManifold(m, entity.mesh.positions, entity.mesh.indices, entity);
-
     case 'cone':
     case 'torus':
     case 'wedge':
     case 'pyramid':
     case 'revolution': {
-      // No dedicated primitive: use llull's own world-space tessellation (the geometry the
-      // viewport renders and STL exports), so the kernel never disagrees with the model.
       const positions: number[] = [];
       for (const triangle of entityToTriangles(entity, NO_COMPONENTS)) {
         for (const [x, y, z] of triangle) positions.push(x, y, z);
       }
       return weldedManifold(m, positions, undefined, entity);
     }
-
+    case 'box':
+    case 'cylinder':
+    case 'sphere':
+    case 'extrusion': {
+      const prim = primitiveOf(m, entity);
+      return prim && applyTransform(prim, entity.position, entity.rotation);
+    }
     default:
-      // 2D shapes (line, polyline, arc, circle, rectangle, point) are not solids.
       return null;
   }
 }
@@ -253,19 +228,41 @@ function manifoldToMeshData(solid: ManifoldShape): MeshData | null {
   if (solid.isEmpty()) return null;
   const mesh = solid.getMesh();
   if (!mesh || mesh.numProp < 3) return null;
-
-  const nVerts = mesh.vertProperties.length / mesh.numProp;
-  // Extract only XYZ from vertProperties (numProp may be > 3 if normals are packed in).
-  const positions: number[] = new Array(nVerts * 3);
-  for (let i = 0; i < nVerts; i++) {
-    positions[i * 3] = mesh.vertProperties[i * mesh.numProp] ?? 0;
-    positions[i * 3 + 1] = mesh.vertProperties[i * mesh.numProp + 1] ?? 0;
-    positions[i * 3 + 2] = mesh.vertProperties[i * mesh.numProp + 2] ?? 0;
+  const positions: number[] = [];
+  for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp) {
+    positions.push(
+      mesh.vertProperties[i] ?? 0,
+      mesh.vertProperties[i + 1] ?? 0,
+      mesh.vertProperties[i + 2] ?? 0,
+    );
   }
+  return { positions, indices: Array.from(mesh.triVerts) };
+}
 
-  const indices: number[] = Array.from(mesh.triVerts);
+/** Free a WASM object; Manifold may already have released it, so failures are ignored. */
+function release(solid: ManifoldShape | null): void {
+  try {
+    solid?.delete();
+  } catch {
+    /* already released */
+  }
+}
 
-  return { positions, indices };
+/** Run `body`, mapping any Manifold exception to null and freeing every solid it registered. */
+function withSolids(
+  body: (own: <T extends ManifoldShape | null>(solid: T) => T) => MeshData | null,
+): MeshData | null {
+  const owned: Array<ManifoldShape | null> = [];
+  try {
+    return body((solid) => {
+      owned.push(solid);
+      return solid;
+    });
+  } catch {
+    return null;
+  } finally {
+    owned.forEach(release);
+  }
 }
 
 /**
@@ -278,84 +275,28 @@ export async function createManifoldKernel(): Promise<GeometryKernel> {
 
   return {
     booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null {
-      let solidA: ManifoldShape | null = null;
-      let solidB: ManifoldShape | null = null;
-      let result: ManifoldShape | null = null;
-
-      try {
-        solidA = entityToManifold(mod, a);
-        if (!solidA) return null;
-
-        solidB = entityToManifold(mod, b);
-        if (!solidB) return null;
-
-        switch (op) {
-          case 'union':
-            result = solidA.add(solidB);
-            break;
-          case 'subtract':
-            result = solidA.subtract(solidB);
-            break;
-          case 'intersect':
-            result = solidA.intersect(solidB);
-            break;
-          default:
-            return null;
-        }
-
-        return manifoldToMeshData(result);
-      } catch {
-        return null;
-      } finally {
-        // Free WASM objects to prevent memory leaks.
-        try {
-          solidA?.delete();
-        } catch {
-          /* ignore */
-        }
-        try {
-          solidB?.delete();
-        } catch {
-          /* ignore */
-        }
-        try {
-          result?.delete();
-        } catch {
-          /* ignore */
-        }
-      }
+      return withSolids((own) => {
+        const solidA = own(entityToManifold(mod, a));
+        const solidB = solidA && own(entityToManifold(mod, b));
+        if (!solidA || !solidB) return null;
+        const combine = { union: 'add', subtract: 'subtract', intersect: 'intersect' } as const;
+        const method = combine[op];
+        return method ? manifoldToMeshData(own(solidA[method](solidB))) : null;
+      });
     },
 
-    // Manifold cannot do filletEdges robustly — graceful no-op; OCC kernel handles it.
-    filletEdges(_shape: MeshData, _edgeIndices: number[], _radius: number): MeshData | null {
-      return null;
-    },
+    // Not supported by Manifold; the OCC kernel handles fillets.
+    filletEdges: () => null,
 
-    // Manifold cannot do chamferEdges robustly — graceful no-op (OCC returns null too).
-    chamferEdges(_shape: MeshData, _edgeIndices: number[], _distance: number): MeshData | null {
-      return null;
-    },
+    chamferEdges: () => null,
 
-    // Manifold cannot do shellSolid robustly — graceful no-op (OCC returns null too).
-    shellSolid(_shape: MeshData, _thickness: number): MeshData | null {
-      return null;
-    },
+    shellSolid: () => null,
 
     tessellate(entity: Entity): MeshData | null {
-      let solid: ManifoldShape | null = null;
-      try {
-        solid = entityToManifold(mod, entity);
-        if (!solid) return null;
-        return manifoldToMeshData(solid);
-      } catch {
-        return null;
-      } finally {
-        try {
-          solid?.delete();
-        } catch {
-          /* ignore */
-        }
-      }
+      return withSolids((own) => {
+        const solid = own(entityToManifold(mod, entity));
+        return solid && manifoldToMeshData(solid);
+      });
     },
   };
 }

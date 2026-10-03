@@ -16,7 +16,6 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { parseKernelChoice } from '@core/geometry/kernelChoice';
 
-// ---------------------------------------------------------------------------
 // Kernel selection: ?kernel=occt swaps in OCC (dev/power-user toggle).
 // Default is Manifold. OCC is opt-in only — never the default.
 //
@@ -25,7 +24,6 @@ import { parseKernelChoice } from '@core/geometry/kernelChoice';
 // OCC carries a 63 MB WASM binary (~800–1000 ms cold init). It is injected
 // asynchronously so the first render is never blocked. Commands no-op
 // gracefully until the kernel resolves (architecture L9 / SOLID S5).
-// ---------------------------------------------------------------------------
 
 const useOcct =
   typeof window !== 'undefined' &&

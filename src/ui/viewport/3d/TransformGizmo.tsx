@@ -77,19 +77,11 @@ type DraggingDispatcher = {
   removeEventListener(type: 'dragging-changed', cb: (event: { value: boolean }) => void): void;
 };
 
-// ---------------------------------------------------------------------------
-// Snap constants
-// ---------------------------------------------------------------------------
-
 /** Tolerance radius (world units) within which a 3D snap candidate is accepted. */
 const SNAP3D_TOLERANCE = 0.8;
 
 /** Grid step in world units (matches the viewport Grid cellSize = 1). */
 const SNAP3D_GRID_STEP = 1;
-
-// ---------------------------------------------------------------------------
-// Pure delta helpers — exported for optional unit tests
-// ---------------------------------------------------------------------------
 
 /** Compute the translation delta between two world positions. */
 export function computeTranslateDelta(
@@ -111,10 +103,6 @@ export function computeRotateDelta(prev: THREE.Euler, next: THREE.Euler): [numbe
 export function computeScaleFactor(scale: THREE.Vector3): number {
   return (scale.x + scale.y + scale.z) / 3;
 }
-
-// ---------------------------------------------------------------------------
-// TransformGizmo
-// ---------------------------------------------------------------------------
 
 interface TransformGizmoProps {
   /** Current transform mode — owned by the parent to share with the overlay. */

@@ -29,14 +29,19 @@ export function yieldStrength(grade: string): number {
   return Number.isFinite(value) && value > 0 ? value : 355;
 }
 
-/** Design resistances of one grade 8.8 bolt (EN 1993-1-8 Tab. 3.4), N. */
-export function boltResistance(diameterMm: number): { tension: number; shear: number } {
+/** Tensile stress area (mm²) of the standard bolt size nearest to `diameterMm`. */
+function stressArea(diameterMm: number): number {
   const nominal = Object.keys(STRESS_AREA)
     .map(Number)
     .reduce((best, size) =>
       Math.abs(size - diameterMm) < Math.abs(best - diameterMm) ? size : best,
     );
-  const area = STRESS_AREA[nominal] as number;
+  return STRESS_AREA[nominal] as number;
+}
+
+/** Design resistances of one grade 8.8 bolt (EN 1993-1-8 Tab. 3.4), N. */
+export function boltResistance(diameterMm: number): { tension: number; shear: number } {
+  const area = stressArea(diameterMm);
   return {
     tension: (0.9 * BOLT_FUB * area) / GAMMA_M2,
     shear: (0.6 * BOLT_FUB * area) / GAMMA_M2,
@@ -60,12 +65,7 @@ export function anchorBoltResistance(
   grade = 8.8,
 ): { tension: number; shear: number } {
   const [fub, fyb] = ANCHOR_GRADES[grade] ?? (ANCHOR_GRADES[8.8] as readonly [number, number]);
-  const nominal = Object.keys(STRESS_AREA)
-    .map(Number)
-    .reduce((best, size) =>
-      Math.abs(size - diameterMm) < Math.abs(best - diameterMm) ? size : best,
-    );
-  const area = STRESS_AREA[nominal] as number;
+  const area = stressArea(diameterMm);
   return {
     tension: (0.9 * fub * area) / GAMMA_M2,
     shear: ((0.44 - 0.0003 * fyb) * fub * area) / GAMMA_M2,

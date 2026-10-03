@@ -32,10 +32,6 @@ import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator } from '../StoreInvalidator';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
 
-// ---------------------------------------------------------------------------
-// AdaptiveGrid2D — grid whose step scales with orthographic camera zoom
-// ---------------------------------------------------------------------------
-
 /**
  * Reacts to camera zoom + viewport size each frame and updates the grid.
  * Uses useFrame + refs (never setState per frame — R9).
@@ -173,10 +169,6 @@ function AdaptiveGrid2D({
   );
 }
 
-// ---------------------------------------------------------------------------
-// ZoomReader — reads camera zoom each frame and surfaces it to React via a ref+callback
-// ---------------------------------------------------------------------------
-
 /**
  * Reads the ortho camera zoom on each frame and calls `onZoom` when it changes.
  * Uses a ref to gate calls — only fires when zoom actually changes.
@@ -204,10 +196,6 @@ function ZoomReader({ onZoom }: ZoomReaderProps): null {
 
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Scene contents (inside Canvas)
-// ---------------------------------------------------------------------------
 
 interface SceneContents2DProps {
   activeTool: DrawToolKind;
@@ -321,10 +309,6 @@ function SceneContents2D({
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Viewport2D — the exported component
-// ---------------------------------------------------------------------------
 
 export function Viewport2D(): React.ReactElement {
   const { activeTool, collectedPoints, handleClick, finishPolyline, finishSpline } = useDrawTool();

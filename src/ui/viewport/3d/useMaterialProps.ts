@@ -19,7 +19,7 @@ import * as THREE from 'three';
 import { useViewportStore } from '@ui/store';
 import type { DisplayMode } from '@ui/store';
 
-export interface MaterialProps {
+interface MaterialProps {
   color: string;
   emissive: string;
   emissiveIntensity: number;

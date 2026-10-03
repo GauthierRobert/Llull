@@ -30,10 +30,7 @@ import { useSnap } from './useSnap';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { SnapType } from './snapping/types';
 import { useGroundPlane } from './useGroundPlane';
-
-// ---------------------------------------------------------------------------
-// Glyph colours per snap type
-// ---------------------------------------------------------------------------
+import { ellipseSegmentsGeometry } from './ellipseSegments';
 
 const SNAP_COLORS: Record<SnapType, string> = {
   endpoint: '#e040fb', // magenta
@@ -61,10 +58,6 @@ const GLYPH_TARGET_PX = 11;
 
 /** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
 const SNAP_TOLERANCE_PX = 12;
-
-// ---------------------------------------------------------------------------
-// Helper: build glyph geometry for each snap type
-// ---------------------------------------------------------------------------
 
 function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
   const s = GLYPH_SIZE;
@@ -129,17 +122,7 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
       return geo;
     }
     case 'center': {
-      // Circle: line loop approximated with 16 segments.
-      const segments = 16;
-      const verts: number[] = [];
-      for (let i = 0; i < segments; i++) {
-        const a0 = (i / segments) * Math.PI * 2;
-        const a1 = ((i + 1) / segments) * Math.PI * 2;
-        verts.push(s * Math.cos(a0), s * Math.sin(a0), 0, s * Math.cos(a1), s * Math.sin(a1), 0);
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-      return geo;
+      return ellipseSegmentsGeometry(0, 0, s, s, 16);
     }
     case 'intersection': {
       // X: two diagonal lines.
@@ -264,10 +247,6 @@ function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Per-type glyph (memoized, disposed on unmount)
-// ---------------------------------------------------------------------------
-
 interface GlyphProps {
   snapType: SnapType;
   x: number;
@@ -310,10 +289,6 @@ function SnapGlyph({ snapType, x, y, zoom }: GlyphProps): React.ReactElement {
   return <primitive object={segments} />;
 }
 
-// ---------------------------------------------------------------------------
-// Ground plane: invisible mesh that captures pointer events
-// ---------------------------------------------------------------------------
-
 interface GroundPlaneProps {
   onMove: (worldX: number, worldY: number) => void;
   onLeave: () => void;
@@ -350,10 +325,6 @@ function GroundPlane({ onMove, onLeave }: GroundPlaneProps): React.ReactElement 
     />
   );
 }
-
-// ---------------------------------------------------------------------------
-// SnapIndicator — the exported component
-// ---------------------------------------------------------------------------
 
 /**
  * Mount inside the r3f scene (inside <Canvas>) in Viewport2D.

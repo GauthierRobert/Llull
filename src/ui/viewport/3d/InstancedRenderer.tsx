@@ -44,10 +44,6 @@ import type { InstanceBatch } from './grouping';
 import { entityIdFromInstanceId } from './grouping';
 import { buildCylinderGeometry, buildSphereGeometry } from './entities/primitiveGeometry';
 
-// ---------------------------------------------------------------------------
-// Geometry factory (pure, called inside useMemo)
-// ---------------------------------------------------------------------------
-
 /**
  * Creates the THREE geometry for a given batchable kind + representative entity.
  * The entity is the first in the batch; all entities in the batch share the same
@@ -82,10 +78,6 @@ export function makeGeometry(batch: InstanceBatch): THREE.BufferGeometry {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Material params per display mode + selection
-// ---------------------------------------------------------------------------
 
 /** Selected-highlight tint color (hex). Matches useMaterialProps.ts emissive. */
 const SELECTED_EMISSIVE = new THREE.Color('#3a7bd5');
@@ -146,10 +138,6 @@ export function makeMaterialArgs(
       };
   }
 }
-
-// ---------------------------------------------------------------------------
-// InstanceBatchMesh — renders one InstancedMesh for one batch
-// ---------------------------------------------------------------------------
 
 interface InstanceBatchMeshProps {
   batch: InstanceBatch;
@@ -289,10 +277,6 @@ function InstanceBatchMesh({
     />
   );
 }
-
-// ---------------------------------------------------------------------------
-// InstancedRenderer — public component
-// ---------------------------------------------------------------------------
 
 interface InstancedRendererProps {
   /**

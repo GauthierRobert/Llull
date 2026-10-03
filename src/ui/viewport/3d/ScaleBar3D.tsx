@@ -20,10 +20,6 @@ import type { CadDocument } from '@core/model/types';
 import { formatLength } from '@core/commands/units';
 import { scaleBarLength3D } from './gridHelpers3D';
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface ScaleBar3DProps {
   /** Camera orbit distance from target (world units). */
   distance: number;
@@ -34,10 +30,6 @@ interface ScaleBar3DProps {
   /** Camera vertical FOV in degrees (default 45, must match the Canvas camera). */
   fovDeg?: number;
 }
-
-// ---------------------------------------------------------------------------
-// ScaleBar3D
-// ---------------------------------------------------------------------------
 
 /**
  * Renders as an absolutely-positioned HTML element.

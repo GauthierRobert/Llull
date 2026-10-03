@@ -17,10 +17,6 @@
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 import type { LiveSnapshotEvent } from '@mcp/liveSync';
 
-// ---------------------------------------------------------------------------
-// Response type
-// ---------------------------------------------------------------------------
-
 /**
  * Shape returned by POST /command, POST /undo, and POST /redo.
  *
@@ -35,10 +31,6 @@ export interface ServerCommandResponse {
   canRedo: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Error type
-// ---------------------------------------------------------------------------
-
 export class ServerCommandError extends Error {
   /** 'network' = fetch failed (server unreachable); 'http' = server answered non-2xx. */
   readonly kind: 'network' | 'http';
@@ -51,10 +43,6 @@ export class ServerCommandError extends Error {
     this.name = 'ServerCommandError';
   }
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 async function postJson(path: string, body: unknown): Promise<ServerCommandResponse> {
   let response: Response;

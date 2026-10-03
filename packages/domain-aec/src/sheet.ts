@@ -68,7 +68,7 @@ export function fitScale(widthMm: number, heightMm: number, viewport: Viewport):
 }
 
 /** Shared drawing-sheet stylesheet (line weights in paper millimetres). */
-export const SHEET_STYLE = [
+const SHEET_STYLE = [
   `<style>`,
   `.cut{fill:#4a4a4a;stroke:#000;stroke-width:0.35}.cut-line{fill:none;stroke:#000;stroke-width:0.35}`,
   `.thin{fill:none;stroke:#000;stroke-width:0.18}.hidden{fill:none;stroke:#000;stroke-width:0.18;stroke-dasharray:1.5 1}`,
@@ -79,7 +79,7 @@ export const SHEET_STYLE = [
 ].join('');
 
 /** Shared fill patterns: ANSI31-style 45° hatch for concrete / masonry cuts. */
-export const SHEET_DEFS =
+const SHEET_DEFS =
   `<defs><pattern id="hatch-concrete" width="1.5" height="1.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
   `<rect width="1.5" height="1.5" fill="#d9d9d9"/><line x1="0" y1="0" x2="0" y2="1.5" stroke="#000" stroke-width="0.12"/></pattern></defs>`;
 
@@ -241,7 +241,7 @@ interface SheetOptions {
   readonly title?: string;
 }
 
-export function titleBlock(
+function titleBlock(
   doc: CadDocument,
   sheet: { width: number; height: number; title: string; scale: number; paper: PaperSize },
 ): string {
@@ -285,7 +285,7 @@ function northArrow(x: number, y: number): string {
   );
 }
 
-export function scaleBar(x: number, y: number, scale: number): string {
+function scaleBar(x: number, y: number, scale: number): string {
   const stepsMetres = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
   const step = stepsMetres.find((metres) => (metres * 1000) / scale >= 8) ?? 100;
   const stepMm = (step * 1000) / scale;
@@ -315,6 +315,8 @@ export function composeSheetSvg(
     caption: string;
     bodyId: string;
     body: string;
+    /** Extra CSS appended after the shared sheet style. */
+    style?: string;
     /** Elements drawn after the body group and before the scale bar. */
     overlays: ReadonlyArray<string>;
   },
@@ -324,6 +326,7 @@ export function composeSheetSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
     `<title>${escapeXml(title)}</title>`,
     SHEET_STYLE,
+    ...(sheet.style ? [`<style>${sheet.style}</style>`] : []),
     SHEET_DEFS,
     `<rect width="${width}" height="${height}" fill="#fff"/>`,
     `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
