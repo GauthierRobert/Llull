@@ -124,7 +124,7 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
 // LayersPanel
 // ---------------------------------------------------------------------------
 
-export interface LayersPanelProps {
+interface LayersPanelProps {
   className?: string;
 }
 

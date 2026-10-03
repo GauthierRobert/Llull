@@ -15,7 +15,7 @@ import type { Vec2, Vec3 } from '@core/model/types';
 // Rectangle from two corners
 // ---------------------------------------------------------------------------
 
-export interface RectParams {
+interface RectParams {
   width: number;
   height: number;
   position: Vec3;
@@ -66,7 +66,7 @@ export function circleRadiusFromPoints(center: Vec2, rim: Vec2): number | null {
 // Ellipse from center + corner
 // ---------------------------------------------------------------------------
 
-export interface EllipseParams {
+interface EllipseParams {
   center: Vec2;
   radiusX: number;
   radiusY: number;

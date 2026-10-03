@@ -390,7 +390,7 @@ function SelectionActions(): React.ReactElement {
 // PropertiesPanel
 // ---------------------------------------------------------------------------
 
-export interface PropertiesPanelProps {
+interface PropertiesPanelProps {
   className?: string;
 }
 

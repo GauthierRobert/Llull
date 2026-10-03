@@ -58,7 +58,7 @@ interface ModifyToolState {
   pendingValue: number;
 }
 
-export interface UseModifyToolResult extends ModifyToolState {
+interface UseModifyToolResult extends ModifyToolState {
   setActiveTool: (tool: ModifyToolKind) => void;
   /**
    * Handle a click on an entity in the viewport.

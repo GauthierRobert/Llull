@@ -70,15 +70,15 @@ export function rotatePointAboutPivot(
 // ---------------------------------------------------------------------------
 
 /** A position expressed as a plain triple (avoids THREE import at call sites). */
-export type PositionTuple = [number, number, number];
+type PositionTuple = [number, number, number];
 
 /** A quaternion expressed as [x, y, z, w]. */
-export type QuaternionTuple = [number, number, number, number];
+type QuaternionTuple = [number, number, number, number];
 
 /**
  * One animation contribution that may be composed onto an existing pose.
  */
-export interface AnimationContribution {
+interface AnimationContribution {
   /** 'rotation' applies an axis-angle on top of the current quaternion and
    *  also rotates the position around `pivot`. */
   channel: 'rotation' | 'position';

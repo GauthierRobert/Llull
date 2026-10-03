@@ -124,7 +124,7 @@ const PRESETS: Preset[] = [
  * Receives the subset of store state it needs via props to avoid subscribing
  * to the store inside the Canvas (which would re-render the entire tree).
  */
-export interface ViewPresetsInnerProps {
+interface ViewPresetsInnerProps {
   entities: Record<string, { position: readonly [number, number, number] }>;
   selection: string[];
   allEntityIds: string[];

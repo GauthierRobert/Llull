@@ -194,7 +194,7 @@ function AddParameterRow(): React.ReactElement {
 // ParametersPanel
 // ---------------------------------------------------------------------------
 
-export interface ParametersPanelProps {
+interface ParametersPanelProps {
   className?: string;
 }
 

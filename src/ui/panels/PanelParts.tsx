@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { Icon } from '@ui/components/Icon';
 import type { IconName } from '@ui/components/Icon';
 
-export interface PanelHeaderProps {
+interface PanelHeaderProps {
   title: string;
   count?: number;
   countLabel?: string;
@@ -34,7 +34,7 @@ export function PanelHeader({
   );
 }
 
-export interface PanelEmptyProps {
+interface PanelEmptyProps {
   icon: IconName;
   message: string;
   hint?: string;
@@ -51,7 +51,7 @@ export function PanelEmpty({ icon, message, hint, compact }: PanelEmptyProps): R
   );
 }
 
-export interface PanelSectionProps {
+interface PanelSectionProps {
   title: string;
   count?: number;
   countLabel?: string;

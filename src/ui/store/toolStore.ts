@@ -34,7 +34,7 @@ export type ModifyToolKind =
 
 export type GizmoMode = 'translate' | 'rotate' | 'scale';
 
-export interface ToolStoreState {
+interface ToolStoreState {
   viewMode: ViewMode;
   /** Armed 2D tool; only meaningful in the 2D view. */
   drawTool: DrawToolKind;

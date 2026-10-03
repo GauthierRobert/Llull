@@ -260,7 +260,7 @@ function CreateMaterialForm(): React.ReactElement {
 // MaterialsPanel
 // ---------------------------------------------------------------------------
 
-export interface MaterialsPanelProps {
+interface MaterialsPanelProps {
   className?: string;
 }
 

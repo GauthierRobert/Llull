@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { useStore } from '@ui/store';
 
-export interface BoundingBoxMeasure {
+interface BoundingBoxMeasure {
   min: readonly [number, number, number];
   max: readonly [number, number, number];
   size: readonly [number, number, number];

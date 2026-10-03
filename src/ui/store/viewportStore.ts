@@ -45,7 +45,7 @@ export type QualityOverride = QualityTier | 'auto';
 export type ClipAxis = 'x' | 'y' | 'z';
 
 /** Section-plane state — all fields are render-only. */
-export interface ClipPlaneState {
+interface ClipPlaneState {
   /** Whether the clipping plane is active. */
   enabled: boolean;
   /** Axis the plane is normal to. Default: 'z' (horizontal cut, Z-up). */
@@ -67,12 +67,12 @@ export interface ClipPlaneState {
 type MechanismSelectionKind = 'constraint' | 'joint';
 
 /** Currently highlighted constraint or joint in the MechanismsPanel. */
-export interface MechanismSelection {
+interface MechanismSelection {
   kind: MechanismSelectionKind;
   id: string;
 }
 
-export interface ViewportStoreState {
+interface ViewportStoreState {
   /** Active render style for all 3D solid entities. Default: 'shaded'. */
   displayMode: DisplayMode;
 

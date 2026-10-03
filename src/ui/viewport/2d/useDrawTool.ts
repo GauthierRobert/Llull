@@ -38,7 +38,7 @@ interface DrawToolState {
   collectedPoints: Vec2[];
 }
 
-export interface UseDrawToolResult extends DrawToolState {
+interface UseDrawToolResult extends DrawToolState {
   /** Set the active draw tool; resets in-progress state. */
   setActiveTool: (tool: DrawToolKind) => void;
   /**

@@ -123,7 +123,7 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
 // FeatureHistoryPanel
 // ---------------------------------------------------------------------------
 
-export interface FeatureHistoryPanelProps {
+interface FeatureHistoryPanelProps {
   className?: string;
 }
 

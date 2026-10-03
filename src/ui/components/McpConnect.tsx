@@ -146,7 +146,7 @@ function McpAgentLoop(): React.ReactElement {
 // McpConnect modal
 // ---------------------------------------------------------------------------
 
-export interface McpConnectProps {
+interface McpConnectProps {
   /** Called when the dialog requests close (Esc, backdrop click, close button). */
   readonly onClose: () => void;
 }

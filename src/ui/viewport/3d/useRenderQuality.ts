@@ -64,7 +64,7 @@ export function resolveQualityTier(override: QualityOverride, entityCount: numbe
 // ---------------------------------------------------------------------------
 
 /** Render settings derived from a quality tier. */
-export interface RenderQualitySettings {
+interface RenderQualitySettings {
   /** Active quality tier (resolved from override + entity count). */
   tier: QualityTier;
   /** PCSS sample count for <SoftShadows>; 0 means SoftShadows is disabled. */

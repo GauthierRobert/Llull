@@ -48,7 +48,7 @@ const TEXT_HEIGHT = 0.5;
 // Props
 // ---------------------------------------------------------------------------
 
-export interface DimensionRenderer2DProps {
+interface DimensionRenderer2DProps {
   entity: DimensionEntity;
   doc: CadDocument;
   selected: boolean;

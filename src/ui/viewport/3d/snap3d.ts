@@ -39,7 +39,7 @@ export interface SnapPoint3D {
   readonly type: Snap3DType;
 }
 
-export interface SnapResult3D {
+interface SnapResult3D {
   /** The snapped world position. */
   readonly x: number;
   readonly y: number;

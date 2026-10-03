@@ -140,7 +140,7 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
 // AssemblyPanel — the exported panel
 // ---------------------------------------------------------------------------
 
-export interface AssemblyPanelProps {
+interface AssemblyPanelProps {
   className?: string;
 }
 

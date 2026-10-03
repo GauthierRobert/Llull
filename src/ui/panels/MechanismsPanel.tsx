@@ -286,7 +286,7 @@ function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactEleme
 // MechanismsPanel — exported component
 // ---------------------------------------------------------------------------
 
-export interface MechanismsPanelProps {
+interface MechanismsPanelProps {
   className?: string;
 }
 

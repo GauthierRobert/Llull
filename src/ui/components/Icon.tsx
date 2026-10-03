@@ -100,7 +100,7 @@ const ICON_PATHS = {
 
 export type IconName = keyof typeof ICON_PATHS;
 
-export interface IconProps {
+interface IconProps {
   name: IconName;
   /** Rendered width/height in px. Default 16. */
   size?: number;

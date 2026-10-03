@@ -27,7 +27,7 @@ export interface NamedViewCamera {
 }
 
 /** A saved camera bookmark. */
-export interface NamedView {
+interface NamedView {
   /** Stable unique id (timestamp-based, not entity id — scoped to this store). */
   readonly id: string;
   /** Human-readable label given by the user. */
@@ -79,7 +79,7 @@ function generateId(): string {
 // Store state
 // ---------------------------------------------------------------------------
 
-export interface NamedViewStoreState {
+interface NamedViewStoreState {
   /** Current list of saved named views, in creation order. */
   namedViews: NamedView[];
 

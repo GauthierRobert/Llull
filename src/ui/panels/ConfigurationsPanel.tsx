@@ -276,7 +276,7 @@ function CreateConfigurationForm(): React.ReactElement {
 // ConfigurationsPanel
 // ---------------------------------------------------------------------------
 
-export interface ConfigurationsPanelProps {
+interface ConfigurationsPanelProps {
   className?: string;
 }
 

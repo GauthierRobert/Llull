@@ -85,7 +85,7 @@ export function majorGridStep(minorStep: number): number {
   return minorStep * 10;
 }
 
-export interface GridPatch {
+interface GridPatch {
   /** Total span of the grid patch in world units. */
   readonly extent: number;
   /** Number of cells across the patch — always even and ≥ 2. */

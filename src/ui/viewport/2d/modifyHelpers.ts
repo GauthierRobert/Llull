@@ -27,7 +27,7 @@ import type {
 // Nearest-vertex picking for polylines (fillet / chamfer)
 // ---------------------------------------------------------------------------
 
-export interface NearestVertexResult {
+interface NearestVertexResult {
   /** 0-based index of the nearest vertex. */
   vertexIndex: number;
   /** World-space position of that vertex. */

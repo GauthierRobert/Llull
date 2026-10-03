@@ -42,7 +42,7 @@ interface LastMeasure {
 
 type SyncState = 'idle' | 'syncing' | 'failed';
 
-export interface DispatchOptions {
+interface DispatchOptions {
   /** Replace the selection with the command's `affected` ids when it succeeds with any. */
   selectAffected?: boolean;
 }
