@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding, isFiniteNumber, noChange } from '../model';
 import { toCsv } from '../scheduleBuild';
-import { CraneModel, FrameLoads } from './frameModelTypes';
+import type { CraneModel, FrameLoads } from './frameModelTypes';
 import { checkFrames } from './frameCheckFrames';
 import type { CheckRow } from './frameCheckSolve';
 import { round } from '../numeric';

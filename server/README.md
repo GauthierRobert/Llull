@@ -214,7 +214,7 @@ Done. Client closed cleanly.
 |----------------------------|----------|-------------------|----------------------------------------------------------|
 | `PORT`                     | no       | `3001`            | Listening port                                           |
 | `MCP_AUTH_TOKEN`           | recommended | —             | Bearer token guarding `/mcp`. Unset = unprotected (warn) |
-| `MCP_RATE_LIMIT_MAX`       | no       | `60`              | Max requests per window per IP on `/mcp`                 |
+| `MCP_RATE_LIMIT_MAX`       | no       | `60`              | Max requests per window per IP on `/mcp` (0 or invalid = default) |
 | `MCP_RATE_LIMIT_WINDOW_MS` | no       | `60000`           | Rate limit window in milliseconds (default: 1 minute)    |
 | `HOST`                     | no       | `127.0.0.1`       | Bind address. Use `0.0.0.0` only with `MCP_AUTH_TOKEN` set |
 | `LLULL_ALLOWED_ORIGINS`    | no       | `http://localhost:5173,http://localhost:5174,http://localhost:3000` | Comma-separated browser origins for CORS and the REST mutation guard. Disallowed origins get no CORS headers |

@@ -6,9 +6,9 @@ import { buildPlanDrawing } from '@aec/planDrawing';
 import { buildingErrors } from '@aec/validate';
 import { serializeDocument } from '@core/commands/persistence';
 import type { CurvedWallElement } from '@core/model/building';
-import { TakeoffLine } from '@aec/takeoffBasics';
-import { IfcExport } from '@aec/ifcBuild';
-import { DxfExport } from '@aec/dxfExport';
+import type { TakeoffLine } from '@aec/takeoffBasics';
+import type { IfcExport } from '@aec/ifcBuild';
+import type { DxfExport } from '@aec/dxfExport';
 import type { Clash } from '@aec/industrial/clash';
 
 /** Half circle of radius 5000 from (−5000, 0) over (0, 5000) to (5000, 0). */

@@ -3,8 +3,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { slabMesh } from '@aec/evaluateElements';
 import { buildPlanDrawing } from '@aec/planDrawing';
-import { TakeoffLine } from '@aec/takeoffBasics';
-import { IfcExport } from '@aec/ifcBuild';
+import type { TakeoffLine } from '@aec/takeoffBasics';
+import type { IfcExport } from '@aec/ifcBuild';
 import { segmentsIntersect, pointInPolygon } from '@lib/polygon';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {

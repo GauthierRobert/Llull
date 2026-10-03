@@ -1,4 +1,4 @@
-import { SceneSnapshot } from './sceneTypes';
+import type { SceneSnapshot } from './sceneTypes';
 
 export interface PlanAction {
   command: string;

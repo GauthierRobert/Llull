@@ -5,7 +5,7 @@
  */
 
 import type { Entity } from '@core/model/types';
-import { RenderViewData } from '@core/commands/renderTypes';
+import type { RenderViewData } from '@core/commands/renderTypes';
 import { entityBounds } from '@core/commands/sceneBounds';
 import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';

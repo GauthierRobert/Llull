@@ -1,4 +1,4 @@
-import { RenderViewData } from '@core/commands/renderTypes';
+import type { RenderViewData } from '@core/commands/renderTypes';
 import { escapeXml } from '@lib/escapeXml';
 import { r2 } from '@core/commands/renderMath';
 import { computeOrthoHalf, makeProjector } from './svgHelpers';

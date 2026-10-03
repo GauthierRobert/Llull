@@ -8,7 +8,7 @@ import { baseReactions, solveCombination } from '@aec/industrial/frameModelSolve
 import { BEARING_STRENGTH, checkPlateMN, sizeBasePlate } from '@aec/industrial/basePlateMN';
 import { type FoundationRow } from '@aec/industrial/foundationModel';
 import { footingMoment } from '@aec/industrial/foundationCombinations';
-import { FootingDesignRow } from '@aec/industrial/footingModel';
+import type { FootingDesignRow } from '@aec/industrial/footingModel';
 import { findProfile } from '@aec/steel/profiles';
 import { buildingErrors } from '@aec/validate';
 

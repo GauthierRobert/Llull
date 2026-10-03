@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { CheckRow } from '@aec/industrial/frameCheckSolve';
+import type { CheckRow } from '@aec/industrial/frameCheckSolve';
 import {
   bucklingReduction,
   criticalMoment,

@@ -4,8 +4,8 @@ import { execute } from '@core/commands/registry';
 import { buildPlanDrawing } from '@aec/planDrawing';
 import { buildingErrors } from '@aec/validate';
 import { layerBoundaries, parseWallLayers } from '@aec/wallLayers';
-import { TakeoffLine } from '@aec/takeoffBasics';
-import { IfcExport } from '@aec/ifcBuild';
+import type { TakeoffLine } from '@aec/takeoffBasics';
+import type { IfcExport } from '@aec/ifcBuild';
 import type { WallElement } from '@core/model/building';
 
 const BUILD_UP = [

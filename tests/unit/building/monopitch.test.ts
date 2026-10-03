@@ -9,9 +9,9 @@ import type {
 import { execute } from '@core/commands/registry';
 import { framesOf } from '@aec/industrial/frameModelFrames';
 import { baseReactions } from '@aec/industrial/frameModelSolve';
-import { PurlinRow, ZoneSummary } from '@aec/industrial/purlinModel';
+import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlinModel';
 import type { ElevationSheet } from '@aec/elevation';
-import { IfcExport } from '@aec/ifcBuild';
+import type { IfcExport } from '@aec/ifcBuild';
 
 const HALL = { span: 24000, length: 30000 };
 const PITCH = (6 * Math.PI) / 180;

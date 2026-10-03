@@ -7,7 +7,7 @@ import { designMat } from '@aec/industrial/footingSizing';
 import { designFootings } from '@aec/industrial/footingDesignCommand';
 import { type FoundationRow } from '@aec/industrial/foundationModel';
 import { foundationCheck } from '@aec/industrial/foundationCheckRun';
-import { TakeoffLine } from '@aec/takeoffBasics';
+import type { TakeoffLine } from '@aec/takeoffBasics';
 
 function hall(params: Record<string, unknown> = {}): CadDocument {
   return execute(createEmptyDocument(), 'add_portal_frame_building', {

@@ -11,7 +11,7 @@ import {
   type RoofZone,
   type WindDirection,
 } from '@aec/industrial/windCoefficients';
-import { PurlinRow, ZoneSummary } from '@aec/industrial/purlinModel';
+import type { PurlinRow, ZoneSummary } from '@aec/industrial/purlinModel';
 
 const cpe = (
   roofType: RoofType,

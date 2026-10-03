@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { CheckRow } from '@aec/industrial/frameCheckSolve';
+import type { CheckRow } from '@aec/industrial/frameCheckSolve';
 import { nextProfile } from '@aec/industrial/frameDesign';
 import { boltResistance, yieldStrength } from '@aec/industrial/steelDesign';
 import { connectionWelds } from '@aec/industrial/connections';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
-import { TakeoffLine } from '@aec/takeoffBasics';
+import type { TakeoffLine } from '@aec/takeoffBasics';
 
 const HALL = { span: 24000, length: 30000 };
 

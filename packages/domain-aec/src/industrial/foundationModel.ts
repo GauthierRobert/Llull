@@ -1,4 +1,4 @@
-import { LoadCase } from './frameModelTypes';
+import type { LoadCase } from './frameModelTypes';
 
 export interface FoundationRow {
   /** Column mark. */

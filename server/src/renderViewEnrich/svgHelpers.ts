@@ -1,4 +1,4 @@
-import { RenderViewData } from '@core/commands/renderTypes';
+import type { RenderViewData } from '@core/commands/renderTypes';
 import { toScreenCoords } from '@core/commands/renderCamera';
 import { cross3, dot3, normalize3, sub3 } from '@lib/vec3';
 

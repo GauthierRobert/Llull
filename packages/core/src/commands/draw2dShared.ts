@@ -1,7 +1,8 @@
 import type { CadDocument, Entity, Vec2, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { DEFAULT_LAYER_ID } from '../model/types';
-import { looseVec3, z } from './schema';
+import type { z } from './schema';
+import { looseVec3 } from './schema';
 
 /** Default stroke color of every drafted 2D shape. */
 export const DEFAULT_DRAW_COLOR = '#4a90d9';

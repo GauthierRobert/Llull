@@ -60,8 +60,8 @@ export function onSseDisconnected(set: StoreSet, get: StoreGet): void {
   if (!syncInFlight && get().syncState !== 'idle') set({ syncState: 'idle' });
 }
 
-export /** Offline undo moves the newest outbox command to the redo outbox; redo moves it back. */
-function moveLastOutboxEntry(
+/** Offline undo moves the newest outbox command to the redo outbox; redo moves it back. */
+export function moveLastOutboxEntry(
   state: CadStoreState,
   direction: 'undo' | 'redo',
 ): Pick<CadStoreState, 'localOutbox' | 'localRedoOutbox'> {
@@ -76,17 +76,17 @@ function moveLastOutboxEntry(
     : { localOutbox: [...state.localOutbox, moved], localRedoOutbox: rest };
 }
 
-export /** Selection survives a document replacement, minus ids that no longer exist. */
-function withLocalSelection(doc: CadDocument, selection: readonly EntityId[]): CadDocument {
+/** Selection survives a document replacement, minus ids that no longer exist. */
+export function withLocalSelection(doc: CadDocument, selection: readonly EntityId[]): CadDocument {
   return { ...doc, selection: selection.filter((id) => id in doc.entities) };
 }
 
-export /**
+/**
  * Offline -> online reconcile: replay the outbox to the server as ordinary commands, in
  * order (the server rebases them onto whatever happened meanwhile), then adopt the server
  * snapshot. Commands queued during the flush are sent too. Retries with backoff on failure.
  */
-function flushOutbox(set: StoreSet, get: StoreGet): void {
+export function flushOutbox(set: StoreSet, get: StoreGet): void {
   if (syncInFlight) return;
   cancelSyncRetry();
   syncInFlight = true;

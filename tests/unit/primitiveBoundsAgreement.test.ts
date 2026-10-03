@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import { createEmptyDocument } from '@core/model/types';
 import type { Entity, Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';

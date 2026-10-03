@@ -5,7 +5,7 @@
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { fromMm, toMetres } from '../model';
-import { BaseReaction } from './frameModelSolve';
+import type { BaseReaction } from './frameModelSolve';
 import { type ClayLayer, type Combination } from './foundationModel';
 import { footingRows } from './foundationRows';
 import { combine, footingMoment, ultimateCombinations } from './foundationCombinations';

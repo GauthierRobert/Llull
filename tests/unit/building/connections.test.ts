@@ -3,8 +3,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { buildingErrors } from '@aec/validate';
 import type { BuildingElement, MomentConnectionElement } from '@core/model/building';
-import { TakeoffLine } from '@aec/takeoffBasics';
-import { IfcExport } from '@aec/ifcBuild';
+import type { TakeoffLine } from '@aec/takeoffBasics';
+import type { IfcExport } from '@aec/ifcBuild';
 
 const HALL = { span: 18000, length: 12000, eaveHeight: 6000, roofPitch: 6 };
 

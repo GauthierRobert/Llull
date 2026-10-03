@@ -8,7 +8,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { shapeToolCallContent } from '@mcp/index';
 import type { CadDocument } from '@core/model/types';
-import { RenderViewData } from '@core/commands/renderTypes';
+import type { RenderViewData } from '@core/commands/renderTypes';
 import { applyCommand } from '../commandBus';
 import { stripSvgFromData, rasterizeSvg } from '../renderImage';
 import { type RenderViewEnrichParams } from '../renderViewEnrich/types';

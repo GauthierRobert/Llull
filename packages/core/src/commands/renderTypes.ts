@@ -1,5 +1,5 @@
 import type { Vec3 } from '../model/types';
-import { Bounds } from './sceneTypes';
+import type { Bounds } from './sceneTypes';
 
 export interface RenderViewData {
   /** The resolved view name ('top'|'bottom'|'front'|'back'|'left'|'right'|'iso'). */

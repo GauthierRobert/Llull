@@ -2,7 +2,7 @@ import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { entityBounds, mergeBounds } from './sceneBounds';
-import { Bounds } from './sceneTypes';
+import type { Bounds } from './sceneTypes';
 import { formatLength } from './units';
 import { polygonArea } from './measureAreaPerimeter';
 interface MeasureBoundingBoxData {

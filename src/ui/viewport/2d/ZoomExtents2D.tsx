@@ -7,7 +7,7 @@
  */
 
 import { useEffect } from 'react';
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
 import type { MapControls as MapControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
