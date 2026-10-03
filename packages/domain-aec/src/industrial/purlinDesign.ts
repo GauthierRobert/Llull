@@ -20,6 +20,7 @@ import { regenerateBuilding } from '../evaluate';
 import { sweepFrame } from '../mesh';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
 import { nextProfile } from './frameDesign';
+import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
 import { checkPurlins, type PurlinRow } from './purlinCheck';
 
 const MAX_ITERATIONS = 15;
@@ -109,15 +110,12 @@ export const designPurlins = defineCommand({
       const { rows } = analyse(current);
       const building = getBuilding(current);
       const levelId = levelOf(building, rows);
-      const groups = new Map<string, { role: string; profile: string }>();
+      const groups: ProfileGroups = new Map();
       for (const row of rows) {
         if (row.utilisation <= targetUtilisation) continue;
         const member = building.elements[row.elementId];
         if (member?.category !== 'member') continue;
-        groups.set(`${member.role}:${member.profile}`, {
-          role: member.role,
-          profile: member.profile,
-        });
+        addProfileGroup(groups, member);
       }
       if (groups.size === 0) break;
       let next = building;
@@ -130,19 +128,15 @@ export const designPurlins = defineCommand({
         }
         progressed = true;
         changes.push(`${role}s ${profile} → ${larger}`);
-        const resizedIds: string[] = [];
-        for (const element of Object.values(next.elements)) {
-          if (
-            element.category !== 'member' ||
-            element.levelId !== levelId ||
-            element.role !== role ||
-            element.profile !== profile
-          )
-            continue;
-          next = withElement(next, { ...element, profile: larger });
-          changed.add(element.id);
-          resizedIds.push(element.id);
-        }
+        const resizedGroup = resizeProfileGroup(
+          next,
+          { role, profile },
+          larger,
+          (element) => element.levelId === levelId,
+        );
+        next = resizedGroup.building;
+        const resizedIds = resizedGroup.resizedIds;
+        for (const id of resizedIds) changed.add(id);
         next = reseatResized(current, next, resizedIds, profile, larger);
       }
       current = { ...current, building: next };

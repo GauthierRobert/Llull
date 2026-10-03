@@ -7,16 +7,7 @@
 import type { Entity } from '@core/model/types';
 import type { RenderViewData } from '@core/commands/render';
 import { entityBounds } from '@core/commands/scene';
-import {
-  computeOrthoHalf,
-  cross3,
-  dot3,
-  escapeXml,
-  normalize3,
-  r2,
-  sub3,
-  toScreenCoords,
-} from './svgHelpers';
+import { computeOrthoHalf, escapeXml, makeProjector, r2 } from './svgHelpers';
 
 // ---------------------------------------------------------------------------
 // Entity labels: per-entity id/name labels + key-point markers + legend
@@ -204,21 +195,7 @@ export function appendEntityLabels(
   entities: ReadonlyArray<Entity>,
 ): string {
   const { camera, width, height } = data;
-  const cam = camera;
-
-  // Camera basis — identical to appendDimensionLabels / appendAxesAndGrid.
-  const fwd = normalize3(sub3(cam.target, cam.position));
-  const right = normalize3(cross3(fwd, cam.up));
-  const up = normalize3(cross3(right, fwd));
-
-  const orthoHalf = computeOrthoHalf(data);
-
-  function project(p: [number, number, number]): [number, number] {
-    const dd = sub3(p, cam.position);
-    const u = dot3(dd, right);
-    const v = dot3(dd, up);
-    return toScreenCoords(u, v, orthoHalf, width, height);
-  }
+  const project = makeProjector(camera, computeOrthoHalf(data), width, height);
 
   const lines: string[] = ['  <!-- entity labels overlay -->'];
   const labelStyle = `font-family="monospace" font-size="10" stroke="#0d0d1a" stroke-width="2.5" paint-order="stroke"`;

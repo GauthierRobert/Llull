@@ -44,6 +44,26 @@ import {
   framePlacement,
   steelProfileDef,
 } from './ifcElementExport';
+import { dot } from './vec3';
+
+/** One extruded-area solid per non-degenerate segment of a polyline, the profile swept along it. */
+function sweptSolids(context: Context, profileRef: string, points: ReadonlyArray<Vec3>): string[] {
+  const solids: string[] = [];
+  for (let index = 0; index + 1 < points.length; index++) {
+    const start = points[index] as Vec3;
+    const frame = sweepFrame(start, points[index + 1] as Vec3);
+    if (!frame) continue;
+    const axes = context.writer.add(
+      `IFCAXIS2PLACEMENT3D(${point3(context, start[0], start[1], start[2])},${direction(context, frame.d)},${direction(context, frame.u)})`,
+    );
+    solids.push(
+      context.writer.add(
+        `IFCEXTRUDEDAREASOLID(${profileRef},${axes},${context.zAxis},${ifcReal(frame.length)})`,
+      ),
+    );
+  }
+  return solids;
+}
 
 export function exportIndustrial(
   context: Context,
@@ -89,7 +109,6 @@ export function exportIndustrial(
     case 'panel': {
       const frame = panelFrame(element.corners.map(mm3));
       if (!frame) return null;
-      const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
       const outline = element.corners.map(mm3).map((corner): Vec2 => {
         const offset: Vec3 = [
           corner[0] - frame.origin[0],
@@ -127,20 +146,7 @@ export function exportIndustrial(
       const circle = writer.add(
         `IFCCIRCLEPROFILEDEF(.AREA.,$,${position},${ifcReal(mm(element.diameter) / 2)})`,
       );
-      const solids: string[] = [];
-      for (let index = 0; index + 1 < element.points.length; index++) {
-        const start = mm3(element.points[index] as Vec3);
-        const frame = sweepFrame(start, mm3(element.points[index + 1] as Vec3));
-        if (!frame) continue;
-        const axes = writer.add(
-          `IFCAXIS2PLACEMENT3D(${point3(context, start[0], start[1], start[2])},${direction(context, frame.d)},${direction(context, frame.u)})`,
-        );
-        solids.push(
-          writer.add(
-            `IFCEXTRUDEDAREASOLID(${circle},${axes},${context.zAxis},${ifcReal(frame.length)})`,
-          ),
-        );
-      }
+      const solids = sweptSolids(context, circle, element.points.map(mm3));
       if (solids.length === 0) return null;
       const ref = writer.add(
         `IFCPIPESEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(element.service)},$,${local},${shape(context, solids)},${ifcString(element.id)},.RIGIDSEGMENT.)`,
@@ -153,20 +159,7 @@ export function exportIndustrial(
         context,
         trayOutline(mm(element.width), mm(element.height), 2),
       );
-      const solids: string[] = [];
-      for (let index = 0; index + 1 < element.points.length; index++) {
-        const start = mm3(element.points[index] as Vec3);
-        const frame = sweepFrame(start, mm3(element.points[index + 1] as Vec3));
-        if (!frame) continue;
-        const axes = writer.add(
-          `IFCAXIS2PLACEMENT3D(${point3(context, start[0], start[1], start[2])},${direction(context, frame.d)},${direction(context, frame.u)})`,
-        );
-        solids.push(
-          writer.add(
-            `IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(frame.length)})`,
-          ),
-        );
-      }
+      const solids = sweptSolids(context, profile, element.points.map(mm3));
       if (solids.length === 0) return null;
       const ref = writer.add(
         `IFCCABLECARRIERSEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(element.system)},$,${local},${shape(context, solids)},${ifcString(element.id)},.CABLETRAYSEGMENT.)`,

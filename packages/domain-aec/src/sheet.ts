@@ -299,6 +299,39 @@ export function scaleBar(x: number, y: number, scale: number): string {
   return parts.join('');
 }
 
+/** The drawing sheet envelope shared by every sheet export: frame, body group, scale bar, caption, title block. */
+export function composeSheetSvg(
+  doc: CadDocument,
+  sheet: {
+    width: number;
+    height: number;
+    title: string;
+    scale: number;
+    paper: PaperSize;
+    caption: string;
+    bodyId: string;
+    body: string;
+    /** Elements drawn after the body group and before the scale bar. */
+    overlays: ReadonlyArray<string>;
+  },
+): string {
+  const { width, height, title, scale, paper } = sheet;
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
+    `<title>${escapeXml(title)}</title>`,
+    SHEET_STYLE,
+    SHEET_DEFS,
+    `<rect width="${width}" height="${height}" fill="#fff"/>`,
+    `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
+    `<g id="${sheet.bodyId}">${sheet.body}</g>`,
+    ...sheet.overlays,
+    scaleBar(BINDING_MARGIN + 8, height - MARGIN - 12, scale),
+    `<text x="${BINDING_MARGIN + 8}" y="${n(height - MARGIN - 16)}" font-size="2.6" text-anchor="start">${escapeXml(sheet.caption)}</text>`,
+    titleBlock(doc, { width, height, title, scale, paper }),
+    `</svg>`,
+  ].join('\n');
+}
+
 /**
  * @pure
  * @failure unknown level, invalid paper or scale -> null
@@ -325,20 +358,17 @@ export function buildPlanSheet(doc: CadDocument, options: SheetOptions): PlanShe
   const painter = new SheetPainter(drawing, millimetresPerUnit / scale, viewport);
   for (const primitive of drawing.primitives) painter.paint(primitive);
   const title = options.title?.trim() || `${drawing.level.name} — Floor plan`;
-  const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
-    `<title>${escapeXml(title)}</title>`,
-    SHEET_STYLE,
-    SHEET_DEFS,
-    `<rect width="${width}" height="${height}" fill="#fff"/>`,
-    `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
-    `<g id="plan">${painter.parts.join('')}</g>`,
-    northArrow(width - MARGIN - 12, MARGIN + 12),
-    scaleBar(BINDING_MARGIN + 8, height - MARGIN - 12, scale),
-    `<text x="${BINDING_MARGIN + 8}" y="${n(height - MARGIN - 16)}" font-size="2.6" text-anchor="start">${escapeXml(title)} · 1:${scale} · dimensions in mm</text>`,
-    titleBlock(doc, { width, height, title, scale, paper }),
-    `</svg>`,
-  ].join('\n');
+  const svg = composeSheetSvg(doc, {
+    width,
+    height,
+    title,
+    scale,
+    paper,
+    caption: `${title} · 1:${scale} · dimensions in mm`,
+    bodyId: 'plan',
+    body: painter.parts.join(''),
+    overlays: [northArrow(width - MARGIN - 12, MARGIN + 12)],
+  });
   const project = fileSlug(getBuilding(doc).project.name, 'project');
   return {
     filename: `${project}_${fileSlug(drawing.level.name, 'level')}_${paper}_1-${scale}.svg`,

@@ -12,13 +12,9 @@ import {
   BINDING_MARGIN,
   MARGIN,
   PAPER_MM,
-  SHEET_DEFS,
-  SHEET_STYLE,
+  composeSheetSvg,
   TITLE_HEIGHT,
-  escapeXml,
   fitScale,
-  scaleBar,
-  titleBlock,
   type PaperSize,
   type Viewport,
 } from '../sheet';
@@ -348,21 +344,17 @@ export const exportAnchorPlan = defineCommand({
         : '';
 
     const title = `${TITLE} — ${level.name}`;
-    const svg = [
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
-      `<title>${escapeXml(title)}</title>`,
-      SHEET_STYLE,
-      SHEET_DEFS,
-      `<rect width="${width}" height="${height}" fill="#fff"/>`,
-      `<rect x="${BINDING_MARGIN}" y="${MARGIN}" width="${width - BINDING_MARGIN - MARGIN}" height="${height - 2 * MARGIN}" class="frame"/>`,
-      `<g id="anchor-plan">${canvas.parts.join('')}</g>`,
-      scheduleTable(shown, tableX, tableY + 2),
-      clipped,
-      scaleBar(BINDING_MARGIN + 8, height - MARGIN - 12, sheetScale),
-      `<text x="${BINDING_MARGIN + 8}" y="${n(height - MARGIN - 16)}" font-size="2.6" text-anchor="start">${escapeXml(title)} · level ${metres(mm(level.elevation))} m · 1:${sheetScale} · dimensions in mm</text>`,
-      titleBlock(doc, { width, height, title, scale: sheetScale, paper: sheetPaper }),
-      `</svg>`,
-    ].join('\n');
+    const svg = composeSheetSvg(doc, {
+      width,
+      height,
+      title,
+      scale: sheetScale,
+      paper: sheetPaper,
+      caption: `${title} · level ${metres(mm(level.elevation))} m · 1:${sheetScale} · dimensions in mm`,
+      bodyId: 'anchor-plan',
+      body: canvas.parts.join(''),
+      overlays: [scheduleTable(shown, tableX, tableY + 2), clipped],
+    });
     const filename = `${fileSlug(building.project.name, 'project')}_${fileSlug(level.name, 'level')}_anchor-plan_${sheetPaper}_1-${sheetScale}.svg`;
     return {
       document: doc,

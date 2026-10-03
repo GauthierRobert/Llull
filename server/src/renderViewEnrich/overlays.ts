@@ -6,16 +6,7 @@
  */
 
 import type { RenderViewData } from '@core/commands/render';
-import {
-  computeOrthoHalf,
-  cross3,
-  dot3,
-  escapeXml,
-  normalize3,
-  r2,
-  sub3,
-  toScreenCoords,
-} from './svgHelpers';
+import { computeOrthoHalf, escapeXml, makeProjector, r2 } from './svgHelpers';
 
 // ---------------------------------------------------------------------------
 // ShowDimensions: overlay W × D × H as SVG text
@@ -39,26 +30,7 @@ export function appendDimensionLabels(svgString: string, data: RenderViewData): 
 
   // Project bounding box corner midpoints to screen space
   const { camera, width, height } = data;
-  const cam = camera;
-
-  // Re-derive camera basis (same math as render.ts)
-  const fwd = normalize3(sub3(cam.target, cam.position));
-  const right = normalize3(cross3(fwd, cam.up));
-  const up = normalize3(cross3(right, fwd));
-
-  // Compute orthoHalf the same way renderDocument does: max scene extent / 2 * 1.2
-  const dx = max[0] - min[0];
-  const dy = max[1] - min[1];
-  const dz = max[2] - min[2];
-  const radius = Math.max(dx, dy, dz) / 2 + 1e-3;
-  const orthoHalf = (radius < 0.1 ? 1 : radius) * 1.2 * 1.2; // extra 1.2x for cameraForView
-
-  function project(p: [number, number, number]): [number, number] {
-    const dd = sub3(p, cam.position);
-    const u = dot3(dd, right);
-    const v = dot3(dd, up);
-    return toScreenCoords(u, v, orthoHalf, width, height);
-  }
+  const project = makeProjector(camera, computeOrthoHalf(data), width, height);
 
   // Midpoints of the 3 dimension edges of the bounding box
   const cx = (min[0] + max[0]) / 2;
@@ -126,22 +98,8 @@ export function appendAxesAndGrid(
   showGrid: boolean,
 ): string {
   const { camera, width, height } = data;
-  const cam = camera;
-
-  // Re-derive camera basis (same as appendDimensionLabels)
-  const fwd = normalize3(sub3(cam.target, cam.position));
-  const right = normalize3(cross3(fwd, cam.up));
-  const up = normalize3(cross3(right, fwd));
-
-  const orthoHalf = computeOrthoHalf(data);
+  const project = makeProjector(camera, computeOrthoHalf(data), width, height);
   const axisLen = computeAxisLength(data);
-
-  function project(p: [number, number, number]): [number, number] {
-    const dd = sub3(p, cam.position);
-    const u = dot3(dd, right);
-    const v = dot3(dd, up);
-    return toScreenCoords(u, v, orthoHalf, width, height);
-  }
 
   const lines: string[] = ['  <!-- world-frame overlay -->'];
 

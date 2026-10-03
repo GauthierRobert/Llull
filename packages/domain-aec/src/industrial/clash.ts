@@ -4,11 +4,17 @@
  */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import type { BimCategory, BuildingElement, BuildingModel } from '@core/model/building';
+import type {
+  BimCategory,
+  BuildingElement,
+  BuildingLevel,
+  BuildingModel,
+} from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, getBuilding, isFiniteNumber, noChange, toMetres } from '../model';
 import { sweepFrame } from '../mesh';
+import { cross, dot, midpoint } from '../vec3';
 import { findProfile } from '../steel/profiles';
 import { atLevel } from './evaluate';
 import { arcPoints, curvedWallArc, curvedWallBand } from '../curvedWallGeometry';
@@ -19,13 +25,6 @@ export interface OrientedBox {
   readonly axes: readonly [Vec3, Vec3, Vec3];
   readonly half: Vec3;
 }
-
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
 
 /**
  * Penetration depth of two oriented boxes along their best separating axis (≤ 0 when apart).
@@ -66,6 +65,28 @@ function zRotated(angle: number): readonly [Vec3, Vec3, Vec3] {
   ];
 }
 
+/** One oriented box per segment of a swept polyline (constant half section). */
+function polylineBoxes(
+  level: BuildingLevel,
+  points: ReadonlyArray<Vec3>,
+  halfWidth: number,
+  halfDepth: number,
+): OrientedBox[] {
+  const boxes: OrientedBox[] = [];
+  for (let index = 0; index + 1 < points.length; index++) {
+    const start = atLevel(level, points[index] as Vec3);
+    const end = atLevel(level, points[index + 1] as Vec3);
+    const frame = sweepFrame(start, end);
+    if (!frame) continue;
+    boxes.push({
+      center: midpoint(start, end),
+      axes: [frame.u, frame.v, frame.d],
+      half: [halfWidth, halfDepth, frame.length / 2],
+    });
+  }
+  return boxes;
+}
+
 interface Solid {
   readonly elementId: string;
   readonly category: BimCategory;
@@ -94,38 +115,14 @@ export function elementBoxes(
         },
       ];
     }
-    case 'pipe': {
-      if (!level) return [];
-      const boxes: OrientedBox[] = [];
-      for (let index = 0; index + 1 < element.points.length; index++) {
-        const start = atLevel(level, element.points[index] as Vec3);
-        const end = atLevel(level, element.points[index + 1] as Vec3);
-        const frame = sweepFrame(start, end);
-        if (!frame) continue;
-        boxes.push({
-          center: [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2],
-          axes: [frame.u, frame.v, frame.d],
-          half: [element.diameter / 2, element.diameter / 2, frame.length / 2],
-        });
-      }
-      return boxes;
-    }
-    case 'tray': {
-      if (!level) return [];
-      const boxes: OrientedBox[] = [];
-      for (let index = 0; index + 1 < element.points.length; index++) {
-        const start = atLevel(level, element.points[index] as Vec3);
-        const end = atLevel(level, element.points[index + 1] as Vec3);
-        const frame = sweepFrame(start, end);
-        if (!frame) continue;
-        boxes.push({
-          center: [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2],
-          axes: [frame.u, frame.v, frame.d],
-          half: [element.width / 2, element.height / 2, frame.length / 2],
-        });
-      }
-      return boxes;
-    }
+    case 'pipe':
+      return level
+        ? polylineBoxes(level, element.points, element.diameter / 2, element.diameter / 2)
+        : [];
+    case 'tray':
+      return level
+        ? polylineBoxes(level, element.points, element.width / 2, element.height / 2)
+        : [];
     case 'curvedWall': {
       const arc = curvedWallArc(element);
       if (!level || !arc || !curvedWallBand(element)) return [];

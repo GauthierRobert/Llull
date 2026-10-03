@@ -8,6 +8,7 @@
 import type { MeshData, Vec2, Vec3 } from '@core/model/types';
 import { triangulatePolygon } from '@lib/triangulate';
 import { toCounterClockwise } from '@lib/polygon';
+import { add, cross, dot, normalize, scale } from './vec3';
 
 /**
  * Builds the prism of `outer` minus `holes`. `place(point, side)` maps a local outline point to
@@ -50,16 +51,6 @@ export interface SweepFrame {
   readonly d: Vec3;
   readonly length: number;
 }
-
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-];
-const scale = (a: Vec3, factor: number): Vec3 => [a[0] * factor, a[1] * factor, a[2] * factor];
-const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const normalize = (a: Vec3): Vec3 => scale(a, 1 / (Math.hypot(a[0], a[1], a[2]) || 1));
 
 /**
  * Member frame: the section depth (v) points "up" (+Z projected off the axis) for horizontal and
