@@ -5,37 +5,13 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { Entity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
-
-// ---------------------------------------------------------------------------
-// Internal math helpers (pure, no external dependencies)
-// ---------------------------------------------------------------------------
-
-/** Dot product of two 3-vectors. */
-function dot3(a: Vec3, b: Vec3): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-/** Cross product of two 3-vectors. */
-function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-/** Euclidean length of a 3-vector. */
-function len3(a: Vec3): number {
-  return Math.sqrt(dot3(a, a));
-}
-
-/** Normalize a 3-vector (returns [0,0,1] for zero-length input). */
-function normalize3(a: Vec3): Vec3 {
-  const l = len3(a);
-  if (l < 1e-12) return [0, 0, 1];
-  return [a[0] / l, a[1] / l, a[2] / l];
-}
+import { cross3, dot3, normalize3 } from '../lib/vec3';
+import { withEntity } from './entityOps';
 
 /**
  * Convert a unit-axis / angle rotation (Rodrigues) to an intrinsic XYZ Euler triple
@@ -136,14 +112,6 @@ function directionToEulerXYZ(dir: Vec3): Vec3 {
 // ---------------------------------------------------------------------------
 // Helper shared by geometry.ts pattern — keep commands pure (withEntity clone)
 // ---------------------------------------------------------------------------
-
-function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
-}
 
 // ---------------------------------------------------------------------------
 // make_tube_between

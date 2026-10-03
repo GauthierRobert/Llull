@@ -1,20 +1,10 @@
-/**
- * @command save_recipe
- * @command instantiate_recipe
- * @pure
- * @layer core/commands
- * @affects recipes record (save_recipe); new entities stamped from recipe steps (instantiate_recipe)
- * @invariant save_recipe does not change geometry; instantiate_recipe is additive (existing entities untouched)
- * @failure blank name → no-op (save_recipe); unknown recipe name → no-op (instantiate_recipe)
- */
-
 import type { CadDocument, FeatureStep, Recipe } from '../model/types';
 import { kernelRefusal } from './kernelRefusal';
 import { currentContext, runInContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
-import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
+import { resolveStepForReplay, runReplayStep } from './replayStep';
 
 // ---------------------------------------------------------------------------
 // Internal replay helper — additive instantiation
@@ -57,46 +47,15 @@ function replayRecipeAdditive(
     const cmd = getCommandFn(step.name);
     if (!cmd) continue; // unknown command — skip gracefully
 
-    try {
-      // 1. Resolve `=expr` strings against the current parameter environment.
-      const env = buildParamEnv(doc.parameters);
-      const { resolved, errors } = resolveStepParams(step.params, env);
-      for (const e of errors) {
-        resolveWarnings?.push(
-          `recipe step '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`,
-        );
+    const params = resolveStepForReplay(step, doc, idMap, resolveWarnings, 'recipe step');
+    const result = runReplayStep(cmd, step, doc, params, idMap, currentContext(), false);
+    if (!result) continue;
+    doc = result.document;
+    for (const id of result.affected) {
+      if (!baseIds.has(id) && !seen.has(id)) {
+        seen.add(id);
+        allAffected.push(id);
       }
-
-      // 2. Rewrite stale entity-id references using the accumulated idMap.
-      const remapped = remapIds(resolved, idMap);
-
-      // 3. Run the step; the command assigns fresh ids via nextId internally.
-      const result = cmd.run(doc, remapped, currentContext());
-      doc = result.document;
-
-      // 4. Accumulate genuinely new entity ids (created by this pass), deduped.
-      for (const id of result.affected) {
-        if (!baseIds.has(id) && !seen.has(id)) {
-          seen.add(id);
-          allAffected.push(id);
-        }
-      }
-
-      // 5. Extend idMap: zip step.affected (old ids from the recipe snapshot)
-      //    with result.affected (new ids from this replay) positionally.
-      if (step.affected && step.affected.length > 0 && result.affected.length > 0) {
-        const len = Math.min(step.affected.length, result.affected.length);
-        for (let i = 0; i < len; i++) {
-          const oldId = step.affected[i];
-          const newId = result.affected[i];
-          if (oldId !== undefined && newId !== undefined && oldId !== newId) {
-            idMap.set(oldId, newId);
-          }
-        }
-      }
-    } catch {
-      // Step threw — skip gracefully (e.g. a move referencing an id that a prior
-      // suppressed step would have created).
     }
   }
 

@@ -10,101 +10,11 @@
  */
 
 import type { CadDocument, Vec3 } from '../model/types';
-import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityToTriangles } from './export';
-import type { Triangle } from './export';
-
-// ---------------------------------------------------------------------------
-// Shared triangle-collection helper
-// ---------------------------------------------------------------------------
-
-/**
- * Collect world-space triangles for the given entity ids (or all 3D entities
- * when `requestedIds` is undefined/empty).  Returns triangles + accounting data.
- */
-function collectTriangles(
-  doc: CadDocument,
-  requestedIds: string[] | undefined,
-): { tris: Triangle[]; skipped2D: number; unknownIds: string[] } {
-  let idsToProcess: string[];
-  const unknownIds: string[] = [];
-
-  if (requestedIds && requestedIds.length > 0) {
-    idsToProcess = [];
-    for (const id of requestedIds) {
-      if (doc.entities[id]) {
-        idsToProcess.push(id);
-      } else {
-        unknownIds.push(id);
-      }
-    }
-  } else {
-    idsToProcess = doc.order;
-  }
-
-  const tris: Triangle[] = [];
-  let skipped2D = 0;
-  for (const id of idsToProcess) {
-    const e = doc.entities[id];
-    if (!e) continue;
-    if (!is3D(e)) {
-      skipped2D++;
-      continue;
-    }
-    const entityTris = entityToTriangles(e, doc);
-    for (const t of entityTris) tris.push(t);
-  }
-
-  return { tris, skipped2D, unknownIds };
-}
-
-// ---------------------------------------------------------------------------
-// Math helpers (pure)
-// ---------------------------------------------------------------------------
-
-function sub3(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-}
-
-function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-function len3(a: Vec3): number {
-  return Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
-}
-
-function normalize3(a: Vec3): Vec3 {
-  const l = len3(a);
-  return l > 1e-10 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 1];
-}
-
-function facetNormal(v0: Vec3, v1: Vec3, v2: Vec3): Vec3 {
-  return normalize3(cross3(sub3(v1, v0), sub3(v2, v0)));
-}
-
-// ---------------------------------------------------------------------------
-// Pure base64 encoder — no Node Buffer, no DOM (same as export.ts)
-// ---------------------------------------------------------------------------
-
-const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const out: string[] = [];
-  const len = bytes.length;
-  for (let i = 0; i < len; i += 3) {
-    const b0 = bytes[i]!;
-    const b1 = i + 1 < len ? bytes[i + 1]! : 0;
-    const b2 = i + 2 < len ? bytes[i + 2]! : 0;
-    out.push(B64_CHARS[b0 >> 2]!);
-    out.push(B64_CHARS[((b0 & 0x03) << 4) | (b1 >> 4)]!);
-    out.push(i + 1 < len ? B64_CHARS[((b1 & 0x0f) << 2) | (b2 >> 6)]! : '=');
-    out.push(i + 2 < len ? B64_CHARS[b2 & 0x3f]! : '=');
-  }
-  return out.join('');
-}
+import { uint8ArrayToBase64 } from '../lib/base64';
+import { collectExportTriangles } from './exportTriangulate';
+import { facetNormal, type Triangle } from './exportMath';
 
 // ---------------------------------------------------------------------------
 // OBJ serialisation
@@ -203,7 +113,7 @@ export const exportObj = defineCommand({
     const { entityIds, units } = params;
     const unitLabel = units ?? (doc as CadDocument & { units?: string }).units ?? 'mm';
 
-    const { tris, skipped2D, unknownIds } = collectTriangles(doc, entityIds);
+    const { tris, skipped2D, unknownIds } = collectExportTriangles(doc, entityIds);
     const triangleCount = tris.length;
 
     const text = [
@@ -488,7 +398,7 @@ export const exportGltf = defineCommand({
   run: (doc, params): CommandResult => {
     const { entityIds, binary = false } = params;
 
-    const { tris, skipped2D, unknownIds } = collectTriangles(doc, entityIds);
+    const { tris, skipped2D, unknownIds } = collectExportTriangles(doc, entityIds);
     const triangleCount = tris.length;
 
     const binPayload = buildBinPayload(tris);

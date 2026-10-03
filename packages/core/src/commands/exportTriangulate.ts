@@ -1,14 +1,18 @@
 import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
+import { is3D } from '../model/types';
 import { applyEulerXYZ } from './render';
 import { expandInstance } from './assemblies';
 import { revolutionTriangles } from '../geometry/revolution';
 import {
   SEG_CIRCLE,
-  SEG_SPHERE_LAT,
-  SEG_SPHERE_LON,
-  SEG_TORUS_TUBE,
+  boxExtents,
   circlePoints,
+  extrusionRings,
   meshTriangles,
+  pyramidCorners,
+  sphereQuads,
+  torusQuads,
+  wedgeCorners,
 } from './tessellation';
 import { type Triangle, fanTriangulate, earClipTriangulateVerts } from './exportMath';
 
@@ -17,14 +21,7 @@ import { type Triangle, fanTriangulate, earClipTriangulateVerts } from './export
 // ---------------------------------------------------------------------------
 
 export function triangulateBox(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Triangle[] {
-  const [px, py, pz] = e.position;
-  const [w, h, d] = e.size;
-  const x0 = px - w / 2,
-    x1 = px + w / 2;
-  const y0 = py - h / 2,
-    y1 = py + h / 2;
-  const z0 = pz - d / 2,
-    z1 = pz + d / 2;
+  const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
 
   // Counter-clockwise seen from outside (outward normals).
   const quads: Vec3[][] = [
@@ -120,40 +117,12 @@ export function triangulateSphere(e: {
   radius: number;
   rotation: Vec3;
 }): Triangle[] {
-  const [px, py, pz] = e.position;
-  const { radius } = e;
-  const tris: Triangle[] = [];
-
-  for (let lat = 0; lat < SEG_SPHERE_LAT; lat++) {
-    const a0 = (Math.PI * lat) / SEG_SPHERE_LAT - Math.PI / 2;
-    const a1 = (Math.PI * (lat + 1)) / SEG_SPHERE_LAT - Math.PI / 2;
-    for (let lon = 0; lon < SEG_SPHERE_LON; lon++) {
-      const b0 = (2 * Math.PI * lon) / SEG_SPHERE_LON;
-      const b1 = (2 * Math.PI * (lon + 1)) / SEG_SPHERE_LON;
-      const v00: Vec3 = [
-        px + radius * Math.cos(a0) * Math.cos(b0),
-        py + radius * Math.cos(a0) * Math.sin(b0),
-        pz + radius * Math.sin(a0),
-      ];
-      const v01: Vec3 = [
-        px + radius * Math.cos(a0) * Math.cos(b1),
-        py + radius * Math.cos(a0) * Math.sin(b1),
-        pz + radius * Math.sin(a0),
-      ];
-      const v10: Vec3 = [
-        px + radius * Math.cos(a1) * Math.cos(b0),
-        py + radius * Math.cos(a1) * Math.sin(b0),
-        pz + radius * Math.sin(a1),
-      ];
-      const v11: Vec3 = [
-        px + radius * Math.cos(a1) * Math.cos(b1),
-        py + radius * Math.cos(a1) * Math.sin(b1),
-        pz + radius * Math.sin(a1),
-      ];
-      tris.push([v00, v01, v11]);
-      tris.push([v00, v11, v10]);
-    }
-  }
+  const tris: Triangle[] = sphereQuads(e.position, e.radius).flatMap(
+    ([v00, v01, v11, v10]): Triangle[] => [
+      [v00, v01, v11],
+      [v00, v11, v10],
+    ],
+  );
 
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
@@ -193,64 +162,18 @@ export function triangulateTorus(e: {
   tubeRadius: number;
   rotation: Vec3;
 }): Triangle[] {
-  const [px, py, pz] = e.position;
-  const { ringRadius, tubeRadius } = e;
-  const RING_SEGS = SEG_CIRCLE;
-  const TUBE_SEGS = SEG_TORUS_TUBE;
-  const tris: Triangle[] = [];
-
-  for (let i = 0; i < RING_SEGS; i++) {
-    const a0 = (2 * Math.PI * i) / RING_SEGS;
-    const a1 = (2 * Math.PI * (i + 1)) / RING_SEGS;
-    const ca0 = Math.cos(a0),
-      sa0 = Math.sin(a0);
-    const ca1 = Math.cos(a1),
-      sa1 = Math.sin(a1);
-    for (let j = 0; j < TUBE_SEGS; j++) {
-      const b0 = (2 * Math.PI * j) / TUBE_SEGS;
-      const b1 = (2 * Math.PI * (j + 1)) / TUBE_SEGS;
-      const cb0 = Math.cos(b0),
-        sb0 = Math.sin(b0);
-      const cb1 = Math.cos(b1),
-        sb1 = Math.sin(b1);
-      const v00: Vec3 = [
-        px + (ringRadius + tubeRadius * cb0) * ca0,
-        py + (ringRadius + tubeRadius * cb0) * sa0,
-        pz + tubeRadius * sb0,
-      ];
-      const v01: Vec3 = [
-        px + (ringRadius + tubeRadius * cb1) * ca0,
-        py + (ringRadius + tubeRadius * cb1) * sa0,
-        pz + tubeRadius * sb1,
-      ];
-      const v10: Vec3 = [
-        px + (ringRadius + tubeRadius * cb0) * ca1,
-        py + (ringRadius + tubeRadius * cb0) * sa1,
-        pz + tubeRadius * sb0,
-      ];
-      const v11: Vec3 = [
-        px + (ringRadius + tubeRadius * cb1) * ca1,
-        py + (ringRadius + tubeRadius * cb1) * sa1,
-        pz + tubeRadius * sb1,
-      ];
-      tris.push([v00, v10, v11]);
-      tris.push([v00, v11, v01]);
-    }
-  }
+  const tris: Triangle[] = torusQuads(e.position, e.ringRadius, e.tubeRadius).flatMap(
+    ([v00, v10, v11, v01]): Triangle[] => [
+      [v00, v10, v11],
+      [v00, v11, v01],
+    ],
+  );
 
   return applyRotationToTriangles(tris, e.position, e.rotation);
 }
 
 export function tessellateWedge(e: { position: Vec3; size: Vec3; rotation: Vec3 }): Triangle[] {
-  const [px, py, pz] = e.position;
-  const [w, h, d] = e.size;
-  const p = (dx: number, dy: number, dz: number): Vec3 => [px + dx, py + dy, pz + dz];
-  const f00 = p(0, 0, 0);
-  const f10 = p(w, 0, 0);
-  const f11 = p(w, h, 0);
-  const f01 = p(0, h, 0);
-  const b00 = p(0, 0, d);
-  const b10 = p(w, 0, d);
+  const { f00, f10, f11, f01, b00, b10 } = wedgeCorners(e.position, e.size);
 
   // Counter-clockwise seen from outside (outward normals).
   const quads: Vec3[][] = [
@@ -279,14 +202,7 @@ export function triangulatePyramid(e: {
   height: number;
   rotation: Vec3;
 }): Triangle[] {
-  const [px, py, pz] = e.position;
-  const hw = e.baseWidth / 2,
-    hd = e.baseDepth / 2;
-  const b00: Vec3 = [px - hw, py - hd, pz];
-  const b10: Vec3 = [px + hw, py - hd, pz];
-  const b11: Vec3 = [px + hw, py + hd, pz];
-  const b01: Vec3 = [px - hw, py + hd, pz];
-  const apex: Vec3 = [px, py, pz + e.height];
+  const { b00, b10, b11, b01, apex } = pyramidCorners(e);
 
   const tris: Triangle[] = [
     // base (reversed = face down)
@@ -308,10 +224,8 @@ export function triangulateExtrusion(e: {
   rotation: Vec3;
 }): Triangle[] {
   if (e.profile.length < 3) return [];
-  const [px, py, pz] = e.position;
   const n = e.profile.length;
-  const bottom: Vec3[] = e.profile.map(([x, y]) => [px + x, py + y, pz]);
-  const top: Vec3[] = e.profile.map(([x, y]) => [px + x, py + y, pz + e.depth]);
+  const { bottom, top } = extrusionRings(e);
 
   const tris: Triangle[] = [];
 
@@ -419,6 +333,33 @@ export function entityToTriangles(e: Entity, doc: CadDocument): Triangle[] {
   }
 }
 
-// ---------------------------------------------------------------------------
-// STL ASCII serialisation
-// ---------------------------------------------------------------------------
+/**
+ * World-space triangles of the entities named by `requestedIds` (all of `doc.order` when
+ * undefined/empty). Unknown ids are reported, 2D entities are counted and skipped.
+ */
+export function collectExportTriangles(
+  doc: CadDocument,
+  requestedIds: readonly string[] | undefined,
+): { tris: Triangle[]; skipped2D: number; unknownIds: string[] } {
+  const unknownIds: string[] = [];
+  let idsToProcess: readonly string[] = doc.order;
+  if (requestedIds && requestedIds.length > 0) {
+    idsToProcess = requestedIds.filter((id) => {
+      const known = doc.entities[id] !== undefined;
+      if (!known) unknownIds.push(id);
+      return known;
+    });
+  }
+  const tris: Triangle[] = [];
+  let skipped2D = 0;
+  for (const id of idsToProcess) {
+    const entity = doc.entities[id];
+    if (!entity) continue;
+    if (!is3D(entity)) {
+      skipped2D++;
+      continue;
+    }
+    for (const t of entityToTriangles(entity, doc)) tris.push(t);
+  }
+  return { tris, skipped2D, unknownIds };
+}

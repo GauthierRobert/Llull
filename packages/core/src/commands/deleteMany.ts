@@ -8,6 +8,27 @@ import type { EntityGroup } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { MAX_BATCH_IDS } from './limits';
+import { resolveBatchIds } from './batchIds';
+
+/**
+ * Remove `removedIds` from every group's `memberIds`; a group left with fewer than 2 members is
+ * dissolved (omitted from `nextGroups`, listed in `dissolvedGroups`).
+ *
+ * @pure
+ */
+export function pruneGroupMembers(
+  groups: Readonly<Record<string, EntityGroup>> | undefined,
+  removedIds: ReadonlySet<string>,
+): { nextGroups: Record<string, EntityGroup>; dissolvedGroups: string[] } {
+  const dissolvedGroups: string[] = [];
+  const nextGroups: Record<string, EntityGroup> = {};
+  for (const group of Object.values(groups ?? {})) {
+    const prunedIds = group.memberIds.filter((memberId) => !removedIds.has(memberId));
+    if (prunedIds.length < 2) dissolvedGroups.push(group.id);
+    else nextGroups[group.id] = { ...group, memberIds: prunedIds };
+  }
+  return { nextGroups, dissolvedGroups };
+}
 
 /**
  * @command delete_entities
@@ -34,43 +55,20 @@ export const deleteEntities = defineCommand({
       ),
   }),
   run: (doc, { ids }): CommandResult => {
-    if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== 'string')) {
-      return {
-        document: doc,
-        summary: 'delete_entities: ids must be a non-empty array of strings.',
-        affected: [],
-      };
-    }
-    if (ids.length > MAX_BATCH_IDS) {
-      return {
-        document: doc,
-        summary: `delete_entities: ${ids.length} ids exceeds MAX_BATCH_IDS (${MAX_BATCH_IDS}).`,
-        affected: [],
-      };
-    }
-
-    const unique = [...new Set(ids)];
-    const existing = unique.filter((id) => Object.hasOwn(doc.entities, id));
-    const missing = unique.filter((id) => !Object.hasOwn(doc.entities, id));
-    if (existing.length === 0) {
-      return {
-        document: doc,
-        summary: `delete_entities: no listed entity exists (missing: [${missing.join(', ')}]).`,
-        affected: [],
-      };
-    }
+    const batch = resolveBatchIds(
+      doc,
+      'delete_entities',
+      ids,
+      'ids must be a non-empty array of strings.',
+    );
+    if (!batch.ok) return batch.result;
+    const { existing, missing } = batch;
 
     const removed = new Set(existing);
     const entities = { ...doc.entities };
     for (const id of existing) delete entities[id];
 
-    const dissolvedGroups: string[] = [];
-    const nextGroups: Record<string, EntityGroup> = {};
-    for (const group of Object.values(doc.groups ?? {})) {
-      const prunedIds = group.memberIds.filter((memberId) => !removed.has(memberId));
-      if (prunedIds.length < 2) dissolvedGroups.push(group.id);
-      else nextGroups[group.id] = { ...group, memberIds: prunedIds };
-    }
+    const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, removed);
 
     const dissolveSuffix =
       dissolvedGroups.length > 0

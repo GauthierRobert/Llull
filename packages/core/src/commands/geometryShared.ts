@@ -1,4 +1,9 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { CommandResult } from './types';
+import { z, looseVec3, tolerant } from './schema';
+import { rotatedEntityBounds } from './scene';
+import { finiteVec3OrZero } from '../lib/vec3';
+import { withEntity } from './entityOps';
 
 export const ORIGIN: Vec3 = [0, 0, 0];
 
@@ -20,10 +25,7 @@ export function translated(entity: Entity, delta: Vec3): Entity {
  * Never throws — malformed rotation is silently ignored and the entity is created unrotated.
  */
 export function resolveRotation(rotation: unknown): Vec3 {
-  if (!Array.isArray(rotation) || rotation.length !== 3) return [0, 0, 0];
-  const [rx, ry, rz] = rotation as unknown[];
-  if (!Number.isFinite(rx) || !Number.isFinite(ry) || !Number.isFinite(rz)) return [0, 0, 0];
-  return [rx as number, ry as number, rz as number];
+  return finiteVec3OrZero(rotation);
 }
 
 /**
@@ -125,22 +127,81 @@ export function boundsText(b: { min: Vec3; max: Vec3 }): string {
   return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
 }
 
-/** Helper: clone the document shallowly with new entity maps. Keeps commands pure. */
-export function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
+/** Default color of every placed primitive solid. */
+export const DEFAULT_SOLID_COLOR = '#6b8f9c';
+
+/** `position` param of a placed primitive; `note` is inserted before the default sentence. */
+export function positionField(note = ''): z.ZodOptional<z.ZodType<Vec3>> {
+  return looseVec3(
+    'World-space location of the anchor point [x, y, z] in document units. ' +
+      `Right-handed frame, +Z up. ${note}Defaults to [0, 0, 0].`,
+  ).optional();
+}
+
+/** `anchor` param of a placed primitive; `description` names the shape and its default anchor. */
+export function anchorField(description: string): z.ZodOptional<
+  z.ZodCatch<
+    z.ZodEnum<{
+      center: 'center';
+      min: 'min';
+      'base-center': 'base-center';
+    }>
+  >
+> {
+  return tolerant(z.enum(['center', 'min', 'base-center']).describe(description)).optional();
+}
+
+/** `rotation` param of a placed primitive; `note` replaces the "Matches rotate_entity" lead-in. */
+export function rotationField(
+  note = 'Matches rotate_entity convention.',
+): z.ZodOptional<z.ZodCatch<z.ZodType<Vec3>>> {
+  return tolerant(
+    looseVec3(
+      'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+        `${note} Defaults to [0, 0, 0]. ` +
+        'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
+    ),
+  ).optional();
 }
 
 /**
- * @command add_box
- * @pure
- * @layer core/commands
- * @affects creates 1 box entity
- * @invariant all size components > 0
- * @failure any size component <= 0 or non-finite -> no-op, affected:[]
- * @failure malformed rotation -> entity still created with rotation [0,0,0]
- * @failure unknown anchor value -> falls back to default anchor 'center', no throw
+ * Reject non-finite or non-positive named dimensions: returns the failing no-op result, or `null`
+ * when every value is finite and > 0. Checked in order.
  */
+export function rejectNonPositive(
+  doc: CadDocument,
+  command: string,
+  dimensions: ReadonlyArray<readonly [name: string, value: number]>,
+): CommandResult | null {
+  for (const [name, value] of dimensions) {
+    if (!Number.isFinite(value) || value <= 0) {
+      return {
+        document: doc,
+        summary: `${command} failed: ${name} must be finite and > 0, got ${value}.`,
+        affected: [],
+      };
+    }
+  }
+  return null;
+}
+
+/** Same as `rejectNonPositive` for a `[w, h, d]` size vector (one combined summary). */
+export function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandResult | null {
+  if (size.every((component) => Number.isFinite(component) && component > 0)) return null;
+  return {
+    document: doc,
+    summary: `${command} failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
+    affected: [],
+  };
+}
+
+/** Append `entity` and report it: `<description>; world AABB ...` with `affected: [entity.id]`. */
+export function commitSolid(doc: CadDocument, entity: Entity, description: string): CommandResult {
+  const newDoc = withEntity(doc, entity);
+  const bounds = rotatedEntityBounds(newDoc.entities[entity.id] as Entity);
+  return {
+    document: newDoc,
+    summary: `${description}; ${boundsText(bounds)}.`,
+    affected: [entity.id],
+  };
+}

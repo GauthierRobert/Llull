@@ -1,9 +1,15 @@
 import type { Entity, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec2 as vec2, looseVec3 as vec3 } from './schema';
+import { defineCommand, z, colorField, looseVec2 as vec2, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
-import { withEntity } from './draw2dShared';
+import { withEntity } from './entityOps';
+import {
+  DEFAULT_DRAW_COLOR,
+  pointSeriesEntity,
+  rejectTooFewPoints,
+  workPlanePositionField,
+} from './draw2dShared';
 
 // ---------------------------------------------------------------------------
 // draw_line
@@ -25,15 +31,13 @@ export const drawLine = defineCommand({
   params: z.object({
     start: vec2('Start point [x, y] in local 2D work-plane coordinates.'),
     end: vec2('End point [x, y] in local 2D work-plane coordinates.'),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
-      .optional(),
+    position: workPlanePositionField(),
+    color: colorField(DEFAULT_DRAW_COLOR),
   }),
-  run: (doc, { start, end, position = [0, 0, 0] as const, color = '#4a90d9' }): CommandResult => {
+  run: (
+    doc,
+    { start, end, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
+  ): CommandResult => {
     if (!Array.isArray(start) || start.length < 2 || !Array.isArray(end) || end.length < 2) {
       return {
         document: doc,
@@ -90,39 +94,17 @@ export const drawPolyline = defineCommand({
         'When true, the last point connects back to the first point, forming a closed loop. Defaults to false.',
       )
       .optional(),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
-      .optional(),
+    position: workPlanePositionField(),
+    color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (
     doc,
-    { points, closed = false, position = [0, 0, 0] as const, color = '#4a90d9' },
+    { points, closed = false, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
-    if (!Array.isArray(points) || points.length < 2) {
-      return {
-        document: doc,
-        summary: `draw_polyline: requires at least 2 points (got ${Array.isArray(points) ? points.length : 0}).`,
-        affected: [],
-      };
-    }
+    const tooFew = rejectTooFewPoints(doc, 'draw_polyline', points);
+    if (tooFew) return tooFew;
     const id = nextId('poly');
-    const safePoints: ReadonlyArray<Vec2> = points.map(
-      (p) => [(p as number[])[0] ?? 0, (p as number[])[1] ?? 0] as Vec2,
-    );
-    const entity: Entity = {
-      id,
-      kind: 'polyline',
-      points: safePoints,
-      closed,
-      position,
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    const entity = pointSeriesEntity('polyline', id, points, closed, position, color);
     return {
       document: withEntity(doc, entity),
       summary: `Drew polyline ${id} with ${points.length} points${closed ? ' (closed)' : ''}.`,
@@ -161,17 +143,19 @@ export const drawArc = defineCommand({
       .describe(
         'End angle in radians, measured counter-clockwise from the +X axis. Arc sweeps from startAngle to endAngle counter-clockwise.',
       ),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
-      .optional(),
+    position: workPlanePositionField(),
+    color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (
     doc,
-    { center, radius, startAngle, endAngle, position = [0, 0, 0] as const, color = '#4a90d9' },
+    {
+      center,
+      radius,
+      startAngle,
+      endAngle,
+      position = [0, 0, 0] as const,
+      color = DEFAULT_DRAW_COLOR,
+    },
   ): CommandResult => {
     if (radius <= 0) {
       return {
@@ -221,17 +205,12 @@ export const drawCircle = defineCommand({
   params: z.object({
     center: vec2('Center point [x, y] of the circle in local 2D work-plane coordinates.'),
     radius: z.number().describe('Circle radius. Must be greater than 0.'),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
-      .optional(),
+    position: workPlanePositionField(),
+    color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (
     doc,
-    { center, radius, position = [0, 0, 0] as const, color = '#4a90d9' },
+    { center, radius, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (radius <= 0) {
       return {
@@ -288,14 +267,11 @@ export const drawRectangle = defineCommand({
     position: vec3(
       'World-space position [x, y, z] of the work-plane origin (lower-left corner). Defaults to [0,0,0].',
     ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
-      .optional(),
+    color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (
     doc,
-    { width, height, position = [0, 0, 0] as const, color = '#4a90d9' },
+    { width, height, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (width <= 0 || height <= 0) {
       return {
@@ -341,12 +317,9 @@ export const drawPoint = defineCommand({
     'The point entity has no local 2D geometry — its position is the point location.',
   params: z.object({
     position: vec3('World-space position [x, y, z] of the point. Defaults to [0,0,0].').optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#4a90d9".')
-      .optional(),
+    color: colorField(DEFAULT_DRAW_COLOR),
   }),
-  run: (doc, { position = [0, 0, 0] as const, color = '#4a90d9' }): CommandResult => {
+  run: (doc, { position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     const id = nextId('pt');
     const entity: Entity = {
       id,

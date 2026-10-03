@@ -7,13 +7,14 @@
  * @module
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { Entity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './scene';
+import { withEntity } from './entityOps';
 
 // ---------------------------------------------------------------------------
 // Internal involute geometry helpers (pure, no side effects)
@@ -115,15 +116,6 @@ function fmt(v: number): string {
 /** Format an AABB for use in a summary string. */
 function boundsText(b: { min: Vec3; max: Vec3 }): string {
   return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
-}
-
-/** Helper: add one entity and append it to order. */
-function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
 }
 
 // ---------------------------------------------------------------------------

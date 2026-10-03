@@ -1,10 +1,35 @@
 import type { Entity } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec3, tolerant } from './schema';
+import { defineCommand, z, looseVec3, colorField } from './schema';
 import { nextId } from '../lib/id';
-import { rotatedEntityBounds } from './scene';
-import { ORIGIN, resolveRotation, resolvePosition, boundsText, withEntity } from './geometryShared';
+import {
+  DEFAULT_SOLID_COLOR,
+  ORIGIN,
+  anchorField,
+  commitSolid,
+  positionField,
+  rejectBadSize,
+  rejectNonPositive,
+  resolveRotation,
+  resolvePosition,
+  rotationField,
+} from './geometryShared';
+
+/**
+ * @command add_wedge
+ * @pure
+ * @layer core/commands
+ * @affects creates 1 wedge entity; stored position is the lower-front-left corner of the bounding box
+ * @invariant all size components > 0
+ * @failure any size component <= 0 -> no-op, affected:[]
+ * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @failure unknown anchor value -> falls back to default anchor 'min', no throw
+ *
+ * Default anchor is 'min': the stored position is the lower-front-left (min-XYZ) corner.
+ * AABB: [position..position+size] in all axes.
+ */
+
 export const addWedge = defineCommand({
   name: 'add_wedge',
   description:
@@ -22,50 +47,25 @@ export const addWedge = defineCommand({
       '[width, height, depth] in document units. width=X extent; height=full height at front face; ' +
         'depth=Z extent (ramp direction). All must be > 0.',
     ),
-    position: looseVec3(
-      'World-space location of the anchor point [x, y, z] in document units. ' +
-        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-    ).optional(),
-    anchor: tolerant(
-      z
-        .enum(['center', 'min', 'base-center'])
-        .describe(
-          'Which point on the wedge the position refers to. ' +
-            '"min" (default): lower-front-left corner of the bounding box (min-XYZ). ' +
-            '"center": geometric center of the AABB. ' +
-            '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-            'Unknown values fall back to "min". ' +
-            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        ),
-    ).optional(),
-    rotation: tolerant(
-      looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      ),
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
-      .optional(),
+    position: positionField(),
+    anchor: anchorField(
+      'Which point on the wedge the position refers to. ' +
+        '"min" (default): lower-front-left corner of the bounding box (min-XYZ). ' +
+        '"center": geometric center of the AABB. ' +
+        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
+        'Unknown values fall back to "min". ' +
+        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+    ),
+    rotation: rotationField(),
+    color: colorField(DEFAULT_SOLID_COLOR),
   }),
-  run: (doc, { size, position = ORIGIN, rotation, color = '#6b8f9c', anchor }): CommandResult => {
+  run: (
+    doc,
+    { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
+  ): CommandResult => {
     const [w, h, d] = size;
-    if (
-      !Number.isFinite(w) ||
-      !Number.isFinite(h) ||
-      !Number.isFinite(d) ||
-      w <= 0 ||
-      h <= 0 ||
-      d <= 0
-    ) {
-      return {
-        document: doc,
-        summary: `add_wedge failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
-        affected: [],
-      };
-    }
+    const rejected = rejectBadSize(doc, 'add_wedge', size);
+    if (rejected) return rejected;
     // Default anchor for wedge is 'min': stored position is the lower-front-left (min-XYZ) corner.
     // AABB half-extents from min corner: [w/2, h/2, d/2] (half-extents measured from min = stored origin).
     const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'min', anchor, position);
@@ -79,13 +79,7 @@ export const addWedge = defineCommand({
       layerId: DEFAULT_LAYER_ID,
       color,
     };
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    return {
-      document: newDoc,
-      summary: `Added wedge ${id} of size ${size.join('×')}; ${boundsText(b)}.`,
-      affected: [id],
-    };
+    return commitSolid(doc, entity, `Added wedge ${id} of size ${size.join('×')}`);
   },
 });
 
@@ -126,59 +120,36 @@ export const addPyramid = defineCommand({
       .describe(
         'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
       ),
-    position: looseVec3(
-      'World-space location of the anchor point [x, y, z] in document units. ' +
-        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
-    ).optional(),
-    anchor: tolerant(
-      z
-        .enum(['center', 'min', 'base-center'])
-        .describe(
-          'Which point on the pyramid the position refers to. ' +
-            '"base-center" (default): center of the rectangular base; apex at position+[0,0,height]. ' +
-            '"center": geometric center of the AABB (mid X/Y/Z). ' +
-            '"min": min-XYZ corner of the AABB. ' +
-            'Unknown values fall back to "base-center". ' +
-            'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-        ),
-    ).optional(),
-    rotation: tolerant(
-      looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
-      ),
-    ).optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
-      .optional(),
+    position: positionField(),
+    anchor: anchorField(
+      'Which point on the pyramid the position refers to. ' +
+        '"base-center" (default): center of the rectangular base; apex at position+[0,0,height]. ' +
+        '"center": geometric center of the AABB (mid X/Y/Z). ' +
+        '"min": min-XYZ corner of the AABB. ' +
+        'Unknown values fall back to "base-center". ' +
+        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
+    ),
+    rotation: rotationField(),
+    color: colorField(DEFAULT_SOLID_COLOR),
   }),
   run: (
     doc,
-    { baseWidth, baseDepth, height, position = ORIGIN, rotation, color = '#6b8f9c', anchor },
+    {
+      baseWidth,
+      baseDepth,
+      height,
+      position = ORIGIN,
+      rotation,
+      color = DEFAULT_SOLID_COLOR,
+      anchor,
+    },
   ): CommandResult => {
-    if (!Number.isFinite(baseWidth) || baseWidth <= 0) {
-      return {
-        document: doc,
-        summary: `add_pyramid failed: baseWidth must be finite and > 0, got ${baseWidth}.`,
-        affected: [],
-      };
-    }
-    if (!Number.isFinite(baseDepth) || baseDepth <= 0) {
-      return {
-        document: doc,
-        summary: `add_pyramid failed: baseDepth must be finite and > 0, got ${baseDepth}.`,
-        affected: [],
-      };
-    }
-    if (!Number.isFinite(height) || height <= 0) {
-      return {
-        document: doc,
-        summary: `add_pyramid failed: height must be finite and > 0, got ${height}.`,
-        affected: [],
-      };
-    }
+    const rejected = rejectNonPositive(doc, 'add_pyramid', [
+      ['baseWidth', baseWidth],
+      ['baseDepth', baseDepth],
+      ['height', height],
+    ]);
+    if (rejected) return rejected;
     // Default anchor for pyramid is 'base-center': stored position IS the base center.
     // AABB from base-center origin: spans [−bw/2..+bw/2, −bd/2..+bd/2, 0..height].
     // Half-extents for resolvePosition (which works from AABB center internally):
@@ -201,12 +172,10 @@ export const addPyramid = defineCommand({
       layerId: DEFAULT_LAYER_ID,
       color,
     };
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-    return {
-      document: newDoc,
-      summary: `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}; ${boundsText(b)}.`,
-      affected: [id],
-    };
+    return commitSolid(
+      doc,
+      entity,
+      `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}`,
+    );
   },
 });

@@ -9,11 +9,11 @@
  */
 
 import type { Vec3 } from '../model/types';
-import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { uint8ArrayToBase64 } from '../lib/base64';
+import { collectExportTriangles } from './exportTriangulate';
 import { facetNormal, type Triangle } from './exportMath';
-import { entityToTriangles } from './exportTriangulate';
 
 export type { Triangle } from './exportMath';
 export { entityToTriangles } from './exportTriangulate';
@@ -36,27 +36,6 @@ function buildAsciiStl(tris: Triangle[], solidName: string): string {
   }
   lines.push(`endsolid ${solidName}`);
   return lines.join('\n');
-}
-
-// ---------------------------------------------------------------------------
-// Pure base64 encoder — no Node Buffer, no DOM (browser-safe for core/)
-// ---------------------------------------------------------------------------
-
-const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const out: string[] = [];
-  const len = bytes.length;
-  for (let i = 0; i < len; i += 3) {
-    const b0 = bytes[i]!;
-    const b1 = i + 1 < len ? bytes[i + 1]! : 0;
-    const b2 = i + 2 < len ? bytes[i + 2]! : 0;
-    out.push(B64_CHARS[b0 >> 2]!);
-    out.push(B64_CHARS[((b0 & 0x03) << 4) | (b1 >> 4)]!);
-    out.push(i + 1 < len ? B64_CHARS[((b1 & 0x0f) << 2) | (b2 >> 6)]! : '=');
-    out.push(i + 2 < len ? B64_CHARS[b2 & 0x3f]! : '=');
-  }
-  return out.join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -198,37 +177,7 @@ export const exportStl = defineCommand({
     const solidName = params.name ?? 'llull';
     const requestedIds = params.entityIds;
 
-    // Determine which entity ids to process
-    let idsToProcess: string[];
-    const unknownIds: string[] = [];
-    if (requestedIds && requestedIds.length > 0) {
-      idsToProcess = [];
-      for (const id of requestedIds) {
-        if (doc.entities[id]) {
-          idsToProcess.push(id);
-        } else {
-          unknownIds.push(id);
-        }
-      }
-    } else {
-      idsToProcess = doc.order;
-    }
-
-    // Collect triangles from 3D entities only
-    const allTris: Triangle[] = [];
-    let skipped2D = 0;
-    for (const id of idsToProcess) {
-      const e = doc.entities[id];
-      if (!e) continue;
-      if (!is3D(e)) {
-        skipped2D++;
-        continue;
-      }
-      const tris = entityToTriangles(e, doc);
-      for (const t of tris) {
-        allTris.push(t);
-      }
-    }
+    const { tris: allTris, skipped2D, unknownIds } = collectExportTriangles(doc, requestedIds);
 
     const triangleCount = allTris.length;
 

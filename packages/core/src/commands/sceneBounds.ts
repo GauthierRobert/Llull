@@ -10,6 +10,49 @@ export function offset(p: Vec3, dx: number, dy: number, dz: number): Vec3 {
   return [p[0] + dx, p[1] + dy, p[2] + dz];
 }
 
+/** Min/max of a flat xyz position array (`[x0, y0, z0, x1, ...]`); needs at least one full triple. */
+export function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity;
+  let maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity;
+  for (let i = 0; i + 2 < positions.length; i += 3) {
+    const x = positions[i] as number,
+      y = positions[i + 1] as number,
+      z = positions[i + 2] as number;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (z < minZ) minZ = z;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+    if (z > maxZ) maxZ = z;
+  }
+  return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
+}
+
+/** 2D extents of `points`; all zeros for an empty list. */
+export function pointsExtent(points: ReadonlyArray<readonly [number, number]>): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
+  if (points.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  for (const [x, y] of points) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
 /** World-space AABB of one entity, matching how the viewport places each kind. */
 export function entityBounds(e: Entity): Bounds {
   switch (e.kind) {
@@ -32,12 +75,7 @@ export function entityBounds(e: Entity): Bounds {
         max: offset(e.position, e.radius, e.radius, e.radius),
       };
     case 'extrusion': {
-      const xs = e.profile.map((pt) => pt[0]);
-      const ys = e.profile.map((pt) => pt[1]);
-      const minX = xs.length ? Math.min(...xs) : 0;
-      const maxX = xs.length ? Math.max(...xs) : 0;
-      const minY = ys.length ? Math.min(...ys) : 0;
-      const maxY = ys.length ? Math.max(...ys) : 0;
+      const { minX, minY, maxX, maxY } = pointsExtent(e.profile);
       // ExtrudeGeometry extrudes along +Z from the profile plane.
       return {
         min: offset(e.position, minX, minY, 0),
@@ -47,24 +85,7 @@ export function entityBounds(e: Entity): Bounds {
     case 'mesh': {
       const p = e.mesh.positions;
       if (p.length < 3) return { min: e.position, max: e.position };
-      let minX = Infinity,
-        minY = Infinity,
-        minZ = Infinity;
-      let maxX = -Infinity,
-        maxY = -Infinity,
-        maxZ = -Infinity;
-      for (let i = 0; i + 2 < p.length; i += 3) {
-        const x = p[i] as number,
-          y = p[i + 1] as number,
-          z = p[i + 2] as number;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (z < minZ) minZ = z;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-        if (z > maxZ) maxZ = z;
-      }
-      return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
+      return positionsExtent(p);
     }
     case 'cone':
       // Base circle centered at position in XY; apex at position+height in Z.
@@ -144,16 +165,7 @@ export function entityBounds(e: Entity): Bounds {
     }
     case 'polyline': {
       if (e.points.length === 0) return { min: e.position, max: e.position };
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-      for (const [x, y] of e.points) {
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-      }
+      const { minX, minY, maxX, maxY } = pointsExtent(e.points);
       return { min: offset(e.position, minX, minY, 0), max: offset(e.position, maxX, maxY, 0) };
     }
     case 'arc':
@@ -175,16 +187,7 @@ export function entityBounds(e: Entity): Bounds {
       };
     case 'spline': {
       if (e.points.length === 0) return { min: e.position, max: e.position };
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-      for (const [x, y] of e.points) {
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-      }
+      const { minX, minY, maxX, maxY } = pointsExtent(e.points);
       return { min: offset(e.position, minX, minY, 0), max: offset(e.position, maxX, maxY, 0) };
     }
     case 'text': {

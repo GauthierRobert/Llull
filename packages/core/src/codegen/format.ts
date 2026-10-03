@@ -55,6 +55,31 @@ export function stepHeading(feature: Feature, previous: Feature | undefined): st
   return `step ${feature.step} · ${commentText(feature.command)}`;
 }
 
+/** One assignment line per program parameter (`(none)` placeholder when there are none). */
+export function parameterLines(
+  program: FeatureProgram,
+  commentPrefix: string,
+  assignment: (parameter: FeatureProgram['parameters'][number]) => string,
+): string[] {
+  if (program.parameters.length === 0) return [`${commentPrefix} (none)`];
+  return program.parameters.map(assignment);
+}
+
+/** Feature lines, each contiguous run of a step introduced by its `stepHeading` comment. */
+export function featureLinesWithHeadings(
+  program: FeatureProgram,
+  commentPrefix: string,
+  featureLine: (feature: Feature) => string,
+): string[] {
+  const lines: string[] = [];
+  program.features.forEach((feature, i) => {
+    const heading = stepHeading(feature, program.features[i - 1]);
+    if (heading !== null) lines.push(`${commentPrefix} ${heading}`);
+    lines.push(featureLine(feature));
+  });
+  return lines;
+}
+
 /** Numbers packed `perLine` per line, for long mesh arrays. */
 export function numberRows(values: readonly number[], perLine: number): string[] {
   const rows: string[] = [];

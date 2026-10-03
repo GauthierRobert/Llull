@@ -1,175 +1,9 @@
-/**
- * @command motion_study
- * @pure
- * @layer core/commands
- * @affects nothing — read-only query, affected:[]
- * @invariant document returned unchanged; each step evaluates a CLONE of the doc
- * @invariant steps = clamp(steps, 2, 360), non-integers rounded
- * @failure unknown jointId (mode='joint') → no-op, affected:[]
- * @failure unknown / non-numeric parameter name (mode='parameter') → no-op, affected:[]
- * @failure start === end → friendly summary, empty steps
- * @failure steps < 2 → graceful no-op with explanatory summary
- */
-
-import type { CadDocument, DriveRelation, Vec3 } from '../model/types';
+import type { CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { instanceBoundsFromDoc } from './scene';
 import type { Bounds } from './scene';
-
-// ---------------------------------------------------------------------------
-// Motion evaluation helpers
-// (duplicated here to avoid exporting them from joints.ts and to remain
-//  self-contained; the logic is identical to evaluateMotionInternal)
-// ---------------------------------------------------------------------------
-
-function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
-  if (axis === 'x') return [1, 0, 0];
-  if (axis === 'y') return [0, 1, 0];
-  if (axis === 'z') return [0, 0, 1];
-  return axis;
-}
-
-function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
-  const [ux, uy, uz] = axis;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const dot = v[0] * ux + v[1] * uy + v[2] * uz;
-  const crossX = uy * v[2] - uz * v[1];
-  const crossY = uz * v[0] - ux * v[2];
-  const crossZ = ux * v[1] - uy * v[0];
-  return [
-    v[0] * cos + crossX * sin + ux * dot * (1 - cos),
-    v[1] * cos + crossY * sin + uy * dot * (1 - cos),
-    v[2] * cos + crossZ * sin + uz * dot * (1 - cos),
-  ];
-}
-
-/** Kahn topo-sort of drive relations — returns joint ids in evaluation order. */
-function driveTopoOrder(driveRelations: Record<string, DriveRelation>): string[] {
-  const jointIds = new Set<string>();
-  for (const dr of Object.values(driveRelations)) {
-    jointIds.add(dr.driver);
-    jointIds.add(dr.driven);
-  }
-  const inDegree = new Map<string, number>();
-  const adj = new Map<string, string[]>();
-  for (const jid of jointIds) {
-    inDegree.set(jid, 0);
-    adj.set(jid, []);
-  }
-  for (const dr of Object.values(driveRelations)) {
-    inDegree.set(dr.driven, (inDegree.get(dr.driven) ?? 0) + 1);
-    adj.get(dr.driver)?.push(dr.driven);
-  }
-  const queue: string[] = [];
-  for (const [jid, deg] of inDegree) {
-    if (deg === 0) queue.push(jid);
-  }
-  const sorted: string[] = [];
-  while (queue.length > 0) {
-    const jid = queue.shift()!;
-    sorted.push(jid);
-    for (const neighbor of adj.get(jid) ?? []) {
-      const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
-      inDegree.set(neighbor, newDeg);
-      if (newDeg === 0) queue.push(neighbor);
-    }
-  }
-  return sorted;
-}
-
-/**
- * Evaluate joint transforms on `doc` at the given base joint values map.
- * The `baseValues` map overrides the joint's stored value for a specific joint
- * (the one being swept). All other joints use their stored values.
- *
- * Returns { instancePositions, instanceRotations, resolvedJoints }.
- * @pure — reads only, never mutates doc
- */
-function evaluateAtValues(
-  doc: CadDocument,
-  baseValues: Record<string, number>,
-): {
-  instancePositions: Record<string, Vec3>;
-  instanceRotations: Record<string, Vec3>;
-  resolvedJoints: Record<string, number>;
-} {
-  // Step 1: collect base joint values (from stored doc + overrides)
-  const resolvedJoints: Record<string, number> = {};
-  for (const [jid, joint] of Object.entries(doc.joints)) {
-    const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
-    resolvedJoints[jid] = jid in baseValues ? baseValues[jid]! : rawValue;
-  }
-
-  // Step 2: propagate drive relations in topo order
-  const sortedJoints = driveTopoOrder(doc.driveRelations);
-  const drivenBy = new Map<string, DriveRelation>();
-  for (const dr of Object.values(doc.driveRelations)) {
-    drivenBy.set(dr.driven, dr);
-  }
-  for (const jid of sortedJoints) {
-    const dr = drivenBy.get(jid);
-    if (!dr) continue;
-    const driverValue = resolvedJoints[dr.driver];
-    if (driverValue === undefined) continue;
-    // Only propagate if the driven joint is NOT already overridden by baseValues
-    if (!(jid in baseValues)) {
-      resolvedJoints[jid] = driverValue * dr.ratio + (dr.offset ?? 0);
-    }
-  }
-
-  // Step 3: apply joints to instance transforms
-  const instancePositions: Record<string, Vec3> = {};
-  const instanceRotations: Record<string, Vec3> = {};
-
-  for (const joint of Object.values(doc.joints)) {
-    const entityA = doc.entities[joint.a.instanceId];
-    const entityB = doc.entities[joint.b.instanceId];
-    if (!entityA || entityA.kind !== 'instance') continue;
-    if (!entityB || entityB.kind !== 'instance') continue;
-
-    const value = resolvedJoints[joint.id] ?? 0;
-    const axisVec = normalizeAxis(joint.axis as 'x' | 'y' | 'z' | Vec3);
-
-    if (joint.kind === 'revolute') {
-      const pivot = entityA.position;
-      const bPos: Vec3 = instancePositions[joint.b.instanceId] ?? entityB.position;
-      const bRot: Vec3 = instanceRotations[joint.b.instanceId] ?? entityB.rotation;
-      const offset: Vec3 = [bPos[0] - pivot[0], bPos[1] - pivot[1], bPos[2] - pivot[2]];
-      const rotatedOffset = rotateAboutAxis(offset, axisVec, value);
-      instancePositions[joint.b.instanceId] = [
-        pivot[0] + rotatedOffset[0],
-        pivot[1] + rotatedOffset[1],
-        pivot[2] + rotatedOffset[2],
-      ];
-      const deltaRot: Vec3 =
-        joint.axis === 'x'
-          ? [value, 0, 0]
-          : joint.axis === 'y'
-            ? [0, value, 0]
-            : joint.axis === 'z'
-              ? [0, 0, value]
-              : [axisVec[0] * value, axisVec[1] * value, axisVec[2] * value];
-      instanceRotations[joint.b.instanceId] = [
-        bRot[0] + deltaRot[0],
-        bRot[1] + deltaRot[1],
-        bRot[2] + deltaRot[2],
-      ];
-    } else {
-      const aPos = entityA.position;
-      instancePositions[joint.b.instanceId] = [
-        aPos[0] + axisVec[0] * value,
-        aPos[1] + axisVec[1] * value,
-        aPos[2] + axisVec[2] * value,
-      ];
-      const bRot: Vec3 = instanceRotations[joint.b.instanceId] ?? entityB.rotation;
-      instanceRotations[joint.b.instanceId] = bRot;
-    }
-  }
-
-  return { instancePositions, instanceRotations, resolvedJoints };
-}
+import { evaluateMotionInternal } from './jointsKinematics';
 
 // ---------------------------------------------------------------------------
 // Motion study result types
@@ -471,7 +305,7 @@ export const motionStudy = defineCommand({
         }
 
         // Now inject the sweep override: joints that are driven by the parameter
-        // via drive relations will be re-evaluated in evaluateAtValues' topo pass.
+        // via drive relations will be re-evaluated in evaluateMotionInternal's topo pass.
         // For direct joint→parameter coupling we compute the correct value:
         // find all joints whose stored (current doc) angle/displacement equals
         // the current parameter value and scale them proportionally.
@@ -489,7 +323,7 @@ export const motionStudy = defineCommand({
         // current numeric value — we scale it to the new sweep position.
       }
 
-      const { instancePositions, instanceRotations, resolvedJoints } = evaluateAtValues(
+      const { instancePositions, instanceRotations, resolvedJoints } = evaluateMotionInternal(
         doc,
         baseValues,
       );

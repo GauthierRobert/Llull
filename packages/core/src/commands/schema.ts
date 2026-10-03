@@ -247,3 +247,11 @@ export function untypedArray(description: string): z.ZodArray<z.ZodAny> {
 export function tolerant<T extends z.ZodType>(schema: T): z.ZodCatch<T> {
   return schema.catch(undefined as never);
 }
+
+/** Optional hex-color param; `defaultColor` is advertised in the description and applied by `run`. */
+export function colorField(defaultColor: string): z.ZodOptional<z.ZodString> {
+  return z
+    .string()
+    .describe(`Hex color string, e.g. "#c8553d". Defaults to "${defaultColor}".`)
+    .optional();
+}

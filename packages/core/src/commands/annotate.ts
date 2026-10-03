@@ -8,22 +8,14 @@
  * @layer core/commands
  */
 
-import type { CadDocument, DimensionEntity, Entity, TextEntity, Vec3 } from '../model/types';
+import type { DimensionEntity, TextEntity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 
 type TextAnchor = NonNullable<TextEntity['anchor']>;
 import { nextId } from '../lib/id';
-
-/** Clone the document shallowly with a new entity added. Keeps commands pure. */
-function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
-}
+import { withEntity } from './entityOps';
 
 // ---------------------------------------------------------------------------
 // add_text

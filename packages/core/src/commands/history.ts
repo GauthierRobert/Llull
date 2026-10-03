@@ -15,16 +15,15 @@
 import type { CadDocument, FeatureStep } from '../model/types';
 import { createEmptyDocument } from '../model/types';
 import { createEmptyBuilding } from '../model/building';
-import type { ExecutionContext } from './context';
-import { currentContext, runInContext } from './context';
+import { currentContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { stepIdSource, stepKeyOf } from '../lib/id';
 import { orphanState } from './history_carry';
 import { kernelRefusal } from './kernelRefusal';
 import { nextStateKey } from './replayCache';
 import { hashText } from '../lib/hash';
-import { buildParamEnv, resolveStepParams, remapIds } from './regenerate';
+import { remapIds } from './regenerate';
+import { resolveStepForReplay, runReplayStep } from './replayStep';
 
 // ---------------------------------------------------------------------------
 // Internal replay helper
@@ -39,21 +38,6 @@ export interface ReplayStepEvent {
   readonly params: unknown;
   readonly before: CadDocument;
   readonly after: CadDocument;
-}
-
-/** Map each legacy recorded id to the id the replay produced at the same position. */
-function extendIdMap(
-  idMap: Map<string, string>,
-  recorded: readonly string[] | undefined,
-  replayed: readonly string[],
-): void {
-  if (!recorded) return;
-  const len = Math.min(recorded.length, replayed.length);
-  for (let i = 0; i < len; i++) {
-    const oldId = recorded[i];
-    const newId = replayed[i];
-    if (oldId !== undefined && newId !== undefined && oldId !== newId) idMap.set(oldId, newId);
-  }
 }
 
 /**
@@ -125,14 +109,7 @@ export function replayHistory(
     if (step.suppressed) continue;
     const cmd = getCommandFn(step.name);
     if (!cmd) continue; // Unknown command — skip gracefully.
-    // 1. Resolve any `=expr` strings against the current parameter environment.
-    const env = buildParamEnv(doc.parameters);
-    const { resolved, errors } = resolveStepParams(step.params, env);
-    for (const e of errors) {
-      resolveWarnings?.push(`step '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`);
-    }
-    // 2. Rewrite stale entity-id references using the accumulated idMap.
-    const remapped = remapIds(resolved, idMap);
+    const remapped = resolveStepForReplay(step, doc, idMap, resolveWarnings, 'step');
     const before = doc;
     let key = cache ? nextStateKey(stateKey, step.id, step.name, remapped) : '';
     const hit = cache?.get(key);
@@ -141,17 +118,9 @@ export function replayHistory(
       idMap = new Map(hit.idMap);
     } else {
       const uidBefore = doc.building?.uid;
-      try {
-        const stepKey = stepKeyOf(step.id);
-        const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
-        const result = runInContext(stepContext, () => cmd.run(doc, remapped, stepContext));
-        // Accept the new geometry but keep OUR featureHistory intact.
-        doc = { ...result.document, featureHistory: history };
-        // 3. Legacy steps: zip step.affected (old ids) with result.affected (new ids) positionally.
-        extendIdMap(idMap, step.affected, result.affected);
-      } catch {
-        // A step that throws (e.g. referencing a now-deleted entity) is skipped.
-      }
+      const result = runReplayStep(cmd, step, doc, remapped, idMap, context, true);
+      // Accept the new geometry but keep OUR featureHistory intact.
+      if (result) doc = { ...result.document, featureHistory: history };
       const mintedUid = uidBefore === undefined ? doc.building?.uid : undefined;
       if (mintedUid === undefined) {
         cache?.set(key, { doc, idMap: new Map(idMap) });
