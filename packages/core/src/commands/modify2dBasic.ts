@@ -120,7 +120,6 @@ export const offset2D = defineCommand({
 
     const newId = nextId('offset');
     const base = {
-      id: newId,
       position: entity.position,
       rotation: entity.rotation,
       layerId: entity.layerId,
@@ -132,7 +131,7 @@ export const offset2D = defineCommand({
     switch (entity.kind) {
       case 'line': {
         const [start, end] = offsetSegment(entity.start, entity.end, distance);
-        newEntity = { ...base, kind: 'line', start, end };
+        newEntity = { ...base, id: newId, kind: 'line', start, end };
         summary = `Offset line ${id} by ${distance} → new line ${newId}.`;
         break;
       }
@@ -150,7 +149,7 @@ export const offset2D = defineCommand({
         const points: Vec2[] = entity.closed
           ? joins
           : [segs[0]![0], ...joins, segs[segs.length - 1]![1]];
-        newEntity = { ...base, kind: 'polyline', points, closed: entity.closed };
+        newEntity = { ...base, id: newId, kind: 'polyline', points, closed: entity.closed };
         summary = `Offset polyline ${id} by ${distance} → new polyline ${newId} (${points.length} points).`;
         break;
       }
@@ -159,7 +158,7 @@ export const offset2D = defineCommand({
         if (radius <= 0) {
           return noOp(doc, `offset_2d: resulting circle radius ${radius} <= 0 — no-op.`);
         }
-        newEntity = { ...base, kind: 'circle', center: entity.center, radius };
+        newEntity = { ...base, id: newId, kind: 'circle', center: entity.center, radius };
         summary = `Offset circle ${id} by ${distance} → new circle ${newId} radius ${radius}.`;
         break;
       }
@@ -176,6 +175,7 @@ export const offset2D = defineCommand({
         const [x, y, z] = entity.position;
         newEntity = {
           ...base,
+          id: newId,
           kind: 'rectangle',
           width,
           height,
