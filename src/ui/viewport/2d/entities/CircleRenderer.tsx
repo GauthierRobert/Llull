@@ -1,46 +1,25 @@
-/**
- * @layer ui/viewport/2d
- *
- * Render branch for `kind:'circle'` entities.
- * Draws a circle outline in the XY plane using EllipseCurve geometry.
- * Geometry is memoized on the entity's center/radius fields; disposed on unmount.
- */
+/** @layer ui/viewport/2d — render branch for `kind:'circle'`. */
 
-import { useMemo } from 'react';
-import * as THREE from 'three';
 import type { CircleEntity } from '@core/model/types';
-import { PlacedLineObject } from './PlacedLineObject';
-
-interface CircleRendererProps {
-  entity: CircleEntity;
-  selected: boolean;
-}
-
-const CIRCLE_SEGMENTS = 64;
+import { EllipticalCurve } from './EllipticalCurve';
 
 export function CircleRenderer({
-  entity,
+  entity: { center, radius, position, color },
   selected,
-}: CircleRendererProps): React.ReactElement | null {
-  const { center, radius, position, color } = entity;
-
-  const lineObject = useMemo(() => {
-    const curve = new THREE.EllipseCurve(
-      center[0],
-      center[1],
-      radius,
-      radius,
-      0,
-      Math.PI * 2,
-      false,
-      0,
-    );
-    const pts = curve.getPoints(CIRCLE_SEGMENTS);
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({ color: selected ? '#5b8dee' : color });
-    return new THREE.Line(geo, mat);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [center[0], center[1], radius, color, selected]);
-
-  return <PlacedLineObject object={lineObject} position={position} />;
+}: {
+  entity: CircleEntity;
+  selected: boolean;
+}): React.ReactElement {
+  return (
+    <EllipticalCurve
+      center={center}
+      radiusX={radius}
+      radiusY={radius}
+      startAngle={0}
+      endAngle={Math.PI * 2}
+      position={position}
+      color={color}
+      selected={selected}
+    />
+  );
 }
