@@ -46,7 +46,7 @@ export function resolveRotation(rotation: unknown): Vec3 {
  * | 'min'         | min corner: min X, min Y, min Z                               |
  * | 'base-center' | center of the bottom face: mid X, mid Y, min Z                |
  */
-export type PlacementAnchor = 'center' | 'min' | 'base-center';
+type PlacementAnchor = 'center' | 'min' | 'base-center';
 
 const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>([
   'center',

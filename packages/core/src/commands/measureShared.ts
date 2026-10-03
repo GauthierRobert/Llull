@@ -1,6 +1,5 @@
 import type { Entity, Vec3 } from '../model/types';
 import { entityBounds } from './sceneBounds';
-import { Bounds } from './sceneTypes';
 
 export function vec3Distance(a: Vec3, b: Vec3): number {
   const dx = b[0] - a[0];
@@ -13,13 +12,6 @@ export function vec3Distance(a: Vec3, b: Vec3): number {
 export function centroid(e: Entity): Vec3 {
   const b = entityBounds(e);
   return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
-}
-
-export function mergeBoundsLocal(a: Bounds, b: Bounds): Bounds {
-  return {
-    min: [Math.min(a.min[0], b.min[0]), Math.min(a.min[1], b.min[1]), Math.min(a.min[2], b.min[2])],
-    max: [Math.max(a.max[0], b.max[0]), Math.max(a.max[1], b.max[1]), Math.max(a.max[2], b.max[2])],
-  };
 }
 
 // ---------------------------------------------------------------------------

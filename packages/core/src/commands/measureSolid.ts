@@ -1,10 +1,9 @@
 import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds } from './sceneBounds';
+import { entityBounds, mergeBounds } from './sceneBounds';
 import { Bounds } from './sceneTypes';
 import { formatLength } from './units';
-import { mergeBoundsLocal } from './measureShared';
 import { polygonArea } from './measureAreaPerimeter';
 // ---------------------------------------------------------------------------
 // 5. measure_bounding_box
@@ -69,7 +68,7 @@ export const measureBoundingBox = defineCommand({
         const e = doc.entities[id];
         if (!e) continue;
         const b = entityBounds(e);
-        bounds = bounds ? mergeBoundsLocal(bounds, b) : b;
+        bounds = bounds ? mergeBounds(bounds, b) : b;
       }
 
       if (!bounds) {

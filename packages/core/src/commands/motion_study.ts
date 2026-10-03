@@ -10,7 +10,7 @@ import { evaluateMotionInternal } from './jointsKinematics';
 // ---------------------------------------------------------------------------
 
 /** Per-step result of a motion study sweep. */
-export interface MotionStep {
+interface MotionStep {
   /** Step index (0-based). */
   stepIndex: number;
   /** The sweep value applied at this step. */
@@ -24,7 +24,7 @@ export interface MotionStep {
 }
 
 /** A pair of instance ids that overlap (AABB interference) at a given step. */
-export interface InterferencePair {
+interface InterferencePair {
   stepIndex: number;
   instanceIdA: string;
   instanceIdB: string;

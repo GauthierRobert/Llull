@@ -31,6 +31,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
+import { rotatePoint2 } from '../lib/polygon';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 
 // ---------------------------------------------------------------------------
@@ -59,22 +60,15 @@ function vec2Scale(v: Vec2, s: number): Vec2 {
   return [v[0] * s, v[1] * s];
 }
 
-/** Rotate a 2D point by angle (radians) around the origin. */
-function rotate2D(p: Vec2, angle: number): Vec2 {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  return [p[0] * c - p[1] * s, p[0] * s + p[1] * c];
-}
-
 /** Transform local-2D point into world-3D using path entity position+rotation. */
 function toWorld3D(local: Vec2, entityPos: Vec3, entityRotZ: number): Vec3 {
-  const rotated = rotate2D(local, entityRotZ);
+  const rotated = rotatePoint2(local, entityRotZ);
   return [rotated[0] + entityPos[0], rotated[1] + entityPos[1], entityPos[2]];
 }
 
 /** Rotate a 2D tangent by the entity's Z rotation to get the world tangent. */
 function toWorldTangent(localTangent: Vec2, entityRotZ: number): Vec2 {
-  return rotate2D(localTangent, entityRotZ);
+  return rotatePoint2(localTangent, entityRotZ);
 }
 
 /**

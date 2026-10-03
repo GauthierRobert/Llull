@@ -56,7 +56,7 @@ const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2]);
 // Serialization
 // ---------------------------------------------------------------------------
 
-export interface SerializeOptions {
+interface SerializeOptions {
   /**
    * Keep evaluated geometry that the definition regenerates (building-element entities).
    * Default false: files store the definition only. Hashing and diffing pass true.

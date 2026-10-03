@@ -59,7 +59,7 @@ class LruCache<V> {
   }
 }
 
-export interface MemoizedKernel extends GeometryKernel {
+interface MemoizedKernel extends GeometryKernel {
   /** Number of kernel results currently cached (observability/tests). */
   readonly cachedResultCount: () => number;
 }

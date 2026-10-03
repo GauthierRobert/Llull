@@ -23,7 +23,7 @@ import { entityBounds } from './sceneBounds';
 // ---------------------------------------------------------------------------
 
 /** Severity of a model issue. */
-export type IssueSeverity = 'error' | 'warning' | 'info';
+type IssueSeverity = 'error' | 'warning' | 'info';
 
 /**
  * A single model issue discovered by `check_model`.

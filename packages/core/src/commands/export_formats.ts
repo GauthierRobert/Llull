@@ -58,7 +58,7 @@ function buildObjText(tris: Triangle[], objectName: string): string {
 // ExportObj public data shape
 // ---------------------------------------------------------------------------
 
-export interface ExportObjData {
+interface ExportObjData {
   /** Always 'obj'. */
   format: 'obj';
   /** Full Wavefront OBJ text. */
@@ -334,7 +334,7 @@ function buildBinPayload(tris: Triangle[]): Uint8Array {
 // ExportGltf public data shape
 // ---------------------------------------------------------------------------
 
-export interface ExportGltfData {
+interface ExportGltfData {
   /** 'gltf' for JSON output, 'glb' for binary container. */
   format: 'gltf' | 'glb';
   /** Total triangles exported. */

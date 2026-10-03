@@ -23,18 +23,18 @@
 // ---------------------------------------------------------------------------
 
 /** Successful evaluation result. */
-export interface EvalOk {
+interface EvalOk {
   readonly ok: true;
   readonly value: number;
 }
 
 /** Failed evaluation result — contains a human-readable reason. */
-export interface EvalErr {
+interface EvalErr {
   readonly ok: false;
   readonly error: string;
 }
 
-export type EvalResult = EvalOk | EvalErr;
+type EvalResult = EvalOk | EvalErr;
 
 // ---------------------------------------------------------------------------
 // Tokenizer

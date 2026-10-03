@@ -50,6 +50,13 @@ export function toCounterClockwise(points: ReadonlyArray<Point2>): Point2[] {
   return signedArea(points) < 0 ? [...points].reverse() : [...points];
 }
 
+/** `point` rotated counter-clockwise by `angle` radians about the origin. */
+export function rotatePoint2(point: Point2, angle: number): Point2 {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [point[0] * c - point[1] * s, point[0] * s + point[1] * c];
+}
+
 export function distance(a: Point2, b: Point2): number {
   return Math.hypot(b[0] - a[0], b[1] - a[1]);
 }

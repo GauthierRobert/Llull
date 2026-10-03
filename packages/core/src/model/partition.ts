@@ -13,9 +13,9 @@ import { documentExtensions } from '../plugins/host';
 /** Keys holding evaluated geometry (the render/export cache). */
 const EVALUATED_KEYS = ['entities', 'order'] as const;
 
-export type EvaluatedKey = (typeof EVALUATED_KEYS)[number];
-export type EvaluatedModel = Pick<CadDocument, EvaluatedKey>;
-export type DocumentDefinition = Omit<CadDocument, EvaluatedKey>;
+type EvaluatedKey = (typeof EVALUATED_KEYS)[number];
+type EvaluatedModel = Pick<CadDocument, EvaluatedKey>;
+type DocumentDefinition = Omit<CadDocument, EvaluatedKey>;
 
 export function definitionOf(doc: CadDocument): DocumentDefinition {
   const definition: Partial<CadDocument> = { ...doc };

@@ -8,7 +8,7 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, EntityGroup } from '../model/types';
+import type { CadDocument, Entity } from '../model/types';
 import { is3D } from '../model/types';
 import type { MeshSolidEntity } from '../model/types';
 import type { CommandResult } from './types';
@@ -17,43 +17,7 @@ import type { BooleanOp } from '../geometry/kernel';
 import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
-
-// ---------------------------------------------------------------------------
-// Internal helper — remove two operand ids from entities/order/selection/groups
-// and add the result entity, mirroring delete_entity's group handling.
-// ---------------------------------------------------------------------------
-
-function consumeOperandsAndAdd(
-  doc: CadDocument,
-  idA: string,
-  idB: string,
-  result: MeshSolidEntity,
-): CadDocument {
-  // Build new entities map — remove operands, add result.
-  const entities = { ...doc.entities };
-  delete entities[idA];
-  delete entities[idB];
-  entities[result.id] = result;
-
-  // Filter operands from order; append new mesh id.
-  const order = [...doc.order.filter((id) => id !== idA && id !== idB), result.id];
-
-  // Filter operands from selection.
-  const selection = doc.selection.filter((id) => id !== idA && id !== idB);
-
-  // Prune operand ids from groups; dissolve groups that fall below 2 members.
-  const existingGroups = doc.groups ?? {};
-  const nextGroups: Record<string, EntityGroup> = {};
-  for (const group of Object.values(existingGroups)) {
-    const prunedIds = group.memberIds.filter((mid) => mid !== idA && mid !== idB);
-    if (prunedIds.length >= 2) {
-      nextGroups[group.id] = { ...group, memberIds: prunedIds };
-    }
-    // Groups that drop below 2 members are dissolved (omitted).
-  }
-
-  return { ...doc, entities, order, selection, groups: nextGroups };
-}
+import { replaceEntities } from './entityOps';
 
 // ---------------------------------------------------------------------------
 // Shared validation helper — returns an error result or null on success.
@@ -151,7 +115,7 @@ function runBoolean(
 
   const triangleCount = meshData.indices.length / 3;
   return {
-    document: consumeOperandsAndAdd(doc, a, b, meshEntity),
+    document: replaceEntities(doc, [a, b], meshEntity),
     summary: `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.`,
     affected: [newId],
   };

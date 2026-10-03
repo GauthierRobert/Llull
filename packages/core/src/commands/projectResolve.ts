@@ -19,7 +19,7 @@ import {
 /** `$alias` or `$alias[N]` — references the affected ids bound by an earlier step. */
 const REF = /^\$([A-Za-z_]\w*)(?:\[(\d+)\])?$/;
 
-export interface Resolved {
+interface Resolved {
   value: unknown;
   error: string | null;
 }

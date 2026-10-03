@@ -185,7 +185,7 @@ export function detectCycleOnAdd(
 // Motion evaluation — shared logic for evaluate_motion and bake_motion
 // ---------------------------------------------------------------------------
 
-export interface EvaluatedMotion {
+interface EvaluatedMotion {
   /** Resolved joint values (joint id → numeric value) after propagating drive relations. */
   resolvedJoints: Record<string, number>;
   /** New instance positions after applying joints. */

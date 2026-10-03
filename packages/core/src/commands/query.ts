@@ -21,7 +21,7 @@ import { distanceSq3 } from '../lib/vec3';
 // ---------------------------------------------------------------------------
 
 /** A compact descriptor of one matched entity, safe to return in `data`. */
-export interface EntityMatch {
+interface EntityMatch {
   id: string;
   kind: EntityKind;
   layerId: string;
@@ -29,7 +29,7 @@ export interface EntityMatch {
   tags?: readonly string[];
 }
 
-export interface FindEntitiesResult {
+interface FindEntitiesResult {
   matches: EntityMatch[];
   count: number;
 }
