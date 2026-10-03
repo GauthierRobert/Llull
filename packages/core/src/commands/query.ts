@@ -12,6 +12,7 @@
 import type { EntityKind } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 import { entityBounds } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { distanceSq3 } from '../lib/vec3';
@@ -197,7 +198,7 @@ export const findEntities = defineCommand({
       tagFuzzy,
     } = params;
 
-    const fail = (summary: string): CommandResult => ({ document: doc, summary, affected: [] });
+    const fail = (summary: string): CommandResult => noop(doc, summary);
     if ((bboxMin === undefined) !== (bboxMax === undefined)) {
       return fail('find_entities: bboxMin and bboxMax must both be provided or both omitted.');
     }

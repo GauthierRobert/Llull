@@ -18,15 +18,10 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 import { entityBounds } from './sceneBounds';
 
 type AxisIndex = 0 | 1 | 2;
-
-const noop = (doc: CadDocument, summary: string): CommandResult => ({
-  document: doc,
-  summary,
-  affected: [],
-});
 
 const axisIndexOf = (axis: 'x' | 'y' | 'z'): AxisIndex => (axis === 'x' ? 0 : axis === 'y' ? 1 : 2);
 

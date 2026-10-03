@@ -45,7 +45,11 @@ function execStep(
   env: Record<string, number>,
   label?: string,
 ): { ok: boolean; affected: string[] } {
-  const report = (ok: boolean, summary: string, affected: string[] = []) => {
+  const report = (
+    ok: boolean,
+    summary: string,
+    affected: string[] = [],
+  ): { ok: boolean; affected: string[] } => {
     run.steps.push({ index, command, ok, summary, affected });
     return { ok, affected };
   };
