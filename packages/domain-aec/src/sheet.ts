@@ -36,7 +36,7 @@ const STANDARD_SCALES: ReadonlyArray<number> = [
 ];
 
 export const MARGIN = 10;
-export const BINDING_MARGIN = 20;
+const BINDING_MARGIN = 20;
 export const TITLE_HEIGHT = 42;
 
 /** Drawing area of a `width`×`height` mm sheet: inside the frame margins, above the title block. @pure */
