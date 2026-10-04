@@ -24,7 +24,8 @@ import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
-import { boltSize, buildingConnectionSolids } from './evaluate';
+import { boltSize } from './evaluate';
+import { buildingConnectionSolids } from './evaluateConnections';
 import { polygonArea } from '@lib/polygon';
 
 /** Steel mass of a connection in kg: its modelled end plate(s) + haunch (half the rafter section per metre). */

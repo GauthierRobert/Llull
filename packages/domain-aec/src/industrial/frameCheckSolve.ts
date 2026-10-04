@@ -6,7 +6,7 @@ import type { BuildingModel, MomentConnectionElement } from '@core/model/buildin
 import type { CadDocument } from '@core/model/types';
 import { solveFrame, type FrameResult } from '@lib/frame2d';
 import { fromMm } from '../model';
-import { buildingConnectionSolids } from './evaluate';
+import { buildingConnectionSolids } from './evaluateConnections';
 import { type FrameModel, type WindCase, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
 import { boltResistance } from './steelDesign';

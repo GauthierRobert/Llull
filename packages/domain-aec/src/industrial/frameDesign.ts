@@ -19,7 +19,7 @@ import { regenerateBuilding } from '../evaluateElements';
 import { refitPlates } from './plates';
 import { designFixedPlates } from './plateDesign';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
-import { buildingConnectionSolids } from './evaluate';
+import { buildingConnectionSolids } from './evaluateConnections';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
 import { sweepFrame } from '../mesh';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';

@@ -8,7 +8,7 @@ import { fromMm, getBuilding } from './model';
 import { MEMBER_LAYER } from './entities';
 import { sweepFrame } from './mesh';
 import { findProfile, profileOutline } from './steel/profiles';
-import { plateLayout } from './industrial/evaluate';
+import { plateLayout } from './industrial/evaluateConnections';
 import { type PlanPrimitive, type PlanSource, layerName } from './planModel';
 
 /** Both edges of a plan polyline offset by ±`half` (mitred at the bends). */
