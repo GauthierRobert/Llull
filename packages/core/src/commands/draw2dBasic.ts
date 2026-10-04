@@ -35,7 +35,7 @@ export const drawLine = defineCommand({
     doc,
     { start, end, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
-    if (!Array.isArray(start) || start.length < 2 || !Array.isArray(end) || end.length < 2) {
+    if (start.length < 2 || end.length < 2) {
       return noop(doc, 'draw_line: start and end must each be [x, y] arrays.');
     }
     const id = nextId('line');

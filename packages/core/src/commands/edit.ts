@@ -74,7 +74,6 @@ export const groupEntities = defineCommand({
       .optional(),
   }),
   run: (doc, { ids, name = 'Group' }): CommandResult => {
-    const existingGroups = doc.groups ?? {};
     const validIds = ids.filter((id) => id in doc.entities);
 
     if (validIds.length < 2) {
@@ -90,7 +89,7 @@ export const groupEntities = defineCommand({
     return {
       document: {
         ...doc,
-        groups: { ...existingGroups, [groupId]: group },
+        groups: { ...doc.groups, [groupId]: group },
       },
       summary: `Created group ${groupId} ("${name}") with ${validIds.length} members: [${validIds.join(', ')}].`,
       affected: [groupId],
@@ -115,14 +114,13 @@ export const ungroupEntities = defineCommand({
     groupId: z.string().describe('Id of the group to dissolve. Must exist in doc.groups.'),
   }),
   run: (doc, { groupId }): CommandResult => {
-    const existingGroups = doc.groups ?? {};
-    const group = existingGroups[groupId];
+    const group = doc.groups[groupId];
 
     if (!group) {
       return noop(doc, `No group ${groupId} to ungroup.`);
     }
 
-    const nextGroups = { ...existingGroups };
+    const nextGroups = { ...doc.groups };
     delete nextGroups[groupId];
 
     return {

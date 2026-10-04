@@ -89,10 +89,10 @@ export const arrayAlongPath = defineCommand({
     if (!source) {
       return noop(doc, `array_along_path: source entity "${sourceId}" not found.`);
     }
-    if (!Array.isArray(path) || path.length < 2) {
+    if (path.length < 2) {
       return noop(
         doc,
-        `array_along_path: path must contain at least 2 points (got ${Array.isArray(path) ? path.length : 'non-array'}).`,
+        `array_along_path: path must contain at least 2 points (got ${path.length}).`,
       );
     }
     if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
@@ -183,10 +183,10 @@ export const distributeOnArc = defineCommand({
         `distribute_on_arc: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
       );
     }
-    if (!Array.isArray(center) || center.length < 3) {
+    if (center.length < 3) {
       return noop(doc, 'distribute_on_arc: center must be a [x,y,z] triple.');
     }
-    if (!Array.isArray(normal) || normal.length < 3) {
+    if (normal.length < 3) {
       return noop(doc, 'distribute_on_arc: normal must be a [x,y,z] triple.');
     }
 

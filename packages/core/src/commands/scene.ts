@@ -61,13 +61,13 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
       entityCount: layerCounts[l.id] ?? 0,
     }));
 
-  const groups: GroupSummary[] = Object.values(doc.groups ?? {}).map((g) => ({
+  const groups: GroupSummary[] = Object.values(doc.groups).map((g) => ({
     id: g.id,
     name: g.name,
     memberIds: [...g.memberIds],
   }));
 
-  const animations: AnimationSummary[] = Object.values(doc.animations ?? {}).map((a) => ({
+  const animations: AnimationSummary[] = Object.values(doc.animations).map((a) => ({
     id: a.id,
     targetId: a.targetId,
     targetKind: a.targetKind,

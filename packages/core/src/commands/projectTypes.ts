@@ -6,12 +6,7 @@ export interface PlanAction {
   as?: string;
 }
 
-/**
- * A `repeat` step runs an inner step `count` times.
- * `count` may be a number literal or an expression string (prefix `=`).
- * Each iteration exposes `$i` (0-indexed) in params expressions.
- * `as` (if provided) is bound to the last iteration's affected ids.
- */
+/** Runs `step` `count` times (number or `=expr`); `$i` is the 0-based iteration; `as` binds the last iteration's ids. */
 export interface RepeatStep {
   repeat: {
     count: number | string;
@@ -20,11 +15,7 @@ export interface RepeatStep {
   step: { command: string; params?: Record<string, unknown> };
 }
 
-/**
- * A `for_each` step iterates over an array of values.
- * `values` may be an array literal or an expression string resolving to an array.
- * Each iteration exposes `$as` (current element) and `$i` (0-indexed index).
- */
+/** Runs `step` per element of `values` (array or `=expr`); exposes `$<as>` (element) and `$i`. */
 export interface ForEachStep {
   for_each: {
     values: unknown[] | string;

@@ -158,7 +158,7 @@ export const drawBeltAround = defineCommand({
 
     for (let i = 0; i < pulleys.length; i++) {
       const p = pulleys[i]!;
-      if (!Array.isArray(p.center) || p.center.length < 2) {
+      if (p.center.length < 2) {
         return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
       }
       const [cx, cy] = p.center;
