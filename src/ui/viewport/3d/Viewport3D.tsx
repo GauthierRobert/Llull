@@ -94,25 +94,16 @@ function SceneContents({
   const quality = useRenderQuality();
   const palette = useViewportPalette();
 
-  const initialPosition = useMemo(
-    () =>
-      sphericalToCartesian(
-        cam.target as [number, number, number],
-        cam.azimuth,
-        cam.polar,
-        cam.distance,
-      ),
-    // Only used for initial mount — intentionally not reactive to later cam changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  const targetVec = useMemo(
-    () => new THREE.Vector3(cam.target[0], cam.target[1], cam.target[2]),
-    // Same: initial mount only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  // Initial camera only: later camera changes are applied imperatively by CameraReactor.
+  const [initialCamera] = useState(() => ({
+    position: sphericalToCartesian(
+      cam.target as [number, number, number],
+      cam.azimuth,
+      cam.polar,
+      cam.distance,
+    ),
+    target: new THREE.Vector3(cam.target[0], cam.target[1], cam.target[2]),
+  }));
 
   // The entities + gizmo group is offset by -renderOrigin so that all entity
   // positions (expressed in document world coords) become relative to the
@@ -126,22 +117,20 @@ function SceneContents({
 
   return (
     <>
-      {/* ---- Theme-aware clear color ---- */}
       <color attach="background" args={[palette.background]} />
 
-      {/* ---- Camera + controls ---- */}
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention). */}
       <PerspectiveCamera
         makeDefault
         fov={45}
         near={0.01}
         far={1e8}
-        position={initialPosition}
+        position={initialCamera.position}
         up={[0, 0, 1]}
       />
       <OrbitControls
         makeDefault
-        target={targetVec}
+        target={initialCamera.target}
         minDistance={0.1}
         maxDistance={5e6}
         enableDamping
@@ -151,20 +140,15 @@ function SceneContents({
         up={[0, 0, 1]}
       />
 
-      {/* ---- Camera reactor: syncs document.camera commands to the live camera ---- */}
       <CameraReactor />
 
-      {/* ---- Demand-mode invalidation: re-render on store/document changes ---- */}
       <StoreInvalidator />
 
-      {/* ---- Demand-mode invalidation: re-render on viewport render-state changes ---- */}
       <ViewportStoreInvalidator />
 
-      {/* ---- Per-frame rebase check — no setState per frame ---- */}
       <RenderOriginSyncer />
       <AdaptiveClipping />
 
-      {/* ---- View preset camera driver — reads store via props to avoid Canvas re-render ---- */}
       <ViewPresetsInner
         entities={
           document.entities as Record<string, { position: readonly [number, number, number] }>
@@ -173,18 +157,14 @@ function SceneContents({
         allEntityIds={allEntityIds}
       />
 
-      {/* ---- Named-view camera bridge — exposes snapshot/apply callbacks across Canvas boundary ---- */}
       <NamedViewsInner />
 
-      {/* ---- Section / clipping plane sync ---- */}
       <ClippingPlane />
 
-      {/* ---- Animation player — evaluates document.animations per-frame ---- */}
       <AnimationPlayer />
 
       <SceneLighting quality={quality} contactShadowOpacity={palette.contactShadowOpacity} />
 
-      {/* ---- Ground grid ---- */}
       <Grid
         args={[40, 40]}
         cellSize={1}
@@ -214,7 +194,6 @@ function SceneContents({
         <MechanismOverlay />
       </group>
 
-      {/* ---- Orientation gizmo (bottom-right corner) ---- */}
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
         <GizmoViewport axisColors={palette.axisColors} labelColor={palette.axisLabel} />
       </GizmoHelper>

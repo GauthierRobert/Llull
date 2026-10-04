@@ -8,13 +8,6 @@
 import type { Entity, Vec2 } from '@core/model/types';
 import type { SnapPoint } from './types';
 
-/** Euclidean distance between two 2D points. */
-export function dist(ax: number, ay: number, bx: number, by: number): number {
-  const dx = bx - ax;
-  const dy = by - ay;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
 /** Midpoint of two 2D points. */
 export function mid(ax: number, ay: number, bx: number, by: number): [number, number] {
   return [(ax + bx) / 2, (ay + by) / 2];
@@ -144,7 +137,7 @@ export function tangentPointsToCircle(
 ): Array<[number, number]> {
   const dx = px - cx;
   const dy = py - cy;
-  const d = Math.sqrt(dx * dx + dy * dy);
+  const d = Math.hypot(dx, dy);
   if (d < r - 1e-10) return []; // inside circle — no tangent
   if (d < 1e-10) return []; // degenerate: point at center
   const theta = Math.atan2(dy, dx);

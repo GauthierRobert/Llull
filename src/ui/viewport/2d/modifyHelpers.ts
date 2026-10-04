@@ -9,8 +9,8 @@
  * @pure
  */
 
-import type { Vec2 } from '@core/model/types';
 import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
+import type { Vec2 } from '@core/model/types';
 import type {
   CadDocument,
   Entity,
@@ -85,7 +85,7 @@ export function offsetSideSign(start: Vec2, end: Vec2, pick: Vec2): 1 | -1 {
 }
 
 /** Squared distance from point P to the segment AB. @pure */
-export function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
+function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
   return projectOntoSegment(p, a, b).distance ** 2;
 }
 

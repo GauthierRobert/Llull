@@ -1,32 +1,16 @@
 /**
  * @layer ui/viewport/3d
- *
- * MechanismOverlay — renders a 3D visual cue when one constraint or joint is
- * highlighted in the MechanismsPanel.
- *
- * Constraint selection:
- *   A dashed THREE.Line connecting the positions of the two referenced entities.
- *   A troika <Text> label at the midpoint showing the constraint kind.
- *
- * Joint selection:
- *   A short axis arrow at instance `a`'s position along the joint axis vector.
- *   Color: revolute = cyan (#00e5ff), prismatic = magenta (#e040fb).
- *
- * R9: geometry and material are memoized and disposed on unmount / change.
- * R3: reads mechanismSelection from a narrow viewport-store selector.
- * PRIME DIRECTIVE: purely presentational — no dispatch, no document mutation.
- *
- * Must be mounted inside the r3f Canvas (inside the floating-origin group
- * in SceneContents, same as MeasureBBoxWireframe).
+ * Cue for the constraint/joint highlighted in the MechanismsPanel: a dashed line + kind label
+ * between the two constrained entities, or an axis arrow at joint instance `a` (revolute = cyan,
+ * prismatic = magenta). Presentational only; mounted inside the floating-origin group.
  */
 
 import { useEffect, useMemo } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
-import { useStore } from '@ui/store';
-import { useViewportStore } from '@ui/store';
-import type { Constraint, Joint, Vec3 } from '@core/model/types';
+import { useStore, useViewportStore } from '@ui/store';
+import type { CadDocument, Constraint, Joint, Vec3 } from '@core/model/types';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 
 const REVOLUTE_COLOR = '#00e5ff';
@@ -41,32 +25,32 @@ function resolveAxis(axis: Joint['axis']): THREE.Vector3 {
   return new THREE.Vector3(axis[0], axis[1], axis[2]).normalize();
 }
 
-/** Get the world position of an entity by id, or [0,0,0] if not found. */
-function entityPosition(
-  entityId: string,
-  entities: Record<string, { position: Vec3 }>,
-): THREE.Vector3 {
-  const e = entities[entityId];
-  if (!e) return new THREE.Vector3(0, 0, 0);
-  return new THREE.Vector3(e.position[0], e.position[1], e.position[2]);
+type Entities = CadDocument['entities'];
+
+const ORIGIN: Vec3 = [0, 0, 0];
+
+/** Position of an entity (stable reference while it is unedited), or the origin if missing. */
+function positionOf(entityId: string, entities: Entities): Vec3 {
+  return entities[entityId]?.position ?? ORIGIN;
 }
 
-interface ConstraintLineProps {
+function ConstraintLine({
+  constraint,
+  entities,
+}: {
   constraint: Constraint;
-  entities: Record<string, { position: Vec3 }>;
-}
-
-function ConstraintLine({ constraint, entities }: ConstraintLineProps): React.ReactElement | null {
-  const posA = entityPosition(constraint.a.entityId, entities);
-  const posB = entityPosition(constraint.b.entityId, entities);
+  entities: Entities;
+}): React.ReactElement | null {
+  const posA = positionOf(constraint.a.entityId, entities);
+  const posB = positionOf(constraint.b.entityId, entities);
 
   const geometry = useMemo(() => {
-    const positions = new Float32Array([posA.x, posA.y, posA.z, posB.x, posB.y, posB.z]);
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([...posA, ...posB], 3));
+    geo.computeBoundingBox();
+    geo.computeBoundingSphere();
     return geo;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posA.x, posA.y, posA.z, posB.x, posB.y, posB.z]);
+  }, [posA, posB]);
 
   const material = useMemo(
     () =>
@@ -82,30 +66,21 @@ function ConstraintLine({ constraint, entities }: ConstraintLineProps): React.Re
     [],
   );
 
-  useEffect(() => {
-    // computeLineDistances is required for LineDashedMaterial dash rendering.
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
-    return () => {
-      geometry.dispose();
-      material.dispose();
-    };
-  }, [geometry, material]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => () => material.dispose(), [material]);
 
-  const midpoint = useMemo(
-    () => new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [posA.x, posA.y, posA.z, posB.x, posB.y, posB.z],
-  );
-
-  if (posA.distanceTo(posB) < 1e-6) return null;
+  if (Math.hypot(posB[0] - posA[0], posB[1] - posA[1], posB[2] - posA[2]) < 1e-6) return null;
 
   return (
     <>
       <lineSegments geometry={geometry} material={material} renderOrder={998} />
       <Text
         font={TEXT_FONT_URL}
-        position={[midpoint.x, midpoint.y, midpoint.z + 0.25]}
+        position={[
+          (posA[0] + posB[0]) / 2,
+          (posA[1] + posB[1]) / 2,
+          (posA[2] + posB[2]) / 2 + 0.25,
+        ]}
         fontSize={0.35}
         color={CONSTRAINT_COLOR}
         anchorX="center"
@@ -120,55 +95,44 @@ function ConstraintLine({ constraint, entities }: ConstraintLineProps): React.Re
   );
 }
 
-interface JointArrowProps {
-  joint: Joint;
-  entities: Record<string, { position: Vec3 }>;
-}
-
 const ARROW_LENGTH = 1.5;
 const ARROW_HEAD_LENGTH = 0.35;
 const ARROW_HEAD_WIDTH = 0.18;
 
-function JointArrow({ joint, entities }: JointArrowProps): React.ReactElement | null {
-  const origin = entityPosition(joint.a.instanceId, entities);
-  const axisVec = useMemo(() => resolveAxis(joint.axis), [joint.axis]);
+function JointArrow({ joint, entities }: { joint: Joint; entities: Entities }): React.ReactElement {
+  const origin = positionOf(joint.a.instanceId, entities);
   const color = joint.kind === 'revolute' ? REVOLUTE_COLOR : PRISMATIC_COLOR;
 
-  // ArrowHelper: THREE.ArrowHelper creates its own geometry/material and handles disposal.
-  const arrowHelper = useMemo(() => {
-    return new THREE.ArrowHelper(
-      axisVec,
-      origin,
-      ARROW_LENGTH,
-      color,
-      ARROW_HEAD_LENGTH,
-      ARROW_HEAD_WIDTH,
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [origin.x, origin.y, origin.z, axisVec.x, axisVec.y, axisVec.z, color]);
+  const arrowHelper = useMemo(
+    () =>
+      new THREE.ArrowHelper(
+        resolveAxis(joint.axis),
+        new THREE.Vector3(...origin),
+        ARROW_LENGTH,
+        color,
+        ARROW_HEAD_LENGTH,
+        ARROW_HEAD_WIDTH,
+      ),
+    [origin, joint.axis, color],
+  );
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       arrowHelper.line.geometry.dispose();
       if (arrowHelper.line.material instanceof THREE.Material) arrowHelper.line.material.dispose();
       arrowHelper.cone.geometry.dispose();
       if (arrowHelper.cone.material instanceof THREE.Material) arrowHelper.cone.material.dispose();
-    };
-  }, [arrowHelper]);
+    },
+    [arrowHelper],
+  );
 
   return <primitive object={arrowHelper} renderOrder={998} />;
 }
 
-/**
- * Reads the viewport-store `mechanismSelection` and renders the appropriate
- * overlay geometry (constraint line or joint arrow) inside the r3f scene.
- *
- * Calls `invalidate()` when the selection changes so the demand-mode canvas
- * redraws immediately (mirrors the MeasureBBoxWireframe pattern).
- */
+/** Renders the overlay for the viewport-store `mechanismSelection`; invalidates the demand canvas on change. */
 export function MechanismOverlay(): React.ReactElement | null {
   const mechanismSelection = useViewportStore((s) => s.mechanismSelection);
-  const entities = useStore((s) => s.document.entities) as Record<string, { position: Vec3 }>;
+  const entities = useStore((s) => s.document.entities);
   const constraints = useStore((s) => s.document.constraints);
   const joints = useStore((s) => s.document.joints);
   const { invalidate } = useThree();

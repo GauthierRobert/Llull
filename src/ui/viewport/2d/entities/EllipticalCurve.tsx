@@ -33,10 +33,11 @@ export function EllipticalCurve({
   color,
   selected,
 }: EllipticalCurveProps): React.ReactElement {
+  const [centerX, centerY] = center;
   const lineObject = useMemo(() => {
     const curve = new THREE.EllipseCurve(
-      center[0],
-      center[1],
+      centerX,
+      centerY,
       radiusX,
       radiusY,
       startAngle,
@@ -47,8 +48,7 @@ export function EllipticalCurve({
     const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(CURVE_SEGMENTS));
     const mat = new THREE.LineBasicMaterial({ color: selected ? '#5b8dee' : color });
     return new THREE.Line(geo, mat);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [center[0], center[1], radiusX, radiusY, startAngle, endAngle, color, selected]);
+  }, [centerX, centerY, radiusX, radiusY, startAngle, endAngle, color, selected]);
 
   return <PlacedLineObject object={lineObject} position={position} />;
 }

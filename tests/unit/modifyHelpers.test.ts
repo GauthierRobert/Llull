@@ -8,7 +8,6 @@ import { describe, it, expect } from 'vitest';
 import {
   nearestVertex,
   offsetSideSign,
-  pointToSegDistSq,
   entityDistSq,
 } from '../../src/ui/viewport/2d/modifyHelpers';
 import type { Vec2 } from '@core/model/types';
@@ -127,31 +126,6 @@ describe('offsetSideSign', () => {
 });
 
 // ---------------------------------------------------------------------------
-// pointToSegDistSq
-// ---------------------------------------------------------------------------
-
-describe('pointToSegDistSq', () => {
-  it('returns 0 when the point is exactly on the segment', () => {
-    expect(pointToSegDistSq([5, 0], [0, 0], [10, 0])).toBeCloseTo(0);
-  });
-
-  it('returns squared distance to the nearest endpoint when point projects outside segment', () => {
-    // Point at (15, 0), segment from (0,0) to (10,0) — nearest endpoint is (10,0)
-    expect(pointToSegDistSq([15, 0], [0, 0], [10, 0])).toBeCloseTo(25);
-  });
-
-  it('returns squared perpendicular distance for a point beside the segment midpoint', () => {
-    // Point at (5, 3), segment from (0,0) to (10,0) — perp dist = 3, distSq = 9
-    expect(pointToSegDistSq([5, 3], [0, 0], [10, 0])).toBeCloseTo(9);
-  });
-
-  it('handles a degenerate segment (zero length) as a point', () => {
-    // Zero-length segment: both endpoints at (3,4). Distance to (0,0) = 5, distSq = 25
-    expect(pointToSegDistSq([0, 0], [3, 4], [3, 4])).toBeCloseTo(25);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // entityDistSq — position-aware pick distance
 // ---------------------------------------------------------------------------
 
@@ -194,10 +168,6 @@ describe('entityDistSq — line with non-zero position', () => {
     expect(entityDistSq(line, [25, 5])).toBeCloseTo(0);
     // World pick 3 units above the segment in world space → distSq ≈ 9
     expect(entityDistSq(line, [25, 8])).toBeCloseTo(9);
-    // Without the position fix, a pick at (25, 5) would be shifted to local (5, 5)
-    // and compare against [0,0]→[10,0], giving distSq=25 instead of 0 — verify this.
-    const naiveDist = pointToSegDistSq([25, 5], [0, 0], [10, 0]);
-    expect(naiveDist).not.toBeCloseTo(0); // naive (broken) approach gives wrong answer
   });
 
   it('returns near-zero for a pick at a non-zero-position line endpoint', () => {
