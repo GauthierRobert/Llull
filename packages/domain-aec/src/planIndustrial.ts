@@ -3,13 +3,14 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import type { BuildingElement } from '@core/model/building';
+import type { BuildingElement, BuildingLevel } from '@core/model/building';
 import { fromMm, getBuilding } from './model';
 import { MEMBER_LAYER } from './entities';
 import { sweepFrame } from './mesh';
 import { findProfile, profileOutline } from './steel/profiles';
 import { plateLayout } from './industrial/evaluateConnections';
 import { type PlanPrimitive, type PlanSource, layerName } from './planModel';
+import { columnPrimitive } from './planArchitectural';
 
 /** Both edges of a plan polyline offset by ±`half` (mitred at the bends). */
 function offsetPolyline(points: ReadonlyArray<Vec2>, half: number): Vec2[][] {
@@ -235,4 +236,35 @@ export function industrialPrimitives(
       ];
     }
   }
+}
+
+/**
+ * Cut symbol, on the plan of `level`, of a concrete or vertical steel column that belongs to ANOTHER
+ * level but whose vertical extent crosses the plan cut (`level.elevation + cutHeight`).
+ * @pure
+ */
+export function crossingColumnPrimitives(
+  doc: PlanSource,
+  element: BuildingElement,
+  level: BuildingLevel,
+  cutHeight: number,
+): PlanPrimitive[] {
+  if (element.category !== 'column' && element.category !== 'member') return [];
+  const home = getBuilding(doc).levels[element.levelId];
+  if (!home) return [];
+  const relativeCut = level.elevation + cutHeight - home.elevation;
+  if (element.category === 'column') {
+    return relativeCut >= 0 && relativeCut < element.height ? [columnPrimitive(element)] : [];
+  }
+  if (element.role !== 'column') return [];
+  const [dx, dy, dz] = [
+    element.end[0] - element.start[0],
+    element.end[1] - element.start[1],
+    element.end[2] - element.start[2],
+  ];
+  const vertical = Math.abs(dz) > 0.9 * Math.hypot(dx, dy, dz);
+  const crosses =
+    Math.min(element.start[2], element.end[2]) <= relativeCut &&
+    Math.max(element.start[2], element.end[2]) >= relativeCut;
+  return vertical && crosses ? industrialPrimitives(doc, element, relativeCut) : [];
 }

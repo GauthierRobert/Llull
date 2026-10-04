@@ -155,9 +155,14 @@ export function globalIdProblems(file: IfcFile): { malformed: string[]; duplicat
  * reference to IFCOWNERHISTORY), then a Name — decided by structure, so a GlobalId of the wrong
  * length is reported, not skipped.
  */
+const NOT_ROOTED =
+  /^IFC(PROPERTY(?!SET)|QUANTITY|COMPLEXPROPERTY|PHYSICALCOMPLEXQUANTITY|MATERIAL)/;
+
 function isRooted(entity: StepEntity, file: IfcFile): boolean {
   const [first, owner] = entity.args;
   if (typeof first !== 'string' || !first.startsWith("'") || entity.args.length < 4) return false;
+  // Properties and quantities (Name, Description, …) are resources, not IfcRoot objects.
+  if (NOT_ROOTED.test(entity.type)) return false;
   if (owner === '$') return true;
   const ref = typeof owner === 'string' && /^#\d+$/.test(owner) ? Number(owner.slice(1)) : NaN;
   return file.entities.get(ref)?.type === 'IFCOWNERHISTORY';

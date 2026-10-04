@@ -23,7 +23,7 @@ import {
   stairPrimitives,
   wallPrimitives,
 } from './planArchitectural';
-import { industrialPrimitives } from './planIndustrial';
+import { crossingColumnPrimitives, industrialPrimitives } from './planIndustrial';
 
 /**
  * Builds the plan of `levelId` (or the active / lowest level).
@@ -43,7 +43,11 @@ export function buildPlanDrawing(
   const walls: WallElement[] = [];
   for (const id of building.elementOrder) {
     const element = building.elements[id];
-    if (!element || !('levelId' in element) || element.levelId !== level.id) continue;
+    if (!element || !('levelId' in element)) continue;
+    if (element.levelId !== level.id) {
+      primitives.push(...crossingColumnPrimitives(doc, element, level, cutHeight));
+      continue;
+    }
     switch (element.category) {
       case 'wall':
         walls.push(element);

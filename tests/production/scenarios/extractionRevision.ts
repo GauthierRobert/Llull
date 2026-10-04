@@ -95,8 +95,11 @@ function revisionScript(): ToolCall[] {
       args: {
         levelId: levelId(0),
         points: PUMP_LINE.route,
-        diameter: PIPE_OD[PUMP_LINE.dn],
-        service: `${PUMP_LINE.line} ${PUMP_LINE.service}`,
+        line: PUMP_LINE.line,
+        dn: PUMP_LINE.dn,
+        from: PUMP_LINE.from,
+        to: PUMP_LINE.to,
+        service: PUMP_LINE.service,
       },
     },
     { tool: 'set_project_info', args: PROJECT },
@@ -133,7 +136,7 @@ export const extractionRevision: Scenario = {
     ...integrityCriteria(),
   ],
   knownIssues: {
-    scripted: ['line-list', 'structural-coverage', 'ifc-equipment-data', 'dxf-plans'],
+    scripted: ['structural-coverage'],
     ui: ['line-list', 'structural-coverage', 'ifc-equipment-data', 'dxf-plans'],
   },
   agentBaseline: 0.6,

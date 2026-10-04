@@ -1,7 +1,6 @@
 import { getCommand } from '@core/commands/registry';
 import type { Vec2 } from '@core/model/types';
 import type { ToolCall } from '../contract';
-import { PIPE_OD } from '../oracle/steel';
 import { levelId, type IntentEquipment, type PlantIntent } from './intent';
 
 /**
@@ -111,8 +110,11 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
       args: {
         levelId: levelId(0),
         points: pipe.route.map((point) => [point[0], point[1], rel(intent, 0, point[2])]),
-        diameter: PIPE_OD[pipe.dn],
-        service: `${pipe.line} ${pipe.service}`,
+        line: pipe.line,
+        dn: pipe.dn,
+        from: pipe.from,
+        to: pipe.to,
+        service: pipe.service,
       },
     });
   }

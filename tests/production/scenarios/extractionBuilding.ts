@@ -30,7 +30,7 @@ export const extractionBuilding: Scenario = {
     ...integrityCriteria(),
   ],
   knownIssues: {
-    scripted: ['line-list', 'structural-coverage', 'ifc-equipment-data', 'dxf-plans'],
+    scripted: ['structural-coverage'],
     ui: ['line-list', 'structural-coverage', 'ifc-equipment-data', 'dxf-plans'],
   },
   agentBaseline: 0.6,

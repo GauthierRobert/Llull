@@ -87,7 +87,8 @@ export function plantBrief(intent: PlantIntent, extra: string[] = []): string {
     ...(intent.trays !== undefined && intent.trays.length > 0 ? trayLines : []),
     '## Deliverables and acceptance',
     '- The model must be clash-free (no hard clash, no clearance violation).',
-    '- The office will issue from the model: IFC for coordination, a DXF plan and a plan sheet per level, a south elevation, member / equipment / pipe schedules and the quantity takeoff, and the saved project file.',
+    '- The office will issue from the model: IFC for coordination, a DXF plan and a plan sheet per level, a south elevation, member / equipment schedules, the line list (line number, DN, from and to of every line) and the quantity takeoff, and the saved project file.',
+    '- Every steel member must pass a structural verification (EN 1993) under its floor, equipment and pipe loads.',
     ...extra,
   ];
   return lines.join('\n');

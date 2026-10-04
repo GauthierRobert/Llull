@@ -1125,15 +1125,27 @@
     "name": "add_panel"
   },
   {
-    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with an outside diameter and a service / fluid name (compressed air, cooling water, steam, gas…). Bends are placed at every interior point. Pipe lengths feed the takeoff; clashes are reported by check_clashes.",
+    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes.",
     "input_schema": {
       "properties": {
         "diameter": {
-          "description": "Outside diameter. Default 114.3 mm (DN100).",
+          "description": "Outside diameter in document units. Default: from `dn` when given, else 114.3 mm (DN100).",
           "type": "number"
+        },
+        "dn": {
+          "description": "Nominal size DN as an integer, e.g. 100. Tabulated: 15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150, 200, 250, 300, 350, 400. Sets the outside diameter when `diameter` is omitted (an untabulated DN then needs an explicit `diameter`). Printed \"DN100\" in the line list.",
+          "type": "number"
+        },
+        "from": {
+          "description": "Line origin: equipment tag (e.g. \"EQ1\") or battery-limit / tie-in id (e.g. \"BL-1\").",
+          "type": "string"
         },
         "levelId": {
           "description": "Level id. Default: the active level.",
+          "type": "string"
+        },
+        "line": {
+          "description": "Line number for the line list, e.g. \"L-101\".",
           "type": "string"
         },
         "material": {
@@ -1152,6 +1164,10 @@
         },
         "service": {
           "description": "Fluid / service. Default \"process\".",
+          "type": "string"
+        },
+        "to": {
+          "description": "Line destination: equipment tag or battery-limit / tie-in id.",
           "type": "string"
         }
       },
@@ -6090,6 +6106,62 @@
       "type": "object"
     },
     "name": "update_constraint"
+  },
+  {
+    "description": "Edit an existing equipment in place (revision): name, tag (mark), plan centre, size, plan rotation, maintenance clearance, operating weight or level. Identify it by `elementId` (e.g. \"equipment-2\") or by its current tag `currentMark` (e.g. \"EQ3\"). The element id is kept, so schedules, plan tags and IFC GlobalIds stay stable across the revision. Fields you omit are unchanged.",
+    "input_schema": {
+      "properties": {
+        "angle": {
+          "description": "New plan rotation in radians.",
+          "type": "number"
+        },
+        "clearance": {
+          "description": "New maintenance clearance (>= 0).",
+          "type": "number"
+        },
+        "currentMark": {
+          "description": "Current equipment tag, e.g. \"EQ3\"; used when `elementId` is omitted.",
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Equipment element id, e.g. \"equipment-2\".",
+          "type": "string"
+        },
+        "levelId": {
+          "description": "Move the equipment to this level id.",
+          "type": "string"
+        },
+        "location": {
+          "description": "New footprint centre [x, y].",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "mark": {
+          "description": "New equipment tag (must not clash with another tag).",
+          "type": "string"
+        },
+        "name": {
+          "description": "New equipment name.",
+          "type": "string"
+        },
+        "size": {
+          "description": "New [length, width, height], all > 0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "weight": {
+          "description": "New operating weight in kg (>= 0).",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "update_equipment"
   },
   {
     "description": "Rename a level or change its elevation / floor-to-floor height. All walls, slabs, columns, beams, stairs, doors, windows and rooms on the level move and regenerate accordingly; walls and columns at full storey height and stairs climbing the storey follow a new height.",

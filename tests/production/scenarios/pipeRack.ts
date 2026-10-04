@@ -36,6 +36,6 @@ export const pipeRack: Scenario = {
     ...deliverableCriteria(pipeRackIntent),
     ...integrityCriteria(),
   ].filter((criterion) => applicable([criterion])),
-  knownIssues: { scripted: ['line-list', 'structural-coverage'] },
+  knownIssues: { scripted: ['structural-coverage'] },
   agentBaseline: 0.6,
 };

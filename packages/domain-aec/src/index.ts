@@ -27,6 +27,7 @@ import { listSteelProfiles } from './industrial/memberSupport';
 import { addSteelMember, updateSteelMember } from './industrial/memberSteelCommands';
 import { addFooting, addPanel } from './industrial/memberFootingPanelCommands';
 import { addEquipment, addPipeRun } from './industrial/equipment';
+import { updateEquipment } from './industrial/equipmentUpdate';
 import { addCraneRunway, addPortalFrameBuilding } from './industrial/portal';
 import { checkClashes } from './industrial/clash';
 import { addCableTray } from './industrial/trays';
@@ -93,6 +94,7 @@ export const industrialCommands = [
   addFooting,
   addPanel,
   addEquipment,
+  updateEquipment,
   addPipeRun,
   addCableTray,
   addBasePlates,
