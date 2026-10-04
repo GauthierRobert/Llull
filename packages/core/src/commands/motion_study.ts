@@ -1,22 +1,17 @@
 import type { CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { instanceBoundsFromDoc } from './sceneBounds';
+import { boundsOverlap, instanceBoundsFromDoc } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { evaluateMotionInternal } from './jointsKinematics';
 import { noop } from './noop';
 
-/** Per-step result of a motion study sweep. */
+/** One sweep sample: the applied value, resolved joint values and instance transforms by id. */
 interface MotionStep {
-  /** Step index (0-based). */
   stepIndex: number;
-  /** The sweep value applied at this step. */
   sweepValue: number;
-  /** Instance positions at this step: instanceId → Vec3. */
   instancePositions: Record<string, Vec3>;
-  /** Instance rotations at this step: instanceId → Vec3. */
   instanceRotations: Record<string, Vec3>;
-  /** Resolved joint values at this step: jointId → number. */
   resolvedJoints: Record<string, number>;
 }
 
@@ -27,7 +22,6 @@ interface InterferencePair {
   instanceIdB: string;
 }
 
-/** Structured data returned by motion_study in CommandResult.data. */
 export interface MotionStudyData {
   steps: MotionStep[];
   interferences: InterferencePair[];
@@ -37,25 +31,7 @@ export interface MotionStudyData {
   };
 }
 
-/** Returns true when two world-space AABBs overlap. */
-function aabbOverlap(a: Bounds, b: Bounds): boolean {
-  return (
-    a.min[0] <= b.max[0] &&
-    a.max[0] >= b.min[0] &&
-    a.min[1] <= b.max[1] &&
-    a.max[1] >= b.min[1] &&
-    a.min[2] <= b.max[2] &&
-    a.max[2] >= b.min[2]
-  );
-}
-
-/**
- * Given a step's instance positions, build AABB bounds per instance using
- * instanceBoundsFromDoc but translated to the resolved step position.
- * Returns instanceId → Bounds.
- *
- * @pure
- */
+/** World AABB per instance id with each instance moved to its position at the step. @pure */
 function boundsAtStep(
   doc: CadDocument,
   instancePositions: Record<string, Vec3>,
@@ -65,19 +41,12 @@ function boundsAtStep(
     const entity = doc.entities[id];
     if (!entity || entity.kind !== 'instance') continue;
     const resolvedPos = instancePositions[id] ?? entity.position;
-    // Temporarily reposition the instance (shallow clone, not mutating doc).
-    const tempEntity = { ...entity, position: resolvedPos };
-    const bounds = instanceBoundsFromDoc(tempEntity, doc);
-    result[id] = bounds;
+    result[id] = instanceBoundsFromDoc({ ...entity, position: resolvedPos }, doc);
   }
   return result;
 }
 
-/**
- * Check all pairs of instance bounds for AABB overlap.
- * Returns array of colliding [idA, idB] pairs.
- * @pure
- */
+/** Every overlapping pair of instance AABBs. @pure */
 function detectInterferences(bounds: Record<string, Bounds>): [string, string][] {
   const ids = Object.keys(bounds);
   const pairs: [string, string][] = [];
@@ -85,7 +54,7 @@ function detectInterferences(bounds: Record<string, Bounds>): [string, string][]
     for (let j = i + 1; j < ids.length; j++) {
       const idA = ids[i]!;
       const idB = ids[j]!;
-      if (aabbOverlap(bounds[idA]!, bounds[idB]!)) {
+      if (boundsOverlap(bounds[idA]!, bounds[idB]!)) {
         pairs.push([idA, idB]);
       }
     }
@@ -191,7 +160,6 @@ export const motionStudy = defineCommand({
     }
     const clampedSteps = Math.min(360, rawSteps);
 
-    // Mode-specific validation
     if (mode === 'joint') {
       if (!(target in doc.joints)) {
         return noop(doc, `motion_study: joint '${target}' does not exist in doc.joints.`);
@@ -210,7 +178,6 @@ export const motionStudy = defineCommand({
       }
     }
 
-    // Run sweep
     const motionSteps: MotionStep[] = [];
     const allInterferences: InterferencePair[] = [];
     const stepsWithInterference = new Set<number>();
@@ -248,7 +215,6 @@ export const motionStudy = defineCommand({
         resolvedJoints,
       });
 
-      // Interference check (optional, O(n²) AABB pairs)
       if (interferenceCheck === true) {
         const bounds = boundsAtStep(doc, instancePositions);
         const pairs = detectInterferences(bounds);
