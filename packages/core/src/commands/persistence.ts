@@ -10,6 +10,7 @@
 import type { CadDocument, DocumentUnit, FeatureStep } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 import { isRecord } from '../lib/isRecord';
 import { derivedEntityIds } from '../model/partition';
 import { documentExtensions } from '../plugins/host';
@@ -227,7 +228,7 @@ export const loadDocument = defineCommand({
       parsed = deserializeDocument(json);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return { document: doc, summary: message, affected: [] };
+      return noop(doc, message);
     }
 
     const entityCount = Object.keys(parsed.entities).length;
