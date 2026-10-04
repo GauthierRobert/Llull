@@ -56,7 +56,8 @@ function sections(all: Pair[]): Map<string, Pair[][]> {
       continue;
     }
     if (name === null) continue;
-    if (code === 0) records.push([[code, value]]);
+    // HEADER has no `0` record: its pairs form one implicit record.
+    if (code === 0 || records.length === 0) records.push([[code, value]]);
     else records[records.length - 1]?.push([code, value]);
   }
   return result;
@@ -102,14 +103,21 @@ function parseHeader(records: Pair[][]): Record<string, number[]> {
 
 function toEntity(record: Pair[]): DxfEntity {
   const value = (code: number): string => record.find(([c]) => c === code)?.[1] ?? '';
-  const xs = record.filter(([code]) => code === 10 || code === 11).map(([, v]) => Number(v));
-  const ys = record.filter(([code]) => code === 20 || code === 21).map(([, v]) => Number(v));
+  // MTEXT 11/21 is a direction vector, not a point.
+  const pointCodes = value(0) === 'MTEXT' ? [10] : [10, 11];
+  const xs = record.filter(([code]) => pointCodes.includes(code)).map(([, v]) => Number(v));
+  const ys = record.filter(([code]) => pointCodes.includes(code - 10)).map(([, v]) => Number(v));
   const points: [number, number][] = xs.map((x, i) => [x, ys[i] ?? 0]);
   return {
     type: value(0),
     layer: value(8),
     points,
-    text: value(1),
+    // MTEXT splits long text into group-3 chunks before the final group 1.
+    text:
+      record
+        .filter(([code]) => code === 3)
+        .map(([, v]) => v)
+        .join('') + value(1),
     closed: (Number(value(70)) & 1) === 1,
   };
 }

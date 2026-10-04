@@ -83,7 +83,9 @@ function coverageCheck({ document, run }: GradeContext): CheckOutcome {
     const result = run(command.name);
     const text = `${result.summary} ${JSON.stringify(result.data ?? {})}`;
     const hits = members.filter(
-      (m) => text.includes(`"${m.id}"`) || new RegExp(`\\b${m.mark}\\b`).test(text),
+      (m) =>
+        text.includes(`"${m.id}"`) ||
+        new RegExp(`\\b${m.mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text),
     );
     hits.forEach((m) => covered.add(m.id));
     if (hits.length > 0) perCheck.push(`${command.name} ${hits.length}`);

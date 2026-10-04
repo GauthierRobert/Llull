@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { resetReports } from './report';
 import { installDefaultPlugins } from '@app/plugins';
 import { extractionBuildingFlow } from './ui/extractionBuilding.flow';
 import { extractionRevisionFlow } from './ui/extractionRevision.flow';
@@ -19,6 +20,7 @@ import { UiSession } from './ui/session';
  */
 
 installDefaultPlugins();
+test.beforeAll(() => resetReports('ui'));
 
 test.describe('production scenarios (UI driver)', () => {
   test('desmet-extraction-building', async ({ page }) => {

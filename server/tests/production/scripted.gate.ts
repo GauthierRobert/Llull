@@ -13,17 +13,21 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { getCommand } from '@core/commands/registry';
 import { toolsetOf } from '@mcp/toolsets';
 import type { CadDocument } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import type { Scenario, ToolCall } from '../../../tests/production/contract';
 import { gradeContext, gradeScenario } from '../../../tests/production/grade';
-import { formatReport, writeReport } from '../../../tests/production/report';
+import { formatReport, resetReports, writeReport } from '../../../tests/production/report';
 import { SCENARIOS, chainOf } from '../../../tests/production/scenarios';
 import { runAgent, type SendTurn } from './agentLoop';
 import { liveDocument, openSession, resetDocument, startServer, stopServer } from './mcpHarness';
 
-beforeAll(startServer);
+beforeAll(async () => {
+  resetReports('scripted');
+  await startServer();
+});
 afterAll(stopServer);
 
 /** Run a scenario's calls in one MCP session on the current live document. */
@@ -41,8 +45,13 @@ async function drive(scenario: Scenario): Promise<{ calls: number; ms: number }>
       expect(enabled.isError, enabled.text).toBe(false);
     }
     for (const call of scenario.script) {
+      const before = liveDocument();
       const outcome = await session.call(call.tool, call.args);
       expect(outcome.isError, `${call.tool}: ${outcome.text}`).toBe(false);
+      // A soft failure returns isError:false with the document unchanged.
+      if (getCommand(call.tool)?.annotations?.readOnly !== true) {
+        expect(liveDocument(), `${call.tool} changed nothing: ${outcome.text}`).not.toBe(before);
+      }
       expect(outcome.text, `${call.tool}`).not.toMatch(/\brejected\b/i);
     }
   } finally {

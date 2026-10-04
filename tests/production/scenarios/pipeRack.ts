@@ -33,7 +33,7 @@ export const pipeRack: Scenario = {
     ...pipingCriteria(pipeRackIntent),
     ...coordinationCriteria(pipeRackIntent),
     ...pipeRackCriteria(pipeRackIntent, RACK_RULES),
-    ...deliverableCriteria(),
+    ...deliverableCriteria(pipeRackIntent),
     ...integrityCriteria(),
   ].filter((criterion) => applicable([criterion])),
   knownIssues: { scripted: ['line-list', 'structural-coverage'] },

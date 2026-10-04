@@ -40,5 +40,8 @@ export function parseCsv(text: string): string[][] {
 export function column(table: string[][], name: string): number[] {
   const index = (table[0] ?? []).indexOf(name);
   if (index < 0) return [];
-  return table.slice(1).map((row) => Number(row[index]));
+  return table.slice(1).map((row) => {
+    const cell = (row[index] ?? '').trim();
+    return cell === '' ? NaN : Number(cell);
+  });
 }

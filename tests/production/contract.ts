@@ -79,7 +79,10 @@ export interface Scenario {
   criteria: Criterion[];
   /** Criteria that fail today, per driver. Ratchet: a known issue that passes fails the gate. */
   knownIssues: Partial<Record<DriverId, string[]>>;
-  /** Minimum share of criteria an AI agent must pass (raise it as llull improves). */
+  /**
+   * Minimum share of the job an AI agent must complete: criteria failing on the starting document
+   * (minus known product gaps) that pass at the end, net of criteria it broke. Raise it over time.
+   */
   agentBaseline: number;
 }
 

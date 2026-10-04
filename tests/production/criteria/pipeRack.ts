@@ -193,9 +193,11 @@ function roadClearanceCheck(rules: RackRules, ctx: GradeContext): CheckOutcome {
     });
   }
   for (const run of runsOf(ctx)) {
-    const inside = [xMin, xMax]
-      .map((x) => crossingAt(run.route, x))
-      .filter((point): point is Vec3 => point !== null);
+    // Corridor edges plus every route vertex inside the corridor (a line may dip between them).
+    const inside = [
+      ...[xMin, xMax].map((x) => crossingAt(run.route, x)),
+      ...run.route.filter((point) => point[0] > xMin && point[0] < xMax),
+    ].filter((point): point is Vec3 => point !== null);
     if (inside.length === 0) continue;
     candidates.push({
       label: run.label,
@@ -426,7 +428,24 @@ function extrusionOf(
   return { radius: Number(profile?.args[3]), depth: Number(solid.args[3]), origin, axis };
 }
 
-function ifcLinesCheck(ctx: GradeContext): CheckOutcome {
+/** The briefed line whose ends match this route (either direction), or undefined. */
+function intendedLine(
+  intent: PlantIntent,
+  route: Vec3[],
+): PlantIntent['pipes'][number] | undefined {
+  const a = route[0] ?? [0, 0, 0];
+  const b = route.at(-1) ?? [0, 0, 0];
+  return intent.pipes.find((line) => {
+    const first = line.route[0] ?? [0, 0, 0];
+    const last = line.route.at(-1) ?? [0, 0, 0];
+    return (
+      (distance(a, first) <= END_TOLERANCE && distance(b, last) <= END_TOLERANCE) ||
+      (distance(a, last) <= END_TOLERANCE && distance(b, first) <= END_TOLERANCE)
+    );
+  });
+}
+
+function ifcLinesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
   const file = parseIfc(ctx.deliverable('ifc'));
   const segments = ofType(file, 'IFCPIPESEGMENT');
   const problems: string[] = [];
@@ -438,8 +457,14 @@ function ifcLinesCheck(ctx: GradeContext): CheckOutcome {
       problems.push(`${pipe.mark} ${pipe.service} not in the IFC`);
       continue;
     }
-    const lineNumber = pipe.service.split(' ')[0] ?? '';
-    if (!`${stepString(segment.args[2])} ${stepString(segment.args[3])}`.includes(lineNumber)) {
+    const lineNumber = intendedLine(intent, route)?.line;
+    if (lineNumber === undefined) {
+      problems.push(`${pipe.mark} matches no briefed line`);
+    } else if (
+      !new RegExp(`(^|\\W)${lineNumber}(\\W|$)`).test(
+        `${stepString(segment.args[2])} ${stepString(segment.args[3])}`,
+      )
+    ) {
       problems.push(`${pipe.mark}: IFC carries no line number ${lineNumber}`);
     }
     const solid = extrusionOf(file, references([segment.args[6] ?? '$'])[0] ?? -1);
@@ -523,7 +548,7 @@ export function pipeRackCriteria(intent: PlantIntent, rules: RackRules): Criteri
       area: 'deliverables',
       requirement:
         'The IFC carries every line with its line number, outside diameter, length, start point and direction, and the cable tray.',
-      check: ifcLinesCheck,
+      check: (ctx) => ifcLinesCheck(intent, ctx),
     },
     {
       id: 'rack-line-metres',

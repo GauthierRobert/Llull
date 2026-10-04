@@ -129,7 +129,7 @@ export const extractionRevision: Scenario = {
     ...equipmentCriteria(revisedIntent),
     ...pipingCriteria(revisedIntent),
     ...coordinationCriteria(revisedIntent),
-    ...deliverableCriteria(),
+    ...deliverableCriteria(revisedIntent),
     ...integrityCriteria(),
   ],
   knownIssues: {

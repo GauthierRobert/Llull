@@ -39,9 +39,12 @@ design intent (`tests/production/plant/intent.ts`), so they cannot disagree.
 
 `scenario.knownIssues[driver]` lists the criteria that fail today. The scripted and UI gates are
 green when **exactly** those fail: a new failure is a regression, and a known issue that starts
-passing must be removed. The agent is non-deterministic, so it must pass at least
-`scenario.agentBaseline` of the criteria per trial (`PRODUCTION_AGENT_TRIALS` for pass^k); raise
-the baseline as llull improves.
+passing must be removed. The agent is non-deterministic, so it is scored on the **job** only:
+the criteria that fail on the starting document and are not known product gaps must pass, and a
+criterion that passed at the start and fails at the end (the agent broke it) counts against it.
+Each trial must complete at least `scenario.agentBaseline` of that (`PRODUCTION_AGENT_TRIALS` for
+pass^k); raise the baseline as llull improves. Doing nothing scores 0, whatever vacuous checks
+stay green.
 
 ## Scenarios
 
@@ -68,7 +71,7 @@ the baseline as llull improves.
 | ------------------- | -------- | -------------- | ----------------------------------- |
 | extraction building | 21 / 25  | 21 / 25        | not run yet (needs API credentials) |
 | revision B          | 24 / 28  | 24 / 28        | not run yet                         |
-| pipe rack           | 23 / 25  | no UI flow yet | not run yet                         |
+| pipe rack           | 24 / 26  | no UI flow yet | not run yet                         |
 
 Everything a coordination package needs already works: the structure, equipment, lines,
 openings and stairs are modelled exactly; the model is clash-free; the steel tonnage matches an

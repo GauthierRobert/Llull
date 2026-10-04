@@ -10,8 +10,8 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Offline mode probes the optional llull server (architecture L6); a refused probe is expected. */
 const OPTIONAL_SERVER = 'http://localhost:3001';
-/** Summaries the commands return when they changed nothing. */
-const REFUSED = /failed|rejected|no-op|nothing to|not available|invalid|no entity|unknown|cannot/i;
+/** Summary prefixes / phrases of commands that changed nothing (not words inside a success). */
+const REFUSED = /^\S+ (failed|rejected):|^No entity|not found\b|kernel not available|^Nothing to/i;
 
 export interface Downloaded {
   name: string;
@@ -80,7 +80,7 @@ export class UiSession {
   async acting(what: string, action: () => Promise<void>): Promise<string> {
     const before = await this.summary();
     await action();
-    await this.page
+    const reacted = await this.page
       .waitForFunction(
         (previous) =>
           (document.querySelector('.status-summary')?.textContent ?? '') !== previous ||
@@ -88,11 +88,13 @@ export class UiSession {
         before,
         { timeout: 4000 },
       )
-      .catch(() => undefined);
+      .then(() => true)
+      .catch(() => false);
     const panelError = this.page.locator('.panel__error');
     if ((await panelError.count()) > 0) {
       throw new Error(`${what}: form error "${await panelError.first().textContent()}"`);
     }
+    if (!reacted) throw new Error(`${what}: the app showed no result (status still "${before}")`);
     const after = await this.summary();
     if (REFUSED.test(after)) throw new Error(`${what}: ${after}`);
     return after;

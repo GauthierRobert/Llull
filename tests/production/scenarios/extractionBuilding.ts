@@ -26,7 +26,7 @@ export const extractionBuilding: Scenario = {
     ...equipmentCriteria(extractionIntent),
     ...pipingCriteria(extractionIntent),
     ...coordinationCriteria(extractionIntent),
-    ...deliverableCriteria(),
+    ...deliverableCriteria(extractionIntent),
     ...integrityCriteria(),
   ],
   knownIssues: {

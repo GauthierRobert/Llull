@@ -104,3 +104,24 @@ export function printedScales(sheet: Sheet): number[] {
   }
   return scales;
 }
+
+/** The value printed after a title-block label, e.g. "CLIENT" → "Desmet" ('' when absent). */
+export function titleBlockField(sheet: Sheet, label: string): string {
+  const index = sheet.titleBlock.indexOf(label);
+  return index < 0 ? '' : (sheet.titleBlock[index + 1] ?? '');
+}
+
+/** Drawing number, revision and date from the "DWG NO · REV · DATE" cell, compared as whole tokens. */
+export function drawingIdentity(sheet: Sheet): {
+  drawingNumber: string;
+  revision: string;
+  date: string;
+} {
+  const [drawingNumber = '', revision = '', date = ''] = titleBlockField(
+    sheet,
+    'DWG NO · REV · DATE',
+  )
+    .split('·')
+    .map((part) => part.trim());
+  return { drawingNumber, revision, date };
+}

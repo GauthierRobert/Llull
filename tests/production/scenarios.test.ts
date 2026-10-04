@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { execute } from '@core/commands/registry';
+import { execute, getCommand } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { Scenario } from './contract';
 import { gradeContext, gradeScenario } from './grade';
@@ -16,7 +16,7 @@ import { SCENARIOS, chainOf } from './scenarios';
 function run(scenario: Scenario, doc: CadDocument): CadDocument {
   return scenario.script.reduce((current, call) => {
     const result = execute(current, call.tool, call.args);
-    const readOnly = call.tool.startsWith('check_');
+    const readOnly = getCommand(call.tool)?.annotations?.readOnly === true;
     if (!readOnly) expect(result.document, `${call.tool}: ${result.summary}`).not.toBe(current);
     return result.document;
   }, doc);

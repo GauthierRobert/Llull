@@ -1,7 +1,7 @@
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
 import { buildingOf, levelsByElevation } from '../oracle/geometry';
 import { parseIfc, stepString } from '../oracle/ifc';
-import { parseSheet } from '../oracle/svg';
+import { drawingIdentity, parseSheet } from '../oracle/svg';
 import type { PlantIntent } from '../plant/intent';
 
 /**
@@ -24,10 +24,10 @@ function issuedCheck(intent: PlantIntent, { document, deliverable }: GradeContex
     'elevation:south',
   ];
   for (const id of sheets) {
-    const block = parseSheet(deliverable(id)).titleBlock.join(' ');
-    if (!block.includes(intent.project.revision) || !block.includes(intent.project.date)) {
+    const printed = drawingIdentity(parseSheet(deliverable(id)));
+    if (printed.revision !== intent.project.revision || printed.date !== intent.project.date) {
       problems.push(
-        `${id} title block not at revision ${intent.project.revision} / ${intent.project.date}`,
+        `${id} title block at revision "${printed.revision}" / ${printed.date}, expected ${intent.project.revision} / ${intent.project.date}`,
       );
     }
   }

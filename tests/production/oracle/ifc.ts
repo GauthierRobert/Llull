@@ -48,7 +48,10 @@ export function parseArgs(text: string): StepValue[] {
       inString = true;
       token += ch;
     } else if (ch === '(') {
-      const list: StepValue[] = [];
+      // A typed value `IFCMASSMEASURE(55000.)` becomes one list whose first item is its type name.
+      const typeName = token.trim();
+      token = '';
+      const list: StepValue[] = typeName === '' ? [] : [typeName];
       stack[stack.length - 1]?.push(list);
       stack.push(list);
     } else if (ch === ')') {
@@ -138,7 +141,7 @@ export function globalIdProblems(file: IfcFile): { malformed: string[]; duplicat
   const malformed: string[] = [];
   const duplicated: string[] = [];
   for (const entity of file.entities.values()) {
-    if (!isRooted(entity)) continue;
+    if (!isRooted(entity, file)) continue;
     const guid = stepString(entity.args[0]);
     if (!GUID_ALPHABET.test(guid)) malformed.push(`#${entity.id} ${entity.type} '${guid}'`);
     else if (seen.has(guid)) duplicated.push(guid);
@@ -147,15 +150,27 @@ export function globalIdProblems(file: IfcFile): { malformed: string[]; duplicat
   return { malformed, duplicated };
 }
 
-/** Rooted entities (IfcRoot subtypes) start with a quoted 22-char GlobalId then an owner history. */
-function isRooted(entity: StepEntity): boolean {
-  const first = entity.args[0];
-  return (
-    typeof first === 'string' &&
-    first.length === 24 &&
-    first.startsWith("'") &&
-    (entity.type.startsWith('IFCREL') || entity.args.length >= 4)
-  );
+/**
+ * Rooted entities (IfcRoot subtypes) start with a quoted GlobalId, then an owner history (`$` or a
+ * reference to IFCOWNERHISTORY), then a Name — decided by structure, so a GlobalId of the wrong
+ * length is reported, not skipped.
+ */
+function isRooted(entity: StepEntity, file: IfcFile): boolean {
+  const [first, owner] = entity.args;
+  if (typeof first !== 'string' || !first.startsWith("'") || entity.args.length < 4) return false;
+  if (owner === '$') return true;
+  const ref = typeof owner === 'string' && /^#\d+$/.test(owner) ? Number(owner.slice(1)) : NaN;
+  return file.entities.get(ref)?.type === 'IFCOWNERHISTORY';
+}
+
+/** Every number inside a value tree (typed values included), e.g. a property's nominal value. */
+export function numbersIn(values: StepValue[]): number[] {
+  const found: number[] = [];
+  for (const value of values) {
+    if (Array.isArray(value)) found.push(...numbersIn(value));
+    else if (/^-?\d+(\.\d*)?(E[-+]?\d+)?$/i.test(value)) found.push(Number(value));
+  }
+  return found;
 }
 
 export interface IfcStorey {

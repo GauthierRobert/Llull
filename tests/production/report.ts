@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { ScenarioReport } from './contract';
 
@@ -17,6 +17,12 @@ function repoRoot(from: string = process.cwd()): string {
 }
 
 export const REPORT_ROOT = path.join(repoRoot(), '.cache', 'production', 'reports');
+
+/** Start a driver's run from an empty report folder, so SUMMARY.md never mixes stale runs. */
+export function resetReports(driver: string): void {
+  rmSync(path.join(REPORT_ROOT, driver), { recursive: true, force: true });
+  writeSummary();
+}
 
 export function writeReport(report: ScenarioReport, extra: Record<string, unknown> = {}): string {
   const dir = path.join(REPORT_ROOT, report.driver);
@@ -76,6 +82,7 @@ export function formatReport(report: ScenarioReport): string {
 }
 
 function writeSummary(): void {
+  mkdirSync(REPORT_ROOT, { recursive: true });
   const reports = readReports().sort((a, b) =>
     `${a.scenario}${a.driver}`.localeCompare(`${b.scenario}${b.driver}`),
   );

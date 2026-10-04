@@ -13,12 +13,30 @@ import {
   containment,
   countByType,
   globalIdProblems,
+  numbersIn,
   ofType,
   parseIfc,
   references,
   stepString,
 } from '../oracle/ifc';
-import { STANDARD_SCALES, paperName, parseSheet, printedScales } from '../oracle/svg';
+import {
+  STANDARD_SCALES,
+  drawingIdentity,
+  paperName,
+  parseSheet,
+  printedScales,
+  titleBlockField,
+  type Sheet,
+} from '../oracle/svg';
+import type { PlantIntent } from '../plant/intent';
+
+interface ProjectFields {
+  name: string;
+  client: string;
+  drawingNumber: string;
+  revision: string;
+  date: string;
+}
 
 /**
  * @layer tests/production/criteria
@@ -135,13 +153,18 @@ function ifcEquipmentDataCheck({ document, deliverable }: GradeContext): CheckOu
     const sets = properties
       .filter((rel) => references([rel.args[4] ?? []]).includes(entity.id))
       .flatMap((rel) => references([rel.args[5] ?? '$']));
-    const values = sets.flatMap((set) => references([file.entities.get(set)?.args[4] ?? []]));
+    // IFCPROPERTYSET lists its properties at [4]; IFCELEMENTQUANTITY (Qto) its quantities at [5].
+    const values = sets.flatMap((set) => {
+      const definition = file.entities.get(set);
+      const index = definition?.type === 'IFCELEMENTQUANTITY' ? 5 : 4;
+      return references([definition?.args[index] ?? []]);
+    });
     const hasWeight = values.some((v) => {
       const property = file.entities.get(v);
       return (
         property !== undefined &&
         /weight|mass/i.test(stepString(property.args[0])) &&
-        JSON.stringify(property.args).includes(String(equipment.weight))
+        numbersIn(property.args.slice(1)).includes(equipment.weight)
       );
     });
     if (!hasWeight) problems.push(`${equipment.mark} carries no operating weight property`);
@@ -194,8 +217,27 @@ function dxfPlansCheck({ document, deliverable }: GradeContext): CheckOutcome {
   return result(problems, 'one DXF plan per level: cut columns, equipment and grid drawn');
 }
 
-function planSheetsCheck({ document, deliverable }: GradeContext): CheckOutcome {
-  const project = buildingOf(document).project;
+/** Title-block fields as printed, compared whole with the expected project. */
+function titleBlockProblems(sheet: Sheet, project: ProjectFields, where: string): string[] {
+  const printed: ProjectFields = {
+    name: titleBlockField(sheet, 'PROJECT'),
+    client: titleBlockField(sheet, 'CLIENT'),
+    ...drawingIdentity(sheet),
+  };
+  return (Object.keys(printed) as (keyof ProjectFields)[])
+    .filter((key) => project[key] !== '' && printed[key] !== project[key])
+    .map((key) => `${where}: title block ${key} "${printed[key]}", expected "${project[key]}"`);
+}
+
+function expectedProject(intent: PlantIntent | undefined, ctx: GradeContext): ProjectFields {
+  const { name, client, drawingNumber, revision, date } =
+    intent?.project ?? buildingOf(ctx.document).project;
+  return { name, client, drawingNumber, revision, date };
+}
+
+function planSheetsCheck(intent: PlantIntent | undefined, ctx: GradeContext): CheckOutcome {
+  const { document, deliverable } = ctx;
+  const project = expectedProject(intent, ctx);
   const problems: string[] = [];
   for (const level of levelsByElevation(document)) {
     const sheet = parseSheet(deliverable(`plan:${level.id}`));
@@ -206,11 +248,7 @@ function planSheetsCheck({ document, deliverable }: GradeContext): CheckOutcome 
     if (scales.length === 0 || !scales.every((s) => STANDARD_SCALES.includes(s))) {
       problems.push(`${level.name}: printed scale(s) ${scales.join(', ') || 'none'}`);
     }
-    const block = sheet.titleBlock.join(' ');
-    for (const field of [project.name, project.client, project.drawingNumber, project.revision]) {
-      if (field !== '' && !block.includes(field))
-        problems.push(`${level.name}: title block lacks "${field}"`);
-    }
+    problems.push(...titleBlockProblems(sheet, project, level.name));
     const texts = sheet.texts.join(' ');
     const tags = elementsOf(document, 'equipment').filter((e) => e.levelId === level.id);
     const missing = tags.filter((e) => !texts.includes(e.mark));
@@ -225,17 +263,18 @@ function planSheetsCheck({ document, deliverable }: GradeContext): CheckOutcome 
   );
 }
 
-function elevationSheetCheck({ document, deliverable }: GradeContext): CheckOutcome {
+function elevationSheetCheck(intent: PlantIntent | undefined, ctx: GradeContext): CheckOutcome {
+  const { document, deliverable } = ctx;
   const sheet = parseSheet(deliverable('elevation:south'));
   const problems = [...sheet.errors];
   const texts = sheet.texts.join(' ');
   for (const level of levelsByElevation(document)) {
     const datum = (level.elevation / 1000).toFixed(3);
-    if (!texts.includes(datum)) problems.push(`no level datum ${datum} for "${level.name}"`);
+    if (!new RegExp(`(?<![\\d.])${datum.replace('.', '\\.')}(?!\\d)`).test(texts)) {
+      problems.push(`no level datum ${datum} for "${level.name}"`);
+    }
   }
-  const revision = buildingOf(document).project.revision;
-  if (!sheet.titleBlock.join(' ').includes(revision))
-    problems.push(`title block lacks revision ${revision}`);
+  problems.push(...titleBlockProblems(sheet, expectedProject(intent, ctx), 'south elevation'));
   return result(problems, 'south elevation with every level datum and the current revision');
 }
 
@@ -264,9 +303,10 @@ function schedulesCheck(ctx: GradeContext): CheckOutcome {
   }
   const pipes = parseCsv(ctx.deliverable('schedule:pipe'));
   const lengths = column(pipes, 'Length (m)');
-  elementsOf(document, 'pipe').forEach((pipe, index) => {
+  const marks = pipes.slice(1).map((row) => row[(pipes[0] ?? []).indexOf('Mark')] ?? '');
+  elementsOf(document, 'pipe').forEach((pipe) => {
     const metres = polylineLength(pipe.points) / 1000;
-    const listed = lengths[index] ?? NaN;
+    const listed = lengths[marks.indexOf(pipe.mark)] ?? NaN;
     if (!(Math.abs(listed - metres) <= 0.01 * metres + 0.05)) {
       problems.push(`pipe schedule ${pipe.mark}: ${listed} m, geometry ${round(metres, 2)} m`);
     }
@@ -277,7 +317,8 @@ function schedulesCheck(ctx: GradeContext): CheckOutcome {
   );
 }
 
-export function deliverableCriteria(): Criterion[] {
+/** Title-block expectations come from the brief (`intent`) when given, else from the document. */
+export function deliverableCriteria(intent?: PlantIntent): Criterion[] {
   return [
     {
       id: 'ifc-model',
@@ -312,13 +353,13 @@ export function deliverableCriteria(): Criterion[] {
       area: 'deliverables',
       requirement:
         'A plan sheet per level: ISO paper, standard scale, full title block, equipment tags.',
-      check: planSheetsCheck,
+      check: (ctx) => planSheetsCheck(intent, ctx),
     },
     {
       id: 'elevation-sheet',
       area: 'deliverables',
       requirement: 'South elevation with level datums and the current revision.',
-      check: elevationSheetCheck,
+      check: (ctx) => elevationSheetCheck(intent, ctx),
     },
     {
       id: 'schedules',

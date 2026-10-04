@@ -148,7 +148,8 @@ function floorsCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
     }
     if (
       Math.abs(polygonArea(slab.boundary) - polygonArea(floor.boundary)) >
-      1e-3 * polygonArea(floor.boundary)
+        1e-3 * polygonArea(floor.boundary) ||
+      !sameExtents(slab.boundary, floor.boundary)
     ) {
       problems.push(`${slab.mark} at ${ffl} does not cover the grid footprint`);
     }
@@ -158,6 +159,21 @@ function floorsCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
     detail:
       problems.length === 0 ? `${intent.floors.length} floors as designed` : problems.join('; '),
   };
+}
+
+/** Plan bounding boxes equal within 1 mm (catches a slab of the right area in the wrong place). */
+function sameExtents(
+  a: readonly (readonly number[])[],
+  b: readonly (readonly number[])[],
+): boolean {
+  const box = (points: readonly (readonly number[])[]): number[] => [
+    Math.min(...points.map((p) => p[0] ?? 0)),
+    Math.min(...points.map((p) => p[1] ?? 0)),
+    Math.max(...points.map((p) => p[0] ?? 0)),
+    Math.max(...points.map((p) => p[1] ?? 0)),
+  ];
+  const [boxA, boxB] = [box(a), box(b)];
+  return boxA.every((value, index) => Math.abs(value - (boxB[index] ?? NaN)) <= 1);
 }
 
 function polygonArea(points: readonly (readonly number[])[]): number {

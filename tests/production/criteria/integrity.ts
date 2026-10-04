@@ -34,7 +34,13 @@ function saveLoadCheck({ document, deliverable }: GradeContext): CheckOutcome {
 }
 
 function replayCheck({ document }: GradeContext): CheckOutcome {
+  if (document.featureHistory.length === 0) {
+    return { pass: false, detail: 'no feature history: the model cannot be regenerated' };
+  }
   const replayed = execute(document, 'replay_history', {});
+  if (!replayed.summary.startsWith('replay_history: replayed')) {
+    return { pass: false, detail: `replay refused: ${replayed.summary}` };
+  }
   const before = canonical(definition(document));
   const after = canonical(definition(replayed.document));
   if (before === after) {
