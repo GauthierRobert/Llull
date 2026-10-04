@@ -19,14 +19,9 @@ import {
   type FoundationRow,
   MAX_UTILISATION,
 } from './foundationModel';
-import {
-  defaultThrustTie,
-  differentialRows,
-  footingRows,
-  groundSlabWeight,
-  plateRows,
-  slidingHorizontalOf,
-} from './foundationRows';
+import { differentialRows, footingRows } from './foundationRows';
+import { plateRows } from './foundationPlateRows';
+import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationThrust';
 import {
   combine,
   findFooting,

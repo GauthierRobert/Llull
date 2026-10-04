@@ -11,7 +11,7 @@ import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheck
 import { baseReactions } from './frameModelSolve';
 import { SOIL_SHAPE } from './foundationCheckRun';
 import { findFooting } from './foundationCombinations';
-import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationRows';
+import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationThrust';
 import { clayLayerError } from './foundationSettlement';
 import {
   COVER_MM,
