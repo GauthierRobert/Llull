@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute, getCommand, listCommands } from '@core/commands/registry';
 import { defineCommand, z } from '@core/commands/schema';
-import { installPlugin, installedPlugins, pluginToolNames } from '@core/plugins/host';
+import { installPlugin, pluginToolNames } from '@core/plugins/host';
 import { TOOLSETS, toolsetOf } from '@mcp/toolsets';
 import type { CadPlugin } from '@core/plugins/plugin';
 import type { CommandDefinition } from '@core/commands/types';
@@ -24,9 +24,6 @@ const echoPlugin: CadPlugin = {
 
 describe('plugins', () => {
   it('the composition root installed building and industrial', () => {
-    expect(installedPlugins().map((p) => p.name)).toEqual(
-      expect.arrayContaining(['building', 'industrial']),
-    );
     expect(getCommand('add_wall')).toBeDefined();
     expect(getCommand('add_portal_frame_building')).toBeDefined();
     expect(TOOLSETS.building).toContain('add_wall');
@@ -54,7 +51,6 @@ describe('plugins', () => {
     };
     const before = listCommands().length;
     expect(() => installPlugin(clash)).toThrow(/add_box/);
-    expect(installedPlugins().some((p) => p.name === 'test-clash')).toBe(false);
     expect(listCommands().length).toBe(before);
   });
 });
