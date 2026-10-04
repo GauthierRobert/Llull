@@ -8,12 +8,10 @@ import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { toCsv } from '../scheduleBuild';
 import type { CraneModel, FrameLoads } from './frameModelTypes';
 import { checkFrames } from './frameCheckFrames';
-import type { CheckRow } from './frameCheckSolve';
 import { round } from '../numeric';
-import { failureSummary } from './checkReport';
+import { checkTable, failureSummary } from './checkReport';
 
 /** Load parameters shared by check_portal_frames and design_portal_frames. */
 export const FRAME_LOAD_SHAPE = {
@@ -174,26 +172,21 @@ export const checkPortalFrames = defineCommand({
         `check_portal_frames failed: no analysable portal frame on the level${skipped.length > 0 ? ` (${skipped.join(', ')})` : ''}.`,
       );
     }
-    const failures = rows.filter((row) => row.utilisation > 1);
-    const worst = rows.reduce<CheckRow | null>(
-      (best, row) => (best === null || row.utilisation > best.utilisation ? row : best),
-      null,
-    );
-    const columns = [
-      'Frame',
-      'Mark',
-      'Type',
-      'N (kN)',
-      'M (kNm)',
-      'V (kN)',
-      'Utilisation',
-      'Status',
-      'Combination',
-      'Check',
-    ];
-    const csv = toCsv(
-      columns,
-      rows.map((row) => [
+    const { csv, failures, worst } = checkTable(
+      rows,
+      [
+        'Frame',
+        'Mark',
+        'Type',
+        'N (kN)',
+        'M (kNm)',
+        'V (kN)',
+        'Utilisation',
+        'Status',
+        'Combination',
+        'Check',
+      ],
+      (row, status) => [
         row.frame,
         row.mark,
         row.kind,
@@ -201,10 +194,10 @@ export const checkPortalFrames = defineCommand({
         round(row.moment, 1),
         round(row.shear, 1),
         round(row.utilisation),
-        row.utilisation > 1 ? 'FAIL' : 'OK',
+        status,
         row.combination,
         row.check,
-      ]),
+      ],
     );
     return {
       document: doc,

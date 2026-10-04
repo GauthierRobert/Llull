@@ -8,7 +8,6 @@ import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { toCsv } from '../scheduleBuild';
 import { findProfile } from '../steel/profiles';
 import { sectionResistance, yieldStrength } from './steelDesign';
 import { craneCapacityOf } from './frameModelTypes';
@@ -33,7 +32,7 @@ import {
   near,
 } from './bracingModel';
 import { round } from '../numeric';
-import { failureSummary } from './checkReport';
+import { checkTable, failureSummary } from './checkReport';
 
 /**
  * @command check_bracing
@@ -446,12 +445,8 @@ export const checkBracing = defineCommand({
       });
     }
 
-    const worst = rows.reduce<BracingRow | null>(
-      (best, row) => (best === null || row.utilisation > best.utilisation ? row : best),
-      null,
-    );
-    const failures = rows.filter((row) => row.utilisation > 1);
-    const csv = toCsv(
+    const { csv, failures, worst } = checkTable(
+      rows,
       [
         'Group',
         'Mark',
@@ -463,7 +458,7 @@ export const checkBracing = defineCommand({
         'Status',
         'Check',
       ],
-      rows.map((row) => [
+      (row, status) => [
         row.group,
         row.mark,
         row.kind,
@@ -471,9 +466,9 @@ export const checkBracing = defineCommand({
         round(row.resistance, 1),
         round(row.moment, 1),
         round(row.utilisation),
-        row.utilisation > 1 ? 'FAIL' : 'OK',
+        status,
         row.check,
-      ]),
+      ],
     );
     return {
       document: doc,

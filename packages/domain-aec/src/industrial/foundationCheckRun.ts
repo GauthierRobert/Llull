@@ -9,7 +9,6 @@ import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { toCsv } from '../scheduleBuild';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
 import { type FrameLoads } from './frameModelTypes';
 import { baseReactions } from './frameModelSolve';
@@ -37,7 +36,7 @@ import {
 } from './foundationCombinations';
 import { clayLayerError, footingSettlementParts } from './foundationSettlement';
 import { round } from '../numeric';
-import { failureSummary } from './checkReport';
+import { checkTable, failureSummary } from './checkReport';
 
 /**
  * Checks footings and base plates of the columns of a level.
@@ -272,15 +271,12 @@ export const foundationCheck = defineCommand({
       soilModulus,
       params.clayLayer,
     );
-    if (rows.length === 0) {
-      return noop(
-        doc,
-        `check_foundations failed: no portal frame column with a footing or base plate on level '${levelId}'.`,
-      );
-    }
-    const failures = rows.filter((row) => row.utilisation > 1);
-    const worstRow = rows.reduce((best, row) => (row.utilisation > best.utilisation ? row : best));
-    const csv = toCsv(
+    const {
+      csv,
+      failures,
+      worst: worstRow,
+    } = checkTable(
+      rows,
       [
         'Column',
         'Footing',
@@ -292,7 +288,7 @@ export const foundationCheck = defineCommand({
         'Status',
         'Combination',
       ],
-      rows.map((row) => [
+      (row, status) => [
         row.column,
         row.footing,
         row.check,
@@ -300,10 +296,16 @@ export const foundationCheck = defineCommand({
         round(row.limit),
         row.unit,
         round(row.utilisation),
-        row.utilisation > 1 ? 'FAIL' : 'OK',
+        status,
         row.combination,
-      ]),
+      ],
     );
+    if (!worstRow) {
+      return noop(
+        doc,
+        `check_foundations failed: no portal frame column with a footing or base plate on level '${levelId}'.`,
+      );
+    }
     const failureIds = [...new Set(failures.map((row) => row.elementId))];
     return {
       document: doc,

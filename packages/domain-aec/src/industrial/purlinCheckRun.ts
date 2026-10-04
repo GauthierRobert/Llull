@@ -8,7 +8,6 @@ import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { toCsv } from '../scheduleBuild';
 import { findProfile } from '../steel/profiles';
 import { ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from './frameModelTypes';
 import { purlinWind } from './purlinWind';
@@ -33,7 +32,7 @@ import {
 } from './purlinModel';
 import { beamVerdicts, freeFlangeReduction, governing } from './purlinSection';
 import { round } from '../numeric';
-import { failureSummary } from './checkReport';
+import { checkTable, failureSummary } from './checkReport';
 
 /**
  * @command check_purlins
@@ -390,15 +389,11 @@ export const checkPurlins = defineCommand({
       record('wall', zone, CPE_WALL[zone], worst.utilisation);
     }
 
-    const worst = rows.reduce<PurlinRow | null>(
-      (best, row) => (best === null || row.utilisation > best.utilisation ? row : best),
-      null,
-    );
-    const failures = rows.filter((row) => row.utilisation > 1);
     const zones = [...zoneStats.values()].sort((a, b) =>
       `${a.surface}${a.zone}` < `${b.surface}${b.zone}` ? -1 : 1,
     );
-    const csv = toCsv(
+    const { csv, failures, worst } = checkTable(
+      rows,
       [
         'Mark',
         'Type',
@@ -412,7 +407,7 @@ export const checkPurlins = defineCommand({
         'Status',
         'Combination',
       ],
-      rows.map((row) => [
+      (row, status) => [
         row.mark,
         row.kind,
         row.zone,
@@ -422,9 +417,9 @@ export const checkPurlins = defineCommand({
         round(row.limit),
         row.unit,
         round(row.utilisation),
-        row.utilisation > 1 ? 'FAIL' : 'OK',
+        status,
         row.combination,
-      ]),
+      ],
     );
     const purlinRows = rows.filter((row) => row.kind === 'purlin');
     const maxOf = (list: readonly PurlinRow[]): number =>

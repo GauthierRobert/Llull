@@ -8,7 +8,6 @@ import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { toCsv } from '../scheduleBuild';
 import { craneCapacityOf, HOISTING_CLASSES, type CraneModel } from './frameModelTypes';
 import {
   CLASSES,
@@ -21,7 +20,7 @@ import {
 } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
 import { round } from '../numeric';
-import { failureSummary } from './checkReport';
+import { checkTable, failureSummary } from './checkReport';
 
 /**
  * @command check_crane_runways
@@ -244,15 +243,8 @@ export const runwayCheck = defineCommand({
       capacities.add(capacity);
       rows.push(...beamRows);
     }
-    if (beams === 0) {
-      return noop(
-        doc,
-        `check_crane_runways failed: no crane runway beam with a known capacity on level '${levelId}' (add_crane_runway first, or pass craneCapacity).`,
-      );
-    }
-    const failures = rows.filter((row) => row.utilisation > 1);
-    const worst = rows.reduce((best, row) => (row.utilisation > best.utilisation ? row : best));
-    const csv = toCsv(
+    const { csv, failures, worst } = checkTable(
+      rows,
       [
         'Beam',
         'Mark',
@@ -266,7 +258,7 @@ export const runwayCheck = defineCommand({
         'Utilisation',
         'Status',
       ],
-      rows.map((row) => [
+      (row, status) => [
         row.elementId,
         row.mark,
         row.profile,
@@ -277,9 +269,15 @@ export const runwayCheck = defineCommand({
         row.limit,
         row.unit,
         row.utilisation,
-        row.utilisation > 1 ? 'FAIL' : 'OK',
-      ]),
+        status,
+      ],
     );
+    if (beams === 0 || !worst) {
+      return noop(
+        doc,
+        `check_crane_runways failed: no crane runway beam with a known capacity on level '${levelId}' (add_crane_runway first, or pass craneCapacity).`,
+      );
+    }
     return {
       document: doc,
       summary:
