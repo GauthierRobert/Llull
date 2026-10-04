@@ -11,16 +11,16 @@ import {
   elementAffected,
   fromMm,
   getBuilding,
-  isFiniteNumber,
   isVec2,
   nextElementId,
   nextMark,
-  noChange,
   resolveLevel,
   toMetres,
   toVec2,
   withElement,
 } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { toVec3 } from './memberSupport';
 
@@ -55,7 +55,7 @@ export const addEquipment = defineCommand({
   ): CommandResult => {
     const dimensions = toVec3(size);
     if (name.trim() === '' || !isVec2(location)) {
-      return noChange(doc, 'add_equipment failed: name and location [x, y] are required.');
+      return noop(doc, 'add_equipment failed: name and location [x, y] are required.');
     }
     if (
       !dimensions ||
@@ -63,7 +63,7 @@ export const addEquipment = defineCommand({
       Array.isArray(size) === false ||
       size.length !== 3
     ) {
-      return noChange(doc, 'add_equipment failed: size must be [length, width, height], all > 0.');
+      return noop(doc, 'add_equipment failed: size must be [length, width, height], all > 0.');
     }
     const resolvedClearance = clearance ?? fromMm(doc, 800);
     if (
@@ -73,10 +73,10 @@ export const addEquipment = defineCommand({
       !isFiniteNumber(weight) ||
       weight < 0
     ) {
-      return noChange(doc, 'add_equipment failed: angle finite, clearance >= 0 and weight >= 0.');
+      return noop(doc, 'add_equipment failed: angle finite, clearance >= 0 and weight >= 0.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
-    if (!resolution.ok) return noChange(doc, `add_equipment failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_equipment failed: ${resolution.reason}.`);
     const equipment: EquipmentElement = {
       id: nextElementId(resolution.building, 'equipment'),
       category: 'equipment',
@@ -126,7 +126,7 @@ export const addPipeRun = defineCommand({
   run: (doc, { points, diameter, service, material, levelId }): CommandResult => {
     const route = Array.isArray(points) ? points.map(toVec3) : [];
     if (route.length < 2 || route.some((point) => point === null)) {
-      return noChange(doc, 'add_pipe_run failed: points must be ≥ 2 [x, y, z] points.');
+      return noop(doc, 'add_pipe_run failed: points must be ≥ 2 [x, y, z] points.');
     }
     const path = route as Vec3[];
     const repeated = path.some(
@@ -138,13 +138,10 @@ export const addPipeRun = defineCommand({
     );
     const resolvedDiameter = diameter ?? fromMm(doc, 114.3);
     if (repeated || !isFiniteNumber(resolvedDiameter) || resolvedDiameter <= 0) {
-      return noChange(
-        doc,
-        'add_pipe_run failed: consecutive points must differ and diameter be > 0.',
-      );
+      return noop(doc, 'add_pipe_run failed: consecutive points must differ and diameter be > 0.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
-    if (!resolution.ok) return noChange(doc, `add_pipe_run failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_pipe_run failed: ${resolution.reason}.`);
     const pipe: PipeElement = {
       id: nextElementId(resolution.building, 'pipe'),
       category: 'pipe',

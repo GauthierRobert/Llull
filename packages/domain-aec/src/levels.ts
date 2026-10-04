@@ -11,13 +11,13 @@ import {
   fromMm,
   getBuilding,
   dependenciesOf,
-  isFiniteNumber,
   nextLevelId,
-  noChange,
   sortLevelOrder,
   withLevel,
   withoutElements,
 } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { openingFitIssues } from './walls';
 
@@ -62,7 +62,7 @@ export const addLevel = defineCommand({
       !isFiniteNumber(resolvedHeight) ||
       resolvedHeight <= 0
     ) {
-      return noChange(
+      return noop(
         doc,
         `add_level failed: elevation must be finite and height > 0 (got elevation=${String(elevation)}, height=${String(height)}).`,
       );
@@ -108,12 +108,12 @@ export const updateLevel = defineCommand({
   run: (doc, { levelId, name, elevation, height }): CommandResult => {
     const building = getBuilding(doc);
     const level = building.levels[levelId];
-    if (!level) return noChange(doc, `update_level failed: no level '${levelId}'.`);
+    if (!level) return noop(doc, `update_level failed: no level '${levelId}'.`);
     if (elevation !== undefined && !isFiniteNumber(elevation)) {
-      return noChange(doc, 'update_level failed: elevation must be finite.');
+      return noop(doc, 'update_level failed: elevation must be finite.');
     }
     if (height !== undefined && (!isFiniteNumber(height) || height <= 0)) {
-      return noChange(doc, 'update_level failed: height must be > 0.');
+      return noop(doc, 'update_level failed: height must be > 0.');
     }
     const updated: BuildingLevel = {
       ...level,
@@ -137,7 +137,7 @@ export const updateLevel = defineCommand({
       elements,
     };
     const issues = openingFitIssues(next, new Set([levelId]));
-    if (issues.length > 0) return noChange(doc, `update_level refused: ${issues[0]}.`);
+    if (issues.length > 0) return noop(doc, `update_level refused: ${issues[0]}.`);
     const document = regenerateBuilding(doc, next);
     return {
       document,
@@ -174,8 +174,7 @@ export const deleteLevel = defineCommand({
   }),
   run: (doc, { levelId, deleteElements = false }): CommandResult => {
     const building = getBuilding(doc);
-    if (!building.levels[levelId])
-      return noChange(doc, `delete_level failed: no level '${levelId}'.`);
+    if (!building.levels[levelId]) return noop(doc, `delete_level failed: no level '${levelId}'.`);
     const onLevel = new Set(
       Object.values(building.elements)
         .filter((element) => 'levelId' in element && element.levelId === levelId)
@@ -185,7 +184,7 @@ export const deleteLevel = defineCommand({
       if (dependenciesOf(element).some((id) => onLevel.has(id))) onLevel.add(element.id);
     }
     if (onLevel.size > 0 && !deleteElements) {
-      return noChange(
+      return noop(
         doc,
         `delete_level refused: level ${levelId} hosts ${onLevel.size} element(s). Pass deleteElements: true to delete them too.`,
       );
@@ -218,9 +217,9 @@ export const setActiveLevel = defineCommand({
   run: (doc, { levelId }): CommandResult => {
     const building = getBuilding(doc);
     const level = building.levels[levelId];
-    if (!level) return noChange(doc, `set_active_level failed: no level '${levelId}'.`);
+    if (!level) return noop(doc, `set_active_level failed: no level '${levelId}'.`);
     if (building.activeLevelId === levelId) {
-      return noChange(doc, `Level ${levelId} "${level.name}" is already active.`);
+      return noop(doc, `Level ${levelId} "${level.name}" is already active.`);
     }
     return {
       document: { ...doc, building: { ...building, activeLevelId: levelId } },
@@ -265,7 +264,7 @@ export const setProjectInfo = defineCommand({
     }
     const changed = Object.keys(changes);
     if (changed.length === 0) {
-      return noChange(
+      return noop(
         doc,
         `set_project_info: no fields given (allowed: ${PROJECT_FIELDS.join(', ')}).`,
       );

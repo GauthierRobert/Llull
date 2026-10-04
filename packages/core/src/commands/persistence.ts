@@ -7,20 +7,7 @@
  * @failure invalid JSON / wrong format or version / structural or value validation error -> no-op, affected:[]
  */
 
-import type {
-  CadDocument,
-  Component,
-  Configuration,
-  Constraint,
-  DocumentUnit,
-  FeatureStep,
-  Joint,
-  DriveRelation,
-  Parameter,
-  Animation,
-  Material,
-  Recipe,
-} from '../model/types';
+import type { CadDocument, DocumentUnit, FeatureStep } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { isRecord } from '../lib/isRecord';
@@ -108,113 +95,49 @@ function restoreDerivedEntities(raw: Record<string, unknown>): Record<string, un
   return documentExtensions().reduce((current, extension) => extension.restore(current), raw);
 }
 
+/** Optional document collections, in output key order; absent (older files) -> empty default. */
+const COLLECTION_DEFAULTS: ReadonlyArray<readonly [string, 'record' | 'array']> = [
+  ['parameters', 'record'],
+  ['animations', 'record'],
+  ['featureHistory', 'array'],
+  ['configurations', 'record'],
+  ['materials', 'record'],
+  ['groups', 'record'],
+  ['recipes', 'record'],
+  ['components', 'record'],
+  ['constraints', 'record'],
+  ['constraintOrder', 'array'],
+  ['joints', 'record'],
+  ['jointOrder', 'array'],
+  ['driveRelations', 'record'],
+  ['driveRelationOrder', 'array'],
+];
+
 /**
- * Upgrade a raw document object from an older schema version to the current one.
- *
- * This is the SINGLE place where back-compat defaults and structural upgrades live.
- * When a new optional field is added to `CadDocument`, add a default here instead of
- * scattering ad-hoc defaults through `deserializeDocument`.
- *
- * @param raw   - The raw document object (already passed shape validation).
- * @param _fromVersion - The envelope `version` field (for future multi-step migrations).
- * @returns A new object with all missing fields filled in to current defaults.
+ * Upgrade a raw document object (already shape-validated) to the current schema: the SINGLE
+ * place for back-compat defaults. A new optional `CadDocument` field gets its default here.
  */
-function migrate(raw: Record<string, unknown>, _fromVersion: number): Record<string, unknown> {
-  // Units
+function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   const units: DocumentUnit =
     typeof raw['units'] === 'string' && VALID_UNITS.has(raw['units'])
       ? (raw['units'] as DocumentUnit)
       : 'mm';
-
-  // Display precision
   const displayPrecision: number =
     typeof raw['displayPrecision'] === 'number' &&
     raw['displayPrecision'] >= 0 &&
     Number.isInteger(raw['displayPrecision'])
       ? raw['displayPrecision']
       : 3;
-
-  // Parameters
-  const parameters: Record<string, Parameter> = isRecord(raw['parameters'])
-    ? (raw['parameters'] as Record<string, Parameter>)
-    : {};
-
-  // Animations
-  const animations: Record<string, Animation> = isRecord(raw['animations'])
-    ? (raw['animations'] as Record<string, Animation>)
-    : {};
-
-  // Feature history
-  const featureHistory: FeatureStep[] = Array.isArray(raw['featureHistory'])
-    ? (raw['featureHistory'] as FeatureStep[])
-    : [];
-
-  // Configurations
-  const configurations: Record<string, Configuration> = isRecord(raw['configurations'])
-    ? (raw['configurations'] as Record<string, Configuration>)
-    : {};
-
-  // Materials
-  const materials: Record<string, Material> = isRecord(raw['materials'])
-    ? (raw['materials'] as Record<string, Material>)
-    : {};
-
-  // Optional collections below: absent in older files -> empty default.
-  const groups: Record<string, unknown> = isRecord(raw['groups'])
-    ? (raw['groups'] as Record<string, unknown>)
-    : {};
-
-  const recipes: Record<string, Recipe> = isRecord(raw['recipes'])
-    ? (raw['recipes'] as Record<string, Recipe>)
-    : {};
-
-  const components: Record<string, Component> = isRecord(raw['components'])
-    ? (raw['components'] as Record<string, Component>)
-    : {};
-
-  const constraints: Record<string, Constraint> = isRecord(raw['constraints'])
-    ? (raw['constraints'] as Record<string, Constraint>)
-    : {};
-
-  const constraintOrder: string[] = Array.isArray(raw['constraintOrder'])
-    ? (raw['constraintOrder'] as string[])
-    : [];
-
-  const joints: Record<string, Joint> = isRecord(raw['joints'])
-    ? (raw['joints'] as Record<string, Joint>)
-    : {};
-
-  const jointOrder: string[] = Array.isArray(raw['jointOrder'])
-    ? (raw['jointOrder'] as string[])
-    : [];
-
-  const driveRelations: Record<string, DriveRelation> = isRecord(raw['driveRelations'])
-    ? (raw['driveRelations'] as Record<string, DriveRelation>)
-    : {};
-
-  const driveRelationOrder: string[] = Array.isArray(raw['driveRelationOrder'])
-    ? (raw['driveRelationOrder'] as string[])
-    : [];
-
-  return {
-    ...raw,
-    units,
-    displayPrecision,
-    parameters,
-    animations,
-    featureHistory,
-    configurations,
-    materials,
-    groups,
-    recipes,
-    components,
-    constraints,
-    constraintOrder,
-    joints,
-    jointOrder,
-    driveRelations,
-    driveRelationOrder,
-  };
+  const collections = Object.fromEntries(
+    COLLECTION_DEFAULTS.map(([key, shape]) => {
+      const value = raw[key];
+      return [
+        key,
+        shape === 'record' ? (isRecord(value) ? value : {}) : Array.isArray(value) ? value : [],
+      ];
+    }),
+  );
+  return { ...raw, units, displayPrecision, ...collections };
 }
 
 /**
@@ -268,9 +191,7 @@ export function deserializeDocument(json: string): CadDocument {
   }
 
   // Apply migration (fills in back-compat defaults for optional fields).
-  const migratedDoc = withSafeStepCounter(
-    restoreDerivedEntities(migrate(rawDoc, parsed['version'] as number)),
-  );
+  const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrate(rawDoc)));
 
   // Deep value validation on the migrated document.
   const valueErrors = validateDocumentValues(migratedDoc);

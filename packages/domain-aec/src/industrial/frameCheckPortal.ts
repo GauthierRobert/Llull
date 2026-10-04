@@ -5,7 +5,9 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { getBuilding, isFiniteNumber, noChange } from '../model';
+import { getBuilding } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { toCsv } from '../scheduleBuild';
 import type { CraneModel, FrameLoads } from './frameModelTypes';
 import { checkFrames } from './frameCheckFrames';
@@ -159,8 +161,7 @@ export const checkPortalFrames = defineCommand({
   params: z.object(FRAME_LOAD_SHAPE),
   run: (doc, params): CommandResult => {
     const resolved = resolveFrameLoads(doc, params);
-    if ('reason' in resolved)
-      return noChange(doc, `check_portal_frames failed: ${resolved.reason}.`);
+    if ('reason' in resolved) return noop(doc, `check_portal_frames failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     const { rows, frames, skipped, combinations, minAlphaCritical } = checkFrames(
       doc,
@@ -168,7 +169,7 @@ export const checkPortalFrames = defineCommand({
       loads,
     );
     if (frames === 0) {
-      return noChange(
+      return noop(
         doc,
         `check_portal_frames failed: no analysable portal frame on the level${skipped.length > 0 ? ` (${skipped.join(', ')})` : ''}.`,
       );

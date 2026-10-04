@@ -1,13 +1,12 @@
 import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
+import { add3, sub3 } from '../lib/vec3';
 import { type Bounds } from './sceneTypes';
 
-function offset(p: Vec3, dx: number, dy: number, dz: number): Vec3 {
-  return [p[0] + dx, p[1] + dy, p[2] + dz];
-}
+const ORIGIN: Vec3 = [0, 0, 0];
 
 /** Min/max of a flat xyz position array (`[x0, y0, z0, x1, ...]`); needs at least one full triple. */
-export function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
+function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
   let minX = Infinity,
     minY = Infinity,
     minZ = Infinity;
@@ -49,164 +48,130 @@ export function pointsExtent(points: ReadonlyArray<readonly [number, number]>): 
   return { minX, minY, maxX, maxY };
 }
 
-/** World-space AABB of one entity, matching how the viewport places each kind. */
-export function entityBounds(e: Entity): Bounds {
+const bounds = (min: Vec3, max: Vec3): Bounds => ({ min, max });
+
+/** Axis-aligned box centered on the origin. */
+const centered = (x: number, y: number, z: number): Bounds => bounds([-x, -y, -z], [x, y, z]);
+
+/** Local-space AABB of a `mesh`: its world-space positions re-expressed relative to `position`. */
+function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
+  const p = e.mesh.positions;
+  if (p.length < 3) return bounds(ORIGIN, ORIGIN);
+  const { min, max } = positionsExtent(p);
+  return bounds(sub3(min, e.position), sub3(max, e.position));
+}
+
+/**
+ * AABB of one entity in its own frame (before `rotation` / `position`), matching how the
+ * viewport places each kind. Mesh positions are world-space, so their local bounds are
+ * relative to `position`.
+ */
+export function localBounds(e: Entity): Bounds {
   switch (e.kind) {
-    case 'box': {
-      const [w, h, d] = e.size;
-      return {
-        min: offset(e.position, -w / 2, -h / 2, -d / 2),
-        max: offset(e.position, w / 2, h / 2, d / 2),
-      };
-    }
+    case 'box':
+      return centered(e.size[0] / 2, e.size[1] / 2, e.size[2] / 2);
     case 'cylinder':
       // Z-up: axis along Z, centered at position (matches render.ts / export.ts).
-      return {
-        min: offset(e.position, -e.radius, -e.radius, -e.height / 2),
-        max: offset(e.position, e.radius, e.radius, e.height / 2),
-      };
+      return centered(e.radius, e.radius, e.height / 2);
     case 'sphere':
-      return {
-        min: offset(e.position, -e.radius, -e.radius, -e.radius),
-        max: offset(e.position, e.radius, e.radius, e.radius),
-      };
+      return centered(e.radius, e.radius, e.radius);
     case 'extrusion': {
-      const { minX, minY, maxX, maxY } = pointsExtent(e.profile);
       // ExtrudeGeometry extrudes along +Z from the profile plane.
-      return {
-        min: offset(e.position, minX, minY, 0),
-        max: offset(e.position, maxX, maxY, e.depth),
-      };
+      const { minX, minY, maxX, maxY } = pointsExtent(e.profile);
+      return bounds([minX, minY, 0], [maxX, maxY, e.depth]);
     }
-    case 'mesh': {
-      const p = e.mesh.positions;
-      if (p.length < 3) return { min: e.position, max: e.position };
-      return positionsExtent(p);
-    }
+    case 'mesh':
+      return meshLocalBounds(e);
     case 'cone':
-      // Base circle centered at position in XY; apex at position+height in Z.
-      return {
-        min: offset(e.position, -e.radius, -e.radius, 0),
-        max: offset(e.position, e.radius, e.radius, e.height),
-      };
-    case 'torus':
-      // Torus ring in XY plane: outer extent is ringRadius+tubeRadius; tube extends ±tubeRadius in Z.
-      return {
-        min: offset(
-          e.position,
-          -(e.ringRadius + e.tubeRadius),
-          -(e.ringRadius + e.tubeRadius),
-          -e.tubeRadius,
-        ),
-        max: offset(
-          e.position,
-          e.ringRadius + e.tubeRadius,
-          e.ringRadius + e.tubeRadius,
-          e.tubeRadius,
-        ),
-      };
-    case 'wedge': {
-      // Wedge lower-front-left corner is at position; bounding box is the full size.
-      const [ww, wh, wd] = e.size;
-      return { min: e.position, max: offset(e.position, ww, wh, wd) };
+      // Base circle in XY; apex at +height in Z.
+      return bounds([-e.radius, -e.radius, 0], [e.radius, e.radius, e.height]);
+    case 'torus': {
+      // Ring in XY: outer extent is ringRadius+tubeRadius; tube extends ±tubeRadius in Z.
+      const outer = e.ringRadius + e.tubeRadius;
+      return centered(outer, outer, e.tubeRadius);
     }
-    case 'pyramid': {
-      // Base centered at position; apex at position+height in Z.
-      const hw = e.baseWidth / 2;
-      const hd = e.baseDepth / 2;
-      return {
-        min: offset(e.position, -hw, -hd, 0),
-        max: offset(e.position, hw, hd, e.height),
-      };
-    }
+    case 'wedge':
+      // Lower-front-left corner at position; extends +X/+Y/+Z by size.
+      return bounds(ORIGIN, e.size);
+    case 'pyramid':
+      return bounds(
+        [-e.baseWidth / 2, -e.baseDepth / 2, 0],
+        [e.baseWidth / 2, e.baseDepth / 2, e.height],
+      );
     case 'revolution': {
-      // Conservative AABB: max radial offset sweeps a cylinder around the axis.
-      // We compute the bounding box of the swept profile for the primary axes only.
-      // For non-axis-aligned axes the bounds are conservative (a cube wrapping the cylinder).
+      // Conservative: radial extent around the world axis closest to `axis`, axial extent from the profile.
       const maxR = e.profile.reduce((m, [x]) => Math.max(m, Math.abs(x)), 0);
-      const axialValues = e.profile.map(([, y]) => y);
-      const minAxial = Math.min(...axialValues);
-      const maxAxial = Math.max(...axialValues);
-      const [ax, ay, az] = e.axis;
-      // Determine which world axis the revolution axis aligns with (largest component).
-      const abx = Math.abs(ax),
-        aby = Math.abs(ay),
-        abz = Math.abs(az);
-      if (abz >= abx && abz >= aby) {
-        // Z-axis revolution: radial in XY, axial in Z
-        return {
-          min: offset(e.position, -maxR, -maxR, minAxial),
-          max: offset(e.position, maxR, maxR, maxAxial),
-        };
-      } else if (aby >= abx) {
-        // Y-axis revolution: radial in XZ, axial in Y
-        return {
-          min: offset(e.position, -maxR, minAxial, -maxR),
-          max: offset(e.position, maxR, maxAxial, maxR),
-        };
-      } else {
-        // X-axis revolution: radial in YZ, axial in X
-        return {
-          min: offset(e.position, minAxial, -maxR, -maxR),
-          max: offset(e.position, maxAxial, maxR, maxR),
-        };
-      }
+      const minAxial = Math.min(...e.profile.map(([, y]) => y));
+      const maxAxial = Math.max(...e.profile.map(([, y]) => y));
+      const [abx, aby, abz] = e.axis.map(Math.abs) as [number, number, number];
+      if (abz >= abx && abz >= aby) return bounds([-maxR, -maxR, minAxial], [maxR, maxR, maxAxial]);
+      if (aby >= abx) return bounds([-maxR, minAxial, -maxR], [maxR, maxAxial, maxR]);
+      return bounds([minAxial, -maxR, -maxR], [maxAxial, maxR, maxR]);
     }
     case 'line': {
-      const minX = Math.min(e.start[0], e.end[0]);
-      const maxX = Math.max(e.start[0], e.end[0]);
-      const minY = Math.min(e.start[1], e.end[1]);
-      const maxY = Math.max(e.start[1], e.end[1]);
-      return { min: offset(e.position, minX, minY, 0), max: offset(e.position, maxX, maxY, 0) };
+      const { minX, minY, maxX, maxY } = pointsExtent([e.start, e.end]);
+      return bounds([minX, minY, 0], [maxX, maxY, 0]);
     }
-    case 'polyline': {
-      if (e.points.length === 0) return { min: e.position, max: e.position };
+    case 'polyline':
+    case 'spline': {
       const { minX, minY, maxX, maxY } = pointsExtent(e.points);
-      return { min: offset(e.position, minX, minY, 0), max: offset(e.position, maxX, maxY, 0) };
+      return bounds([minX, minY, 0], [maxX, maxY, 0]);
     }
     case 'arc':
     case 'circle':
       // Conservative: full center±radius box (arcs are not angle-trimmed here).
-      return {
-        min: offset(e.position, e.center[0] - e.radius, e.center[1] - e.radius, 0),
-        max: offset(e.position, e.center[0] + e.radius, e.center[1] + e.radius, 0),
-      };
+      return bounds(
+        [e.center[0] - e.radius, e.center[1] - e.radius, 0],
+        [e.center[0] + e.radius, e.center[1] + e.radius, 0],
+      );
     case 'rectangle':
       // Origin at lower-left; extends +X (width), +Y (height).
-      return { min: e.position, max: offset(e.position, e.width, e.height, 0) };
-    case 'point':
-      return { min: e.position, max: e.position };
+      return bounds(ORIGIN, [e.width, e.height, 0]);
     case 'ellipse':
-      return {
-        min: offset(e.position, e.center[0] - e.radiusX, e.center[1] - e.radiusY, 0),
-        max: offset(e.position, e.center[0] + e.radiusX, e.center[1] + e.radiusY, 0),
-      };
-    case 'spline': {
-      if (e.points.length === 0) return { min: e.position, max: e.position };
-      const { minX, minY, maxX, maxY } = pointsExtent(e.points);
-      return { min: offset(e.position, minX, minY, 0), max: offset(e.position, maxX, maxY, 0) };
-    }
-    case 'text': {
-      // Estimated width using a monospace approximation: each glyph ≈ 0.6×height.
-      const estimatedWidth = e.content.length * e.height * 0.6;
-      return { min: e.position, max: offset(e.position, estimatedWidth, e.height, 0) };
-    }
+      return bounds(
+        [e.center[0] - e.radiusX, e.center[1] - e.radiusY, 0],
+        [e.center[0] + e.radiusX, e.center[1] + e.radiusY, 0],
+      );
+    case 'text':
+      // Monospace estimate: each glyph ≈ 0.6×height wide.
+      return bounds(ORIGIN, [e.content.length * e.height * 0.6, e.height, 0]);
     case 'dimension': {
-      // Dimensions have no own geometry — produce a small AABB around the entity position
-      // using the offset (witness-line distance) as a proxy for the annotation extent.
+      // No own geometry: a small box sized by the witness-line offset.
       const ext = e.offset ?? 5;
-      return { min: offset(e.position, -ext, -ext, 0), max: offset(e.position, ext, ext, 0) };
+      return bounds([-ext, -ext, 0], [ext, ext, 0]);
     }
-    case 'instance': {
-      // Instance bounds without component access: return a point at the instance position.
-      // Callers with doc access should use instanceBoundsFromDoc() for accurate bounds.
-      return { min: e.position, max: e.position };
-    }
-    default: {
-      const exhaustive: never = e;
-      return { min: (exhaustive as Entity).position, max: (exhaustive as Entity).position };
-    }
+    case 'point':
+    case 'instance':
+      // Instances need the document for real bounds: use `instanceBoundsFromDoc`.
+      return bounds(ORIGIN, ORIGIN);
   }
+}
+
+/** World-space AABB of one entity, matching how the viewport places each kind. */
+export function entityBounds(e: Entity): Bounds {
+  if (e.kind === 'mesh') {
+    // Mesh positions are already world-space.
+    const p = e.mesh.positions;
+    return p.length < 3 ? bounds(e.position, e.position) : positionsExtent(p);
+  }
+  const { min, max } = localBounds(e);
+  return bounds(add3(e.position, min), add3(e.position, max));
+}
+
+/** The 8 corners of an AABB. */
+export function boundsCorners({ min, max }: Bounds): Vec3[] {
+  return [min[2], max[2]].flatMap((z) => [
+    [min[0], min[1], z] as Vec3,
+    [max[0], min[1], z] as Vec3,
+    [max[0], max[1], z] as Vec3,
+    [min[0], max[1], z] as Vec3,
+  ]);
+}
+
+/** Tight AABB of a non-empty point set. */
+export function boundsOfPoints(points: readonly Vec3[]): Bounds {
+  const { min, max } = positionsExtent(points.flat());
+  return { min, max };
 }
 
 /**
@@ -224,60 +189,21 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
     return { min: instance.position, max: instance.position };
   }
 
-  const scale = instance.scale ?? ([1, 1, 1] as const);
-  const [sx, sy, sz] = scale;
-  const rot = instance.rotation;
-  const pos = instance.position;
-  const hasRotation = !isZeroRotation(rot);
+  const { scale = [1, 1, 1], rotation, position } = instance;
+  const hasRotation = !isZeroRotation(rotation);
 
-  let combined: Bounds | null = null;
-
+  const worldPoints: Vec3[] = [];
   for (const cid of component.order) {
     const child = component.entities[cid];
     if (!child) continue;
-
-    const localBounds = entityBounds(child);
-    const lMin = localBounds.min;
-    const lMax = localBounds.max;
-    const corners: Vec3[] = [
-      [lMin[0], lMin[1], lMin[2]],
-      [lMax[0], lMin[1], lMin[2]],
-      [lMin[0], lMax[1], lMin[2]],
-      [lMax[0], lMax[1], lMin[2]],
-      [lMin[0], lMin[1], lMax[2]],
-      [lMax[0], lMin[1], lMax[2]],
-      [lMin[0], lMax[1], lMax[2]],
-      [lMax[0], lMax[1], lMax[2]],
-    ];
-
-    for (const c of corners) {
-      // Scale
-      const scaled: Vec3 = [c[0] * sx, c[1] * sy, c[2] * sz];
-      // Rotate around component origin
-      const rotated: Vec3 = hasRotation ? applyEulerXYZ(scaled, [0, 0, 0], rot) : scaled;
-      // Translate
-      const world: Vec3 = [rotated[0] + pos[0], rotated[1] + pos[1], rotated[2] + pos[2]];
-
-      if (!combined) {
-        combined = { min: [world[0], world[1], world[2]], max: [world[0], world[1], world[2]] };
-      } else {
-        combined = {
-          min: [
-            Math.min(combined.min[0], world[0]),
-            Math.min(combined.min[1], world[1]),
-            Math.min(combined.min[2], world[2]),
-          ],
-          max: [
-            Math.max(combined.max[0], world[0]),
-            Math.max(combined.max[1], world[1]),
-            Math.max(combined.max[2], world[2]),
-          ],
-        };
-      }
+    for (const c of boundsCorners(entityBounds(child))) {
+      const scaled: Vec3 = [c[0] * scale[0], c[1] * scale[1], c[2] * scale[2]];
+      // Rotate around the component origin, then translate.
+      const rotated = hasRotation ? applyEulerXYZ(scaled, ORIGIN, rotation) : scaled;
+      worldPoints.push(add3(rotated, position));
     }
   }
-
-  return combined ?? { min: instance.position, max: instance.position };
+  return worldPoints.length > 0 ? boundsOfPoints(worldPoints) : bounds(position, position);
 }
 
 export function mergeBounds(a: Bounds, b: Bounds): Bounds {

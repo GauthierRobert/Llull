@@ -77,33 +77,23 @@ function buildGroundGrid(
   width: number,
   height: number,
 ): string {
-  // Project a ±orthoHalf grid (5×5) at Z=0
   const GRID_LINES = 5;
   const step = (orthoHalf * 2) / GRID_LINES;
   const start = -orthoHalf;
   const end = orthoHalf;
-  // Grid center at world origin
   const cx = cam.target[0],
     cy = cam.target[1];
+  const screen = (x: number, y: number): [number, number] => {
+    const [u, v] = projectPoint([cx + x, cy + y, 0], cam, basis);
+    return toScreenCoords(u, v, orthoHalf, width, height);
+  };
+  const gridLine = (a: [number, number], b: [number, number]): string =>
+    `<line x1="${r2(a[0])}" y1="${r2(a[1])}" x2="${r2(b[0])}" y2="${r2(b[1])}" stroke="#333355" stroke-width="0.5"/>`;
   const parts: string[] = [];
   for (let i = 0; i <= GRID_LINES; i++) {
     const offset = start + step * i;
-    // Horizontal lines (constant Y, vary X)
-    const p0 = projectPoint([cx + start, cy + offset, 0], cam, basis);
-    const p1 = projectPoint([cx + end, cy + offset, 0], cam, basis);
-    const s0 = toScreenCoords(p0[0], p0[1], orthoHalf, width, height);
-    const s1 = toScreenCoords(p1[0], p1[1], orthoHalf, width, height);
-    parts.push(
-      `<line x1="${r2(s0[0])}" y1="${r2(s0[1])}" x2="${r2(s1[0])}" y2="${r2(s1[1])}" stroke="#333355" stroke-width="0.5"/>`,
-    );
-    // Vertical lines (constant X, vary Y)
-    const q0 = projectPoint([cx + offset, cy + start, 0], cam, basis);
-    const q1 = projectPoint([cx + offset, cy + end, 0], cam, basis);
-    const sq0 = toScreenCoords(q0[0], q0[1], orthoHalf, width, height);
-    const sq1 = toScreenCoords(q1[0], q1[1], orthoHalf, width, height);
-    parts.push(
-      `<line x1="${r2(sq0[0])}" y1="${r2(sq0[1])}" x2="${r2(sq1[0])}" y2="${r2(sq1[1])}" stroke="#333355" stroke-width="0.5"/>`,
-    );
+    parts.push(gridLine(screen(start, offset), screen(end, offset))); // constant Y
+    parts.push(gridLine(screen(offset, start), screen(offset, end))); // constant X
   }
   return `  <g id="grid">${parts.join('')}</g>`;
 }

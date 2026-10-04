@@ -13,50 +13,24 @@
  *          Solver non-convergence → best-effort positions returned, converged:false in data.
  */
 
-import type { CadDocument, Constraint, ConstraintKind, EntityRef } from '../model/types';
+import type { CadDocument, Constraint } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { runSolver } from './constraintSolver';
+import { noop } from './noop';
 
-const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
-  'coincident',
-  'parallel',
-  'perpendicular',
-  'tangent',
-  'distance',
-  'angle',
-]);
-
-function isEntityRef(v: unknown): v is EntityRef {
-  if (typeof v !== 'object' || v === null) return false;
-  const obj = v as Record<string, unknown>;
-  if (typeof obj['entityId'] !== 'string' || obj['entityId'].length === 0) return false;
-  if ('kind' in obj) {
-    const k = obj['kind'];
-    if (k !== 'start' && k !== 'end' && k !== 'center' && k !== 'mid') return false;
-  }
-  return true;
-}
-
-function isValidValue(v: unknown): v is number | string {
-  return typeof v === 'number' || typeof v === 'string';
-}
-
-/** Validate a raw constraint object. Returns an error string or null on success. */
-function validateConstraintShape(v: unknown): string | null {
-  if (typeof v !== 'object' || v === null) return 'constraint is not an object';
-  const obj = v as Record<string, unknown>;
-  const kind = obj['kind'];
-  if (typeof kind !== 'string' || !VALID_CONSTRAINT_KINDS.has(kind)) {
-    return `unknown constraint kind '${String(kind)}'`;
-  }
-  if (!isEntityRef(obj['a'])) return `constraint.a must be a valid EntityRef (has entityId)`;
-  if (!isEntityRef(obj['b'])) return `constraint.b must be a valid EntityRef (has entityId)`;
-  if (kind === 'distance' || kind === 'angle') {
-    if (!isValidValue(obj['value'])) {
-      return `constraint kind '${kind}' requires a numeric or string 'value' field`;
-    }
+/** Semantic checks zod cannot express: non-empty entity ids; `value` on dimensional kinds. */
+function validateConstraintShape(c: {
+  kind: string;
+  a: { entityId: string };
+  b: { entityId: string };
+  value?: unknown;
+}): string | null {
+  if (c.a.entityId.length === 0) return `constraint.a must be a valid EntityRef (has entityId)`;
+  if (c.b.entityId.length === 0) return `constraint.b must be a valid EntityRef (has entityId)`;
+  if ((c.kind === 'distance' || c.kind === 'angle') && c.value === undefined) {
+    return `constraint kind '${c.kind}' requires a numeric or string 'value' field`;
   }
   return null;
 }
@@ -141,24 +115,18 @@ export const addConstraint = defineCommand({
   run: (doc, { constraint, id }): CommandResult => {
     const err = validateConstraintShape(constraint);
     if (err !== null) {
-      return {
-        document: doc,
-        summary: `add_constraint failed: ${err}.`,
-        affected: [],
-      };
+      return noop(doc, `add_constraint failed: ${err}.`);
     }
 
-    const constraintId = typeof id === 'string' && id.length > 0 ? id : nextId('con');
+    const constraintId = id !== undefined && id.length > 0 ? id : nextId('con');
 
     if (constraintId in doc.constraints) {
-      return {
-        document: doc,
-        summary: `add_constraint: constraint id '${constraintId}' already exists — no change made.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_constraint: constraint id '${constraintId}' already exists — no change made.`,
+      );
     }
 
-    // Build the typed Constraint. validateConstraintShape already confirmed the shape.
     const newConstraint = { ...constraint, id: constraintId } as Constraint;
 
     const newDoc: CadDocument = {
@@ -200,11 +168,7 @@ export const deleteConstraint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     if (!(id in doc.constraints)) {
-      return {
-        document: doc,
-        summary: `delete_constraint: constraint '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
+      return noop(doc, `delete_constraint: constraint '${id}' does not exist — no change made.`);
     }
 
     const constraint = doc.constraints[id]!;
@@ -278,54 +242,34 @@ export const updateConstraint = defineCommand({
   }),
   run: (doc, { id, patch }): CommandResult => {
     if (!(id in doc.constraints)) {
-      return {
-        document: doc,
-        summary: `update_constraint: constraint '${String(id)}' does not exist — no change made.`,
-        affected: [],
-      };
+      return noop(doc, `update_constraint: constraint '${id}' does not exist — no change made.`);
     }
 
     const existing = doc.constraints[id]!;
-    const updates: Partial<Constraint> = {};
+    const updates: Record<string, unknown> = {};
 
-    if ('a' in patch && patch.a !== undefined) {
-      if (!isEntityRef(patch.a)) {
-        return {
-          document: doc,
-          summary: `update_constraint: patch.a is not a valid EntityRef — no change made.`,
-          affected: [],
-        };
+    if (patch.a !== undefined) {
+      if (patch.a.entityId.length === 0) {
+        return noop(doc, `update_constraint: patch.a is not a valid EntityRef — no change made.`);
       }
-      (updates as Record<string, unknown>)['a'] = patch.a;
+      updates['a'] = patch.a;
     }
 
-    if ('b' in patch && patch.b !== undefined) {
-      if (!isEntityRef(patch.b)) {
-        return {
-          document: doc,
-          summary: `update_constraint: patch.b is not a valid EntityRef — no change made.`,
-          affected: [],
-        };
+    if (patch.b !== undefined) {
+      if (patch.b.entityId.length === 0) {
+        return noop(doc, `update_constraint: patch.b is not a valid EntityRef — no change made.`);
       }
-      (updates as Record<string, unknown>)['b'] = patch.b;
+      updates['b'] = patch.b;
     }
 
-    if ('value' in patch && patch.value !== undefined) {
+    if (patch.value !== undefined) {
       if (existing.kind !== 'distance' && existing.kind !== 'angle') {
-        return {
-          document: doc,
-          summary: `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`,
+        );
       }
-      if (!isValidValue(patch.value)) {
-        return {
-          document: doc,
-          summary: `update_constraint: patch.value must be a number or string — no change made.`,
-          affected: [],
-        };
-      }
-      (updates as Record<string, unknown>)['value'] = patch.value;
+      updates['value'] = patch.value;
     }
 
     const updatedConstraint = { ...existing, ...updates } as Constraint;

@@ -30,7 +30,7 @@ import { defineCommand, z } from './schema';
 import { currentContext, runInContext } from './context';
 import { MAX_PROJECT_DEPTH } from './limits';
 import { type BuildProjectParams } from './projectTypes';
-import { noop } from './projectResolve';
+import { rejectPlan } from './projectResolve';
 import { runProject } from './projectRun';
 
 /**
@@ -78,7 +78,7 @@ export const buildProject = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
     if (context.projectDepth >= MAX_PROJECT_DEPTH) {
-      return noop(
+      return rejectPlan(
         doc,
         { ok: false, validated: params.validate === true, stepCount: 0, steps: [], failedAt: null },
         `build_project: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,

@@ -24,6 +24,7 @@ import { nextStateKey } from './replayCache';
 import { hashText } from '../lib/hash';
 import { remapIds } from './regenerate';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
+import { noop } from './noop';
 
 /** One successfully replayed step, reported to `replayHistory`'s optional `onStep` observer. */
 export interface ReplayStepEvent {
@@ -139,6 +140,29 @@ export function replayHistory(
   return doc;
 }
 
+/** Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities". */
+function regenerateWith(
+  doc: CadDocument,
+  command: string,
+  newHistory: FeatureStep[],
+  done: (entityCount: string) => string,
+  nextStepNumber?: number,
+): CommandResult {
+  const refused = kernelRefusal(doc, newHistory);
+  if (refused !== null) return noop(doc, `${command}: ${refused}`);
+  const replayed = replayHistory(doc, newHistory, currentContext().registry);
+  const regenerated = nextStepNumber === undefined ? replayed : { ...replayed, nextStepNumber };
+  const count = Object.keys(regenerated.entities).length;
+  return {
+    document: regenerated,
+    summary: `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}`,
+    affected: regenerated.order,
+  };
+}
+
+const replaceAt = (history: FeatureStep[], idx: number, step: FeatureStep): FeatureStep[] =>
+  history.map((s, i) => (i === idx ? step : s));
+
 /**
  * @command replay_history
  * @pure
@@ -157,16 +181,12 @@ const replayHistory_cmd = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, _params): CommandResult => {
     if (doc.featureHistory.length === 0) {
-      return {
-        document: doc,
-        summary: 'replay_history: featureHistory is empty — nothing to replay.',
-        affected: [],
-      };
+      return noop(doc, 'replay_history: featureHistory is empty — nothing to replay.');
     }
     const warnings: string[] = [];
     const refused = kernelRefusal(doc, doc.featureHistory);
     if (refused !== null) {
-      return { document: doc, summary: `replay_history: ${refused}`, affected: [] };
+      return noop(doc, `replay_history: ${refused}`);
     }
     const regenerated = replayHistory(doc, doc.featureHistory, currentContext().registry, warnings);
     const count = Object.keys(regenerated.entities).length;
@@ -208,29 +228,18 @@ const setStepSuppressed = defineCommand({
   run: (doc, { stepId, suppressed }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
     if (idx === -1) {
-      return {
-        document: doc,
-        summary: `set_step_suppressed: step '${stepId}' not found in featureHistory.`,
-        affected: [],
-      };
+      return noop(doc, `set_step_suppressed: step '${stepId}' not found in featureHistory.`);
     }
-    const updatedStep: FeatureStep = { ...doc.featureHistory[idx]!, suppressed };
-    const newHistory = [
-      ...doc.featureHistory.slice(0, idx),
-      updatedStep,
-      ...doc.featureHistory.slice(idx + 1),
-    ];
-    const refused = kernelRefusal(doc, newHistory);
-    if (refused !== null) {
-      return { document: doc, summary: `set_step_suppressed: ${refused}`, affected: [] };
-    }
-    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
-    const count = Object.keys(regenerated.entities).length;
-    return {
-      document: regenerated,
-      summary: `set_step_suppressed: step '${stepId}' suppressed=${String(suppressed)}; regenerated ${count} ${count === 1 ? 'entity' : 'entities'}.`,
-      affected: regenerated.order,
-    };
+    const newHistory = replaceAt(doc.featureHistory, idx, {
+      ...doc.featureHistory[idx]!,
+      suppressed,
+    });
+    return regenerateWith(
+      doc,
+      'set_step_suppressed',
+      newHistory,
+      (n) => `step '${stepId}' suppressed=${String(suppressed)}; regenerated ${n}.`,
+    );
   },
 });
 
@@ -265,29 +274,18 @@ const editStepParams = defineCommand({
   run: (doc, { stepId, params: newParams }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
     if (idx === -1) {
-      return {
-        document: doc,
-        summary: `edit_step_params: step '${stepId}' not found in featureHistory.`,
-        affected: [],
-      };
+      return noop(doc, `edit_step_params: step '${stepId}' not found in featureHistory.`);
     }
-    const updatedStep: FeatureStep = { ...doc.featureHistory[idx]!, params: newParams };
-    const newHistory = [
-      ...doc.featureHistory.slice(0, idx),
-      updatedStep,
-      ...doc.featureHistory.slice(idx + 1),
-    ];
-    const refused = kernelRefusal(doc, newHistory);
-    if (refused !== null) {
-      return { document: doc, summary: `edit_step_params: ${refused}`, affected: [] };
-    }
-    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
-    const count = Object.keys(regenerated.entities).length;
-    return {
-      document: regenerated,
-      summary: `edit_step_params: step '${stepId}' params updated; regenerated ${count} ${count === 1 ? 'entity' : 'entities'}.`,
-      affected: regenerated.order,
-    };
+    const newHistory = replaceAt(doc.featureHistory, idx, {
+      ...doc.featureHistory[idx]!,
+      params: newParams,
+    });
+    return regenerateWith(
+      doc,
+      'edit_step_params',
+      newHistory,
+      (n) => `step '${stepId}' params updated; regenerated ${n}.`,
+    );
   },
 });
 
@@ -317,34 +315,21 @@ const reorderStep = defineCommand({
   run: (doc, { stepId, newIndex }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
     if (idx === -1) {
-      return {
-        document: doc,
-        summary: `reorder_step: step '${stepId}' not found in featureHistory.`,
-        affected: [],
-      };
+      return noop(doc, `reorder_step: step '${stepId}' not found in featureHistory.`);
     }
     const clamped = Math.max(0, Math.min(newIndex, doc.featureHistory.length - 1));
     if (clamped === idx) {
-      return {
-        document: doc,
-        summary: `reorder_step: step '${stepId}' is already at index ${idx}.`,
-        affected: [],
-      };
+      return noop(doc, `reorder_step: step '${stepId}' is already at index ${idx}.`);
     }
     const step = doc.featureHistory[idx]!;
     const without = [...doc.featureHistory.slice(0, idx), ...doc.featureHistory.slice(idx + 1)];
     const newHistory = [...without.slice(0, clamped), step, ...without.slice(clamped)];
-    const refused = kernelRefusal(doc, newHistory);
-    if (refused !== null) {
-      return { document: doc, summary: `reorder_step: ${refused}`, affected: [] };
-    }
-    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
-    const count = Object.keys(regenerated.entities).length;
-    return {
-      document: regenerated,
-      summary: `reorder_step: step '${stepId}' moved from index ${idx} to ${clamped}; regenerated ${count} ${count === 1 ? 'entity' : 'entities'}.`,
-      affected: regenerated.order,
-    };
+    return regenerateWith(
+      doc,
+      'reorder_step',
+      newHistory,
+      (n) => `step '${stepId}' moved from index ${idx} to ${clamped}; regenerated ${n}.`,
+    );
   },
 });
 
@@ -369,24 +354,14 @@ const deleteStep = defineCommand({
   run: (doc, { stepId }): CommandResult => {
     const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
     if (idx === -1) {
-      return {
-        document: doc,
-        summary: `delete_step: step '${stepId}' not found in featureHistory.`,
-        affected: [],
-      };
+      return noop(doc, `delete_step: step '${stepId}' not found in featureHistory.`);
     }
-    const newHistory = doc.featureHistory.filter((s) => s.id !== stepId);
-    const refused = kernelRefusal(doc, newHistory);
-    if (refused !== null) {
-      return { document: doc, summary: `delete_step: ${refused}`, affected: [] };
-    }
-    const regenerated = replayHistory(doc, newHistory, currentContext().registry);
-    const count = Object.keys(regenerated.entities).length;
-    return {
-      document: regenerated,
-      summary: `delete_step: step '${stepId}' deleted; regenerated ${count} ${count === 1 ? 'entity' : 'entities'}.`,
-      affected: regenerated.order,
-    };
+    return regenerateWith(
+      doc,
+      'delete_step',
+      doc.featureHistory.filter((s) => s.id !== stepId),
+      (n) => `step '${stepId}' deleted; regenerated ${n}.`,
+    );
   },
 });
 
@@ -430,15 +405,12 @@ const insertStep = defineCommand({
   }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { afterStepId, name: cmdName, params: stepParams, label }): CommandResult => {
-    if (afterStepId !== undefined) {
-      const exists = doc.featureHistory.some((s) => s.id === afterStepId);
-      if (!exists) {
-        return {
-          document: doc,
-          summary: `insert_step: afterStepId '${afterStepId}' not found in featureHistory.`,
-          affected: [],
-        };
-      }
+    const insertIdx =
+      afterStepId === undefined
+        ? doc.featureHistory.length - 1
+        : doc.featureHistory.findIndex((s) => s.id === afterStepId);
+    if (afterStepId !== undefined && insertIdx === -1) {
+      return noop(doc, `insert_step: afterStepId '${afterStepId}' not found in featureHistory.`);
     }
 
     const stepNumber = doc.nextStepNumber ?? 1;
@@ -449,35 +421,18 @@ const insertStep = defineCommand({
       suppressed: false,
       ...(label !== undefined ? { label } : {}),
     };
-
-    let newHistory: FeatureStep[];
-    if (afterStepId === undefined) {
-      newHistory = [...doc.featureHistory, newStep];
-    } else {
-      const insertIdx = doc.featureHistory.findIndex((s) => s.id === afterStepId);
-      newHistory = [
-        ...doc.featureHistory.slice(0, insertIdx + 1),
-        newStep,
-        ...doc.featureHistory.slice(insertIdx + 1),
-      ];
-    }
-
-    const refused = kernelRefusal(doc, newHistory);
-
-    if (refused !== null) {
-      return { document: doc, summary: `insert_step: ${refused}`, affected: [] };
-    }
-
-    const regenerated = {
-      ...replayHistory(doc, newHistory, currentContext().registry),
-      nextStepNumber: stepNumber + 1,
-    };
-    const count = Object.keys(regenerated.entities).length;
-    return {
-      document: regenerated,
-      summary: `insert_step: step '${newStep.id}' (${cmdName}) inserted; regenerated ${count} ${count === 1 ? 'entity' : 'entities'}.`,
-      affected: regenerated.order,
-    };
+    const newHistory = [
+      ...doc.featureHistory.slice(0, insertIdx + 1),
+      newStep,
+      ...doc.featureHistory.slice(insertIdx + 1),
+    ];
+    return regenerateWith(
+      doc,
+      'insert_step',
+      newHistory,
+      (n) => `step '${newStep.id}' (${cmdName}) inserted; regenerated ${n}.`,
+      stepNumber + 1,
+    );
   },
 });
 

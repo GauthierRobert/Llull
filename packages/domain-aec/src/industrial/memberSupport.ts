@@ -6,7 +6,9 @@ import type { Vec3 } from '@core/model/types';
 import type { BuildingModel, MemberRole, SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, tolerant, z } from '@core/commands/schema';
-import { highestIndex, isFiniteNumber, nextElementId, noChange, withElement } from '../model';
+import { highestIndex, nextElementId, withElement } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { findProfile, STEEL_PROFILES, type SteelProfile } from '../steel/profiles';
 
 export const MEMBER_ROLES: ReadonlyArray<MemberRole> = [
@@ -124,7 +126,7 @@ export const listSteelProfiles = defineCommand({
   run: (doc, { family }): CommandResult => {
     const raw: unknown = family;
     if (raw !== undefined && typeof raw !== 'string') {
-      return noChange(doc, 'list_steel_profiles: family must be a string such as "HEA".');
+      return noop(doc, 'list_steel_profiles: family must be a string such as "HEA".');
     }
     const wanted = raw?.trim().toUpperCase();
     const profiles = STEEL_PROFILES.filter(

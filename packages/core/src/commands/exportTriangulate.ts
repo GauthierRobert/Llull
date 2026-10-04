@@ -343,3 +343,17 @@ export function collectExportTriangles(
   }
   return { tris, skipped2D, unknownIds };
 }
+
+/** Summary line shared by the mesh export commands. */
+export function exportSummary(
+  command: string,
+  format: string,
+  { tris, skipped2D, unknownIds }: ReturnType<typeof collectExportTriangles>,
+): string {
+  const parts = [
+    `${command}: ${tris.length} triangle${tris.length !== 1 ? 's' : ''} exported (format=${format}).`,
+  ];
+  if (skipped2D > 0) parts.push(`${skipped2D} 2D entit${skipped2D !== 1 ? 'ies' : 'y'} skipped.`);
+  if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
+  return parts.join(' ');
+}

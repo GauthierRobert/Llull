@@ -59,6 +59,17 @@ function makeRectangle(width: number, height: number, position: Vec3, color: str
   };
 }
 
+const positive = (template: string, name: string, value: number): string | null =>
+  !Number.isFinite(value) || value <= 0 ? `${template}: ${name} must be > 0 (got ${value}).` : null;
+
+const nonNegative = (template: string, name: string, value: number): string | null =>
+  !Number.isFinite(value) || value < 0 ? `${template}: ${name} must be >= 0 (got ${value}).` : null;
+
+const integerAtLeastOne = (template: string, name: string, value: number): string | null =>
+  !Number.isFinite(value) || value < 1 || !Number.isInteger(value)
+    ? `${template}: ${name} must be an integer >= 1 (got ${value}).`
+    : null;
+
 interface BoltHolePatternParams {
   count: number;
   boltCircleRadius: number;
@@ -101,19 +112,15 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       'N equally-spaced bolt holes (circles) arranged on a bolt circle. ' +
       'count must be >= 1; boltCircleRadius and holeRadius must be > 0.',
     validate(params: BoltHolePatternParams): string | null {
-      if (!Number.isFinite(params.count) || params.count < 1 || !Number.isInteger(params.count)) {
-        return `bolt_hole_pattern: count must be an integer >= 1 (got ${params.count}).`;
-      }
-      if (params.count > MAX_TEMPLATE_ENTITIES) {
-        return `bolt_hole_pattern: count ${params.count} exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`;
-      }
-      if (!Number.isFinite(params.boltCircleRadius) || params.boltCircleRadius <= 0) {
-        return `bolt_hole_pattern: boltCircleRadius must be > 0 (got ${params.boltCircleRadius}).`;
-      }
-      if (!Number.isFinite(params.holeRadius) || params.holeRadius <= 0) {
-        return `bolt_hole_pattern: holeRadius must be > 0 (got ${params.holeRadius}).`;
-      }
-      return null;
+      const t = 'bolt_hole_pattern';
+      return (
+        integerAtLeastOne(t, 'count', params.count) ??
+        (params.count > MAX_TEMPLATE_ENTITIES
+          ? `${t}: count ${params.count} exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`
+          : null) ??
+        positive(t, 'boltCircleRadius', params.boltCircleRadius) ??
+        positive(t, 'holeRadius', params.holeRadius)
+      );
     },
     build(params: BoltHolePatternParams, position: Vec3, color: string): Entity[] {
       const entities: Entity[] = [];
@@ -132,32 +139,20 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       'A flange: outer circle + bore circle + a bolt-hole pattern ring. ' +
       'outerRadius > boltCircleRadius + holeRadius; boreRadius < outerRadius; boltCount >= 1; all radii > 0.',
     validate(params: FlangeParams): string | null {
-      if (!Number.isFinite(params.outerRadius) || params.outerRadius <= 0) {
-        return `flange: outerRadius must be > 0 (got ${params.outerRadius}).`;
-      }
-      if (!Number.isFinite(params.boreRadius) || params.boreRadius <= 0) {
-        return `flange: boreRadius must be > 0 (got ${params.boreRadius}).`;
-      }
-      if (params.boreRadius >= params.outerRadius) {
-        return `flange: boreRadius (${params.boreRadius}) must be < outerRadius (${params.outerRadius}).`;
-      }
-      if (
-        !Number.isFinite(params.boltCount) ||
-        params.boltCount < 1 ||
-        !Number.isInteger(params.boltCount)
-      ) {
-        return `flange: boltCount must be an integer >= 1 (got ${params.boltCount}).`;
-      }
-      if (params.boltCount + 2 > MAX_TEMPLATE_ENTITIES) {
-        return `flange: boltCount ${params.boltCount} exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`;
-      }
-      if (!Number.isFinite(params.boltCircleRadius) || params.boltCircleRadius <= 0) {
-        return `flange: boltCircleRadius must be > 0 (got ${params.boltCircleRadius}).`;
-      }
-      if (!Number.isFinite(params.holeRadius) || params.holeRadius <= 0) {
-        return `flange: holeRadius must be > 0 (got ${params.holeRadius}).`;
-      }
-      return null;
+      const t = 'flange';
+      return (
+        positive(t, 'outerRadius', params.outerRadius) ??
+        positive(t, 'boreRadius', params.boreRadius) ??
+        (params.boreRadius >= params.outerRadius
+          ? `${t}: boreRadius (${params.boreRadius}) must be < outerRadius (${params.outerRadius}).`
+          : null) ??
+        integerAtLeastOne(t, 'boltCount', params.boltCount) ??
+        (params.boltCount + 2 > MAX_TEMPLATE_ENTITIES
+          ? `${t}: boltCount ${params.boltCount} exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`
+          : null) ??
+        positive(t, 'boltCircleRadius', params.boltCircleRadius) ??
+        positive(t, 'holeRadius', params.holeRadius)
+      );
     },
     build(params: FlangeParams, position: Vec3, color: string): Entity[] {
       // Order: [outerCircle, boreCircle, hole_0, hole_1, ..., hole_n-1]
@@ -183,39 +178,19 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       'width and height must be > 0; holeRows and holeCols must be >= 1; holeRadius > 0; ' +
       'marginX and marginY set the inset from the plate edge to the outermost hole centers.',
     validate(params: RectangularPlateWithHolesParams): string | null {
-      if (!Number.isFinite(params.width) || params.width <= 0) {
-        return `rectangular_plate_with_holes: width must be > 0 (got ${params.width}).`;
-      }
-      if (!Number.isFinite(params.height) || params.height <= 0) {
-        return `rectangular_plate_with_holes: height must be > 0 (got ${params.height}).`;
-      }
-      if (
-        !Number.isFinite(params.holeRows) ||
-        params.holeRows < 1 ||
-        !Number.isInteger(params.holeRows)
-      ) {
-        return `rectangular_plate_with_holes: holeRows must be an integer >= 1 (got ${params.holeRows}).`;
-      }
-      if (
-        !Number.isFinite(params.holeCols) ||
-        params.holeCols < 1 ||
-        !Number.isInteger(params.holeCols)
-      ) {
-        return `rectangular_plate_with_holes: holeCols must be an integer >= 1 (got ${params.holeCols}).`;
-      }
-      if (params.holeRows * params.holeCols + 1 > MAX_TEMPLATE_ENTITIES) {
-        return `rectangular_plate_with_holes: holeRows*holeCols (${params.holeRows * params.holeCols}) exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`;
-      }
-      if (!Number.isFinite(params.holeRadius) || params.holeRadius <= 0) {
-        return `rectangular_plate_with_holes: holeRadius must be > 0 (got ${params.holeRadius}).`;
-      }
-      if (!Number.isFinite(params.marginX) || params.marginX < 0) {
-        return `rectangular_plate_with_holes: marginX must be >= 0 (got ${params.marginX}).`;
-      }
-      if (!Number.isFinite(params.marginY) || params.marginY < 0) {
-        return `rectangular_plate_with_holes: marginY must be >= 0 (got ${params.marginY}).`;
-      }
-      return null;
+      const t = 'rectangular_plate_with_holes';
+      return (
+        positive(t, 'width', params.width) ??
+        positive(t, 'height', params.height) ??
+        integerAtLeastOne(t, 'holeRows', params.holeRows) ??
+        integerAtLeastOne(t, 'holeCols', params.holeCols) ??
+        (params.holeRows * params.holeCols + 1 > MAX_TEMPLATE_ENTITIES
+          ? `${t}: holeRows*holeCols (${params.holeRows * params.holeCols}) exceeds MAX_TEMPLATE_ENTITIES (${MAX_TEMPLATE_ENTITIES}).`
+          : null) ??
+        positive(t, 'holeRadius', params.holeRadius) ??
+        nonNegative(t, 'marginX', params.marginX) ??
+        nonNegative(t, 'marginY', params.marginY)
+      );
     },
     build(params: RectangularPlateWithHolesParams, position: Vec3, color: string): Entity[] {
       // Order: [plate (rectangle), hole_row0_col0, hole_row0_col1, ..., hole_rowN_colM]

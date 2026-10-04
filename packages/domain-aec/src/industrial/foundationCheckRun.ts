@@ -6,7 +6,9 @@ import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { getBuilding, isFiniteNumber, noChange } from '../model';
+import { getBuilding } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { toCsv } from '../scheduleBuild';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
 import { type FrameLoads } from './frameModelTypes';
@@ -242,22 +244,22 @@ export const foundationCheck = defineCommand({
   run: (doc, params): CommandResult => {
     const soilBearing = params.soilBearing ?? 150;
     if (!isFiniteNumber(soilBearing) || soilBearing <= 0) {
-      return noChange(doc, 'check_foundations failed: soilBearing must be a number > 0 (kPa).');
+      return noop(doc, 'check_foundations failed: soilBearing must be a number > 0 (kPa).');
     }
     const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
     if (!isFiniteNumber(soilModulus) || soilModulus <= 0) {
-      return noChange(doc, 'check_foundations failed: soilModulus must be a number > 0 (MPa).');
+      return noop(doc, 'check_foundations failed: soilModulus must be a number > 0 (MPa).');
     }
     if (params.clayLayer !== undefined) {
       const clayError = clayLayerError(params.clayLayer);
-      if (clayError) return noChange(doc, `check_foundations failed: ${clayError}.`);
+      if (clayError) return noop(doc, `check_foundations failed: ${clayError}.`);
     }
     const resolved = resolveFrameLoads(doc, params);
-    if ('reason' in resolved) return noChange(doc, `check_foundations failed: ${resolved.reason}.`);
+    if ('reason' in resolved) return noop(doc, `check_foundations failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     const tieCapacity = params.tieCapacity ?? DEFAULT_TIE_CAPACITY;
     if (!isFiniteNumber(tieCapacity) || tieCapacity <= 0) {
-      return noChange(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
+      return noop(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
     }
     const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
     const { rows, footings, plates, unchecked } = checkFoundations(
@@ -271,7 +273,7 @@ export const foundationCheck = defineCommand({
       params.clayLayer,
     );
     if (rows.length === 0) {
-      return noChange(
+      return noop(
         doc,
         `check_foundations failed: no portal frame column with a footing or base plate on level '${levelId}'.`,
       );

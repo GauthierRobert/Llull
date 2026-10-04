@@ -1,6 +1,8 @@
+import { distance, polygonPerimeter } from '../lib/polygon';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { formatLength } from './units';
+import { noop } from './noop';
 interface MeasureAreaData {
   area: number;
   unit: string;
@@ -54,11 +56,7 @@ export const measureArea = defineCommand({
 
     if (points) {
       if (points.length < 3) {
-        return {
-          document: doc,
-          summary: `measure_area: points must have >= 3 vertices, got ${points.length}.`,
-          affected: [],
-        };
+        return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
       }
       const area = polygonArea(points);
       const data: MeasureAreaData = { area, unit: areaUnit };
@@ -71,20 +69,12 @@ export const measureArea = defineCommand({
     }
 
     if (!entityId) {
-      return {
-        document: doc,
-        summary: 'measure_area: provide either entityId or points.',
-        affected: [],
-      };
+      return noop(doc, 'measure_area: provide either entityId or points.');
     }
 
     const e = doc.entities[entityId];
     if (!e) {
-      return {
-        document: doc,
-        summary: `measure_area: entity '${entityId}' not found.`,
-        affected: [],
-      };
+      return noop(doc, `measure_area: entity '${entityId}' not found.`);
     }
 
     let area: number;
@@ -97,28 +87,22 @@ export const measureArea = defineCommand({
         break;
       case 'polyline': {
         if (!e.closed) {
-          return {
-            document: doc,
-            summary: `measure_area: polyline '${entityId}' is not closed — cannot compute area.`,
-            affected: [],
-          };
+          return noop(
+            doc,
+            `measure_area: polyline '${entityId}' is not closed — cannot compute area.`,
+          );
         }
         if (e.points.length < 3) {
-          return {
-            document: doc,
-            summary: `measure_area: polyline '${entityId}' has fewer than 3 points.`,
-            affected: [],
-          };
+          return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
         }
         area = polygonArea(e.points);
         break;
       }
       default:
-        return {
-          document: doc,
-          summary: `measure_area: entity '${entityId}' is kind '${e.kind}'; supported kinds are 'circle', 'rectangle', 'polyline'.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `measure_area: entity '${entityId}' is kind '${e.kind}'; supported kinds are 'circle', 'rectangle', 'polyline'.`,
+        );
     }
 
     const data: MeasureAreaData = { area, unit: areaUnit };
@@ -162,40 +146,19 @@ export const measurePerimeter = defineCommand({
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) {
-      return {
-        document: doc,
-        summary: `measure_perimeter: entity '${entityId}' not found.`,
-        affected: [],
-      };
+      return noop(doc, `measure_perimeter: entity '${entityId}' not found.`);
     }
 
     let perimeter: number;
     switch (e.kind) {
-      case 'line': {
-        const dx = e.end[0] - e.start[0];
-        const dy = e.end[1] - e.start[1];
-        perimeter = Math.sqrt(dx * dx + dy * dy);
+      case 'line':
+        perimeter = distance(e.start, e.end);
         break;
-      }
-      case 'polyline': {
-        perimeter = 0;
-        const pts = e.points;
-        for (let i = 0; i + 1 < pts.length; i++) {
-          const a = pts[i]!;
-          const b = pts[i + 1]!;
-          const dx = b[0] - a[0];
-          const dy = b[1] - a[1];
-          perimeter += Math.sqrt(dx * dx + dy * dy);
-        }
-        if (e.closed && pts.length >= 2) {
-          const last = pts[pts.length - 1]!;
-          const first = pts[0]!;
-          const dx = first[0] - last[0];
-          const dy = first[1] - last[1];
-          perimeter += Math.sqrt(dx * dx + dy * dy);
-        }
+      case 'polyline':
+        perimeter = e.closed
+          ? polygonPerimeter(e.points)
+          : e.points.reduce((sum, p, i, pts) => (i === 0 ? 0 : sum + distance(pts[i - 1]!, p)), 0);
         break;
-      }
       case 'rectangle':
         perimeter = 2 * (e.width + e.height);
         break;

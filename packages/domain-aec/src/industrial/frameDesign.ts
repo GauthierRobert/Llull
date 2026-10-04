@@ -12,14 +12,9 @@ import type {
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import {
-  elementAffected,
-  fromMm,
-  getBuilding,
-  isFiniteNumber,
-  noChange,
-  withElement,
-} from '../model';
+import { elementAffected, fromMm, getBuilding, withElement } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { refitPlates } from './plates';
 import { designFixedPlates } from './plateDesign';
@@ -84,11 +79,10 @@ export const designPortalFrames = defineCommand({
     if (
       !(isFiniteNumber(targetUtilisation) && targetUtilisation >= 0.5 && targetUtilisation <= 1)
     ) {
-      return noChange(doc, 'design_portal_frames failed: targetUtilisation must be in [0.5, 1].');
+      return noop(doc, 'design_portal_frames failed: targetUtilisation must be in [0.5, 1].');
     }
     const resolved = resolveFrameLoads(doc, params);
-    if ('reason' in resolved)
-      return noChange(doc, `design_portal_frames failed: ${resolved.reason}.`);
+    if ('reason' in resolved) return noop(doc, `design_portal_frames failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     let current = doc;
     const analysed = new Set<string>();
@@ -98,10 +92,7 @@ export const designPortalFrames = defineCommand({
     for (let iteration = 0; iteration < 15; iteration++) {
       const { rows, frames } = checkFrames(current, levelId, loads);
       if (frames === 0) {
-        return noChange(
-          doc,
-          'design_portal_frames failed: no analysable portal frame on the level.',
-        );
+        return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
       }
       const building = getBuilding(current);
       for (const row of rows) if (row.kind !== 'connection') analysed.add(row.elementId);

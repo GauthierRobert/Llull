@@ -17,6 +17,7 @@ import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { withEntity } from './entityOps';
+import { noop } from './noop';
 
 /**
  * Sample points along the involute of a circle with base radius `baseR`.
@@ -166,12 +167,10 @@ export function buildSpurGearProfile(
   for (let t = 0; t < teeth; t++) {
     const toothCenter = t * toothAngle;
 
-    // --- Right flank (CCW order: approach from root, go outward) ---
     const rightFlank = sampleInvolute(baseRadius, tStart, tMax, flankSamples).map((pt) =>
       rotatePoint2(pt, rightFlankRotation + toothCenter),
     );
 
-    // --- Tip arc: from right-flank tip to left-flank tip ---
     const rightTipAngle = Math.atan2(
       rightFlank[rightFlank.length - 1]![1],
       rightFlank[rightFlank.length - 1]![0],
@@ -194,7 +193,6 @@ export function buildSpurGearProfile(
 
     const tipArc = sampleArc(outerRadius, rightTipAngle, arcEnd, 2);
 
-    // --- Root arc: from this tooth's left root to next tooth's right root ---
     // Root point angles at bottom of flanks.
     let leftRootAngle: number;
     let nextRightRootAngle: number;
@@ -339,75 +337,53 @@ export const addSpurGear = defineCommand({
       name,
     },
   ): CommandResult => {
-    // --- Validate module ---
     if (!Number.isFinite(mod) || mod <= 0) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`,
-        affected: [],
-      };
+      return noop(doc, `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`);
     }
 
-    // --- Validate teeth ---
     const teethInt = Math.round(teeth);
     if (!Number.isFinite(teeth) || teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_spur_gear failed: teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
+      );
     }
 
-    // --- Validate pressureAngle ---
     if (!Number.isFinite(pressureAngle) || pressureAngle <= 0 || pressureAngle >= Math.PI / 2) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_spur_gear failed: pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`,
+      );
     }
 
-    // --- Validate faceWidth ---
     if (!Number.isFinite(faceWidth) || faceWidth <= 0) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: faceWidth must be finite and > 0, got ${String(faceWidth)}.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_spur_gear failed: faceWidth must be finite and > 0, got ${String(faceWidth)}.`,
+      );
     }
 
-    // --- Validate bore ---
     const pitchRadius = (mod * teethInt) / 2;
     if (!Number.isFinite(bore) || bore < 0) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`,
-        affected: [],
-      };
+      return noop(doc, `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`);
     }
     if (bore >= pitchRadius) {
-      return {
-        document: doc,
-        summary: `add_spur_gear failed: bore (${bore}) must be < pitchRadius (${pitchRadius}).`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `add_spur_gear failed: bore (${bore}) must be < pitchRadius (${pitchRadius}).`,
+      );
     }
 
-    // --- Validate position ---
     const resolvedPosition = finiteVec3OrZero(position);
     const resolvedRotation = finiteVec3OrZero(rotation);
 
-    // --- Build profile ---
     const profile = buildSpurGearProfile(mod, teethInt, pressureAngle);
 
-    // --- Computed values for summary ---
     const pitchDiameter = mod * teethInt;
     const outerDiameter = pitchDiameter + 2 * mod;
 
-    // --- Bore note ---
     const boreNote = bore > 0 ? ` bore=${bore} ignored — kernel hole not yet wired.` : '';
 
-    // --- Create extrusion entity ---
     const id = nextId('gear');
     const entity: Entity = {
       id,

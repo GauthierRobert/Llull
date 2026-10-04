@@ -10,6 +10,7 @@ import {
   rejectTooFewPoints,
   workPlanePositionField,
 } from './draw2dShared';
+import { noop } from './noop';
 
 /**
  * @command draw_line
@@ -35,11 +36,7 @@ export const drawLine = defineCommand({
     { start, end, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (!Array.isArray(start) || start.length < 2 || !Array.isArray(end) || end.length < 2) {
-      return {
-        document: doc,
-        summary: 'draw_line: start and end must each be [x, y] arrays.',
-        affected: [],
-      };
+      return noop(doc, 'draw_line: start and end must each be [x, y] arrays.');
     }
     const id = nextId('line');
     const entity: Entity = {
@@ -146,11 +143,7 @@ export const drawArc = defineCommand({
     },
   ): CommandResult => {
     if (radius <= 0) {
-      return {
-        document: doc,
-        summary: `draw_arc: radius must be > 0 (got ${radius}).`,
-        affected: [],
-      };
+      return noop(doc, `draw_arc: radius must be > 0 (got ${radius}).`);
     }
     const id = nextId('arc');
     const safeCenter: Vec2 = [center[0], center[1]];
@@ -197,11 +190,7 @@ export const drawCircle = defineCommand({
     { center, radius, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (radius <= 0) {
-      return {
-        document: doc,
-        summary: `draw_circle: radius must be > 0 (got ${radius}).`,
-        affected: [],
-      };
+      return noop(doc, `draw_circle: radius must be > 0 (got ${radius}).`);
     }
     const id = nextId('circ');
     const safeCenter: Vec2 = [center[0], center[1]];
@@ -254,11 +243,10 @@ export const drawRectangle = defineCommand({
     { width, height, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (width <= 0 || height <= 0) {
-      return {
-        document: doc,
-        summary: `draw_rectangle: width and height must both be > 0 (got ${width}×${height}).`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `draw_rectangle: width and height must both be > 0 (got ${width}×${height}).`,
+      );
     }
     const id = nextId('rect');
     const entity: Entity = {

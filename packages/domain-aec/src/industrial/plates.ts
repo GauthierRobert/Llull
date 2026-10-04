@@ -11,13 +11,13 @@ import {
   elementAffected,
   fromMm,
   getBuilding,
-  isFiniteNumber,
   nextElementId,
   nextMark,
-  noChange,
   withElement,
   withoutElements,
 } from '../model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
 import { boltSize } from './evaluate';
@@ -158,21 +158,18 @@ export const addBasePlates = defineCommand({
     const positive = (value: number | undefined): boolean =>
       value === undefined || (isFiniteNumber(value) && value > 0);
     if (!positive(params.margin) || !positive(params.thickness) || !positive(params.boltDiameter)) {
-      return noChange(
-        doc,
-        'add_base_plates failed: margin, thickness and boltDiameter must be > 0.',
-      );
+      return noop(doc, 'add_base_plates failed: margin, thickness and boltDiameter must be > 0.');
     }
     const boltCount = params.boltCount ?? 4;
     if (
       !(Number.isInteger(boltCount) && boltCount % 2 === 0 && boltCount >= 2 && boltCount <= 12)
     ) {
-      return noChange(doc, 'add_base_plates failed: boltCount must be an even number 2–12.');
+      return noop(doc, 'add_base_plates failed: boltCount must be an even number 2–12.');
     }
     const building = getBuilding(doc);
     const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0] ?? null;
     if (params.levelId !== undefined && !building.levels[params.levelId]) {
-      return noChange(doc, `add_base_plates failed: no level '${params.levelId}'.`);
+      return noop(doc, `add_base_plates failed: no level '${params.levelId}'.`);
     }
     const columns = columnsWithoutPlates(
       building,
@@ -180,7 +177,7 @@ export const addBasePlates = defineCommand({
       Array.isArray(params.memberIds) ? new Set(params.memberIds) : null,
     );
     if (columns.length === 0) {
-      return noChange(doc, 'add_base_plates failed: no steel column without a base plate found.');
+      return noop(doc, 'add_base_plates failed: no steel column without a base plate found.');
     }
     const added = appendBasePlates(doc, building, columns, {
       ...(params.margin !== undefined ? { margin: params.margin } : {}),

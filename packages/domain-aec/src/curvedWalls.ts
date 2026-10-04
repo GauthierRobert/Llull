@@ -10,15 +10,15 @@ import {
   elementAffected,
   fromMm,
   getBuilding,
-  isFiniteNumber,
   nextElementId,
   nextMark,
-  noChange,
   resolveLevel,
   toMetres,
   toVec2,
   withElement,
 } from './model';
+import { noop } from '@core/commands/noop';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { curvedWallArc, curvedWallBand, curvedWallLength } from './curvedWallGeometry';
 
@@ -47,7 +47,7 @@ export const addCurvedWall = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
-    if (!resolution.ok) return noChange(doc, `add_curved_wall failed: ${resolution.reason}.`);
+    if (!resolution.ok) return noop(doc, `add_curved_wall failed: ${resolution.reason}.`);
     const thickness = params.thickness ?? fromMm(doc, 200);
     const height = params.height ?? resolution.level.height;
     const baseOffset = params.baseOffset ?? 0;
@@ -56,7 +56,7 @@ export const addCurvedWall = defineCommand({
       !(isFiniteNumber(height) && height > 0) ||
       !isFiniteNumber(baseOffset)
     ) {
-      return noChange(doc, 'add_curved_wall failed: thickness and height must be > 0.');
+      return noop(doc, 'add_curved_wall failed: thickness and height must be > 0.');
     }
     const wall: CurvedWallElement = {
       id: nextElementId(resolution.building, 'curvedWall'),
@@ -74,10 +74,10 @@ export const addCurvedWall = defineCommand({
     };
     const arc = curvedWallArc(wall);
     if (!arc) {
-      return noChange(doc, 'add_curved_wall failed: start, through and end must not be collinear.');
+      return noop(doc, 'add_curved_wall failed: start, through and end must not be collinear.');
     }
     if (!curvedWallBand(wall)) {
-      return noChange(doc, 'add_curved_wall failed: thickness must be smaller than the diameter.');
+      return noop(doc, 'add_curved_wall failed: thickness must be smaller than the diameter.');
     }
     const document = regenerateBuilding(doc, withElement(resolution.building, wall));
     return {

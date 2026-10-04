@@ -4,7 +4,8 @@
 
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { isFiniteNumber, toMetres } from '../model';
+import { toMetres } from '../model';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import type { BaseReaction } from './frameModelSolve';
 import { combine } from './foundationCombinations';
 import {

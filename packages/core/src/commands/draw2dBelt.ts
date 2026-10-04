@@ -1,4 +1,4 @@
-import type { Entity, Vec3, Vec2 } from '../model/types';
+import type { Entity } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
@@ -8,6 +8,7 @@ import { MAX_CURVE_SAMPLES } from './limits';
 import { DEFAULT_DRAW_COLOR, fmtN, workPlanePositionField } from './draw2dShared';
 import { withEntity } from './entityOps';
 import { pointsExtent } from './sceneBounds';
+import { noop } from './noop';
 
 /** One pulley/sprocket specification: center in local 2D frame + radius. */
 interface PulleySpec {
@@ -142,54 +143,39 @@ export const drawBeltAround = defineCommand({
       name,
     },
   ): CommandResult => {
-    // --- Validate pulleys array ---
     const pulleys = pulleyInput as unknown as PulleySpec[];
     if (pulleys.length < 2) {
-      return {
-        document: doc,
-        summary: `draw_belt_around: requires at least 2 pulleys (got ${pulleys.length}).`,
-        affected: [],
-      };
+      return noop(doc, `draw_belt_around: requires at least 2 pulleys (got ${pulleys.length}).`);
     }
 
-    // --- Validate arcSamples ---
     if (!Number.isFinite(arcSamples) || arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
-      return {
-        document: doc,
-        summary: `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
+      );
     }
     const samplesInt = Math.round(arcSamples);
 
-    // --- Validate each pulley ---
     for (let i = 0; i < pulleys.length; i++) {
       const p = pulleys[i]!;
-      if (!p || !Array.isArray(p.center) || p.center.length < 2) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulley[${i}] center must be a [x, y] array.`,
-          affected: [],
-        };
+      if (!Array.isArray(p.center) || p.center.length < 2) {
+        return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
       }
       const [cx, cy] = p.center;
       if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulley[${i}] center contains non-finite coordinate (${cx}, ${cy}).`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `draw_belt_around: pulley[${i}] center contains non-finite coordinate (${cx}, ${cy}).`,
+        );
       }
       if (!Number.isFinite(p.radius) || p.radius <= 0) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulley[${i}] radius must be a finite positive number (got ${String(p.radius)}).`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `draw_belt_around: pulley[${i}] radius must be a finite positive number (got ${String(p.radius)}).`,
+        );
       }
     }
 
-    // --- Check for coincident centers or pulley-inside-pulley ---
     const n = pulleys.length;
     for (let i = 0; i < n; i++) {
       const ni = (i + 1) % n;
@@ -199,27 +185,20 @@ export const drawBeltAround = defineCommand({
       const dy = p2.center[1]! - p1.center[1]!;
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d === 0) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`,
+        );
       }
       if (d < Math.abs(p1.radius - p2.radius)) {
-        return {
-          document: doc,
-          summary: `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${fmtN(d)} < |r1−r2|=${fmtN(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${fmtN(d)} < |r1−r2|=${fmtN(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
+        );
       }
     }
 
-    // --- Compute belt loop ---
-    // For each pair i→(i+1)%n, compute external tangent touch-points.
-    // Then for each pulley, emit wrap arc from its incoming tp to its outgoing tp.
-
-    // Gather per-pair tangent touch-points:
-    // tangentPairs[i] = [outTP on pulleys[i], inTP on pulleys[(i+1)%n]]
+    // tangentPairs[i] = [outgoing TP on pulleys[i], incoming TP on pulleys[(i+1)%n]]
     type TangentPair = readonly [readonly [number, number], readonly [number, number]];
     const tangentPairs: TangentPair[] = [];
     for (let i = 0; i < n; i++) {
@@ -235,31 +214,17 @@ export const drawBeltAround = defineCommand({
         p2.radius,
       );
       if (result === null) {
-        // Shouldn't happen since we checked above, but guard for safety
-        return {
-          document: doc,
-          summary: `draw_belt_around: failed to compute tangent between pulleys[${i}] and pulleys[${ni}].`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `draw_belt_around: failed to compute tangent between pulleys[${i}] and pulleys[${ni}].`,
+        );
       }
       tangentPairs.push(result);
     }
 
-    // Build the closed polyline points:
-    // For each pulley i:
-    //   1. Emit outgoing tangent point on pulley i (from tangentPairs[i][0])
-    //   2. Emit the tangent line (implicit — just the start point; end is next arc's start)
-    //   Actually: the loop is:
-    //     outTP_i, [tangent line to] inTP_{i+1},
-    //     arc on pulley_{i+1} from inTP_{i+1} to outTP_{i+1}
-    // So we iterate: for i in 0..n-1:
-    //   push outTP[i] (= tangentPairs[i][0])
-    //   push arc samples on pulleys[(i+1)%n] from inAngle to outAngle
-    //   (the end of the arc is outTP[(i+1)%n], which is tangentPairs[(i+1)%n][0])
-
+    // Per pulley i: outTP[i], then the wrap arc on pulleys[i+1] from inTP[i+1] to outTP[i+1].
     const points: Array<readonly [number, number]> = [];
 
-    // Accumulate lengths for summary
     let totalLength = 0;
 
     for (let i = 0; i < n; i++) {
@@ -267,15 +232,12 @@ export const drawBeltAround = defineCommand({
       const outTP = tangentPairs[i]![0]; // outgoing TP on pulley i
       const inTP = tangentPairs[i]![1]; // incoming TP on pulley ni
 
-      // 1. Outgoing tangent point on pulley i
       points.push(outTP);
 
-      // 2. Tangent segment length: outTP → inTP
       const tdx = inTP[0] - outTP[0];
       const tdy = inTP[1] - outTP[1];
       totalLength += Math.sqrt(tdx * tdx + tdy * tdy);
 
-      // 3. Wrap arc on pulley ni from inTP to its outgoing TP
       const pni = pulleys[ni]!;
       const outTPni = tangentPairs[ni]![0]; // outgoing TP on pulley ni
 
@@ -290,36 +252,25 @@ export const drawBeltAround = defineCommand({
         outAngle,
         samplesInt,
       );
-      for (const pt of arcPts) {
-        points.push(pt);
-      }
+      points.push(...arcPts);
 
-      // Arc length contribution
       let arcSweep = outAngle - inAngle;
       while (arcSweep <= 0) arcSweep += 2 * Math.PI;
       while (arcSweep > 2 * Math.PI) arcSweep -= 2 * Math.PI;
       totalLength += pni.radius * arcSweep;
     }
 
-    // --- Resolve position / rotation ---
-    const resolvedPos: Vec3 = finiteVec3OrZero(position, true);
-
-    const resolvedRot: Vec3 = finiteVec3OrZero(rotation, true);
-
-    // --- Compute AABB for summary ---
     const { minX, minY, maxX, maxY } = pointsExtent(points);
 
-    // --- Build entity ---
     const id = nextId('belt');
-    const safePoints: ReadonlyArray<Vec2> = points.map(([x, y]) => [x, y] as Vec2);
 
     const entity: Entity = {
       id,
       kind: 'polyline',
-      points: safePoints,
+      points,
       closed: true,
-      position: resolvedPos,
-      rotation: resolvedRot,
+      position: finiteVec3OrZero(position, true),
+      rotation: finiteVec3OrZero(rotation, true),
       layerId: DEFAULT_LAYER_ID,
       color,
       ...(name !== undefined && name !== '' ? { name } : {}),

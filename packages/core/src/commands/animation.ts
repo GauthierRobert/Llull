@@ -9,6 +9,7 @@ import type { Animation, CadDocument, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
+import { noop } from './noop';
 
 /**
  * Resolve `targetId` to its kind: 'group' if found in doc.groups, 'entity' if
@@ -25,6 +26,23 @@ function toAxis(raw: number[] | undefined): Vec3 {
   if (!raw || raw.length < 3) return [0, 1, 0];
   return [raw[0] ?? 0, raw[1] ?? 1, raw[2] ?? 0];
 }
+
+const pivotField = z
+  .array(z.number())
+  .optional()
+  .describe(
+    'World-space pivot point [x, y, z] for the rotation axis. ' +
+      'Only meaningful for the rotation channel. ' +
+      'When omitted the player uses the target entity/group position as the pivot.',
+  );
+
+const triggerField = z
+  .string()
+  .optional()
+  .describe(
+    "When to run the animation: 'auto' (default) starts under the global Play button; " +
+      "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
+  );
 
 /** Raw (possibly malformed) target/channel/axis/trigger/pivot inputs shared by the animate_* commands. */
 interface AnimationInput {
@@ -109,30 +127,13 @@ export const animateSpin = defineCommand({
       .describe(
         "Transform channel to drive: 'rotation' (default) spins the part; 'position' translates it at constant speed.",
       ),
-    pivot: z
-      .array(z.number())
-      .optional()
-      .describe(
-        'World-space pivot point [x, y, z] for the rotation axis. ' +
-          'Only meaningful for the rotation channel. ' +
-          'When omitted the player uses the target entity/group position as the pivot.',
-      ),
-    trigger: z
-      .string()
-      .optional()
-      .describe(
-        "When to run the animation: 'auto' (default) starts under the global Play button; " +
-          "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
-      ),
+    pivot: pivotField,
+    trigger: triggerField,
   }),
   run: (doc, { targetId, speed, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) {
-      return {
-        document: doc,
-        summary: `animate_spin: no entity or group ${targetId}.`,
-        affected: [],
-      };
+      return noop(doc, `animate_spin: no entity or group ${targetId}.`);
     }
 
     const anim = buildAnimation(
@@ -197,46 +198,27 @@ export const animateOscillate = defineCommand({
       .describe(
         "Transform channel to drive: 'rotation' (default) rocks the part; 'position' slides it back and forth.",
       ),
-    pivot: z
-      .array(z.number())
-      .optional()
-      .describe(
-        'World-space pivot point [x, y, z] for the rotation axis. ' +
-          'Only meaningful for the rotation channel. ' +
-          'When omitted the player uses the target entity/group position as the pivot.',
-      ),
-    trigger: z
-      .string()
-      .optional()
-      .describe(
-        "When to run the animation: 'auto' (default) starts under the global Play button; " +
-          "'click' toggles the animation on/off when the user clicks the animated part in the viewport.",
-      ),
+    pivot: pivotField,
+    trigger: triggerField,
   }),
   run: (doc, { targetId, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) {
-      return {
-        document: doc,
-        summary: `animate_oscillate: no entity or group ${targetId}.`,
-        affected: [],
-      };
+      return noop(doc, `animate_oscillate: no entity or group ${targetId}.`);
     }
 
     if (amplitude <= 0) {
-      return {
-        document: doc,
-        summary: `animate_oscillate: amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `animate_oscillate: amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`,
+      );
     }
 
     if (frequency <= 0) {
-      return {
-        document: doc,
-        summary: `animate_oscillate: frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`,
-        affected: [],
-      };
+      return noop(
+        doc,
+        `animate_oscillate: frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`,
+      );
     }
 
     const anim = buildAnimation(
@@ -290,14 +272,9 @@ export const stopAnimation = defineCommand({
   run: (doc, { animationId, targetId }): CommandResult => {
     const existing = doc.animations;
 
-    // --- by animationId ---
     if (animationId !== undefined) {
       if (existing[animationId] === undefined) {
-        return {
-          document: doc,
-          summary: `stop_animation: animation ${animationId} not found; nothing removed.`,
-          affected: [],
-        };
+        return noop(doc, `stop_animation: animation ${animationId} not found; nothing removed.`);
       }
       const next = { ...existing };
       delete next[animationId];
@@ -308,15 +285,13 @@ export const stopAnimation = defineCommand({
       };
     }
 
-    // --- by targetId ---
     if (targetId !== undefined) {
       const toRemove = Object.values(existing).filter((a) => a.targetId === targetId);
       if (toRemove.length === 0) {
-        return {
-          document: doc,
-          summary: `stop_animation: no animations found for target ${targetId}; nothing removed.`,
-          affected: [],
-        };
+        return noop(
+          doc,
+          `stop_animation: no animations found for target ${targetId}; nothing removed.`,
+        );
       }
       const next = { ...existing };
       for (const a of toRemove) {
@@ -329,14 +304,9 @@ export const stopAnimation = defineCommand({
       };
     }
 
-    // --- clear all ---
     const count = Object.keys(existing).length;
     if (count === 0) {
-      return {
-        document: doc,
-        summary: 'stop_animation: no animations to clear.',
-        affected: [],
-      };
+      return noop(doc, 'stop_animation: no animations to clear.');
     }
     return {
       document: { ...doc, animations: {} },

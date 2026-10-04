@@ -1,17 +1,30 @@
 import type { DocumentUnit, EntityKind, Layer, CameraState, Vec3 } from '../model/types';
 import { isRecord } from '../lib/isRecord';
+import { isFiniteNumber } from '../lib/isFiniteNumber';
 
 export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
+const isPositiveNumber = (v: unknown): v is number => isFiniteNumber(v) && v > 0;
+
+/** Fields that must be finite and > 0, per entity kind. */
+const POSITIVE_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  cylinder: ['radius', 'height'],
+  cone: ['radius', 'height'],
+  sphere: ['radius'],
+  torus: ['ringRadius', 'tubeRadius'],
+  pyramid: ['baseWidth', 'baseDepth', 'height'],
+  arc: ['radius'],
+  circle: ['radius'],
+  rectangle: ['width', 'height'],
+  ellipse: ['radiusX', 'radiusY'],
+  text: ['height'],
+};
+
 /** A Vec3 where all three components are finite numbers. */
 function isFiniteVec3(v: unknown): v is Vec3 {
-  return (
-    Array.isArray(v) &&
-    v.length === 3 &&
-    v.every((x) => typeof x === 'number' && Number.isFinite(x))
-  );
+  return Array.isArray(v) && v.length === 3 && v.every(isFiniteNumber);
 }
 
 /** /^#[0-9a-fA-F]{6}$/ — the only hex format accepted by the renderer. */
@@ -61,12 +74,9 @@ export function validateCamera(v: unknown): v is CameraState {
   if (!isRecord(v)) return false;
   return (
     isFiniteVec3(v['target']) &&
-    typeof v['azimuth'] === 'number' &&
-    Number.isFinite(v['azimuth']) &&
-    typeof v['polar'] === 'number' &&
-    Number.isFinite(v['polar']) &&
-    typeof v['distance'] === 'number' &&
-    Number.isFinite(v['distance'])
+    isFiniteNumber(v['azimuth']) &&
+    isFiniteNumber(v['polar']) &&
+    isFiniteNumber(v['distance'])
   );
 }
 
@@ -104,6 +114,11 @@ export function validateEntityValue(v: unknown): string | null {
     return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
 
   // Kind-specific numeric invariants.
+  for (const field of POSITIVE_FIELDS[kind] ?? []) {
+    const value = v[field];
+    if (!isPositiveNumber(value))
+      return `entity ${id} (${kind}): ${field} must be finite and > 0, got ${String(value)}`;
+  }
   switch (kind) {
     case 'box':
     case 'wedge': {
@@ -112,84 +127,15 @@ export function validateEntityValue(v: unknown): string | null {
         return `entity ${id} (${kind}): size must be a 3-element array`;
       for (let i = 0; i < 3; i++) {
         const c = size[i] as unknown;
-        if (typeof c !== 'number' || !Number.isFinite(c) || c <= 0)
+        if (!isPositiveNumber(c))
           return `entity ${id} (${kind}): size[${i}] must be finite and > 0, got ${String(c)}`;
       }
       break;
     }
-    case 'cylinder':
-    case 'cone': {
-      const radius = v['radius'];
-      const height = v['height'];
-      if (typeof radius !== 'number' || !Number.isFinite(radius) || radius <= 0)
-        return `entity ${id} (${kind}): radius must be finite and > 0, got ${String(radius)}`;
-      if (typeof height !== 'number' || !Number.isFinite(height) || height <= 0)
-        return `entity ${id} (${kind}): height must be finite and > 0, got ${String(height)}`;
-      break;
-    }
-    case 'sphere': {
-      const radius = v['radius'];
-      if (typeof radius !== 'number' || !Number.isFinite(radius) || radius <= 0)
-        return `entity ${id} (sphere): radius must be finite and > 0, got ${String(radius)}`;
-      break;
-    }
-    case 'torus': {
-      const ringRadius = v['ringRadius'];
-      const tubeRadius = v['tubeRadius'];
-      if (typeof ringRadius !== 'number' || !Number.isFinite(ringRadius) || ringRadius <= 0)
-        return `entity ${id} (torus): ringRadius must be finite and > 0, got ${String(ringRadius)}`;
-      if (typeof tubeRadius !== 'number' || !Number.isFinite(tubeRadius) || tubeRadius <= 0)
-        return `entity ${id} (torus): tubeRadius must be finite and > 0, got ${String(tubeRadius)}`;
-      break;
-    }
-    case 'pyramid': {
-      const baseWidth = v['baseWidth'];
-      const baseDepth = v['baseDepth'];
-      const height = v['height'];
-      if (typeof baseWidth !== 'number' || !Number.isFinite(baseWidth) || baseWidth <= 0)
-        return `entity ${id} (pyramid): baseWidth must be finite and > 0, got ${String(baseWidth)}`;
-      if (typeof baseDepth !== 'number' || !Number.isFinite(baseDepth) || baseDepth <= 0)
-        return `entity ${id} (pyramid): baseDepth must be finite and > 0, got ${String(baseDepth)}`;
-      if (typeof height !== 'number' || !Number.isFinite(height) || height <= 0)
-        return `entity ${id} (pyramid): height must be finite and > 0, got ${String(height)}`;
-      break;
-    }
     case 'extrusion': {
       const depth = v['depth'];
-      if (typeof depth !== 'number' || !Number.isFinite(depth))
+      if (!isFiniteNumber(depth))
         return `entity ${id} (extrusion): depth must be a finite number, got ${String(depth)}`;
-      break;
-    }
-    // 2D shapes: radius-bearing kinds
-    case 'arc':
-    case 'circle': {
-      const radius = v['radius'];
-      if (typeof radius !== 'number' || !Number.isFinite(radius) || radius <= 0)
-        return `entity ${id} (${kind}): radius must be finite and > 0, got ${String(radius)}`;
-      break;
-    }
-    case 'rectangle': {
-      const width = v['width'];
-      const height = v['height'];
-      if (typeof width !== 'number' || !Number.isFinite(width) || width <= 0)
-        return `entity ${id} (rectangle): width must be finite and > 0, got ${String(width)}`;
-      if (typeof height !== 'number' || !Number.isFinite(height) || height <= 0)
-        return `entity ${id} (rectangle): height must be finite and > 0, got ${String(height)}`;
-      break;
-    }
-    case 'ellipse': {
-      const radiusX = v['radiusX'];
-      const radiusY = v['radiusY'];
-      if (typeof radiusX !== 'number' || !Number.isFinite(radiusX) || radiusX <= 0)
-        return `entity ${id} (ellipse): radiusX must be finite and > 0, got ${String(radiusX)}`;
-      if (typeof radiusY !== 'number' || !Number.isFinite(radiusY) || radiusY <= 0)
-        return `entity ${id} (ellipse): radiusY must be finite and > 0, got ${String(radiusY)}`;
-      break;
-    }
-    case 'text': {
-      const height = v['height'];
-      if (typeof height !== 'number' || !Number.isFinite(height) || height <= 0)
-        return `entity ${id} (text): height must be finite and > 0, got ${String(height)}`;
       break;
     }
     case 'instance': {
@@ -203,18 +149,15 @@ export function validateEntityValue(v: unknown): string | null {
           return `entity ${id} (instance): scale must be a 3-element array when present`;
         for (let i = 0; i < 3; i++) {
           const c = scale[i] as unknown;
-          if (typeof c !== 'number' || !Number.isFinite(c))
+          if (!isFiniteNumber(c))
             return `entity ${id} (instance): scale[${i}] must be a finite number, got ${String(c)}`;
         }
       }
       break;
     }
-    // 'line', 'polyline', 'point', 'spline', 'dimension', 'mesh' — no extra numeric invariants enforced here
-    default:
-      break;
   }
 
-  return null; // valid
+  return null;
 }
 
 /**
@@ -223,23 +166,14 @@ export function validateEntityValue(v: unknown): string | null {
 export function validateMaterialValue(name: string, v: unknown): string | null {
   if (!isRecord(v)) return `material '${name}' is not an object`;
   const { density, color, metalness, roughness } = v;
-  if (typeof density !== 'number' || !Number.isFinite(density) || density <= 0)
+  if (!isPositiveNumber(density))
     return `material '${name}': density must be finite and > 0, got ${String(density)}`;
   if (!isValidHexColor(color))
     return `material '${name}': color '${String(color)}' is not a valid hex color (#rrggbb)`;
-  if (
-    typeof metalness !== 'number' ||
-    !Number.isFinite(metalness) ||
-    metalness < 0 ||
-    metalness > 1
-  )
+  const isUnit = (x: unknown): boolean => isFiniteNumber(x) && x >= 0 && x <= 1;
+  if (!isUnit(metalness))
     return `material '${name}': metalness must be a finite number in [0, 1], got ${String(metalness)}`;
-  if (
-    typeof roughness !== 'number' ||
-    !Number.isFinite(roughness) ||
-    roughness < 0 ||
-    roughness > 1
-  )
+  if (!isUnit(roughness))
     return `material '${name}': roughness must be a finite number in [0, 1], got ${String(roughness)}`;
   return null;
 }
