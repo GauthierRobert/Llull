@@ -4,9 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  ellipseParamsFromCenterCorner,
-} from '../../src/ui/viewport/2d/drawHelpers';
+import { ellipseParamsFromCenterCorner } from '../../src/ui/viewport/2d/drawHelpers';
 
 // ---------------------------------------------------------------------------
 // ellipseParamsFromCenterCorner
