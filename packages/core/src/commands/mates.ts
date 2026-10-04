@@ -1,22 +1,14 @@
 /**
- * @command add_mate
- * @command bill_of_materials
- * @pure
+ * add_mate: stores a mate between two instances as an ordinary constraint (solved by
+ * `solve_constraints`; instance origins are the solver's point proxies).
+ *
  * @layer core/commands
- * @affects add_mate: adds 1 constraint to document.constraints and document.constraintOrder
- *          bill_of_materials: no document mutation, affected:[]
- * @invariant Mate constraints are stored as ordinary constraints; solve_constraints
- *            applies them exactly like hand-authored constraints.
- * @failure Unknown instanceId / invalid kind / distance without value → no-op, affected:[].
- *          bill_of_materials: orphan instances (componentId absent from doc.components) emitted
- *          as a warning row with componentName:'(missing)'; never throws.
  */
 
-import type { CadDocument, EntityKind, InstanceEntity } from '../model/types';
+import type { Constraint } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { expandInstance } from './assemblies';
 import { noop } from './noop';
 
 /**
@@ -96,39 +88,28 @@ export const addMate = defineCommand({
       ),
   }),
   run: (doc, { kind, a, b, value, id }): CommandResult => {
-    if (a.instanceId.length === 0) {
-      return noop(doc, `add_mate: a must be an object with a non-empty instanceId string.`);
-    }
-    if (b.instanceId.length === 0) {
-      return noop(doc, `add_mate: b must be an object with a non-empty instanceId string.`);
-    }
-
-    const entityA = doc.entities[a.instanceId];
-    if (!entityA || entityA.kind !== 'instance') {
-      return noop(
-        doc,
-        `add_mate: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
-      );
-    }
-    const entityB = doc.entities[b.instanceId];
-    if (!entityB || entityB.kind !== 'instance') {
-      return noop(
-        doc,
-        `add_mate: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
-      );
-    }
-
-    if (kind === 'distance') {
-      if (value === undefined) {
+    for (const [side, ref] of [
+      ['a', a],
+      ['b', b],
+    ] as const) {
+      if (ref.instanceId.length === 0) {
+        return noop(doc, `add_mate: ${side} must be an object with a non-empty instanceId string.`);
+      }
+      if (doc.entities[ref.instanceId]?.kind !== 'instance') {
         return noop(
           doc,
-          `add_mate: kind='distance' requires a 'value' field (number or expression string).`,
+          `add_mate: ${side}.instanceId '${ref.instanceId}' does not exist or is not an InstanceEntity.`,
         );
       }
     }
+    if (kind === 'distance' && value === undefined) {
+      return noop(
+        doc,
+        `add_mate: kind='distance' requires a 'value' field (number or expression string).`,
+      );
+    }
 
-    const constraintId = typeof id === 'string' && id.length > 0 ? id : nextId('mate');
-
+    const constraintId = id !== undefined && id.length > 0 ? id : nextId('mate');
     if (constraintId in doc.constraints) {
       return noop(
         doc,
@@ -136,57 +117,14 @@ export const addMate = defineCommand({
       );
     }
 
-    // Build the constraint. Mates are stored as ordinary Constraint objects.
-    // EntityRef shape uses instanceId as entityId — the solver's resolvePoint
-    // looks up doc.entities[entityId].position which is the instance's world origin.
-    // For parallel mates on axis frames, we store them as 'coincident' is not applicable;
-    // but note the solver's resolveDirection only works on 'line' entities. For the
-    // 'parallel' mate kind we store a 'parallel' constraint between the two instance
-    // entities, which will use entity.position as the proxy (the gradient step on
-    // parallel reads direction from entity positions for line entities, so it's a
-    // best-effort approximation when applied to instances). The key value is the
-    // constraint is stored for round-trip fidelity; full axis-parallel solving requires
-    // a future extension of the solver.
-    type NewConstraint =
-      | { id: string; kind: 'coincident'; a: { entityId: string }; b: { entityId: string } }
-      | { id: string; kind: 'parallel'; a: { entityId: string }; b: { entityId: string } }
-      | {
-          id: string;
-          kind: 'distance';
-          a: { entityId: string };
-          b: { entityId: string };
-          value: number | string;
-        };
-
-    let newConstraint: NewConstraint;
-    if (kind === 'distance' && value !== undefined) {
-      newConstraint = {
-        id: constraintId,
-        kind: 'distance',
-        a: { entityId: a.instanceId },
-        b: { entityId: b.instanceId },
-        value,
-      };
-    } else if (kind === 'parallel') {
-      newConstraint = {
-        id: constraintId,
-        kind: 'parallel',
-        a: { entityId: a.instanceId },
-        b: { entityId: b.instanceId },
-      };
-    } else {
-      // coincident
-      newConstraint = {
-        id: constraintId,
-        kind: 'coincident',
-        a: { entityId: a.instanceId },
-        b: { entityId: b.instanceId },
-      };
-    }
-
-    const newDoc: CadDocument = {
+    const refs = { a: { entityId: a.instanceId }, b: { entityId: b.instanceId } };
+    const constraint: Constraint =
+      kind === 'distance'
+        ? { id: constraintId, kind, ...refs, value: value as number | string }
+        : { id: constraintId, kind, ...refs };
+    const newDoc = {
       ...doc,
-      constraints: { ...doc.constraints, [constraintId]: newConstraint },
+      constraints: { ...doc.constraints, [constraintId]: constraint },
       constraintOrder: [...doc.constraintOrder, constraintId],
     };
 
@@ -200,133 +138,6 @@ export const addMate = defineCommand({
         `and instance '${b.instanceId}' (frame: ${frameB})` +
         (kind === 'distance' ? ` with value=${String(value)}.` : '.'),
       affected: [constraintId],
-    };
-  },
-});
-
-/** One row in the bill of materials output. */
-interface BomRow {
-  /** Id of the component in doc.components. Absent for orphan instances. */
-  componentId: string;
-  /** Human-readable component name. '(missing)' for orphan instances (componentId not in doc.components). */
-  componentName: string;
-  /** Number of instances of this component in the document. */
-  count: number;
-  /**
-   * Count of child entities by kind within the component, computed by expandInstance.
-   * Empty for orphan instances where the component cannot be found.
-   */
-  perEntityKindCounts: Partial<Record<EntityKind, number>>;
-  /** When true, this component id is not present in doc.components (orphan instances). */
-  orphan?: true;
-}
-
-interface BillOfMaterialsData {
-  rows: BomRow[];
-  totalInstances: number;
-  distinctComponents: number;
-}
-
-/**
- * @command bill_of_materials
- * @pure
- * @layer core/commands
- * @affects nothing — read-only query, affected:[]
- * @invariant document is returned unchanged; rows are grouped by componentId
- * @failure orphan instances (componentId not in doc.components) produce a warning row with
- *          componentName:'(missing)' and orphan:true; no throw
- */
-export const billOfMaterials = defineCommand({
-  name: 'bill_of_materials',
-  annotations: { readOnly: true, metaHistory: true },
-  description:
-    'Generate a bill of materials (BOM) from all InstanceEntity objects in the document. ' +
-    'Groups instances by componentId; reports count per component and a breakdown of ' +
-    'child entity kinds (perEntityKindCounts). ' +
-    'Instances whose componentId is absent from doc.components are reported as orphan rows ' +
-    '(componentName: "(missing)", orphan: true) — no error is thrown. ' +
-    'Returns the unchanged document, affected:[], and data: ' +
-    '{ rows: BomRow[], totalInstances: number, distinctComponents: number }. ' +
-    'A BomRow has: { componentId, componentName, count, perEntityKindCounts, orphan? }.',
-  params: z.object({}),
-  run: (doc, _params): CommandResult => {
-    // Collect all instance entities
-    const instances = Object.values(doc.entities).filter(
-      (e): e is InstanceEntity => e.kind === 'instance',
-    );
-
-    if (instances.length === 0) {
-      return {
-        document: doc,
-        summary: 'bill_of_materials: 0 instances found. BOM is empty.',
-        affected: [],
-        data: { rows: [], totalInstances: 0, distinctComponents: 0 } satisfies BillOfMaterialsData,
-      };
-    }
-
-    // Group instances by componentId
-    const grouped = new Map<string, InstanceEntity[]>();
-    for (const inst of instances) {
-      const existing = grouped.get(inst.componentId);
-      if (existing) {
-        existing.push(inst);
-      } else {
-        grouped.set(inst.componentId, [inst]);
-      }
-    }
-
-    const rows: BomRow[] = [];
-
-    for (const [componentId, instanceList] of grouped) {
-      const component = doc.components[componentId];
-
-      if (!component) {
-        // Orphan: componentId not present in doc.components
-        rows.push({
-          componentId,
-          componentName: '(missing)',
-          count: instanceList.length,
-          perEntityKindCounts: {},
-          orphan: true,
-        });
-        continue;
-      }
-
-      // Compute perEntityKindCounts via expandInstance on the first instance
-      // (all instances of the same component have the same child structure).
-      const representative = instanceList[0]!;
-      const expanded = expandInstance(representative, component);
-      const perEntityKindCounts: Partial<Record<EntityKind, number>> = {};
-      for (const child of expanded) {
-        const k = child.kind as EntityKind;
-        perEntityKindCounts[k] = (perEntityKindCounts[k] ?? 0) + 1;
-      }
-
-      rows.push({
-        componentId,
-        componentName: component.name,
-        count: instanceList.length,
-        perEntityKindCounts,
-      });
-    }
-
-    // Sort rows by componentName for deterministic output
-    rows.sort((ra, rb) => ra.componentName.localeCompare(rb.componentName));
-
-    const totalInstances = instances.length;
-    const distinctComponents = rows.filter((r) => !r.orphan).length;
-
-    const rowSummary = rows
-      .map((r) => `"${r.componentName}" ×${r.count}${r.orphan ? ' [ORPHAN]' : ''}`)
-      .join(', ');
-
-    return {
-      document: doc,
-      summary:
-        `bill_of_materials: ${totalInstances} instance(s), ${distinctComponents} distinct component(s). ` +
-        (rows.length > 0 ? `Rows: ${rowSummary}.` : 'No rows.'),
-      affected: [],
-      data: { rows, totalInstances, distinctComponents } satisfies BillOfMaterialsData,
     };
   },
 });

@@ -2,8 +2,8 @@ import type { CadDocument, Entity, Vec2, PolylineEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { cross2, dot2, len2, normalize2 } from './modify2dGeometry';
-import { withEntity } from './entityOps';
+import { add2, cross2, dot2, len2, normalize2, scale2, sub2 } from '../lib/vec2';
+import { replaceEntity, withEntity } from './entityOps';
 import { noop } from './noop';
 
 type CornerResolution =
@@ -43,7 +43,7 @@ function commitCorner(
   const points = poly.points.flatMap((p, i): Vec2[] => (i === vertexIndex ? [first, second] : [p]));
   const updated: Entity = { ...poly, points };
   return {
-    document: withEntity({ ...doc, entities: { ...doc.entities, [poly.id]: updated } }, extra),
+    document: withEntity(replaceEntity(doc, updated), extra),
     pointCount: points.length,
   };
 }
@@ -88,8 +88,8 @@ function resolveCorner(
   const prev = poly.points[prevIdx]!;
   const vertex = poly.points[vertexIndex]!;
   const next = poly.points[nextIdx]!;
-  const toPrev: Vec2 = [prev[0] - vertex[0], prev[1] - vertex[1]];
-  const toNext: Vec2 = [next[0] - vertex[0], next[1] - vertex[1]];
+  const toPrev = sub2(prev, vertex);
+  const toNext = sub2(next, vertex);
   const lenPrev = len2(toPrev);
   const lenNext = len2(toNext);
   if (lenPrev < 1e-12 || lenNext < 1e-12) {
@@ -111,12 +111,6 @@ function resolveCorner(
  * @affects updates 1 polyline entity (trims the two adjacent segments) + creates 1 arc entity
  * @invariant entity must be kind:'polyline'; vertexIndex must be an interior vertex (1..n-2 for open, 0..n-1 for closed)
  * @failure missing id / wrong kind / invalid vertex / radius too large -> no-op, affected:[]
- *
- * Single-corner mode: supply vertexIndex (0-based) to specify which vertex to fillet.
- * The arc is tangent to both adjacent segments at points located `radius` distance back
- * from the vertex along each segment. The two segment endpoints adjacent to the vertex
- * are trimmed to these tangent points; the arc is inserted as a separate ArcEntity.
- * The polyline is updated with the new trimmed points (vertex replaced by the two tangent points).
  */
 export const fillet2D = defineCommand({
   name: 'fillet_2d',
@@ -149,20 +143,16 @@ export const fillet2D = defineCommand({
     const dirPrev = normalize2(toPrev);
     const dirNext = normalize2(toNext);
 
-    // Half-angle between the two segments
-    // cos(theta) = dot(dirPrev, dirNext)
     const cosA = Math.max(-1, Math.min(1, dot2(dirPrev, dirNext)));
     const halfAngle = Math.acos(cosA) / 2;
 
     if (halfAngle < 1e-9 || Math.abs(halfAngle - Math.PI / 2) < 1e-9) {
-      // Lines are collinear or form a 180° angle — no fillet needed / not possible
       return noop(
         doc,
         `fillet_2d: segments at vertex ${vertexIndex} are collinear — no fillet possible.`,
       );
     }
 
-    // Distance from vertex to tangent points = radius / tan(halfAngle)
     const tanHalf = Math.tan(halfAngle);
     if (!isFinite(tanHalf) || tanHalf < 1e-12) {
       return noop(doc, `fillet_2d: degenerate angle at vertex ${vertexIndex}.`);
@@ -179,51 +169,17 @@ export const fillet2D = defineCommand({
       };
     }
 
-    // Tangent points on each adjacent segment
-    const tangentPrev: Vec2 = [
-      vertex[0] + dirPrev[0] * tangentDist,
-      vertex[1] + dirPrev[1] * tangentDist,
-    ];
-    const tangentNext: Vec2 = [
-      vertex[0] + dirNext[0] * tangentDist,
-      vertex[1] + dirNext[1] * tangentDist,
-    ];
-
-    // Arc center: located perpendicular to each tangent, distance `radius` from each tangent point
-    // The center is along the bisector from vertex at distance radius / sin(halfAngle)
-    const bisector = normalize2([dirPrev[0] + dirNext[0], dirPrev[1] + dirNext[1]]);
-    const centerDist = radius / Math.sin(halfAngle);
-    const arcCenter: Vec2 = [
-      vertex[0] + bisector[0] * centerDist,
-      vertex[1] + bisector[1] * centerDist,
-    ];
-
-    // Compute start and end angles of the fillet arc
+    const tangentPrev = add2(vertex, scale2(dirPrev, tangentDist));
+    const tangentNext = add2(vertex, scale2(dirNext, tangentDist));
+    // The arc centre lies on the bisector at radius / sin(halfAngle) from the vertex.
+    const bisector = normalize2(add2(dirPrev, dirNext));
+    const arcCenter = add2(vertex, scale2(bisector, radius / Math.sin(halfAngle)));
     const startAngle = Math.atan2(tangentPrev[1] - arcCenter[1], tangentPrev[0] - arcCenter[0]);
     const endAngle = Math.atan2(tangentNext[1] - arcCenter[1], tangentNext[0] - arcCenter[0]);
-
-    // Determine arc sweep direction: the arc should curve around the vertex.
-    // The cross product of dirPrev × dirNext determines which side the center is on.
-    const crossVal = cross2(dirPrev, dirNext);
-
-    // For CCW arcs, endAngle should be CCW from startAngle.
-    // If crossVal > 0, the turn is to the left (CCW) and we want a CW arc to fill the corner.
-    // Adjust angles so the arc sweeps through the fillet region.
-    let arcStart = startAngle;
-    let arcEnd = endAngle;
-
-    // If the center is on the same side as the vertex interior (cross > 0 means left turn),
-    // the arc sweeps CW from tangentPrev to tangentNext.
-    // Our ArcEntity convention: CCW from startAngle to endAngle.
-    // For a right-turn (cross < 0): arc sweeps CCW naturally.
-    // For a left-turn (cross > 0): swap and make it CCW (which goes the long way around → need the short CW).
-    // Simplest approach: just store start/end; the renderer draws CCW.
-    // We'll normalize: ensure the arc sweeps through the fillet (short arc).
-    if (crossVal > 0) {
-      // Left turn: center is to the right of our direction, so swap to get CCW short arc
-      arcStart = endAngle;
-      arcEnd = startAngle;
-    }
+    // ArcEntity sweeps CCW start -> end: a left turn (cross > 0) swaps the tangent angles so the short arc is drawn.
+    const leftTurn = cross2(dirPrev, dirNext) > 0;
+    const arcStart = leftTurn ? endAngle : startAngle;
+    const arcEnd = leftTurn ? startAngle : endAngle;
 
     const arcId = nextId('arc');
     const arcEntity: Entity = {
@@ -265,11 +221,6 @@ export const fillet2D = defineCommand({
  * @affects updates 1 polyline entity (trims the two adjacent segments) + creates 1 line entity (the bevel)
  * @invariant entity must be kind:'polyline'; vertexIndex must be interior vertex
  * @failure missing id / wrong kind / invalid vertex / distance too large -> no-op, affected:[]
- *
- * Single-corner mode: supply vertexIndex (0-based) to specify which vertex to chamfer.
- * The bevel is a straight line connecting the two points located `distance` back from the
- * vertex along each adjacent segment. The polyline is updated with the bevel endpoints
- * (vertex replaced by the two trim points); the bevel is inserted as a separate LineEntity.
  */
 export const chamfer2D = defineCommand({
   name: 'chamfer_2d',
@@ -317,8 +268,8 @@ export const chamfer2D = defineCommand({
     const dirPrev = normalize2(toPrev);
     const dirNext = normalize2(toNext);
 
-    const bevelPrev: Vec2 = [vertex[0] + dirPrev[0] * distance, vertex[1] + dirPrev[1] * distance];
-    const bevelNext: Vec2 = [vertex[0] + dirNext[0] * distance, vertex[1] + dirNext[1] * distance];
+    const bevelPrev = add2(vertex, scale2(dirPrev, distance));
+    const bevelNext = add2(vertex, scale2(dirNext, distance));
 
     const bevelId = nextId('line');
     const bevelLine: Entity = {

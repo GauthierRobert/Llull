@@ -1,10 +1,6 @@
 /**
- * export_obj and export_gltf — Wavefront OBJ and glTF 2.0 / GLB export commands.
- *
- * Both are read-only: the document is returned unchanged, affected:[].
- * Triangle tessellation is shared via `entityToTriangles` from export.ts — no
- * duplication of geometry code.  Instance entities are expanded recursively via
- * expandInstance (assemblies.ts).  Revolution entities are fully tessellated.
+ * export_obj and export_gltf: read-only exports of the world-space triangles shared with
+ * `exportTriangulate.ts` (document returned unchanged, affected: []).
  *
  * @layer core/commands
  */
@@ -32,15 +28,6 @@ function buildObjText(tris: Triangle[], header: string, objectName: string): str
     lines.push(`f ${vi}//${ni} ${vi + 1}//${ni} ${vi + 2}//${ni}`);
   }
   return lines.join('\n');
-}
-
-interface ExportObjData {
-  /** Always 'obj'. */
-  format: 'obj';
-  /** Full Wavefront OBJ text. */
-  text: string;
-  /** Total triangles exported. */
-  triangleCount: number;
 }
 
 /**
@@ -94,72 +81,35 @@ export const exportObj = defineCommand({
     );
     const summary = exportSummary('export_obj', 'obj', collected);
 
-    const data: ExportObjData = { format: 'obj', text, triangleCount };
-    return { document: doc, summary, affected: [], data };
+    return { document: doc, summary, affected: [], data: { format: 'obj', text, triangleCount } };
   },
 });
 
-/**
- * Build a Float32Array of interleaved position+normal data for all triangles.
- * Layout per vertex: [px, py, pz, nx, ny, nz] — 6 floats, 24 bytes.
- * Returns separate position and normal arrays for glTF separate accessors.
- */
-function buildGltfBuffers(tris: Triangle[]): {
-  positions: Float32Array;
-  normals: Float32Array;
-} {
-  const count = tris.length * 3; // total vertices
-  const positions = new Float32Array(count * 3);
-  const normals = new Float32Array(count * 3);
-
-  let vi = 0;
-  for (const [v0, v1, v2] of tris) {
-    const n = facetNormal(v0, v1, v2);
-    for (const v of [v0, v1, v2]) {
-      positions[vi * 3 + 0] = v[0];
-      positions[vi * 3 + 1] = v[1];
-      positions[vi * 3 + 2] = v[2];
-      normals[vi * 3 + 0] = n[0];
-      normals[vi * 3 + 1] = n[1];
-      normals[vi * 3 + 2] = n[2];
-      vi++;
-    }
-  }
-
+/** Per-vertex (triangle-soup) positions and facet normals as flat Float32Arrays. */
+function buildGltfBuffers(tris: Triangle[]): { positions: Float32Array; normals: Float32Array } {
+  const positions = new Float32Array(tris.length * 9);
+  const normals = new Float32Array(tris.length * 9);
+  tris.forEach((tri, t) => {
+    const n = facetNormal(...tri);
+    tri.forEach((v, k) => {
+      positions.set(v, t * 9 + k * 3);
+      normals.set(n, t * 9 + k * 3);
+    });
+  });
   return { positions, normals };
 }
 
-/** Compute axis-aligned bounding box [minX,minY,minZ] / [maxX,maxY,maxZ]. */
-function computeAabb(positions: Float32Array): {
-  min: [number, number, number];
-  max: [number, number, number];
-} {
-  let minX = Infinity,
-    minY = Infinity,
-    minZ = Infinity;
-  let maxX = -Infinity,
-    maxY = -Infinity,
-    maxZ = -Infinity;
-  for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i]!,
-      y = positions[i + 1]!,
-      z = positions[i + 2]!;
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-    if (z < minZ) minZ = z;
-    if (z > maxZ) maxZ = z;
+/** Component-wise min/max of a flat xyz array (both zero when empty). */
+function computeAabb(positions: Float32Array): { min: number[]; max: number[] } {
+  if (positions.length === 0) return { min: [0, 0, 0], max: [0, 0, 0] };
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < positions.length; i++) {
+    const axis = i % 3;
+    min[axis] = Math.min(min[axis] as number, positions[i] as number);
+    max[axis] = Math.max(max[axis] as number, positions[i] as number);
   }
-  if (!isFinite(minX)) {
-    minX = 0;
-    minY = 0;
-    minZ = 0;
-    maxX = 0;
-    maxY = 0;
-    maxZ = 0;
-  }
-  return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
+  return { min, max };
 }
 
 /** Align a byte length to a 4-byte boundary (glTF chunk requirement). */
@@ -174,9 +124,8 @@ function align4(n: number): number {
  */
 function buildGltfJson(positions: Float32Array, binBuffer: Uint8Array): Record<string, unknown> {
   const vertexCount = positions.length / 3;
-  // Buffer layout: positions (float32×3 per vertex) then normals (float32×3 per vertex)
-  const posByteLength = vertexCount * 3 * 4;
-  const normByteLength = vertexCount * 3 * 4;
+  const posByteLength = positions.byteLength;
+  const normByteLength = positions.byteLength;
 
   const aabb = computeAabb(positions);
 
@@ -229,55 +178,33 @@ function buildGltfJson(positions: Float32Array, binBuffer: Uint8Array): Record<s
   };
 }
 
-/**
- * Pack JSON chunk + BIN chunk into a GLB binary container.
- * GLB format: 12-byte file header + JSON chunk + BIN chunk.
- *   - Each chunk: 4-byte length (LE) + 4-byte type + payload (padded to 4 bytes).
- *   - JSON chunk type: 0x4E4F534A ('JSON')
- *   - BIN  chunk type: 0x004E4942 ('BIN\0')
- */
+/** One GLB chunk: u32 length + u32 type + payload padded to 4 bytes with `pad`. */
+function glbChunk(type: number, payload: Uint8Array, pad: number): Uint8Array {
+  const padded = align4(payload.length);
+  const chunk = new Uint8Array(8 + padded).fill(pad);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, padded, true);
+  view.setUint32(4, type, true);
+  chunk.set(payload, 8);
+  return chunk;
+}
+
+/** GLB container: 12-byte header + JSON chunk (+ BIN chunk when there is a payload). */
 function buildGlb(jsonObj: Record<string, unknown>, binPayload: Uint8Array): Uint8Array {
-  const jsonStr = JSON.stringify(jsonObj);
-  const jsonBytes = new TextEncoder().encode(jsonStr);
-  const jsonPadded = align4(jsonBytes.length);
-  const binPadded = align4(binPayload.length);
-
-  const totalLength = 12 + 8 + jsonPadded + (binPayload.length > 0 ? 8 + binPadded : 0);
-  const buf = new Uint8Array(totalLength);
-  const view = new DataView(buf.buffer);
-
-  let off = 0;
-  // File header
-  view.setUint32(off, 0x46546c67, true);
-  off += 4; // magic 'glTF'
-  view.setUint32(off, 2, true);
-  off += 4; // version 2
-  view.setUint32(off, totalLength, true);
-  off += 4; // total length
-
-  // JSON chunk
-  view.setUint32(off, jsonPadded, true);
-  off += 4;
-  view.setUint32(off, 0x4e4f534a, true);
-  off += 4; // 'JSON'
-  buf.set(jsonBytes, off);
-  // pad with spaces (0x20)
-  for (let i = jsonBytes.length; i < jsonPadded; i++) buf[off + i] = 0x20;
-  off += jsonPadded;
-
-  if (binPayload.length > 0) {
-    // BIN chunk
-    view.setUint32(off, binPadded, true);
-    off += 4;
-    view.setUint32(off, 0x004e4942, true);
-    off += 4; // 'BIN\0'
-    buf.set(binPayload, off);
-    // pad with zeros
-    for (let i = binPayload.length; i < binPadded; i++) buf[off + i] = 0;
-    off += binPadded;
+  const chunks = [glbChunk(0x4e4f534a, new TextEncoder().encode(JSON.stringify(jsonObj)), 0x20)];
+  if (binPayload.length > 0) chunks.push(glbChunk(0x004e4942, binPayload, 0));
+  const total = 12 + chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const glb = new Uint8Array(total);
+  const view = new DataView(glb.buffer);
+  view.setUint32(0, 0x46546c67, true); // 'glTF'
+  view.setUint32(4, 2, true);
+  view.setUint32(8, total, true);
+  let offset = 12;
+  for (const chunk of chunks) {
+    glb.set(chunk, offset);
+    offset += chunk.length;
   }
-
-  return buf;
+  return glb;
 }
 
 /** Combined BIN payload: positions then normals as raw bytes. */
@@ -289,17 +216,6 @@ function buildBinPayload(positions: Float32Array, normals: Float32Array): Uint8A
     positions.byteLength,
   );
   return combined;
-}
-
-interface ExportGltfData {
-  /** 'gltf' for JSON output, 'glb' for binary container. */
-  format: 'gltf' | 'glb';
-  /** Total triangles exported. */
-  triangleCount: number;
-  /** Present when format='gltf': the glTF 2.0 JSON text. */
-  text?: string;
-  /** Present when format='glb': base64-encoded GLB binary blob. */
-  base64?: string;
 }
 
 /**
@@ -360,18 +276,18 @@ export const exportGltf = defineCommand({
 
     if (binary) {
       const base64 = uint8ArrayToBase64(buildGlb(jsonObj, binPayload));
-      const data: ExportGltfData = { format: 'glb', triangleCount, base64 };
-      return { document: doc, summary, affected: [], data };
+      return {
+        document: doc,
+        summary,
+        affected: [],
+        data: { format: 'glb', triangleCount, base64 },
+      };
     }
     if (binPayload.length > 0) {
       const buffers = jsonObj['buffers'] as Array<Record<string, unknown>>;
       buffers[0]!['uri'] = `data:application/octet-stream;base64,${uint8ArrayToBase64(binPayload)}`;
     }
-    const data: ExportGltfData = {
-      format: 'gltf',
-      triangleCount,
-      text: JSON.stringify(jsonObj, null, 2),
-    };
-    return { document: doc, summary, affected: [], data };
+    const text = JSON.stringify(jsonObj, null, 2);
+    return { document: doc, summary, affected: [], data: { format: 'gltf', triangleCount, text } };
   },
 });

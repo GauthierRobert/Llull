@@ -1,4 +1,4 @@
-import { distance, polygonPerimeter } from '../lib/polygon';
+import { distance, polygonArea, polygonPerimeter } from '../lib/polygon';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { formatLength } from './units';
@@ -6,18 +6,6 @@ import { noop } from './noop';
 interface MeasureAreaData {
   area: number;
   unit: string;
-}
-
-/** Shoelace formula for a polygon in 2D. Returns the absolute area. */
-export function polygonArea(pts: ReadonlyArray<readonly [number, number]>): number {
-  let sum = 0;
-  const n = pts.length;
-  for (let i = 0; i < n; i++) {
-    const a = pts[i]!;
-    const b = pts[(i + 1) % n]!;
-    sum += a[0] * b[1] - b[0] * a[1];
-  }
-  return Math.abs(sum / 2);
 }
 
 /**

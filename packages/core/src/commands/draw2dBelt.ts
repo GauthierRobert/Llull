@@ -1,12 +1,12 @@
-import type { Entity } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
+import { compactNumber } from '../lib/compactNumber';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_CURVE_SAMPLES } from './limits';
-import { DEFAULT_DRAW_COLOR, fmtN, workPlanePositionField } from './draw2dShared';
+import { DEFAULT_DRAW_COLOR, workPlanePositionField } from './draw2dShared';
 import { withEntity } from './entityOps';
+import { newEntity } from './newEntity';
 import { pointsExtent } from './sceneBounds';
 import { noop } from './noop';
 
@@ -158,7 +158,7 @@ export const drawBeltAround = defineCommand({
 
     for (let i = 0; i < pulleys.length; i++) {
       const p = pulleys[i]!;
-      if (!Array.isArray(p.center) || p.center.length < 2) {
+      if (p.center.length < 2) {
         return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
       }
       const [cx, cy] = p.center;
@@ -193,7 +193,7 @@ export const drawBeltAround = defineCommand({
       if (d < Math.abs(p1.radius - p2.radius)) {
         return noop(
           doc,
-          `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${fmtN(d)} < |r1−r2|=${fmtN(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
+          `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${compactNumber(d)} < |r1−r2|=${compactNumber(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
         );
       }
     }
@@ -264,23 +264,20 @@ export const drawBeltAround = defineCommand({
 
     const id = nextId('belt');
 
-    const entity: Entity = {
+    const entity = newEntity(
+      'polyline',
       id,
-      kind: 'polyline',
-      points,
-      closed: true,
-      position: finiteVec3OrZero(position, true),
-      rotation: finiteVec3OrZero(rotation, true),
-      layerId: DEFAULT_LAYER_ID,
+      { points, closed: true },
+      finiteVec3OrZero(position, true),
       color,
-      ...(name !== undefined && name !== '' ? { name } : {}),
-    };
+      { rotation: finiteVec3OrZero(rotation, true), name },
+    );
 
     return {
       document: withEntity(doc, entity),
       summary:
-        `Drew belt ${id}: ${n} pulleys, length ≈ ${fmtN(totalLength)}, ` +
-        `bounds x=[${fmtN(minX)}, ${fmtN(maxX)}] y=[${fmtN(minY)}, ${fmtN(maxY)}].`,
+        `Drew belt ${id}: ${n} pulleys, length ≈ ${compactNumber(totalLength)}, ` +
+        `bounds x=[${compactNumber(minX)}, ${compactNumber(maxX)}] y=[${compactNumber(minY)}, ${compactNumber(maxY)}].`,
       affected: [id],
     };
   },

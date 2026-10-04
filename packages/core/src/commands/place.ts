@@ -15,11 +15,12 @@
  * geometry math is introduced here.
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
 import { entityBounds } from './sceneBounds';
+import { replaceEntity } from './entityOps';
 
 type AxisIndex = 0 | 1 | 2;
 
@@ -34,15 +35,6 @@ function shiftAlong(e: Entity, axisIndex: AxisIndex, delta: number): Entity {
     z + (axisIndex === 2 ? delta : 0),
   ];
   return { ...e, position };
-}
-
-/** Patch multiple entities into the document at once (pure). */
-function withEntities(doc: CadDocument, updates: Entity[]): CadDocument {
-  const newEntities = { ...doc.entities };
-  for (const e of updates) {
-    newEntities[e.id] = e;
-  }
-  return { ...doc, entities: newEntities };
 }
 
 const plural = (n: number): string => (n === 1 ? 'y' : 'ies');
@@ -118,7 +110,7 @@ export const align = defineCommand({
       );
     }
     return {
-      document: withEntities(doc, moved),
+      document: moved.reduce(replaceEntity, doc),
       summary: `align: moved ${moved.length} entit${plural(moved.length)} to ${edge} of "${referenceId}".`,
       affected: moved.map((e) => e.id),
     };
@@ -218,7 +210,7 @@ export const distribute = defineCommand({
       );
     }
     return {
-      document: withEntities(doc, moved),
+      document: moved.reduce(replaceEntity, doc),
       summary: `distribute: repositioned ${moved.length} entit${plural(moved.length)} along ${axis} (mode: ${mode}).`,
       affected: moved.map((e) => e.id),
     };
@@ -263,7 +255,7 @@ export const stackOn = defineCommand({
       return noop(doc, `stack_on: "${movingId}" is already stacked on "${baseId}" along ${axis}.`);
     }
     return {
-      document: withEntities(doc, [shiftAlong(movingEntity, axisIndex, delta)]),
+      document: replaceEntity(doc, shiftAlong(movingEntity, axisIndex, delta)),
       summary: `stack_on: moved "${movingId}" by ${delta.toFixed(4)} along ${axis} to sit on top of "${baseId}".`,
       affected: [movingId],
     };

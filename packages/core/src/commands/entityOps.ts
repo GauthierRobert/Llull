@@ -13,18 +13,19 @@ export function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 }
 
 /**
+ * `doc` with `entity` stored under its id (order unchanged).
+ * @pure
+ */
+export function replaceEntity(doc: CadDocument, entity: Entity): CadDocument {
+  return { ...doc, entities: { ...doc.entities, [entity.id]: entity } };
+}
+
+/**
  * `doc` without entity `id` (also dropped from `order` and `selection`).
  * @pure
  */
 export function withoutEntity(doc: CadDocument, id: string): CadDocument {
-  const entities = { ...doc.entities };
-  delete entities[id];
-  return {
-    ...doc,
-    entities,
-    order: doc.order.filter((eid) => eid !== id),
-    selection: doc.selection.filter((eid) => eid !== id),
-  };
+  return withoutEntities(doc, new Set([id]), false).document;
 }
 
 /**
@@ -33,7 +34,7 @@ export function withoutEntity(doc: CadDocument, id: string): CadDocument {
  *
  * @pure
  */
-export function pruneGroupMembers(
+function pruneGroupMembers(
   groups: Readonly<Record<string, EntityGroup>> | undefined,
   removedIds: ReadonlySet<string>,
 ): { nextGroups: Record<string, EntityGroup>; dissolvedGroups: string[] } {
@@ -48,6 +49,29 @@ export function pruneGroupMembers(
 }
 
 /**
+ * `doc` without `removed` entities (entities/order/selection; with `pruneGroups`, also group
+ * memberships — groups left with fewer than 2 members are dissolved and listed).
+ * @pure
+ */
+export function withoutEntities(
+  doc: CadDocument,
+  removed: ReadonlySet<string>,
+  pruneGroups = true,
+): { document: CadDocument; dissolvedGroups: string[] } {
+  const entities = { ...doc.entities };
+  for (const id of removed) delete entities[id];
+  const base: CadDocument = {
+    ...doc,
+    entities,
+    order: doc.order.filter((id) => !removed.has(id)),
+    selection: doc.selection.filter((id) => !removed.has(id)),
+  };
+  if (!pruneGroups) return { document: base, dissolvedGroups: [] };
+  const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, removed);
+  return { document: { ...base, groups: nextGroups }, dissolvedGroups };
+}
+
+/**
  * `doc` with every `removedIds` entity consumed (entities/order/selection/groups) and `result`
  * stored and appended to `order`.
  * @pure
@@ -57,14 +81,5 @@ export function replaceEntities(
   removedIds: readonly string[],
   result: Entity,
 ): CadDocument {
-  const removed = new Set(removedIds);
-  const entities = { ...doc.entities };
-  for (const id of removed) delete entities[id];
-  return {
-    ...doc,
-    entities: { ...entities, [result.id]: result },
-    order: [...doc.order.filter((id) => !removed.has(id)), result.id],
-    selection: doc.selection.filter((id) => !removed.has(id)),
-    groups: pruneGroupMembers(doc.groups, removed).nextGroups,
-  };
+  return withEntity(withoutEntities(doc, new Set(removedIds)).document, result);
 }

@@ -5,7 +5,9 @@ import type {
   DriveRelation,
   Vec3,
 } from '../model/types';
-import { evaluateExpression } from './expression';
+import { resolveNumeric } from './expression';
+import { topologicalSort } from '../lib/topologicalSort';
+import { add3, scale3, sub3 } from '../lib/vec3';
 /** Normalize a string axis shorthand ('x'|'y'|'z') to a Vec3 unit vector. */
 function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
   if (axis === 'x') return [1, 0, 0];
@@ -34,37 +36,11 @@ function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
   ];
 }
 
-/**
- * Resolve a joint value that may be a number or a parameter expression string.
- * Returns the resolved number, or null on resolution failure.
- */
-export function resolveJointValue(raw: number | string, doc: CadDocument): number | null {
-  if (typeof raw === 'number') return raw;
-  const env: Record<string, number> = {};
-  for (const [name, param] of Object.entries(doc.parameters)) {
-    env[name] = param.value;
-  }
-  const result = evaluateExpression(raw, env);
-  return result.ok ? result.value : null;
-}
-
 /** Validate that a string is a valid named axis shorthand or that the value is a Vec3. */
 export function isValidAxis(v: unknown): v is 'x' | 'y' | 'z' | Vec3 {
   if (v === 'x' || v === 'y' || v === 'z') return true;
   if (!Array.isArray(v) || v.length !== 3) return false;
   return (v as unknown[]).every((c) => typeof c === 'number' && Number.isFinite(c));
-}
-
-/** Validate a JointMateRef shape. */
-export function isValidMateRef(v: unknown): v is { instanceId: string; frame?: string } {
-  if (typeof v !== 'object' || v === null) return false;
-  const obj = v as Record<string, unknown>;
-  if (typeof obj['instanceId'] !== 'string' || obj['instanceId'].length === 0) return false;
-  if (obj['frame'] !== undefined) {
-    const f = obj['frame'];
-    if (f !== 'origin' && f !== 'axis-x' && f !== 'axis-y' && f !== 'axis-z') return false;
-  }
-  return true;
 }
 
 /** Resolve a JointMateRef to the InstanceEntity, returning null on missing/wrong kind. */
@@ -74,60 +50,14 @@ function resolveInstance(ref: JointMateRef, doc: CadDocument): InstanceEntity | 
   return e as InstanceEntity;
 }
 
-/**
- * Topological sort of all drive relation ids by dependency (driver → driven).
- * Returns { sorted, cycleSet } where cycleSet contains ids whose drivers form a cycle.
- *
- * @pure
- */
-function driveTopoSort(driveRelations: Record<string, DriveRelation>): {
-  sorted: string[];
-  cycleSet: Set<string>;
-} {
-  // Build a joint-id graph: who drives whom.
-  // We topo-sort JOINT ids (not drive relation ids) to detect cycles.
-  // A joint has in-degree = number of drive relations where it is `driven`.
-  const jointIds = new Set<string>();
-  for (const dr of Object.values(driveRelations)) {
-    jointIds.add(dr.driver);
-    jointIds.add(dr.driven);
-  }
-
-  // inDegree[jointId] = number of drive relations pointing AT it (as driven)
-  const inDegree = new Map<string, number>();
-  // adjacency: driver → [driven, ...]
-  const adj = new Map<string, string[]>();
-  for (const jid of jointIds) {
-    inDegree.set(jid, 0);
-    adj.set(jid, []);
-  }
-  for (const dr of Object.values(driveRelations)) {
-    inDegree.set(dr.driven, (inDegree.get(dr.driven) ?? 0) + 1);
-    adj.get(dr.driver)?.push(dr.driven);
-  }
-
-  // Kahn
-  const queue: string[] = [];
-  for (const [jid, deg] of inDegree) {
-    if (deg === 0) queue.push(jid);
-  }
-  const sorted: string[] = [];
-  while (queue.length > 0) {
-    const jid = queue.shift()!;
-    sorted.push(jid);
-    for (const neighbor of adj.get(jid) ?? []) {
-      const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
-      inDegree.set(neighbor, newDeg);
-      if (newDeg === 0) queue.push(neighbor);
-    }
-  }
-
-  const cycleSet = new Set<string>();
-  for (const jid of jointIds) {
-    if (!sorted.includes(jid)) cycleSet.add(jid);
-  }
-
-  return { sorted, cycleSet };
+/** Joint ids ordered driver before driven; joints on a drive cycle are omitted. */
+function driveOrder(driveRelations: Record<string, DriveRelation>): string[] {
+  const relations = Object.values(driveRelations);
+  const jointIds = new Set(relations.flatMap((dr) => [dr.driver, dr.driven]));
+  return topologicalSort(
+    jointIds,
+    relations.map((dr): [string, string] => [dr.driver, dr.driven]),
+  ).sorted;
 }
 
 /**
@@ -208,11 +138,11 @@ export function evaluateMotionInternal(
       continue;
     }
     const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
-    resolvedJoints[jid] = resolveJointValue(rawValue, doc) ?? rawValue;
+    resolvedJoints[jid] = resolveNumeric(rawValue, doc.parameters) ?? rawValue;
   }
 
   // Step 2: propagate drive relations in topo order
-  const { sorted: sortedJoints } = driveTopoSort(doc.driveRelations);
+  const sortedJoints = driveOrder(doc.driveRelations);
   // Build a lookup: driven joint id → drive relation that drives it
   const drivenBy = new Map<string, DriveRelation>();
   for (const dr of Object.values(doc.driveRelations)) {
@@ -239,46 +169,18 @@ export function evaluateMotionInternal(
     const value = resolvedJoints[joint.id] ?? 0;
     const axisVec = normalizeAxis(joint.axis);
 
+    const bId = joint.b.instanceId;
+    const bRot: Vec3 = instanceRotations[bId] ?? instanceB.rotation;
     if (joint.kind === 'revolute') {
-      // Revolute: rotate b around axis through a's position by `value` radians.
+      // Rotate b about the axis through a's position; b's Euler angles gain value * axis.
       const pivot = instanceA.position;
-      const bPos: Vec3 = instancePositions[joint.b.instanceId] ?? instanceB.position;
-      const bRot: Vec3 = instanceRotations[joint.b.instanceId] ?? instanceB.rotation;
-
-      // Rotate the offset vector (b relative to a) around the axis
-      const offset: Vec3 = [bPos[0] - pivot[0], bPos[1] - pivot[1], bPos[2] - pivot[2]];
-      const rotatedOffset = rotateAboutAxis(offset, axisVec, value);
-      instancePositions[joint.b.instanceId] = [
-        pivot[0] + rotatedOffset[0],
-        pivot[1] + rotatedOffset[1],
-        pivot[2] + rotatedOffset[2],
-      ];
-      // Accumulate rotation on b by adding angle to the axis component
-      // Simple: add angle to Euler component matching axis shorthand
-      const deltaRot: Vec3 =
-        joint.axis === 'x'
-          ? [value, 0, 0]
-          : joint.axis === 'y'
-            ? [0, value, 0]
-            : joint.axis === 'z'
-              ? [0, 0, value]
-              : [axisVec[0] * value, axisVec[1] * value, axisVec[2] * value];
-      instanceRotations[joint.b.instanceId] = [
-        bRot[0] + deltaRot[0],
-        bRot[1] + deltaRot[1],
-        bRot[2] + deltaRot[2],
-      ];
+      const offset = sub3(instancePositions[bId] ?? instanceB.position, pivot);
+      instancePositions[bId] = add3(pivot, rotateAboutAxis(offset, axisVec, value));
+      instanceRotations[bId] = add3(bRot, scale3(axisVec, value));
     } else {
-      // Prismatic: translate b along axis by `value` units from a's position.
-      const aPos = instanceA.position;
-      instancePositions[joint.b.instanceId] = [
-        aPos[0] + axisVec[0] * value,
-        aPos[1] + axisVec[1] * value,
-        aPos[2] + axisVec[2] * value,
-      ];
-      // Prismatic does not change rotation
-      const bRot = instanceRotations[joint.b.instanceId] ?? instanceB.rotation;
-      instanceRotations[joint.b.instanceId] = bRot;
+      // Prismatic: b slides along the axis from a's position; rotation unchanged.
+      instancePositions[bId] = add3(instanceA.position, scale3(axisVec, value));
+      instanceRotations[bId] = bRot;
     }
   }
 

@@ -1,9 +1,9 @@
-import type { Entity, Vec2 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import type { Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, colorField, looseVec2 as vec2, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { withEntity } from './entityOps';
+import { newEntity } from './newEntity';
 import {
   DEFAULT_DRAW_COLOR,
   pointSeriesEntity,
@@ -35,20 +35,17 @@ export const drawLine = defineCommand({
     doc,
     { start, end, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
-    if (!Array.isArray(start) || start.length < 2 || !Array.isArray(end) || end.length < 2) {
+    if (start.length < 2 || end.length < 2) {
       return noop(doc, 'draw_line: start and end must each be [x, y] arrays.');
     }
     const id = nextId('line');
-    const entity: Entity = {
+    const entity = newEntity(
+      'line',
       id,
-      kind: 'line',
-      start: [start[0]!, start[1]!] as Vec2,
-      end: [end[0]!, end[1]!] as Vec2,
+      { start: [start[0]!, start[1]!], end: [end[0]!, end[1]!] },
       position,
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
       color,
-    };
+    );
     return {
       document: withEntity(doc, entity),
       summary: `Drew line ${id} from [${start.join(', ')}] to [${end.join(', ')}].`,
@@ -147,18 +144,13 @@ export const drawArc = defineCommand({
     }
     const id = nextId('arc');
     const safeCenter: Vec2 = [center[0], center[1]];
-    const entity: Entity = {
+    const entity = newEntity(
+      'arc',
       id,
-      kind: 'arc',
-      center: safeCenter,
-      radius,
-      startAngle,
-      endAngle,
+      { center: safeCenter, radius, startAngle, endAngle },
       position,
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
       color,
-    };
+    );
     return {
       document: withEntity(doc, entity),
       summary: `Drew arc ${id} center [${safeCenter.join(', ')}] radius ${radius} from ${startAngle.toFixed(3)} to ${endAngle.toFixed(3)} rad.`,
@@ -194,16 +186,7 @@ export const drawCircle = defineCommand({
     }
     const id = nextId('circ');
     const safeCenter: Vec2 = [center[0], center[1]];
-    const entity: Entity = {
-      id,
-      kind: 'circle',
-      center: safeCenter,
-      radius,
-      position,
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    const entity = newEntity('circle', id, { center: safeCenter, radius }, position, color);
     return {
       document: withEntity(doc, entity),
       summary: `Drew circle ${id} center [${safeCenter.join(', ')}] radius ${radius}.`,
@@ -249,16 +232,7 @@ export const drawRectangle = defineCommand({
       );
     }
     const id = nextId('rect');
-    const entity: Entity = {
-      id,
-      kind: 'rectangle',
-      width,
-      height,
-      position,
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    const entity = newEntity('rectangle', id, { width, height }, position, color);
     return {
       document: withEntity(doc, entity),
       summary: `Drew rectangle ${id} ${width}×${height} at [${position.join(', ')}].`,
@@ -285,14 +259,7 @@ export const drawPoint = defineCommand({
   }),
   run: (doc, { position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     const id = nextId('pt');
-    const entity: Entity = {
-      id,
-      kind: 'point',
-      position,
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    const entity = newEntity('point', id, {}, position, color);
     return {
       document: withEntity(doc, entity),
       summary: `Drew point ${id} at [${position.join(', ')}].`,

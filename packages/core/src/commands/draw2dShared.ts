@@ -1,9 +1,9 @@
 import type { CadDocument, Entity, Vec2, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { z } from './schema';
 import { looseVec3 } from './schema';
 import { noop } from './noop';
+import { newEntity } from './newEntity';
 
 /** Default stroke color of every drafted 2D shape. */
 export const DEFAULT_DRAW_COLOR = '#4a90d9';
@@ -31,21 +31,7 @@ export function pointSeriesEntity(
   const safePoints: ReadonlyArray<Vec2> = points.map(
     (p) => [(p as number[])[0] ?? 0, (p as number[])[1] ?? 0] as Vec2,
   );
-  return {
-    id,
-    kind,
-    points: safePoints,
-    closed,
-    position,
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color,
-  };
-}
-
-/** Format a number compactly for the summary string. */
-export function fmtN(v: number): string {
-  return parseFloat(v.toFixed(4)).toString();
+  return newEntity(kind, id, { points: safePoints, closed }, position, color);
 }
 
 /** No-op result when `points` is not an array of at least 2 points, else `null`. */

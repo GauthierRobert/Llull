@@ -1,9 +1,7 @@
 import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
-import { add3, sub3 } from '../lib/vec3';
+import { ORIGIN, add3, sub3 } from '../lib/vec3';
 import { type Bounds } from './sceneTypes';
-
-const ORIGIN: Vec3 = [0, 0, 0];
 
 /** Min/max of a flat xyz position array (`[x0, y0, z0, x1, ...]`); needs at least one full triple. */
 function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
@@ -204,6 +202,23 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
     }
   }
   return worldPoints.length > 0 ? boundsOfPoints(worldPoints) : bounds(position, position);
+}
+
+/** True when two AABBs overlap (touching counts) on every axis. */
+export function boundsOverlap(a: Bounds, b: Bounds): boolean {
+  return (
+    a.min[0] <= b.max[0] &&
+    a.max[0] >= b.min[0] &&
+    a.min[1] <= b.max[1] &&
+    a.max[1] >= b.min[1] &&
+    a.min[2] <= b.max[2] &&
+    a.max[2] >= b.min[2]
+  );
+}
+
+/** Centre of an AABB. */
+export function boundsCenter({ min, max }: Bounds): Vec3 {
+  return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
 }
 
 export function mergeBounds(a: Bounds, b: Bounds): Bounds {

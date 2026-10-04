@@ -38,26 +38,25 @@ export const setUnits = defineCommand({
       ),
   }),
   run: (doc, { units, displayPrecision }): CommandResult => {
-    if (displayPrecision !== undefined) {
-      if (displayPrecision < 0 || !Number.isInteger(displayPrecision)) {
-        return noop(
-          doc,
-          `Invalid displayPrecision ${String(displayPrecision)}. Must be a non-negative integer.`,
-        );
-      }
+    if (
+      displayPrecision !== undefined &&
+      (displayPrecision < 0 || !Number.isInteger(displayPrecision))
+    ) {
+      return noop(
+        doc,
+        `Invalid displayPrecision ${String(displayPrecision)}. Must be a non-negative integer.`,
+      );
     }
 
     if (units === undefined && displayPrecision === undefined) {
       return noop(doc, 'No changes: provide at least one of units or displayPrecision.');
     }
 
-    const nextUnits: DocumentUnit = units ?? doc.units;
-    const nextPrecision: number = displayPrecision ?? doc.displayPrecision;
-
-    const nextDoc: CadDocument = { ...doc, units: nextUnits, displayPrecision: nextPrecision };
+    const nextUnits = units ?? doc.units;
+    const nextPrecision = displayPrecision ?? doc.displayPrecision;
 
     return {
-      document: nextDoc,
+      document: { ...doc, units: nextUnits, displayPrecision: nextPrecision },
       summary: `Units set to ${nextUnits}, precision ${nextPrecision}.`,
       affected: [],
     };

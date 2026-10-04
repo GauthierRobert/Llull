@@ -1,9 +1,5 @@
 /**
- * Export commands — read-only serialisation of the document to external formats.
- *
- * Each command returns the SAME document reference, affected:[], and a `data`
- * field containing the serialised output. They are safe to call at any time
- * without side effects.
+ * export_stl: read-only serialisation to STL (document returned unchanged, output in `data`).
  *
  * @layer core/commands
  */
@@ -15,77 +11,41 @@ import { uint8ArrayToBase64 } from '../lib/base64';
 import { collectExportTriangles, exportSummary } from './exportTriangulate';
 import { facetNormal, type Triangle } from './exportMath';
 
-function formatVec3(v: Vec3): string {
-  return `${v[0]} ${v[1]} ${v[2]}`;
-}
+const formatVec3 = (v: Vec3): string => v.join(' ');
 
 function buildAsciiStl(tris: Triangle[], solidName: string): string {
-  const lines: string[] = [`solid ${solidName}`];
+  const lines = [`solid ${solidName}`];
   for (const [v0, v1, v2] of tris) {
-    const n = facetNormal(v0, v1, v2);
-    lines.push(`  facet normal ${formatVec3(n)}`);
-    lines.push('    outer loop');
-    lines.push(`      vertex ${formatVec3(v0)}`);
-    lines.push(`      vertex ${formatVec3(v1)}`);
-    lines.push(`      vertex ${formatVec3(v2)}`);
-    lines.push('    endloop');
-    lines.push('  endfacet');
+    lines.push(
+      `  facet normal ${formatVec3(facetNormal(v0, v1, v2))}`,
+      '    outer loop',
+      `      vertex ${formatVec3(v0)}`,
+      `      vertex ${formatVec3(v1)}`,
+      `      vertex ${formatVec3(v2)}`,
+      '    endloop',
+      '  endfacet',
+    );
   }
   lines.push(`endsolid ${solidName}`);
   return lines.join('\n');
 }
 
+/** Binary STL: 80-byte label header (never "solid ...", which trips ASCII sniffers), u32 count, 50 bytes per facet. */
 function buildBinaryStl(tris: Triangle[], headerText: string): Uint8Array {
-  const count = tris.length;
-  // 80-byte header + 4-byte count + count × 50-byte triangles
-  const buf = new Uint8Array(84 + count * 50);
+  const buf = new Uint8Array(84 + tris.length * 50);
   const view = new DataView(buf.buffer);
-
-  // Header: ASCII solid name in the first 80 bytes (truncated; remainder stays zero).
-  // STL binary headers conventionally carry a label/comment (never "solid ...", which
-  // would trip ASCII-vs-binary sniffers — callers pass a plain name).
   for (let i = 0; i < headerText.length && i < 80; i += 1) {
     buf[i] = headerText.charCodeAt(i) & 0x7f;
   }
-  // Triangle count at offset 80
-  view.setUint32(80, count, true); // little-endian
-
+  view.setUint32(80, tris.length, true);
   let offset = 84;
   for (const [v0, v1, v2] of tris) {
-    const n = facetNormal(v0, v1, v2);
-    // normal (3 × float32)
-    view.setFloat32(offset, n[0], true);
-    offset += 4;
-    view.setFloat32(offset, n[1], true);
-    offset += 4;
-    view.setFloat32(offset, n[2], true);
-    offset += 4;
-    // v0 (3 × float32)
-    view.setFloat32(offset, v0[0], true);
-    offset += 4;
-    view.setFloat32(offset, v0[1], true);
-    offset += 4;
-    view.setFloat32(offset, v0[2], true);
-    offset += 4;
-    // v1 (3 × float32)
-    view.setFloat32(offset, v1[0], true);
-    offset += 4;
-    view.setFloat32(offset, v1[1], true);
-    offset += 4;
-    view.setFloat32(offset, v1[2], true);
-    offset += 4;
-    // v2 (3 × float32)
-    view.setFloat32(offset, v2[0], true);
-    offset += 4;
-    view.setFloat32(offset, v2[1], true);
-    offset += 4;
-    view.setFloat32(offset, v2[2], true);
-    offset += 4;
-    // attribute byte count (2 bytes, always 0)
-    view.setUint16(offset, 0, true);
-    offset += 2;
+    for (const component of [...facetNormal(v0, v1, v2), ...v0, ...v1, ...v2]) {
+      view.setFloat32(offset, component, true);
+      offset += 4;
+    }
+    offset += 2; // attribute byte count, always 0
   }
-
   return buf;
 }
 
@@ -160,22 +120,17 @@ export const exportStl = defineCommand({
   run: (doc, params): CommandResult => {
     const fmt: 'ascii' | 'binary' = params.format === 'binary' ? 'binary' : 'ascii';
     const solidName = params.name ?? 'llull';
-    const requestedIds = params.entityIds;
-
-    const collected = collectExportTriangles(doc, requestedIds);
-    const allTris = collected.tris;
-    const triangleCount = allTris.length;
+    const collected = collectExportTriangles(doc, params.entityIds);
+    const triangleCount = collected.tris.length;
     const summary = exportSummary('export_stl', fmt, collected);
-
-    if (fmt === 'ascii') {
-      const stl = buildAsciiStl(allTris, solidName);
-      const data: ExportStlData = { format: 'ascii', triangleCount, stl };
-      return { document: doc, summary, affected: [], data };
-    } else {
-      const bytes = buildBinaryStl(allTris, solidName);
-      const stlBase64 = uint8ArrayToBase64(bytes);
-      const data: ExportStlData = { format: 'binary', triangleCount, stlBase64 };
-      return { document: doc, summary, affected: [], data };
-    }
+    const data: ExportStlData =
+      fmt === 'ascii'
+        ? { format: 'ascii', triangleCount, stl: buildAsciiStl(collected.tris, solidName) }
+        : {
+            format: 'binary',
+            triangleCount,
+            stlBase64: uint8ArrayToBase64(buildBinaryStl(collected.tris, solidName)),
+          };
+    return { document: doc, summary, affected: [], data };
   },
 });

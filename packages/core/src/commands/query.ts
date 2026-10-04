@@ -13,7 +13,7 @@ import type { EntityKind } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
-import { entityBounds } from './sceneBounds';
+import { boundsCenter, boundsOverlap, entityBounds } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { distanceSq3 } from '../lib/vec3';
 
@@ -31,11 +31,6 @@ interface FindEntitiesResult {
   count: number;
 }
 
-/** Returns the centroid of a world-space AABB. */
-function bboxCentroid(b: Bounds): readonly [number, number, number] {
-  return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
-}
-
 type Corner = readonly [number, number, number];
 
 const axes = [0, 1, 2] as const;
@@ -43,10 +38,6 @@ const axes = [0, 1, 2] as const;
 /** True when AABB `b` is fully inside `[qMin, qMax]`. */
 const insideAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean =>
   axes.every((i) => b.min[i] >= qMin[i] && b.max[i] <= qMax[i]);
-
-/** True when AABB `b` intersects `[qMin, qMax]` on every axis. */
-const overlapsAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean =>
-  axes.every((i) => b.max[i] >= qMin[i] && b.min[i] <= qMax[i]);
 
 const isInverted = (min: Corner, max: Corner): boolean => axes.some((i) => min[i] > max[i]);
 
@@ -241,11 +232,12 @@ export const findEntities = defineCommand({
       const needsBounds = bboxMin || nearPoint || insideBBox || overlapsBBox || touchingBounds;
       if (needsBounds) {
         const b = entityBounds(e);
-        if (bboxMin && bboxMax && !overlapsAabb(b, bboxMin, bboxMax)) continue;
-        if (nearPoint && distanceSq3(bboxCentroid(b), nearPoint.point) > nearRadiusSq) continue;
+        if (bboxMin && bboxMax && !boundsOverlap(b, { min: bboxMin, max: bboxMax })) continue;
+        if (nearPoint && distanceSq3(boundsCenter(b), nearPoint.point) > nearRadiusSq) continue;
         if (insideBBox && !insideAabb(b, insideBBox[0], insideBBox[1])) continue;
-        if (overlapsBBox && !overlapsAabb(b, overlapsBBox[0], overlapsBBox[1])) continue;
-        if (touchingBounds && !overlapsAabb(b, touchingBounds.min, touchingBounds.max)) continue;
+        if (overlapsBBox && !boundsOverlap(b, { min: overlapsBBox[0], max: overlapsBBox[1] }))
+          continue;
+        if (touchingBounds && !boundsOverlap(b, touchingBounds)) continue;
       }
 
       matches.push({

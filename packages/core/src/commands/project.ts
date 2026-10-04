@@ -1,28 +1,10 @@
 /**
- * build_project — execute an AI-authored plan (an ordered list of command
- * actions) as one transaction.
+ * build_project: an AI-authored plan (ordered command actions) applied as one transaction. Every
+ * step routes through `execute`; steps bind results with `as` and reference them as `$alias` /
+ * `$alias[N]`. `onError: "abort"` rolls the whole document back; `validate` is a dry run.
+ * `data` carries the per-step report and the final SceneSnapshot.
  *
  * @layer core/commands
- *
- * This is the headline MCP capability: an agent describes a whole project as a
- * list of actions and applies it in a single round-trip. It does NOT bypass the
- * command layer — it routes every step through `execute` (the Prime Directive
- * choke point). Adding it to the registry made it one undoable step in the UI
- * and one MCP tool, like any other command.
- *
- * Cross-step references: a step may bind its result to an alias via `as`, and a
- * later step may reference the created id with `$alias` (first affected id) or
- * `$alias[N]` (Nth). This lets an agent author a multi-step plan without knowing
- * generated ids in advance — e.g. create a box `as: "base"`, then `move` `$base`.
- *
- * `onError: "abort"` (default) rolls the document fully back on the first failing
- * step (commands are pure, so the original doc is simply returned). `"continue"`
- * keeps going, recording per-step status. `validate: true` is a dry run: it
- * checks every step (command exists, required params present, alias refs defined)
- * without mutating the document.
- *
- * The result `data` carries a per-step report plus the final SceneSnapshot, so an
- * agent sees the whole outcome in one call.
  */
 
 import type { CommandResult } from './types';

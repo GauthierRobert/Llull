@@ -1,12 +1,10 @@
-import type { Entity } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
+import { newEntity } from './newEntity';
 import { defineCommand, z, looseVec3, colorField, untypedArray } from './schema';
 import { nextId } from '../lib/id';
-import { pruneGroupMembers } from './entityOps';
+import { replaceEntity, withoutEntities } from './entityOps';
 import {
   DEFAULT_SOLID_COLOR,
-  ORIGIN,
   anchorField,
   commitSolid,
   positionField,
@@ -16,6 +14,7 @@ import {
   rotationField,
   translated,
 } from './geometryShared';
+import { ORIGIN } from '../lib/vec3';
 import { noop } from './noop';
 
 /**
@@ -61,15 +60,9 @@ export const addBox = defineCommand({
     // Half-extents from center: [w/2, h/2, d/2].
     const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'center', anchor, position);
     const id = nextId('box');
-    const entity: Entity = {
-      id,
-      kind: 'box',
-      size,
-      position: storedPosition,
+    const entity = newEntity('box', id, { size }, storedPosition, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(doc, entity, `Added box ${id} of size ${size.join('×')}`);
   },
 });
@@ -118,16 +111,9 @@ export const extrude = defineCommand({
       );
     }
     const id = nextId('ext');
-    const entity: Entity = {
-      id,
-      kind: 'extrusion',
-      profile,
-      depth,
-      position,
+    const entity = newEntity('extrusion', id, { profile, depth }, position, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(doc, entity, `Extruded a ${profile.length}-point profile by ${depth}`);
   },
 });
@@ -145,7 +131,7 @@ export const move = defineCommand({
       return noop(doc, `No entity ${id} to move.`);
     }
     return {
-      document: { ...doc, entities: { ...doc.entities, [id]: translated(target, delta) } },
+      document: replaceEntity(doc, translated(target, delta)),
       summary: `Moved ${id} by ${delta.join(', ')}.`,
       affected: [id],
     };
@@ -175,10 +161,7 @@ export const deleteEntity = defineCommand({
       return noop(doc, `No entity ${id} to delete.`);
     }
 
-    const entities = { ...doc.entities };
-    delete entities[id];
-
-    const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, new Set([id]));
+    const { document, dissolvedGroups } = withoutEntities(doc, new Set([id]));
 
     const dissolveSuffix =
       dissolvedGroups.length > 0
@@ -186,13 +169,7 @@ export const deleteEntity = defineCommand({
         : '';
 
     return {
-      document: {
-        ...doc,
-        entities,
-        order: doc.order.filter((e) => e !== id),
-        selection: doc.selection.filter((e) => e !== id),
-        groups: nextGroups,
-      },
+      document,
       summary: `Deleted ${id}.${dissolveSuffix}`,
       affected: [id],
     };

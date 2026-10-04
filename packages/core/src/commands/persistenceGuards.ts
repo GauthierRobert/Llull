@@ -1,6 +1,7 @@
 import type { DocumentUnit, EntityKind, Layer, CameraState, Vec3 } from '../model/types';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
+import { isHexColor } from '../lib/isHexColor';
 
 export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
@@ -25,13 +26,6 @@ const POSITIVE_FIELDS: Readonly<Record<string, readonly string[]>> = {
 /** A Vec3 where all three components are finite numbers. */
 function isFiniteVec3(v: unknown): v is Vec3 {
   return Array.isArray(v) && v.length === 3 && v.every(isFiniteNumber);
-}
-
-/** /^#[0-9a-fA-F]{6}$/ — the only hex format accepted by the renderer. */
-const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
-
-function isValidHexColor(v: unknown): v is string {
-  return typeof v === 'string' && HEX_COLOR_RE.test(v);
 }
 
 /** All legal entity kinds (must stay in sync with EntityKind union in types.ts). */
@@ -110,7 +104,7 @@ export function validateEntityValue(v: unknown): string | null {
   if (!isFiniteVec3(position)) return `entity ${id}: position must be a Vec3 of finite numbers`;
   if (!isFiniteVec3(rotation)) return `entity ${id}: rotation must be a Vec3 of finite numbers`;
   if (typeof layerId !== 'string') return `entity ${id}: layerId is not a string`;
-  if (!isValidHexColor(color))
+  if (!isHexColor(color))
     return `entity ${id}: color '${String(color)}' is not a valid hex color (#rrggbb)`;
 
   // Kind-specific numeric invariants.
@@ -168,7 +162,7 @@ export function validateMaterialValue(name: string, v: unknown): string | null {
   const { density, color, metalness, roughness } = v;
   if (!isPositiveNumber(density))
     return `material '${name}': density must be finite and > 0, got ${String(density)}`;
-  if (!isValidHexColor(color))
+  if (!isHexColor(color))
     return `material '${name}': color '${String(color)}' is not a valid hex color (#rrggbb)`;
   const isUnit = (x: unknown): boolean => isFiniteNumber(x) && x >= 0 && x <= 1;
   if (!isUnit(metalness))
