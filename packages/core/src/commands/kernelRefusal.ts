@@ -50,3 +50,8 @@ export function kernelRefusal(
     ? null
     : `step '${step}' needs the geometry kernel, which is not available yet; document unchanged — retry once the kernel is ready.`;
 }
+
+/** No-op summary of a kernel-dependent command invoked while no kernel is installed. */
+export function kernelUnavailable(command: string): string {
+  return `${command}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`;
+}

@@ -9,6 +9,8 @@ import type { CommandDefinition, CommandResult } from './types';
 import type { ExecutionContext } from './context';
 import { currentContext, runInContext } from './context';
 import { guardCommand } from './guard';
+import { kernelUnavailable } from './kernelRefusal';
+import { noop } from './noop';
 import { stepIdSource } from '../lib/id';
 import { addWedge, addPyramid } from './geometryPrismatic';
 import { addCylinder, addSphere, addCone, addTorus } from './geometryRound';
@@ -243,11 +245,7 @@ export function execute(
     return { document: doc, summary: `Unknown command: ${commandName}`, affected: [] };
   }
   if (def.annotations?.requiresKernel === true && ctx.kernel === null) {
-    return {
-      document: doc,
-      summary: `${commandName}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
-      affected: [],
-    };
+    return noop(doc, kernelUnavailable(commandName));
   }
   const ann = def.annotations;
   const recordsStep = ann?.readOnly !== true && ann?.metaHistory !== true;
