@@ -3,8 +3,9 @@
  *
  * Command palette (Ctrl/Cmd+K) — one searchable entry point to every app action and every
  * registry command. ARIA combobox + listbox; arrows / Home / End move, Enter runs, Escape closes.
- * A command with parameters opens its generated form; one without runs at once. Every document
- * change goes through `dispatch` (PRIME DIRECTIVE).
+ * A command with parameters (or a destructive one) opens its generated form; any other runs at
+ * once. Modal: focus stays inside (Tab is trapped). Every document change goes through
+ * `dispatch` (PRIME DIRECTIVE); its own result is toasted via `onResult`.
  */
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -16,10 +17,44 @@ import type { PaletteItem } from './paletteItems';
 import { CommandParamForm } from './CommandParamForm';
 
 function runCommand(command: CommandDefinition<unknown>, params: Record<string, unknown>): void {
-  // Clear the previous summary so an identical new one still registers as this run's result.
-  useStore.setState({ lastSummary: null });
-  usePaletteStore.getState().setAwaitingResultOf(command.name);
-  useStore.getState().dispatch(command.name, params, { selectAffected: true });
+  const readOnly = command.annotations?.readOnly === true;
+  useStore.getState().dispatch(command.name, params, {
+    selectAffected: true,
+    onResult: ({ summary, changed }) =>
+      usePaletteStore.getState().showResult({
+        commandName: command.name,
+        summary,
+        failed: !changed && !readOnly,
+      }),
+  });
+}
+
+/** A command opens its form first when it takes input or would destroy content. */
+function needsForm(command: CommandDefinition<unknown>): boolean {
+  return (
+    Object.keys(command.paramsSchema.properties).length > 0 ||
+    command.annotations?.destructive === true
+  );
+}
+
+const FOCUSABLE = 'button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+/** Keep Tab / Shift+Tab cycling inside `container`. */
+function trapTab(e: React.KeyboardEvent<HTMLElement>, container: HTMLElement): void {
+  const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => !el.hasAttribute('disabled'),
+  );
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (first === undefined || last === undefined) return;
+  const active = document.activeElement;
+  if (e.shiftKey && (active === first || active === container)) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && active === last) {
+    e.preventDefault();
+    first.focus();
+  }
 }
 
 interface PaletteListProps {
@@ -62,7 +97,7 @@ function PaletteList({
         return (
           <React.Fragment key={`${item.group}-${item.id}`}>
             {showHeader && (
-              <li className="palette-group" role="presentation">
+              <li className="palette-group" role="presentation" aria-hidden="true">
                 {item.group}
               </li>
             )}
@@ -107,6 +142,7 @@ function OpenPalette(): React.ReactElement {
   const [activeIndex, setActiveIndex] = useState(0);
   const [formCommand, setFormCommand] = useState<CommandDefinition<unknown> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
 
   const catalog = useMemo(() => allPaletteItems(), []);
@@ -115,10 +151,12 @@ function OpenPalette(): React.ReactElement {
     [catalog, query, recentIds],
   );
 
-  // Restore focus to whatever opened the palette when it closes.
+  // Restore focus to whatever opened the palette when it closes (if it still exists).
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    return () => opener?.focus();
+    return () => {
+      if (opener?.isConnected === true) opener.focus();
+    };
   }, []);
 
   useEffect(() => {
@@ -128,16 +166,14 @@ function OpenPalette(): React.ReactElement {
   const close = (): void => setOpen(false);
 
   const choose = (item: PaletteItem): void => {
-    recordRecent(item.id);
-    if (item.kind === 'action') {
-      close();
-      item.run();
-    } else if (Object.keys(item.command.paramsSchema.properties).length === 0) {
-      close();
-      runCommand(item.command, {});
-    } else {
+    if (item.kind === 'command' && needsForm(item.command)) {
       setFormCommand(item.command);
+      return;
     }
+    recordRecent(item.id);
+    close();
+    if (item.kind === 'action') item.run();
+    else runCommand(item.command, {});
   };
 
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -154,7 +190,7 @@ function OpenPalette(): React.ReactElement {
     if (next !== undefined && results.length > 0) {
       e.preventDefault();
       setActiveIndex(next);
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
       e.preventDefault();
       const item = results[activeIndex];
       if (item !== undefined) choose(item);
@@ -169,14 +205,18 @@ function OpenPalette(): React.ReactElement {
       }}
     >
       <div
+        ref={dialogRef}
         className="palette"
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
+        tabIndex={-1}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.preventDefault();
             close();
+          } else if (e.key === 'Tab' && dialogRef.current !== null) {
+            trapTab(e, dialogRef.current);
           }
         }}
       >
@@ -188,8 +228,8 @@ function OpenPalette(): React.ReactElement {
                 ref={inputRef}
                 className="palette-search__input"
                 role="combobox"
-                aria-expanded="true"
-                aria-controls={listId}
+                aria-expanded={results.length > 0}
+                aria-controls={results.length > 0 ? listId : undefined}
                 aria-autocomplete="list"
                 aria-activedescendant={results.length > 0 ? `${listId}-${activeIndex}` : undefined}
                 aria-label="Search commands"
@@ -229,8 +269,12 @@ function OpenPalette(): React.ReactElement {
         ) : (
           <CommandParamForm
             command={formCommand}
-            onBack={() => setFormCommand(null)}
+            onBack={() => {
+              setFormCommand(null);
+              setActiveIndex(0);
+            }}
             onSubmit={(params) => {
+              recordRecent(`command:${formCommand.name}`);
               close();
               runCommand(formCommand, params);
             }}

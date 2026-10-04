@@ -1,8 +1,9 @@
 /**
  * @layer ui/store
  *
- * Command palette store — open state and the most recently run palette items (persisted, so the
- * empty-query list starts with what the user reaches for). Presentation-only; never CadDocument.
+ * Command palette store — open state, the most recently run palette items (persisted, so the
+ * empty-query list starts with what the user reaches for) and the result toast of the last
+ * command run from the palette. Presentation-only; never CadDocument.
  */
 
 import { create } from 'zustand';
@@ -29,14 +30,24 @@ function persistRecent(recentIds: readonly string[]): void {
   }
 }
 
+/** Outcome of a command run from the palette, shown as a toast. */
+export interface PaletteResult {
+  /** Increments per result, so a repeated identical summary is still a new toast. */
+  id: number;
+  commandName: string;
+  summary: string;
+  /** A mutating command that changed nothing (rejected / no-op). */
+  failed: boolean;
+}
+
 interface PaletteStoreState {
   open: boolean;
   /** Palette item ids, most recent first, at most RECENT_LIMIT. */
   recentIds: readonly string[];
-  /** Command name run from the palette whose result summary has not been toasted yet. */
-  awaitingResultOf: string | null;
+  result: PaletteResult | null;
   setOpen(open: boolean): void;
-  setAwaitingResultOf(commandName: string | null): void;
+  showResult(result: Omit<PaletteResult, 'id'>): void;
+  dismissResult(): void;
   /** Move `id` to the front of the recent list. */
   recordRecent(id: string): void;
 }
@@ -44,14 +55,18 @@ interface PaletteStoreState {
 export const usePaletteStore = create<PaletteStoreState>()((set, get) => ({
   open: false,
   recentIds: readRecent(),
-  awaitingResultOf: null,
+  result: null,
 
   setOpen(open: boolean): void {
     set({ open });
   },
 
-  setAwaitingResultOf(awaitingResultOf: string | null): void {
-    set({ awaitingResultOf });
+  showResult(result: Omit<PaletteResult, 'id'>): void {
+    set({ result: { ...result, id: (get().result?.id ?? 0) + 1 } });
+  },
+
+  dismissResult(): void {
+    set({ result: null });
   },
 
   recordRecent(id: string): void {

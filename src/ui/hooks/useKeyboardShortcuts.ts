@@ -42,10 +42,17 @@ export function useKeyboardShortcuts(): void {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if (e.defaultPrevented) return;
+      const palette = usePaletteStore.getState();
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        const palette = usePaletteStore.getState();
+        if (e.repeat) return;
+        useToolStore.getState().setShortcutsOpen(false);
         palette.setOpen(!palette.open);
+        return;
+      }
+      // The palette is modal: canvas shortcuts never act behind it; Escape still closes it.
+      if (palette.open) {
+        if (e.key === 'Escape') palette.setOpen(false);
         return;
       }
       if (isEditingKeyEvent(e)) return;

@@ -56,6 +56,7 @@ export function runLocally(
     result.data !== undefined ? { command: name, data: result.data } : state.lastMeasure;
   if (result.document === state.document) {
     set({ lastSummary: summary, lastMeasure });
+    options?.onResult?.({ summary, changed: false });
     return;
   }
   set({
@@ -77,6 +78,7 @@ export function runLocally(
     hasUnsyncedLocalEdits: true,
     localEditCounter: state.localEditCounter + 1,
   });
+  options?.onResult?.({ summary, changed: true });
 }
 
 /** Step the local snapshot history (offline undo/redo). */

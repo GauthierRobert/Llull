@@ -92,15 +92,15 @@ interface LayoutStoreState extends PersistedLayout {
 }
 
 export const useLayoutStore = create<LayoutStoreState>()((set, get) => {
+  // Persist only what changed, over the stored layout: a dock forced closed by the drawer layout
+  // never overwrites the stored desktop preference.
   const commit = (patch: Partial<PersistedLayout>): void => {
-    const { sidebarTab, sidebarOpen, inspectorOpen } = { ...get(), ...patch };
-    persistLayout({ sidebarTab, sidebarOpen, inspectorOpen });
+    persistLayout({ ...readStoredLayout(), ...patch });
     set(patch);
   };
 
-  const stored = readStoredLayout();
   return {
-    ...stored,
+    ...readStoredLayout(),
     ...(isDrawerLayout() ? { sidebarOpen: false, inspectorOpen: false } : {}),
 
     selectSidebarTab(tab: SidebarTab): void {

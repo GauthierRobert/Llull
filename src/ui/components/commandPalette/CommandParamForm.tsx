@@ -2,7 +2,8 @@
  * @layer ui/components/commandPalette
  *
  * Generated param form for one registry command: one control per `paramsSchema` property,
- * entity-id fields pre-filled from the selection. Submitting parses the text and dispatches the
+ * entity-id fields pre-filled from the selection; a destructive command shows a warning and a
+ * danger-styled Run. Submitting parses the text and dispatches the
  * command (react R1: gather params -> dispatch). Escape / Back returns to the command list.
  */
 
@@ -113,6 +114,7 @@ export function CommandParamForm({
   };
 
   const requiredCount = fields.filter((f) => f.required).length;
+  const destructive = command.annotations?.destructive === true;
 
   return (
     <form
@@ -148,56 +150,71 @@ export function CommandParamForm({
         </code>
       </header>
 
-      <div className="palette-form__fields">
-        {fields.map((field, index) => {
-          const fieldId = `${baseId}-${field.name}`;
-          const helpId = `${fieldId}-help`;
-          const error = errors[field.name];
-          return (
-            <div
-              key={field.name}
-              className={`palette-field${error !== undefined ? ' palette-field--invalid' : ''}`}
-            >
-              <label htmlFor={fieldId} className="palette-field__label">
-                {field.label}
-                {field.required ? (
-                  <span className="palette-field__req" aria-hidden="true">
-                    *
-                  </span>
-                ) : (
-                  <span className="palette-field__opt">optional</span>
-                )}
-              </label>
-              <FieldControl
-                field={field}
-                id={fieldId}
-                value={values[field.name] ?? ''}
-                describedBy={helpId}
-                invalid={error !== undefined}
-                autoFocus={index === 0}
-                onChange={(value) => {
-                  setValues((prev) => ({ ...prev, [field.name]: value }));
-                  if (error !== undefined) {
-                    setErrors(({ [field.name]: _cleared, ...rest }) => rest);
-                  }
-                }}
-              />
-              <p id={helpId} className="palette-field__help">
-                {error !== undefined ? <strong role="alert">{error} </strong> : null}
-                {field.description}
-              </p>
-            </div>
-          );
-        })}
-      </div>
+      {destructive && (
+        <p className="palette-form__warning" role="note">
+          <Icon name="info" size={14} />
+          This command removes document content. You can undo it afterwards.
+        </p>
+      )}
+
+      {fields.length > 0 && (
+        <div className="palette-form__fields">
+          {fields.map((field, index) => {
+            const fieldId = `${baseId}-${field.name}`;
+            const helpId = `${fieldId}-help`;
+            const error = errors[field.name];
+            return (
+              <div
+                key={field.name}
+                className={`palette-field${error !== undefined ? ' palette-field--invalid' : ''}`}
+              >
+                <label htmlFor={fieldId} className="palette-field__label">
+                  {field.label}
+                  {field.required ? (
+                    <span className="palette-field__req" aria-hidden="true">
+                      *
+                    </span>
+                  ) : (
+                    <span className="palette-field__opt">optional</span>
+                  )}
+                </label>
+                <FieldControl
+                  field={field}
+                  id={fieldId}
+                  value={values[field.name] ?? ''}
+                  describedBy={helpId}
+                  invalid={error !== undefined}
+                  autoFocus={index === 0}
+                  onChange={(value) => {
+                    setValues((prev) => ({ ...prev, [field.name]: value }));
+                    if (error !== undefined) {
+                      setErrors(({ [field.name]: _cleared, ...rest }) => rest);
+                    }
+                  }}
+                />
+                <p id={helpId} className="palette-field__help">
+                  {error !== undefined ? <strong role="alert">{error} </strong> : null}
+                  {field.description}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <footer className="palette-form__footer">
         <span className="palette-form__meta">
-          {requiredCount === 0
-            ? 'All parameters are optional.'
-            : `${requiredCount} required · blank optional fields use defaults`}
+          {fields.length === 0
+            ? 'No parameters.'
+            : requiredCount === 0
+              ? 'All parameters are optional.'
+              : `${requiredCount} required · blank optional fields use defaults`}
         </span>
-        <button type="submit" className="btn btn--primary">
+        <button
+          type="submit"
+          className={`btn ${destructive ? 'btn--destructive' : 'btn--primary'}`}
+          autoFocus={fields.length === 0}
+        >
           Run
           <kbd className="kbd kbd--on-accent">Ctrl ↵</kbd>
         </button>

@@ -36,13 +36,16 @@ function handlePostFailure(
   err: unknown,
   what: string,
   runLocal: () => void,
+  onFailure?: (summary: string) => void,
 ): void {
   if (!isHttpError(err) && sseIsDown(get())) {
     set({ liveStatus: 'disconnected' });
     runLocal();
     return;
   }
-  set({ lastSummary: postFailureMessage(err, what) });
+  const summary = postFailureMessage(err, what);
+  set({ lastSummary: summary });
+  onFailure?.(summary);
 }
 
 /**
@@ -83,10 +86,16 @@ export function postDispatch(
         lastMeasure:
           response.data !== undefined ? { command: name, data: response.data } : state.lastMeasure,
       }));
+      options?.onResult?.({ summary: response.summary, changed: response.affected.length > 0 });
     })
     .catch((err: unknown) => {
-      handlePostFailure(set, get, err, `Command '${name}'`, () =>
-        runLocally(set, get, name, params, options),
+      handlePostFailure(
+        set,
+        get,
+        err,
+        `Command '${name}'`,
+        () => runLocally(set, get, name, params, options),
+        (summary) => options?.onResult?.({ summary, changed: false }),
       );
     });
 }

@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { usePaletteStore, useStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
+import type { DispatchOptions } from '@ui/store/storeTypes';
 import { CommandPalette } from '@ui/components/commandPalette/CommandPalette';
 import { PaletteResultToast } from '@ui/components/commandPalette/PaletteResultToast';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
@@ -33,7 +34,7 @@ function search(text: string): HTMLElement {
 describe('CommandPalette', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    usePaletteStore.setState({ open: false, recentIds: [], awaitingResultOf: null });
+    usePaletteStore.setState({ open: false, recentIds: [], result: null });
     useToolStore.setState({ viewMode: '3d', drawTool: 'none', modifyTool: 'none' });
     useStore.setState({
       document: { ...createEmptyDocument(), selection: ['box-1.1'] },
@@ -83,7 +84,7 @@ describe('CommandPalette', () => {
     render(<Harness />);
     search('qqqzzz');
     expect(screen.queryAllByRole('option')).toHaveLength(0);
-    expect(screen.getByRole('status').textContent).toMatch(/No matching command/);
+    expect(screen.getByText(/No matching command/)).toBeDefined();
   });
 
   it('opens the generated form for a command with params, pre-filled from the selection', () => {
@@ -100,7 +101,7 @@ describe('CommandPalette', () => {
     expect(dispatch).toHaveBeenCalledWith(
       'move_entity',
       { id: 'box-1.1', delta: [10, 0, 0] },
-      { selectAffected: true },
+      expect.objectContaining({ selectAffected: true }),
     );
     expect(usePaletteStore.getState().open).toBe(false);
   });
@@ -120,31 +121,51 @@ describe('CommandPalette', () => {
     expect(screen.getByRole('combobox')).toBeDefined();
   });
 
-  it('runs a parameterless command at once and toasts its summary', () => {
-    dispatch.mockImplementation(() => useStore.setState({ lastSummary: 'Scene: 0 entities.' }));
+  it('runs a parameterless command at once and toasts its own result', () => {
+    dispatch.mockImplementation((_name: string, _params: unknown, options?: DispatchOptions) =>
+      options?.onResult?.({ summary: 'Scene: 0 entities.', changed: false }),
+    );
     usePaletteStore.setState({ open: true });
-    render(<Harness />);
+    const { container } = render(<Harness />);
     const input = search('describe scene');
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(dispatch).toHaveBeenCalledWith('describe_scene', {}, { selectAffected: true });
+    expect(dispatch).toHaveBeenCalledWith(
+      'describe_scene',
+      {},
+      expect.objectContaining({
+        selectAffected: true,
+      }),
+    );
     expect(screen.getByRole('status').textContent).toContain('Scene: 0 entities.');
+    // A read-only query that changes nothing is not a failure.
+    expect(container.querySelector('.palette-toast--failed')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss result' }));
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(container.querySelector('.palette-toast')).toBeNull();
   });
 
-  it('auto-dismisses the toast and flags a rejected run', () => {
+  it('flags a rejected run and auto-dismisses, even after a hover + dismiss', () => {
     vi.useFakeTimers();
     try {
-      dispatch.mockImplementation(() =>
-        useStore.setState({ lastSummary: 'add_box rejected: invalid params — size: …' }),
+      dispatch.mockImplementation((_name: string, _params: unknown, options?: DispatchOptions) =>
+        options?.onResult?.({ summary: 'add_box rejected: invalid params', changed: false }),
       );
-      usePaletteStore.setState({ open: true });
       const { container } = render(<Harness />);
-      search('add box');
-      fireEvent.click(screen.getByRole('option', { name: /Add box…/ }));
-      fireEvent.change(screen.getByLabelText(/^Size/), { target: { value: '1, 1, 1' } });
-      fireEvent.submit(screen.getByRole('form'));
-      expect(container.querySelector('.palette-toast--failed')).not.toBeNull();
+      const runAddBox = (): void => {
+        act(() => usePaletteStore.setState({ open: true }));
+        search('add box');
+        fireEvent.click(screen.getByRole('option', { name: /Add box…/ }));
+        fireEvent.change(screen.getByLabelText(/^Size/), { target: { value: '1, 1, 1' } });
+        fireEvent.submit(screen.getByRole('form'));
+      };
+
+      runAddBox();
+      const toast = container.querySelector('.palette-toast');
+      expect(toast?.classList.contains('palette-toast--failed')).toBe(true);
+      fireEvent.mouseEnter(toast as Element);
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss result' }));
+      expect(container.querySelector('.palette-toast')).toBeNull();
+
+      runAddBox();
       act(() => {
         vi.advanceTimersByTime(7000);
       });
@@ -152,5 +173,58 @@ describe('CommandPalette', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('ignores summaries from other dispatches', () => {
+    render(<Harness />);
+    act(() => useStore.setState({ lastSummary: 'Undid last step.' }));
+    expect(screen.getByRole('status').textContent).toBe('');
+  });
+
+  it('is modal: canvas shortcuts do not act behind it, Escape closes it', () => {
+    usePaletteStore.setState({ open: true });
+    render(<Harness />);
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+    fireEvent.keyDown(document.body, { key: 'l' });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(useToolStore.getState().drawTool).toBe('none');
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(usePaletteStore.getState().open).toBe(false);
+  });
+
+  it('traps Tab inside the dialog', () => {
+    usePaletteStore.setState({ open: true });
+    render(<Harness />);
+    const input = screen.getByRole('combobox');
+    input.focus();
+    fireEvent.keyDown(input, { key: 'Tab', shiftKey: true });
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Tab' });
+    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true);
+  });
+
+  it('asks before running a destructive command, even without required params', () => {
+    usePaletteStore.setState({ open: true });
+    render(<Harness />);
+    const input = search('clear document');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(screen.getByRole('note').textContent).toMatch(/removes document content/);
+    fireEvent.submit(screen.getByRole('form'));
+    expect(dispatch).toHaveBeenCalledWith('clear_document', {}, expect.anything());
+    expect(usePaletteStore.getState().recentIds[0]).toBe('command:clear_document');
+  });
+
+  it('submits a required boolean as displayed', () => {
+    usePaletteStore.setState({ open: true });
+    render(<Harness />);
+    search('set step suppressed');
+    fireEvent.click(screen.getByRole('option', { name: /Set step suppressed…/ }));
+    fireEvent.change(screen.getByLabelText(/^Step id/), { target: { value: 'step-1' } });
+    fireEvent.submit(screen.getByRole('form'));
+    expect(dispatch).toHaveBeenCalledWith(
+      'set_step_suppressed',
+      expect.objectContaining({ stepId: 'step-1', suppressed: true }),
+      expect.anything(),
+    );
   });
 });

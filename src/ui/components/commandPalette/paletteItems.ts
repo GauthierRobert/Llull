@@ -15,7 +15,7 @@ import { createSolid } from '@ui/actions/createSolid';
 import { DRAW_TOOL_KEYS, GIZMO_KEYS } from '@ui/hooks/shortcuts';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { DRAW_TOOLS } from '@ui/components/toolbar/drawTools';
-import { SIDEBAR_TABS } from '@ui/components/Sidebar';
+import { SIDEBAR_TAB_SPECS } from '@ui/components/sidebarTabs';
 import { fuzzyScore } from './fuzzyMatch';
 import { humanizeName } from './paramForm';
 
@@ -210,7 +210,7 @@ function appActions(): PaletteAction[] {
       () => layout().toggleInspector(),
       { keywords: 'properties' },
     ),
-    ...SIDEBAR_TABS.map((spec) =>
+    ...SIDEBAR_TAB_SPECS.map((spec) =>
       action(
         `panel-${spec.tab}`,
         'Panels',

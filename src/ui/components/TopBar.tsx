@@ -19,6 +19,7 @@ import { ThemeToggle } from '@ui/components/ThemeToggle';
 import { ProjectIO } from '@ui/components/ProjectIO';
 import { ModelExport } from '@ui/components/ModelExport';
 import { McpConnectButton } from '@ui/components/McpConnect';
+import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
 
 interface AgentPillProps {
   status: 'connected' | 'connecting' | 'disconnected';
@@ -88,11 +89,9 @@ function InspectorToggle(): React.ReactElement {
   );
 }
 
-const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
-
 function SearchTrigger(): React.ReactElement {
   const setOpen = usePaletteStore((s) => s.setOpen);
-  const shortcut = IS_MAC ? '⌘K' : 'Ctrl K';
+  const shortcut = PALETTE_SHORTCUT_LABEL;
   return (
     <button
       type="button"

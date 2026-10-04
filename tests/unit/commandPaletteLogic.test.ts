@@ -107,6 +107,12 @@ describe('paramForm', () => {
       note: '',
     });
     expect(initialValues(fieldsFromSchema(SCHEMA), []).id).toBe('');
+    const requiredBoolean = fieldsFromSchema({
+      type: 'object',
+      properties: { visible: { type: 'boolean', description: 'Visible' } },
+      required: ['visible'],
+    });
+    expect(initialValues(requiredBoolean, [])).toEqual({ visible: 'true' });
   });
 
   it('parses typed text into params, omitting blank optional fields', () => {

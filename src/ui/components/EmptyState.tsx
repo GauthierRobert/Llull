@@ -9,6 +9,7 @@
 
 import React, { useState } from 'react';
 import { useStore, useToolStore } from '@ui/store';
+import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
 import { Icon } from '@ui/components/Icon';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { createSolid } from '@ui/actions/createSolid';
@@ -94,8 +95,8 @@ export function EmptyState(): React.ReactElement | null {
               <Icon name="search" size={14} />
             </span>
             <span className="empty-state__tip-text">
-              Press <kbd className="kbd">Ctrl K</kbd> to search and run any of llull’s commands, or{' '}
-              <kbd className="kbd">?</kbd> for keyboard shortcuts.
+              Press <kbd className="kbd">{PALETTE_SHORTCUT_LABEL}</kbd> to search and run any of
+              llull’s commands, or <kbd className="kbd">?</kbd> for keyboard shortcuts.
             </span>
           </li>
         </ul>

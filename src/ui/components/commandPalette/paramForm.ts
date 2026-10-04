@@ -79,7 +79,10 @@ function selectedIdFor(name: string, selection: readonly EntityId[]): EntityId |
   return numbered === null ? undefined : selection[Number(numbered[1]) - 1];
 }
 
-/** Pre-fill entity-id fields from the current selection so "select, then run" just works. */
+/**
+ * Pre-fill entity-id fields from the current selection so "select, then run" just works; required
+ * enums / booleans start on the value their select shows (first option / `true`).
+ */
 export function initialValues(
   fields: readonly FormField[],
   selection: readonly EntityId[],
@@ -93,6 +96,8 @@ export function initialValues(
       values[field.name] = selection.join(', ');
     } else if (field.kind === 'enum' && field.required) {
       values[field.name] = field.options[0] ?? '';
+    } else if (field.kind === 'boolean' && field.required) {
+      values[field.name] = 'true';
     } else {
       values[field.name] = '';
     }
