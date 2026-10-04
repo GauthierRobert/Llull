@@ -7,14 +7,8 @@ import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, GridElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import {
-  fromMm,
-  getBuilding,
-  lengthOf,
-  nextElementId,
-  withElement,
-  elementAffected,
-} from './model';
+import { fromMm, getBuilding, nextElementId, withElement, elementAffected } from './model';
+import { distance } from '@lib/polygon';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
 
@@ -79,7 +73,7 @@ export const addGridLine = defineCommand({
     label: z.string().optional().describe('Bubble label, e.g. "A" or "3". Must be unique.'),
   }),
   run: (doc, { start, end, label }): CommandResult => {
-    if (lengthOf(start, end) <= 0) {
+    if (distance(start, end) <= 0) {
       return noop(doc, 'add_grid_line failed: start and end must be distinct [x, y] points.');
     }
     const building = getBuilding(doc);

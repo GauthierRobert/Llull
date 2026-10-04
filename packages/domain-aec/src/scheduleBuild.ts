@@ -9,8 +9,8 @@ import type {
   OpeningElement,
   WallElement,
 } from '@core/model/building';
-import { polygonArea, polygonPerimeter } from '@lib/polygon';
-import { getBuilding, lengthOf } from './model';
+import { distance, polygonArea, polygonPerimeter } from '@lib/polygon';
+import { getBuilding } from './model';
 import { round } from './numeric';
 import { openingsOf } from './wallGeometry';
 import { boltSize } from './industrial/evaluate';
@@ -229,7 +229,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           'Volume (m³)',
         ],
         rows: elementsOf(building, 'beam').map((beam) => {
-          const span = lengthOf(beam.start, beam.end);
+          const span = distance(beam.start, beam.end);
           return [
             beam.mark,
             levelName(building, beam.levelId),

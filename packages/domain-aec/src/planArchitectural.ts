@@ -14,13 +14,9 @@ import type {
   WallElement,
 } from '@core/model/building';
 import { polygonArea, polygonCentroid } from '@lib/polygon';
-import {
-  curvedBandBetween,
-  curvedWallExtent,
-  curvedWallPieces,
-  tangentWall,
-} from './curvedWallGeometry';
+import { curvedBandBetween, curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import { fromMm, toMetres } from './model';
+import { wallPieces } from './wallPieces';
 import { openingsOf, pointAlong, wallExtent, wallFrame } from './wallGeometry';
 import { stairPoint } from './stairGeometry';
 import { layerBoundaries } from './wallLayers';
@@ -312,7 +308,7 @@ export function curvedWallPrimitives(
   }
   const openings = openingsOf(building, wall.id);
   const primitives: PlanPrimitive[] = [];
-  for (const piece of curvedWallPieces(wall, openings, extent)) {
+  for (const piece of wallPieces(wall, openings, extent)) {
     if (!(piece.z0 <= localCut && localCut < piece.z1)) continue;
     const points = curvedBandBetween(wall, piece.s0, piece.s1);
     if (points) primitives.push({ type: 'polygon', layer, style: 'cut', fill: 'hatch', points });

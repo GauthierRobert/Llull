@@ -19,7 +19,6 @@ import {
   fromMm,
   getBuilding,
   isVec2List,
-  lengthOf,
   nextElementId,
   nextMark,
   resolveLevel,
@@ -340,7 +339,7 @@ export const addBeam = defineCommand({
     material: z.string().optional().describe('Material. Default concrete.'),
   }),
   run: (doc, { start, end, width, depth, topOffset = 0, levelId, material }): CommandResult => {
-    if (lengthOf(start, end) <= 0) {
+    if (distance(start, end) <= 0) {
       return noop(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
     }
     const resolvedWidth = width ?? fromMm(doc, 300);
@@ -366,7 +365,7 @@ export const addBeam = defineCommand({
     const document = regenerateBuilding(doc, withElement(resolution.building, beam));
     return {
       document,
-      summary: `Added beam ${beam.mark} (${beam.id}) ${resolvedWidth}×${resolvedDepth}, span ${lengthOf(start, end).toFixed(3)} ${doc.units}.`,
+      summary: `Added beam ${beam.mark} (${beam.id}) ${resolvedWidth}×${resolvedDepth}, span ${distance(start, end).toFixed(3)} ${doc.units}.`,
       affected: elementAffected(document, [beam.id]),
       data: { elementId: beam.id },
     };

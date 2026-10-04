@@ -23,6 +23,7 @@ import type {
   BuildingLevel,
   BuildingModel,
   ColumnElement,
+  CurvedWallElement,
   GridElement,
   OpeningElement,
   RoomElement,
@@ -34,7 +35,8 @@ import { polygonArea, polygonCentroid, toCounterClockwise } from '@lib/polygon';
 import { fromMm, toMetres } from './model';
 import { prismMesh } from './mesh';
 import { base, CATEGORY_LAYER, colorForMaterial, meshEntity, orientedBox } from './entities';
-import { openingsOf, pointAlong, wallExtent, wallFrame } from './wallGeometry';
+import { curvedBandBetween } from './curvedWallGeometry';
+import { openingsOf, pointAlong, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
 import { stairPoint } from './stairGeometry';
 import { wallPieces } from './wallPieces';
 
@@ -323,4 +325,24 @@ export function evaluateGrid(context: EvaluationContext, grid: GridElement): Ent
     entities.push(bubble, label);
   }
   return entities;
+}
+
+export function evaluateCurvedWall(
+  wall: CurvedWallElement,
+  level: BuildingLevel,
+  openings: ReadonlyArray<OpeningElement>,
+  extent: WallExtent,
+): Entity[] {
+  const bottom = level.elevation + wall.baseOffset;
+  const color = colorForMaterial(wall.material, '#c9c4b8');
+  const pieces = wallPieces(wall, openings, extent);
+  return pieces.flatMap((piece, index): Entity[] => {
+    const band = curvedBandBetween(wall, piece.s0, piece.s1);
+    const mesh = band
+      ? prismMesh(band, [], ([x, y], side) => [x, y, bottom + (side ? piece.z1 : piece.z0)])
+      : null;
+    if (!mesh) return [];
+    const part = pieces.length === 1 ? 'body' : `body-${index}`;
+    return [meshEntity(wall, { part, label: `Wall ${wall.mark}` }, mesh, color)];
+  });
 }

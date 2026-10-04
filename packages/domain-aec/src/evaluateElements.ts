@@ -11,7 +11,7 @@ import type {
   OpeningElement,
   SteelMemberElement,
 } from '@core/model/building';
-import { curvedWallExtent, evaluateCurvedWall, tangentWall } from './curvedWallGeometry';
+import { curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import {
   evaluateEquipment,
   evaluateFooting,
@@ -28,6 +28,7 @@ import {
   type EvaluationContext,
   evaluateBeam,
   evaluateColumn,
+  evaluateCurvedWall,
   evaluateGrid,
   evaluateOpening,
   evaluateRoom,

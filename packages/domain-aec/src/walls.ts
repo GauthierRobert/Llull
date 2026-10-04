@@ -11,7 +11,6 @@ import {
   fromMm,
   getBuilding,
   isVec2List,
-  lengthOf,
   nextElementId,
   nextMark,
   resolveLevel,
@@ -19,6 +18,7 @@ import {
   withElement,
   elementAffected,
 } from './model';
+import { distance } from '@lib/polygon';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
 import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
@@ -103,7 +103,7 @@ function buildWalls(
   let building = resolution.building;
   const wallIds: string[] = [];
   for (const [start, end] of segments) {
-    if (lengthOf(start, end) <= 0) {
+    if (distance(start, end) <= 0) {
       return {
         ok: false,
         reason: `segment [${start.join(', ')}]→[${end.join(', ')}] has zero length`,
@@ -133,7 +133,7 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
   const walls = build.wallIds
     .map((id) => document.building?.elements[id])
     .filter((element): element is WallElement => element?.category === 'wall');
-  const totalLength = walls.reduce((sum, wall) => sum + lengthOf(wall.start, wall.end), 0);
+  const totalLength = walls.reduce((sum, wall) => sum + distance(wall.start, wall.end), 0);
   const first = walls[0];
   const level = first ? document.building?.levels[first.levelId] : undefined;
   return {
@@ -260,7 +260,7 @@ export const updateWall = defineCommand({
       material: material?.trim() || wall.material,
       levelId: levelId ?? wall.levelId,
     };
-    if (lengthOf(updated.start, updated.end) <= 0) {
+    if (distance(updated.start, updated.end) <= 0) {
       return noop(doc, 'update_wall failed: start and end would coincide.');
     }
     const next = withElement(building, updated);
