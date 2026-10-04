@@ -13,6 +13,8 @@ const OPTIONAL_SERVER = 'http://localhost:3001';
 /** Summary prefixes / phrases of commands that changed nothing (not words inside a success). */
 const REFUSED = /^\S+ (failed|rejected):|^No entity|not found\b|kernel not available|^Nothing to/i;
 
+const DOWNLOAD_GAP_MS = 400;
+
 export interface Downloaded {
   name: string;
   text: string;
@@ -22,6 +24,7 @@ export class UiSession {
   readonly problems: string[] = [];
   /** Off while the app boots: the reload that clears storage aborts the first wasm download. */
   private watching = false;
+  private lastDownload = 0;
 
   constructor(readonly page: Page) {
     page.on('console', (message) => {
@@ -100,8 +103,15 @@ export class UiSession {
     return after;
   }
 
-  /** Click something that triggers a browser download and read the file. */
+  /**
+   * Click something that triggers a browser download and read the file. Downloads are paced like
+   * a person's clicks: Chromium drops an anchor download started within ~100 ms of the previous
+   * one (measured: 6 / 78 dropped back to back, 0 / 78 with a 400 ms gap).
+   */
   async download(trigger: () => Promise<void>): Promise<Downloaded> {
+    const wait = this.lastDownload + DOWNLOAD_GAP_MS - Date.now();
+    if (wait > 0) await this.page.waitForTimeout(wait);
+    this.lastDownload = Date.now();
     const [download] = await Promise.all([
       this.page.waitForEvent('download', { timeout: 30_000 }),
       trigger(),
