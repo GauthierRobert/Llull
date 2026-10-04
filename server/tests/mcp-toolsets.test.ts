@@ -219,7 +219,7 @@ describe('MCP toolsets', () => {
     );
   });
 
-  it('keeps the render_view server enrichments in the filtered list', async () => {
+  it('advertises the render_view enrichment params in the filtered list', async () => {
     const sessionId = await openSession();
     const { tools } = (await rpc(sessionId, 'tools/list', {})) as {
       tools: { name: string; inputSchema: { properties?: Record<string, unknown> } }[];

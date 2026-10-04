@@ -5,162 +5,17 @@
  * building. No three.js, no DOM, no React. The document coordinate convention is
  * Z-up throughout: +X right, +Y forward, +Z up. This matches the model/types.ts
  * entity contracts (box, cone, pyramid, wedge, extrusion are all Z-up).
- *
- * NOTE on cylinder: scene.ts entityBounds uses Y-axis (three.js CylinderGeometry
- * convention). The tessellation here uses Z-axis (Z-up, matching the model). The
- * bounds used for framing come from computeSceneSnapshot which uses scene.ts
- * entityBounds — the slight inconsistency only affects framing; rendering is
- * Z-up throughout.
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { computeSceneSnapshot } from './scene';
-import { type RenderViewData, type PreDepthPolygon, type Polygon3D } from './renderTypes';
-import { centroid3, applyRotation } from './renderMath';
-import { type ViewName, cameraForView, cameraBasis, projectPoint } from './renderCamera';
-import {
-  tessellateBox,
-  tessellateCylinder,
-  tessellateSphere,
-  tessellateCone,
-  tessellateTorus,
-  tessellateWedge,
-  tessellatePyramid,
-  tessellateRevolution,
-  tessellateExtrusion,
-  tessellateMesh,
-} from './renderTessellation3D';
-import {
-  tessellate2DLine,
-  tessellate2DPolyline,
-  tessellate2DArc,
-  tessellate2DCircle,
-  tessellate2DRectangle,
-  tessellate2DEllipse,
-  tessellate2DSpline,
-  tessellate2DPoint,
-} from './renderTessellation2D';
-import { MAX_POLYGONS, buildSvg } from './renderSvg';
-function tessellateEntity(e: Entity): PreDepthPolygon[] {
-  switch (e.kind) {
-    // 3D solids — apply entity rotation (three.js intrinsic XYZ Euler order)
-    case 'box':
-      return applyRotation(tessellateBox(e), e.position, e.rotation);
-    case 'cylinder':
-      return applyRotation(tessellateCylinder(e), e.position, e.rotation);
-    case 'sphere':
-      return applyRotation(tessellateSphere(e), e.position, e.rotation);
-    case 'cone':
-      return applyRotation(tessellateCone(e), e.position, e.rotation);
-    case 'torus':
-      return applyRotation(tessellateTorus(e), e.position, e.rotation);
-    case 'wedge':
-      return applyRotation(tessellateWedge(e), e.position, e.rotation);
-    case 'pyramid':
-      return applyRotation(tessellatePyramid(e), e.position, e.rotation);
-    case 'extrusion':
-      return applyRotation(tessellateExtrusion(e), e.position, e.rotation);
-    case 'revolution':
-      return applyRotation(tessellateRevolution(e), e.position, e.rotation);
-    case 'mesh':
-      return applyRotation(tessellateMesh(e), e.position, e.rotation);
-    // 2D shapes — rotation not applied here (2D plane orientation is out of scope)
-    case 'line':
-      return tessellate2DLine(e);
-    case 'polyline':
-      return tessellate2DPolyline(e);
-    case 'arc':
-      return tessellate2DArc(e);
-    case 'circle':
-      return tessellate2DCircle(e);
-    case 'rectangle':
-      return tessellate2DRectangle(e);
-    case 'point':
-      return tessellate2DPoint(e);
-    case 'ellipse':
-      return tessellate2DEllipse(e);
-    case 'spline':
-      return tessellate2DSpline(e);
-    case 'text':
-      return []; // not drawn in render_view SVG; the viewport renders text
-    case 'dimension':
-      return []; // not drawn in render_view SVG; the viewport renders dimensions
-    case 'instance':
-      return []; // expanded form not yet tessellated; use explode_instance to export
-    default: {
-      const exhaustive: never = e;
-      void exhaustive;
-      return [];
-    }
-  }
-}
+import type { ViewName } from './renderCamera';
+import { renderDocument } from './renderScene';
+import { composeOverlays } from './renderOverlays';
+import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './renderMultiPass';
 
-function renderDocument(
-  doc: CadDocument,
-  view: ViewName,
-  width: number,
-  height: number,
-): RenderViewData {
-  const snapshot = computeSceneSnapshot(doc);
-  const bounds = snapshot.bounds;
-
-  // Compute scene radius and center
-  let center: Vec3 = [0, 0, 0];
-  let radius = 5; // default for empty scene
-
-  if (bounds) {
-    center = [
-      (bounds.min[0] + bounds.max[0]) / 2,
-      (bounds.min[1] + bounds.max[1]) / 2,
-      (bounds.min[2] + bounds.max[2]) / 2,
-    ];
-    const dx = bounds.max[0] - bounds.min[0];
-    const dy = bounds.max[1] - bounds.min[1];
-    const dz = bounds.max[2] - bounds.min[2];
-    radius = Math.max(dx, dy, dz) / 2 + 1e-3;
-    if (radius < 0.1) radius = 1;
-  }
-
-  const cam = cameraForView(view, center, radius);
-  const basis = cameraBasis(cam);
-  const orthoHalf = (cam.ortho ?? radius) * 1.2;
-
-  // Tessellate in doc.order up to MAX_POLYGONS (no spread: a mesh can exceed the argument limit).
-  const capped: PreDepthPolygon[] = [];
-  collect: for (const id of doc.order) {
-    const e = doc.entities[id];
-    if (!e) continue;
-    for (const p of tessellateEntity(e)) {
-      if (capped.length >= MAX_POLYGONS) break collect;
-      capped.push(p);
-    }
-  }
-
-  // Project depth and shade
-  const polygons: Polygon3D[] = capped.map((p) => {
-    const c = centroid3(p.verts);
-    const [, , depth] = projectPoint(c, cam, basis);
-    return { ...p, depth };
-  });
-
-  const svg = buildSvg(polygons, cam, basis, orthoHalf, width, height, view, snapshot.entityCount);
-
-  return {
-    view,
-    width,
-    height,
-    entityCount: snapshot.entityCount,
-    bounds,
-    camera: {
-      position: [...cam.position] as [number, number, number],
-      target: [...cam.target] as [number, number, number],
-      up: [...cam.up] as [number, number, number],
-    },
-    svg,
-  };
-}
+const clampPixels = (value: number | undefined, fallback: number): number =>
+  Math.max(64, Math.min(2000, Math.round(value ?? fallback)));
 
 /**
  * @command render_view
@@ -168,7 +23,8 @@ function renderDocument(
  * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.svg is a self-contained <svg> string; document === input doc (referential equality)
- * @failure unknown view name -> fallback to 'iso'; width/height clamped to [64, 2000]
+ * @invariant turntable wins over isolate over section; turntable output carries no overlays
+ * @failure width/height clamped to [64, 2000]; turntable.frames clamped to [1, 12]
  */
 export const renderView = defineCommand({
   name: 'render_view',
@@ -182,6 +38,9 @@ export const renderView = defineCommand({
     '"left", or "right" (all orthographic). ' +
     'Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. ' +
     'The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. ' +
+    'Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), ' +
+    'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
+    'showLabels (entity id/name labels + key-point markers, default off). ' +
     'Does NOT modify the document; `affected` is always [].',
   params: z.object({
     view: z
@@ -202,19 +61,105 @@ export const renderView = defineCommand({
       .number()
       .optional()
       .describe('Output image height in pixels. Clamped to [64, 2000]. Default: 600.'),
+    turntable: z
+      .object({
+        frames: z
+          .number()
+          .describe(
+            'Number of frames (1..12). Each frame is a separate rotated view stitched into one wide strip.',
+          ),
+      })
+      .optional()
+      .describe(
+        'Produce a horizontal strip of N evenly-spaced rotation frames around the Z (up) axis. ' +
+          'frames: integer 1..12. When omitted, behavior is unchanged (single frame).',
+      ),
+    isolate: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .describe(
+        'Entity id (or array of ids) to highlight. All other entities are rendered ' +
+          'dimmed/desaturated; the specified id(s) are shown at full color.',
+      ),
+    section: z
+      .object({
+        axis: z.enum(['x', 'y', 'z']).describe('Axis normal to the cut plane: "x", "y", or "z".'),
+        offset: z.number().describe('World-space position of the cut plane along the axis.'),
+      })
+      .optional()
+      .describe(
+        'Render a section-plane view: entities on the negative side of the cut plane are dimmed; ' +
+          'a colored dashed line marks the cut. axis: "x"|"y"|"z"; offset: world-space position of the plane.',
+      ),
+    showDimensions: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, overlay the bounding-box dimensions (W × D × H) as text labels on the image. ' +
+          'Labels are placed near the bounding box edges in screen space.',
+      ),
+    showAxes: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true (default), overlay a world-frame X/Y/Z axis triad anchored at the world origin. ' +
+          'X=red, Y=green, Z=blue. A scale label (e.g. "1 mm = 42 px") is also shown. ' +
+          'Set to false to suppress.',
+      ),
+    showGrid: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true (default), overlay a faint ground grid on the Z=0 plane so you can judge ' +
+          'object placement relative to the world origin. Set to false to suppress.',
+      ),
+    showLabels: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, overlay per-entity id/name labels and key-point markers on the image. ' +
+          'Each entity shows its name (or id) at the centroid of its key points (endpoints, center, ' +
+          'corners, AABB corners for solids). Markers are color-coded by category: ' +
+          'orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. ' +
+          'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const view: ViewName = params.view ?? 'iso';
-    const width = Math.max(64, Math.min(2000, Math.round(params.width ?? 800)));
-    const height = Math.max(64, Math.min(2000, Math.round(params.height ?? 600)));
+    const width = clampPixels(params.width, 800);
+    const height = clampPixels(params.height, 600);
+    const base = renderDocument(doc, view, width, height);
+    const plural = base.entityCount === 1 ? 'y' : 'ies';
+    let summary = `Rendered ${view} view: ${base.entityCount} entit${plural}, ${width}×${height}.`;
 
-    const data = renderDocument(doc, view, width, height);
+    if (params.turntable) {
+      const frames = Math.max(1, Math.min(12, Math.round(params.turntable.frames)));
+      const strip = buildTurntableSvg(doc, frames, view, width, height);
+      return {
+        document: doc,
+        summary: `Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.`,
+        affected: [],
+        data: { ...base, width: strip.width, svg: strip.svg },
+      };
+    }
 
-    return {
-      document: doc,
-      summary: `Rendered ${view} view: ${data.entityCount} entit${data.entityCount === 1 ? 'y' : 'ies'}, ${width}×${height}.`,
-      affected: [],
-      data,
-    };
+    let svg = base.svg;
+    if (params.isolate !== undefined) {
+      const ids = typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
+      svg = buildIsolateSvg(doc, ids, view, width, height);
+      summary = `Rendered isolated view: ${ids.length} entity/entities highlighted, ${width}×${height}.`;
+    } else if (params.section) {
+      const { axis, offset } = params.section;
+      svg = buildSectionSvg(doc, axis, offset, view, width, height);
+      summary = `Rendered section view: cut at ${axis}=${offset}, ${width}×${height}.`;
+    }
+    svg = composeOverlays(svg, base, doc, {
+      showDimensions: params.showDimensions === true,
+      showAxes: params.showAxes !== false,
+      showGrid: params.showGrid !== false,
+      showLabels: params.showLabels === true,
+    });
+
+    return { document: doc, summary, affected: [], data: { ...base, svg } };
   },
 });
