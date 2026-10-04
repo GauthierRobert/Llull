@@ -1,11 +1,8 @@
 /**
- * @command create_configuration
- * @command activate_configuration
- * @pure
+ * create_configuration / activate_configuration: design-table variants. Configurations are document
+ * INPUT state, so both are `metaHistory`.
+ *
  * @layer core/commands
- * @affects configurations record (create_configuration); parameters + entities (activate_configuration)
- * @invariant configurations are document INPUT state, not replayable geometry steps (metaHistory: true)
- * @failure blank name / non-object parameterValues → no-op; unknown config name → no-op; unknown parameter → summary surfaces it, no throw
  */
 
 import type { CadDocument, Configuration, Parameter } from '../model/types';
@@ -53,7 +50,7 @@ export const createConfiguration = defineCommand({
   }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, parameterValues }): CommandResult => {
-    if (typeof name !== 'string' || name.trim() === '') {
+    if (name.trim() === '') {
       return noop(doc, 'create_configuration failed: name must be a non-empty string.');
     }
 
@@ -73,10 +70,7 @@ export const createConfiguration = defineCommand({
 
     const newDoc: CadDocument = {
       ...doc,
-      configurations: {
-        ...doc.configurations,
-        [name]: configuration,
-      },
+      configurations: { ...doc.configurations, [name]: configuration },
     };
 
     const paramCount = Object.keys(parameterValues).length;
@@ -113,9 +107,6 @@ export const activateConfiguration = defineCommand({
           'Example: "small", "large", "production_v2".',
       ),
   }),
-  // idempotent: activating the same configuration twice yields the same end-state
-  // (sets the same parameter values, replays the same history). metaHistory: it sets
-  // document INPUT state and triggers a replay, so it must not append/recurse (L8).
   annotations: { idempotent: true, metaHistory: true },
   run: (doc, { name }): CommandResult => {
     if (name.trim() === '') {
@@ -132,43 +123,24 @@ export const activateConfiguration = defineCommand({
       return noop(doc, `activate_configuration failed: configuration '${name}' not found.${hint}`);
     }
 
-    // Apply this configuration's parameter expressions to the current parameters record.
-    // Parameters that exist in the doc are updated; parameters named in the config but
-    // absent from the doc are created. Surface unknown-parameter notes in the summary.
-    const unknownParams: string[] = [];
-    const changedParams: string[] = [];
-
-    let updatedParameters: Record<string, Parameter> = { ...doc.parameters };
-
+    // Parameters named in the config but absent from the document are created (and reported).
+    const unknownParams = Object.keys(config.parameterValues).filter(
+      (paramName) => !(paramName in doc.parameters),
+    );
+    const changedParams = Object.entries(config.parameterValues).map(
+      ([paramName, expression]) => `${paramName}="${expression}"`,
+    );
+    const updatedParameters: Record<string, Parameter> = { ...doc.parameters };
     for (const [paramName, expression] of Object.entries(config.parameterValues)) {
-      if (!(paramName in doc.parameters)) {
-        unknownParams.push(paramName);
-        // Still create the parameter so the config's intent is honoured.
-      }
-      changedParams.push(`${paramName}="${expression}"`);
-      updatedParameters = {
-        ...updatedParameters,
-        [paramName]: {
-          name: paramName,
-          expression,
-          // Seed value: reEvaluateAll overwrites this on successful evaluation. On
-          // eval failure it retains this seed (0 for a newly-created param), so it is
-          // the error-retention fallback rather than a value that is always replaced.
-          value: doc.parameters[paramName]?.value ?? 0,
-        },
+      // The seed value is kept when evaluation fails (reEvaluateAll retains the last good value).
+      updatedParameters[paramName] = {
+        name: paramName,
+        expression,
+        value: doc.parameters[paramName]?.value ?? 0,
       };
     }
+    const baseDoc: CadDocument = { ...doc, parameters: reEvaluateAll(updatedParameters) };
 
-    // Re-evaluate all parameters in topological order.
-    const evaluatedParameters = reEvaluateAll(updatedParameters);
-
-    // Build the intermediate doc with the new parameter values.
-    const baseDoc: CadDocument = {
-      ...doc,
-      parameters: evaluatedParameters,
-    };
-
-    // Replay featureHistory to regenerate entities with the new parameter values.
     const warnings: string[] = [];
     const refused = kernelRefusal(baseDoc, doc.featureHistory);
     if (refused !== null) {

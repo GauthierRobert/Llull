@@ -8,22 +8,11 @@ import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
 
 /**
- * Replay `steps` ADDITIVELY on top of `base` (not from createEmptyDocument).
- *
- * Fresh entity ids are assigned by the underlying commands (nextId calls). The
- * function maintains its own `idMap` so that id references within the recipe's
- * steps (e.g. a move_entity referencing a box created in a prior step) are
- * correctly rewritten to the new ids produced during this instantiation pass.
- *
- * `=expr` strings in params are resolved against `base.parameters` before each step.
- * Steps that name an unknown command or whose `run` throws are silently skipped
- * (graceful degradation — the recipe may reference commands available when it was
- * saved but not in the current registry).
- *
- * Returns `{ doc, allAffected }` where `allAffected` is the union of all
- * `result.affected` ids created across every step.
- *
- * @pure — never mutates `base`.
+ * Replay `steps` ADDITIVELY on top of `base`, remapping ids within the recipe to the fresh ones the
+ * steps mint; `=expr` params resolve against `base.parameters`. Steps naming an unknown command
+ * (or whose `run` throws) are skipped. `allAffected` lists the entities created, not ones that
+ * pre-existed and were merely modified.
+ * @pure
  */
 function replayRecipeAdditive(
   base: CadDocument,
@@ -34,15 +23,13 @@ function replayRecipeAdditive(
   let doc = base;
   const idMap = new Map<string, string>();
   const allAffected: string[] = [];
-  // Entities that already existed before instantiation must not be reported as
-  // "new" if a recipe step merely modifies them (e.g. a move on the just-created box).
   const baseIds = new Set(Object.keys(base.entities));
   const seen = new Set<string>();
 
   for (const step of steps) {
     if (step.suppressed) continue;
     const cmd = getCommandFn(step.name);
-    if (!cmd) continue; // unknown command — skip gracefully
+    if (!cmd) continue;
 
     const params = resolveStepForReplay(step, doc, idMap, resolveWarnings, 'recipe step');
     const result = runReplayStep(cmd, step, doc, params, idMap, currentContext(), false);
@@ -90,15 +77,12 @@ export const saveRecipe = defineCommand({
         'Optional human/AI note describing the recipe\'s purpose, e.g. "L-bracket with 3 holes".',
       ),
   }),
-  // Does not change geometry → metaHistory so execute() does not append a FeatureStep.
-  // idempotent: saving the same recipe name twice with the same history yields the same result.
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, label }): CommandResult => {
     if (name.trim() === '') {
       return noop(doc, 'save_recipe failed: name must be a non-empty, non-whitespace-only string.');
     }
 
-    // Deep-copy the steps so mutations to the live featureHistory cannot corrupt saved recipes.
     const steps: FeatureStep[] = doc.featureHistory.map((s) => ({ ...s }));
 
     const recipe: Recipe = {
@@ -107,13 +91,7 @@ export const saveRecipe = defineCommand({
       ...(label !== undefined ? { label } : {}),
     };
 
-    const newDoc: CadDocument = {
-      ...doc,
-      recipes: {
-        ...doc.recipes,
-        [name]: recipe,
-      },
-    };
+    const newDoc: CadDocument = { ...doc, recipes: { ...doc.recipes, [name]: recipe } };
 
     const stepCount = steps.length;
     const emptySuffix = stepCount === 0 ? ' (empty recipe — no steps in featureHistory)' : '';
@@ -150,8 +128,6 @@ export const instantiateRecipe = defineCommand({
           'save_recipe (case-sensitive). Example: "bracket_v1", "wheel_assembly".',
       ),
   }),
-  // Normal constructive command — execute() appends a FeatureStep automatically.
-  // No metaHistory, no readOnly, not idempotent (each call creates new entities).
   run: (doc, params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
     if (context.recipeDepth >= MAX_PROJECT_DEPTH) {

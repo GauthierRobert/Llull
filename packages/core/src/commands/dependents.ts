@@ -8,19 +8,15 @@
 
 import type { CadDocument, FeatureStep, Parameter } from '../model/types';
 import { extractReferences } from './expression';
+import { stringLeaves } from './regenerate';
 import { replayHistory } from './replay';
 import { currentContext } from './context';
 import { kernelRefusal } from './kernelRefusal';
 
 /** Parameter names referenced by `=expr` strings anywhere in `params`. */
 export function parametersReadBy(params: unknown, into = new Set<string>()): Set<string> {
-  if (typeof params === 'string') {
-    if (params.startsWith('='))
-      for (const name of extractReferences(params.slice(1))) into.add(name);
-  } else if (Array.isArray(params)) {
-    for (const item of params) parametersReadBy(item, into);
-  } else if (params !== null && typeof params === 'object') {
-    for (const value of Object.values(params)) parametersReadBy(value, into);
+  for (const text of stringLeaves(params)) {
+    if (text.startsWith('=')) for (const name of extractReferences(text.slice(1))) into.add(name);
   }
   return into;
 }
@@ -40,16 +36,12 @@ export function changedParameters(
 /** Commands whose params hold bare (no `=`) dimensional expressions evaluated against parameters. */
 const CONSTRAINT_COMMANDS: ReadonlySet<string> = new Set(['add_constraint', 'update_constraint']);
 
-/** Identifiers in every bare string of `params` (conservative: an id may read as a name). */
+/** Identifiers in every string of `params`, `=` or not (conservative: an id may read as a name). */
 function bareExpressionRefs(params: unknown, into: Set<string>): void {
-  if (typeof params === 'string') {
-    for (const name of extractReferences(params.startsWith('=') ? params.slice(1) : params)) {
+  for (const text of stringLeaves(params)) {
+    for (const name of extractReferences(text.startsWith('=') ? text.slice(1) : text)) {
       into.add(name);
     }
-  } else if (Array.isArray(params)) {
-    for (const item of params) bareExpressionRefs(item, into);
-  } else if (params !== null && typeof params === 'object') {
-    for (const value of Object.values(params)) bareExpressionRefs(value, into);
   }
 }
 
