@@ -9,12 +9,13 @@
 
 import React from 'react';
 import { useStore, useToolStore } from '@ui/store';
-import type { DrawToolKind, GizmoMode } from '@ui/store';
+import type { GizmoMode } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import type { IconName } from '@ui/components/Icon';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { DRAW_TOOL_KEYS, GIZMO_KEYS } from '@ui/hooks/shortcuts';
 import { SOLID_PRESETS } from './solidPresets';
+import { DRAW_TOOLS } from './drawTools';
 import { createSolid } from '@ui/actions/createSolid';
 
 interface ToolButtonProps {
@@ -70,49 +71,6 @@ function ToolGroup({
     </div>
   );
 }
-
-interface DrawToolSpec {
-  tool: DrawToolKind;
-  label: string;
-  icon: IconName;
-  tip: string;
-}
-
-const DRAW_TOOLS: readonly DrawToolSpec[] = [
-  { tool: 'line', label: 'Line', icon: 'drawLine', tip: 'click start, then end point' },
-  {
-    tool: 'polyline',
-    label: 'Polyline',
-    icon: 'drawPolyline',
-    tip: 'click points, Enter or double-click to finish',
-  },
-  {
-    tool: 'rectangle',
-    label: 'Rectangle',
-    icon: 'drawRectangle',
-    tip: 'click two opposite corners',
-  },
-  { tool: 'circle', label: 'Circle', icon: 'drawCircle', tip: 'click center, then a rim point' },
-  {
-    tool: 'ellipse',
-    label: 'Ellipse',
-    icon: 'drawEllipse',
-    tip: 'click center, then a bounding-box corner',
-  },
-  {
-    tool: 'spline',
-    label: 'Spline',
-    icon: 'drawSpline',
-    tip: 'click through-points, Enter to finish',
-  },
-  { tool: 'point', label: 'Point', icon: 'drawPoint', tip: 'click to place a point' },
-  {
-    tool: 'wall',
-    label: 'Wall',
-    icon: 'wall',
-    tip: 'click wall centerline points, Enter to finish',
-  },
-];
 
 function DrawGroup(): React.ReactElement {
   const drawTool = useToolStore((s) => s.drawTool);

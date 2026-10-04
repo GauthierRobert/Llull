@@ -11,3 +11,4 @@ export { useLayoutStore } from './layoutStore';
 export type { SidebarTab } from './layoutStore';
 export { useToolStore } from './toolStore';
 export type { ViewMode, DrawToolKind, ModifyToolKind, GizmoMode } from './toolStore';
+export { usePaletteStore } from './paletteStore';

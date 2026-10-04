@@ -91,10 +91,11 @@ export function EmptyState(): React.ReactElement | null {
           </li>
           <li className="empty-state__tip">
             <span className="empty-state__tip-icon" aria-hidden="true">
-              <Icon name="keyboard" size={14} />
+              <Icon name="search" size={14} />
             </span>
             <span className="empty-state__tip-text">
-              Press <kbd className="kbd">?</kbd> for every keyboard shortcut.
+              Press <kbd className="kbd">Ctrl K</kbd> to search and run any of llull’s commands, or{' '}
+              <kbd className="kbd">?</kbd> for keyboard shortcuts.
             </span>
           </li>
         </ul>

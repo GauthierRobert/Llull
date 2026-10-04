@@ -5,15 +5,15 @@
  *
  * Slots (left → right):
  *   - Sidebar toggle, brand mark + wordmark, file breadcrumbs
- *   - Workspace tabs: Design (active) + Render (aria-disabled, coming soon)
+ *   - Command palette trigger (Ctrl/Cmd+K) — search every action and registry command
  *   - Agent pill (liveStatus), project Open/Save, Connect agent, theme toggle,
- *     inspector toggle, avatar
+ *     inspector toggle
  *
  * No document mutation here — purely presentational (react R1).
  */
 
 import React from 'react';
-import { useLayoutStore, useStore } from '@ui/store';
+import { useLayoutStore, usePaletteStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { ThemeToggle } from '@ui/components/ThemeToggle';
 import { ProjectIO } from '@ui/components/ProjectIO';
@@ -88,6 +88,27 @@ function InspectorToggle(): React.ReactElement {
   );
 }
 
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
+function SearchTrigger(): React.ReactElement {
+  const setOpen = usePaletteStore((s) => s.setOpen);
+  const shortcut = IS_MAC ? '⌘K' : 'Ctrl K';
+  return (
+    <button
+      type="button"
+      className="search-trigger"
+      onClick={() => setOpen(true)}
+      aria-label="Search commands"
+      aria-keyshortcuts="Control+K Meta+K"
+      title={`Search every action and command (${shortcut})`}
+    >
+      <Icon name="search" size={14} />
+      <span className="search-trigger__text">Search or run a command…</span>
+      <kbd className="kbd search-trigger__kbd">{shortcut}</kbd>
+    </button>
+  );
+}
+
 export function TopBar(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
 
@@ -122,20 +143,7 @@ export function TopBar(): React.ReactElement {
         </nav>
       </div>
 
-      <nav className="tabbar" aria-label="Workspace tabs">
-        <button type="button" className="tab tab--active" aria-pressed={true} aria-current="page">
-          Design
-        </button>
-        <button
-          type="button"
-          className="tab tab--disabled"
-          aria-disabled="true"
-          title="Coming soon"
-          tabIndex={-1}
-        >
-          Render
-        </button>
-      </nav>
+      <SearchTrigger />
 
       <div className="topbar__right">
         <AgentPill status={liveStatus} />
@@ -146,9 +154,6 @@ export function TopBar(): React.ReactElement {
         <span className="topbar__sep" aria-hidden="true" />
         <ThemeToggle />
         <InspectorToggle />
-        <div className="avatar" aria-label="User avatar" title="User">
-          G
-        </div>
       </div>
     </header>
   );

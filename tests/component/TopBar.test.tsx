@@ -5,8 +5,7 @@
  *   - Brand wordmark "Llull" renders.
  *   - Agent pill reflects liveStatus: shows "claude-mcp" when connected,
  *     "connecting…" when connecting, "offline" when disconnected.
- *   - "Design" tab is present and marked active.
- *   - "Render" tab is present but aria-disabled.
+ *   - The search trigger opens the command palette.
  *   - Theme toggle flips the theme store.
  *   - Dock toggles flip the layout store.
  *   - Project Open/Save and Connect agent actions are present.
@@ -16,7 +15,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useLayoutStore, useStore, useThemeStore } from '@ui/store';
+import { useLayoutStore, usePaletteStore, useStore, useThemeStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { TopBar } from '@ui/components/TopBar';
 
@@ -89,26 +88,21 @@ describe('TopBar — agent pill', () => {
 });
 
 // ---------------------------------------------------------------------------
-// TopBar — tabs
+// TopBar — command palette trigger
 // ---------------------------------------------------------------------------
 
-describe('TopBar — tabs', () => {
+describe('TopBar — search trigger', () => {
   beforeEach(() => {
     resetStore();
+    usePaletteStore.setState({ open: false });
   });
 
-  it('renders a "Design" tab that is active', () => {
+  it('opens the command palette and advertises the shortcut', () => {
     render(<TopBar />);
-    const designTab = screen.getByRole('button', { name: /design/i });
-    expect(designTab).toBeDefined();
-    expect(designTab.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('renders a "Render" tab that is aria-disabled', () => {
-    render(<TopBar />);
-    const renderTab = screen.getByRole('button', { name: /render/i });
-    expect(renderTab).toBeDefined();
-    expect(renderTab.getAttribute('aria-disabled')).toBe('true');
+    const trigger = screen.getByRole('button', { name: 'Search commands' });
+    expect(trigger.getAttribute('aria-keyshortcuts')).toContain('Control+K');
+    fireEvent.click(trigger);
+    expect(usePaletteStore.getState().open).toBe(true);
   });
 });
 

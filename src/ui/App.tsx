@@ -34,6 +34,8 @@ import { Sidebar } from '@ui/components/Sidebar';
 import { Toolbar } from '@ui/components/toolbar/Toolbar';
 import { HintBar } from '@ui/components/HintBar';
 import { ShortcutsDialog } from '@ui/components/ShortcutsDialog';
+import { CommandPalette } from '@ui/components/commandPalette/CommandPalette';
+import { PaletteResultToast } from '@ui/components/commandPalette/PaletteResultToast';
 import { Icon } from '@ui/components/Icon';
 import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
@@ -92,6 +94,7 @@ export function App(): React.ReactElement {
             {viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}
           </ViewportErrorBoundary>
           <HintBar />
+          <PaletteResultToast />
         </main>
 
         {inspectorOpen && <PropertiesPanel className="inspector" />}
@@ -99,6 +102,7 @@ export function App(): React.ReactElement {
 
       <StatusBar />
       <ShortcutsDialog />
+      <CommandPalette />
     </div>
   );
 }

@@ -82,6 +82,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
   {
     title: 'General',
     entries: [
+      { keys: 'Ctrl K', action: 'Search & run any command' },
       { keys: 'Ctrl Z', action: 'Undo' },
       { keys: 'Ctrl Y', action: 'Redo (also Ctrl Shift Z)' },
       { keys: 'Ctrl D', action: 'Duplicate selection' },

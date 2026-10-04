@@ -26,7 +26,7 @@ interface SidebarTabSpec {
   icon: IconName;
 }
 
-const TABS: readonly SidebarTabSpec[] = [
+export const SIDEBAR_TABS: readonly SidebarTabSpec[] = [
   { tab: 'building', label: 'Building', icon: 'building' },
   { tab: 'layers', label: 'Layers', icon: 'layers' },
   { tab: 'assembly', label: 'Assembly', icon: 'assembly' },
@@ -155,7 +155,7 @@ export function Sidebar(): React.ReactElement {
         aria-label="Document browser"
         onKeyDown={handleRailKeyDown}
       >
-        {TABS.map((spec) => (
+        {SIDEBAR_TABS.map((spec) => (
           <RailButton
             key={spec.tab}
             spec={spec}

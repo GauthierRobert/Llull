@@ -95,6 +95,8 @@ const ICON_PATHS = {
   transformScale: 'M14 4h6v6M20 4l-8 8M4 10v10h10M4 20l5-5',
   undo: 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
   redo: 'M15 14l5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13',
+  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM21 21l-4.35-4.35',
+  arrowLeft: 'M19 12H5M12 19l-7-7 7-7',
   keyboard: 'M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M17 10h.01M7 14h.01M17 14h.01M10 14h4',
 } as const;
 

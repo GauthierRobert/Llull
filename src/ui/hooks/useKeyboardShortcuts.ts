@@ -1,7 +1,7 @@
 /**
  * @layer ui/hooks
  *
- * Global shortcuts: Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo, Ctrl/Cmd+D duplicate,
+ * Global shortcuts: Ctrl/Cmd+K command palette (also from inside fields), Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo, Ctrl/Cmd+D duplicate,
  * Delete/Backspace delete selection, arrows nudge selection (Shift ×10, repeats while held), Escape
  * clear selection (unless an armed 2D tool consumed it via preventDefault), `?` shortcut sheet, and
  * the single-key tool table in shortcuts.ts. Ignored while typing in form fields or inside dialogs.
@@ -10,7 +10,7 @@
 
 import { useEffect } from 'react';
 import type { Vec3 } from '@core/model/types';
-import { useStore, useToolStore } from '@ui/store';
+import { usePaletteStore, useStore, useToolStore } from '@ui/store';
 import { deleteSelection, duplicateSelection, moveSelection } from '@ui/actions/selectionActions';
 import { resolveShortcut } from './shortcuts';
 
@@ -41,7 +41,14 @@ export function isEditingKeyEvent(e: KeyboardEvent): boolean {
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
-      if (e.defaultPrevented || isEditingKeyEvent(e)) return;
+      if (e.defaultPrevented) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const palette = usePaletteStore.getState();
+        palette.setOpen(!palette.open);
+        return;
+      }
+      if (isEditingKeyEvent(e)) return;
       // Holding an arrow nudges repeatedly; every other shortcut fires once per press.
       if (e.repeat && !(e.key in ARROW_DIRECTIONS)) return;
       const state = useStore.getState();
