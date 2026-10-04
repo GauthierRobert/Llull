@@ -78,9 +78,8 @@ import { addJoint, deleteJoint, setJointValue } from './jointsEdit';
 import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
-import { deleteEntities } from './deleteMany';
+import { deleteEntities, moveEntities } from './batch';
 import { onPluginInstalled } from '../plugins/host';
-import { moveEntities } from './moveMany';
 
 const rawDefinitions = [
   addBox,
