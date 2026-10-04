@@ -31,6 +31,7 @@ export const extractionBuilding: Scenario = {
   ],
   knownIssues: {
     scripted: ['line-list', 'structural-coverage', 'ifc-equipment-data', 'dxf-plans'],
+    ui: ['line-list', 'structural-coverage', 'ifc-equipment-data', 'dxf-plans'],
   },
   agentBaseline: 0.6,
 };

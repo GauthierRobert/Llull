@@ -12,10 +12,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" playwright.config.ts playwright.quality.config.ts server/vitest.quality.config.ts server/vitest.production.config.ts \"quality/**/*.mjs\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" playwright.config.ts playwright.quality.config.ts playwright.production.config.ts server/vitest.quality.config.ts server/vitest.production.config.ts \"quality/**/*.mjs\"",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/quality && tsc --noEmit -p tests/production",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" playwright.config.ts playwright.quality.config.ts server/vitest.quality.config.ts server/vitest.production.config.ts \"quality/**/*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" playwright.config.ts playwright.quality.config.ts playwright.production.config.ts server/vitest.quality.config.ts server/vitest.production.config.ts \"quality/**/*.mjs\"",
     "test:e2e": "playwright test",
     "quality:fetch": "node quality/fetchCorpus.mjs",
     "quality:step": "npm --prefix server run quality:step",
@@ -24,7 +24,7 @@
     "quality:generate": "python3 quality/synthetic_step.py",
     "production:scripted": "npm --prefix server run production:scripted",
     "production:agent": "npm --prefix server run production:agent",
-    "production:ui": "playwright test --config",
+    "production:ui": "playwright test --config playwright.production.config.ts",
     "production": "npm run production:scripted && npm run production:ui"
   },
   "dependencies": {
