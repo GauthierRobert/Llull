@@ -47,7 +47,7 @@ export type ScheduleKind =
   | 'plate'
   | 'connection';
 
-export interface Schedule {
+interface Schedule {
   readonly kind: ScheduleKind;
   readonly columns: string[];
   readonly rows: Array<Array<string | number>>;

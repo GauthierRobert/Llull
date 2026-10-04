@@ -31,7 +31,7 @@ import {
 import { beamVerdicts, freeFlangeReduction, governing } from './purlinSection';
 import { round } from '../numeric';
 
-export interface PurlinLoads {
+interface PurlinLoads {
   readonly windPressure: number;
   readonly snowLoad: number;
   readonly roofDeadLoad: number;
@@ -74,7 +74,7 @@ export function locatePurlinMembers(
   return { members, skipped };
 }
 
-export interface PurlinAnalysis {
+interface PurlinAnalysis {
   readonly rows: PurlinRow[];
   readonly zones: ZoneSummary[];
   readonly monopitch: boolean;

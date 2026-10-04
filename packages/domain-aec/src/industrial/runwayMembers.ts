@@ -10,7 +10,7 @@ import { fromMm } from '../model';
 import type { SteelProfile } from '../steel/profiles';
 import type { MemberSpec } from './portalGeometry';
 
-export interface RunwaySpec {
+interface RunwaySpec {
   readonly start: Vec2;
   readonly end: Vec2;
   readonly railHeight: number;

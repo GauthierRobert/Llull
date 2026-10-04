@@ -10,7 +10,7 @@ import { toCounterClockwise } from '@lib/polygon';
 import type { WallExtent } from './wallGeometry';
 
 /** Circle arc through three points: centre, radius, start angle and signed sweep (radians). */
-export interface Arc {
+interface Arc {
   readonly center: Vec2;
   readonly radius: number;
   readonly startAngle: number;

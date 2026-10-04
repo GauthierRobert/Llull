@@ -8,7 +8,7 @@ import type { SteelMemberElement } from '@core/model/building';
 import { FLAT_ROOF_LIMIT, frameRoofAverage } from './windCoefficients';
 import { DOWNWIND_ROOF_FACTOR, type WindCase } from './frameModelTypes';
 
-export interface RafterEnds {
+interface RafterEnds {
   readonly x0: number;
   readonly z0: number;
   readonly x1: number;
@@ -17,7 +17,7 @@ export interface RafterEnds {
   readonly flip: boolean;
 }
 
-export interface FrameRoof {
+interface FrameRoof {
   readonly low: number;
   readonly high: number;
   readonly rafters: ReadonlyArray<SteelMemberElement>;

@@ -9,7 +9,7 @@ import { type ClayLayer } from './foundationModel';
 import { clayLayerError } from './foundationSettlement';
 
 /** Allowable SLS soil bearing pressure, kPa. */
-export const DEFAULT_SOIL_BEARING = 150;
+const DEFAULT_SOIL_BEARING = 150;
 
 /** Soil elastic modulus Es, MPa. */
 export const DEFAULT_SOIL_MODULUS = 20;

@@ -43,7 +43,7 @@ function addWall(
   );
 }
 
-export function exportWall(
+function exportWall(
   context: Context,
   wall: WallElement,
   extent: WallExtent,
@@ -70,7 +70,7 @@ export function exportWall(
 }
 
 /** Material layer set usage for a layered wall (layers across local +Y, from −thickness/2). */
-export function exportWallLayers(context: Context, wall: WallElement, wallRef: string): void {
+function exportWallLayers(context: Context, wall: WallElement, wallRef: string): void {
   const { mm, writer } = context;
   const layers = (wall.layers ?? []).map((layer) => {
     const material = writer.add(`IFCMATERIAL(${ifcString(layer.material)},$,$)`);
@@ -89,7 +89,7 @@ export function exportWallLayers(context: Context, wall: WallElement, wallRef: s
   );
 }
 
-export function exportCurvedWall(
+function exportCurvedWall(
   context: Context,
   wall: CurvedWallElement,
   extent: { start: number; end: number },
@@ -104,7 +104,7 @@ export function exportCurvedWall(
   return { ref, material: wall.material };
 }
 
-export function exportOpening(
+function exportOpening(
   context: Context,
   opening: OpeningElement,
   wall: WallElement,

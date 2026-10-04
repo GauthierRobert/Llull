@@ -30,7 +30,7 @@ import {
   near,
 } from './bracingModel';
 
-export interface BracingInputs {
+interface BracingInputs {
   readonly windPressure: number;
   readonly deadLoad: number;
   readonly snowLoad: number;
@@ -117,7 +117,7 @@ function gablePostRows(
   return rows;
 }
 
-export interface BracingAnalysis {
+interface BracingAnalysis {
   readonly rows: BracingRow[];
   readonly gableArea: number;
   readonly windUltimate: number;

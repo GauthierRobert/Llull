@@ -44,7 +44,7 @@ interface CutRegion {
   readonly loops: Vec2[][];
 }
 
-export interface ElevationDrawing {
+interface ElevationDrawing {
   readonly items: DrawItem[];
   readonly cutLines: Array<readonly [Vec2, Vec2]>;
   readonly cutRegions: CutRegion[];

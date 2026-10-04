@@ -30,7 +30,7 @@ import {
 } from './planModel';
 
 /** Plan symbol of a door (leaf + swing) or window (three lines) in a straight wall frame. */
-export function openingSymbol(
+function openingSymbol(
   wall: Pick<WallElement, 'start' | 'end' | 'thickness'>,
   opening: OpeningElement,
 ): PlanPrimitive[] {

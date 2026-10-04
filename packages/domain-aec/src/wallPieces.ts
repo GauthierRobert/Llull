@@ -6,7 +6,7 @@
 import type { OpeningElement } from '@core/model/building';
 import type { WallExtent } from './wallGeometry';
 
-export interface WallPiece {
+interface WallPiece {
   readonly s0: number;
   readonly s1: number;
   readonly z0: number;

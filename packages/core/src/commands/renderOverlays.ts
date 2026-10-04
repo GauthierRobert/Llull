@@ -5,7 +5,7 @@ import { r2 } from './renderMath';
 import { makeProjector, computeOrthoHalf } from './renderCamera';
 import { appendEntityLabels } from './renderLabels';
 
-export interface OverlayFlags {
+interface OverlayFlags {
   showDimensions: boolean;
   showAxes: boolean;
   showGrid: boolean;
@@ -44,7 +44,7 @@ export function composeOverlays(
  *
  * @pure — returns a new SVG string; does not modify the input.
  */
-export function appendDimensionLabels(svgString: string, data: RenderViewData): string {
+function appendDimensionLabels(svgString: string, data: RenderViewData): string {
   if (!data.bounds) return svgString; // nothing to annotate on empty scene
 
   const { min, max } = data.bounds;
@@ -110,7 +110,7 @@ function computeAxisLength(data: RenderViewData): number {
  *
  * @pure — returns a new SVG string; does not modify the input.
  */
-export function appendAxesAndGrid(
+function appendAxesAndGrid(
   svgString: string,
   data: RenderViewData,
   units: string,

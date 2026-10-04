@@ -7,7 +7,7 @@
 
 import type { SteelMemberElement } from '@core/model/building';
 
-export interface FrameCandidate {
+interface FrameCandidate {
   readonly y: number;
   range: [number, number];
   readonly rafters: SteelMemberElement[];

@@ -24,7 +24,7 @@ type BatchIds =
  * @failure empty/malformed, > MAX_BATCH_IDS, or no listed entity exists -> `{ ok: false, result }` no-op
  * @invariant `existing` and `missing` are de-duplicated, in first-seen order
  */
-export function resolveBatchIds(
+function resolveBatchIds(
   doc: CadDocument,
   command: string,
   ids: readonly unknown[],

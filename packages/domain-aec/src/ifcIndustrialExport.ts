@@ -44,7 +44,7 @@ import type { Exported } from './ifcElementExport';
 import { dot3 } from '@lib/vec3';
 
 /** IFC parametric profile definition of a catalogue section (dimensions in mm). */
-export function steelProfileDef(context: Context, profile: SteelProfile): string {
+function steelProfileDef(context: Context, profile: SteelProfile): string {
   const position = context.writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
   const name = ifcString(profile.name);
   const r = ifcReal;
@@ -77,7 +77,7 @@ export function steelProfileDef(context: Context, profile: SteelProfile): string
   }
 }
 
-export const MEMBER_CLASS: Readonly<Record<MemberRole, { entity: string; type: string }>> = {
+const MEMBER_CLASS: Readonly<Record<MemberRole, { entity: string; type: string }>> = {
   column: { entity: 'IFCCOLUMN', type: '.COLUMN.' },
   rafter: { entity: 'IFCBEAM', type: '.BEAM.' },
   beam: { entity: 'IFCBEAM', type: '.BEAM.' },

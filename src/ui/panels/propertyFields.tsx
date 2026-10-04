@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 
 const AXES = ['x', 'y', 'z'] as const;
 
-export function formatNumber(n: number): string {
+function formatNumber(n: number): string {
   return n.toFixed(3);
 }
 

@@ -32,7 +32,7 @@ import {
 export const isResized = (before: PadSize, after: PadSize): boolean =>
   before.some((value, index) => Math.round(value) !== Math.round(after[index] ?? 0));
 
-export interface FootingDesignOutcome {
+interface FootingDesignOutcome {
   readonly row: FootingDesignRow;
   /** Present when the footing's size or reinforcement changed. */
   readonly updated?: FootingElement;
@@ -50,7 +50,7 @@ const emptyRow = {
   combination: '-',
 } as const;
 
-export interface FootingDesignInputs {
+interface FootingDesignInputs {
   readonly doc: CadDocument;
   readonly building: BuildingModel;
   readonly footing: FootingElement;

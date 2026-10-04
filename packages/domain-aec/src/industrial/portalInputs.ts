@@ -12,9 +12,9 @@ import type { PortalProfiles } from './portalGeometry';
 import type { portalFrameParams } from './portalParams';
 import type { z } from '@core/commands/schema';
 
-export type PortalParams = z.output<typeof portalFrameParams>;
+type PortalParams = z.output<typeof portalFrameParams>;
 
-export interface PortalInputs {
+interface PortalInputs {
   readonly mm: (value: number) => number;
   readonly origin: Vec2;
   readonly span: number;
