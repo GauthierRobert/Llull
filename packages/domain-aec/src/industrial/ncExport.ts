@@ -6,191 +6,31 @@
 
 import type {
   BasePlateElement,
-  BuildingLevel,
   MomentConnectionElement,
   SteelMemberElement,
 } from '@core/model/building';
-import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, fromMm, getBuilding } from '../model';
+import { fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { sweepFrame } from '../mesh';
-import { distanceSq3, dot3, sub3 } from '@lib/vec3';
-import { findProfile, STEEL_DENSITY_KG_PER_M3, type SteelProfile } from '../steel/profiles';
-import { atLevel, connectionSolids, plateLayout } from './evaluate';
-
-const END_PLATE_HOLE_CLEARANCE_MM = 2;
-const ANCHOR_HOLE_CLEARANCE_MM = 4;
-
-type DstvFace = 'o' | 'u' | 'v';
-
-interface NcHole {
-  readonly face: DstvFace;
-  readonly x: number;
-  readonly y: number;
-  readonly diameter: number;
-}
-
-interface NcPiece {
-  readonly kind: 'member' | 'plate';
-  readonly mark: string;
-  readonly grade: string;
-  readonly profileName: string;
-  readonly code: string;
-  readonly length: number;
-  readonly height: number;
-  readonly flangeWidth: number;
-  readonly flangeThickness: number;
-  readonly webThickness: number;
-  readonly massPerMetre: number;
-  readonly paintPerMetre: number;
-  /** Cut angles in degrees: web start, web end, flange start, flange end. */
-  readonly cuts: readonly [number, number, number, number];
-  readonly holes: ReadonlyArray<NcHole>;
-  /** AK outer contour (mm, plate corner origin), plates only. */
-  readonly contour: ReadonlyArray<readonly [number, number]>;
-  readonly sourceIds: ReadonlyArray<string>;
-}
-
-export interface NcFile {
-  readonly name: string;
-  readonly content: string;
-  readonly mark: string;
-  readonly kind: 'member' | 'plate';
-  readonly profile: string;
-  readonly quantity: number;
-  readonly length: number;
-  readonly sourceIds: string[];
-}
+import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
+import { connectionSolids, plateLayout } from './evaluate';
+import { buildFiles, type NcFile } from './ncFiles';
+import {
+  ANCHOR_HOLE_CLEARANCE_MM,
+  END_PLATE_HOLE_CLEARANCE_MM,
+  type NcHole,
+  type NcPiece,
+  memberPiece,
+  outlineMean,
+  round2,
+} from './ncMemberPieces';
 
 export interface NcExport {
   readonly files: NcFile[];
   readonly count: number;
-}
-
-const CODE_BY_SHAPE: Readonly<Record<SteelProfile['shape'], string>> = {
-  I: 'I',
-  U: 'U',
-  C: 'U',
-  SHS: 'M',
-  RHS: 'M',
-  CHS: 'RO',
-  L: 'L',
-};
-
-function round2(value: number): number {
-  const rounded = Math.round(value * 100) / 100;
-  return rounded === 0 ? 0 : rounded;
-}
-
-/** Rafter end cut: the end plate is vertical, so the cut equals the roof pitch. */
-function pitchCut(member: SteelMemberElement): number {
-  if (member.role !== 'rafter') return 0;
-  const [dx, dy, dz] = [
-    member.end[0] - member.start[0],
-    member.end[1] - member.start[1],
-    member.end[2] - member.start[2],
-  ];
-  const horizontal = Math.hypot(dx, dy);
-  if (horizontal <= 0.2 * Math.hypot(dx, dy, dz)) return 0;
-  return round2((Math.atan2(Math.abs(dz), horizontal) * 180) / Math.PI);
-}
-
-/** Length (document units) removed from a member by the end plates welded to its ends. */
-function endPlateCutback(
-  doc: CadDocument,
-  member: SteelMemberElement,
-  direction: Vec3,
-  connections: ReadonlyArray<MomentConnectionElement>,
-  members: Readonly<Record<string, SteelMemberElement | undefined>>,
-  levels: Readonly<Record<string, BuildingLevel | undefined>>,
-): number {
-  const ends = { start: 0, end: 0 };
-  const [start, end] = [
-    atLevel(levels[member.levelId] as BuildingLevel, member.start),
-    atLevel(levels[member.levelId] as BuildingLevel, member.end),
-  ];
-  for (const connection of connections) {
-    const level = levels[connection.levelId];
-    if (!level || (connection.rafterId !== member.id && connection.otherId !== member.id)) continue;
-    const plates = connectionSolids(doc, connection, members, level)?.filter((solid) =>
-      solid.part.startsWith('plate'),
-    );
-    for (const solid of plates ?? []) {
-      const atStart = distanceSq3(solid.origin, start) <= distanceSq3(solid.origin, end);
-      const into: Vec3 = atStart ? direction : [-direction[0], -direction[1], -direction[2]];
-      const joint = atStart ? start : end;
-      const slope = dot3(into, solid.along);
-      if (slope <= 1e-6) continue;
-      const hosted =
-        connection.rafterId === member.id
-          ? solid.part === 'plate'
-          : connection.kind === 'apex' && solid.part === 'plate-2';
-      if (!hosted) continue;
-      const cutback = dot3(sub3(solid.origin, joint), into) + solid.depth / slope;
-      ends[atStart ? 'start' : 'end'] = Math.max(ends[atStart ? 'start' : 'end'], cutback);
-    }
-  }
-  return ends.start + ends.end;
-}
-
-function outlineMean(outline: ReadonlyArray<Vec2>): Vec2 {
-  const count = outline.length;
-  return outline.reduce<Vec2>(
-    (sum, point) => [sum[0] + point[0] / count, sum[1] + point[1] / count],
-    [0, 0],
-  );
-}
-
-function memberHoles(
-  doc: CadDocument,
-  member: SteelMemberElement,
-  profile: SteelProfile,
-  connections: ReadonlyArray<MomentConnectionElement>,
-  members: Readonly<Record<string, SteelMemberElement | undefined>>,
-  levels: Readonly<Record<string, BuildingLevel | undefined>>,
-): NcHole[] {
-  const mm = (value: number): number => value / fromMm(doc, 1);
-  const holes: NcHole[] = [];
-  for (const connection of connections) {
-    const level = levels[connection.levelId];
-    if (connection.kind !== 'eaves' || connection.otherId !== member.id || !level) continue;
-    const solids = connectionSolids(doc, connection, members, level);
-    const [start, end] = [atLevel(level, member.start), atLevel(level, member.end)];
-    const frame = sweepFrame(start, end, member.roll);
-    if (!solids || !frame) continue;
-    for (const solid of solids) {
-      if (!solid.part.startsWith('bolt-')) continue;
-      const [cx, cy] = outlineMean(solid.outline);
-      const centre: Vec3 = [
-        solid.origin[0] + solid.x[0] * cx + solid.y[0] * cy,
-        solid.origin[1] + solid.x[1] * cx + solid.y[1] * cy,
-        solid.origin[2] + solid.x[2] * cx + solid.y[2] * cy,
-      ];
-      const offset = sub3(centre, start);
-      const throughFlange =
-        Math.abs(dot3(solid.along, frame.v)) >= Math.abs(dot3(solid.along, frame.u));
-      const diameter = round2(mm(connection.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM);
-      const x = round2(mm(dot3(offset, frame.d)));
-      holes.push(
-        throughFlange
-          ? {
-              face: dot3(solid.along, frame.v) > 0 ? 'o' : 'u',
-              x,
-              y: round2(mm(dot3(offset, frame.u)) + profile.b / 2),
-              diameter,
-            }
-          : {
-              face: 'v',
-              x,
-              y: round2(mm(dot3(offset, frame.v)) + profile.h / 2),
-              diameter,
-            },
-      );
-    }
-  }
-  return holes;
 }
 
 function platePiece(
@@ -237,103 +77,68 @@ function platePiece(
   };
 }
 
-function numberField(value: number): string {
-  return `  ${value.toFixed(2).padStart(10)}`;
+type PlateLayout = NonNullable<ReturnType<typeof plateLayout>>;
+type ConnectionSolids = NonNullable<ReturnType<typeof connectionSolids>>;
+
+function basePlatePiece(doc: CadDocument, plate: BasePlateElement, layout: PlateLayout): NcPiece {
+  const [cos, sin] = [Math.cos(layout.angle), Math.sin(layout.angle)];
+  const mm = (value: number): number => value / fromMm(doc, 1);
+  const foot = layout.center;
+  return platePiece(doc, {
+    mark: plate.mark,
+    grade: plate.material,
+    length: plate.length,
+    width: plate.width,
+    thickness: plate.thickness,
+    sourceId: plate.id,
+    holes: layout.bolts.map((bolt): NcHole => {
+      const [dx, dy] = [bolt[0] - foot[0], bolt[1] - foot[1]];
+      return {
+        face: 'o',
+        x: round2(mm(dx * cos + dy * sin + plate.length / 2)),
+        y: round2(mm(-dx * sin + dy * cos + plate.width / 2)),
+        diameter: round2(mm(plate.boltDiameter) + ANCHOR_HOLE_CLEARANCE_MM),
+      };
+    }),
+  });
 }
 
-function textField(value: string): string {
-  return `  ${value}`;
-}
-
-/** DSTV NC1 text for one piece (`quantity` pieces of the same mark). */
-function renderPiece(
-  piece: NcPiece,
-  quantity: number,
-  orderNumber: string,
-  drawingNumber: string,
-): string {
-  const lines: string[] = [
-    'ST',
-    textField(orderNumber),
-    textField(drawingNumber),
-    textField('1'),
-    textField(piece.mark),
-    textField(piece.grade),
-    textField(String(quantity)),
-    textField(piece.profileName),
-    textField(piece.code),
-    ...[
-      piece.length,
-      piece.height,
-      piece.flangeWidth,
-      piece.flangeThickness,
-      piece.webThickness,
-      0,
-      piece.massPerMetre,
-      piece.paintPerMetre,
-      ...piece.cuts,
-    ].map(numberField),
-    textField(''),
-  ];
-  if (piece.contour.length > 0) {
-    lines.push('AK', ...piece.contour.map(([x, y]) => `  o${numberField(x)}${numberField(y)}`));
-  }
-  if (piece.holes.length > 0) {
-    lines.push(
-      'BO',
-      ...piece.holes.map(
-        (hole) =>
-          `  ${hole.face}${numberField(hole.x)}${numberField(hole.y)}${numberField(hole.diameter)}`,
-      ),
-    );
-  }
-  lines.push('EN');
-  return `${lines.join('\n')}\n`;
-}
-
-function pieceKey(piece: NcPiece): string {
-  const holes = piece.holes.map((hole) => `${hole.face},${hole.x},${hole.y},${hole.diameter}`);
-  return [
-    piece.kind,
-    piece.profileName,
-    piece.grade,
-    piece.length,
-    piece.height,
-    piece.cuts.join(','),
-    holes.sort().join(';'),
-  ].join('|');
-}
-
-function buildFiles(
-  pieces: ReadonlyArray<NcPiece>,
-  orderNumber: string,
-  drawingNumber: string,
-): NcFile[] {
-  const groups = new Map<string, NcPiece[]>();
-  for (const piece of pieces) {
-    const key = pieceKey(piece);
-    groups.set(key, [...(groups.get(key) ?? []), piece]);
-  }
-  const usedNames = new Set<string>();
-  const files: NcFile[] = [];
-  for (const group of groups.values()) {
-    const first = group[0] as NcPiece;
-    const slug = fileSlug(first.mark, first.kind);
-    let name = `${slug}.nc1`;
-    for (let suffix = 2; usedNames.has(name); suffix++) name = `${slug}-${suffix}.nc1`;
-    usedNames.add(name);
-    files.push({
-      name,
-      content: renderPiece(first, group.length, orderNumber, drawingNumber),
-      mark: first.mark,
-      kind: first.kind,
-      profile: first.profileName,
-      quantity: group.length,
-      length: first.length,
-      sourceIds: group.flatMap((piece) => piece.sourceIds),
+/** One piece per end-plate solid of the connection (second plate marked `<mark>b`); none without a main plate. */
+function endPlatePieces(
+  doc: CadDocument,
+  connection: MomentConnectionElement,
+  solids: ConnectionSolids,
+): NcPiece[] {
+  const mm = (value: number): number => value / fromMm(doc, 1);
+  const outline = solids.find((solid) => solid.part === 'plate')?.outline;
+  if (!outline) return [];
+  const xs = outline.map((point) => point[0]);
+  const ys = outline.map((point) => point[1]);
+  const [minX, minY] = [Math.min(...xs), Math.min(...ys)];
+  const holes = solids
+    .filter((solid) => solid.part.startsWith('bolt-'))
+    .map((solid): NcHole => {
+      const [cx, cy] = outlineMean(solid.outline);
+      return {
+        face: 'o',
+        x: round2(mm(cy - minY)),
+        y: round2(mm(cx - minX)),
+        diameter: round2(mm(connection.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM),
+      };
     });
-  }
-  return files;
+  return solids
+    .filter((solid) => solid.part.startsWith('plate'))
+    .map((solid, index) =>
+      platePiece(doc, {
+        mark: index === 0 ? connection.mark : `${connection.mark}b`,
+        grade: connection.material,
+        length: Math.max(...solid.outline.map((point) => point[1])) - minY,
+        width: Math.max(...solid.outline.map((point) => point[0])) - minX,
+        thickness: connection.plateThickness,
+        holes,
+        sourceId: connection.id,
+      }),
+    );
 }
 
 /**
@@ -398,29 +203,9 @@ export const exportNcFiles = defineCommand({
       const profile = findProfile(element.profile);
       const frame = sweepFrame(element.start, element.end, element.roll);
       if (!profile || !frame) continue;
-      const cut = pitchCut(element);
-      pieces.push({
-        kind: 'member',
-        mark: element.mark,
-        grade: element.material,
-        profileName: profile.name,
-        code: CODE_BY_SHAPE[profile.shape],
-        length: round2(
-          (frame.length -
-            endPlateCutback(doc, element, frame.d, allConnections, allMembers, building.levels)) /
-            fromMm(doc, 1),
-        ),
-        height: profile.h,
-        flangeWidth: profile.b,
-        flangeThickness: profile.tf,
-        webThickness: profile.tw,
-        massPerMetre: profile.massPerMetre,
-        paintPerMetre: round2(profile.perimeter / 1000),
-        cuts: [cut, cut, 0, 0],
-        holes: memberHoles(doc, element, profile, allConnections, allMembers, building.levels),
-        contour: [],
-        sourceIds: [element.id],
-      });
+      pieces.push(
+        memberPiece(doc, element, profile, frame, allConnections, allMembers, building.levels),
+      );
     }
     if (pieces.length === 0) {
       return noop(
@@ -433,70 +218,16 @@ export const exportNcFiles = defineCommand({
     if (includePlates) {
       for (const element of elements) {
         if (element.category === 'plate') {
-          const plate: BasePlateElement = element;
-          const column = allMembers[plate.memberId];
-          const level = building.levels[plate.levelId];
-          if (!column || !level || !inScope(column.id, plate.levelId)) continue;
-          const layout = plateLayout(doc, plate, column, level);
-          if (!layout) continue;
-          const [cos, sin] = [Math.cos(layout.angle), Math.sin(layout.angle)];
-          const mm = (value: number): number => value / fromMm(doc, 1);
-          const foot = layout.center;
-          pieces.push(
-            platePiece(doc, {
-              mark: plate.mark,
-              grade: plate.material,
-              length: plate.length,
-              width: plate.width,
-              thickness: plate.thickness,
-              sourceId: plate.id,
-              holes: layout.bolts.map((bolt): NcHole => {
-                const [dx, dy] = [bolt[0] - foot[0], bolt[1] - foot[1]];
-                return {
-                  face: 'o',
-                  x: round2(mm(dx * cos + dy * sin + plate.length / 2)),
-                  y: round2(mm(-dx * sin + dy * cos + plate.width / 2)),
-                  diameter: round2(mm(plate.boltDiameter) + ANCHOR_HOLE_CLEARANCE_MM),
-                };
-              }),
-            }),
-          );
+          const column = allMembers[element.memberId];
+          const level = building.levels[element.levelId];
+          if (!column || !level || !inScope(column.id, element.levelId)) continue;
+          const layout = plateLayout(doc, element, column, level);
+          if (layout) pieces.push(basePlatePiece(doc, element, layout));
         } else if (element.category === 'connection') {
           const level = building.levels[element.levelId];
           if (!level || !inScope(element.rafterId, element.levelId)) continue;
           const solids = connectionSolids(doc, element, allMembers, level);
-          const mm = (value: number): number => value / fromMm(doc, 1);
-          const outline = solids?.find((solid) => solid.part === 'plate')?.outline;
-          if (!solids || !outline) continue;
-          const xs = outline.map((point) => point[0]);
-          const ys = outline.map((point) => point[1]);
-          const [minX, minY] = [Math.min(...xs), Math.min(...ys)];
-          const holes = solids
-            .filter((solid) => solid.part.startsWith('bolt-'))
-            .map((solid): NcHole => {
-              const [cx, cy] = outlineMean(solid.outline);
-              return {
-                face: 'o',
-                x: round2(mm(cy - minY)),
-                y: round2(mm(cx - minX)),
-                diameter: round2(mm(element.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM),
-              };
-            });
-          solids
-            .filter((solid) => solid.part.startsWith('plate'))
-            .forEach((solid, index) => {
-              pieces.push(
-                platePiece(doc, {
-                  mark: index === 0 ? element.mark : `${element.mark}b`,
-                  grade: element.material,
-                  length: Math.max(...solid.outline.map((point) => point[1])) - minY,
-                  width: Math.max(...solid.outline.map((point) => point[0])) - minX,
-                  thickness: element.plateThickness,
-                  holes,
-                  sourceId: element.id,
-                }),
-              );
-            });
+          if (solids) pieces.push(...endPlatePieces(doc, element, solids));
         }
       }
     }
