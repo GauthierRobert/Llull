@@ -6,7 +6,6 @@
 
 import type { Vec2 } from '@core/model/types';
 import type { OrthoPolarOpts, SnapPoint, SnapResult, SnapType } from './types';
-import { dist } from './geometry';
 
 /**
  * Snap type priority order — geometric snaps beat grid.
@@ -47,7 +46,7 @@ export function snap(
   let best: SnapPoint | null = null;
 
   for (const candidate of candidates) {
-    const d = dist(cx, cy, candidate.x, candidate.y);
+    const d = Math.hypot(candidate.x - cx, candidate.y - cy);
     if (d <= tolerance) {
       const beatsByDist = d < bestDist - 1e-10;
       const sameDist = Math.abs(d - bestDist) <= 1e-10;
