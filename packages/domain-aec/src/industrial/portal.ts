@@ -3,7 +3,7 @@
  * @layer domain-aec
  */
 
-import type { CadDocument, Vec2 } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
 import type { BuildingModel, SlabElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -31,7 +31,9 @@ import {
   MAX_GENERATED_MEMBERS,
   withoutFootings,
 } from './memberFootingPanelCommands';
-import { buildHallGeometry, type MemberSpec, type PortalProfiles } from './portalGeometry';
+import { portalInputs } from './portalInputs';
+import { runwayMembers } from './runwayMembers';
+import { buildHallGeometry, type MemberSpec } from './portalGeometry';
 import { portalFrameParams } from './portalParams';
 import { hallMemberSpecs } from './portalMembers';
 import { claddingPanels, facing } from './portalCladding';
@@ -52,76 +54,6 @@ function steelMass(doc: CadDocument, building: BuildingModel, ids: ReadonlyArray
     );
     return sum + (profile ? toMetres(doc, length) * profile.massPerMetre : 0);
   }, 0);
-}
-
-interface RunwaySpec {
-  readonly start: Vec2;
-  readonly end: Vec2;
-  readonly railHeight: number;
-  readonly profile: SteelProfile;
-  readonly supports: ReadonlyArray<number>;
-  readonly bracket: SteelProfile;
-  readonly note: string;
-}
-
-/** Runway beam segments between supports + brackets to the nearest steel column at each support. */
-function runwayMembers(
-  doc: CadDocument,
-  building: BuildingModel,
-  levelId: string,
-  spec: RunwaySpec,
-): MemberSpec[] {
-  const dx = spec.end[0] - spec.start[0];
-  const dy = spec.end[1] - spec.start[1];
-  const length = Math.hypot(dx, dy);
-  const at = (distance: number): Vec2 => [
-    spec.start[0] + (dx / length) * distance,
-    spec.start[1] + (dy / length) * distance,
-  ];
-  const axisZ = spec.railHeight - fromMm(doc, spec.profile.h) / 2;
-  const stations = [
-    ...new Set([0, ...spec.supports.filter((s) => s > 0 && s < length), length]),
-  ].sort((a, b) => a - b);
-  const members: MemberSpec[] = [];
-  for (let index = 0; index + 1 < stations.length; index++) {
-    const [from, to] = [at(stations[index] as number), at(stations[index + 1] as number)];
-    members.push({
-      role: 'crane',
-      profile: spec.profile.name,
-      start: [from[0], from[1], axisZ],
-      end: [to[0], to[1], axisZ],
-      note: spec.note,
-    });
-  }
-  const columns = Object.values(building.elements).filter(
-    (element) =>
-      element.category === 'member' && element.role === 'column' && element.levelId === levelId,
-  );
-  const bracketZ = spec.railHeight - fromMm(doc, spec.profile.h) - fromMm(doc, spec.bracket.h) / 2;
-  for (const station of stations) {
-    const point = at(station);
-    let nearest: Vec2 | null = null;
-    let best = fromMm(doc, 2000);
-    for (const column of columns) {
-      if (column.category !== 'member') continue;
-      const [x, y] = column.start;
-      const distance = Math.hypot(x - point[0], y - point[1]);
-      if (distance > 0 && distance < best) {
-        best = distance;
-        nearest = [x, y];
-      }
-    }
-    if (nearest) {
-      members.push({
-        role: 'beam',
-        profile: spec.bracket.name,
-        start: [nearest[0], nearest[1], bracketZ],
-        end: [point[0], point[1], bracketZ],
-        note: 'crane bracket',
-      });
-    }
-  }
-  return members;
 }
 
 /**
@@ -219,88 +151,23 @@ export const addPortalFrameBuilding = defineCommand({
     'degrees. Defaults: 24 m span, 48 m long, 6 m bays, 7 m eaves, 6° roof, HEA400 columns, IPE450 rafters.',
   params: portalFrameParams,
   run: (doc, params): CommandResult => {
-    const mm = (value: number): number => fromMm(doc, value);
-    const origin = params.origin ?? [0, 0];
-    const span = Array.isArray(params.spans)
-      ? Math.max(...params.spans.map(Number))
-      : (params.span ?? mm(24000));
-    const hallLength = params.length ?? mm(48000);
-    const targetBay = params.baySpacing ?? mm(6000);
-    const eave = params.eaveHeight ?? mm(7000);
-    const pitchDegrees = params.roofPitch ?? 6;
-    const purlinSpacing = params.purlinSpacing ?? mm(1800);
-    const railSpacing = params.railSpacing ?? mm(1800);
-    if (
-      params.spans !== undefined &&
-      !(
-        Array.isArray(params.spans) &&
-        params.spans.length >= 1 &&
-        params.spans.length <= 10 &&
-        params.spans.every((width) => isFiniteNumber(width) && width > 0)
-      )
-    ) {
-      return noop(doc, 'add_portal_frame_building failed: spans must be 1–10 widths, each > 0.');
-    }
-    const spanCount = params.spans?.length ?? 1;
-    const sizes = [span, hallLength, targetBay, eave, purlinSpacing, railSpacing];
-    if (!isVec2(origin) || sizes.some((value) => !(isFiniteNumber(value) && value > 0))) {
-      return noop(
-        doc,
-        'add_portal_frame_building failed: origin [x, y] and all sizes > 0 required.',
-      );
-    }
-    if (!(isFiniteNumber(pitchDegrees) && pitchDegrees >= 0 && pitchDegrees < 45)) {
-      return noop(doc, 'add_portal_frame_building failed: roofPitch must be in [0, 45) degrees.');
-    }
-    const roofType = params.roofType ?? 'duopitch';
-    if (roofType !== 'duopitch' && roofType !== 'monopitch') {
-      return noop(
-        doc,
-        "add_portal_frame_building failed: roofType must be 'duopitch' or 'monopitch'.",
-      );
-    }
-    const columnBase = params.columnBase ?? 'pinned';
-    if (columnBase !== 'pinned' && columnBase !== 'fixed') {
-      return noop(doc, "add_portal_frame_building failed: columnBase must be 'pinned' or 'fixed'.");
-    }
-    if (columnBase === 'fixed' && params.basePlates === false) {
-      return noop(
-        doc,
-        "add_portal_frame_building failed: columnBase 'fixed' needs base plates (basePlates must not be false).",
-      );
-    }
-    const names = {
-      column: params.columnProfile ?? 'HEA400',
-      rafter: params.rafterProfile ?? 'IPE450',
-      purlin: params.purlinProfile ?? 'C200x75x2.5',
-      rail: params.railProfile ?? 'C200x75x2.5',
-      brace: params.braceProfile ?? 'CHS76.1x3.6',
-      gable: params.gablePostProfile ?? 'HEA200',
-    };
-    const profiles = Object.fromEntries(
-      Object.entries(names).map(([key, name]) => [key, findProfile(name)]),
-    ) as Record<keyof typeof names, SteelProfile | undefined>;
-    const missing = Object.entries(profiles).filter(([, profile]) => !profile);
-    if (missing.length > 0) {
-      return noop(
-        doc,
-        `add_portal_frame_building failed: unknown profile(s) ${missing.map(([key]) => names[key as keyof typeof names]).join(', ')} (see list_steel_profiles).`,
-      );
-    }
-    const p = profiles as PortalProfiles;
-    if (
-      params.crane &&
-      !(
-        isFiniteNumber(params.crane.railHeight) &&
-        params.crane.railHeight > 0 &&
-        params.crane.railHeight < eave
-      )
-    ) {
-      return noop(
-        doc,
-        'add_portal_frame_building failed: crane.railHeight must be > 0 and below the eaves.',
-      );
-    }
+    const inputs = portalInputs(doc, params);
+    if ('reason' in inputs) return noop(doc, inputs.reason);
+    const {
+      mm,
+      origin,
+      span,
+      spanCount,
+      hallLength,
+      targetBay,
+      eave,
+      pitchDegrees,
+      purlinSpacing,
+      railSpacing,
+      roofType,
+      columnBase,
+      profiles: p,
+    } = inputs;
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noop(doc, `add_portal_frame_building failed: ${resolution.reason}.`);
     const levelId = resolution.level.id;
