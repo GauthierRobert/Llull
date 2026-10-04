@@ -12,7 +12,8 @@
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "agent:example": "tsx examples/mcp-agent.ts",
-    "demo:factory": "tsx examples/factory-demo.mts"
+    "demo:factory": "tsx examples/factory-demo.mts",
+    "quality:step": "vitest run --config vitest.quality.config.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

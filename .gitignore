@@ -13,3 +13,5 @@ server/.autosave.json
 *.tsbuildinfo
 test-results
 playwright-report
+.cache
+__pycache__

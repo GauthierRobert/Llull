@@ -12,11 +12,16 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" playwright.config.ts",
-    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" playwright.config.ts playwright.quality.config.ts server/vitest.quality.config.ts \"quality/**/*.mjs\"",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests/quality",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" playwright.config.ts",
-    "test:e2e": "playwright test"
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"packages/*/src/**/*.ts\" \"tests/**/*.{ts,tsx}\" \"server/src/**/*.ts\" \"server/tests/**/*.ts\" \"server/examples/**/*.ts\" playwright.config.ts playwright.quality.config.ts server/vitest.quality.config.ts \"quality/**/*.mjs\"",
+    "test:e2e": "playwright test",
+    "quality:fetch": "node quality/fetchCorpus.mjs",
+    "quality:step": "npm --prefix server run quality:step",
+    "quality:display": "playwright test --config playwright.quality.config.ts",
+    "quality": "npm run quality:fetch && npm run quality:generate && npm run quality:step && npm run quality:display",
+    "quality:generate": "python3 quality/synthetic_step.py"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
@@ -36,6 +41,7 @@
     "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.1",
+    "@types/node": "^22.20.5",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/three": "^0.169.0",

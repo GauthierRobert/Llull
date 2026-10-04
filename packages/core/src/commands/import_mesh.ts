@@ -20,7 +20,8 @@ interface MeshBodyParams {
   color?: string;
 }
 
-const DEFAULT_MESH_COLOR = '#9aa5b1';
+/** Colour of a body imported without one (e.g. a STEP solid with no colour). */
+export const DEFAULT_MESH_COLOR = '#9aa5b1';
 
 /** Expand to a triangle soup (positions per corner, indices 0..n-1) so every consumer agrees. */
 function toTriangleSoup(body: MeshBodyParams): number[] | string {
