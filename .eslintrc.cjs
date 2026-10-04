@@ -22,6 +22,11 @@ module.exports = {
       files: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts', 'server/src/**/*.ts'],
       rules: { 'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }] },
     },
+    {
+      // Plain-JS Node scripts (quality/*.mjs) cannot declare return types.
+      files: ['*.mjs'],
+      rules: { '@typescript-eslint/explicit-function-return-type': 'off' },
+    },
   ],
   ignorePatterns: ['dist', 'coverage', 'node_modules', '*.cjs'],
 };

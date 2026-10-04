@@ -5,6 +5,8 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
+    /* No ambient @types (e.g. node): browser code must not see Node globals. */
+    "types": [],
 
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -33,5 +35,7 @@
       "@app/*": ["./src/app/*"]
     }
   },
-  "include": ["src", "packages", "tests"]
+  "include": ["src", "packages", "tests"],
+  /* Node-side quality gates have their own config (tests/quality/tsconfig.json). */
+  "exclude": ["tests/quality"]
 }

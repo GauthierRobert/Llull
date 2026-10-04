@@ -104,6 +104,7 @@ npm install          # root + every packages/* workspace
 npm run dev          # app at http://localhost:5173
 npm run check        # typecheck + lint + format:check + test — MUST pass before commit
 npm run test:coverage
+npm run quality       # import + display quality gates on real CAD files (docs/QUALITY_GATES.md)
 npm --prefix server install && npm --prefix server run dev   # optional backend (not a workspace)
 ```
 
