@@ -13,15 +13,8 @@ import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
 import { escapeXml } from '@lib/escapeXml';
 
-export type PaperSize = 'A4' | 'A3' | 'A2' | 'A1' | 'A0';
-
-export const PAPER_SIZES = [
-  'A4',
-  'A3',
-  'A2',
-  'A1',
-  'A0',
-] as const satisfies ReadonlyArray<PaperSize>;
+export const PAPER_SIZES = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
+export type PaperSize = (typeof PAPER_SIZES)[number];
 
 /** Landscape ISO 216 sizes, millimetres. */
 export const PAPER_MM: Readonly<Record<PaperSize, readonly [number, number]>> = {
@@ -235,13 +228,6 @@ export interface PlanSheet {
   readonly levelId: string;
 }
 
-interface SheetOptions {
-  readonly levelId?: string;
-  readonly paper?: PaperSize;
-  readonly scale?: number;
-  readonly title?: string;
-}
-
 function titleBlock(
   doc: CadDocument,
   sheet: { width: number; height: number; title: string; scale: number; paper: PaperSize },
@@ -344,23 +330,25 @@ export function composeSheetSvg(
  * @pure
  * @failure unknown level, invalid paper or scale -> null
  */
-function buildPlanSheet(doc: CadDocument, options: SheetOptions): PlanSheet | null {
-  const drawing = buildPlanDrawing(doc, options.levelId);
-  const paper = options.paper ?? 'A3';
-  const size = PAPER_MM[paper];
-  if (!drawing || !size) return null;
-  if (options.scale !== undefined && !(Number.isFinite(options.scale) && options.scale > 0))
-    return null;
-  const [width, height] = size;
+function buildPlanSheet(
+  doc: CadDocument,
+  levelId: string | undefined,
+  paper: PaperSize,
+  requestedScale: number | undefined,
+  requestedTitle: string | undefined,
+): PlanSheet | null {
+  const drawing = buildPlanDrawing(doc, levelId);
+  if (!drawing || (requestedScale !== undefined && requestedScale <= 0)) return null;
+  const [width, height] = PAPER_MM[paper];
   const viewport = sheetDrawingArea(width, height);
   const millimetresPerUnit = toMetres(doc, 1) * 1000;
   const [minX, minY, maxX, maxY] = drawing.bounds;
   const scale =
-    options.scale ??
+    requestedScale ??
     fitScale((maxX - minX) * millimetresPerUnit, (maxY - minY) * millimetresPerUnit, viewport);
   const painter = new SheetPainter(drawing, millimetresPerUnit / scale, viewport);
   for (const primitive of drawing.primitives) painter.paint(primitive);
-  const title = options.title?.trim() || `${drawing.level.name} — Floor plan`;
+  const title = requestedTitle?.trim() || `${drawing.level.name} — Floor plan`;
   const svg = composeSheetSvg(doc, {
     width,
     height,
@@ -407,13 +395,8 @@ export const exportPlanSheet = defineCommand({
       ),
     title: z.string().optional().describe('Drawing title. Default "<level> — Floor plan".'),
   }),
-  run: (doc, { levelId, paper, scale, title }): CommandResult => {
-    const sheet = buildPlanSheet(doc, {
-      ...(levelId !== undefined ? { levelId } : {}),
-      ...(paper !== undefined ? { paper } : {}),
-      ...(scale !== undefined ? { scale } : {}),
-      ...(title !== undefined ? { title } : {}),
-    });
+  run: (doc, { levelId, paper = 'A3', scale, title }): CommandResult => {
+    const sheet = buildPlanSheet(doc, levelId, paper, scale, title);
     if (!sheet) {
       return noop(
         doc,
