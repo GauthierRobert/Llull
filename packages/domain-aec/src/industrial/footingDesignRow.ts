@@ -24,6 +24,7 @@ import {
   evaluatePad,
   geometryOf,
   netLoads,
+  padVolume,
   sizeText,
   trialSizes,
 } from './footingSizing';
@@ -106,13 +107,12 @@ export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutc
     slabShare: inputs.slabShare,
   };
   const currentVerdict = evaluatePad(context, current);
-  const volume = (size: PadSize): number => size[0] * size[1] * size[2];
   let size = current;
   let verdict = currentVerdict;
   if (!currentVerdict.passes || allowShrink) {
     const candidates = trialSizes(current, face, !allowShrink);
     const found = candidates.find((candidate) => {
-      if (currentVerdict.passes && volume(candidate) >= volume(current)) return false;
+      if (currentVerdict.passes && padVolume(candidate) >= padVolume(current)) return false;
       const trial = evaluatePad(context, candidate);
       if (trial.passes) verdict = trial;
       return trial.passes;
