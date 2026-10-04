@@ -3,28 +3,63 @@
  */
 
 import type { CadDocument } from '@core/model/types';
+import type { BuildingElement, BuildingLevel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, getBuilding, toMetres } from './model';
 import { noop } from '@core/commands/noop';
-import { openingsOf, wallExtent, wallFrame } from './wallGeometry';
-import { curvedWallArc, curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
-import {
-  type Exported,
-  exportCurvedWall,
-  exportOpening,
-  exportWall,
-  exportWallLayers,
-} from './ifcElementExport';
+import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
 import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrialExport';
 import { exportOther } from './ifcOtherExport';
+
+type LevelElement = Extract<BuildingElement, { levelId: string }>;
 
 export interface IfcExport {
   readonly filename: string;
   readonly ifc: string;
   readonly entityCount: number;
   readonly productCount: number;
+}
+
+/** Every IFC product of one element placed on `level`, in export order (hosted openings follow their wall). */
+function exportElement(
+  context: Context,
+  doc: CadDocument,
+  element: LevelElement,
+  level: BuildingLevel,
+  storeyPlacement: string,
+): Exported[] {
+  const building = getBuilding(doc);
+  switch (element.category) {
+    case 'wall':
+      return exportWallElement(context, building, element, storeyPlacement);
+    case 'curvedWall':
+      return exportCurvedWallElement(context, building, element, storeyPlacement);
+    case 'member':
+    case 'footing':
+    case 'panel':
+    case 'equipment':
+    case 'pipe':
+    case 'tray': {
+      const exported = exportIndustrial(context, element, storeyPlacement);
+      return exported ? [exported] : [];
+    }
+    case 'connection':
+      return exportConnection(context, doc, element, building, level, storeyPlacement);
+    case 'plate': {
+      const member = building.elements[element.memberId];
+      return member?.category === 'member'
+        ? exportPlate(context, doc, element, member, level, storeyPlacement)
+        : [];
+    }
+    case 'slab':
+    case 'column':
+    case 'beam':
+    case 'stair':
+    case 'room':
+      return [exportOther(context, element, level, storeyPlacement)];
+  }
 }
 
 /** @pure */
@@ -95,118 +130,18 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
     storeys.push(storey);
     const contained: string[] = [];
     const spaces: string[] = [];
-    const record = (exported: Exported): void => {
-      productCount += 1;
-      if (exported.material === null) return;
-      byMaterial.set(exported.material, [
-        ...(byMaterial.get(exported.material) ?? []),
-        exported.ref,
-      ]);
-    };
     for (const id of building.elementOrder) {
       const element = building.elements[id];
       if (!element || !('levelId' in element) || element.levelId !== level.id) continue;
-      if (element.category === 'wall') {
-        const wall = exportWall(context, element, wallExtent(building, element), storeyPlacement);
-        contained.push(wall.ref);
-        if (element.layers) {
-          exportWallLayers(context, element, wall.ref);
-          record({ ...wall, material: null });
-        } else {
-          record(wall);
-        }
-        for (const openingId of building.elementOrder) {
-          const opening = building.elements[openingId];
-          if (
-            (opening?.category === 'door' || opening?.category === 'window') &&
-            opening.hostId === element.id
-          ) {
-            record(exportOpening(context, opening, element, wall, contained));
-          }
-        }
-        continue;
+      for (const exported of exportElement(context, doc, element, level, storeyPlacement)) {
+        (element.category === 'room' ? spaces : contained).push(exported.ref);
+        productCount += 1;
+        if (exported.material === null) continue;
+        byMaterial.set(exported.material, [
+          ...(byMaterial.get(exported.material) ?? []),
+          exported.ref,
+        ]);
       }
-      if (
-        element.category === 'member' ||
-        element.category === 'footing' ||
-        element.category === 'panel' ||
-        element.category === 'equipment' ||
-        element.category === 'pipe' ||
-        element.category === 'tray'
-      ) {
-        const industrial = exportIndustrial(context, element, storeyPlacement);
-        if (industrial) {
-          contained.push(industrial.ref);
-          record(industrial);
-        }
-        continue;
-      }
-      if (element.category === 'curvedWall') {
-        const exported = exportCurvedWall(
-          context,
-          element,
-          curvedWallExtent(building, element),
-          storeyPlacement,
-        );
-        if (!exported) continue;
-        contained.push(exported.ref);
-        record(exported);
-        for (const opening of openingsOf(building, element.id)) {
-          // Openings sit on the tangent to the arc at their offset.
-          const tangent = tangentWall(element, opening.offset);
-          const host = {
-            ref: exported.ref,
-            placement: placement(
-              context,
-              storeyPlacement,
-              context.mm(tangent.start[0]),
-              context.mm(tangent.start[1]),
-              context.mm(element.baseOffset),
-              wallFrame(tangent).angle,
-            ),
-          };
-          // The arc leaves the tangent by its sagitta at the jambs: deepen the void to cut through.
-          const radius = curvedWallArc(element)?.radius ?? 0;
-          const half = Math.min(opening.width / 2, radius);
-          const sagitta = radius - Math.sqrt(radius * radius - half * half);
-          record(
-            exportOpening(
-              context,
-              opening,
-              { ...tangent, thickness: element.thickness + 2 * sagitta },
-              host,
-              contained,
-            ),
-          );
-        }
-        continue;
-      }
-      if (element.category === 'connection') {
-        for (const exported of exportConnection(
-          context,
-          doc,
-          element,
-          building,
-          level,
-          storeyPlacement,
-        )) {
-          contained.push(exported.ref);
-          record(exported);
-        }
-        continue;
-      }
-      if (element.category === 'plate') {
-        const member = building.elements[element.memberId];
-        if (member?.category !== 'member') continue;
-        for (const exported of exportPlate(context, doc, element, member, level, storeyPlacement)) {
-          contained.push(exported.ref);
-          record(exported);
-        }
-        continue;
-      }
-      const exported = exportOther(context, element, level, storeyPlacement);
-      (exported.isSpace ? spaces : contained).push(exported.ref);
-      record(exported);
     }
     if (contained.length > 0) {
       writer.add(

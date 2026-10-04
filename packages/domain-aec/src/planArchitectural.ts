@@ -3,8 +3,20 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import type { BuildingModel, OpeningElement, WallElement } from '@core/model/building';
+import type {
+  BuildingModel,
+  ColumnElement,
+  CurvedWallElement,
+  GridElement,
+  OpeningElement,
+  RoomElement,
+  SlabElement,
+  WallElement,
+} from '@core/model/building';
+import { polygonArea, polygonCentroid } from '@lib/polygon';
+import { curvedBandBetween, curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import { fromMm, toMetres } from './model';
+import { wallPieces } from './wallPieces';
 import { openingsOf, pointAlong, wallExtent, wallFrame } from './wallGeometry';
 import { stairPoint } from './stairGeometry';
 import { layerBoundaries } from './wallLayers';
@@ -277,5 +289,134 @@ export function stairPrimitives(
       content: `UP ${stair.riserCount}R`,
     },
   );
+  return primitives;
+}
+
+/** Cut band of a curved wall (hatched pieces + opening symbols), or its hidden outline above the cut. */
+export function curvedWallPrimitives(
+  building: BuildingModel,
+  wall: CurvedWallElement,
+  cutHeight: number,
+): PlanPrimitive[] {
+  const extent = curvedWallExtent(building, wall);
+  const outline = curvedBandBetween(wall, extent.start, extent.end);
+  if (!outline) return [];
+  const layer = layerName('wall');
+  const localCut = cutHeight - wall.baseOffset;
+  if (!(localCut >= 0 && localCut < wall.height)) {
+    return [{ type: 'polygon', layer, style: 'hidden', points: outline }];
+  }
+  const openings = openingsOf(building, wall.id);
+  const primitives: PlanPrimitive[] = [];
+  for (const piece of wallPieces(wall, openings, extent)) {
+    if (!(piece.z0 <= localCut && localCut < piece.z1)) continue;
+    const points = curvedBandBetween(wall, piece.s0, piece.s1);
+    if (points) primitives.push({ type: 'polygon', layer, style: 'cut', fill: 'hatch', points });
+  }
+  for (const opening of openings) {
+    primitives.push(...openingSymbol(tangentWall(wall, opening.offset), opening));
+  }
+  return primitives;
+}
+
+/** Slab outline plus each opening outline with its diagonal break line. */
+export function slabPrimitives(slab: SlabElement): PlanPrimitive[] {
+  const layer = layerName('slab');
+  const primitives: PlanPrimitive[] = [
+    { type: 'polygon', layer, style: 'thin', points: slab.boundary },
+  ];
+  for (const opening of slab.openings ?? []) {
+    const middle = Math.floor(opening.length / 2);
+    primitives.push(
+      { type: 'polygon', layer, style: 'thin', points: opening },
+      { type: 'line', layer, style: 'thin', a: opening[0] as Vec2, b: opening[middle] as Vec2 },
+      {
+        type: 'line',
+        layer,
+        style: 'thin',
+        a: opening[opening.length - 1] as Vec2,
+        b: opening[middle - 1] as Vec2,
+      },
+    );
+  }
+  return primitives;
+}
+
+export function columnPrimitive(column: ColumnElement): PlanPrimitive {
+  const layer = layerName('column');
+  if (column.shape === 'circular') {
+    return {
+      type: 'circle',
+      layer,
+      style: 'cut',
+      center: column.location,
+      radius: column.width / 2,
+    };
+  }
+  const [x, y] = column.location;
+  const axis = { start: [x - column.width / 2, y] as Vec2, end: [x + column.width / 2, y] as Vec2 };
+  return {
+    type: 'polygon',
+    layer,
+    style: 'cut',
+    fill: 'hatch',
+    points: band(axis, 0, column.width, column.depth / 2),
+  };
+}
+
+/** Room name and "mark · area" tags at the outline centroid. */
+export function roomPrimitives(doc: PlanSource, room: RoomElement): PlanPrimitive[] {
+  const [cx, cy] = polygonCentroid(room.boundary);
+  const textHeight = fromMm(doc, 250);
+  const area = polygonArea(room.boundary) * toMetres(doc, 1) ** 2;
+  const layer = layerName('room');
+  return [
+    {
+      type: 'text',
+      layer,
+      style: 'annotation',
+      at: [cx, cy + textHeight * 0.7],
+      height: textHeight,
+      content: room.name,
+    },
+    {
+      type: 'text',
+      layer,
+      style: 'annotation',
+      at: [cx, cy - textHeight * 0.9],
+      height: textHeight * 0.8,
+      content: `${room.mark} · ${area.toFixed(2)} m²`,
+    },
+  ];
+}
+
+/** Axis line with a labelled bubble at each end. */
+export function gridPrimitives(doc: PlanSource, grid: GridElement): PlanPrimitive[] {
+  const bubbleRadius = fromMm(doc, 400);
+  const { direction } = wallFrame(grid);
+  const layer = layerName('grid');
+  const primitives: PlanPrimitive[] = [
+    { type: 'line', layer, style: 'thin', a: grid.start, b: grid.end },
+  ];
+  for (const [point, sign] of [
+    [grid.start, -1],
+    [grid.end, 1],
+  ] as const) {
+    const center: Vec2 = [
+      point[0] + sign * direction[0] * bubbleRadius,
+      point[1] + sign * direction[1] * bubbleRadius,
+    ];
+    primitives.push(
+      { type: 'circle', layer, style: 'thin', center, radius: bubbleRadius },
+      {
+        type: 'text',
+        layer,
+        style: 'annotation',
+        at: [center[0], center[1] - bubbleRadius * 0.4],
+        height: bubbleRadius * 0.9,
+        content: grid.mark,
+      },
+    );
+  }
   return primitives;
 }

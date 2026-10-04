@@ -4,19 +4,10 @@
  * @pure
  */
 
-import type {
-  BuildingModel,
-  BuildingLevel,
-  CurvedWallElement,
-  OpeningElement,
-  WallElement,
-} from '@core/model/building';
-import type { Entity, Vec2 } from '@core/model/types';
+import type { BuildingModel, CurvedWallElement, WallElement } from '@core/model/building';
+import type { Vec2 } from '@core/model/types';
 import { toCounterClockwise } from '@lib/polygon';
-import { colorForMaterial, meshEntity } from './entities';
-import { prismMesh } from './mesh';
 import type { WallExtent } from './wallGeometry';
-import { wallPieces, type WallPiece } from './wallPieces';
 
 /** Circle arc through three points: centre, radius, start angle and signed sweep (radians). */
 export interface Arc {
@@ -72,47 +63,9 @@ export function arcPoints(arc: Arc, radius: number): Vec2[] {
   });
 }
 
-/** Plan outline of the wall (outer arc, then inner arc back), counter-clockwise. */
+/** Plan outline of the whole wall (outer arc, then inner arc back), counter-clockwise. */
 export function curvedWallBand(wall: CurvedWallElement): Vec2[] | null {
-  const arc = curvedWallArc(wall);
-  if (!arc || wall.thickness / 2 >= arc.radius) return null;
-  return toCounterClockwise([
-    ...arcPoints(arc, arc.radius + wall.thickness / 2),
-    ...arcPoints(arc, arc.radius - wall.thickness / 2).reverse(),
-  ]);
-}
-
-/** Vertical solid pieces of a curved wall: full height between openings, sill / head pieces. */
-export function curvedWallPieces(
-  wall: CurvedWallElement,
-  openings: ReadonlyArray<OpeningElement>,
-  extent: WallExtent = { start: 0, end: curvedWallLength(wall) },
-): WallPiece[] {
-  return wallPieces(
-    wall,
-    [...openings].sort((a, b) => a.offset - b.offset),
-    extent,
-  );
-}
-
-export function evaluateCurvedWall(
-  wall: CurvedWallElement,
-  level: BuildingLevel,
-  openings: ReadonlyArray<OpeningElement> = [],
-  extent: { start: number; end: number } = { start: 0, end: curvedWallLength(wall) },
-): Entity[] {
-  const bottom = level.elevation + wall.baseOffset;
-  const color = colorForMaterial(wall.material, '#c9c4b8');
-  const pieces = curvedWallPieces(wall, openings, extent);
-  return pieces.flatMap((piece, index): Entity[] => {
-    const band = curvedBandBetween(wall, piece.s0, piece.s1);
-    const mesh = band
-      ? prismMesh(band, [], ([x, y], side) => [x, y, bottom + (side ? piece.z1 : piece.z0)])
-      : null;
-    if (!mesh) return [];
-    const part = pieces.length === 1 ? 'body' : `body-${index}`;
-    return [meshEntity(wall, { part, label: `Wall ${wall.mark}` }, mesh, color)];
-  });
+  return curvedBandBetween(wall, 0, curvedWallLength(wall));
 }
 
 /** Point and unit travel direction at arc length `s` from the start. */
@@ -188,10 +141,7 @@ export function curvedBandBetween(wall: CurvedWallElement, s0: number, s1: numbe
  * Arc-length interval actually built: each end is cut back where a straight wall closes the
  * corner (that wall extends over the curved wall's end, as in straight L joints).
  */
-export function curvedWallExtent(
-  building: BuildingModel,
-  wall: CurvedWallElement,
-): { start: number; end: number } {
+export function curvedWallExtent(building: BuildingModel, wall: CurvedWallElement): WallExtent {
   const length = curvedWallLength(wall);
   const arc = curvedWallArc(wall);
   if (!arc) return { start: 0, end: length };

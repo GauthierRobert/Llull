@@ -104,7 +104,7 @@ export function base(
     rotation,
     layerId: stub.layer !== undefined ? `layer-${stub.layer}` : layerIdFor(element.category),
     color,
-    name: `${stub.label}`,
+    name: stub.label,
     tags: ['bim', element.category, `element:${element.id}`],
   };
 }

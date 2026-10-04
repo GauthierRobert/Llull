@@ -17,7 +17,6 @@ import {
   withoutElements,
 } from './model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { openingFitIssues } from './walls';
 
@@ -50,22 +49,11 @@ export const addLevel = defineCommand({
   }),
   run: (doc, { name, elevation, height, makeActive = true }): CommandResult => {
     const building = getBuilding(doc);
-    const top = building.levelOrder
-      .map((id) => building.levels[id])
-      .reduce<
-        number | null
-      >((highest, level) => (level && (highest === null || level.elevation + level.height > highest) ? level.elevation + level.height : highest), null);
-    const resolvedElevation = elevation ?? top ?? 0;
+    const tops = Object.values(building.levels).map((level) => level.elevation + level.height);
+    const resolvedElevation = elevation ?? (tops.length > 0 ? Math.max(...tops) : 0);
     const resolvedHeight = height ?? fromMm(doc, 3000);
-    if (
-      !isFiniteNumber(resolvedElevation) ||
-      !isFiniteNumber(resolvedHeight) ||
-      resolvedHeight <= 0
-    ) {
-      return noop(
-        doc,
-        `add_level failed: elevation must be finite and height > 0 (got elevation=${String(elevation)}, height=${String(height)}).`,
-      );
+    if (resolvedHeight <= 0) {
+      return noop(doc, `add_level failed: height must be > 0 (got ${String(height)}).`);
     }
     const id = nextLevelId(building);
     const level: BuildingLevel = {
@@ -109,10 +97,7 @@ export const updateLevel = defineCommand({
     const building = getBuilding(doc);
     const level = building.levels[levelId];
     if (!level) return noop(doc, `update_level failed: no level '${levelId}'.`);
-    if (elevation !== undefined && !isFiniteNumber(elevation)) {
-      return noop(doc, 'update_level failed: elevation must be finite.');
-    }
-    if (height !== undefined && (!isFiniteNumber(height) || height <= 0)) {
+    if (height !== undefined && height <= 0) {
       return noop(doc, 'update_level failed: height must be > 0.');
     }
     const updated: BuildingLevel = {

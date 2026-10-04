@@ -24,7 +24,6 @@ import {
   elementAffected,
 } from './model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { stairPoint } from './stairGeometry';
 import { triangulatePolygon } from '@lib/triangulate';
@@ -144,7 +143,7 @@ export const addSlabOpening = defineCommand({
       if (stair?.category !== 'stair')
         return noop(doc, `add_slab_opening failed: no stair '${stairId}'.`);
       const clearance = margin ?? fromMm(doc, 100);
-      if (!isFiniteNumber(clearance) || clearance < 0) {
+      if (clearance < 0) {
         return noop(doc, 'add_slab_opening failed: margin must be >= 0.');
       }
       outline = stairFootprint(stair, clearance);

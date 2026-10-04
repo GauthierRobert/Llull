@@ -14,6 +14,7 @@ import type {
   SteelMemberElement,
   BuildingLevel,
   BuildingModel,
+  MemberRole,
 } from '@core/model/building';
 import { sweepFrame } from './mesh';
 import { panelFrame, trayOutline } from './industrial/evaluate';
@@ -22,27 +23,69 @@ import {
   plateLayout,
   type ConnectionSolid,
 } from './industrial/evaluateConnections';
-import { findProfile } from './steel/profiles';
+import { type SteelProfile, findProfile } from './steel/profiles';
 import {
   type Context,
+  circleProfile,
+  direction,
   extrusion,
+  framePlacement,
   ifcReal,
   ifcString,
   placement,
   point2,
   point3,
   polygonProfile,
+  scaledPolygonProfile,
   rectangleProfile,
   shape,
 } from './ifcStep';
-import {
-  type Exported,
-  MEMBER_CLASS,
-  direction,
-  framePlacement,
-  steelProfileDef,
-} from './ifcElementExport';
+import type { Exported } from './ifcElementExport';
 import { dot3 } from '@lib/vec3';
+
+/** IFC parametric profile definition of a catalogue section (dimensions in mm). */
+export function steelProfileDef(context: Context, profile: SteelProfile): string {
+  const position = context.writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
+  const name = ifcString(profile.name);
+  const r = ifcReal;
+  switch (profile.shape) {
+    case 'I':
+      return context.writer.add(
+        `IFCISHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.b)},${r(profile.h)},${r(profile.tw)},${r(profile.tf)},$,$,$)`,
+      );
+    case 'U':
+      return context.writer.add(
+        `IFCUSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},${r(profile.tf)},$,$,$)`,
+      );
+    case 'C':
+      return context.writer.add(
+        `IFCCSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},${r(profile.lip)},$)`,
+      );
+    case 'L':
+      return context.writer.add(
+        `IFCLSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},$,$,$)`,
+      );
+    case 'SHS':
+    case 'RHS':
+      return context.writer.add(
+        `IFCRECTANGLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.b)},${r(profile.h)},${r(profile.tw)},$,$)`,
+      );
+    case 'CHS':
+      return context.writer.add(
+        `IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.h / 2)},${r(profile.tw)})`,
+      );
+  }
+}
+
+export const MEMBER_CLASS: Readonly<Record<MemberRole, { entity: string; type: string }>> = {
+  column: { entity: 'IFCCOLUMN', type: '.COLUMN.' },
+  rafter: { entity: 'IFCBEAM', type: '.BEAM.' },
+  beam: { entity: 'IFCBEAM', type: '.BEAM.' },
+  crane: { entity: 'IFCBEAM', type: '.BEAM.' },
+  brace: { entity: 'IFCMEMBER', type: '.BRACE.' },
+  purlin: { entity: 'IFCMEMBER', type: '.PURLIN.' },
+  rail: { entity: 'IFCMEMBER', type: '.MEMBER.' },
+};
 
 /** One extruded-area solid per non-degenerate segment of a polyline, the profile swept along it. */
 function sweptSolids(context: Context, profileRef: string, points: ReadonlyArray<Vec3>): string[] {
@@ -140,10 +183,7 @@ export function exportIndustrial(
     }
     case 'pipe': {
       const local = placement(context, storeyPlacement, 0, 0, 0);
-      const position = writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
-      const circle = writer.add(
-        `IFCCIRCLEPROFILEDEF(.AREA.,$,${position},${ifcReal(mm(element.diameter) / 2)})`,
-      );
+      const circle = circleProfile(context, mm(element.diameter) / 2);
       const solids = sweptSolids(context, circle, element.points.map(mm3));
       if (solids.length === 0) return null;
       const ref = writer.add(
@@ -187,14 +227,7 @@ export function exportConnection(
       solid.along,
       solid.x,
     ),
-    body: extrusion(
-      context,
-      polygonProfile(
-        context,
-        solid.outline.map(([x, y]): Vec2 => [mm(x), mm(y)]),
-      ),
-      mm(solid.depth),
-    ),
+    body: extrusion(context, scaledPolygonProfile(context, solid.outline), mm(solid.depth)),
   });
   const exported: Exported[] = [];
   for (const solid of solids.filter((candidate) => !candidate.part.startsWith('bolt'))) {
@@ -214,10 +247,7 @@ export function exportConnection(
       const axes = writer.add(
         `IFCAXIS2PLACEMENT3D(${point3(context, mm(bolt.origin[0]), mm(bolt.origin[1]), mm(bolt.origin[2] - level.elevation))},${direction(context, bolt.along)},${direction(context, bolt.x)})`,
       );
-      const profile = polygonProfile(
-        context,
-        bolt.outline.map(([x, y]): Vec2 => [mm(x), mm(y)]),
-      );
+      const profile = scaledPolygonProfile(context, bolt.outline);
       return writer.add(
         `IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(mm(bolt.depth))})`,
       );
@@ -253,10 +283,7 @@ export function exportPlate(
   const plateRef = writer.add(
     `IFCPLATE('${context.guid(plate.id)}',$,${ifcString(plate.mark)},$,'BASE_PLATE',${local},${shape(context, [body])},${ifcString(plate.id)},.USERDEFINED.)`,
   );
-  const origin = writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
-  const circle = writer.add(
-    `IFCCIRCLEPROFILEDEF(.AREA.,$,${origin},${ifcReal(mm(plate.boltDiameter) / 2)})`,
-  );
+  const circle = circleProfile(context, mm(plate.boltDiameter) / 2);
   const boltLength = layout.boltBelow + plate.thickness + layout.boltAbove;
   const boltBottom = bottom - layout.boltBelow;
   const bolts = layout.bolts.map(([x, y]) =>

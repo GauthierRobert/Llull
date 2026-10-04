@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { slabMesh } from '@aec/evaluateElements';
+import { prismMesh } from '@aec/mesh';
 import { buildPlanDrawing } from '@aec/planDrawing';
 import type { TakeoffLine } from '@aec/takeoffBasics';
 import type { IfcExport } from '@aec/ifcBuild';
@@ -27,13 +27,12 @@ function twoStoreys(): CadDocument {
   return run(doc, 'add_slab', { boundary: rect(0, 0, 10000, 8000), levelId: 'level-2' });
 }
 
-describe('slabMesh', () => {
+describe('prismMesh of a slab with voids', () => {
   it('is watertight with outward-facing triangles and the net volume', () => {
-    const mesh = slabMesh(
+    const mesh = prismMesh(
       rect(0, 0, 10, 8) as Array<[number, number]>,
       [rect(2, 2, 4, 5) as Array<[number, number]>, rect(6, 1, 9, 3) as Array<[number, number]>],
-      0,
-      0.5,
+      ([x, y], side) => [x, y, side === 1 ? 0.5 : 0],
     )!;
     const edges = new Map<string, number>();
     let volume = 0;

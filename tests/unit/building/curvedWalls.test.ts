@@ -140,7 +140,7 @@ describe('add_curved_wall', () => {
 
 describe('curved wall review regressions', () => {
   it('is hatched as concrete when cut in a section', async () => {
-    const { buildElevationDrawing } = await import('@aec/elevation');
+    const { buildElevationDrawing } = await import('@aec/elevationProjection');
     const doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
     const drawing = buildElevationDrawing(doc, { direction: 'south', cutAt: 4000 })!;
     expect(drawing.cutRegions.map((region) => region.material)).toEqual(['concrete']);
