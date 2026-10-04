@@ -5,7 +5,6 @@
  */
 
 import type { Entity } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
@@ -15,6 +14,7 @@ import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { withEntity } from './entityOps';
+import { newEntity } from './newEntity';
 import { boundsText } from './geometryShared';
 import { noop } from './noop';
 
@@ -253,17 +253,14 @@ export const addSpurGear = defineCommand({
     const boreNote = bore > 0 ? ` bore=${bore} ignored — kernel hole not yet wired.` : '';
 
     const id = nextId('gear');
-    const entity: Entity = {
+    const entity = newEntity(
+      'extrusion',
       id,
-      kind: 'extrusion',
-      profile,
-      depth: faceWidth,
-      position: resolvedPosition,
-      rotation: resolvedRotation,
-      layerId: DEFAULT_LAYER_ID,
+      { profile, depth: faceWidth },
+      resolvedPosition,
       color,
-      ...(name !== undefined && name !== '' ? { name } : {}),
-    };
+      { rotation: resolvedRotation, name },
+    );
 
     const newDoc = withEntity(doc, entity);
     const b = rotatedEntityBounds(newDoc.entities[id] as Entity);

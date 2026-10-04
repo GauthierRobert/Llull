@@ -1,9 +1,9 @@
-import type { ExtrusionEntity, RevolutionEntity, Vec3 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import type { RevolutionEntity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
 import { ORIGIN } from '../lib/vec3';
 import { noop } from './noop';
+import { newEntity } from './newEntity';
 import { nextId } from '../lib/id';
 import { commitSolid, resolveRotation } from './geometryShared';
 
@@ -100,16 +100,16 @@ export const extrudeSketch = defineCommand({
     }
 
     const extId = nextId('ext');
-    const extrusion: ExtrusionEntity = {
-      id: extId,
-      kind: 'extrusion',
-      profile,
-      depth,
-      position: [source.position[0], source.position[1], source.position[2]],
-      rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color: '#c8553d',
-    };
+    const extrusion = newEntity(
+      'extrusion',
+      extId,
+      { profile, depth },
+      source.position,
+      '#c8553d',
+      {
+        rotation: resolveRotation(rotation),
+      },
+    );
 
     return commitSolid(
       doc,

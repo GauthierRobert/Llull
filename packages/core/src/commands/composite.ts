@@ -5,9 +5,9 @@
  * @layer core/commands
  */
 
-import type { Entity, Vec3 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
+import { newEntity } from './newEntity';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
@@ -168,16 +168,9 @@ export const makeTubeBetween = defineCommand({
     const mid = scale3(add3(p1, p2), 0.5);
 
     const id = nextId('cyl');
-    const entity: Entity = {
-      id,
-      kind: 'cylinder',
-      radius,
-      height: length,
-      position: mid,
-      rotation,
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    const entity = newEntity('cylinder', id, { radius, height: length }, mid, color, {
+      rotation: rotation,
+    });
 
     const fmtPoint = (p: Vec3): string =>
       `[${p

@@ -12,40 +12,22 @@
  */
 
 import type { Entity, Vec3, Vec2 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 } from './schema';
 import { nextId } from '../lib/id';
 import { withEntity } from './entityOps';
+import { newEntity } from './newEntity';
 import { ORIGIN } from '../lib/vec3';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
 
 /** Build a circle entity at a given 2D center on the given work-plane position. */
 function makeCircle(center: Vec2, radius: number, position: Vec3, color: string): Entity {
-  return {
-    id: nextId('circ'),
-    kind: 'circle',
-    center,
-    radius,
-    position,
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color,
-  };
+  return newEntity('circle', nextId('circ'), { center, radius }, position, color);
 }
 
 /** Build a rectangle entity at the given work-plane position. */
 function makeRectangle(width: number, height: number, position: Vec3, color: string): Entity {
-  return {
-    id: nextId('rect'),
-    kind: 'rectangle',
-    width,
-    height,
-    position,
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color,
-  };
+  return newEntity('rectangle', nextId('rect'), { width, height }, position, color);
 }
 
 const positive = (template: string, name: string, value: number): string | null =>

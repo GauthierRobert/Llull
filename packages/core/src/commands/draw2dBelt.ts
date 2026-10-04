@@ -1,5 +1,3 @@
-import type { Entity } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { compactNumber } from '../lib/compactNumber';
 import { defineCommand, z } from './schema';
@@ -8,6 +6,7 @@ import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_CURVE_SAMPLES } from './limits';
 import { DEFAULT_DRAW_COLOR, workPlanePositionField } from './draw2dShared';
 import { withEntity } from './entityOps';
+import { newEntity } from './newEntity';
 import { pointsExtent } from './sceneBounds';
 import { noop } from './noop';
 
@@ -265,17 +264,14 @@ export const drawBeltAround = defineCommand({
 
     const id = nextId('belt');
 
-    const entity: Entity = {
+    const entity = newEntity(
+      'polyline',
       id,
-      kind: 'polyline',
-      points,
-      closed: true,
-      position: finiteVec3OrZero(position, true),
-      rotation: finiteVec3OrZero(rotation, true),
-      layerId: DEFAULT_LAYER_ID,
+      { points, closed: true },
+      finiteVec3OrZero(position, true),
       color,
-      ...(name !== undefined && name !== '' ? { name } : {}),
-    };
+      { rotation: finiteVec3OrZero(rotation, true), name },
+    );
 
     return {
       document: withEntity(doc, entity),

@@ -1,6 +1,5 @@
-import type { Entity } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
+import { newEntity } from './newEntity';
 import { defineCommand, z, looseVec3, colorField, untypedArray } from './schema';
 import { nextId } from '../lib/id';
 import { replaceEntity, withoutEntities } from './entityOps';
@@ -61,15 +60,9 @@ export const addBox = defineCommand({
     // Half-extents from center: [w/2, h/2, d/2].
     const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'center', anchor, position);
     const id = nextId('box');
-    const entity: Entity = {
-      id,
-      kind: 'box',
-      size,
-      position: storedPosition,
+    const entity = newEntity('box', id, { size }, storedPosition, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(doc, entity, `Added box ${id} of size ${size.join('×')}`);
   },
 });
@@ -118,16 +111,9 @@ export const extrude = defineCommand({
       );
     }
     const id = nextId('ext');
-    const entity: Entity = {
-      id,
-      kind: 'extrusion',
-      profile,
-      depth,
-      position,
+    const entity = newEntity('extrusion', id, { profile, depth }, position, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(doc, entity, `Extruded a ${profile.length}-point profile by ${depth}`);
   },
 });
