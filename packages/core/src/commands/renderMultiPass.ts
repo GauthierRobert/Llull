@@ -11,6 +11,8 @@ import { type ViewName, makeProjector, computeOrthoHalf } from './renderCamera';
 import { renderDocument } from './renderScene';
 import { extractSvgInner } from './renderSvg';
 import { computeSceneSnapshot } from './scene';
+import { boundsCenter } from './sceneBounds';
+import { ORIGIN } from '../lib/vec3';
 
 const BACKGROUND = '#1a1a2e';
 
@@ -61,8 +63,7 @@ export function buildTurntableSvg(
   height: number,
 ): { svg: string; width: number } {
   const bounds = computeSceneSnapshot(doc).bounds;
-  const cx = bounds ? (bounds.min[0] + bounds.max[0]) / 2 : 0;
-  const cy = bounds ? (bounds.min[1] + bounds.max[1]) / 2 : 0;
+  const [cx, cy] = bounds ? boundsCenter(bounds) : ORIGIN;
   const layers: string[] = [];
   const angleLabels: string[] = [];
   for (let i = 0; i < frames; i++) {
@@ -150,9 +151,7 @@ function sectionPlaneLine(
         bounds.max[2] - bounds.min[2],
       ) * 1.5
     : 10;
-  const cx = bounds ? (bounds.min[0] + bounds.max[0]) / 2 : 0;
-  const cy = bounds ? (bounds.min[1] + bounds.max[1]) / 2 : 0;
-  const cz = bounds ? (bounds.min[2] + bounds.max[2]) / 2 : 0;
+  const [cx, cy, cz] = bounds ? boundsCenter(bounds) : ORIGIN;
   const [p0, p1]: [[number, number, number], [number, number, number]] =
     axis === 'z'
       ? [

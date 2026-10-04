@@ -1,5 +1,6 @@
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import { computeSceneSnapshot } from './scene';
+import { boundsCenter } from './sceneBounds';
 import { type RenderViewData, type PreDepthPolygon, type Polygon3D } from './renderTypes';
 import { centroid3, applyRotation } from './renderMath';
 import { type ViewName, cameraForView, cameraBasis, projectPoint } from './renderCamera';
@@ -96,11 +97,7 @@ export function renderDocument(
   let radius = 5; // default for empty scene
 
   if (bounds) {
-    center = [
-      (bounds.min[0] + bounds.max[0]) / 2,
-      (bounds.min[1] + bounds.max[1]) / 2,
-      (bounds.min[2] + bounds.max[2]) / 2,
-    ];
+    center = boundsCenter(bounds);
     const dx = bounds.max[0] - bounds.min[0];
     const dy = bounds.max[1] - bounds.min[1];
     const dz = bounds.max[2] - bounds.min[2];

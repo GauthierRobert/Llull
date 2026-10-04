@@ -1,7 +1,7 @@
 /**
- * Kernel readiness for history operations: a replay whose live steps (including the steps of
- * every instantiated recipe) need the geometry kernel cannot run without one — it would silently
- * drop that geometry. Callers refuse up front with an explicit summary instead.
+ * Refusal summaries for kernel-dependent work while no geometry kernel is installed: single
+ * commands (`kernelUnavailable`) and replays whose live steps, recipes included, need the kernel
+ * (refusing beats silently dropping that geometry).
  *
  * @layer core/commands
  * @pure

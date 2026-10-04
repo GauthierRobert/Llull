@@ -101,38 +101,37 @@ function entityAABB(entity: Entity): AABB | null {
 }
 
 /** The 8 corners (x varies fastest), 6 face centres and 12 edge midpoints of an AABB. */
-function aabbSnapPoints(bb: AABB): SnapPoint3D[] {
-  const at = (choose: (axis: number) => number): Triple => [choose(0), choose(1), choose(2)];
-  const extreme = (axis: number, high: boolean): number => (high ? bb.max : bb.min)[axis] ?? 0;
-  const mid = (axis: number): number => (extreme(axis, false) + extreme(axis, true)) / 2;
-  const points: SnapPoint3D[] = [];
-  const push = (point: Triple, type: Snap3DType): void => {
-    points.push({ x: point[0], y: point[1], z: point[2], type });
+function aabbSnapPoints({ min, max }: AABB): SnapPoint3D[] {
+  const sides = [min, max];
+  const center: Triple = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
+  const point = ([x, y, z]: Triple, type: Snap3DType): SnapPoint3D => ({ x, y, z, type });
+  /** `center` with the listed axes moved onto the given sides. */
+  const onSides = (moves: ReadonlyArray<readonly [axis: number, side: Triple]>): Triple => {
+    const p: [number, number, number] = [...center];
+    for (const [axis, side] of moves) p[axis] = side[axis] ?? 0;
+    return p;
   };
-  for (let corner = 0; corner < 8; corner++) {
-    push(
-      at((axis) => extreme(axis, ((corner >> axis) & 1) === 1)),
-      'vertex',
+  const corners = sides.flatMap((zs) =>
+    sides.flatMap((ys) => sides.map((xs) => point([xs[0], ys[1], zs[2]], 'vertex'))),
+  );
+  const faces = [0, 1, 2].flatMap((axis) =>
+    sides.map((side) => point(onSides([[axis, side]]), 'face-center')),
+  );
+  const edges = [0, 1, 2].flatMap((axis) => {
+    const [a = 0, b = 0] = [0, 1, 2].filter((other) => other !== axis);
+    return sides.flatMap((bSide) =>
+      sides.map((aSide) =>
+        point(
+          onSides([
+            [a, aSide],
+            [b, bSide],
+          ]),
+          'edge',
+        ),
+      ),
     );
-  }
-  for (let axis = 0; axis < 3; axis++) {
-    for (const high of [false, true]) {
-      push(
-        at((a) => (a === axis ? extreme(a, high) : mid(a))),
-        'face-center',
-      );
-    }
-  }
-  for (let axis = 0; axis < 3; axis++) {
-    const others = [0, 1, 2].filter((a) => a !== axis);
-    for (let quad = 0; quad < 4; quad++) {
-      push(
-        at((a) => (a === axis ? mid(a) : extreme(a, ((quad >> others.indexOf(a)) & 1) === 1))),
-        'edge',
-      );
-    }
-  }
-  return points;
+  });
+  return [...corners, ...faces, ...edges];
 }
 
 /** Cylinder: both disc centres plus 8 rim points on each disc, all 'vertex'. */

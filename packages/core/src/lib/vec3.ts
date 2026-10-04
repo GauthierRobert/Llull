@@ -1,7 +1,7 @@
 import type { Vec3 } from '../model/types';
 
 /** The world origin `[0, 0, 0]`. */
-export const ORIGIN: Vec3 = [0, 0, 0];
+export const ORIGIN: Vec3 = Object.freeze<Vec3>([0, 0, 0]);
 
 /** @pure component-wise a + b */
 export function add3(a: Vec3, b: Vec3): Vec3 {

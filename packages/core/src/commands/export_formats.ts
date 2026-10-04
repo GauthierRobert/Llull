@@ -99,17 +99,16 @@ function buildGltfBuffers(tris: Triangle[]): { positions: Float32Array; normals:
   return { positions, normals };
 }
 
-/** Component-wise min/max of a flat xyz array (both zero when empty). */
+/** Component-wise min/max of a flat xyz array; NaN values are skipped, all-zero when no finite x. */
 function computeAabb(positions: Float32Array): { min: number[]; max: number[] } {
-  if (positions.length === 0) return { min: [0, 0, 0], max: [0, 0, 0] };
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < positions.length; i++) {
+  positions.forEach((value, i) => {
     const axis = i % 3;
-    min[axis] = Math.min(min[axis] as number, positions[i] as number);
-    max[axis] = Math.max(max[axis] as number, positions[i] as number);
-  }
-  return { min, max };
+    if (value < (min[axis] as number)) min[axis] = value;
+    if (value > (max[axis] as number)) max[axis] = value;
+  });
+  return Number.isFinite(min[0]) ? { min, max } : { min: [0, 0, 0], max: [0, 0, 0] };
 }
 
 /** Align a byte length to a 4-byte boundary (glTF chunk requirement). */

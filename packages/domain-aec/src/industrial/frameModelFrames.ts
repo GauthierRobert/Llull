@@ -8,9 +8,8 @@ import type { FrameNode } from '@lib/frame2d';
 import { fromMm } from '../model';
 import { findProfile, sectionProperties } from '../steel/profiles';
 import { E_STEEL } from './steelDesign';
-import { frameCandidates } from './frameCandidates';
-import { frameRoofWind } from './frameRoofWind';
-import { type CraneRail, craneRailLoads } from './frameCraneLoads';
+
+import { type CraneRail, craneRailLoads, frameCandidates, frameRoofWind } from './frameLoads';
 import {
   type AnalysisMember,
   type CaseLoads,

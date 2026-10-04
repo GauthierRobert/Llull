@@ -5,6 +5,7 @@ import { ORIGIN } from '../lib/vec3';
 import { noop } from './noop';
 import { newEntity } from './newEntity';
 import { nextId } from '../lib/id';
+import { compactNumber } from '../lib/compactNumber';
 import { commitSolid, resolveRotation } from './geometryShared';
 
 /** Number of polygon segments used to approximate a circle. */
@@ -276,7 +277,7 @@ export const revolveProfile = defineCommand({
     return commitSolid(
       doc,
       entity,
-      `revolve_profile: created revolution "${id}" — ${profile.length}-point profile, axis=${axisLabel}, angle=${parseFloat(angle.toFixed(4))} rad, segments=${segments}`,
+      `revolve_profile: created revolution "${id}" — ${profile.length}-point profile, axis=${axisLabel}, angle=${compactNumber(angle)} rad, segments=${segments}`,
     );
   },
 });
