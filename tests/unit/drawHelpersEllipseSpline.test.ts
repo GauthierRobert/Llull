@@ -4,10 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  ellipseParamsFromCenterCorner,
-  validateSplinePoints,
-} from '../../src/ui/viewport/2d/drawHelpers';
+import { ellipseParamsFromCenterCorner } from '../../src/ui/viewport/2d/drawHelpers';
 
 // ---------------------------------------------------------------------------
 // ellipseParamsFromCenterCorner
@@ -61,48 +58,5 @@ describe('ellipseParamsFromCenterCorner', () => {
     expect(result).not.toBeNull();
     expect(result!.radiusX).toBeCloseTo(10);
     expect(result!.radiusY).toBeCloseTo(4);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateSplinePoints
-// ---------------------------------------------------------------------------
-
-describe('validateSplinePoints', () => {
-  it('returns the array when it has 2 points', () => {
-    const pts: ReadonlyArray<[number, number]> = [
-      [0, 0],
-      [1, 1],
-    ];
-    const result = validateSplinePoints(pts);
-    expect(result).toBe(pts);
-  });
-
-  it('returns the array when it has more than 2 points', () => {
-    const pts: ReadonlyArray<[number, number]> = [
-      [0, 0],
-      [1, 2],
-      [3, 1],
-      [5, 4],
-    ];
-    expect(validateSplinePoints(pts)).toBe(pts);
-  });
-
-  it('returns null when the array has 1 point', () => {
-    expect(validateSplinePoints([[0, 0]])).toBeNull();
-  });
-
-  it('returns null for an empty array', () => {
-    expect(validateSplinePoints([])).toBeNull();
-  });
-
-  it('does not mutate the input array', () => {
-    const pts: ReadonlyArray<[number, number]> = [
-      [1, 2],
-      [3, 4],
-    ];
-    const before = pts.length;
-    validateSplinePoints(pts);
-    expect(pts.length).toBe(before);
   });
 });

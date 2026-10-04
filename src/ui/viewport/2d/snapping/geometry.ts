@@ -96,28 +96,6 @@ export function entityToSegments(entity: Entity): Array<[number, number, number,
 }
 
 /**
- * Compute the foot of the perpendicular from point P to the infinite line
- * through (ax,ay)→(bx,by). Returns null when the segment has zero length.
- *
- * @pure
- */
-export function perpendicularFoot(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): [number, number] | null {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-20) return null;
-  const t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
-  return [ax + t * dx, ay + t * dy];
-}
-
-/**
  * Snap perpendicular to a segment from reference point `from`.
  * Returns the foot point only when it lies within the segment extents (0 ≤ t ≤ 1).
  * When `from` is null the snap is skipped (no previous point).
