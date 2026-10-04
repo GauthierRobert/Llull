@@ -1,24 +1,23 @@
 /**
  * Layer management commands.
- *
- * Locked-layer policy:
- *   A locked layer rejects mutations that originate FROM that layer's entities.
- *   Specifically, `set_entity_layer` refuses to move an entity off a locked layer —
- *   this prevents accidental edits to locked content.  Moving an entity ON TO a
- *   locked layer is allowed (the entity simply becomes harder to edit once there).
- *   Commands that mutate layers themselves (rename, visibility, lock, delete) do NOT
- *   require the layer to be unlocked — layer-level operations are always permitted.
- *   Geometry edits to entities on locked layers are NOT blocked.
+ * Locked-layer policy: only `set_entity_layer` honours locks (it refuses to move an entity OFF a
+ * locked layer); layer operations and geometry edits are never blocked.
  *
  * @layer core/commands
  */
 
-import type { Layer } from '../model/types';
+import type { CadDocument, Layer } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { noop } from './noop';
+import { replaceEntity } from './entityOps';
+
+const withLayer = (doc: CadDocument, layer: Layer): CadDocument => ({
+  ...doc,
+  layers: { ...doc.layers, [layer.id]: layer },
+});
 
 /**
  * @command add_layer
@@ -61,11 +60,7 @@ export const addLayer = defineCommand({
     };
 
     return {
-      document: {
-        ...doc,
-        layers: { ...doc.layers, [id]: layer },
-        layerOrder: [...doc.layerOrder, id],
-      },
+      document: { ...withLayer(doc, layer), layerOrder: [...doc.layerOrder, id] },
       summary: `Created layer ${id} ("${trimmed}").`,
       affected: [id],
     };
@@ -103,13 +98,7 @@ export const renameLayer = defineCommand({
 
     const prevName = layer.name;
     return {
-      document: {
-        ...doc,
-        layers: {
-          ...doc.layers,
-          [id]: { ...layer, name: trimmed },
-        },
-      },
+      document: withLayer(doc, { ...layer, name: trimmed }),
       summary: `Layer ${id}: renamed "${prevName}" → "${trimmed}".`,
       affected: [id],
     };
@@ -141,13 +130,7 @@ export const setLayerVisibility = defineCommand({
     }
 
     return {
-      document: {
-        ...doc,
-        layers: {
-          ...doc.layers,
-          [id]: { ...layer, visible },
-        },
-      },
+      document: withLayer(doc, { ...layer, visible }),
       summary: `Layer ${id} ("${layer.name}"): visible = ${visible}.`,
       affected: [id],
     };
@@ -180,13 +163,7 @@ export const setLayerLock = defineCommand({
     }
 
     return {
-      document: {
-        ...doc,
-        layers: {
-          ...doc.layers,
-          [id]: { ...layer, locked },
-        },
-      },
+      document: withLayer(doc, { ...layer, locked }),
       summary: `Layer ${id} ("${layer.name}"): locked = ${locked}.`,
       affected: [id],
     };
@@ -225,7 +202,6 @@ export const setEntityLayer = defineCommand({
       return noop(doc, `No layer ${layerId} — set_entity_layer is a no-op.`);
     }
 
-    // Locked-layer guard: refuse to move an entity off a locked source layer.
     const sourceLayer = doc.layers[entity.layerId];
     if (sourceLayer?.locked) {
       return {
@@ -238,13 +214,7 @@ export const setEntityLayer = defineCommand({
     }
 
     return {
-      document: {
-        ...doc,
-        entities: {
-          ...doc.entities,
-          [entityId]: { ...entity, layerId },
-        },
-      },
+      document: replaceEntity(doc, { ...entity, layerId }),
       summary: `Entity ${entityId}: moved from layer ${entity.layerId} to ${layerId} ("${targetLayer.name}").`,
       affected: [entityId],
     };
@@ -286,34 +256,21 @@ export const deleteLayer = defineCommand({
       return noop(doc, `No layer ${id} — delete_layer is a no-op.`);
     }
 
-    // Reassign orphaned entities to the default layer.
-    const nextEntities = { ...doc.entities };
-    let reassignedCount = 0;
-    for (const entityId of Object.keys(nextEntities)) {
-      const entity = nextEntities[entityId];
-      if (entity && entity.layerId === id) {
-        nextEntities[entityId] = { ...entity, layerId: DEFAULT_LAYER_ID };
-        reassignedCount++;
-      }
-    }
-
-    // Remove layer from layers map.
-    const nextLayers = { ...doc.layers };
-    delete nextLayers[id];
-
-    // Remove layer from layerOrder.
-    const nextLayerOrder = doc.layerOrder.filter((lid) => lid !== id);
+    const orphans = Object.values(doc.entities).filter((entity) => entity.layerId === id);
+    const nextLayers = Object.fromEntries(Object.entries(doc.layers).filter(([lid]) => lid !== id));
 
     return {
       document: {
-        ...doc,
-        entities: nextEntities,
+        ...orphans.reduce(
+          (next, entity) => replaceEntity(next, { ...entity, layerId: DEFAULT_LAYER_ID }),
+          doc,
+        ),
         layers: nextLayers,
-        layerOrder: nextLayerOrder,
+        layerOrder: doc.layerOrder.filter((lid) => lid !== id),
       },
       summary:
         `Deleted layer ${id} ("${layer.name}"). ` +
-        `${reassignedCount} entity(s) reassigned to default layer ${DEFAULT_LAYER_ID}.`,
+        `${orphans.length} entity(s) reassigned to default layer ${DEFAULT_LAYER_ID}.`,
       affected: [id],
     };
   },
