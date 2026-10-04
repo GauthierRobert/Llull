@@ -146,3 +146,69 @@ describe('render_view isolate and section', () => {
     expect(result.affected).toEqual([]);
   });
 });
+
+describe('render_view label markers and axes (ported from server enrichment tests)', () => {
+  const labelled = { ...bare, showLabels: true } as const;
+  const markerCount = (svg: string, id: string): number => {
+    const group = svg.match(new RegExp(`data-entity-id="${id}"[\\s\\S]*?</g>`))?.[0];
+    expect(group).toBeDefined();
+    return group?.match(/<circle[^>]+r="3"/g)?.length ?? 0;
+  };
+
+  it.each([
+    ['box (8 AABB corners)', 'add_box', { position: [0, 0, 0], size: [2, 2, 2] }, 8],
+    ['line (2 endpoints)', 'draw_line', { start: [0, 0], end: [3, 3] }, 2],
+    ['circle (center + radius handle)', 'draw_circle', { center: [1, 2], radius: 1.5 }, 2],
+    [
+      'ellipse (center + 2 semi-axes)',
+      'draw_ellipse',
+      { center: [0, 0], radiusX: 3, radiusY: 1.5 },
+      3,
+    ],
+    [
+      'arc (center + on-curve handle)',
+      'draw_arc',
+      { center: [0, 0], radius: 2, startAngle: Math.PI / 2, endAngle: Math.PI },
+      2,
+    ],
+    ['rectangle (4 corners)', 'draw_rectangle', { position: [0, 0], width: 4, height: 3 }, 4],
+  ])('%s', (_label, command, params, expected) => {
+    const created = execute(createEmptyDocument(), command, params);
+    const id = created.affected[0] as string;
+    const svg = render(created.document, labelled).svg;
+    expect(svg).toContain(id);
+    expect(markerCount(svg, id)).toBe(expected);
+  });
+
+  it('labels with the entity name when set, otherwise the id', () => {
+    const { doc, boxId } = boxDoc();
+    expect(render(doc, labelled).svg).toContain(`>${boxId}</text>`);
+    const named = execute(doc, 'set_entity_name', { id: boxId, name: 'MySpecialBox' }).document;
+    const svg = render(named, labelled).svg;
+    expect(svg).toContain('>MySpecialBox</text>');
+    expect(svg).not.toContain(`>${boxId}</text>`);
+  });
+
+  it('draws X=red, Y=green, Z=blue axes with X/Y/Z labels', () => {
+    const svg = render(boxDoc().doc, { showAxes: true, showGrid: false }).svg;
+    for (const color of ['#ff4444', '#44dd44', '#4488ff']) expect(svg).toContain(color);
+    for (const axis of ['X', 'Y', 'Z']) expect(svg).toContain(`>${axis}</text>`);
+  });
+
+  it('composes axes, grid and labels in one render', () => {
+    const { doc, boxId } = boxDoc();
+    const svg = render(doc, { showAxes: true, showGrid: true, showLabels: true }).svg;
+    expect(svg).toContain('id="world-axes"');
+    expect(svg).toContain('id="ground-grid"');
+    expect(svg).toContain('entity labels overlay');
+    expect(svg).toContain(boxId);
+    expect(svg.trimEnd().endsWith('</svg>')).toBe(true);
+  });
+
+  it('section plane line is dashed and the far side is dimmed', () => {
+    const svg = render(boxDoc().doc, { ...bare, section: { axis: 'z', offset: 10 } }).svg;
+    expect(svg).toContain('stroke-dasharray');
+    expect(svg).toContain('opacity="0.25"');
+    expect(svg).toContain('SECTION Z=10');
+  });
+});
