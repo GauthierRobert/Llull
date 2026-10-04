@@ -1,17 +1,7 @@
 /**
  * Assembly commands: create_component, insert_instance, explode_instance.
- *
- * An assembly is a two-level structure:
- *   - A `Component` definition stores local-space entities (geometry), keyed by id.
- *   - An `InstanceEntity` places that component in the world via position/rotation/scale.
- *
- * Instances reference the component by id — they do NOT copy geometry. Editing the
- * component definition is immediately reflected in every instance.
- *
- * `expandInstance` bakes an instance into world-space entities for `explode_instance`.
- * Scene bounds (`scene.ts` `instanceBoundsFromDoc`) apply the SAME transform order
- * (scale → rotate-about-origin → translate) to each child's local-AABB corners — keep
- * the two in sync. The render tessellator does NOT expand instances (explode to export).
+ * Instances reference a component by id; `expandInstance` bakes one into world-space entities
+ * (scale -> rotate about origin -> translate; keep in sync with `scene.ts` `instanceBoundsFromDoc`).
  *
  * @layer core/commands
  */
@@ -21,45 +11,45 @@ import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
-import { pruneGroupMembers } from './entityOps';
+import { replaceEntities, withEntity, withoutEntities } from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { noop } from './noop';
 import { add3 } from '../lib/vec3';
+import { ORIGIN } from './geometryShared';
 
-/**
- * Build a deterministic expanded-entity id from the instance id and the
- * source entity id.  The double-colon delimiter cannot appear in real
- * nextId-generated ids (which use base-36 chars only), so collisions with
- * real document entity ids are impossible.
- *
- * Same inputs → same output (pure, no side effects).
- *
- * @pure
- */
-const ORIGIN: Vec3 = [0, 0, 0];
 const UNIT_SCALE: Vec3 = [1, 1, 1];
+
+/** A fresh instance of `componentId` (default color `#c8553d`). */
+export function instanceEntity(
+  id: string,
+  componentId: string,
+  position: Vec3,
+  rotation: Vec3,
+  scale?: Vec3,
+): InstanceEntity {
+  return {
+    id,
+    kind: 'instance',
+    componentId,
+    position,
+    rotation,
+    ...(scale ? { scale } : {}),
+    layerId: DEFAULT_LAYER_ID,
+    color: '#c8553d',
+  };
+}
 
 function expandedId(instanceId: string, sourceEntityId: string): string {
   return `expanded::${instanceId}::${sourceEntityId}`;
 }
 
 /**
- * Bake an instance into world-space copies of the component's entities.
- *
- * For each entity in `component.entities`, applies `instance.scale` (default [1,1,1]),
- * rotates by `instance.rotation` (XYZ Euler — the same convention as
- * `lib/eulerRotation.applyEulerXYZ` and the viewport), then translates by `instance.position`.
- * Each returned entity receives a fresh id from `nextId`.
- *
- * Callers: `explode_instance` (produces real entities), scene bounds, and the
- * render tessellator (recursion for the instance kind).
- *
- * @pure — returns new entities; does not mutate the input
- * @layer core/commands
+ * Bake an instance into world-space copies of the component's entities (ids `expanded::<instance>::<source>`).
+ * Child rotations add the instance's Euler angles (additive, as elsewhere in the command layer).
+ * @pure
  */
 export function expandInstance(instance: InstanceEntity, component: Component): Entity[] {
-  const scale: Vec3 = instance.scale ?? [1, 1, 1];
-  const [sx, sy, sz] = scale;
+  const [sx, sy, sz] = instance.scale ?? UNIT_SCALE;
   const rot = instance.rotation;
   const pos = instance.position;
   const hasRotation = !isZeroRotation(rot);
@@ -68,21 +58,16 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
     .map((cid) => component.entities[cid])
     .filter((e): e is Entity => e !== undefined)
     .map((childEntity): Entity => {
-      // 1. Apply scale to the component-local position.
       const localPos: Vec3 = [
         childEntity.position[0] * sx,
         childEntity.position[1] * sy,
         childEntity.position[2] * sz,
       ];
 
-      // 2. Apply instance rotation around the component origin [0,0,0].
       const rotatedPos: Vec3 = hasRotation ? applyEulerXYZ(localPos, [0, 0, 0], rot) : localPos;
 
-      // 3. Translate by the instance world position.
       const worldPos = add3(rotatedPos, pos);
 
-      // 4. Accumulate rotation (add Euler angles — approximate but consistent with the
-      //    rest of the command layer which uses additive Euler).
       const worldRot = add3(childEntity.rotation, rot);
 
       return {
@@ -145,56 +130,19 @@ export const createComponent = defineCommand({
       );
     }
 
-    // Snapshot the promoted entities as component-local (positions kept as-is;
-    // they are already local to the component origin which is at the world origin by default).
-    const compEntities: Record<string, Entity> = {};
-    const compOrder: string[] = [];
-    for (const id of entityIds) {
-      const e = doc.entities[id]!;
-      compEntities[e.id] = e;
-      compOrder.push(e.id);
-    }
-
     const compId = componentId ?? nextId('comp');
     const component: Component = {
       id: compId,
       name,
-      entities: compEntities,
-      order: compOrder,
+      entities: Object.fromEntries(entityIds.map((id) => [id, doc.entities[id] as Entity])),
+      order: [...entityIds],
     };
-
-    // Remove source entities from doc
-    const newEntities = { ...doc.entities };
-    for (const id of entityIds) delete newEntities[id];
-
-    const newOrder = doc.order.filter((id) => !entityIds.includes(id));
-
-    const newGroups = pruneGroupMembers(doc.groups, new Set(entityIds)).nextGroups;
-
-    // Prune removed ids from selection
-    const newSelection = doc.selection.filter((sid) => !entityIds.includes(sid));
-
-    // Insert the replacement instance
     const instanceId = nextId('instance');
-    const instance: InstanceEntity = {
-      id: instanceId,
-      kind: 'instance',
-      componentId: compId,
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
-      color: '#c8553d',
-    };
+    const instance = instanceEntity(instanceId, compId, ORIGIN, ORIGIN);
+    const replaced = replaceEntities(doc, entityIds, instance);
 
     return {
-      document: {
-        ...doc,
-        entities: { ...newEntities, [instanceId]: instance },
-        order: [...newOrder, instanceId],
-        groups: newGroups,
-        selection: newSelection,
-        components: { ...doc.components, [compId]: component },
-      },
+      document: { ...replaced, components: { ...doc.components, [compId]: component } },
       summary: `Created component "${name}" (id: ${compId}) from ${entityIds.length} entit${entityIds.length === 1 ? 'y' : 'ies'} [${entityIds.join(', ')}]; placed instance ${instanceId}.`,
       affected: [instanceId],
     };
@@ -230,34 +178,26 @@ export const insertInstance = defineCommand({
   }),
   run: (
     doc,
-    { componentId, position: rawPosition, rotation: rawRotation, scale: rawScale },
+    { componentId, position: rawPosition, rotation: rawRotation, scale },
   ): CommandResult => {
     const position = rawPosition ?? ORIGIN;
     const rotation = rawRotation ?? ORIGIN;
-    const scale = rawScale ?? UNIT_SCALE;
     const component = doc.components[componentId];
     if (!component) {
       return noop(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
     }
 
     const instanceId = nextId('instance');
-    const instance: InstanceEntity = {
-      id: instanceId,
-      kind: 'instance',
+    const instance = instanceEntity(
+      instanceId,
       componentId,
       position,
       rotation,
-      scale,
-      layerId: DEFAULT_LAYER_ID,
-      color: '#c8553d',
-    };
+      scale ?? UNIT_SCALE,
+    );
 
     return {
-      document: {
-        ...doc,
-        entities: { ...doc.entities, [instanceId]: instance },
-        order: [...doc.order, instanceId],
-      },
+      document: withEntity(doc, instance),
       summary: `Inserted instance ${instanceId} of component "${component.name}" (${componentId}) at position [${position.join(', ')}].`,
       affected: [instanceId],
     };
@@ -303,36 +243,16 @@ export const explodeInstance = defineCommand({
 
     const bakedEntities = expandInstance(instance, component);
 
-    // Remove the instance and insert the baked entities at the same order position
-    const instanceOrderIdx = doc.order.indexOf(id);
-    const newOrder = [...doc.order];
     const bakedIds = bakedEntities.map((e) => e.id);
-    if (instanceOrderIdx >= 0) {
-      newOrder.splice(instanceOrderIdx, 1, ...bakedIds);
-    } else {
-      // Shouldn't happen, but safe fallback
-      newOrder.push(...bakedIds);
-    }
-
-    const newEntities = { ...doc.entities };
-    delete newEntities[id];
-    for (const e of bakedEntities) {
-      newEntities[e.id] = e;
-    }
-
-    const newGroups = pruneGroupMembers(doc.groups, new Set([id])).nextGroups;
-
-    // Prune instance from selection
-    const newSelection = doc.selection.filter((sid) => sid !== id);
+    const { document: rest } = withoutEntities(doc, new Set([id]));
+    const document = {
+      ...rest,
+      entities: { ...rest.entities, ...Object.fromEntries(bakedEntities.map((e) => [e.id, e])) },
+      order: doc.order.flatMap((orderId) => (orderId === id ? bakedIds : [orderId])),
+    };
 
     return {
-      document: {
-        ...doc,
-        entities: newEntities,
-        order: newOrder,
-        groups: newGroups,
-        selection: newSelection,
-      },
+      document,
       summary: `Exploded instance "${id}" (component "${component.name}", ${instance.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].`,
       affected: bakedIds,
     };

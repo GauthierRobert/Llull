@@ -8,7 +8,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { MAX_BATCH_IDS } from './limits';
 import { resolveBatchIds } from './batchIds';
-import { pruneGroupMembers } from './entityOps';
+import { withoutEntities } from './entityOps';
 
 /**
  * @command delete_entities
@@ -44,11 +44,7 @@ export const deleteEntities = defineCommand({
     if (!batch.ok) return batch.result;
     const { existing, missing } = batch;
 
-    const removed = new Set(existing);
-    const entities = { ...doc.entities };
-    for (const id of existing) delete entities[id];
-
-    const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, removed);
+    const { document, dissolvedGroups } = withoutEntities(doc, new Set(existing));
 
     const dissolveSuffix =
       dissolvedGroups.length > 0
@@ -57,13 +53,7 @@ export const deleteEntities = defineCommand({
     const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
 
     return {
-      document: {
-        ...doc,
-        entities,
-        order: doc.order.filter((id) => !removed.has(id)),
-        selection: doc.selection.filter((id) => !removed.has(id)),
-        groups: nextGroups,
-      },
+      document,
       summary: `Deleted ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}].${dissolveSuffix}${missingSuffix}`,
       affected: existing,
     };

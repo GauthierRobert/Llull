@@ -15,17 +15,8 @@ import type {
   RectangleEntity,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  cross2,
-  dot2,
-  len2,
-  normalize2,
-  perp2,
-  segIntersect,
-  evalLine,
-  offsetSegment,
-  miterJoin,
-} from '@core/commands/modify2dGeometry';
+import { cross2, dot2, len2, normalize2, perp2 } from '@lib/vec2';
+import { segIntersect, evalLine, offsetSegment, miterJoin } from '@core/commands/modify2dGeometry';
 
 // ---------------------------------------------------------------------------
 // Geometry helper unit tests

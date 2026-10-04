@@ -3,7 +3,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, colorField, untypedArray } from './schema';
 import { nextId } from '../lib/id';
-import { pruneGroupMembers } from './entityOps';
+import { withoutEntities } from './entityOps';
 import {
   DEFAULT_SOLID_COLOR,
   ORIGIN,
@@ -175,10 +175,7 @@ export const deleteEntity = defineCommand({
       return noop(doc, `No entity ${id} to delete.`);
     }
 
-    const entities = { ...doc.entities };
-    delete entities[id];
-
-    const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, new Set([id]));
+    const { document, dissolvedGroups } = withoutEntities(doc, new Set([id]));
 
     const dissolveSuffix =
       dissolvedGroups.length > 0
@@ -186,13 +183,7 @@ export const deleteEntity = defineCommand({
         : '';
 
     return {
-      document: {
-        ...doc,
-        entities,
-        order: doc.order.filter((e) => e !== id),
-        selection: doc.selection.filter((e) => e !== id),
-        groups: nextGroups,
-      },
+      document,
       summary: `Deleted ${id}.${dissolveSuffix}`,
       affected: [id],
     };

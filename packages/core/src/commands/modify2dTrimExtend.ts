@@ -2,13 +2,14 @@ import type { Entity, LineEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import type { Vec2 } from '../model/types';
-import { len2, segIntersect, evalLine } from './modify2dGeometry';
+import { len2, sub2 } from '../lib/vec2';
+import { segIntersect, evalLine } from './modify2dGeometry';
 import { noop } from './noop';
 
 /** `line` with its endpoint nearer to `point` moved onto `point` (a tie moves the start). */
 function withNearerEndpointAt(line: LineEntity, point: Vec2): LineEntity {
-  const distToStart = len2([point[0] - line.start[0], point[1] - line.start[1]]);
-  const distToEnd = len2([point[0] - line.end[0], point[1] - line.end[1]]);
+  const distToStart = len2(sub2(point, line.start));
+  const distToEnd = len2(sub2(point, line.end));
   return distToStart <= distToEnd ? { ...line, start: point } : { ...line, end: point };
 }
 

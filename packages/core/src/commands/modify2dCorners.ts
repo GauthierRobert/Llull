@@ -2,7 +2,7 @@ import type { CadDocument, Entity, Vec2, PolylineEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { cross2, dot2, len2, normalize2 } from './modify2dGeometry';
+import { cross2, dot2, len2, normalize2 } from '../lib/vec2';
 import { withEntity } from './entityOps';
 import { noop } from './noop';
 
