@@ -69,41 +69,80 @@ function accessCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
   };
 }
 
+/** Per-member verdict rows in a check's data: objects naming the member id with a utilisation / ok. */
+interface MemberRow {
+  id: string;
+  utilisation: number | null;
+  ok: boolean | null;
+}
+
+function memberRows(value: unknown, ids: ReadonlySet<string>, rows: MemberRow[] = []): MemberRow[] {
+  if (Array.isArray(value)) {
+    for (const item of value) memberRows(item, ids, rows);
+  } else if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const id = record['id'] ?? record['memberId'] ?? record['elementId'];
+    const utilisation = record['utilisation'] ?? record['utilization'];
+    const ok = record['ok'];
+    if (
+      typeof id === 'string' &&
+      ids.has(id) &&
+      (typeof utilisation === 'number' || typeof ok === 'boolean')
+    ) {
+      rows.push({
+        id,
+        utilisation: typeof utilisation === 'number' ? utilisation : null,
+        ok: typeof ok === 'boolean' ? ok : null,
+      });
+    }
+    for (const inner of Object.values(record)) memberRows(inner, ids, rows);
+  }
+  return rows;
+}
+
+/**
+ * A member is verified when a structural check returns a verdict row for it (its id with a
+ * utilisation or ok flag) and every such row passes (utilisation ≤ 1, ok not false).
+ */
 function coverageCheck({ document, run }: GradeContext): CheckOutcome {
   const members = elementsOf(document, 'member');
+  const ids = new Set(members.map((m) => m.id));
   const checks = listCommands().filter(
     (command) =>
       command.name.startsWith('check_') &&
       command.annotations?.readOnly === true &&
       !NOT_STRUCTURAL.has(command.name),
   );
-  const covered = new Set<string>();
+  const rows: MemberRow[] = [];
   const perCheck: string[] = [];
   for (const command of checks) {
-    const result = run(command.name);
-    const text = `${result.summary} ${JSON.stringify(result.data ?? {})}`;
-    const hits = members.filter(
-      (m) =>
-        text.includes(`"${m.id}"`) ||
-        new RegExp(`\\b${m.mark.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text),
-    );
-    hits.forEach((m) => covered.add(m.id));
-    if (hits.length > 0) perCheck.push(`${command.name} ${hits.length}`);
+    const found = memberRows(run(command.name).data ?? {}, ids);
+    rows.push(...found);
+    if (found.length > 0) perCheck.push(`${command.name} ${new Set(found.map((r) => r.id)).size}`);
   }
+  const covered = new Set(rows.map((r) => r.id));
+  const failing = new Set(
+    rows
+      .filter((r) => r.ok === false || (r.utilisation !== null && r.utilisation > 1))
+      .map((r) => r.id),
+  );
   const uncovered = members.filter((m) => !covered.has(m.id));
+  const failed = members.filter((m) => failing.has(m.id));
+  const worst = rows.reduce((max, r) => Math.max(max, r.utilisation ?? 0), 0);
+  const marks = (list: typeof members): string =>
+    list
+      .slice(0, 6)
+      .map((m) => m.mark)
+      .join(', ');
   return {
-    pass: members.length > 0 && uncovered.length === 0,
+    pass: members.length > 0 && uncovered.length === 0 && failed.length === 0,
     detail:
-      `${covered.size}/${members.length} steel members verified by a structural check` +
+      `${covered.size - failed.length}/${members.length} steel members verified and passing` +
       (perCheck.length > 0
-        ? ` (${perCheck.join(', ')})`
+        ? ` (${perCheck.join(', ')}; max utilisation ${worst.toFixed(2)})`
         : ` (ran ${checks.map((c) => c.name).join(', ')})`) +
-      (uncovered.length > 0
-        ? `; unverified e.g. ${uncovered
-            .slice(0, 5)
-            .map((m) => m.mark)
-            .join(', ')}`
-        : ''),
+      (failed.length > 0 ? `; failing: ${marks(failed)}` : '') +
+      (uncovered.length > 0 ? `; unverified e.g. ${marks(uncovered)}` : ''),
   };
 }
 
@@ -126,7 +165,7 @@ export function coordinationCriteria(intent: PlantIntent): Criterion[] {
       id: 'structural-coverage',
       area: 'engineering',
       requirement:
-        'Every steel member is verified (EN 1993) under the equipment and floor loads by a structural check.',
+        'Every steel member is verified (EN 1993) under its equipment, floor and pipe loads by a structural check, and passes (utilisation ≤ 1).',
       check: coverageCheck,
     },
   ];

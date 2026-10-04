@@ -31,9 +31,12 @@ export function buildAuthMiddleware(): (req: Request, res: Response, next: () =>
   };
 }
 
-/** 60 requests per minute per IP; override via `MCP_RATE_LIMIT_MAX` / `MCP_RATE_LIMIT_WINDOW_MS`. */
+/**
+ * 600 requests per minute per IP (an agent modelling a building makes 100–300 tool calls in a few
+ * minutes); override via `MCP_RATE_LIMIT_MAX` / `MCP_RATE_LIMIT_WINDOW_MS`.
+ */
 export function buildMcpRateLimiter(): RequestHandler {
   const windowMs = Number.parseInt(process.env['MCP_RATE_LIMIT_WINDOW_MS'] ?? '', 10) || 60_000;
-  const max = Number.parseInt(process.env['MCP_RATE_LIMIT_MAX'] ?? '', 10) || 60;
+  const max = Number.parseInt(process.env['MCP_RATE_LIMIT_MAX'] ?? '', 10) || 600;
   return buildRateLimiter(max, windowMs);
 }

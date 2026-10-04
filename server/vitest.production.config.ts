@@ -12,9 +12,8 @@ export default defineConfig({
   test: {
     ...base.test,
     include: ['tests/production/**/*.gate.ts'],
-    // A modelling job is 100–300 tool calls in a few minutes; the default /mcp limit (60/min/IP)
-    // throttles it, so the gate runs like an office would configure its local server.
-    env: { MCP_RATE_LIMIT_MAX: '100000' },
+    // Default server settings (incl. the /mcp rate limit): a modelling job must fit within them.
+    env: {},
     testTimeout: 3_600_000,
     hookTimeout: 120_000,
   },
