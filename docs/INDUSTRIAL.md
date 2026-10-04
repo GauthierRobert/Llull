@@ -91,6 +91,31 @@ punching at 2d; footings that fail shear or punching are reported "increase thic
 go to the footing schedule and the rebar mass to the takeoff. `check_foundations` adds elastic
 settlement (`soilModulus`, 25 mm) and differential settlement between frame columns (L/500).
 
+### Any steel structure: `check_steel_members`
+
+Multi-storey process structures, platforms and pipe racks are not portal frames, so
+`check_steel_members` (read-only) verifies **every** steel member of the model with loads derived
+from it:
+
+- **Floors**: `floorDeadLoad` (0.5 kN/m², gratings) and `imposedLoad` (5 kN/m², process floors; not
+  under equipment footprints) go to the beams under each slab by the 45° tributary rule.
+- **Equipment**: operating weight on the floor it stands on, spread over the bays its footprint
+  covers. Equipment on grade is reported, not carried.
+- **Pipes and trays** resting on a beam (underside at top of steel ±10 mm): water-filled steel pipe
+  (standard wall by OD) and `cableTrayWeight` (75 kg/m), tributary length to the neighbouring
+  supports.
+- **Self weight** from the catalogue.
+
+ULS 1.35 G + 1.5 Q. Beams (simply supported): bending with LTB (restrained by a floor or by pipes),
+shear, deflection ≤ L/`deflectionRatio` (250) under G + Q. Columns: Npl and flexural buckling per
+storey segment between beam levels. Bracing: equivalent horizontal forces (`notionalFactor` 1/200,
+EN 1993-1-1 §5.3.2) shared by the bracing planes; X-bracing tension-only with λ ≤ 300; chord beams
+of braced bays as struts. `data.members` has one verdict row per member (`utilisation`, `ok`,
+governing check); members it cannot analyse (rafters, purlins, crane beams — use the dedicated
+checks — or sections outside the catalogue) are listed with the reason. `data.loads.assumptions`
+states every rule above; `data.warnings` lists model gaps (equipment on grade, pipes resting on no
+beam, a storey without bracing in one direction).
+
 ### Design workflow
 
 Run the design commands in order — each one sizes what the next one checks:
