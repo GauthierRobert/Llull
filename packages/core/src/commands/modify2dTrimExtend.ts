@@ -1,7 +1,6 @@
-import type { Entity, LineEntity } from '../model/types';
+import type { CadDocument, LineEntity, Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import type { Vec2 } from '../model/types';
 import { len2, sub2 } from '../lib/vec2';
 import { segIntersect, evalLine } from './modify2dGeometry';
 import { noop } from './noop';
@@ -14,6 +13,31 @@ function withNearerEndpointAt(line: LineEntity, point: Vec2): LineEntity {
   return distToStart <= distToEnd ? { ...line, start: point } : { ...line, end: point };
 }
 
+/** The two distinct line entities `id` and `boundaryId`, or the no-op result explaining why not. */
+function resolveLinePair(
+  doc: CadDocument,
+  command: string,
+  id: string,
+  boundaryId: string,
+): { line: LineEntity; boundary: LineEntity } | CommandResult {
+  if (id === boundaryId)
+    return noop(doc, `${command}: id and boundaryId must be different entities.`);
+  const line = doc.entities[id];
+  const boundary = doc.entities[boundaryId];
+  if (!line) return noop(doc, `${command}: entity ${id} not found.`);
+  if (!boundary) return noop(doc, `${command}: boundary entity ${boundaryId} not found.`);
+  if (line.kind !== 'line') {
+    return noop(doc, `${command}: entity ${id} is kind '${line.kind}', expected 'line'.`);
+  }
+  if (boundary.kind !== 'line') {
+    return noop(
+      doc,
+      `${command}: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`,
+    );
+  }
+  return { line, boundary };
+}
+
 /**
  * @command trim
  * @pure
@@ -21,12 +45,6 @@ function withNearerEndpointAt(line: LineEntity, point: Vec2): LineEntity {
  * @affects updates 1 line entity (the endpoint closer to the intersection moves to the intersection)
  * @invariant both entities must be kind:'line'
  * @failure missing id / wrong kind / no intersection -> no-op, affected:[]
- *
- * Trim convention:
- *   The endpoint of `id` that is closer to the intersection point is moved to the
- *   intersection. The farther endpoint (and the longer portion of the line) is kept.
- *   In other words, the "short" side of the line is trimmed off.
- *   Only trims at intersections within the segment bounds (t ∈ [0,1]).
  */
 export const trim = defineCommand({
   name: 'trim',
@@ -41,41 +59,22 @@ export const trim = defineCommand({
     boundaryId: z.string().describe('Id of the line entity that acts as the trim boundary.'),
   }),
   run: (doc, { id, boundaryId }): CommandResult => {
-    if (id === boundaryId) {
-      return noop(doc, `trim: id and boundaryId must be different entities.`);
-    }
-    const entity = doc.entities[id];
-    const boundary = doc.entities[boundaryId];
-    if (!entity) {
-      return noop(doc, `trim: entity ${id} not found.`);
-    }
-    if (!boundary) {
-      return noop(doc, `trim: boundary entity ${boundaryId} not found.`);
-    }
-    if (entity.kind !== 'line') {
-      return noop(doc, `trim: entity ${id} is kind '${entity.kind}', expected 'line'.`);
-    }
-    if (boundary.kind !== 'line') {
-      return noop(doc, `trim: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`);
-    }
-
-    const line = entity as LineEntity;
-    const bLine = boundary as LineEntity;
+    const pair = resolveLinePair(doc, 'trim', id, boundaryId);
+    if ('summary' in pair) return pair;
+    const { line, boundary: bLine } = pair;
     const hit = segIntersect(line.start, line.end, bLine.start, bLine.end);
 
     if (hit === null) {
       return noop(doc, `trim: lines ${id} and ${boundaryId} are parallel — no intersection.`);
     }
 
-    // The intersection must lie on the boundary segment (u ∈ [0,1])
-    // and within the line segment (t ∈ [0,1])
     if (hit.t < -1e-9 || hit.t > 1 + 1e-9 || hit.u < -1e-9 || hit.u > 1 + 1e-9) {
       return noop(doc, `trim: intersection of ${id} and ${boundaryId} is outside segment bounds.`);
     }
 
     const intersectionPt = evalLine(line.start, line.end, hit.t);
 
-    const trimmed: Entity = withNearerEndpointAt(line, intersectionPt);
+    const trimmed = withNearerEndpointAt(line, intersectionPt);
 
     return {
       document: replaceEntity(doc, trimmed),
@@ -92,11 +91,6 @@ export const trim = defineCommand({
  * @affects updates 1 line entity (the endpoint closer to the boundary is extended)
  * @invariant both entities must be kind:'line'
  * @failure missing id / wrong kind / parallel lines -> no-op, affected:[]
- *
- * Extend convention:
- *   Finds the intersection of the infinite line through `id` and the infinite line
- *   through `boundaryId`. The endpoint of `id` that is closer to the intersection
- *   is extended to meet it. No-op if lines are parallel.
  */
 export const extend = defineCommand({
   name: 'extend',
@@ -111,31 +105,10 @@ export const extend = defineCommand({
     boundaryId: z.string().describe('Id of the line entity that acts as the extend boundary.'),
   }),
   run: (doc, { id, boundaryId }): CommandResult => {
-    if (id === boundaryId) {
-      return noop(doc, `extend: id and boundaryId must be different entities.`);
-    }
-    const entity = doc.entities[id];
-    const boundary = doc.entities[boundaryId];
-    if (!entity) {
-      return noop(doc, `extend: entity ${id} not found.`);
-    }
-    if (!boundary) {
-      return noop(doc, `extend: boundary entity ${boundaryId} not found.`);
-    }
-    if (entity.kind !== 'line') {
-      return noop(doc, `extend: entity ${id} is kind '${entity.kind}', expected 'line'.`);
-    }
-    if (boundary.kind !== 'line') {
-      return noop(
-        doc,
-        `extend: boundary ${boundaryId} is kind '${boundary.kind}', expected 'line'.`,
-      );
-    }
+    const pair = resolveLinePair(doc, 'extend', id, boundaryId);
+    if ('summary' in pair) return pair;
+    const { line, boundary: bLine } = pair;
 
-    const line = entity as LineEntity;
-    const bLine = boundary as LineEntity;
-
-    // Use infinite-line intersection (no segment clamping)
     const hit = segIntersect(line.start, line.end, bLine.start, bLine.end);
     if (hit === null) {
       return noop(doc, `extend: lines ${id} and ${boundaryId} are parallel — no intersection.`);
@@ -143,7 +116,7 @@ export const extend = defineCommand({
 
     const intersectionPt = evalLine(line.start, line.end, hit.t);
 
-    const extended: Entity = withNearerEndpointAt(line, intersectionPt);
+    const extended = withNearerEndpointAt(line, intersectionPt);
 
     return {
       document: replaceEntity(doc, extended),
