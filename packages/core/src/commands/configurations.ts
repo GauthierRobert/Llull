@@ -14,7 +14,7 @@ import { currentContext } from './context';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { reEvaluateAll } from './parameters';
-import { replayHistory } from './history';
+import { replayHistory } from './replay';
 import { noop } from './noop';
 
 /**

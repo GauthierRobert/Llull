@@ -8,7 +8,7 @@
 
 import type { CadDocument, FeatureStep, Parameter } from '../model/types';
 import { extractReferences } from './expression';
-import { replayHistory } from './history';
+import { replayHistory } from './replay';
 import { currentContext } from './context';
 import { kernelRefusal } from './kernelRefusal';
 

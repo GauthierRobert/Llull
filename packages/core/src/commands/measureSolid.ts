@@ -1,10 +1,11 @@
 import type { Vec3 } from '../model/types';
+import { cross3, dot3 } from '../lib/vec3';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { entityBounds, mergeBounds } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { formatLength } from './units';
-import { polygonArea } from './measureAreaPerimeter';
+import { polygonArea, polygonCentroid } from '../lib/polygon';
 import { noop } from './noop';
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -92,35 +93,19 @@ interface MeasureVolumeData {
   unit: string;
 }
 
-/**
- * Signed-tetrahedra sum over an INDEXED triangle mesh — gives the solid volume.
- * Each triangle (A, B, C) contributes A · (B × C) to the scalar triple-product sum.
- * Summing over all `indices.length / 3` triangles and taking |sum| / 6 gives the volume.
- * Result is valid only for a closed, consistently-wound mesh (Manifold output satisfies this).
- *
- * `positions` is a deduplicated vertex buffer (flat [x0,y0,z0, x1,y1,z1, …]).
- * `indices` is the flat triangle index list ([i0,i1,i2, …], one triplet per triangle).
- *
- * Reference: "Efficient feature extraction for 2D/3D objects in mesh representation",
- * Cha Zhang & Tsuhan Chen, ICIP 2001.
- */
+/** Signed-tetrahedra volume of a closed, consistently wound indexed mesh (Σ A·(B×C) / 6). */
 function meshVolume(positions: ReadonlyArray<number>, indices: ReadonlyArray<number>): number {
+  const vertex = (i: number): Vec3 => [
+    positions[i * 3] as number,
+    positions[i * 3 + 1] as number,
+    positions[i * 3 + 2] as number,
+  ];
   let sum = 0;
   for (let t = 0; t + 2 < indices.length; t += 3) {
-    const ia = indices[t]! * 3,
-      ib = indices[t + 1]! * 3,
-      ic = indices[t + 2]! * 3;
-    const ax = positions[ia]!,
-      ay = positions[ia + 1]!,
-      az = positions[ia + 2]!;
-    const bx = positions[ib]!,
-      by = positions[ib + 1]!,
-      bz = positions[ib + 2]!;
-    const cx = positions[ic]!,
-      cy = positions[ic + 1]!,
-      cz = positions[ic + 2]!;
-    // Scalar triple product A · (B × C)
-    sum += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
+    sum += dot3(
+      vertex(indices[t] as number),
+      cross3(vertex(indices[t + 1] as number), vertex(indices[t + 2] as number)),
+    );
   }
   return Math.abs(sum / 6);
 }
@@ -181,73 +166,37 @@ export const measureVolume = defineCommand({
         volume = meshVolume(e.mesh.positions, e.mesh.indices);
         break;
       case 'cone':
-        // V = π r² h / 3
         volume = (Math.PI * e.radius * e.radius * e.height) / 3;
         break;
       case 'torus':
-        // V = 2 π² · ringRadius · tubeRadius²
         volume = 2 * Math.PI * Math.PI * e.ringRadius * e.tubeRadius * e.tubeRadius;
         break;
       case 'wedge':
-        // Right-triangular prism: half the enclosing box volume
         volume = (e.size[0] * e.size[1] * e.size[2]) / 2;
         break;
       case 'pyramid':
-        // V = baseWidth × baseDepth × height / 3
         volume = (e.baseWidth * e.baseDepth * e.height) / 3;
         break;
       case 'revolution': {
-        // Pappus's centroid theorem (second kind):
-        //   V = sweepAngle × |x_centroid| × A_profile
-        //
-        // Convention from types.ts / revolve_profile: profile points are
-        // [radialOffset, axialOffset] where x (radialOffset) is the perpendicular
-        // distance from the revolution axis.  The axis vector stored in e.axis
-        // selects which world axes map to radial/axial, but for the volume
-        // formula only the profile-plane centroid matters — x_centroid IS the
-        // centroid's distance from the revolution axis.
-        //
-        // Guard: Pappus requires the profile NOT to cross the revolution axis
-        // (x < 0 would mean points on the other side of the axis).  When any
-        // profile x is negative we fall back to a bounding-box approximation
-        // and include a caveat in the summary.
-        const prof = e.profile;
-        const profN = prof.length;
-        let profileArea = 0;
-        let cx = 0;
-        for (let pi = 0; pi < profN; pi++) {
-          const [xi, yi] = prof[pi]!;
-          const [xj, yj] = prof[(pi + 1) % profN]!;
-          const cross = xi * yj - xj * yi;
-          profileArea += cross;
-          cx += (xi + xj) * cross;
-        }
-        profileArea = Math.abs(profileArea) / 2;
-        // Check for axis-crossing (any point with negative radial offset).
-        const crossesAxis = prof.some(([x]) => x < 0);
-        if (crossesAxis) {
-          // Fallback: bounding-box approximation (same as pre-fix behaviour).
+        // Pappus: V = sweepAngle * |centroid x| * profile area; profile x = distance from the axis.
+        // A profile crossing the axis falls back to the bounding-box volume.
+        if (e.profile.some(([x]) => x < 0)) {
           const b = entityBounds(e);
           volume = (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]);
-          const data: MeasureVolumeData = { volume, unit: volumeUnit };
           return {
             document: doc,
             summary:
               `Volume of ${entityId} ≈ ${volume.toFixed(doc.displayPrecision)} ${volumeUnit} ` +
               `(bounding-box approximation — profile crosses revolution axis; Pappus requires profile x ≥ 0).`,
             affected: [],
-            data,
+            data: { volume, unit: volumeUnit } satisfies MeasureVolumeData,
           };
         }
-        if (profileArea < 1e-12) {
-          volume = 0;
-          break;
-        }
-        const sweepAngle = e.angle ?? 2 * Math.PI;
-        // centroid x = (1/(6·A)) · Σ (xi+xj)(xi·yj − xj·yi)  — but we need |x_c|
-        const xCentroid = Math.abs(cx / (6 * profileArea));
-        // V = sweepAngle · x_centroid · A_profile
-        volume = sweepAngle * xCentroid * profileArea;
+        const profileArea = polygonArea(e.profile);
+        volume =
+          profileArea < 1e-12
+            ? 0
+            : (e.angle ?? 2 * Math.PI) * Math.abs(polygonCentroid(e.profile)[0]) * profileArea;
         break;
       }
       default:
@@ -320,8 +269,6 @@ export const massProperties = defineCommand({
       ),
   }),
   run: (doc, { entityId, density }): CommandResult => {
-    // Validate the fallback density param even if it may not be used — caller must
-    // supply a valid number so the API stays consistent.
     if (density <= 0) {
       return noop(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
     }
@@ -331,7 +278,6 @@ export const massProperties = defineCommand({
       return noop(doc, `mass_properties: entity '${entityId}' not found.`);
     }
 
-    // Resolve the effective density: prefer assigned material over the param.
     let effectiveDensity = density;
     let densitySource = 'param';
     if (e.materialId) {
@@ -344,7 +290,6 @@ export const massProperties = defineCommand({
 
     const volumeResult = measureVolume.run(doc, { entityId });
     if (!volumeResult.data) {
-      // measureVolume returned a no-op — propagate its summary.
       return noop(doc, volumeResult.summary);
     }
 
