@@ -14,3 +14,4 @@ server/.autosave.json
 test-results
 playwright-report
 .cache
+__pycache__

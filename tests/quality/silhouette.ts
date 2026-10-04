@@ -88,16 +88,27 @@ export function aspectOf(rect: NonNullable<Silhouette['rect']>): number {
   return (rect.maxX - rect.minX + 1) / (rect.maxY - rect.minY + 1);
 }
 
-/** Visible, not cut off by the canvas border, and covering at least `minFill` of the canvas. */
-export function isFramed(shape: Silhouette, minFill: number, margin = 1): boolean {
+/**
+ * Whole (not cut off by the canvas border) and fitted: along its major axis the model spans at least
+ * `minSpan` of the canvas. Span, not area, so a slender model (a facade seen from above) can pass.
+ */
+export function isFramed(shape: Silhouette, minSpan: number, margin = 1): boolean {
   if (shape.rect === null) return false;
   const { minX, minY, maxX, maxY } = shape.rect;
-  const fill = ((maxX - minX + 1) * (maxY - minY + 1)) / (shape.canvasWidth * shape.canvasHeight);
+  const span = Math.max(
+    (maxX - minX + 1) / shape.canvasWidth,
+    (maxY - minY + 1) / shape.canvasHeight,
+  );
   return (
-    fill >= minFill &&
+    span >= minSpan &&
     minX >= margin &&
     minY >= margin &&
     maxX <= shape.canvasWidth - 1 - margin &&
     maxY <= shape.canvasHeight - 1 - margin
   );
+}
+
+/** Aspect error a perfect render can still show: ±2 px of edge/stroke on the shorter side. */
+export function pixelAspectSlack(rect: NonNullable<Silhouette['rect']>): number {
+  return 2 / Math.min(rect.maxX - rect.minX + 1, rect.maxY - rect.minY + 1);
 }

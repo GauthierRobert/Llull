@@ -17,6 +17,8 @@ export interface MeshReport {
   /** Undirected edges used by three or more triangles. */
   readonly nonManifoldEdges: number;
   readonly edges: number;
+  /** Sum of triangle areas. */
+  readonly area: number;
   /** Signed-tetrahedra volume: > 0 for a closed, outward-wound solid. */
   readonly signedVolume: number;
   readonly box: Box6;
@@ -60,6 +62,7 @@ export function analyzeSoup(positions: readonly number[]): MeshReport {
   let nonFiniteValues = 0;
   let degenerateTriangles = 0;
   let signedVolume = 0;
+  let area = 0;
   for (const value of positions) if (!Number.isFinite(value)) nonFiniteValues += 1;
   for (let i = 0; i + 8 < positions.length; i += 9) {
     const [ax, ay, az, bx, by, bz, cx, cy, cz] = positions.slice(i, i + 9) as [
@@ -82,7 +85,9 @@ export function analyzeSoup(positions: readonly number[]): MeshReport {
     const nx = uy * vz - uz * vy,
       ny = uz * vx - ux * vz,
       nz = ux * vy - uy * vx;
-    if (Math.hypot(nx, ny, nz) / 2 < areaFloor) degenerateTriangles += 1;
+    const triangleArea = Math.hypot(nx, ny, nz) / 2;
+    area += triangleArea;
+    if (triangleArea < areaFloor) degenerateTriangles += 1;
     signedVolume +=
       (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
     const keys = [
@@ -111,6 +116,7 @@ export function analyzeSoup(positions: readonly number[]): MeshReport {
     boundaryEdges,
     nonManifoldEdges,
     edges: edgeUse.size,
+    area,
     signedVolume,
     box,
   };

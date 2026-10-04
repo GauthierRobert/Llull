@@ -1,11 +1,13 @@
 """Independent OpenCascade ground truth for one STEP file (quality gate reference).
 
 Reads the file with plain OCCT readers — NOT the llull bridge's code path — and prints JSON:
-  {"solids": int, "faces": int, "volume": float,
+  {"solids": int, "freeShells": int, "closedShells": int, "faces": int, "area": float, "volume": float,
    "solidVolumes": [float], "solidBoxes": [[xmin,ymin,zmin,xmax,ymax,zmax]],
    "faceBox": [6 floats], "colors": int, "partNames": [str]}
 
-faceBox is the optimal bounding box of every face (what a tessellation covers); it ignores free
+Shells outside any solid count in freeShells; the CLOSED ones (no free edge) are bodies too (some
+exporters write parts that way) and count in closedShells, volume, solidVolumes and solidBoxes.
+area is the total area of every face (what a tessellation must cover). faceBox is the optimal bounding box of every face (what a tessellation covers); it ignores free
 wires/points that a plain compound bbox would include. colors / partNames come from the XDE
 (STEPCAFControl) document: the colours the file defines and its non-default product names.
 
@@ -56,6 +58,43 @@ def volume(solid):
     return props.Mass()
 
 
+def free_shells(shape):
+    """Shells that belong to no solid (some exporters write parts this way)."""
+    from OCP.TopAbs import TopAbs_SHELL
+    from OCP.TopoDS import TopoDS_Iterator
+
+    found = []
+
+    def walk(node):
+        if node.ShapeType() == TopAbs_SOLID:
+            return
+        if node.ShapeType() == TopAbs_SHELL:
+            found.append(node)
+            return
+        children = TopoDS_Iterator(node)
+        while children.More():
+            walk(children.Value())
+            children.Next()
+
+    walk(shape)
+    return found
+
+
+def is_closed(shell):
+    """No free boundary edge: the shell encloses a volume."""
+    from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
+    from OCP.TopAbs import TopAbs_EDGE
+
+    bounds = ShapeAnalysis_FreeBounds(shell, 1e-4, False, False)
+    return not sub_shapes(bounds.GetClosedWires(), TopAbs_EDGE) and not sub_shapes(bounds.GetOpenWires(), TopAbs_EDGE)
+
+
+def area(shape):
+    props = GProp_GProps()
+    BRepGProp.SurfaceProperties_s(shape, props)
+    return props.Mass()
+
+
 def geometry(path):
     reader = STEPControl_Reader()
     if reader.ReadFile(path) != IFSelect_RetDone:
@@ -63,8 +102,10 @@ def geometry(path):
     reader.TransferRoots()
     shape = reader.OneShape()
     solids = sub_shapes(shape, TopAbs_SOLID)
+    shells = free_shells(shape)
+    closed = [shell for shell in shells if is_closed(shell)]
     faces = sub_shapes(shape, TopAbs_FACE)
-    volumes = [volume(s) for s in solids]
+    volumes = [abs(volume(s)) for s in solids + closed]
     from OCP.BRep import BRep_Builder
     from OCP.TopoDS import TopoDS_Compound
 
@@ -75,10 +116,13 @@ def geometry(path):
         builder.Add(face_compound, face)
     return {
         "solids": len(solids),
+        "freeShells": len(shells),
+        "closedShells": len(closed),
         "faces": len(faces),
+        "area": area(face_compound),
         "volume": sum(volumes),
         "solidVolumes": volumes,
-        "solidBoxes": [optimal_box(s) for s in solids],
+        "solidBoxes": [optimal_box(s) for s in solids + closed],
         "faceBox": optimal_box(face_compound),
     }
 

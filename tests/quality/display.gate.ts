@@ -8,7 +8,15 @@ import { deserializeDocument, serializeDocument } from '@core/commands/persisten
 import type { CadDocument } from '@core/model/types';
 import { plans, type GoldenAction } from '../golden/plans';
 import { runPlan } from '../golden/runPlan';
-import { aspectOf, isFramed, shootCanvas, silhouette, type Silhouette } from './silhouette';
+import { COMPLEX_2D, COMPLEX_3D } from './complexPlans';
+import {
+  aspectOf,
+  isFramed,
+  pixelAspectSlack,
+  shootCanvas,
+  silhouette,
+  type Silhouette,
+} from './silhouette';
 
 /**
  * @layer tests/quality
@@ -18,7 +26,8 @@ import { aspectOf, isFramed, shootCanvas, silhouette, type Silhouette } from './
  * aspect ratio of its bounding box (no deformation). The silhouette is the pixel diff between a
  * shot and the same camera with every layer hidden. 3D documents are framed by the `fit_view`
  * command (top view), then the UI "Fit all" and "Top" buttons are checked; 2D uses zoom-extents.
- * Corpus: STEP files imported by `npm run quality:step` + native documents from golden plans.
+ * Corpus: STEP files imported by `npm run quality:step`, native documents from golden plans, and
+ * complex documents (tests/quality/complexPlans.ts: scale extremes, far from origin, dense scenes).
  *
  *   npm run quality:display        # after quality:step; QUALITY_TIER=smoke|full|stress
  *
@@ -50,7 +59,8 @@ const TIER = process.env['QUALITY_TIER'] ?? 'full';
 if (!TIERS.includes(TIER)) throw new Error(`QUALITY_TIER must be one of ${TIERS.join(', ')}`);
 /** Perspective (3D) projects depth unevenly; the orthographic 2D view must be near exact. */
 const ASPECT_TOLERANCE: Record<View, number> = { '3D': 0.15, '2D': 0.03 };
-const MIN_FILL = 0.02;
+/** A fitted model spans at least this share of the canvas along its major axis. */
+const MIN_SPAN = 0.3;
 /** Offline mode probes the optional llull server (architecture L6); a refused probe is expected. */
 const OPTIONAL_SERVER = 'http://localhost:3001';
 const NATIVE: Record<View, string[]> = {
@@ -138,6 +148,35 @@ function nativeCases(): DisplayCase[] {
   );
 }
 
+/** Complex-document checks expected to fail today (same ratchet). */
+const COMPLEX_KNOWN_ISSUES: Record<string, CheckId[]> = {
+  '3d_far_from_origin': ['fit-all-button', 'top-view-button'],
+  '3d_many_instances': ['fit-all-button', 'top-view-button'],
+  '3d_micro_part': ['fit-all-button', 'top-view-button'],
+  '3d_site_scale': ['fit-all-button', 'top-view-button'],
+  '3d_rotated_beam': ['aspect', 'fit-all-button', 'top-view-button'],
+};
+
+/** A complex plan must build completely: a failed step would hide what the case is about. */
+function built(name: string, actions: GoldenAction[]): CadDocument {
+  const outcome = runPlan(actions);
+  if (outcome.failedSteps.length > 0) {
+    throw new Error(`complex/${name}: ${outcome.failedSteps.slice(0, 3).join('; ')}`);
+  }
+  return outcome.document;
+}
+
+function complexCases(): DisplayCase[] {
+  const cases = (view: View, source: Record<string, GoldenAction[]>): DisplayCase[] =>
+    Object.entries(source).map(([name, actions]) => ({
+      id: `complex/${view.toLowerCase()}_${name}`,
+      view,
+      document: built(name, actions),
+      knownIssues: COMPLEX_KNOWN_ISSUES[`${view.toLowerCase()}_${name}`] ?? [],
+    }));
+  return [...cases('2D', COMPLEX_2D), ...cases('3D', COMPLEX_3D)];
+}
+
 /** Run a fixture-preparation command; a rejected command would silently void the measurement. */
 function apply(doc: CadDocument, name: string, params: Record<string, unknown>): CadDocument {
   const result = execute(doc, name, params);
@@ -200,7 +239,7 @@ async function measure(page: Page, canvas: Locator, imageFile?: string): Promise
 }
 
 installDefaultPlugins();
-const cases = [...stepCases(), ...nativeCases()];
+const cases = [...stepCases(), ...nativeCases(), ...complexCases()];
 
 test.describe('display quality gate', () => {
   test('the STEP corpus has been imported (npm run quality:step)', () => {
@@ -235,11 +274,15 @@ test.describe('display quality gate', () => {
       if ((await layersTab.getAttribute('aria-selected')) !== 'true') await layersTab.click();
       await expect(page.getByRole('list', { name: 'Layer list' })).toBeVisible();
       const started = Date.now();
-      await page.locator('[aria-label="Project file"] input[type="file"]').setInputFiles({
-        name: `${displayCase.id.replace('/', '-')}.json`,
-        mimeType: 'application/json',
-        buffer: Buffer.from(prepared(displayCase)),
-      });
+      // Uploaded by path: Playwright caps in-memory uploads at 50 MB (big STEP documents exceed it).
+      const upload = path.join(
+        CORPUS_DIR,
+        'display-input',
+        `${displayCase.id.replace('/', '-')}.json`,
+      );
+      mkdirSync(path.dirname(upload), { recursive: true });
+      writeFileSync(upload, prepared(displayCase));
+      await page.locator('[aria-label="Project file"] input[type="file"]').setInputFiles(upload);
       await expect(page.getByLabel(/^Last command: Loaded document/)).toBeVisible({
         timeout: 120_000,
       });
@@ -260,7 +303,7 @@ test.describe('display quality gate', () => {
       const loadMs = Date.now() - started;
 
       const expected = expectedAspect(displayCase.document);
-      const framed = isFramed(shape, MIN_FILL);
+      const framed = isFramed(shape, MIN_SPAN);
       const aspectError =
         shape.rect === null || expected === null
           ? null
@@ -272,14 +315,15 @@ test.describe('display quality gate', () => {
         framed,
       };
       // Aspect is only meaningful for a whole, framed silhouette.
-      if (framed && aspectError !== null) {
-        results.aspect = aspectError <= ASPECT_TOLERANCE[displayCase.view];
+      if (framed && aspectError !== null && shape.rect !== null) {
+        results.aspect =
+          aspectError <= ASPECT_TOLERANCE[displayCase.view] + pixelAspectSlack(shape.rect);
       }
       if (displayCase.view === '3D') {
         await page.getByRole('button', { name: 'Fit all into view' }).click();
-        results['fit-all-button'] = isFramed(await measure(page, canvas), MIN_FILL);
+        results['fit-all-button'] = isFramed(await measure(page, canvas), MIN_SPAN);
         await page.getByRole('button', { name: 'Top view' }).click();
-        results['top-view-button'] = isFramed(await measure(page, canvas), MIN_FILL);
+        results['top-view-button'] = isFramed(await measure(page, canvas), MIN_SPAN);
       }
       const metrics = { loadMs, rect: shape.rect, expected, aspectError, results, problems };
       record(displayCase.id, metrics);

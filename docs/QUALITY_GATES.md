@@ -1,16 +1,18 @@
 # Quality gates
 
 `npm run check` proves the code is internally consistent. The quality gates prove the **app** does
-the right thing with **real CAD data it did not author**: third-party STEP files from OpenCascade,
-CadQuery, build123d and pythonocc, imported through the same path an MCP agent uses, then opened
-in the real browser app.
+the right thing with **real CAD data it did not author**: third-party STEP files (OpenCascade,
+CadQuery, build123d, pythonocc, the FreeCAD parts library), plus synthetic STEP files built to hit
+known CAD failure modes, imported through the same path an MCP agent uses, then opened in the real
+browser app next to complex native 2D/3D documents.
 
 ```bash
 npm run quality:fetch     # download the pinned corpus → .cache/quality-corpus/ (sha256-verified)
+npm run quality:generate  # build the synthetic STEP cases + their analytic ground truth (CadQuery)
 npm run quality:step      # STEP import gate   (needs CadQuery: pip install -r server/python/requirements.txt)
 npm run quality:display   # display gate       (Playwright + Chromium, runs after quality:step)
-npm run quality           # all three
-QUALITY_TIER=smoke|full|stress npm run quality:step   # default: full
+npm run quality           # all four
+QUALITY_TIER=smoke|full|stress npm run quality   # default: full (≈ 15 min); stress adds the giants
 ```
 
 Reports (JSON metrics per file) and screenshots land in `.cache/quality-corpus/reports/`.
@@ -34,6 +36,39 @@ range from MIT to LGPL). Tiers are cumulative: `smoke` ⊂ `full` ⊂ `stress`.
 | part-11752 | full | ~125k-triangle single solid |
 | kuka-kr600 | stress | robot, 61 solids, ~860k triangles |
 | rc-buggy-suspension | stress | 211-part assembly, ~1.2M triangles |
+| fc-bearing-608zz | smoke | ball bearing: toroidal races, balls, shields |
+| fc-gearmotor-l | smoke | 6-part gearmotor, named materials, 6 colours |
+| fc-glass-skin-doors | smoke | 28-part facade spanning 7.6 m |
+| fc-steel-sheets | smoke | 3 m corrugated roof sheet: long, thin, repetitive |
+| fc-hotend | full | 3D-printer hotend: threads and fins |
+| fc-arduino-mega | full | PCB assembly, 108 parts |
+| fc-nema17-connector | full | stepper motor, 1151 faces; its screws are shells, not solids |
+| fc-raspberry-pi-4b | stress | 52 MB PCB assembly: 89 solids + 1978 surface patches |
+
+### Synthetic cases — `quality/synthetic_step.py`
+
+Generated with CadQuery, never downloaded. Each case writes `<id>.expected.json` with **analytic**
+ground truth (plain maths, not OpenCascade) and is self-checked when it is generated: the written
+file must read back as designed. The `intent-*` checks compare the import with that design, so they
+catch errors the bridge and the OCCT reference would share.
+
+| id | tier | failure mode it targets |
+| -- | ---- | ----------------------- |
+| syn-chiral-pair | smoke | mirrored geometry (reversed face orientation → winding and volume sign) |
+| syn-inch-units | smoke | a file in INCH units must land in millimetres |
+| syn-hollow-cavity | smoke | a sealed internal void: two shells, the inner one facing inward |
+| syn-skew-nested | smoke | a leaf three assembly levels deep, skew-axis rotations at every level |
+| syn-far-from-origin | smoke | parts 1 000 km from the origin (float precision, floating origin) |
+| syn-micro-part | smoke | a 0.5 mm pin against a fixed 0.05 mm chord tolerance |
+| syn-unicode-names | smoke | `Ø20 Welle`, `支架-01`, `pièce éàü`, correctly `\X2\`-encoded |
+| syn-face-colors | smoke | six face colours on one solid, no part colour |
+| syn-perforated-plate | full | 0.5 mm plate with 100 holes: thin walls, genus 100 |
+| syn-helical-spring | full | a wire swept along a 10-turn helix |
+| syn-bolt-grid | full | 400 instances of one bolt, each rotated and moved |
+| syn-huge-sphere | stress | a 10 m radius sphere: triangle count explodes with a fixed chord tolerance |
+
+A mirrored *instance* cannot be expressed in STEP (placements are right-handed axis systems, and
+writers turn a mirror into a 180° rotation), so mirroring is tested in the geometry.
 
 Eight DXF files (gear, V-slot profile, splines, hatches, nested-block dimensions…) are also pinned
 and downloaded, but **llull has no DXF/SVG importer yet**, so no gate consumes them. They are the
@@ -48,19 +83,23 @@ table), independently of the bridge's code path.
 
 | check | passes when |
 | ----- | ----------- |
-| `imports` | one mesh per reference solid |
+| `imports` | at least one mesh per reference solid and per closed free shell |
 | `mesh-integrity` | finite coordinates, < 1 % degenerate triangles; solids: < 0.1 % open/non-manifold edges and every body outward-wound (positive signed volume) |
 | `volume` | `measure_volume` total within 1.5 % of the exact B-rep volume |
 | `bounding-box` | `measure_bounding_box` within 0.5 % of the diagonal (+ 2× chord tolerance) of the face bbox. Catches scale, unit and axis-swap errors |
 | `part-placement` | every body's bbox matches a distinct reference solid. Catches assembly-transform errors that keep total volume |
+| `surface-area` | imported triangle area within 2 % of the area of every face in the file. Catches **dropped geometry** whatever the grouping |
 | `colors` | the file defines colours ⇒ at least one body is not the default grey |
 | `part-names` | assemblies keep at least one product name |
 | `check-model` | `check_model` reports no errors |
-| `save-load` | `serializeDocument` → `load_document` round-trips; writes the document for gate 2 |
+| `save-load` | `serializeDocument` → `load_document` round-trips every body; writes the document for gate 2 |
+| `intent-geometry` | synthetic only: body count, volume and bbox match the **analytic** design |
+| `intent-names` | synthetic only: every designed product name is kept exactly (unicode included) |
 
 ## Gate 2 — display (`tests/quality/display.gate.ts`)
 
-Every imported STEP document, plus native 2D and 3D documents built from golden plans, is opened
+Every imported STEP document, native 2D and 3D documents built from golden plans, and the complex
+native documents of `tests/quality/complexPlans.ts` are opened
 through **Open project** in the real app (offline mode). The model silhouette is the pixel diff
 between a screenshot and the same camera with every layer hidden (a local view toggle), so the
 grid, lighting and DOM overlays cancel out.
@@ -70,18 +109,22 @@ grid, lighting and DOM overlays cancel out.
 | `errors` | no console error, page error or `webglcontextlost` (the refused probe of the optional server at `localhost:3001` is expected offline) |
 | `stretch` | canvas drawing-buffer aspect equals its CSS box aspect |
 | `visible` | the model covers ≥ 0.05 % of the canvas |
-| `framed` | after `fit_view` (3D, top) / zoom-extents (2D) the model is whole (not touching the border) and fills ≥ 2 % |
-| `aspect` | on-screen width/height equals the world X/Y bounding-box ratio. 2D (orthographic): within 3 %; 3D (perspective): within 15 %. **This is the deformation check.** |
+| `framed` | after `fit_view` (3D, top) / zoom-extents (2D) the model is whole (not touching the border) and spans ≥ 30 % of the canvas along its major axis |
+| `aspect` | on-screen width/height equals the world X/Y bounding-box ratio. 2D (orthographic): within 3 %; 3D (perspective): within 15 %; plus ±2 px of edge on the shorter side. **This is the deformation check.** |
 | `fit-all-button` / `top-view-button` | the UI buttons leave the model whole and visible |
+
+Complex native documents: a 1 100-entity drawing, 2D and 3D scenes 2 000 km from the origin,
+10 µm parts, a 100 m site plan, a 20:1 drawing, 900 instanced boxes + 60 cones, and a beam rotated
+45°.
 
 ## The ratchet: `knownIssues`
 
 A check that fails today is listed in the file's `knownIssues` (`displayKnownIssues` for gate 2,
-`NATIVE_KNOWN_ISSUES` for native documents). The gate is green when **exactly** the known checks
+`NATIVE_KNOWN_ISSUES` / `COMPLEX_KNOWN_ISSUES` for native documents). The gate is green when **exactly** the known checks
 fail. It goes red on a new failure, and also when a known issue starts passing, which forces whoever
 fixed it to delete the entry. Quality can only move forward.
 
-## What the gates found (first run, 2026-10)
+## What the gates found (2026-10)
 
 Geometry import is solid: on every file that imports, volume is within 0.9 % of the exact B-rep,
 bboxes and per-part placement match, meshes are watertight and outward-wound, and save/load
@@ -99,7 +142,21 @@ match the bounding box (2D within 0.2 %, most 3D within 0.5 %). The open defects
 | 6 | **Open surfaces render single-sided**: faces of a surface-only import seen from behind disappear | `splinecage`: `aspect` | `MeshSolidMesh` / `SolidMeshShell` |
 | 7 | **Arc bounds are the full circle**: `measure_bounding_box` (and so 2D zoom-extents and agents) over-reports a semicircle's height ×2 | `2d_arcs_circles`: `aspect` | `packages/core/src/commands/sceneBounds.ts` |
 | 8 | **Text / dimension bounds disagree with what is drawn**, so zoom-extents is off-centre | `2d_text_dimensions`: `aspect` | `sceneBounds.ts` |
-| 9 | A dark-grey half-plane (shadow-frustum edge) is visible on some 3D scenes | screenshot `native/3d_cone_torus_wedge_pyramid.png` | lighting / shadows |
+| 9 | A dark-grey half-plane / "wings" (shadow-frustum edge) is visible on some 3D scenes, and inflates `fc-gearmotor-l`'s silhouette | screenshots `native/3d_cone_torus_wedge_pyramid.png`, `step/fc-gearmotor-l.png` | lighting / shadows |
+| 10 | **Surface geometry is dropped when an assembly also has solids**: the bridge keeps only solids per node, so 1 978 surface patches (13 % of the area) vanish from the Raspberry Pi | `fc-raspberry-pi-4b`: `imports`, `surface-area` | `llull_bridge.py` `_solids` |
+| 11 | **`measure_bounding_box` ignores rotation**: a 40 × 4 beam rotated 45° reports 40 × 4 (it covers ≈ 31 × 31), and `fit_view` / zoom-extents / agents inherit it | `complex/3d_rotated_beam`: `aspect` | `packages/core/src/commands/sceneBounds.ts` |
+| 12 | **Thin round features lose volume**: the bridge's 0.3 rad angular deflection makes a swept 1 mm wire 2.3 % too light (vs the exact B-rep and the design) | `syn-helical-spring`: `volume`, `intent-geometry` | `llull_bridge.py` `_triangles` |
+| 13 | **No triangle budget**: a 10 m sphere tessellated at 0.05 mm kills the bridge process (no graceful error); a 9 cm stepper turns into a 114 MB document because each M2.5 screw thread becomes 79k triangles | `syn-huge-sphere`: all; `fc-nema17-connector` report | `llull_bridge.py`, `import_mesh` limits |
+| 14 | Face-level STEP colours are ignored (only part colours are read) | `syn-face-colors`: `colors` | `llull_bridge.py` `_assembly_bodies` |
+
+What the complex cases **confirmed works**: inch → mm conversion, skew-rotated three-level nested
+assemblies (exact to the analytic corners), mirrored geometry, sealed cavities, 400 rotated
+instances, 100-hole thin plates, 0.5 mm parts, parts 1 000 km away, correctly encoded unicode names,
+and shell-only parts (the NEMA 17 screws). In the browser: no error on any of the 52 documents,
+including 900 instances, 1 100-entity drawings and documents 2 000 km from the origin.
+
+CadQuery's own STEP writer double-encodes non-ASCII names (`Ã20 Welle`), and llull's
+`export_step` goes through CadQuery. The proposed export round-trip gate should cover names.
 
 `as1-oc-214`'s known `aspect` failure is **not** a defect. It renders correctly, but the 3D aspect
 check runs in perspective, and its tall brackets near the camera read 15.5 % wide. An orthographic
