@@ -14,7 +14,7 @@ import { refitPlates } from './plates';
 import { designFixedPlates } from './plateDesign';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 import { sizeBoltGroups } from './frameBoltDesign';
 import { reseatDependents } from './frameReseat';
 import { checkFrames } from './frameCheckFrames';

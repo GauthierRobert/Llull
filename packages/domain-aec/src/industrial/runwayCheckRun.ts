@@ -17,7 +17,7 @@ import {
 } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
 import { round } from '../numeric';
-import { checkTable, failureSummary } from './checkReport';
+import { checkTable, existingLevelId, failureSummary } from './checkReport';
 
 /**
  * @command check_crane_runways
@@ -157,8 +157,8 @@ export const runwayCheck = defineCommand({
       }
     }
     const building = getBuilding(doc);
-    const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
-    if (levelId === undefined || !building.levels[levelId]) {
+    const levelId = existingLevelId(building, params.levelId);
+    if (levelId === undefined) {
       return noop(doc, `check_crane_runways failed: no level '${params.levelId ?? ''}'.`);
     }
     const mm = (value: number): number => value / fromMm(doc, 1);

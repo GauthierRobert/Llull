@@ -1,3 +1,4 @@
+import type { BuildingModel } from '@core/model/building';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
 
@@ -30,3 +31,12 @@ export const checkTable = <Row extends { utilisation: number }>(
     undefined,
   ),
 });
+
+/** Level a read-only check runs on: `requested`, else the active / first level; undefined when it does not exist. */
+export const existingLevelId = (
+  building: BuildingModel,
+  requested: string | undefined,
+): string | undefined => {
+  const levelId = requested ?? building.activeLevelId ?? building.levelOrder[0];
+  return levelId !== undefined && building.levels[levelId] ? levelId : undefined;
+};

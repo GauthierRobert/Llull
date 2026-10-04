@@ -11,7 +11,7 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import type { PurlinRow } from './purlinModel';
 import { analysePurlins, locatePurlinMembers } from './purlinAnalysis';
 import { round } from '../numeric';
-import { checkTable, failureSummary } from './checkReport';
+import { checkTable, existingLevelId, failureSummary } from './checkReport';
 
 /**
  * @command check_purlins
@@ -76,8 +76,8 @@ export const checkPurlins = defineCommand({
       );
     }
     const building = getBuilding(doc);
-    const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
-    if (levelId === undefined || !building.levels[levelId]) {
+    const levelId = existingLevelId(building, params.levelId);
+    if (levelId === undefined) {
       return noop(doc, `check_purlins failed: no level '${params.levelId ?? ''}'.`);
     }
     const { members, skipped } = locatePurlinMembers(doc, levelId);

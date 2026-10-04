@@ -10,7 +10,7 @@ import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_TRAVEL_SPEED } from './runwayCheckModel';
 import { round } from '../numeric';
-import { checkTable, failureSummary } from './checkReport';
+import { checkTable, existingLevelId, failureSummary } from './checkReport';
 import { analyseBracing, locateMembers } from './bracingAnalysis';
 
 /**
@@ -108,8 +108,8 @@ export const checkBracing = defineCommand({
       }
     }
     const building = getBuilding(doc);
-    const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
-    if (levelId === undefined || !building.levels[levelId]) {
+    const levelId = existingLevelId(building, params.levelId);
+    if (levelId === undefined) {
       return noop(doc, `check_bracing failed: no level '${params.levelId ?? ''}'.`);
     }
     const analysis = analyseBracing(locateMembers(doc, levelId), levelId, {

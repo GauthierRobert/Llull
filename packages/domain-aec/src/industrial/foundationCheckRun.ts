@@ -6,7 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 import { DEFAULT_TIE_CAPACITY } from './foundationModel';
 import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { checkFoundations } from './foundationAssessment';
