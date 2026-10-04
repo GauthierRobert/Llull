@@ -190,25 +190,16 @@ function SceneContents({
   const quality = useRenderQuality();
   const palette = useViewportPalette();
 
-  const initialPosition = useMemo(
-    () =>
-      sphericalToCartesian(
-        cam.target as [number, number, number],
-        cam.azimuth,
-        cam.polar,
-        cam.distance,
-      ),
-    // Only used for initial mount — intentionally not reactive to later cam changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  const targetVec = useMemo(
-    () => new THREE.Vector3(cam.target[0], cam.target[1], cam.target[2]),
-    // Same: initial mount only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  // Initial camera only: later camera changes are applied imperatively by CameraReactor.
+  const [initialCamera] = useState(() => ({
+    position: sphericalToCartesian(
+      cam.target as [number, number, number],
+      cam.azimuth,
+      cam.polar,
+      cam.distance,
+    ),
+    target: new THREE.Vector3(cam.target[0], cam.target[1], cam.target[2]),
+  }));
 
   // The entities + gizmo group is offset by -renderOrigin so that all entity
   // positions (expressed in document world coords) become relative to the
@@ -232,12 +223,12 @@ function SceneContents({
         fov={45}
         near={0.01}
         far={1e8}
-        position={initialPosition}
+        position={initialCamera.position}
         up={[0, 0, 1]}
       />
       <OrbitControls
         makeDefault
-        target={targetVec}
+        target={initialCamera.target}
         minDistance={0.1}
         maxDistance={5e6}
         enableDamping

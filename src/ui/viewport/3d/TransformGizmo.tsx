@@ -178,11 +178,7 @@ export function TransformGizmo({
     t.updateMatrixWorld(true);
   }
 
-  // ---- Sync target from entity on id change ----
-  // Compute render-space position from entity's world position minus renderOrigin.
-  useEffect(syncTargetFromEntity, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ---- Sync target from entity after a committed dispatch ----
+  // ---- Sync target from the entity (selection change or committed dispatch) ----
   useEffect(syncTargetFromEntity, [entity, renderOrigin]);
 
   // ---- Per-frame snap computation (translate only) ----

@@ -168,17 +168,19 @@ function InstanceBatchMesh({
   const count = batch.entities.length;
 
   // --- Geometry ---
-  const geometry = useMemo(() => makeGeometry(batch), [batch.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // batch objects are rebuilt every grouping pass; batch.key is the content identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const geometry = useMemo(() => makeGeometry(batch), [batch.key]);
 
   // Dispose geometry on unmount or key change.
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   // --- Material ---
   // Uses batch.pbrMaterial for roughness/metalness in shaded mode.
-  const material = useMemo(() => {
-    const mat = new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, batch.pbrMaterial));
-    return mat;
-  }, [displayMode, batch.pbrMaterial]); // eslint-disable-line react-hooks/exhaustive-deps
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, batch.pbrMaterial)),
+    [displayMode, batch.pbrMaterial],
+  );
 
   // Dispose material on unmount or displayMode change.
   useEffect(() => () => material.dispose(), [material]);
