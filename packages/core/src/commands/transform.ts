@@ -5,12 +5,16 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
+import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { noop } from './noop';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
+import { add3, scale3 } from '../lib/vec3';
+import { scale2 } from '../lib/vec2';
+import { rotatePoint2 } from '../lib/polygon';
+import { replaceEntity, withEntity } from './entityOps';
 
 /**
  * @command rotate_entity
@@ -34,35 +38,21 @@ export const rotateEntity = defineCommand({
     if (!target) {
       return noop(doc, `No entity ${id} to rotate.`);
     }
-    const rotated: Entity = {
-      ...target,
-      rotation: [
-        target.rotation[0] + delta[0],
-        target.rotation[1] + delta[1],
-        target.rotation[2] + delta[2],
-      ],
-    };
+    const rotated: Entity = { ...target, rotation: add3(target.rotation, delta) };
     return {
-      document: { ...doc, entities: { ...doc.entities, [id]: rotated } },
+      document: replaceEntity(doc, rotated),
       summary: `Rotated ${id} by [${delta.join(', ')}] rad; new rotation [${rotated.rotation.join(', ')}].`,
       affected: [id],
     };
   },
 });
 
-const scaleVec2 = ([x, y]: readonly [number, number], f: number): Vec2 => [x * f, y * f];
-const scaleVec3 = ([x, y, z]: readonly [number, number, number], f: number): Vec3 => [
-  x * f,
-  y * f,
-  z * f,
-];
-
 /** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
 function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
   switch (e.kind) {
     case 'box':
     case 'wedge': {
-      const size = scaleVec3(e.size, f);
+      const size = scale3(e.size, f);
       return { scaled: { ...e, size }, dims: `new size [${size.join(', ')}]` };
     }
     case 'cylinder':
@@ -78,13 +68,13 @@ function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
     case 'extrusion': {
       const depth = e.depth * f;
       return {
-        scaled: { ...e, profile: e.profile.map((p) => scaleVec2(p, f)), depth },
+        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)), depth },
         dims: `new depth ${depth}`,
       };
     }
     case 'line': {
-      const start = scaleVec2(e.start, f);
-      const end = scaleVec2(e.end, f);
+      const start = scale2(e.start, f);
+      const end = scale2(e.end, f);
       return {
         scaled: { ...e, start, end },
         dims: `new start [${start.join(', ')}] end [${end.join(', ')}]`,
@@ -93,12 +83,12 @@ function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
     case 'polyline':
     case 'spline':
       return {
-        scaled: { ...e, points: e.points.map((p) => scaleVec2(p, f)) },
+        scaled: { ...e, points: e.points.map((p) => scale2(p, f)) },
         dims: `scaled ${e.points.length} points`,
       };
     case 'arc':
     case 'circle': {
-      const center = scaleVec2(e.center, f);
+      const center = scale2(e.center, f);
       const radius = e.radius * f;
       return {
         scaled: { ...e, center, radius },
@@ -111,7 +101,7 @@ function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
       return { scaled: { ...e, width, height }, dims: `new size ${width}×${height}` };
     }
     case 'ellipse': {
-      const center = scaleVec2(e.center, f);
+      const center = scale2(e.center, f);
       const radiusX = e.radiusX * f;
       const radiusY = e.radiusY * f;
       return {
@@ -157,11 +147,11 @@ function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
     case 'revolution':
       // Radial and axial profile offsets scale; axis direction is unchanged.
       return {
-        scaled: { ...e, profile: e.profile.map((p) => scaleVec2(p, f)) },
+        scaled: { ...e, profile: e.profile.map((p) => scale2(p, f)) },
         dims: `scaled ${e.profile.length}-point profile`,
       };
     case 'instance': {
-      const scale = scaleVec3(e.scale ?? [1, 1, 1], f);
+      const scale = scale3(e.scale ?? [1, 1, 1], f);
       return { scaled: { ...e, scale }, dims: `new scale [${scale.join(', ')}]` };
     }
   }
@@ -197,7 +187,7 @@ export const scaleEntity = defineCommand({
 
     const { scaled, dims } = scaleGeometry(target, factor);
     return {
-      document: { ...doc, entities: { ...doc.entities, [id]: scaled } },
+      document: replaceEntity(doc, scaled),
       summary: `Scaled ${id} by factor ${factor}; ${dims}.`,
       affected: [id],
     };
@@ -245,26 +235,27 @@ export const mirrorEntity = defineCommand({
 
     const mirrored: Entity = { ...target, position: newPosition };
     return {
-      document: { ...doc, entities: { ...doc.entities, [id]: mirrored } },
+      document: replaceEntity(doc, mirrored),
       summary: `Mirrored ${id} across ${axis}-axis; new position [${newPosition.join(', ')}].`,
       affected: [id],
     };
   },
 });
 
-function cloneEntityAt(source: Entity, newPosition: Vec3): Entity {
-  const id = nextId(source.kind);
-  return { ...source, id, position: newPosition };
-}
-
-function withEntities(doc: CadDocument, copies: Entity[]): CadDocument {
-  const newEntities = { ...doc.entities };
-  const newOrder = [...doc.order];
-  for (const e of copies) {
-    newEntities[e.id] = e;
-    newOrder.push(e.id);
+/** `doc` plus a copy of `source` per `[position, rotation]`; copy ids in order. */
+function addCopies(
+  doc: CadDocument,
+  source: Entity,
+  placements: ReadonlyArray<{ position: Vec3; rotation?: Vec3 }>,
+): { document: CadDocument; newIds: string[] } {
+  let document = doc;
+  const newIds: string[] = [];
+  for (const { position, rotation = source.rotation } of placements) {
+    const id = nextId(source.kind);
+    document = withEntity(document, { ...source, id, position, rotation });
+    newIds.push(id);
   }
-  return { ...doc, entities: newEntities, order: newOrder };
+  return { document, newIds };
 }
 
 /**
@@ -301,25 +292,24 @@ export const arrayLinear = defineCommand({
         `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
       );
     }
-    if (!Number.isFinite(offset[0]) || !Number.isFinite(offset[1]) || !Number.isFinite(offset[2])) {
+    if (!offset.every(Number.isFinite)) {
       return noop(
         doc,
         `array_linear: offset must be finite (got [${offset.join(', ')}]); entity ${id} unchanged.`,
       );
     }
 
-    const [ox, oy, oz] = target.position;
-    const copies: Entity[] = [];
-    for (let k = 1; k < count; k++) {
-      const newPosition: Vec3 = [ox + k * offset[0], oy + k * offset[1], oz + k * offset[2]];
-      copies.push(cloneEntityAt(target, newPosition));
-    }
-
-    const newIds = copies.map((e) => e.id);
+    const { document, newIds } = addCopies(
+      doc,
+      target,
+      Array.from({ length: count - 1 }, (_, i) => ({
+        position: add3(target.position, scale3(offset, i + 1)),
+      })),
+    );
     return {
-      document: withEntities(doc, copies),
+      document,
       summary:
-        `Linear array of ${target.kind} ${id}: created ${copies.length} copies ` +
+        `Linear array of ${target.kind} ${id}: created ${newIds.length} copies ` +
         `along [${offset.join(', ')}]. New ids: ${newIds.join(', ')}.`,
       affected: newIds,
     };
@@ -371,36 +361,25 @@ export const arrayPolar = defineCommand({
       );
     }
 
-    const [px, py] = target.position;
     const [cx, cy] = center;
     const step = angle / count;
-    const copies: Entity[] = [];
-
-    for (let k = 1; k < count; k++) {
-      const theta = k * step;
-      const cosT = Math.cos(theta);
-      const sinT = Math.sin(theta);
-      // Rotate (px, py) around (cx, cy) by theta
-      const rx = px - cx;
-      const ry = py - cy;
-      const newX = cx + rx * cosT - ry * sinT;
-      const newY = cy + rx * sinT + ry * cosT;
-      const newPosition: Vec3 = [newX, newY, target.position[2]];
-      const newRotation: Vec3 = [
-        target.rotation[0],
-        target.rotation[1],
-        target.rotation[2] + theta,
-      ];
-      const copy: Entity = { ...cloneEntityAt(target, newPosition), rotation: newRotation };
-      copies.push(copy);
-    }
-
-    const newIds = copies.map((e) => e.id);
+    const { document, newIds } = addCopies(
+      doc,
+      target,
+      Array.from({ length: count - 1 }, (_, i) => {
+        const theta = (i + 1) * step;
+        const [rx, ry] = rotatePoint2([target.position[0] - cx, target.position[1] - cy], theta);
+        return {
+          position: [cx + rx, cy + ry, target.position[2]] as Vec3,
+          rotation: [target.rotation[0], target.rotation[1], target.rotation[2] + theta] as Vec3,
+        };
+      }),
+    );
     const angleDeg = ((angle * 180) / Math.PI).toFixed(1);
     return {
-      document: withEntities(doc, copies),
+      document,
       summary:
-        `Polar array of ${target.kind} ${id}: created ${copies.length} copies ` +
+        `Polar array of ${target.kind} ${id}: created ${newIds.length} copies ` +
         `over ${angleDeg}° around center [${center[0]}, ${center[1]}]. New ids: ${newIds.join(', ')}.`,
       affected: newIds,
     };

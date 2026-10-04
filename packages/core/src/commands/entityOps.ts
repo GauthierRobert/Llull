@@ -13,6 +13,14 @@ export function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 }
 
 /**
+ * `doc` with `entity` stored under its id (order unchanged).
+ * @pure
+ */
+export function replaceEntity(doc: CadDocument, entity: Entity): CadDocument {
+  return { ...doc, entities: { ...doc.entities, [entity.id]: entity } };
+}
+
+/**
  * `doc` without entity `id` (also dropped from `order` and `selection`).
  * @pure
  */

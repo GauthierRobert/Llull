@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { cross2, dot2, len2, normalize2 } from '../lib/vec2';
-import { withEntity } from './entityOps';
+import { replaceEntity, withEntity } from './entityOps';
 import { noop } from './noop';
 
 type CornerResolution =
@@ -43,7 +43,7 @@ function commitCorner(
   const points = poly.points.flatMap((p, i): Vec2[] => (i === vertexIndex ? [first, second] : [p]));
   const updated: Entity = { ...poly, points };
   return {
-    document: withEntity({ ...doc, entities: { ...doc.entities, [poly.id]: updated } }, extra),
+    document: withEntity(replaceEntity(doc, updated), extra),
     pointCount: points.length,
   };
 }

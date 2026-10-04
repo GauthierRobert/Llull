@@ -43,11 +43,6 @@ export function pointSeriesEntity(
   };
 }
 
-/** Format a number compactly for the summary string. */
-export function fmtN(v: number): string {
-  return parseFloat(v.toFixed(4)).toString();
-}
-
 /** No-op result when `points` is not an array of at least 2 points, else `null`. */
 export function rejectTooFewPoints(
   doc: CadDocument,

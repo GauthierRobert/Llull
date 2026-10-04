@@ -5,6 +5,7 @@ import type { Vec2 } from '../model/types';
 import { len2, sub2 } from '../lib/vec2';
 import { segIntersect, evalLine } from './modify2dGeometry';
 import { noop } from './noop';
+import { replaceEntity } from './entityOps';
 
 /** `line` with its endpoint nearer to `point` moved onto `point` (a tie moves the start). */
 function withNearerEndpointAt(line: LineEntity, point: Vec2): LineEntity {
@@ -77,10 +78,7 @@ export const trim = defineCommand({
     const trimmed: Entity = withNearerEndpointAt(line, intersectionPt);
 
     return {
-      document: {
-        ...doc,
-        entities: { ...doc.entities, [id]: trimmed },
-      },
+      document: replaceEntity(doc, trimmed),
       summary: `Trimmed line ${id} to intersection with ${boundaryId} at [${intersectionPt[0].toFixed(3)}, ${intersectionPt[1].toFixed(3)}].`,
       affected: [id],
     };
@@ -148,10 +146,7 @@ export const extend = defineCommand({
     const extended: Entity = withNearerEndpointAt(line, intersectionPt);
 
     return {
-      document: {
-        ...doc,
-        entities: { ...doc.entities, [id]: extended },
-      },
+      document: replaceEntity(doc, extended),
       summary: `Extended line ${id} to meet ${boundaryId} at [${intersectionPt[0].toFixed(3)}, ${intersectionPt[1].toFixed(3)}].`,
       affected: [id],
     };

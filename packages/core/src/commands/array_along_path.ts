@@ -1,30 +1,19 @@
 /**
- * Path and arc distribution commands.
+ * Path and arc distribution: copies of a source entity along a polyline (`array_along_path`) or a
+ * circular arc (`distribute_on_arc`, copies face radially outward). The source is untouched.
  *
  * @layer core/commands
- *
- * Two pure commands that place copies of a source entity along a geometric path:
- *
- *   array_along_path  — duplicate/instance sourceId at evenly-spaced positions
- *                       along a polyline path defined by Vec3 points.
- *   distribute_on_arc — duplicate sourceId at evenly-spaced positions along a
- *                       circular arc; each copy is rotated to face radially outward.
- *
- * Both commands never mutate the input document; they create NEW entities with
- * fresh ids via nextId(). The source entity is NOT removed or altered.
  */
 
-import type { Entity, Vec3 } from '../model/types';
+import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import { withEntity } from './entityOps';
 import { add3, cross3, distanceSq3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { noop } from './noop';
 
-/** Total arc length of the polyline. */
 function polylineLength(path: Vec3[]): number {
   let total = 0;
   for (let i = 1; i < path.length; i++) {
@@ -33,10 +22,7 @@ function polylineLength(path: Vec3[]): number {
   return total;
 }
 
-/**
- * Find the world position at a given arc-length `t` along a polyline.
- * `t` must be in [0, totalLength].
- */
+/** World position at arc length `t` along the polyline (t in [0, total]). */
 function pointAtArcLength(path: Vec3[], t: number): Vec3 {
   let remaining = t;
   for (let i = 1; i < path.length; i++) {
@@ -50,12 +36,20 @@ function pointAtArcLength(path: Vec3[], t: number): Vec3 {
   return path[path.length - 1]!;
 }
 
-/**
- * Shallow-clone an entity with a new id and new position/rotation, preserving all
- * other properties (kind, size, radius, etc.). Pure — never mutates the original.
- */
-function cloneEntityAt(source: Entity, newId: string, position: Vec3, rotation: Vec3): Entity {
-  return { ...source, id: newId, position, rotation } as Entity;
+/** `doc` plus copies of `source` placed at each `[position, rotation]`; ids in placement order. */
+function placeCopies(
+  doc: CadDocument,
+  source: Entity,
+  placements: ReadonlyArray<readonly [Vec3, Vec3]>,
+): { document: CadDocument; createdIds: string[] } {
+  const createdIds: string[] = [];
+  let document = doc;
+  for (const [position, rotation] of placements) {
+    const id = nextId('e');
+    document = withEntity(document, { ...source, id, position, rotation } as Entity);
+    createdIds.push(id);
+  }
+  return { document, createdIds };
 }
 
 /**
@@ -126,28 +120,15 @@ export const arrayAlongPath = defineCommand({
     const intCount = Math.max(1, Math.round(count));
     const totalLen = polylineLength(validatedPath);
 
-    let newDoc = doc;
-    const createdIds: string[] = [];
-
-    if (intCount === 1) {
-      // Place a single copy at the midpoint.
-      const pos = pointAtArcLength(validatedPath, totalLen / 2);
-      const id = nextId('e');
-      const newEntity = cloneEntityAt(source, id, pos, source.rotation);
-      newDoc = withEntity(newDoc, { ...newEntity, layerId: source.layerId || DEFAULT_LAYER_ID });
-      createdIds.push(id);
-    } else {
-      // Place count copies at evenly-spaced arc-length positions [0 .. totalLen].
-      const step = totalLen / (intCount - 1);
-      for (let i = 0; i < intCount; i++) {
-        const t = i * step;
-        const pos = pointAtArcLength(validatedPath, t);
-        const id = nextId('e');
-        const newEntity = cloneEntityAt(source, id, pos, source.rotation);
-        newDoc = withEntity(newDoc, { ...newEntity, layerId: source.layerId || DEFAULT_LAYER_ID });
-        createdIds.push(id);
-      }
-    }
+    const step = intCount === 1 ? 0 : totalLen / (intCount - 1);
+    const { document: newDoc, createdIds } = placeCopies(
+      doc,
+      source,
+      Array.from({ length: intCount }, (_, i): [Vec3, Vec3] => [
+        pointAtArcLength(validatedPath, intCount === 1 ? totalLen / 2 : i * step),
+        source.rotation,
+      ]),
+    );
 
     return {
       document: newDoc,
@@ -212,47 +193,28 @@ export const distributeOnArc = defineCommand({
     const c: Vec3 = [center[0] as number, center[1] as number, center[2] as number];
     const n: Vec3 = normalize3([normal[0] as number, normal[1] as number, normal[2] as number]);
 
-    // Build a local coordinate frame in the arc plane.
-    // u = local +X (from which startAngle is measured), v = local +Y = n × u.
+    // In-plane frame: u = local +X (startAngle origin), v = n × u.
     const u = buildPerpendicularInPlane(n);
     const v = cross3(n, u);
 
     const intCount = Math.max(1, Math.round(count));
     const angleRange = endAngle - startAngle;
-    // Full circle (sweep ≈ 2π): step = range/count so the first and last
-    // copies don't collide. Partial arc: step = range/(count-1) so endpoints
-    // are included.
+    // Full circle: step = range/count (first and last copies must not coincide).
     const isFullCircle = Math.abs(Math.abs(angleRange) - Math.PI * 2) < 1e-9;
 
-    let newDoc = doc;
-    const createdIds: string[] = [];
-
-    for (let i = 0; i < intCount; i++) {
-      // Angle for this copy.
-      const angle =
-        intCount === 1
-          ? startAngle + angleRange / 2
-          : isFullCircle
-            ? startAngle + (angleRange / intCount) * i
-            : startAngle + (angleRange / (intCount - 1)) * i;
-
-      const cosA = Math.cos(angle);
-      const sinA = Math.sin(angle);
-
-      // World position on the arc.
-      const radial: Vec3 = add3(scale3(u, cosA), scale3(v, sinA));
-      const pos: Vec3 = add3(c, scale3(radial, radius));
-
-      // Radial rotation: derive Euler ZYX from radial direction.
-      // For the common case of normal=[0,0,1] (XY plane), the entity rotates
-      // about Z by `angle`. For other normals we compute a general rotation.
-      const rotation = rotationForRadial(n, angle);
-
-      const id = nextId('e');
-      const newEntity = cloneEntityAt(source, id, pos, rotation);
-      newDoc = withEntity(newDoc, { ...newEntity, layerId: source.layerId || DEFAULT_LAYER_ID });
-      createdIds.push(id);
-    }
+    const angles = Array.from({ length: intCount }, (_, i) =>
+      intCount === 1
+        ? startAngle + angleRange / 2
+        : startAngle + (angleRange / (isFullCircle ? intCount : intCount - 1)) * i,
+    );
+    const { document: newDoc, createdIds } = placeCopies(
+      doc,
+      source,
+      angles.map((angle): [Vec3, Vec3] => [
+        add3(c, scale3(add3(scale3(u, Math.cos(angle)), scale3(v, Math.sin(angle))), radius)),
+        rotationForRadial(n, angle),
+      ]),
+    );
 
     return {
       document: newDoc,
@@ -272,32 +234,18 @@ function buildPerpendicularInPlane(n: Vec3): Vec3 {
   return normalize3(sub3(candidate, scale3(n, dot3(candidate, n))));
 }
 
-/**
- * Compute an Euler XYZ rotation (in radians) such that the entity's local +X
- * points radially outward at `angle`. For the common case of normal=[0,0,1] this
- * reduces to a pure Z rotation of `angle`.
- *
- * We use the convention: rotation about [normal axis] by `angle` degrees.
- * The axis-angle → Euler conversion is done via the rotation matrix of
- * Rodrigues' formula projected to intrinsic XYZ Euler angles.
- */
+/** Euler XYZ rotation about the dominant axis of `normal` (sign-corrected) turning local +X by `angle`. */
 function rotationForRadial(normal: Vec3, angle: number): Vec3 {
-  // For simplicity, for the common XY-plane case (normal ≈ Z), rotate about Z.
-  // For Y-axis normal, rotate about Y. For X-axis normal, rotate about X.
-  // For other normals, compose the rotation.
   const [nx, ny, nz] = normal;
   const abx = Math.abs(nx),
     aby = Math.abs(ny),
     abz = Math.abs(nz);
 
   if (abz >= abx && abz >= aby) {
-    // Normal is mostly Z — rotate about Z.
     return [0, 0, nz >= 0 ? angle : -angle];
   } else if (aby >= abx) {
-    // Normal is mostly Y — rotate about Y.
     return [0, ny >= 0 ? angle : -angle, 0];
   } else {
-    // Normal is mostly X — rotate about X.
     return [nx >= 0 ? angle : -angle, 0, 0];
   }
 }

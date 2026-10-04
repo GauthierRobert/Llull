@@ -4,19 +4,13 @@
  * @layer core/commands
  */
 
-import type { Entity, EntityGroup, Vec3 } from '../model/types';
+import type { EntityGroup } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { noop } from './noop';
-
-/**
- * Shallow-clone an entity with a new id and adjusted position.
- * Written locally to avoid cross-command-file coupling (transform.ts is off-limits).
- */
-function cloneEntity(source: Entity, newId: string, position: Vec3): Entity {
-  return { ...source, id: newId, position } as Entity;
-}
+import { replaceEntity, withEntity } from './entityOps';
+import { ORIGIN, translated } from './geometryShared';
 
 /**
  * @command duplicate_entity
@@ -37,26 +31,15 @@ export const duplicateEntity = defineCommand({
       'Optional [dx, dy, dz] offset applied to the copy position. Defaults to [0, 0, 0] (exact overlap).',
     ).optional(),
   }),
-  run: (doc, { id, offset = [0, 0, 0] as const }): CommandResult => {
+  run: (doc, { id, offset = ORIGIN }): CommandResult => {
     const source = doc.entities[id];
     if (!source) {
       return noop(doc, `No entity ${id} to duplicate.`);
     }
 
     const newId = nextId(source.kind);
-    const newPosition: Vec3 = [
-      source.position[0] + offset[0],
-      source.position[1] + offset[1],
-      source.position[2] + offset[2],
-    ];
-    const copy = cloneEntity(source, newId, newPosition);
-
     return {
-      document: {
-        ...doc,
-        entities: { ...doc.entities, [newId]: copy },
-        order: [...doc.order, newId],
-      },
+      document: withEntity(doc, { ...translated(source, offset), id: newId }),
       summary: `Duplicated ${id} → ${newId} at offset [${offset.join(', ')}].`,
       affected: [newId],
     };
@@ -202,10 +185,7 @@ export const setEntityName = defineCommand({
       patched.tags !== undefined ? `tags=[${patched.tags.join(', ')}]` : 'tags=<none>';
 
     return {
-      document: {
-        ...doc,
-        entities: { ...doc.entities, [id]: patched },
-      },
+      document: replaceEntity(doc, patched),
       summary: `Entity ${id}: ${namePart}, ${tagsPart}.`,
       affected: [id],
     };

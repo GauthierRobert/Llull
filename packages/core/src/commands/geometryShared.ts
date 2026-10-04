@@ -2,22 +2,16 @@ import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { z, looseVec3, tolerant } from './schema';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
-import { finiteVec3OrZero } from '../lib/vec3';
+import { add3, finiteVec3OrZero } from '../lib/vec3';
 import { withEntity } from './entityOps';
 import { noop } from './noop';
+import { formatNumber } from '../lib/format';
 
 export const ORIGIN: Vec3 = [0, 0, 0];
 
 /** `entity` with its position offset by `delta` (the one translation used by every move command). */
 export function translated(entity: Entity, delta: Vec3): Entity {
-  return {
-    ...entity,
-    position: [
-      entity.position[0] + delta[0],
-      entity.position[1] + delta[1],
-      entity.position[2] + delta[2],
-    ],
-  };
+  return { ...entity, position: add3(entity.position, delta) };
 }
 
 /**
@@ -122,10 +116,9 @@ export function resolvePosition(
   ];
 }
 
-/** Format an AABB for inclusion in a command summary. */
-function boundsText(b: { min: Vec3; max: Vec3 }): string {
-  const fmt = (v: number): string => parseFloat(v.toFixed(4)).toString();
-  return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
+/** `world AABB min [...] max [...]` for command summaries. */
+export function boundsText(b: { min: Vec3; max: Vec3 }): string {
+  return `world AABB min [${b.min.map(formatNumber).join(', ')}] max [${b.max.map(formatNumber).join(', ')}]`;
 }
 
 /** Default color of every placed primitive solid. */

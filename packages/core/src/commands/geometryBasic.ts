@@ -3,7 +3,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, colorField, untypedArray } from './schema';
 import { nextId } from '../lib/id';
-import { withoutEntities } from './entityOps';
+import { replaceEntity, withoutEntities } from './entityOps';
 import {
   DEFAULT_SOLID_COLOR,
   ORIGIN,
@@ -145,7 +145,7 @@ export const move = defineCommand({
       return noop(doc, `No entity ${id} to move.`);
     }
     return {
-      document: { ...doc, entities: { ...doc.entities, [id]: translated(target, delta) } },
+      document: replaceEntity(doc, translated(target, delta)),
       summary: `Moved ${id} by ${delta.join(', ')}.`,
       affected: [id],
     };
