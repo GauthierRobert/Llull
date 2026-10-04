@@ -59,8 +59,6 @@ export const TOLERANCE_METRES = 0.1;
 /** 2 × H16 B500 bars: 2 × 201 mm² × 435 N/mm², kN. */
 export const DEFAULT_TIE_CAPACITY = 175;
 
-export const DEFAULT_SOIL_MODULUS = 20;
-
 // MPa
 export const POISSON_RATIO = 0.3;
 

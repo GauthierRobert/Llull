@@ -6,19 +6,12 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
 import { baseReactions } from './frameModelSolve';
-import { SOIL_SHAPE } from './foundationCheckRun';
+import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { findFooting } from './foundationCombinations';
 import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationThrust';
-import { clayLayerError } from './foundationSettlement';
-import {
-  COVER_MM,
-  DEFAULT_SOIL_BEARING,
-  DEFAULT_SOIL_MODULUS,
-  type FootingDesignRow,
-} from './footingModel';
+import { COVER_MM, type FootingDesignRow } from './footingModel';
 import { designFootingRow, isResized } from './footingDesignRow';
 import { sizeText } from './footingSizing';
 import { round } from '../numeric';
@@ -67,18 +60,9 @@ export const designFootings = defineCommand({
     'Preliminary design, not a substitute for a structural engineer.',
   params: footingDesignParams,
   run: (doc, params): CommandResult => {
-    const soilBearing = params.soilBearing ?? DEFAULT_SOIL_BEARING;
-    const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
-    if (!isFiniteNumber(soilBearing) || soilBearing <= 0) {
-      return noop(doc, 'design_footings failed: soilBearing must be a number > 0 (kPa).');
-    }
-    if (!isFiniteNumber(soilModulus) || soilModulus <= 0) {
-      return noop(doc, 'design_footings failed: soilModulus must be a number > 0 (MPa).');
-    }
-    if (params.clayLayer !== undefined) {
-      const clayError = clayLayerError(params.clayLayer);
-      if (clayError) return noop(doc, `design_footings failed: ${clayError}.`);
-    }
+    const soil = soilInputs(params);
+    if ('reason' in soil) return noop(doc, `design_footings failed: ${soil.reason}`);
+    const { soilBearing, soilModulus } = soil;
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `design_footings failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;

@@ -2,190 +2,17 @@
  * @layer domain-aec
  */
 
-import type { FootingElement } from '@core/model/building';
-import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
-import { type FrameLoads } from './frameModelTypes';
-import { baseReactions } from './frameModelSolve';
-import {
-  type ClayLayer,
-  DEFAULT_SOIL_MODULUS,
-  DEFAULT_TIE_CAPACITY,
-  type FoundationRow,
-  MAX_UTILISATION,
-} from './foundationModel';
-import { differentialRows, footingRows } from './foundationRows';
-import { plateRows } from './foundationPlateRows';
-import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationThrust';
-import {
-  combine,
-  findFooting,
-  findPlate,
-  hasCase,
-  ultimateCombinations,
-} from './foundationCombinations';
-import { clayLayerError, footingSettlementParts } from './foundationSettlement';
+import { DEFAULT_TIE_CAPACITY } from './foundationModel';
+import { SOIL_SHAPE, soilInputs } from './soilParams';
+import { checkFoundations } from './foundationAssessment';
+import { defaultThrustTie } from './foundationThrust';
 import { round } from '../numeric';
 import { checkTable, failureSummary } from './checkReport';
-
-/**
- * Checks footings and base plates of the columns of a level.
- * @pure
- */
-function checkFoundations(
-  doc: CadDocument,
-  levelId: string,
-  loads: FrameLoads,
-  soilBearing: number,
-  thrustTie: boolean,
-  tieCapacity: number,
-  soilModulus: number = DEFAULT_SOIL_MODULUS,
-  clayLayer?: ClayLayer,
-): { rows: FoundationRow[]; footings: number; plates: number; unchecked: number } {
-  const building = getBuilding(doc);
-  const wind = loads.windPressure > 0;
-  const rows: FoundationRow[] = [];
-  let footings = 0;
-  let plates = 0;
-  const reactions = baseReactions(doc, building, levelId, loads);
-  const checkedFootings = new Set<string>();
-  const tieDone = new Set<string>();
-  const slabWeight = thrustTie ? groundSlabWeight(doc, building, levelId) : 0;
-  const settlements: Array<{
-    frame: string;
-    x: number;
-    column: string;
-    footing: FootingElement;
-    settlement: number;
-  }> = [];
-  const slabShare = reactions.length > 0 ? slabWeight / reactions.length : 0;
-  for (const reaction of reactions) {
-    const column = building.elements[reaction.columnId];
-    if (column?.category !== 'member') continue;
-    const siblings = reactions.filter((other) => other.frame === reaction.frame);
-    const slidingHorizontal = slidingHorizontalOf(reactions, reaction, thrustTie);
-    const footing = findFooting(doc, building, levelId, column);
-    const plate = findPlate(building, column.id);
-    if (thrustTie && !tieDone.has(reaction.frame) && (footing || plate)) {
-      tieDone.add(reaction.frame);
-      const gravity = ultimateCombinations(
-        wind,
-        siblings.some((other) => hasCase(other, 'CL') || hasCase(other, 'CR')),
-        false,
-      ).filter((combination) => !/W/.test(combination.name));
-      const tie = gravity
-        .flatMap((combination) =>
-          siblings.map((other) => ({
-            other,
-            combination,
-            force: Math.abs(combine(other, combination.factors).h),
-          })),
-        )
-        .reduce((best, item) => (item.force > best.force ? item : best));
-      rows.push({
-        column: reaction.frame,
-        footing: '—',
-        elementId: tie.other.columnId,
-        check: `thrust tie force (assumed 2 H16 B500 = ${round(tieCapacity, 0)} kN)`,
-        value: tie.force,
-        limit: tieCapacity,
-        unit: 'kN',
-        utilisation: Math.min(tie.force / tieCapacity, MAX_UTILISATION),
-        combination: tie.combination.name,
-      });
-    }
-    if (footing) {
-      footings += 1;
-      checkedFootings.add(footing.id);
-      rows.push(
-        ...footingRows(
-          doc,
-          reaction,
-          column.mark,
-          footing,
-          soilBearing,
-          wind,
-          slidingHorizontal,
-          slabShare,
-          soilModulus,
-          clayLayer,
-        ),
-      );
-      settlements.push({
-        frame: reaction.frame,
-        x: footing.location[0],
-        column: column.mark,
-        footing,
-        settlement: footingSettlementParts(doc, reaction, footing, soilModulus, clayLayer).total,
-      });
-    }
-    if (plate) {
-      plates += 1;
-      rows.push(
-        ...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind),
-      );
-    }
-  }
-  rows.push(...differentialRows(doc, settlements));
-  const unchecked = Object.values(building.elements).filter(
-    (element) =>
-      element.category === 'footing' &&
-      element.levelId === levelId &&
-      !checkedFootings.has(element.id),
-  ).length;
-  return { rows, footings, plates, unchecked };
-}
-
-export const SOIL_SHAPE = {
-  soilBearing: z
-    .number()
-    .optional()
-    .describe('Allowable (SLS) soil bearing pressure in kPa. Default 150. Must be > 0.'),
-  thrustTie: z
-    .boolean()
-    .optional()
-    .describe(
-      'true = the frame thrust is carried by a tie (ground slab cast around the columns or tie ' +
-        "bars): each frame's columns share the frame's net horizontal reaction for the sliding " +
-        'check and one tie-force row per frame is added. false = every pad resists its own ' +
-        'horizontal reaction by friction. Default true when the level has a slab element, else false.',
-    ),
-  soilModulus: z
-    .number()
-    .optional()
-    .describe(
-      'Soil elastic (Young) modulus Es in MPa for the settlement rows. Default 20. Must be > 0.',
-    ),
-  clayLayer: z
-    .object({
-      topDepth: z.number().describe('Layer top below founding level, m (>= 0).'),
-      thickness: z.number().describe('Layer thickness, m (> 0).'),
-      compressionIndex: z.number().describe('Compression index Cc (> 0).'),
-      recompressionIndex: z
-        .number()
-        .optional()
-        .describe('Recompression index Cr (> 0, <= Cc). Default Cc/5.'),
-      voidRatio: z.number().describe('Initial void ratio e0 (> 0).'),
-      unitWeight: z.number().optional().describe('Bulk unit weight kN/m³ (> 9.81). Default 19.'),
-      preconsolidationPressure: z
-        .number()
-        .optional()
-        .describe("Preconsolidation pressure σ'p in kPa (> 0). Default: normally consolidated."),
-    })
-    .optional()
-    .describe(
-      'Optional compressible clay layer under the pads, adds primary consolidation settlement to the settlement rows. ' +
-        'topDepth: depth of the layer top below the founding level, m (>= 0). thickness: m (> 0). compressionIndex: Cc (> 0). ' +
-        'recompressionIndex: Cr (> 0, <= Cc; default Cc/5, used only with preconsolidationPressure). voidRatio: e0 (> 0). ' +
-        'unitWeight: bulk kN/m³ (> 9.81, default 19; groundwater assumed at the founding level; σ′0 = 18 kN/m³ × founding depth + γ′·z). ' +
-        'preconsolidationPressure: σ′p in kPa (> 0; omit for normally consolidated clay). Required: topDepth, thickness, compressionIndex, voidRatio.',
-    ),
-};
 
 const foundationCheckParams = z.object({
   ...FRAME_LOAD_SHAPE,
@@ -236,18 +63,9 @@ export const foundationCheck = defineCommand({
     'or structural engineer.',
   params: foundationCheckParams,
   run: (doc, params): CommandResult => {
-    const soilBearing = params.soilBearing ?? 150;
-    if (!isFiniteNumber(soilBearing) || soilBearing <= 0) {
-      return noop(doc, 'check_foundations failed: soilBearing must be a number > 0 (kPa).');
-    }
-    const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
-    if (!isFiniteNumber(soilModulus) || soilModulus <= 0) {
-      return noop(doc, 'check_foundations failed: soilModulus must be a number > 0 (MPa).');
-    }
-    if (params.clayLayer !== undefined) {
-      const clayError = clayLayerError(params.clayLayer);
-      if (clayError) return noop(doc, `check_foundations failed: ${clayError}.`);
-    }
+    const soil = soilInputs(params);
+    if ('reason' in soil) return noop(doc, `check_foundations failed: ${soil.reason}`);
+    const { soilBearing, soilModulus } = soil;
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `check_foundations failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;

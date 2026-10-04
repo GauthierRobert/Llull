@@ -49,10 +49,6 @@ export const MIN_THICKNESS_MM = 300;
 
 export const MAX_THICKNESS_MM = 1500;
 
-export const DEFAULT_SOIL_BEARING = 150;
-
-export const DEFAULT_SOIL_MODULUS = 20;
-
 /** Plan width, plan length and thickness, mm. */
 export type PadSize = readonly [number, number, number];
 
