@@ -1,5 +1,5 @@
 import { PIPE_OD, section } from '../oracle/steel';
-import { gridCoordinates, letterLabels, type PlantIntent } from './intent';
+import { gridCoordinates, letterLabels, type IntentMember, type PlantIntent } from './intent';
 import { OPENING_MARGIN } from './script';
 
 /**
@@ -17,18 +17,40 @@ function profilesOf(intent: PlantIntent, role: string): string[] {
   return [...new Set(intent.members.filter((m) => m.role === role).map((m) => m.profile))];
 }
 
+type Axis = 'x' | 'y';
+const runsAlong = (m: IntentMember): Axis =>
+  Math.abs(m.end[0] - m.start[0]) >= Math.abs(m.end[1] - m.start[1]) ? 'x' : 'y';
+
+/** The usual beam section along an axis (most frequent), and the members that differ from it. */
+function beamRule(
+  intent: PlantIntent,
+  axis: Axis,
+): { profile: string; exceptions: IntentMember[] } {
+  const beams = intent.members.filter((m) => m.role === 'beam' && runsAlong(m) === axis);
+  const counts = new Map<string, number>();
+  for (const beam of beams) counts.set(beam.profile, (counts.get(beam.profile) ?? 0) + 1);
+  const profile = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+  return { profile, exceptions: beams.filter((b) => b.profile !== profile) };
+}
+
 export function plantBrief(intent: PlantIntent, extra: string[] = []): string {
   const xs = gridCoordinates(intent.grid.xSpacings);
   const ys = gridCoordinates(intent.grid.ySpacings);
   const letters = letterLabels(ys.length);
-  const beams = profilesOf(intent, 'beam');
+  const main = beamRule(intent, 'y');
+  const secondary = beamRule(intent, 'x');
+  const exceptions = [...main.exceptions, ...secondary.exceptions].map(
+    (m) =>
+      `  - ${m.profile} (h = ${section(m.profile)?.h ?? '?'} mm) instead, on "${intent.levels[m.level]?.name ?? ''}" from ${point(m.start.slice(0, 2))} to ${point(m.end.slice(0, 2))} (same top of steel).`,
+  );
   const grating = intent.floors[0]?.thickness ?? 0;
   const buildingRules: string[] = [
     '## Steel structure (S355)',
     `- Columns ${profilesOf(intent, 'column').join(', ')} at every grid intersection, one continuous member from ${mm(0)} to ${mm(Math.max(...intent.members.filter((m) => m.role === 'column').map((m) => m.end[2])))} (belongs to the ground level).`,
     `- Every floor level above ground carries ${grating} mm gratings on steel beams: top of steel = FFL − ${grating}. Member axes are section centroid lines, so a beam axis is at FFL − ${grating} − h/2.`,
-    `- Main beams ${beams[0] ?? ''} (h = ${section(beams[0] ?? '')?.h ?? '?'} mm) along Y on every numbered axis, one member per bay between lettered axes.`,
-    `- Secondary beams ${beams[1] ?? ''} (h = ${section(beams[1] ?? '')?.h ?? '?'} mm) along X on every lettered axis, one member per bay between numbered axes.`,
+    `- Main beams ${main.profile} (h = ${section(main.profile)?.h ?? '?'} mm) along Y on every numbered axis, one member per bay between lettered axes.`,
+    `- Secondary beams ${secondary.profile} (h = ${section(secondary.profile)?.h ?? '?'} mm) along X on every lettered axis, one member per bay between numbered axes.`,
+    ...(exceptions.length > 0 ? ['- Upsized beams (structural check):', ...exceptions] : []),
     `- Vertical X-bracing ${profilesOf(intent, 'brace').join(', ')} in every storey: bays 1–2 and ${xs.length - 1}–${xs.length} on axes ${letters[0]} and ${letters.at(-1)}, and bay ${letters[0]}–${letters[1]} on axes 1 and ${xs.length}. Work points: column base at ground, then the secondary-beam axis of each floor. Two diagonals per braced bay and storey.`,
     `- Floors: ${grating} mm ${intent.floors[0]?.material ?? ''} over the full grid footprint on every level above ground (top at FFL).`,
     '',

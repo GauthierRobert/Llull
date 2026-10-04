@@ -45,6 +45,7 @@ import { checkPurlins } from './industrial/purlinCheckRun';
 import { designPurlins } from './industrial/purlinDesign';
 import { exportAnchorPlan } from './industrial/anchorPlanExport';
 import { runwayCheck } from './industrial/runwayCheckRun';
+import { checkSteelMembers } from './industrial/steelMembersCheck';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 /** AEC / BIM commands (levels, walls, openings, slabs, sheets, IFC, takeoff). */
@@ -109,6 +110,7 @@ export const industrialCommands = [
   designPurlins,
   exportAnchorPlan,
   runwayCheck,
+  checkSteelMembers,
   addCraneRunway,
   addPortalFrameBuilding,
   checkClashes,

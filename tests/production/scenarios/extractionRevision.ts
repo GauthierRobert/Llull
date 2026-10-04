@@ -136,8 +136,8 @@ export const extractionRevision: Scenario = {
     ...integrityCriteria(),
   ],
   knownIssues: {
-    scripted: ['structural-coverage'],
-    ui: ['line-list', 'structural-coverage', 'ifc-equipment-data', 'dxf-plans'],
+    scripted: [],
+    ui: ['structural-coverage'],
   },
   agentBaseline: 0.6,
 };

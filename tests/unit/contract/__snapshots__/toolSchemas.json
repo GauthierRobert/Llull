@@ -2800,6 +2800,48 @@
   },
   {
     "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "General EN 1993-1-1 member verification of a steel structure built from add_steel_member (multi-storey process structures, pipe racks, platforms, halls), with the loads derived from the model: self weight, floor slabs (add_slab role floor) with dead + imposed load, equipment operating weight (add_equipment weight, kg), pipes (add_pipe_run, steel + contents) and cable trays resting on beams. ULS 1.35 G + 1.5 Q, SLS G + Q. Beams (role beam, horizontal) are simply supported between end nodes, with floor load shared by the 45° tributary rule and equipment by footprint area per bay; checked for bending (+ lateral-torsional buckling when nothing restrains the top flange), shear and deflection ≤ span/250. Columns are checked per storey segment between beam levels for Npl,Rd and flexural buckling Nb,Rd (Lcr = segment length). Braces (role brace, in an X or Y vertical plane) carry the EN 1993-1-1 §5.3.2 equivalent horizontal forces (notionalFactor × factored vertical load per level), tension-only in X-bracing, with slenderness ≤ 300; the horizontal members of a braced bay are checked as struts. Returns data.members: one row per steel member { id, mark, role, profile, check (governing check), utilisation (1.0 = at resistance), ok, governing (combination), detail, checks, forces } — members that cannot be analysed (profile not in the catalogue, class 4, roles rafter / purlin / rail / crane, inclined columns) appear with check \"not analysed\", ok false and the reason; data.ok is true only when every member is analysed and passes. data.warnings lists model gaps (equipment on grade, pipes resting on nothing, directions without bracing, beam ends bearing on nothing). Beam-column connections are assumed pinned; a preliminary check, not a substitute for the engineer of record. See data.loads.assumptions for every load-path rule.",
+    "input_schema": {
+      "properties": {
+        "cableTrayWeight": {
+          "description": "Weight of a cable tray including its cables, kg per metre of run. Default 75.",
+          "type": "number"
+        },
+        "deflectionRatio": {
+          "description": "Beam deflection limit as span / n under G + Q. Default 250 (L/250).",
+          "type": "number"
+        },
+        "floorDeadLoad": {
+          "description": "Permanent load of floor gratings / finishes, kN/m², on every floor slab (add_slab role floor). Default 0.5.",
+          "type": "number"
+        },
+        "imposedLoad": {
+          "description": "Imposed load on floors, kN/m² (process-plant floors, EN 1991-1-1 category E-like), applied on the floor area not occupied by equipment. Default 5.0.",
+          "type": "number"
+        },
+        "levelId": {
+          "description": "Only report the members of this level id. The whole model is always analysed (column loads come from beams on other levels). Default: every level.",
+          "type": "string"
+        },
+        "notionalFactor": {
+          "description": "Equivalent horizontal force as a fraction of the factored vertical load at each floor level (EN 1993-1-1 §5.3.2 φ0 = 1/200 = 0.005, no αh / αm reduction). Default 0.005.",
+          "type": "number"
+        },
+        "pipeContentDensity": {
+          "description": "Density of the pipe contents, kg/m³: 1000 = water-filled (default, operating / hydrotest), 0 = empty pipes.",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "check_steel_members"
+  },
+  {
+    "annotations": {
       "destructiveHint": true
     },
     "description": "Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, and components. Preserves units, camera, and displayPrecision so view framing survives. Set keepLayers=true to also preserve layers and the active layer scheme; by default layers are reset to a single default \"Layer 0\".",

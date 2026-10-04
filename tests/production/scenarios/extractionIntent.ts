@@ -22,6 +22,11 @@ const FLOORS = [6000, 12000, 18000];
 const GRATING = 30;
 const MAIN_BEAM = 'IPE450'; // along Y, carries the floor
 const SECONDARY_BEAM = 'IPE300'; // along X
+/** Main beams under the extractor (+6.00, bay A–B), upsized after check_steel_members (deflection). */
+const EXTRACTOR_BEAM = 'IPE500';
+const EXTRACTOR_AXES = [6000, 12000, 18000];
+const mainBeam = (floorIndex: number, x: number, bay: number): string =>
+  floorIndex === 0 && bay === 0 && EXTRACTOR_AXES.includes(x) ? EXTRACTOR_BEAM : MAIN_BEAM;
 const COLUMN = 'HEB300';
 const BRACE = 'CHS139.7x5';
 
@@ -46,10 +51,11 @@ function members(): IntentMember[] {
     const level = index + 1;
     for (const x of X) {
       for (let j = 0; j + 1 < Y.length; j++) {
-        const z = axisZ(floor, MAIN_BEAM);
+        const profile = mainBeam(index, x, j);
+        const z = axisZ(floor, profile);
         const start: Vec3 = [x, Y[j] ?? 0, z];
         const end: Vec3 = [x, Y[j + 1] ?? 0, z];
-        result.push({ role: 'beam', profile: MAIN_BEAM, start, end, level });
+        result.push({ role: 'beam', profile, start, end, level });
       }
     }
     for (const y of Y) {
