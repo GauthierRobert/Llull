@@ -102,7 +102,10 @@ export class UiSession {
 
   /** Click something that triggers a browser download and read the file. */
   async download(trigger: () => Promise<void>): Promise<Downloaded> {
-    const [download] = await Promise.all([this.page.waitForEvent('download'), trigger()]);
+    const [download] = await Promise.all([
+      this.page.waitForEvent('download', { timeout: 30_000 }),
+      trigger(),
+    ]);
     const file = await download.path();
     return { name: download.suggestedFilename(), text: readFileSync(file, 'utf8') };
   }
