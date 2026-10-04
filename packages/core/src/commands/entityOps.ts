@@ -34,7 +34,7 @@ export function withoutEntity(doc: CadDocument, id: string): CadDocument {
  *
  * @pure
  */
-export function pruneGroupMembers(
+function pruneGroupMembers(
   groups: Readonly<Record<string, EntityGroup>> | undefined,
   removedIds: ReadonlySet<string>,
 ): { nextGroups: Record<string, EntityGroup>; dissolvedGroups: string[] } {
