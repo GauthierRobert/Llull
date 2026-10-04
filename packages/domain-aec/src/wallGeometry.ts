@@ -7,10 +7,6 @@ import type { BuildingModel, OpeningElement, WallElement } from '@core/model/bui
 import { projectOntoSegment, distance } from '@lib/polygon';
 import { arcOffsetOf, tangentWall } from './curvedWallGeometry';
 
-// ---------------------------------------------------------------------------
-// Walls
-// ---------------------------------------------------------------------------
-
 interface WallFrame {
   readonly length: number;
   readonly angle: number;

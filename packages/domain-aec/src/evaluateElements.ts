@@ -37,10 +37,6 @@ import {
   evaluateWall,
 } from './evaluateArchitectural';
 
-// ---------------------------------------------------------------------------
-// Whole-building regeneration
-// ---------------------------------------------------------------------------
-
 function evaluateElement(context: EvaluationContext, element: BuildingElement): Entity[] {
   const { building } = context;
   if (element.category === 'grid') return evaluateGrid(context, element);

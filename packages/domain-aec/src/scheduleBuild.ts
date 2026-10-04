@@ -29,10 +29,6 @@ import {
 } from './takeoffBasics';
 import { memberLength, memberMass, panelArea, pipeLength } from './takeoffCompute';
 
-// ---------------------------------------------------------------------------
-// Schedules
-// ---------------------------------------------------------------------------
-
 export type ScheduleKind =
   | 'wall'
   | 'door'
