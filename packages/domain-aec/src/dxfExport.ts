@@ -2,13 +2,21 @@
  * @layer domain-aec
  */
 
-import { type CadDocument, type Vec2, is2D } from '@core/model/types';
+import { type CadDocument, type Entity, type Vec2, is2D } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fileSlug, fromMm, getBuilding } from './model';
 import { noop } from '@core/commands/noop';
 import { buildPlanDrawing } from './planDrawing';
-import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, toWorld, writePrimitive } from './dxfWriter';
+import { DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, writePrimitive } from './dxfWriter';
+
+/** Places a local 2D point of `entity` in world plan coordinates (position + Z rotation). */
+function toWorld(entity: Entity, [x, y]: Vec2): Vec2 {
+  const angle = entity.rotation[2];
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return [entity.position[0] + x * cos - y * sin, entity.position[1] + x * sin + y * cos];
+}
 
 function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
   for (const id of doc.order) {
@@ -21,8 +29,6 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
         writer.line(layer, world(entity.start), world(entity.end));
         break;
       case 'polyline':
-        writer.polyline(layer, entity.points.map(world), entity.closed);
-        break;
       case 'spline':
         writer.polyline(layer, entity.points.map(world), entity.closed);
         break;
@@ -51,16 +57,13 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
         );
         break;
       case 'ellipse': {
-        const samples: Vec2[] = [];
-        for (let index = 0; index < 64; index++) {
+        const samples = Array.from({ length: 64 }, (_, index): Vec2 => {
           const t = (index / 64) * Math.PI * 2;
-          samples.push(
-            world([
-              entity.center[0] + entity.radiusX * Math.cos(t),
-              entity.center[1] + entity.radiusY * Math.sin(t),
-            ]),
-          );
-        }
+          return world([
+            entity.center[0] + entity.radiusX * Math.cos(t),
+            entity.center[1] + entity.radiusY * Math.sin(t),
+          ]);
+        });
         writer.polyline(layer, samples, true);
         break;
       }
@@ -83,121 +86,76 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
   }
 }
 
+type Group = readonly [code: number, value: string | number];
+
+const flatten = (groups: ReadonlyArray<Group>): string[] =>
+  groups.flatMap(([code, value]) => [String(code), String(value)]);
+
 function header(doc: CadDocument, bounds: readonly [number, number, number, number]): string[] {
-  return [
-    '0',
-    'SECTION',
-    '2',
-    'HEADER',
-    '9',
-    '$ACADVER',
-    '1',
-    'AC1009',
-    '9',
-    '$INSUNITS',
-    '70',
-    String(INSUNITS[doc.units]),
-    '9',
-    '$EXTMIN',
-    '10',
-    fmt(bounds[0]),
-    '20',
-    fmt(bounds[1]),
-    '30',
-    '0',
-    '9',
-    '$EXTMAX',
-    '10',
-    fmt(bounds[2]),
-    '20',
-    fmt(bounds[3]),
-    '30',
-    '0',
-    '0',
-    'ENDSEC',
-  ];
+  return flatten([
+    [0, 'SECTION'],
+    [2, 'HEADER'],
+    [9, '$ACADVER'],
+    [1, 'AC1009'],
+    [9, '$INSUNITS'],
+    [70, INSUNITS[doc.units]],
+    [9, '$EXTMIN'],
+    [10, fmt(bounds[0])],
+    [20, fmt(bounds[1])],
+    [30, 0],
+    [9, '$EXTMAX'],
+    [10, fmt(bounds[2])],
+    [20, fmt(bounds[3])],
+    [30, 0],
+    [0, 'ENDSEC'],
+  ]);
 }
 
 function tables(layers: ReadonlyMap<string, number>): string[] {
-  const out = [
-    '0',
-    'SECTION',
-    '2',
-    'TABLES',
-    '0',
-    'TABLE',
-    '2',
-    'LTYPE',
-    '70',
-    '2',
-    '0',
-    'LTYPE',
-    '2',
-    'CONTINUOUS',
-    '70',
-    '0',
-    '3',
-    'Solid line',
-    '72',
-    '65',
-    '73',
-    '0',
-    '40',
-    '0.0',
-    '0',
-    'LTYPE',
-    '2',
-    'DASHED',
-    '70',
-    '0',
-    '3',
-    '__ __ __',
-    '72',
-    '65',
-    '73',
-    '2',
-    '40',
-    '0.75',
-    '49',
-    '0.5',
-    '49',
-    '-0.25',
-    '0',
-    'ENDTAB',
-    '0',
-    'TABLE',
-    '2',
-    'LAYER',
-    '70',
-    String(layers.size + 1),
-    '0',
-    'LAYER',
-    '2',
-    '0',
-    '70',
-    '0',
-    '62',
-    '7',
-    '6',
-    'CONTINUOUS',
+  const groups: Group[] = [
+    [0, 'SECTION'],
+    [2, 'TABLES'],
+    [0, 'TABLE'],
+    [2, 'LTYPE'],
+    [70, 2],
+    [0, 'LTYPE'],
+    [2, 'CONTINUOUS'],
+    [70, 0],
+    [3, 'Solid line'],
+    [72, 65],
+    [73, 0],
+    [40, '0.0'],
+    [0, 'LTYPE'],
+    [2, 'DASHED'],
+    [70, 0],
+    [3, '__ __ __'],
+    [72, 65],
+    [73, 2],
+    [40, '0.75'],
+    [49, '0.5'],
+    [49, '-0.25'],
+    [0, 'ENDTAB'],
+    [0, 'TABLE'],
+    [2, 'LAYER'],
+    [70, layers.size + 1],
+    [0, 'LAYER'],
+    [2, '0'],
+    [70, 0],
+    [62, 7],
+    [6, 'CONTINUOUS'],
   ];
   for (const [name, color] of layers) {
     if (name === '0') continue;
-    out.push(
-      '0',
-      'LAYER',
-      '2',
-      name,
-      '70',
-      '0',
-      '62',
-      String(color),
-      '6',
-      HIDDEN_LAYERS.has(name) ? 'DASHED' : 'CONTINUOUS',
+    groups.push(
+      [0, 'LAYER'],
+      [2, name],
+      [70, 0],
+      [62, color],
+      [6, HIDDEN_LAYERS.has(name) ? 'DASHED' : 'CONTINUOUS'],
     );
   }
-  out.push('0', 'ENDTAB', '0', 'ENDSEC');
-  return out;
+  groups.push([0, 'ENDTAB'], [0, 'ENDSEC']);
+  return flatten(groups);
 }
 
 export interface DxfExport {
@@ -213,32 +171,32 @@ export interface DxfExport {
  */
 function buildDxf(
   doc: CadDocument,
-  options: { levelId?: string; includeDrafting?: boolean },
+  levelId: string | undefined,
+  includeDrafting: boolean,
 ): DxfExport | null {
   const building = getBuilding(doc);
   const writer = new DxfWriter();
   let levelLabel = 'drafting';
-  if (building.levelOrder.length > 0 || options.levelId !== undefined) {
-    const plan = buildPlanDrawing(doc, options.levelId);
+  if (building.levelOrder.length > 0 || levelId !== undefined) {
+    const plan = buildPlanDrawing(doc, levelId);
     if (!plan) return null;
     const hatchSpacing = fromMm(doc, 150);
     for (const primitive of plan.primitives) writePrimitive(writer, primitive, hatchSpacing);
     levelLabel = plan.level.name;
   }
-  if (options.includeDrafting !== false) writeDrafting(writer, doc);
-  const body = writer.entitiesSection();
+  if (includeDrafting) writeDrafting(writer, doc);
   const dxf = [
     ...header(doc, writer.bounds()),
     ...tables(writer.layers),
-    '0',
-    'SECTION',
-    '2',
-    'ENTITIES',
-    ...body,
-    '0',
-    'ENDSEC',
-    '0',
-    'EOF',
+    ...flatten([
+      [0, 'SECTION'],
+      [2, 'ENTITIES'],
+    ]),
+    ...writer.lines,
+    ...flatten([
+      [0, 'ENDSEC'],
+      [0, 'EOF'],
+    ]),
   ].join('\n');
   return {
     filename: `${fileSlug(building.project.name, 'project')}_${fileSlug(levelLabel, 'plan')}.dxf`,
@@ -271,11 +229,8 @@ export const exportDxf = defineCommand({
         'Also export non-building 2D entities (lines, polylines, circles, text…). Default true.',
       ),
   }),
-  run: (doc, { levelId, includeDrafting }): CommandResult => {
-    const result = buildDxf(doc, {
-      ...(levelId !== undefined ? { levelId } : {}),
-      ...(includeDrafting !== undefined ? { includeDrafting } : {}),
-    });
+  run: (doc, { levelId, includeDrafting = true }): CommandResult => {
+    const result = buildDxf(doc, levelId, includeDrafting);
     if (!result) return noop(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
     if (result.entityCount === 0) {
       return noop(doc, 'export_dxf: nothing to export (no building elements or 2D drafting).');
