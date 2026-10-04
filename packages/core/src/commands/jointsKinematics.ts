@@ -6,6 +6,7 @@ import type {
   Vec3,
 } from '../model/types';
 import { evaluateExpression } from './expression';
+import { topologicalSort } from '../lib/topologicalSort';
 import { add3, scale3, sub3 } from '../lib/vec3';
 /** Normalize a string axis shorthand ('x'|'y'|'z') to a Vec3 unit vector. */
 function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
@@ -63,60 +64,14 @@ function resolveInstance(ref: JointMateRef, doc: CadDocument): InstanceEntity | 
   return e as InstanceEntity;
 }
 
-/**
- * Topological sort of all drive relation ids by dependency (driver → driven).
- * Returns { sorted, cycleSet } where cycleSet contains ids whose drivers form a cycle.
- *
- * @pure
- */
-function driveTopoSort(driveRelations: Record<string, DriveRelation>): {
-  sorted: string[];
-  cycleSet: Set<string>;
-} {
-  // Build a joint-id graph: who drives whom.
-  // We topo-sort JOINT ids (not drive relation ids) to detect cycles.
-  // A joint has in-degree = number of drive relations where it is `driven`.
-  const jointIds = new Set<string>();
-  for (const dr of Object.values(driveRelations)) {
-    jointIds.add(dr.driver);
-    jointIds.add(dr.driven);
-  }
-
-  // inDegree[jointId] = number of drive relations pointing AT it (as driven)
-  const inDegree = new Map<string, number>();
-  // adjacency: driver → [driven, ...]
-  const adj = new Map<string, string[]>();
-  for (const jid of jointIds) {
-    inDegree.set(jid, 0);
-    adj.set(jid, []);
-  }
-  for (const dr of Object.values(driveRelations)) {
-    inDegree.set(dr.driven, (inDegree.get(dr.driven) ?? 0) + 1);
-    adj.get(dr.driver)?.push(dr.driven);
-  }
-
-  // Kahn
-  const queue: string[] = [];
-  for (const [jid, deg] of inDegree) {
-    if (deg === 0) queue.push(jid);
-  }
-  const sorted: string[] = [];
-  while (queue.length > 0) {
-    const jid = queue.shift()!;
-    sorted.push(jid);
-    for (const neighbor of adj.get(jid) ?? []) {
-      const newDeg = (inDegree.get(neighbor) ?? 1) - 1;
-      inDegree.set(neighbor, newDeg);
-      if (newDeg === 0) queue.push(neighbor);
-    }
-  }
-
-  const cycleSet = new Set<string>();
-  for (const jid of jointIds) {
-    if (!sorted.includes(jid)) cycleSet.add(jid);
-  }
-
-  return { sorted, cycleSet };
+/** Joint ids ordered driver before driven; joints on a drive cycle are omitted. */
+function driveOrder(driveRelations: Record<string, DriveRelation>): string[] {
+  const relations = Object.values(driveRelations);
+  const jointIds = new Set(relations.flatMap((dr) => [dr.driver, dr.driven]));
+  return topologicalSort(
+    jointIds,
+    relations.map((dr): [string, string] => [dr.driver, dr.driven]),
+  ).sorted;
 }
 
 /**
@@ -201,7 +156,7 @@ export function evaluateMotionInternal(
   }
 
   // Step 2: propagate drive relations in topo order
-  const { sorted: sortedJoints } = driveTopoSort(doc.driveRelations);
+  const sortedJoints = driveOrder(doc.driveRelations);
   // Build a lookup: driven joint id → drive relation that drives it
   const drivenBy = new Map<string, DriveRelation>();
   for (const dr of Object.values(doc.driveRelations)) {
