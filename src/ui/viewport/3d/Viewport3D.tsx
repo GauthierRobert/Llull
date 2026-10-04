@@ -213,10 +213,8 @@ function SceneContents({
 
   return (
     <>
-      {/* ---- Theme-aware clear color ---- */}
       <color attach="background" args={[palette.background]} />
 
-      {/* ---- Camera + controls ---- */}
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention). */}
       <PerspectiveCamera
         makeDefault
@@ -238,20 +236,15 @@ function SceneContents({
         up={[0, 0, 1]}
       />
 
-      {/* ---- Camera reactor: syncs document.camera commands to the live camera ---- */}
       <CameraReactor />
 
-      {/* ---- Demand-mode invalidation: re-render on store/document changes ---- */}
       <StoreInvalidator />
 
-      {/* ---- Demand-mode invalidation: re-render on viewport render-state changes ---- */}
       <ViewportStoreInvalidator />
 
-      {/* ---- Per-frame rebase check — no setState per frame ---- */}
       <RenderOriginSyncer />
       <AdaptiveClipping />
 
-      {/* ---- View preset camera driver — reads store via props to avoid Canvas re-render ---- */}
       <ViewPresetsInner
         entities={
           document.entities as Record<string, { position: readonly [number, number, number] }>
@@ -260,13 +253,10 @@ function SceneContents({
         allEntityIds={allEntityIds}
       />
 
-      {/* ---- Named-view camera bridge — exposes snapshot/apply callbacks across Canvas boundary ---- */}
       <NamedViewsInner />
 
-      {/* ---- Section / clipping plane sync ---- */}
       <ClippingPlane />
 
-      {/* ---- Animation player — evaluates document.animations per-frame ---- */}
       <AnimationPlayer />
 
       {/* ---- IBL environment: studio preset for reflections/ambient; no background.
@@ -326,7 +316,6 @@ function SceneContents({
         />
       )}
 
-      {/* ---- Ground grid ---- */}
       <Grid
         args={[40, 40]}
         cellSize={1}
@@ -356,7 +345,6 @@ function SceneContents({
         <MechanismOverlay />
       </group>
 
-      {/* ---- Orientation gizmo (bottom-right corner) ---- */}
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
         <GizmoViewport axisColors={palette.axisColors} labelColor={palette.axisLabel} />
       </GizmoHelper>

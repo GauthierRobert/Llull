@@ -213,7 +213,6 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
     [select, toggleSelection, toggleClickAnimation],
   );
 
-  // --- Compute visible entity list (applies all visibility filters) ---
   const visibleEntities = useMemo(() => {
     return order
       .map((id) => entities[id])
@@ -227,16 +226,13 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
       });
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
 
-  // --- Split: batchable kinds (box/cylinder/sphere) go to InstancedRenderer ---
   const batchableEntities = useMemo(() => visibleEntities.filter(isBatchable), [visibleEntities]);
 
-  // --- Non-batchable kinds continue as per-entity meshes ---
   const nonBatchableEntities = useMemo(
     () => visibleEntities.filter((e) => !isBatchable(e)),
     [visibleEntities],
   );
 
-  // --- Group batchable entities into InstancedMesh batches ---
   // Pass the materials map so batches can carry per-batch PBR overrides.
   const batches = useMemo(
     () => groupEntitiesForInstancing(batchableEntities, materials),

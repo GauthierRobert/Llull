@@ -142,7 +142,6 @@ export function TransformGizmo({
   // and IS a DraggingDispatcher at runtime; we cast when wiring events.
   const controlsRef = useRef<TransformControlsImpl>(null);
 
-  // ---- Snap state (refs for per-frame work, no setState per frame) ----
   const isDraggingRef = useRef(false);
   // Snap candidates: rebuilt when entities change (or selection changes).
   const snapCandidatesRef = useRef<ReadonlyArray<SnapPoint3D>>([]);
@@ -166,7 +165,6 @@ export function TransformGizmo({
     snapCandidatesRef.current = collectSnapCandidates3D(doc, selectedId);
   }, [selectedId]);
 
-  // ---- Place the gizmo target at the entity's render-space transform ----
   function syncTargetFromEntity(): void {
     if (!entity) return;
     const t = targetRef.current;
@@ -178,10 +176,8 @@ export function TransformGizmo({
     t.updateMatrixWorld(true);
   }
 
-  // ---- Sync target from the entity (selection change or committed dispatch) ----
   useEffect(syncTargetFromEntity, [entity, renderOrigin]);
 
-  // ---- Per-frame snap computation (translate only) ----
   // NOTE: this useFrame runs ONLY when a drag is in progress (isDraggingRef.current).
   // When idle it returns immediately after the first branch — no setState, no
   // invalidate() calls → the demand frameloop quiesces.
@@ -241,7 +237,6 @@ export function TransformGizmo({
     }
   });
 
-  // ---- dragging-changed handler ----
   const handleDraggingChanged = useCallback(
     (event: { value: boolean }) => {
       const dragging = event.value;
@@ -304,7 +299,6 @@ export function TransformGizmo({
     [selectedId, mode, dispatch, onDraggingChanged, snap3dEnabled, renderOrigin],
   );
 
-  // ---- Wire / re-wire event listener when handler or controls change ----
   useEffect(() => {
     const ctrl = controlsRef.current as (DraggingDispatcher & TransformControlsImpl) | null;
     if (!ctrl) return;

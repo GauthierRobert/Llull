@@ -96,8 +96,6 @@ interface ViewportStoreState {
    */
   snap3dEnabled: boolean;
 
-  // ---- Animation runtime state -------------------------------------------
-
   /**
    * Global play/pause for `trigger:'auto'` animations.
    * `trigger:'click'` animations are controlled independently via `activeClickAnimationIds`.
@@ -126,8 +124,6 @@ interface ViewportStoreState {
    * UI-only state — never serialised into CadDocument.
    */
   mechanismSelection: MechanismSelection | null;
-
-  // ---- Actions ------------------------------------------------------------
 
   /** Set the global display mode ('shaded' | 'wireframe' | 'xray'). */
   setDisplayMode(mode: DisplayMode): void;
@@ -159,8 +155,6 @@ interface ViewportStoreState {
 
   /** Set the quality override ('high' | 'medium' | 'low' | 'auto'). */
   setQualityOverride(quality: QualityOverride): void;
-
-  // ---- Animation actions -------------------------------------------------
 
   /** Toggle global animation playback (Play ↔ Pause for `trigger:'auto'` animations). */
   toggleAnimationPlaying(): void;
@@ -258,8 +252,6 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   setQualityOverride(quality: QualityOverride): void {
     set({ qualityOverride: quality });
   },
-
-  // ---- Animation actions -------------------------------------------------
 
   toggleAnimationPlaying(): void {
     set((state) => ({ animationPlaying: !state.animationPlaying }));

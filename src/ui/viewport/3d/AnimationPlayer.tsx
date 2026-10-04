@@ -83,7 +83,6 @@ export function AnimationPlayer(): null {
     const vpState = useViewportStore.getState();
     const doc = useStore.getState().document;
 
-    // ---- Detect reset ---------------------------------------------------
     const currentNonce = vpState.animationResetNonce;
     if (currentNonce !== lastResetNonce.current) {
       phaseMap.current.clear();
@@ -103,7 +102,6 @@ export function AnimationPlayer(): null {
       invalidateRef.current();
     }
 
-    // ---- Collect per-entity composed transforms -------------------------
     // entityId → { position: THREE.Vector3, quaternion: THREE.Quaternion }
     // We accumulate all animations targeting each entity before applying,
     // composing position offsets and multiplying quaternions.
@@ -207,7 +205,6 @@ export function AnimationPlayer(): null {
       }
     }
 
-    // ---- Apply composed transforms to scene objects ----------------------
     for (const [entityId, transform] of composed) {
       const obj = scene.getObjectByName(entityId);
       if (!obj) continue;
