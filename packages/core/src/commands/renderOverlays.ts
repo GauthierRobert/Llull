@@ -1,7 +1,40 @@
-import type { RenderViewData } from '@core/commands/renderTypes';
-import { escapeXml } from '@lib/escapeXml';
-import { r2 } from '@core/commands/renderMath';
-import { computeOrthoHalf, makeProjector } from './svgHelpers';
+import type { CadDocument } from '../model/types';
+import type { RenderViewData } from './renderTypes';
+import { escapeXml } from '../lib/escapeXml';
+import { r2 } from './renderMath';
+import { makeProjector, computeOrthoHalf } from './renderCamera';
+import { appendEntityLabels } from './renderLabels';
+
+export interface OverlayFlags {
+  showDimensions: boolean;
+  showAxes: boolean;
+  showGrid: boolean;
+  showLabels: boolean;
+}
+
+/** The single overlay pipeline (dimensions, axes/grid, entity labels) applied on top of any base SVG. @pure */
+export function composeOverlays(
+  svg: string,
+  baseData: RenderViewData,
+  doc: CadDocument,
+  flags: OverlayFlags,
+): string {
+  let composed = svg;
+  if (flags.showDimensions) composed = appendDimensionLabels(composed, baseData);
+  if (flags.showAxes || flags.showGrid) {
+    composed = appendAxesAndGrid(
+      composed,
+      baseData,
+      doc.units ?? 'mm',
+      flags.showAxes,
+      flags.showGrid,
+    );
+  }
+  if (flags.showLabels) {
+    composed = appendEntityLabels(composed, baseData, Object.values(doc.entities));
+  }
+  return composed;
+}
 
 /**
  * Append bounding-box dimension labels to an existing SVG string.

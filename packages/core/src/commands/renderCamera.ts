@@ -1,5 +1,6 @@
 import type { Vec3 } from '../model/types';
 import { sub3, dot3, cross3, normalize3 } from '../lib/vec3';
+import type { RenderViewData } from './renderTypes';
 
 export type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso';
 
@@ -79,6 +80,34 @@ export function toScreenCoords(
   const sx = width / 2 + u * scale;
   const sy = height / 2 - v * scale; // flip Y (SVG Y grows down)
   return [sx, sy];
+}
+
+/** World→screen projector for a `RenderViewData.camera`. @pure */
+export function makeProjector(
+  camera: Pick<Camera, 'position' | 'target' | 'up'>,
+  orthoHalf: number,
+  width: number,
+  height: number,
+): (p: Vec3) => [number, number] {
+  const cam: Camera = { ...camera, ortho: null };
+  const basis = cameraBasis(cam);
+  return (p) => {
+    const [u, v] = projectPoint(p, cam, basis);
+    return toScreenCoords(u, v, orthoHalf, width, height);
+  };
+}
+
+/** Half-width of the orthographic frustum (world units) the SVG overlays project with. */
+export function computeOrthoHalf(data: RenderViewData): number {
+  const bounds = data.bounds;
+  if (!bounds) return 1;
+  const extent = Math.max(
+    bounds.max[0] - bounds.min[0],
+    bounds.max[1] - bounds.min[1],
+    bounds.max[2] - bounds.min[2],
+  );
+  const radius = extent / 2 + 1e-3;
+  return (radius < 0.1 ? 1 : radius) * 1.2 * 1.2;
 }
 
 /** Fixed directional light direction in world space (Z-up). */
