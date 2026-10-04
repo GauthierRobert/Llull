@@ -18,7 +18,7 @@ import { plateMass } from './industrial/plates';
 import { connectionMass, connectionWelds } from './industrial/connections';
 import { curvedWallExtent } from './curvedWallGeometry';
 import {
-  curvedVoids,
+  openingsArea,
   elementsOf,
   scaleFor,
   slabNetArea,
@@ -118,10 +118,10 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
               wall.height,
               wall.material,
               openingsOf(building, wall.id).length,
-              round(scale.area(length * wall.height - curvedVoids(building, wall.id))),
+              round(scale.area(length * wall.height - openingsArea(building, wall.id))),
               round(
                 scale.volume(
-                  (length * wall.height - curvedVoids(building, wall.id)) * wall.thickness,
+                  (length * wall.height - openingsArea(building, wall.id)) * wall.thickness,
                 ),
               ),
             ];

@@ -15,7 +15,7 @@ import { curvedWallExtent } from './curvedWallGeometry';
 import {
   TakeoffAccumulator,
   type TakeoffLine,
-  curvedVoids,
+  openingsArea,
   elementsOf,
   footingRebarMass,
   scaleFor,
@@ -60,7 +60,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   for (const wall of elementsOf(building, 'curvedWall')) {
     const extent = curvedWallExtent(building, wall);
     const length = extent.end - extent.start;
-    const voids = curvedVoids(building, wall.id);
+    const voids = openingsArea(building, wall.id);
     takeoff.add(
       'wall',
       wall.material,
@@ -98,7 +98,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   }
   for (const slab of elementsOf(building, 'slab')) {
     const area = slabNetArea(slab);
-    const material = `${slab.material}`;
+    const { material } = slab;
     takeoff.add(
       'slab',
       material,

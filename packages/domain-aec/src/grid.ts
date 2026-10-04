@@ -10,15 +10,12 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import {
   fromMm,
   getBuilding,
-  isVec2,
   lengthOf,
   nextElementId,
-  toVec2,
   withElement,
   elementAffected,
 } from './model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 
 export function gridLabels(building: BuildingModel): Set<string> {
@@ -59,8 +56,8 @@ export function addGrid(
     category: 'grid',
     mark: label,
     entityIds: [],
-    start: toVec2(start),
-    end: toVec2(end),
+    start,
+    end,
   };
   return withElement(building, element);
 }
@@ -82,7 +79,7 @@ export const addGridLine = defineCommand({
     label: z.string().optional().describe('Bubble label, e.g. "A" or "3". Must be unique.'),
   }),
   run: (doc, { start, end, label }): CommandResult => {
-    if (!isVec2(start) || !isVec2(end) || lengthOf(start, end) <= 0) {
+    if (lengthOf(start, end) <= 0) {
       return noop(doc, 'add_grid_line failed: start and end must be distinct [x, y] points.');
     }
     const building = getBuilding(doc);
@@ -130,7 +127,7 @@ export const addGridSystem = defineCommand({
   }),
   run: (doc, { xSpacings, ySpacings, origin: originInput, extension }): CommandResult => {
     const validSpacings = (values: readonly number[]): boolean =>
-      values.every((value) => isFiniteNumber(value) && value > 0);
+      values.every((value) => value > 0);
     if (
       !validSpacings(xSpacings) ||
       !validSpacings(ySpacings) ||
@@ -142,7 +139,7 @@ export const addGridSystem = defineCommand({
       );
     }
     const overrun = extension ?? fromMm(doc, 1500);
-    if (!isFiniteNumber(overrun) || overrun < 0) {
+    if (overrun < 0) {
       return noop(doc, 'add_grid_system failed: extension must be >= 0.');
     }
     const origin: Vec2 = originInput ?? [0, 0];

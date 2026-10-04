@@ -51,15 +51,20 @@ interface WallQuantities {
   readonly volume: number;
 }
 
+/** Area of the openings hosted by a wall (for net face areas). */
+export function openingsArea(building: BuildingModel, wallId: string): number {
+  return openingsOf(building, wallId).reduce(
+    (sum, opening) => sum + opening.width * opening.height,
+    0,
+  );
+}
+
 /** Wall quantities of the built body (joints applied) in document units: length, one-face areas, volume. */
 export function wallQuantities(building: BuildingModel, wall: WallElement): WallQuantities {
   const extent = wallExtent(building, wall);
   const length = extent.end - extent.start;
   const grossArea = length * wall.height;
-  const openingArea = openingsOf(building, wall.id).reduce(
-    (sum, opening) => sum + opening.width * opening.height,
-    0,
-  );
+  const openingArea = openingsArea(building, wall.id);
   const netArea = grossArea - openingArea;
   return { length, grossArea, openingArea, netArea, volume: netArea * wall.thickness };
 }
@@ -144,14 +149,6 @@ export class TakeoffAccumulator {
       quantity: Math.round(line.quantity * 1000) / 1000,
     }));
   }
-}
-
-/** Area of the openings hosted by a wall (for net face areas). */
-export function curvedVoids(building: BuildingModel, wallId: string): number {
-  return openingsOf(building, wallId).reduce(
-    (sum, opening) => sum + opening.width * opening.height,
-    0,
-  );
 }
 
 /** "a8 flanges / a5 web · 3.2 m" (empty without welds). */

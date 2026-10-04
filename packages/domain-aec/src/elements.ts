@@ -12,7 +12,6 @@ import {
   getBuilding,
   hostOf,
   dependenciesOf,
-  isVec2,
   nextElementId,
   nextMark,
   resolveLevel,
@@ -202,7 +201,6 @@ export const moveBuildingElement = defineCommand({
     delta: vec2('Plan translation [dx, dy].'),
   }),
   run: (doc, { elementIds, delta }): CommandResult => {
-    if (!isVec2(delta)) return noop(doc, 'move_building_element failed: delta must be [dx, dy].');
     const building = getBuilding(doc);
     const known = elementIds.filter((id) => building.elements[id] !== undefined);
     if (known.length === 0) {

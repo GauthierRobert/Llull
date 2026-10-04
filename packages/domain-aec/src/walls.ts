@@ -10,7 +10,6 @@ import { defineCommand, z, vec2 } from '@core/commands/schema';
 import {
   fromMm,
   getBuilding,
-  isVec2,
   isVec2List,
   lengthOf,
   nextElementId,
@@ -21,7 +20,6 @@ import {
   elementAffected,
 } from './model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
 import { curvedWallExtent } from './curvedWallGeometry';
@@ -93,14 +91,13 @@ function buildWalls(
 ): WallBuild {
   const thickness = options.thickness ?? fromMm(doc, 200);
   const baseOffset = options.baseOffset ?? 0;
-  if (!isFiniteNumber(thickness) || thickness <= 0) {
+  if (thickness <= 0) {
     return { ok: false, reason: `thickness must be > 0 (got ${String(options.thickness)})` };
   }
-  if (!isFiniteNumber(baseOffset)) return { ok: false, reason: 'baseOffset must be finite' };
   const resolution = resolveLevel(doc, getBuilding(doc), options.levelId);
   if (!resolution.ok) return { ok: false, reason: resolution.reason };
   const height = options.height ?? resolution.level.height;
-  if (!isFiniteNumber(height) || height <= 0) {
+  if (height <= 0) {
     return { ok: false, reason: `height must be > 0 (got ${String(options.height)})` };
   }
   let building = resolution.building;
@@ -168,9 +165,6 @@ export const addWall = defineCommand({
     ...WALL_OPTION_SHAPE,
   }),
   run: (doc, { start, end, ...options }): CommandResult => {
-    if (!isVec2(start) || !isVec2(end)) {
-      return noop(doc, 'add_wall failed: start and end must be [x, y] points.');
-    }
     const build = buildWalls(doc, [[start, end]], options);
     return build.ok ? wallResult(doc, build) : noop(doc, `add_wall failed: ${build.reason}.`);
   },
@@ -242,17 +236,8 @@ export const updateWall = defineCommand({
     if (!wall || wall.category !== 'wall') {
       return noop(doc, `update_wall failed: no wall '${wallId}'.`);
     }
-    if ((start !== undefined && !isVec2(start)) || (end !== undefined && !isVec2(end))) {
-      return noop(doc, 'update_wall failed: start/end must be [x, y].');
-    }
-    const positive = (value: number | undefined): boolean =>
-      value === undefined || (isFiniteNumber(value) && value > 0);
-    if (
-      !positive(thickness) ||
-      !positive(height) ||
-      (baseOffset !== undefined && !isFiniteNumber(baseOffset))
-    ) {
-      return noop(doc, 'update_wall failed: thickness/height must be > 0 and baseOffset finite.');
+    if ((thickness !== undefined && thickness <= 0) || (height !== undefined && height <= 0)) {
+      return noop(doc, 'update_wall failed: thickness/height must be > 0.');
     }
     if (levelId !== undefined && !building.levels[levelId]) {
       return noop(doc, `update_wall failed: no level '${levelId}'.`);
@@ -267,8 +252,8 @@ export const updateWall = defineCommand({
     const updated: WallElement = {
       ...single,
       ...(keepLayers && layers ? { layers } : {}),
-      start: start ? toVec2(start) : wall.start,
-      end: end ? toVec2(end) : wall.end,
+      start: start ?? wall.start,
+      end: end ?? wall.end,
       thickness: thickness ?? wall.thickness,
       height: height ?? wall.height,
       baseOffset: baseOffset ?? wall.baseOffset,

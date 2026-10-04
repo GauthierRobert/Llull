@@ -12,6 +12,7 @@ import { priceTakeoff } from './costing';
 import { computeTakeoff } from './takeoffCompute';
 import { buildSchedule, toCsv, type ScheduleKind } from './scheduleBuild';
 
+const TAKEOFF_COLUMNS = ['Key', 'Description', 'Quantity', 'Unit'];
 const UNIT_LABEL = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' } as const;
 
 /**
@@ -35,11 +36,11 @@ export const quantityTakeoff = defineCommand({
         document: doc,
         summary: 'Quantity takeoff: the building model is empty (add walls, slabs, columns…).',
         affected: [],
-        data: { lines, csv: toCsv(['Key', 'Description', 'Quantity', 'Unit'], []) },
+        data: { lines, csv: toCsv(TAKEOFF_COLUMNS, []) },
       };
     }
     const csv = toCsv(
-      ['Key', 'Description', 'Quantity', 'Unit'],
+      TAKEOFF_COLUMNS,
       lines.map((line) => [line.key, line.description, line.quantity, UNIT_LABEL[line.unit]]),
     );
     const highlights = lines

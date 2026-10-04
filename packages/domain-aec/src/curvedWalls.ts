@@ -14,11 +14,9 @@ import {
   nextMark,
   resolveLevel,
   toMetres,
-  toVec2,
   withElement,
 } from './model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { curvedWallArc, curvedWallBand, curvedWallLength } from './curvedWallGeometry';
 
@@ -50,12 +48,7 @@ export const addCurvedWall = defineCommand({
     if (!resolution.ok) return noop(doc, `add_curved_wall failed: ${resolution.reason}.`);
     const thickness = params.thickness ?? fromMm(doc, 200);
     const height = params.height ?? resolution.level.height;
-    const baseOffset = params.baseOffset ?? 0;
-    if (
-      !(isFiniteNumber(thickness) && thickness > 0) ||
-      !(isFiniteNumber(height) && height > 0) ||
-      !isFiniteNumber(baseOffset)
-    ) {
+    if (thickness <= 0 || height <= 0) {
       return noop(doc, 'add_curved_wall failed: thickness and height must be > 0.');
     }
     const wall: CurvedWallElement = {
@@ -64,12 +57,12 @@ export const addCurvedWall = defineCommand({
       mark: nextMark(resolution.building, 'curvedWall'),
       entityIds: [],
       levelId: resolution.level.id,
-      start: toVec2(params.start),
-      through: toVec2(params.through),
-      end: toVec2(params.end),
+      start: params.start,
+      through: params.through,
+      end: params.end,
       thickness,
       height,
-      baseOffset,
+      baseOffset: params.baseOffset ?? 0,
       material: params.material?.trim() || 'concrete',
     };
     const arc = curvedWallArc(wall);
