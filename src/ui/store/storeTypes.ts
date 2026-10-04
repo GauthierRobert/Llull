@@ -14,9 +14,18 @@ interface LastMeasure {
 
 type SyncState = 'idle' | 'syncing' | 'failed';
 
+/** Outcome of one dispatched command, as reported to its caller. */
+export interface DispatchResult {
+  summary: string;
+  /** True when the command changed the document (`affected` non-empty / new document). */
+  changed: boolean;
+}
+
 export interface DispatchOptions {
   /** Replace the selection with the command's `affected` ids when it succeeds with any. */
   selectAffected?: boolean;
+  /** Called once with THIS dispatch's outcome (also on a failed POST), never with another's. */
+  onResult?: (result: DispatchResult) => void;
 }
 
 export interface CadStoreState {

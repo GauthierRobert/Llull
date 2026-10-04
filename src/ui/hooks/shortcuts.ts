@@ -8,6 +8,12 @@
 
 import type { DrawToolKind, GizmoMode, ViewMode } from '@ui/store';
 
+const IS_APPLE_PLATFORM =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.userAgent);
+
+/** Label for the command-palette shortcut on this platform (⌘K on Apple, Ctrl K elsewhere). */
+export const PALETTE_SHORTCUT_LABEL = IS_APPLE_PLATFORM ? '⌘K' : 'Ctrl K';
+
 type ShortcutAction =
   | { kind: 'draw'; tool: DrawToolKind }
   | { kind: 'gizmo'; mode: GizmoMode }
@@ -82,6 +88,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
   {
     title: 'General',
     entries: [
+      { keys: PALETTE_SHORTCUT_LABEL, action: 'Search & run any command' },
       { keys: 'Ctrl Z', action: 'Undo' },
       { keys: 'Ctrl Y', action: 'Redo (also Ctrl Shift Z)' },
       { keys: 'Ctrl D', action: 'Duplicate selection' },

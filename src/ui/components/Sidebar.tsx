@@ -10,7 +10,6 @@ import React from 'react';
 import { useLayoutStore, useStore } from '@ui/store';
 import type { SidebarTab } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
-import type { IconName } from '@ui/components/Icon';
 import { LayersPanel } from '@ui/panels/LayersPanel';
 import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
 import { MechanismsPanel } from '@ui/panels/MechanismsPanel';
@@ -19,23 +18,8 @@ import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
-
-interface SidebarTabSpec {
-  tab: SidebarTab;
-  label: string;
-  icon: IconName;
-}
-
-const TABS: readonly SidebarTabSpec[] = [
-  { tab: 'building', label: 'Building', icon: 'building' },
-  { tab: 'layers', label: 'Layers', icon: 'layers' },
-  { tab: 'assembly', label: 'Assembly', icon: 'assembly' },
-  { tab: 'mechanisms', label: 'Mechanisms', icon: 'mechanism' },
-  { tab: 'parameters', label: 'Parameters', icon: 'parameters' },
-  { tab: 'history', label: 'History', icon: 'history' },
-  { tab: 'configurations', label: 'Configurations', icon: 'configurations' },
-  { tab: 'materials', label: 'Materials', icon: 'materials' },
-];
+import { SIDEBAR_TAB_SPECS } from './sidebarTabs';
+import type { SidebarTabSpec } from './sidebarTabs';
 
 /** Item count shown as a badge on each rail button. */
 function useTabCount(tab: SidebarTab): number {
@@ -155,7 +139,7 @@ export function Sidebar(): React.ReactElement {
         aria-label="Document browser"
         onKeyDown={handleRailKeyDown}
       >
-        {TABS.map((spec) => (
+        {SIDEBAR_TAB_SPECS.map((spec) => (
           <RailButton
             key={spec.tab}
             spec={spec}
