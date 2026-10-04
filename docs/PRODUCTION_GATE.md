@@ -67,35 +67,40 @@ stay green.
 
 ## Results (2026-10)
 
-| scenario            | scripted | ui             | agent                               |
-| ------------------- | -------- | -------------- | ----------------------------------- |
-| extraction building | 21 / 25  | 21 / 25        | not run yet (needs API credentials) |
-| revision B          | 24 / 28  | 24 / 28        | not run yet                         |
-| pipe rack           | 24 / 26  | no UI flow yet | not run yet                         |
+| scenario            | scripted | ui      | agent                           |
+| ------------------- | -------- | ------- | ------------------------------- |
+| extraction building | 25 / 25  | 25 / 25 | not run (needs API credentials) |
+| revision B          | 28 / 28  | 28 / 28 | not run                         |
+| pipe rack           | 26 / 26  | 26 / 26 | not run                         |
 
-Everything a coordination package needs already works: the structure, equipment, lines,
-openings and stairs are modelled exactly; the model is clash-free; the steel tonnage matches an
-independent table to 0.02 %; the IFC parses with unique GlobalIds, correct storeys and
-containment; plan sheets carry a complete title block at a standard scale; schedules agree with the
-takeoff; the project reopens and replays identically. A revision keeps every id, mark and IFC
-GlobalId.
+Every acceptance criterion passes through `/mcp` and through the browser; `knownIssues` is empty
+for both drivers. The structure, equipment, lines, openings and stairs are modelled exactly; the
+model is clash-free; the steel tonnage matches an independent table to 0.02 %; every steel member
+passes `check_steel_members`; the IFC parses with unique GlobalIds, correct storeys, containment and
+equipment weights; DXF plans and plan sheets show the columns crossing each level and a complete
+title block; the line list carries line number, DN, from and to; schedules agree with the takeoff;
+the project reopens and replays identically; a revision keeps every id, mark and IFC GlobalId.
 
-### What stops an office from using it today (known issues)
+### Gaps the gate found, and how they were closed
 
-| #   | gap                                                                                                                                                                             | criterion             | why it blocks the office                                                                                            |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 1   | **No line list**: a pipe has no line number, no DN, no from / to equipment (`add_pipe_run`, pipe schedule)                                                                      | `line-list`           | the line list is a contractual piping deliverable; today the line number survives only inside the free-text service |
-| 2   | **No structural verification outside portal frames**: no check covers a multi-storey process structure or a pipe rack under equipment / pipe loads (0 / 117 and 0 / 48 members) | `structural-coverage` | the structure cannot be signed off; the EN 1993 checks exist only for portal-frame halls                            |
-| 3   | **IFC equipment has no property set** (operating weight)                                                                                                                        | `ifc-equipment-data`  | the structural engineer's Tekla / Revit model cannot take the equipment loads from the coordination model           |
-| 4   | **Upper-floor DXF plans do not draw the columns passing through** (columns belong to the ground level)                                                                          | `dxf-plans`           | a +6.00 plan without its columns is not a floor plan                                                                |
-| 5   | **The default `/mcp` rate limit (60 requests / min / IP) throttles a real job** (140–300 calls); the gate runs with `MCP_RATE_LIMIT_MAX` raised                                 | —                     | an agent modelling a building hits "Too many requests" within seconds                                               |
+| #   | gap (first run)                                                                          | criterion             | fix                                                                                                              |
+| --- | ---------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 1   | No line list: a pipe had no line number, DN, from / to                                   | `line-list`           | `add_pipe_run` takes `line`, `dn` (OD from the DN table), `from`, `to`; the pipe schedule is a line list         |
+| 2   | No structural verification outside portal frames (0 / 117 and 0 / 48 members)            | `structural-coverage` | `check_steel_members` (EN 1993, loads from the model — see INDUSTRIAL.md)                                        |
+| 3   | IFC equipment had no property set (operating weight)                                     | `ifc-equipment-data`  | `Pset_llullEquipment` (operating weight, clearance), GlobalIds stable across revisions                           |
+| 4   | Upper-floor plans did not draw the columns passing through                               | `dxf-plans`           | plans / DXF draw every column crossing the level's cut height                                                    |
+| 5   | The default `/mcp` rate limit (60 / min / IP) throttled a real job (140–300 calls)       | —                     | default raised to 600 / min; the gate runs on default server settings                                            |
+| 6   | UI: no slab material, no equipment tag, no equipment editing, no level picker on exports | (UI driver)           | Building panel fields, Equipment section editor (`update_equipment`), "Export level" picker; no palette fallback |
+| 7   | Design: IPE450 main beams under the 60 t extractor fail deflection (1.05)                | `structural-coverage` | the scenario design was corrected (IPE500), as an engineer would — the check was not weakened                    |
 
-UI-only gaps (recorded as `uiGaps` in the UI reports; the work was done through the command
-palette instead): the slab form has no material (gratings), the equipment form has no tag
-(E-301 becomes EQ1), the project form is hidden on an empty document, plan / DXF exports have no
-level picker (activate each level first), and nothing edits an existing equipment or history step
-except the palette's `edit_step_params` with hand-typed JSON — deleting and re-adding would break
-ids, marks and GlobalIds.
+`check_steel_members` still warns (without failing) about two things the scenario designs leave
+out: the process lines of the extraction building rest on no modelled pipe support, and the pipe
+rack's transverse bents have no modelled stability system. Both are next scenario refinements.
+
+The UI driver does every call through the Building panel forms: no command-palette fallback and no
+`uiGaps`. Placement is explicit (each form has a Level selector), equipment is revised in the
+Equipment section's editor (`update_equipment`: same id, tag and GlobalId), and plan / DXF exports
+take an "Export level" picker. Any call without a panel control is still recorded as a `uiGap`.
 
 ## Adding a scenario
 

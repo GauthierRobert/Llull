@@ -18,6 +18,8 @@ interface ReportRow {
   readonly elementId: string;
   readonly label: string;
   readonly utilisation: number;
+  /** False when the command reports the row as failing / not analysed whatever its utilisation. */
+  readonly ok: boolean;
 }
 
 interface Report {
@@ -32,14 +34,20 @@ const CHECKS = [
   { command: 'check_purlins', label: 'Purlins', testId: 'purlin-check' },
   { command: 'check_foundations', label: 'Foundations', testId: 'foundation-check' },
   { command: 'check_crane_runways', label: 'Runways', testId: 'runway-check' },
+  { command: 'check_steel_members', label: 'Steel members', testId: 'steel-members-check' },
 ] as const;
+
+type CheckCommand = (typeof CHECKS)[number]['command'];
+
+/** Multi-storey / rack check: its loads come from the model (slabs, equipment, pipes), not the form. */
+const loadsFromModel: ReadonlySet<CheckCommand> = new Set(['check_steel_members']);
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null;
 }
 
 function toReportRows(data: unknown): ReportRow[] {
-  const rows: unknown = isRecord(data) ? data.rows : undefined;
+  const rows: unknown = isRecord(data) ? (data.rows ?? data.members) : undefined;
   if (!Array.isArray(rows)) return [];
   return rows.flatMap((row: unknown, index): ReportRow[] => {
     if (!isRecord(row) || typeof row.utilisation !== 'number') return [];
@@ -53,9 +61,10 @@ function toReportRows(data: unknown): ReportRow[] {
     return [
       {
         key: `${index}:${text('elementId')}`,
-        elementId: text('elementId'),
+        elementId: text('elementId') || text('id'),
         label,
         utilisation: row.utilisation,
+        ok: row.ok !== false,
       },
     ];
   });
@@ -76,8 +85,12 @@ export function StructuralSection(): React.ReactElement {
     windPressure: Number(windPressure),
   };
 
-  const runCheck = (command: string): void => {
-    const result = execute(useStore.getState().document, command, loads);
+  const runCheck = (command: CheckCommand): void => {
+    const result = execute(
+      useStore.getState().document,
+      command,
+      loadsFromModel.has(command) ? {} : loads,
+    );
     setReport({
       summary: result.summary,
       rows: toReportRows(result.data)
@@ -167,7 +180,7 @@ export function StructuralSection(): React.ReactElement {
                   onClick={() => select(building?.elements[row.elementId]?.entityIds ?? [])}
                   data-testid="frame-check-row"
                 >
-                  <span className="chip">{row.utilisation > 1 ? 'FAIL' : 'OK'}</span>
+                  <span className="chip">{row.utilisation > 1 || !row.ok ? 'FAIL' : 'OK'}</span>
                   <span className="panel__row-main">{row.label}</span>
                   <span className="panel__row-meta">{row.utilisation.toFixed(2)}</span>
                 </button>

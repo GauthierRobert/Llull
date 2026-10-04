@@ -3,6 +3,7 @@ import { resetReports } from './report';
 import { installDefaultPlugins } from '@app/plugins';
 import { extractionBuildingFlow } from './ui/extractionBuilding.flow';
 import { extractionRevisionFlow } from './ui/extractionRevision.flow';
+import { pipeRackFlow } from './ui/pipeRack.flow';
 import { gradeUiRun } from './ui/grading';
 import { UiSession } from './ui/session';
 
@@ -29,5 +30,9 @@ test.describe('production scenarios (UI driver)', () => {
 
   test('desmet-extraction-revision-b', async ({ page }) => {
     gradeUiRun(await extractionRevisionFlow(new UiSession(page)));
+  });
+
+  test('desmet-pipe-rack', async ({ page }) => {
+    gradeUiRun(await pipeRackFlow(new UiSession(page)));
   });
 });

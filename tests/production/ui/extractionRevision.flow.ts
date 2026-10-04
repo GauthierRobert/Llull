@@ -15,7 +15,8 @@ import type { UiSession } from './session';
  *
  * desmet-extraction-revision-b through the UI: the colleague's issued rev A project (built in
  * Node by running the building scenario's calls) is opened with "Open project"; the engineer
- * applies the change order with the same controls, re-issues the package and saves.
+ * applies the change order with the same controls (the uprated extractor in the equipment editor),
+ * re-issues the package and saves.
  */
 
 function runScript(scenario: Scenario, from: CadDocument): CadDocument {
@@ -38,11 +39,7 @@ export async function extractionRevisionFlow(session: UiSession): Promise<UiRun>
   driver.startFromProject(levels);
   for (const call of extractionRevision.script) await driver.perform(call);
 
-  const { provided, fileNames } = await exportPackage(
-    session,
-    { levelIds: baseline.building?.levelOrder ?? [], activate: (id) => driver.activateLevel(id) },
-    driver.gaps,
-  );
+  const { provided, fileNames } = await exportPackage(session, baseline.building?.levelOrder ?? []);
   const saved = await saveProject(session);
   return {
     scenario: extractionRevision,

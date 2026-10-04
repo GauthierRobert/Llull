@@ -61,7 +61,7 @@ function describe(element: BuildingElement, units: DocumentUnit): string {
     case 'equipment':
       return element.name;
     case 'pipe':
-      return `Ø${element.diameter} · ${element.service}`;
+      return `${element.line !== undefined ? `${element.line} · ` : ''}${element.dn !== undefined ? `DN${element.dn}` : `Ø${element.diameter}`} · ${element.service}`;
     case 'tray':
       return `${element.width}×${element.height} · ${element.system}`;
     case 'curvedWall':

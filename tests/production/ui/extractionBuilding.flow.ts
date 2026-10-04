@@ -12,7 +12,7 @@ import type { UiSession } from './session';
  *
  * desmet-extraction-building through the UI: from an empty app, the engineer creates the project,
  * levels, grid, steel, gratings, equipment, openings, stairs and lines with the Building panel
- * (command palette where a panel form lacks a field), issues the package and saves the project.
+ * forms, issues the package and saves the project.
  */
 
 export async function extractionBuildingFlow(session: UiSession): Promise<UiRun> {
@@ -21,11 +21,7 @@ export async function extractionBuildingFlow(session: UiSession): Promise<UiRun>
   for (const call of extractionBuilding.script) await driver.perform(call);
 
   const levelIds = extractionIntent.levels.map((_, index) => levelId(index));
-  const { provided, fileNames } = await exportPackage(
-    session,
-    { levelIds, activate: (id) => driver.activateLevel(id) },
-    driver.gaps,
-  );
+  const { provided, fileNames } = await exportPackage(session, levelIds);
   const saved = await saveProject(session);
   return {
     scenario: extractionBuilding,

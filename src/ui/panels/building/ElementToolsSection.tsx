@@ -30,9 +30,17 @@ interface ElementOption {
 
 type ElementOptions = Readonly<Record<ElementListKind, ReadonlyArray<ElementOption>>>;
 
-const NO_OPTIONS: ElementOptions = { walls: [], hosts: [], stairs: [], slabs: [] };
+const NO_OPTIONS: ElementOptions = { walls: [], hosts: [], stairs: [], slabs: [], levels: [] };
 
-/** Active level's walls and stairs, and every slab (stair wells cut the slab above). */
+const BLANK_LABEL: Readonly<Record<ElementListKind, string>> = {
+  walls: 'Choose…',
+  hosts: 'Choose…',
+  stairs: 'Choose…',
+  slabs: 'Choose…',
+  levels: 'Active level',
+};
+
+/** Active level's walls, every stair / slab (stair wells cut the slab above) and every level. */
 function elementOptions(building: BuildingModel | undefined): ElementOptions {
   if (!building) return NO_OPTIONS;
   const options: Record<ElementListKind, ElementOption[]> = {
@@ -40,7 +48,12 @@ function elementOptions(building: BuildingModel | undefined): ElementOptions {
     hosts: [],
     stairs: [],
     slabs: [],
+    levels: [],
   };
+  for (const levelId of building.levelOrder) {
+    const level = building.levels[levelId];
+    if (level) options.levels.push({ id: levelId, label: `${level.name} · +${level.elevation}` });
+  }
   for (const id of building.elementOrder) {
     const element = building.elements[id];
     if (!element) continue;
@@ -54,8 +67,12 @@ function elementOptions(building: BuildingModel | undefined): ElementOptions {
       options.hosts.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
     } else if (element.category === 'curvedWall' && onActiveLevel) {
       options.hosts.push({ id, label: `${element.mark} · curved` });
-    } else if (element.category === 'stair' && onActiveLevel) {
-      options.stairs.push({ id, label: `${element.mark} · ${element.riserCount} risers` });
+    } else if (element.category === 'stair') {
+      const level = building.levels[element.levelId]?.name ?? element.levelId;
+      options.stairs.push({
+        id,
+        label: `${element.mark} · ${element.riserCount} risers · ${level}`,
+      });
     } else if (element.category === 'slab') {
       const level = building.levels[element.levelId]?.name ?? element.levelId;
       options.slabs.push({ id, label: `${element.mark} · ${element.role} · ${level}` });
@@ -87,7 +104,8 @@ function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.R
     );
   }
   if (field.kind === 'select') {
-    const live = typeof field.options === 'string' ? lists[field.options] : null;
+    const listKind = typeof field.options === 'string' ? field.options : null;
+    const live = listKind !== null ? lists[listKind] : null;
     const options = live
       ? live.map((option): readonly [string, string] => [option.id, option.label])
       : typeof field.options === 'string'
@@ -101,7 +119,13 @@ function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.R
           onChange={(event) => onChange(field.key, event.target.value)}
           data-testid={testId}
         >
-          {live && <option value="">{live.length === 0 ? 'None available' : 'Choose…'}</option>}
+          {listKind !== null && live && (
+            <option value="">
+              {live.length === 0 && listKind !== 'levels'
+                ? 'None available'
+                : BLANK_LABEL[listKind]}
+            </option>
+          )}
           {options.map(([optionValue, label]) => (
             <option key={optionValue} value={optionValue}>
               {label}

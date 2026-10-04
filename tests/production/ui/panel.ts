@@ -3,7 +3,8 @@ import type { UiSession } from './session';
 /**
  * @layer tests/production/ui
  *
- * Building panel controls: "Add element" tool forms, levels list, project information form.
+ * Building panel controls: "Add element" tool forms, levels list, project information form,
+ * equipment editor.
  * Fields keep their value between submissions (as for a human), so only changed ones are retyped.
  */
 
@@ -36,12 +37,16 @@ export class BuildingPanel {
     return this.session.acting(`tool ${toolId}`, () => page.getByTestId('tool-submit').click());
   }
 
-  /** Levels list: click a level to make it the active one (new elements and exports use it). */
-  async activateLevel(levelId: string): Promise<void> {
-    const row = this.session.page.getByTestId(`level-row-${levelId}`);
-    if ((await row.getAttribute('aria-current')) === 'true') return;
-    await this.session.acting(`activate ${levelId}`, () =>
-      row.getByRole('button', { name: /^Activate level/ }).click(),
+  /** Equipment list: open a tag's editor, set the given fields (by key) and Save → update_equipment. */
+  async editEquipment(mark: string, fields: FieldValues): Promise<string> {
+    const { page } = this.session;
+    const row = page.getByRole('button', { name: `Edit equipment ${mark}`, exact: true });
+    if ((await row.getAttribute('aria-pressed')) !== 'true') await row.click();
+    for (const [key, value] of Object.entries(fields)) {
+      await page.getByTestId(`equipment-edit-${key}`).fill(value);
+    }
+    return this.session.acting(`edit equipment ${mark}`, () =>
+      page.getByTestId('equipment-save').click(),
     );
   }
 
@@ -52,11 +57,6 @@ export class BuildingPanel {
     return this.session.acting(`add level ${name}`, () =>
       page.getByRole('button', { name: 'Add level', exact: true }).click(),
     );
-  }
-
-  /** True once the project information form is shown (it needs a building model). */
-  projectFormVisible(): Promise<boolean> {
-    return this.session.page.getByTestId('project-name').isVisible();
   }
 
   async setProjectInfo(info: Record<string, string>): Promise<string> {

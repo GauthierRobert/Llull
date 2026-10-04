@@ -31,7 +31,7 @@ export const extractionBuilding: Scenario = {
   ],
   knownIssues: {
     scripted: [],
-    ui: ['structural-coverage'],
+    ui: [],
   },
   agentBaseline: 0.6,
 };

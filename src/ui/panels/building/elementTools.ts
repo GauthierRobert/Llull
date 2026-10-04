@@ -7,9 +7,12 @@
 
 import {
   FieldReader,
+  levelField,
   num,
   onLevel,
+  placement,
   result,
+  txt,
   type ElementTool,
   type ToolField,
 } from './elementToolForm';
@@ -270,6 +273,8 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
           ['foundation', 'Foundation'],
         ],
       },
+      txt('material', 'Material (concrete, grating…)', '', true),
+      levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
@@ -282,7 +287,8 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
         thickness: reader.number('thickness'),
         offset: reader.number('offset'),
         role: reader.text('role'),
-        ...onLevel(context),
+        material: reader.text('material') || undefined,
+        ...placement(reader, context),
       });
     },
   },
@@ -347,17 +353,18 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
         ],
       },
       num('width', 'Width / Ø', '300'),
+      levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      const placement = reader.flag('atGrid')
+      const position = reader.flag('atGrid')
         ? { atGridIntersections: true }
         : { location: [reader.number('x'), reader.number('y')] };
       return result(reader, 'add_column', {
-        ...placement,
+        ...position,
         shape: reader.text('shape'),
         width: reader.number('width'),
-        ...onLevel(context),
+        ...placement(reader, context),
       });
     },
   },
@@ -371,6 +378,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('y2', 'End Y', '0'),
       num('width', 'Width', '300'),
       num('depth', 'Depth', '500'),
+      levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
@@ -379,7 +387,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
         end: [reader.number('x2'), reader.number('y2')],
         width: reader.number('width'),
         depth: reader.number('depth'),
-        ...onLevel(context),
+        ...placement(reader, context),
       });
     },
   },
@@ -392,6 +400,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       num('direction', 'Direction (°)', '0'),
       num('width', 'Width', '1000'),
       num('treadDepth', 'Tread', '280'),
+      levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
@@ -400,7 +409,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
         angle: (reader.number('direction') * Math.PI) / 180,
         width: reader.number('width'),
         treadDepth: reader.number('treadDepth'),
-        ...onLevel(context),
+        ...placement(reader, context),
       });
     },
   },
