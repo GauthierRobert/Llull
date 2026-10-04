@@ -5,7 +5,7 @@ import type {
   DriveRelation,
   Vec3,
 } from '../model/types';
-import { evaluateExpression } from './expression';
+import { resolveNumeric } from './expression';
 import { topologicalSort } from '../lib/topologicalSort';
 import { add3, scale3, sub3 } from '../lib/vec3';
 /** Normalize a string axis shorthand ('x'|'y'|'z') to a Vec3 unit vector. */
@@ -34,20 +34,6 @@ function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
     v[1] * cos + crossY * sin + uy * dot * (1 - cos),
     v[2] * cos + crossZ * sin + uz * dot * (1 - cos),
   ];
-}
-
-/**
- * Resolve a joint value that may be a number or a parameter expression string.
- * Returns the resolved number, or null on resolution failure.
- */
-export function resolveJointValue(raw: number | string, doc: CadDocument): number | null {
-  if (typeof raw === 'number') return raw;
-  const env: Record<string, number> = {};
-  for (const [name, param] of Object.entries(doc.parameters)) {
-    env[name] = param.value;
-  }
-  const result = evaluateExpression(raw, env);
-  return result.ok ? result.value : null;
 }
 
 /** Validate that a string is a valid named axis shorthand or that the value is a Vec3. */
@@ -152,7 +138,7 @@ export function evaluateMotionInternal(
       continue;
     }
     const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
-    resolvedJoints[jid] = resolveJointValue(rawValue, doc) ?? rawValue;
+    resolvedJoints[jid] = resolveNumeric(rawValue, doc.parameters) ?? rawValue;
   }
 
   // Step 2: propagate drive relations in topo order

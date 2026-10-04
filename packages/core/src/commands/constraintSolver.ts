@@ -1,8 +1,10 @@
 import type { CadDocument, Constraint, EntityRef, Vec3 } from '../model/types';
-import { evaluateExpression } from './expression';
+import { resolveNumeric } from './expression';
+
+type Point = readonly [number, number];
 
 /** Resolve a 2D point [x, y] from an EntityRef. Returns null when the entity is missing. */
-function resolvePoint(doc: CadDocument, ref: EntityRef): [number, number] | null {
+function resolvePoint(doc: CadDocument, ref: EntityRef): Point | null {
   const entity = doc.entities[ref.entityId];
   if (!entity) return null;
 
@@ -56,23 +58,6 @@ function resolveRadius(doc: CadDocument, ref: EntityRef): number | null {
     return (entity as { radius: number }).radius;
   }
   return null;
-}
-
-/**
- * Resolve a dimensional value which may be a plain number or a parameter
- * expression referencing the document's parameter table.
- *
- * Returns the numeric value on success, or null when the expression cannot be
- * resolved (unknown parameter / parse error).
- */
-function resolveValue(doc: CadDocument, v: number | string): number | null {
-  if (typeof v === 'number') return v;
-  const env: Record<string, number> = {};
-  for (const [name, param] of Object.entries(doc.parameters)) {
-    env[name] = param.value;
-  }
-  const result = evaluateExpression(v, env);
-  return result.ok ? result.value : null;
 }
 
 /** Per-entity 2D position deltas accumulated in one solver iteration. */
@@ -137,7 +122,7 @@ function applyConstraintGradient(
       const pa = resolvePoint(doc, c.a);
       const pb = resolvePoint(doc, c.b);
       if (!pa || !pb) return 0;
-      const target = resolveValue(doc, c.value);
+      const target = resolveNumeric(c.value, doc.parameters);
       if (target === null) return 0;
       return pullToDistance(c.a.entityId, c.b.entityId, pa, pb, target);
     }
@@ -146,7 +131,7 @@ function applyConstraintGradient(
       const da = resolveDirection(doc, c.a);
       const db = resolveDirection(doc, c.b);
       if (!da || !db) return 0;
-      const target = resolveValue(doc, c.value);
+      const target = resolveNumeric(c.value, doc.parameters);
       if (target === null) return 0;
       // Angle from da to db (z-component of cross product + dot product).
       const cross = da[0] * db[1] - da[1] * db[0]; // da × db
@@ -196,30 +181,20 @@ function applyConstraintGradient(
       }
 
       // Line ↔ circle: |distance from circle center to line| == radius.
-      // Determine which is the circle and which is the line.
       const circleRef = rA !== null ? c.a : rB !== null ? c.b : null;
-      const lineRef = circleRef === c.a ? c.b : c.a;
       if (circleRef === null) return 0;
-
-      const radius = rA !== null ? rA : rB!;
+      const lineRef = circleRef === c.a ? c.b : c.a;
+      const radius = rA !== null ? rA : (rB as number);
       const pc = resolvePoint(doc, circleRef);
-      const lineEntity = doc.entities[lineRef.entityId];
-      if (!pc || !lineEntity || lineEntity.kind !== 'line') return 0;
-      const le = lineEntity as { start: readonly [number, number]; end: readonly [number, number] };
-      const [lpx, lpy] = lineEntity.position;
-      const ax = le.start[0] + lpx;
-      const ay = le.start[1] + lpy;
-      const bx = le.end[0] + lpx;
-      const by = le.end[1] + lpy;
-      // Line direction.
+      if (!pc || doc.entities[lineRef.entityId]?.kind !== 'line') return 0;
+      const [ax, ay] = resolvePoint(doc, { entityId: lineRef.entityId, kind: 'start' }) as Point;
+      const [bx, by] = resolvePoint(doc, { entityId: lineRef.entityId, kind: 'end' }) as Point;
       const ldx = bx - ax;
       const ldy = by - ay;
       const llen = Math.sqrt(ldx * ldx + ldy * ldy);
       if (llen < 1e-12) return 0;
-      // Normal to the line.
       const nx = -ldy / llen;
       const ny = ldx / llen;
-      // Signed distance from pc to line.
       const d = (pc[0] - ax) * nx + (pc[1] - ay) * ny;
       const err = Math.abs(d) - radius;
       const err2 = err * err;

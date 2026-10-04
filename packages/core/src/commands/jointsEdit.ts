@@ -2,7 +2,8 @@ import type { Joint, JointMateRef } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { resolveJointValue, isValidAxis } from './jointsKinematics';
+import { resolveNumeric } from './expression';
+import { isValidAxis } from './jointsKinematics';
 import { noop } from './noop';
 /**
  * @command add_joint
@@ -218,7 +219,7 @@ export const setJointValue = defineCommand({
     }
 
     const existing = doc.joints[id]!;
-    const resolved = resolveJointValue(value, doc);
+    const resolved = resolveNumeric(value, doc.parameters);
     const fieldName = existing.kind === 'revolute' ? 'angle' : 'displacement';
     const current = existing.kind === 'revolute' ? existing.angle : existing.displacement;
     const storedValue = resolved ?? current;

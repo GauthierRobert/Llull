@@ -18,6 +18,8 @@
  *   - Divide-by-zero yields Infinity (IEEE 754); callers may treat as an error.
  */
 
+import type { Parameter } from '../model/types';
+
 /** Successful evaluation result. */
 interface EvalOk {
   readonly ok: true;
@@ -248,4 +250,15 @@ export function extractReferences(expression: string): ReadonlySet<string> {
     if (tok.kind === 'ident') refs.add(tok.text);
   }
   return refs;
+}
+
+/** A number, or an expression string evaluated over the parameter values; null when it fails. */
+export function resolveNumeric(
+  raw: number | string,
+  parameters: Readonly<Record<string, Parameter>>,
+): number | null {
+  if (typeof raw === 'number') return raw;
+  const env = Object.fromEntries(Object.entries(parameters).map(([name, p]) => [name, p.value]));
+  const result = evaluateExpression(raw, env);
+  return result.ok ? result.value : null;
 }
