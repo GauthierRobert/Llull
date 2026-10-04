@@ -30,7 +30,7 @@ import {
   columnFeet,
   MAX_GENERATED_MEMBERS,
   withoutFootings,
-} from './memberFootingPanelCommands';
+} from './footingPanelSupport';
 import { portalInputs } from './portalInputs';
 import { runwayMembers } from './runwayMembers';
 import { buildHallGeometry, type MemberSpec } from './portalGeometry';
