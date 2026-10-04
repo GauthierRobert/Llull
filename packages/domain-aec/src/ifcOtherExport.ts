@@ -2,17 +2,15 @@
  * @layer domain-aec
  */
 
-import type { Vec2 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel, SlabElement } from '@core/model/building';
 import { wallFrame } from './wallGeometry';
 import {
   type Context,
   extrusion,
-  ifcReal,
   ifcString,
   placement,
-  point2,
-  polygonProfile,
+  circleProfile,
+  scaledPolygonProfile,
   rectangleProfile,
   shape,
 } from './ifcStep';
@@ -29,7 +27,7 @@ export function exportOther(
   element: Extract<BuildingElement, { category: 'slab' | 'column' | 'beam' | 'stair' | 'room' }>,
   level: BuildingLevel,
   storeyPlacement: string,
-): Exported & { isSpace: boolean } {
+): Exported {
   const { mm, writer } = context;
   const guid = context.guid(element.id);
   switch (element.category) {
@@ -41,18 +39,12 @@ export function exportOther(
         0,
         mm(element.offset - element.thickness),
       );
-      const profile = polygonProfile(
-        context,
-        element.boundary.map(([x, y]): Vec2 => [mm(x), mm(y)]),
-      );
+      const profile = scaledPolygonProfile(context, element.boundary);
       const ref = writer.add(
         `IFCSLAB('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(element.thickness))])},${ifcString(element.id)},${SLAB_TYPE[element.role]})`,
       );
       (element.openings ?? []).forEach((opening, index) => {
-        const voidProfile = polygonProfile(
-          context,
-          opening.map(([x, y]): Vec2 => [mm(x), mm(y)]),
-        );
+        const voidProfile = scaledPolygonProfile(context, opening);
         const voidRef = writer.add(
           `IFCOPENINGELEMENT('${context.guid(`${element.id}:void-${index}`)}',$,${ifcString(`${element.mark} opening ${index + 1}`)},$,$,${placement(context, local, 0, 0, 0)},${shape(context, [extrusion(context, voidProfile, mm(element.thickness) + 20, 0, 0, -10)])},$,.OPENING.)`,
         );
@@ -60,7 +52,7 @@ export function exportOther(
           `IFCRELVOIDSELEMENT('${context.guid(`${element.id}:voids-${index}`)}',$,$,$,${ref},${voidRef})`,
         );
       });
-      return { ref, material: element.material, isSpace: false };
+      return { ref, material: element.material };
     }
     case 'column': {
       const local = placement(
@@ -70,19 +62,14 @@ export function exportOther(
         mm(element.location[1]),
         0,
       );
-      const position = writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
       const profile =
         element.shape === 'circular'
-          ? writer.add(
-              `IFCCIRCLEPROFILEDEF(.AREA.,$,${position},${ifcReal(mm(element.width) / 2)})`,
-            )
-          : writer.add(
-              `IFCRECTANGLEPROFILEDEF(.AREA.,$,${position},${ifcReal(mm(element.width))},${ifcReal(mm(element.depth))})`,
-            );
+          ? circleProfile(context, mm(element.width) / 2)
+          : rectangleProfile(context, [0, 0], mm(element.width), mm(element.depth));
       const ref = writer.add(
         `IFCCOLUMN('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(element.height))])},${ifcString(element.id)},.COLUMN.)`,
       );
-      return { ref, material: element.material, isSpace: false };
+      return { ref, material: element.material };
     }
     case 'beam': {
       const frame = wallFrame(element);
@@ -104,7 +91,7 @@ export function exportOther(
       const ref = writer.add(
         `IFCBEAM('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(element.depth))])},${ifcString(element.id)},.BEAM.)`,
       );
-      return { ref, material: element.material, isSpace: false };
+      return { ref, material: element.material };
     }
     case 'stair': {
       const local = placement(
@@ -128,18 +115,15 @@ export function exportOther(
       const ref = writer.add(
         `IFCSTAIR('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, steps)},${ifcString(element.id)},.STRAIGHT_RUN_STAIR.)`,
       );
-      return { ref, material: element.material, isSpace: false };
+      return { ref, material: element.material };
     }
     case 'room': {
       const local = placement(context, storeyPlacement, 0, 0, 0);
-      const profile = polygonProfile(
-        context,
-        element.boundary.map(([x, y]): Vec2 => [mm(x), mm(y)]),
-      );
+      const profile = scaledPolygonProfile(context, element.boundary);
       const ref = writer.add(
         `IFCSPACE('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(level.height))])},${ifcString(element.name)},.ELEMENT.,.INTERNAL.,$)`,
       );
-      return { ref, material: null, isSpace: true };
+      return { ref, material: null };
     }
   }
 }
