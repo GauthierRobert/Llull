@@ -1,5 +1,5 @@
 /**
- * @layer server
+ * @layer mcp
  *
  * Server-only render_view enrichment param types (never passed to core).
  */

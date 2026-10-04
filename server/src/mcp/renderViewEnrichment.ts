@@ -11,16 +11,16 @@ import type { CadDocument } from '@core/model/types';
 import type { RenderViewData } from '@core/commands/renderTypes';
 import { applyCommand } from '../commandBus';
 import { stripSvgFromData, rasterizeSvg } from '../renderImage';
-import { type RenderViewEnrichParams } from '../renderViewEnrich/types';
-import { appendEntityLabels } from '../renderViewEnrich/entityLabels';
-import { appendDimensionLabels, appendAxesAndGrid } from '../renderViewEnrich/overlays';
+import { type RenderViewEnrichParams } from '@mcp/renderViewEnrich/types';
+import { appendEntityLabels } from '@mcp/renderViewEnrich/entityLabels';
+import { appendDimensionLabels, appendAxesAndGrid } from '@mcp/renderViewEnrich/overlays';
 import {
   buildTurntableFrames,
   buildIsolateSvg,
   buildSectionSvg,
-} from '../renderViewEnrich/multiPassViews';
+} from '@mcp/renderViewEnrich/multiPassViews';
 import { r2 } from '@core/commands/renderMath';
-import { extractSvgInner } from '../renderViewEnrich/svgHelpers';
+import { extractSvgInner } from '@mcp/renderViewEnrich/svgHelpers';
 
 /** The set of param keys that are handled server-side (not forwarded to core). */
 const ENRICH_PARAM_KEYS = new Set([

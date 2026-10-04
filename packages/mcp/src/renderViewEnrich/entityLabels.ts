@@ -1,5 +1,5 @@
 /**
- * @layer server
+ * @layer mcp
  *
  * render_view showLabels overlay: per-entity id/name labels, key-point markers, legend.
  */

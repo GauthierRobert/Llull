@@ -79,7 +79,7 @@ interface OccMakeSolid extends OccBuilder {
 type OccApi = any; // The WASM binding is extremely wide; all narrowing is done above.
 
 /** Injected loader inputs: core never fetches; the caller supplies WASM bytes or a locator. */
-export interface OcctKernelOptions {
+interface OcctKernelOptions {
   /** Pre-loaded WASM bytes (Node). */
   readonly wasmBinary?: ArrayBuffer | Uint8Array;
   /** Maps an asset path to a URL/path (browser). */
