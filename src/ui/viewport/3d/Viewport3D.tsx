@@ -6,25 +6,20 @@
  * Presentational only: changes go through dispatch.
  */
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { ensureBvhSetup } from './bvhSetup';
 
 // Engage BVH prototype patch once at module load — idempotent, safe under StrictMode.
 ensureBvhSetup();
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import {
   OrbitControls,
   Grid,
   GizmoHelper,
   GizmoViewport,
   PerspectiveCamera,
-  Environment,
-  Lightformer,
-  ContactShadows,
-  SoftShadows,
 } from '@react-three/drei';
 import * as THREE from 'three';
-import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
 import { useToolStore, useViewportStore } from '@ui/store';
 import { Entities } from './Entities';
@@ -38,6 +33,8 @@ import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { useRenderQuality } from './useRenderQuality';
+import { AdaptiveClipping, CameraReactor, sphericalToCartesian } from './CameraRig';
+import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { MechanismOverlay } from './MechanismOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator } from '../StoreInvalidator';
@@ -72,99 +69,6 @@ function ViewportStoreInvalidator(): null {
     });
   }, [invalidate]);
 
-  return null;
-}
-
-/** drei Grid/ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
-const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
-
-/**
- * Convert spherical CameraState → a cartesian THREE.Vector3 eye position.
- *
- * +Z-up right-handed convention:
- *   polar=0   → camera directly above the target along +Z
- *   polar=π/2 → camera in the XY plane (at target elevation)
- *   azimuth   → angle in the XY plane from +Y axis toward +X
- */
-function sphericalToCartesian(
-  target: [number, number, number],
-  azimuth: number,
-  polar: number,
-  distance: number,
-): [number, number, number] {
-  const sinPolar = Math.sin(polar);
-  return [
-    target[0] + distance * sinPolar * Math.sin(azimuth),
-    target[1] + distance * sinPolar * Math.cos(azimuth),
-    target[2] + distance * Math.cos(polar),
-  ];
-}
-
-/**
- * Reacts to `document.camera` changes written by commands (`set_camera`, `fit_view`)
- * and imperatively updates the PerspectiveCamera + OrbitControls to match.
- *
- * Pattern (R6): useEffect syncs an external object (three.js camera/controls) to
- * React state. Does NOT push drag-orbit updates back to the store — orbit/zoom
- * are presentation-only (architecture L4; PRIME DIRECTIVE).
- *
- * Feedback-loop guard: the effect compares the incoming CameraState value against
- * what the live camera currently shows (target + azimuth/polar/distance computed
- * from the camera position). Only applies when the selector produces a new object
- * reference (Zustand shallow equality keeps this stable through re-renders caused
- * by unrelated store slices).
- *
- * Must be mounted inside the Canvas so useThree resolves.
- */
-function CameraReactor(): null {
-  const { camera, controls, invalidate } = useThree();
-  // Narrow selector: only subscribe to the camera slice (R3).
-  const docCamera = useStore((s) => s.document.camera);
-
-  useEffect(() => {
-    const orbit = controls as OrbitControlsImpl | null;
-    if (!orbit) return;
-
-    // The camera lives in render space (world − renderOrigin), like the entity group.
-    const [ox, oy, oz] = useStore.getState().renderOrigin;
-    const newPos = sphericalToCartesian(
-      docCamera.target as [number, number, number],
-      docCamera.azimuth,
-      docCamera.polar,
-      docCamera.distance,
-    );
-
-    camera.position.set(newPos[0] - ox, newPos[1] - oy, newPos[2] - oz);
-    orbit.target.set(docCamera.target[0] - ox, docCamera.target[1] - oy, docCamera.target[2] - oz);
-
-    // Sync OrbitControls internal spherical state to new position/target.
-    orbit.update();
-    // Queue a render frame (demand frameloop).
-    invalidate();
-  }, [docCamera, camera, controls, invalidate]);
-
-  return null;
-}
-
-/**
- * Keeps depth precision usable from millimetre parts to building-scale models (1e4–1e5 units in
- * mm): near/far track the camera→target distance at a fixed 1:4e6 ratio. Updates the projection
- * only when the distance changed by more than 10 %.
- */
-function AdaptiveClipping(): null {
-  const { camera, controls } = useThree();
-  const lastDistance = useRef(0);
-  useFrame(() => {
-    const target = (controls as OrbitControlsImpl | null)?.target;
-    if (!target) return;
-    const distance = camera.position.distanceTo(target);
-    if (Math.abs(distance - lastDistance.current) <= lastDistance.current * 0.1) return;
-    lastDistance.current = distance;
-    const perspective = camera as THREE.PerspectiveCamera;
-    perspective.near = Math.max(distance / 2000, 1e-3);
-    perspective.far = Math.max(distance * 2000, 1e3);
-    perspective.updateProjectionMatrix();
-  });
   return null;
 }
 
@@ -278,62 +182,7 @@ function SceneContents({
       {/* ---- Animation player — evaluates document.animations per-frame ---- */}
       <AnimationPlayer />
 
-      {/* ---- IBL environment: studio preset for reflections/ambient; no background.
-           Kept on across all quality tiers — it is a single texture sample (cheap)
-           and significantly improves material quality. ---- */}
-      {quality.environmentEnabled && (
-        // Procedural studio IBL — no network fetch (preset="studio" pulls an HDR from a CDN
-        // and crashes the viewport offline).
-        <Environment background={false} resolution={256}>
-          <Lightformer form="rect" intensity={2} position={[0, 5, 5]} scale={[10, 6, 1]} />
-          <Lightformer form="rect" intensity={1} position={[-6, -2, 2]} scale={[6, 4, 1]} />
-          <Lightformer form="rect" intensity={1} position={[6, -2, 2]} scale={[6, 4, 1]} />
-          <Lightformer form="ring" intensity={0.6} position={[0, 0, -4]} scale={8} />
-        </Environment>
-      )}
-
-      {/* ---- Soft shadow patch: PCSS-style softening on the shadow map.
-           Disabled in Low tier (softShadowSamples === 0) to save per-fragment cost.
-           Medium tier: 8 samples (halved from High's 16). ---- */}
-      {quality.softShadowSamples > 0 && (
-        <SoftShadows size={25} samples={quality.softShadowSamples} focus={0.5} />
-      )}
-
-      {/* ---- Light rig ----
-           hemisphere: warm ground / cool sky fill to avoid pure-black undersides.
-           directional key: high-angle from front-right, casts shadows.
-             shadow-mapSize scales with quality tier (2048 High / 1024 Medium+Low).
-           directional rim: cool back-left counter fill.  */}
-      <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} position={[0, 0, 1]} />
-      <directionalLight
-        position={[8, -6, 14]}
-        intensity={1.8}
-        castShadow
-        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
-        shadow-camera-near={0.5}
-        shadow-camera-far={200}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
-        shadow-bias={-0.0004}
-      />
-      <directionalLight position={[-6, 8, 4]} intensity={0.4} color="#a8c8ff" />
-
-      {/* ---- Contact shadows: rendered once (frames=1) — safe under demand frameloop.
-           Disabled in Low tier to avoid the extra render pass. ---- */}
-      {quality.contactShadowsEnabled && (
-        <ContactShadows
-          position={[0, 0, -0.001]}
-          rotation={GROUND_PLANE_ROTATION}
-          opacity={palette.contactShadowOpacity}
-          scale={40}
-          blur={2.5}
-          far={20}
-          frames={1}
-          color="#1a1e2a"
-        />
-      )}
+      <SceneLighting quality={quality} contactShadowOpacity={palette.contactShadowOpacity} />
 
       {/* ---- Ground grid ---- */}
       <Grid
