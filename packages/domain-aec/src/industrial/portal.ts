@@ -37,8 +37,8 @@ import { buildHallGeometry, type MemberSpec } from './portalGeometry';
 import { portalFrameParams } from './portalParams';
 import { hallMemberSpecs } from './portalMembers';
 import { claddingPanels, facing } from './portalCladding';
-import { appendBasePlates, columnsWithoutPlates } from './plates';
-import { appendConnections, findMomentJoints } from './connections';
+import { appendBasePlates, columnsWithoutPlates } from './plateSupport';
+import { appendConnections, findMomentJoints } from './connectionSupport';
 import { addGrid, gridLabels, nextFreeLabel } from '../grid';
 
 /** Steel mass of members created by a generator, kg. */

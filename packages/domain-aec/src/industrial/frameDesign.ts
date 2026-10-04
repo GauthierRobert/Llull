@@ -10,7 +10,7 @@ import { elementAffected, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
-import { refitPlates } from './plates';
+import { refitPlates } from './plateSupport';
 import { designFixedPlates } from './plateDesign';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
