@@ -8,9 +8,10 @@ import type { EntityGroup } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
+import { ORIGIN } from '../lib/vec3';
 import { noop } from './noop';
 import { replaceEntity, withEntity } from './entityOps';
-import { ORIGIN, translated } from './geometryShared';
+import { translated } from './geometryShared';
 
 /**
  * @command duplicate_entity

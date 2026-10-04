@@ -3,9 +3,9 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, colorField } from './schema';
 import { nextId } from '../lib/id';
+import { ORIGIN } from '../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
-  ORIGIN,
   anchorField,
   commitSolid,
   positionField,

@@ -7,8 +7,6 @@ import { withEntity } from './entityOps';
 import { noop } from './noop';
 import { formatNumber } from '../lib/format';
 
-export const ORIGIN: Vec3 = [0, 0, 0];
-
 /** `entity` with its position offset by `delta` (the one translation used by every move command). */
 export function translated(entity: Entity, delta: Vec3): Entity {
   return { ...entity, position: add3(entity.position, delta) };

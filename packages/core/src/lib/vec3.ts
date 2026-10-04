@@ -1,5 +1,8 @@
 import type { Vec3 } from '../model/types';
 
+/** The world origin `[0, 0, 0]`. */
+export const ORIGIN: Vec3 = [0, 0, 0];
+
 /** @pure component-wise a + b */
 export function add3(a: Vec3, b: Vec3): Vec3 {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];

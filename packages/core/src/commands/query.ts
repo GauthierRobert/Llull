@@ -13,7 +13,7 @@ import type { EntityKind } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
-import { entityBounds } from './sceneBounds';
+import { boundsCenter, entityBounds } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { distanceSq3 } from '../lib/vec3';
 
@@ -29,11 +29,6 @@ interface EntityMatch {
 interface FindEntitiesResult {
   matches: EntityMatch[];
   count: number;
-}
-
-/** Returns the centroid of a world-space AABB. */
-function bboxCentroid(b: Bounds): readonly [number, number, number] {
-  return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
 }
 
 type Corner = readonly [number, number, number];
@@ -242,7 +237,7 @@ export const findEntities = defineCommand({
       if (needsBounds) {
         const b = entityBounds(e);
         if (bboxMin && bboxMax && !overlapsAabb(b, bboxMin, bboxMax)) continue;
-        if (nearPoint && distanceSq3(bboxCentroid(b), nearPoint.point) > nearRadiusSq) continue;
+        if (nearPoint && distanceSq3(boundsCenter(b), nearPoint.point) > nearRadiusSq) continue;
         if (insideBBox && !insideAabb(b, insideBBox[0], insideBBox[1])) continue;
         if (overlapsBBox && !overlapsAabb(b, overlapsBBox[0], overlapsBBox[1])) continue;
         if (touchingBounds && !overlapsAabb(b, touchingBounds.min, touchingBounds.max)) continue;

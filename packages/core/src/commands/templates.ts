@@ -16,6 +16,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 } from './schema';
 import { nextId } from '../lib/id';
+import { ORIGIN } from '../lib/vec3';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
 
 /** Append multiple entities to a document in one pass. Keeps the command pure. */
@@ -217,8 +218,6 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
     },
   } as TemplateEntry<never>,
 };
-
-const ORIGIN: Vec3 = [0, 0, 0];
 
 const VALID_TEMPLATES: readonly TemplateName[] = [
   'bolt_hole_pattern',

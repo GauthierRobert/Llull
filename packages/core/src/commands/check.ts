@@ -1,30 +1,19 @@
 /**
- * Model validation — read-only lint pass over the document.
+ * check_model: read-only lint pass (geometry defects, structural inconsistencies, parameter errors).
  *
- * `check_model` scans the document for common geometry defects, structural
- * inconsistencies, and parameter errors. It is the agent's "lint before/after
- * build_project" step. It never mutates the document.
- *
- * @command check_model
- * @pure
  * @layer core/commands
- * @affects nothing — read-only; document returned as the SAME reference, affected:[]
- * @invariant data is a CheckResult; document === input doc (same reference)
- * @failure no params required; optional farThreshold defaults to 1e6
  */
 
 import type { CadDocument, Entity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds } from './sceneBounds';
+import { boundsCenter, entityBounds } from './sceneBounds';
+import { dot3 } from '../lib/vec3';
 
 /** Severity of a model issue. */
 type IssueSeverity = 'error' | 'warning' | 'info';
 
-/**
- * A single model issue discovered by `check_model`.
- * `entityId` is present when the issue is associated with a specific entity.
- */
+/** One finding of `check_model`; `entityId` when it concerns a specific entity. */
 export interface Issue {
   severity: IssueSeverity;
   /** Short machine-readable tag identifying the issue class. */
@@ -42,112 +31,107 @@ export interface CheckResult {
   issues: Issue[];
 }
 
-const errorIssue = (code: string, message: string, entityId: string): Issue => ({
-  severity: 'error',
-  code,
-  message,
-  entityId,
-});
+const issue = (
+  severity: IssueSeverity,
+  code: string,
+  message: string,
+  entityId?: string,
+): Issue => ({ severity, code, message, ...(entityId !== undefined ? { entityId } : {}) });
 
 /** Degenerate geometry: sizes, radii, and depths that are ≤ 0. */
 function checkDegenerateGeometry(e: Entity): Issue[] {
-  const issues: Issue[] = [];
   const label = e.kind.charAt(0).toUpperCase() + e.kind.slice(1);
-  const nonPositive = (field: string, value: number, rule: string): void => {
-    if (value <= 0) {
-      issues.push(
-        errorIssue(
-          'degenerate_size',
-          `${label} entity '${e.id}' has ${field} ${value} ≤ 0. ${rule}`,
-          e.id,
-        ),
-      );
-    }
-  };
-  const checkSize = (size: readonly number[]): void => {
-    if (size.some((c) => c <= 0)) {
-      issues.push(
-        errorIssue(
-          'degenerate_size',
-          `${label} entity '${e.id}' has a zero or negative size component [${size.join(', ')}]. All dimensions must be > 0.`,
-          e.id,
-        ),
-      );
-    }
-  };
-
+  const nonPositive = (field: string, value: number, rule: string): Issue[] =>
+    value <= 0
+      ? [
+          issue(
+            'error',
+            'degenerate_size',
+            `${label} entity '${e.id}' has ${field} ${value} ≤ 0. ${rule}`,
+            e.id,
+          ),
+        ]
+      : [];
   switch (e.kind) {
     case 'box':
     case 'wedge':
-      checkSize(e.size);
-      break;
+      return e.size.some((c) => c <= 0)
+        ? [
+            issue(
+              'error',
+              'degenerate_size',
+              `${label} entity '${e.id}' has a zero or negative size component [${e.size.join(', ')}]. All dimensions must be > 0.`,
+              e.id,
+            ),
+          ]
+        : [];
     case 'cylinder':
     case 'cone':
-      nonPositive('radius', e.radius, 'Radius must be > 0.');
-      nonPositive('height', e.height, 'Height must be > 0.');
-      break;
+      return [
+        ...nonPositive('radius', e.radius, 'Radius must be > 0.'),
+        ...nonPositive('height', e.height, 'Height must be > 0.'),
+      ];
     case 'sphere':
     case 'circle':
     case 'arc':
-      nonPositive('radius', e.radius, 'Radius must be > 0.');
-      break;
+      return nonPositive('radius', e.radius, 'Radius must be > 0.');
     case 'extrusion':
-      nonPositive('depth', e.depth, 'Depth must be > 0.');
-      break;
+      return nonPositive('depth', e.depth, 'Depth must be > 0.');
     case 'ellipse':
-      nonPositive('radiusX', e.radiusX, 'Both radii must be > 0.');
-      nonPositive('radiusY', e.radiusY, 'Both radii must be > 0.');
-      break;
+      return [
+        ...nonPositive('radiusX', e.radiusX, 'Both radii must be > 0.'),
+        ...nonPositive('radiusY', e.radiusY, 'Both radii must be > 0.'),
+      ];
     case 'torus':
-      nonPositive('ringRadius', e.ringRadius, 'ringRadius must be > 0.');
-      nonPositive('tubeRadius', e.tubeRadius, 'tubeRadius must be > 0.');
-      break;
+      return [
+        ...nonPositive('ringRadius', e.ringRadius, 'ringRadius must be > 0.'),
+        ...nonPositive('tubeRadius', e.tubeRadius, 'tubeRadius must be > 0.'),
+      ];
     case 'pyramid':
-      nonPositive('baseWidth', e.baseWidth, 'baseWidth must be > 0.');
-      nonPositive('baseDepth', e.baseDepth, 'baseDepth must be > 0.');
-      nonPositive('height', e.height, 'Height must be > 0.');
-      break;
+      return [
+        ...nonPositive('baseWidth', e.baseWidth, 'baseWidth must be > 0.'),
+        ...nonPositive('baseDepth', e.baseDepth, 'baseDepth must be > 0.'),
+        ...nonPositive('height', e.height, 'Height must be > 0.'),
+      ];
     case 'text':
-      nonPositive('height', e.height, 'Height must be > 0.');
-      if (e.content.trim().length === 0) {
-        issues.push(
-          errorIssue(
-            'degenerate_size',
-            `Text entity '${e.id}' has empty content. Content must be a non-empty string.`,
-            e.id,
-          ),
-        );
-      }
-      break;
+      return [
+        ...nonPositive('height', e.height, 'Height must be > 0.'),
+        ...(e.content.trim().length === 0
+          ? [
+              issue(
+                'error',
+                'degenerate_size',
+                `Text entity '${e.id}' has empty content. Content must be a non-empty string.`,
+                e.id,
+              ),
+            ]
+          : []),
+      ];
+    default:
+      return [];
   }
-
-  return issues;
 }
 
-/**
- * Open profile warning: a polyline that is not closed.
- * Relevant when a 2D profile is intended to be used with `extrude_sketch`.
- */
+/** A polyline intended as an extrusion profile must be closed. */
 function checkOpenProfile(e: Entity): Issue[] {
-  if (e.kind !== 'polyline') return [];
-  if (!e.closed) {
-    return [
-      {
-        severity: 'warning',
-        code: 'open_profile',
-        message: `Polyline entity '${e.id}' is not closed. If this polyline is intended as an extrusion profile it must be closed (closed: true).`,
-        entityId: e.id,
-      },
-    ];
-  }
-  return [];
+  return e.kind === 'polyline' && !e.closed
+    ? [
+        issue(
+          'warning',
+          'open_profile',
+          `Polyline entity '${e.id}' is not closed. If this polyline is intended as an extrusion profile it must be closed (closed: true).`,
+          e.id,
+        ),
+      ]
+    : [];
 }
 
 function checkInsufficientPoints(e: Entity): Issue[] {
   if ((e.kind !== 'polyline' && e.kind !== 'spline') || e.points.length >= 2) return [];
   const label = e.kind === 'polyline' ? 'Polyline' : 'Spline';
   return [
-    errorIssue(
+    issue(
+      'error',
       'insufficient_points',
       `${label} entity '${e.id}' has ${e.points.length} point(s); minimum is 2.`,
       e.id,
@@ -155,158 +139,110 @@ function checkInsufficientPoints(e: Entity): Issue[] {
   ];
 }
 
-/**
- * Far from origin: bounding-box center beyond `farThreshold` units.
- * Objects far from the origin cause floating-point precision issues in the viewport.
- */
+/** Far from origin: bounding-box centre beyond `farThreshold` (viewport precision issues). */
 function checkFarFromOrigin(e: Entity, farThreshold: number): Issue[] {
-  const bounds = entityBounds(e);
-  const cx = (bounds.min[0] + bounds.max[0]) / 2;
-  const cy = (bounds.min[1] + bounds.max[1]) / 2;
-  const cz = (bounds.min[2] + bounds.max[2]) / 2;
-  const dist = Math.sqrt(cx * cx + cy * cy + cz * cz);
-  if (dist > farThreshold) {
-    return [
-      {
-        severity: 'warning',
-        code: 'far_from_origin',
-        message: `Entity '${e.id}' (kind: ${e.kind}) has its bounding-box center ${dist.toFixed(0)} units from the world origin (threshold: ${farThreshold}). Floating-point precision issues may occur.`,
-        entityId: e.id,
-      },
-    ];
-  }
-  return [];
+  const center = boundsCenter(entityBounds(e));
+  const dist = Math.sqrt(dot3(center, center));
+  return dist > farThreshold
+    ? [
+        issue(
+          'warning',
+          'far_from_origin',
+          `Entity '${e.id}' (kind: ${e.kind}) has its bounding-box center ${dist.toFixed(0)} units from the world origin (threshold: ${farThreshold}). Floating-point precision issues may occur.`,
+          e.id,
+        ),
+      ]
+    : [];
 }
 
-/**
- * Empty layers: layers that have no entities assigned to them.
- */
 function checkEmptyLayers(doc: CadDocument): Issue[] {
-  const issues: Issue[] = [];
-  const entityLayerIds = new Set(Object.values(doc.entities).map((e) => e.layerId));
-
-  for (const layerId of doc.layerOrder) {
+  const usedLayerIds = new Set(Object.values(doc.entities).map((e) => e.layerId));
+  return doc.layerOrder.flatMap((layerId) => {
     const layer = doc.layers[layerId];
-    if (!layer) continue;
-    if (!entityLayerIds.has(layerId)) {
-      issues.push({
-        severity: 'info',
-        code: 'empty_layer',
-        message: `Layer '${layer.name}' (id: ${layerId}) has no entities assigned to it.`,
-      });
-    }
-  }
-  return issues;
+    return layer && !usedLayerIds.has(layerId)
+      ? [
+          issue(
+            'info',
+            'empty_layer',
+            `Layer '${layer.name}' (id: ${layerId}) has no entities assigned to it.`,
+          ),
+        ]
+      : [];
+  });
 }
 
-/**
- * Orphaned group members: a group referencing an entity id not in `entities`.
- */
 function checkOrphanedGroupMembers(doc: CadDocument): Issue[] {
-  const issues: Issue[] = [];
-  for (const group of Object.values(doc.groups)) {
-    for (const memberId of group.memberIds) {
-      if (!(memberId in doc.entities)) {
-        issues.push({
-          severity: 'error',
-          code: 'orphaned_group_member',
-          message: `Group '${group.name}' (id: ${group.id}) references member id '${memberId}' which does not exist in the document.`,
-          entityId: memberId,
-        });
-      }
-    }
-  }
-  return issues;
+  return Object.values(doc.groups).flatMap((group) =>
+    group.memberIds
+      .filter((memberId) => !(memberId in doc.entities))
+      .map((memberId) =>
+        issue(
+          'error',
+          'orphaned_group_member',
+          `Group '${group.name}' (id: ${group.id}) references member id '${memberId}' which does not exist in the document.`,
+          memberId,
+        ),
+      ),
+  );
 }
 
-/**
- * Dangling dimension references: a dimension entity whose entityIds point to
- * entity ids that no longer exist in the document.
- *
- * Issue code: `dangling_dimension_ref`
- */
-function checkDanglingDimensionRefs(doc: CadDocument): Issue[] {
-  const issues: Issue[] = [];
-  for (const entity of Object.values(doc.entities)) {
-    if (entity.kind !== 'dimension') continue;
-    for (const refId of entity.entityIds) {
-      if (!(refId in doc.entities)) {
-        issues.push({
-          severity: 'error',
-          code: 'dangling_dimension_ref',
-          message: `Dimension entity '${entity.id}' (${entity.dimensionKind}) references entity id '${refId}' which does not exist in the document.`,
-          entityId: entity.id,
-        });
-      }
-    }
-  }
-  return issues;
+function checkDanglingDimensionRefs(entity: Entity, doc: CadDocument): Issue[] {
+  if (entity.kind !== 'dimension') return [];
+  return entity.entityIds
+    .filter((refId) => !(refId in doc.entities))
+    .map((refId) =>
+      issue(
+        'error',
+        'dangling_dimension_ref',
+        `Dimension entity '${entity.id}' (${entity.dimensionKind}) references entity id '${refId}' which does not exist in the document.`,
+        entity.id,
+      ),
+    );
 }
 
-/**
- * Dangling component references: an instance entity whose componentId is not in doc.components.
- *
- * Issue code: `dangling_component`
- */
-function checkDanglingComponentRefs(doc: CadDocument): Issue[] {
-  const issues: Issue[] = [];
-  for (const entity of Object.values(doc.entities)) {
-    if (entity.kind !== 'instance') continue;
-    if (!(entity.componentId in (doc.components ?? {}))) {
-      issues.push({
-        severity: 'error',
-        code: 'dangling_component',
-        message: `Instance entity '${entity.id}' references component id '${entity.componentId}' which does not exist in doc.components.`,
-        entityId: entity.id,
-      });
-    }
-  }
-  return issues;
+function checkDanglingComponentRef(entity: Entity, doc: CadDocument): Issue[] {
+  return entity.kind === 'instance' && !(entity.componentId in doc.components)
+    ? [
+        issue(
+          'error',
+          'dangling_component',
+          `Instance entity '${entity.id}' references component id '${entity.componentId}' which does not exist in doc.components.`,
+          entity.id,
+        ),
+      ]
+    : [];
 }
 
-/**
- * Parameter errors: parameters whose `error` field is set.
- */
 function checkParameterErrors(doc: CadDocument): Issue[] {
-  const issues: Issue[] = [];
-  for (const param of Object.values(doc.parameters)) {
-    if (param.error) {
-      issues.push({
-        severity: 'error',
-        code: 'parameter_error',
-        message: `Parameter '${param.name}' has an evaluation error: ${param.error}. Fix the expression or remove this parameter.`,
-      });
-    }
-  }
-  return issues;
+  return Object.values(doc.parameters).flatMap((param) =>
+    param.error
+      ? [
+          issue(
+            'error',
+            'parameter_error',
+            `Parameter '${param.name}' has an evaluation error: ${param.error}. Fix the expression or remove this parameter.`,
+          ),
+        ]
+      : [],
+  );
 }
 
-/**
- * Run all checks over the document and collect the full issue list.
- *
- * @pure — reads the document, never mutates it.
- * @layer core/commands
- */
+/** Run every check over the document. @pure */
 export function runModelChecks(doc: CadDocument, farThreshold: number): CheckResult {
-  const issues: Issue[] = [];
-
-  // Per-entity checks
-  for (const entity of Object.values(doc.entities)) {
-    issues.push(...checkDegenerateGeometry(entity));
-    issues.push(...checkInsufficientPoints(entity));
-    issues.push(...checkOpenProfile(entity));
-    issues.push(...checkFarFromOrigin(entity, farThreshold));
-  }
-
-  // Document-level checks
-  issues.push(...checkEmptyLayers(doc));
-  issues.push(...checkOrphanedGroupMembers(doc));
-  issues.push(...checkDanglingDimensionRefs(doc));
-  issues.push(...checkDanglingComponentRefs(doc));
-  issues.push(...checkParameterErrors(doc));
-
-  const ok = !issues.some((i) => i.severity === 'error');
-  return { ok, issues };
+  const issues = [
+    ...Object.values(doc.entities).flatMap((entity) => [
+      ...checkDegenerateGeometry(entity),
+      ...checkInsufficientPoints(entity),
+      ...checkOpenProfile(entity),
+      ...checkFarFromOrigin(entity, farThreshold),
+    ]),
+    ...checkEmptyLayers(doc),
+    ...checkOrphanedGroupMembers(doc),
+    ...Object.values(doc.entities).flatMap((entity) => checkDanglingDimensionRefs(entity, doc)),
+    ...Object.values(doc.entities).flatMap((entity) => checkDanglingComponentRef(entity, doc)),
+    ...checkParameterErrors(doc),
+  ];
+  return { ok: !issues.some((i) => i.severity === 'error'), issues };
 }
 
 /**
@@ -344,14 +280,13 @@ export const checkModel = defineCommand({
     const farThreshold = params.farThreshold ?? 1e6;
     const result = runModelChecks(doc, farThreshold);
 
-    const errorCount = result.issues.filter((i) => i.severity === 'error').length;
-    const warnCount = result.issues.filter((i) => i.severity === 'warning').length;
-    const infoCount = result.issues.filter((i) => i.severity === 'info').length;
+    const count = (severity: IssueSeverity): number =>
+      result.issues.filter((i) => i.severity === severity).length;
 
     const summary =
       result.issues.length === 0
         ? 'check_model: no issues found — model is clean.'
-        : `check_model: ${result.issues.length} issue(s) — ${errorCount} error(s), ${warnCount} warning(s), ${infoCount} info(s). ok=${result.ok}.`;
+        : `check_model: ${result.issues.length} issue(s) — ${count('error')} error(s), ${count('warning')} warning(s), ${count('info')} info(s). ok=${result.ok}.`;
 
     return {
       document: doc,

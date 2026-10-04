@@ -6,7 +6,6 @@ import { nextId } from '../lib/id';
 import { replaceEntity, withoutEntities } from './entityOps';
 import {
   DEFAULT_SOLID_COLOR,
-  ORIGIN,
   anchorField,
   commitSolid,
   positionField,
@@ -16,6 +15,7 @@ import {
   rotationField,
   translated,
 } from './geometryShared';
+import { ORIGIN } from '../lib/vec3';
 import { noop } from './noop';
 
 /**

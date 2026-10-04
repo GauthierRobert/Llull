@@ -14,8 +14,7 @@ import { nextId } from '../lib/id';
 import { replaceEntities, withEntity, withoutEntities } from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { noop } from './noop';
-import { add3 } from '../lib/vec3';
-import { ORIGIN } from './geometryShared';
+import { ORIGIN, add3 } from '../lib/vec3';
 
 const UNIT_SCALE: Vec3 = [1, 1, 1];
 
