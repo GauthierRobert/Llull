@@ -1,25 +1,7 @@
 /**
  * @layer ui/viewport/3d
- *
- * Pure 3D object-snapping helpers for the transform gizmo.
- *
- * Given a candidate world point + scene entities (described by their world-space
- * AABB key points) + a tolerance, returns the nearest snap point and its type.
- *
- * Key points derived per solid kind:
- *   - box/extrusion  : 8 AABB corners + 6 face centres + 12 edge midpoints
- *   - cylinder       : top & bottom disc centres + 8 rim points on each disc
- *   - sphere         : centre + 6 axis-aligned poles
- *   - mesh           : 8 AABB corners + 6 face centres (mesh vertices not traversed)
- *
- * Grid snap: round to the nearest gridStep on all three axes.
- *
- * All functions are deterministic and side-effect free.
- * No React, no three.js, no store reads — pure TypeScript.
- *
- * Unit-tested in tests/unit/snap3d.test.ts.
- *
- * @pure
+ * @pure Object snapping for the transform gizmo: AABB corners/face centres/edge midpoints of
+ * solids (cylinder and sphere use disc/pole points), then grid fallback.
  */
 
 import type { Entity, CadDocument } from '@core/model/types';
@@ -54,234 +36,140 @@ const SNAP3D_PRIORITY: Record<Snap3DType, number> = {
   none: 4,
 };
 
-/** Euclidean distance between two 3D points. */
-function dist3(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const dz = bz - az;
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
-}
+type Triple = readonly [number, number, number];
 
-/**
- * Axis-aligned bounding box defined by its min/max corners.
- * All in world space.
- */
+/** World-space axis-aligned bounds. */
 interface AABB {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-  minZ: number;
-  maxZ: number;
+  readonly min: Triple;
+  readonly max: Triple;
 }
 
-/**
- * Derive an entity's world-space AABB.
- * For 3D solids only — returns null for 2D shapes.
- * Ignores entity rotation (uses axis-aligned bounds from entity position + size params).
- *
- * @pure
- */
+function boundsOf(points: ReadonlyArray<Triple>): AABB | null {
+  if (points.length === 0) return null;
+  const min: [number, number, number] = [Infinity, Infinity, Infinity];
+  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (const point of points) {
+    for (let axis = 0; axis < 3; axis++) {
+      min[axis] = Math.min(min[axis] ?? Infinity, point[axis] ?? 0);
+      max[axis] = Math.max(max[axis] ?? -Infinity, point[axis] ?? 0);
+    }
+  }
+  return { min, max };
+}
+
+/** World AABB of a 3D solid (rotation ignored); null for kinds without one. */
 function entityAABB(entity: Entity): AABB | null {
   const [px, py, pz] = entity.position;
-
   switch (entity.kind) {
     case 'box': {
       const [w, h, d] = entity.size;
-      // Box is centred at position.
       return {
-        minX: px - w / 2,
-        maxX: px + w / 2,
-        minY: py - h / 2,
-        maxY: py + h / 2,
-        minZ: pz - d / 2,
-        maxZ: pz + d / 2,
+        min: [px - w / 2, py - h / 2, pz - d / 2],
+        max: [px + w / 2, py + h / 2, pz + d / 2],
       };
     }
     case 'cylinder': {
       const { radius, height } = entity;
-      return {
-        minX: px - radius,
-        maxX: px + radius,
-        minY: py,
-        maxY: py + height,
-        minZ: pz - radius,
-        maxZ: pz + radius,
-      };
+      return { min: [px - radius, py, pz - radius], max: [px + radius, py + height, pz + radius] };
     }
     case 'sphere': {
       const { radius } = entity;
       return {
-        minX: px - radius,
-        maxX: px + radius,
-        minY: py - radius,
-        maxY: py + radius,
-        minZ: pz - radius,
-        maxZ: pz + radius,
+        min: [px - radius, py - radius, pz - radius],
+        max: [px + radius, py + radius, pz + radius],
       };
     }
     case 'extrusion': {
-      const { profile, depth } = entity;
-      if (profile.length === 0) return null;
-      let minX = Infinity,
-        maxX = -Infinity;
-      let minZ = Infinity,
-        maxZ = -Infinity;
-      for (const [lx, lz] of profile) {
-        if (lx < minX) minX = lx;
-        if (lx > maxX) maxX = lx;
-        if (lz < minZ) minZ = lz;
-        if (lz > maxZ) maxZ = lz;
-      }
+      const bounds = boundsOf(entity.profile.map(([lx, lz]) => [lx, 0, lz]));
+      if (bounds === null) return null;
       return {
-        minX: px + minX,
-        maxX: px + maxX,
-        minY: py,
-        maxY: py + depth,
-        minZ: pz + minZ,
-        maxZ: pz + maxZ,
+        min: [px + bounds.min[0], py, pz + bounds.min[2]],
+        max: [px + bounds.max[0], py + entity.depth, pz + bounds.max[2]],
       };
     }
     case 'mesh': {
-      // Derive AABB from mesh vertices.
       const { positions } = entity.mesh;
-      if (positions.length < 3) return null;
-      let minX = Infinity,
-        maxX = -Infinity;
-      let minY = Infinity,
-        maxY = -Infinity;
-      let minZ = Infinity,
-        maxZ = -Infinity;
-      for (let i = 0; i < positions.length; i += 3) {
-        const vx = positions[i] ?? 0;
-        const vy = positions[i + 1] ?? 0;
-        const vz = positions[i + 2] ?? 0;
-        if (vx < minX) minX = vx;
-        if (vx > maxX) maxX = vx;
-        if (vy < minY) minY = vy;
-        if (vy > maxY) maxY = vy;
-        if (vz < minZ) minZ = vz;
-        if (vz > maxZ) maxZ = vz;
+      const vertices: Triple[] = [];
+      for (let i = 0; i + 2 < positions.length; i += 3) {
+        vertices.push([positions[i] ?? 0, positions[i + 1] ?? 0, positions[i + 2] ?? 0]);
       }
-      return { minX, maxX, minY, maxY, minZ, maxZ };
+      return boundsOf(vertices);
     }
     default:
       return null;
   }
 }
 
-/**
- * Expand an AABB's 8 corners into world-space snap candidates of type 'vertex'.
- *
- * @pure
- */
-function aabbCorners(bb: AABB): Array<[number, number, number]> {
-  const { minX, maxX, minY, maxY, minZ, maxZ } = bb;
-  return [
-    [minX, minY, minZ],
-    [maxX, minY, minZ],
-    [minX, maxY, minZ],
-    [maxX, maxY, minZ],
-    [minX, minY, maxZ],
-    [maxX, minY, maxZ],
-    [minX, maxY, maxZ],
-    [maxX, maxY, maxZ],
-  ];
+/** The 8 corners (x varies fastest), 6 face centres and 12 edge midpoints of an AABB. */
+function aabbSnapPoints(bb: AABB): SnapPoint3D[] {
+  const at = (choose: (axis: number) => number): Triple => [choose(0), choose(1), choose(2)];
+  const extreme = (axis: number, high: boolean): number => (high ? bb.max : bb.min)[axis] ?? 0;
+  const mid = (axis: number): number => (extreme(axis, false) + extreme(axis, true)) / 2;
+  const points: SnapPoint3D[] = [];
+  const push = (point: Triple, type: Snap3DType): void => {
+    points.push({ x: point[0], y: point[1], z: point[2], type });
+  };
+  for (let corner = 0; corner < 8; corner++) {
+    push(
+      at((axis) => extreme(axis, ((corner >> axis) & 1) === 1)),
+      'vertex',
+    );
+  }
+  for (let axis = 0; axis < 3; axis++) {
+    for (const high of [false, true]) {
+      push(
+        at((a) => (a === axis ? extreme(a, high) : mid(a))),
+        'face-center',
+      );
+    }
+  }
+  for (let axis = 0; axis < 3; axis++) {
+    const others = [0, 1, 2].filter((a) => a !== axis);
+    for (let quad = 0; quad < 4; quad++) {
+      push(
+        at((a) => (a === axis ? mid(a) : extreme(a, ((quad >> others.indexOf(a)) & 1) === 1))),
+        'edge',
+      );
+    }
+  }
+  return points;
 }
 
-/**
- * Expand an AABB's 6 face centres into snap candidates of type 'face-center'.
- *
- * @pure
- */
-function aabbFaceCenters(bb: AABB): Array<[number, number, number]> {
-  const cx = (bb.minX + bb.maxX) / 2;
-  const cy = (bb.minY + bb.maxY) / 2;
-  const cz = (bb.minZ + bb.maxZ) / 2;
-  return [
-    [bb.minX, cy, cz],
-    [bb.maxX, cy, cz], // -X / +X face
-    [cx, bb.minY, cz],
-    [cx, bb.maxY, cz], // -Y / +Y face
-    [cx, cy, bb.minZ],
-    [cx, cy, bb.maxZ], // -Z / +Z face
-  ];
-}
-
-/**
- * Expand an AABB's 12 edge midpoints into snap candidates of type 'edge'.
- * An axis-aligned box has 12 edges — 4 per axis direction.
- *
- * @pure
- */
-function aabbEdgeMidpoints(bb: AABB): Array<[number, number, number]> {
-  const { minX, maxX, minY, maxY, minZ, maxZ } = bb;
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-  const cz = (minZ + maxZ) / 2;
-  return [
-    // Edges along X axis (constant Y, Z)
-    [cx, minY, minZ],
-    [cx, maxY, minZ],
-    [cx, minY, maxZ],
-    [cx, maxY, maxZ],
-    // Edges along Y axis (constant X, Z)
-    [minX, cy, minZ],
-    [maxX, cy, minZ],
-    [minX, cy, maxZ],
-    [maxX, cy, maxZ],
-    // Edges along Z axis (constant X, Y)
-    [minX, minY, cz],
-    [maxX, minY, cz],
-    [minX, maxY, cz],
-    [maxX, maxY, cz],
-  ];
-}
-
-/**
- * Cylinder snap points: top & bottom disc centres (vertex) +
- * 8 rim points on each disc at 45° increments (vertex).
- *
- * @pure
- */
+/** Cylinder: both disc centres plus 8 rim points on each disc, all 'vertex'. */
 function cylinderSnapPoints(entity: Entity & { kind: 'cylinder' }): SnapPoint3D[] {
   const [px, py, pz] = entity.position;
   const { radius, height } = entity;
-  const pts: SnapPoint3D[] = [];
-
-  // Disc centres.
-  pts.push({ x: px, y: py, z: pz, type: 'vertex' });
-  pts.push({ x: px, y: py + height, z: pz, type: 'vertex' });
-
-  // 8 rim points per disc (every 45°).
+  const points: SnapPoint3D[] = [
+    { x: px, y: py, z: pz, type: 'vertex' },
+    { x: px, y: py + height, z: pz, type: 'vertex' },
+  ];
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * 2 * Math.PI;
-    const rx = Math.cos(angle) * radius;
-    const rz = Math.sin(angle) * radius;
-    pts.push({ x: px + rx, y: py, z: pz + rz, type: 'vertex' });
-    pts.push({ x: px + rx, y: py + height, z: pz + rz, type: 'vertex' });
+    const x = px + Math.cos(angle) * radius;
+    const z = pz + Math.sin(angle) * radius;
+    points.push({ x, y: py, z, type: 'vertex' }, { x, y: py + height, z, type: 'vertex' });
   }
-
-  return pts;
+  return points;
 }
 
-/**
- * Sphere snap points: centre + 6 axis-aligned poles.
- *
- * @pure
- */
+/** Sphere: centre plus 6 axis-aligned poles, all 'vertex'. */
 function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
   const [px, py, pz] = entity.position;
-  const { radius } = entity;
+  const { radius: r } = entity;
   return [
-    { x: px, y: py, z: pz, type: 'vertex' }, // centre
-    { x: px + radius, y: py, z: pz, type: 'vertex' }, // +X
-    { x: px - radius, y: py, z: pz, type: 'vertex' }, // -X
-    { x: px, y: py + radius, z: pz, type: 'vertex' }, // +Y
-    { x: px, y: py - radius, z: pz, type: 'vertex' }, // -Y
-    { x: px, y: py, z: pz + radius, type: 'vertex' }, // +Z
-    { x: px, y: py, z: pz - radius, type: 'vertex' }, // -Z
-  ];
+    [0, 0, 0],
+    [r, 0, 0],
+    [-r, 0, 0],
+    [0, r, 0],
+    [0, -r, 0],
+    [0, 0, r],
+    [0, 0, -r],
+  ].map(([dx, dy, dz]) => ({
+    x: px + (dx ?? 0),
+    y: py + (dy ?? 0),
+    z: pz + (dz ?? 0),
+    type: 'vertex',
+  }));
 }
 
 /**
@@ -313,19 +201,8 @@ export function collectSnapCandidates3D(
       continue;
     }
 
-    // For box, extrusion, mesh: derive from AABB.
     const bb = entityAABB(entity);
-    if (!bb) continue;
-
-    for (const [x, y, z] of aabbCorners(bb)) {
-      candidates.push({ x, y, z, type: 'vertex' });
-    }
-    for (const [x, y, z] of aabbFaceCenters(bb)) {
-      candidates.push({ x, y, z, type: 'face-center' });
-    }
-    for (const [x, y, z] of aabbEdgeMidpoints(bb)) {
-      candidates.push({ x, y, z, type: 'edge' });
-    }
+    if (bb) candidates.push(...aabbSnapPoints(bb));
   }
 
   return candidates;
@@ -355,7 +232,7 @@ export function snap3d(
   let best: SnapPoint3D | null = null;
 
   for (const pt of candidates) {
-    const d = dist3(candidateX, candidateY, candidateZ, pt.x, pt.y, pt.z);
+    const d = Math.hypot(pt.x - candidateX, pt.y - candidateY, pt.z - candidateZ);
     if (d <= tolerance) {
       const beatsByDist = d < bestDist - 1e-10;
       const sameDist = Math.abs(d - bestDist) <= 1e-10;
