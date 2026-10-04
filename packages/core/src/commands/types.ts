@@ -1,15 +1,7 @@
 /**
- * Command contracts.
- *
- * A Command is the ONE unit of change in the system. The same command set is
- * invoked by:
- *   - the React UI (button clicks, gizmo drags)
- *   - the AI bridge (Claude tool calls)
- *   - the MCP server (external agents)
- *
- * Each command is a pure function: (document, params) -> CommandResult.
- * It never mutates its input; it returns a new document. This makes undo/redo,
- * testing, and AI replay trivial.
+ * Command contracts: a command is the ONE unit of change. Each is a pure function
+ * `(document, params, ctx?) -> CommandResult` that returns a new document; the UI, the AI bridge
+ * and the MCP server all invoke the same set through `execute`.
  */
 
 import type { CadDocument } from '../model/types';
@@ -19,98 +11,57 @@ import type { ZodType } from 'zod';
 export interface CommandResult {
   /** The next document state. */
   document: CadDocument;
-  /** Human/AI-readable summary of what happened (great for AI feedback loops). */
+  /** Human/AI-readable summary of what happened (the agent's feedback signal). */
   summary: string;
   /**
-   * Ids of entities created or affected — lets the caller select/highlight them.
-   * @invariant Ordering MUST be deterministic for the same (doc-shape, params): the
-   * feature-history replay positionally zips a step's recorded `affected` (old ids)
-   * with the replay's `affected` (new ids) to remap downstream id references. A command
-   * that creates multiple entities must list them in a stable order across runs.
+   * Ids of entities created or affected (the caller selects/highlights them).
+   * @invariant deterministic order for the same (doc-shape, params): feature-history replay zips a
+   *   step's recorded `affected` with the replay's positionally to remap downstream id references.
    */
   affected: string[];
   /**
-   * Structured result for read-only/query commands (e.g. measure_distance,
-   * mass_properties). Absent on mutating commands; lets a programmatic agent read
-   * a value instead of parsing `summary`. Passes through `execute` and the MCP layer.
-   * @example { distance: 42, unit: 'mm' }
+   * Structured result of read-only/query commands (e.g. `{ distance: 42, unit: 'mm' }`); absent on
+   * mutating commands. Passes through `execute` and the MCP layer.
    */
   data?: unknown;
 }
 
-/**
- * @invariant `ctx` is always supplied when invoked through `execute`/`replayHistory`; it is
- * optional only so direct `def.run(doc, params)` calls (tests, composed helpers) still type-check.
- */
+/** @invariant `ctx` is always supplied by `execute`/`replayHistory`; optional only for direct `run` calls. */
 export type Command<P> = (doc: CadDocument, params: P, ctx?: ExecutionContext) => CommandResult;
 
-/**
- * Safety annotations for a command. Emitted verbatim as MCP tool `annotations`.
- * Field names follow the MCP Tool Annotations spec (readOnlyHint, destructiveHint, idempotentHint).
- *
- * @see https://spec.modelcontextprotocol.io/specification/2025-03-26/server/tools/#tool-annotations
- */
+/** Safety annotations; emitted as MCP tool annotations (readOnlyHint, destructiveHint, idempotentHint). */
 export interface CommandAnnotations {
-  /**
-   * When true: the command never mutates the document. It returns the SAME document
-   * reference, `affected:[]`, and a `data` field with query results.
-   * Safe to call at any time without side effects.
-   * Maps to MCP `annotations.readOnlyHint`.
-   */
+  /** Never mutates the document: returns the SAME document, `affected: []`, results in `data`. */
   readonly readOnly?: boolean;
-  /**
-   * When true: the command removes or irreversibly destroys document content (e.g. delete_entity,
-   * delete_layer). Agents should prefer confirmation or undo before calling.
-   * Maps to MCP `annotations.destructiveHint`.
-   */
+  /** Removes or irreversibly destroys document content (e.g. delete_entity, delete_layer). */
   readonly destructive?: boolean;
-  /**
-   * When true: calling the command twice with the same params produces the same end-state as
-   * calling it once (setter/renamer semantics). Safe to retry on network failure.
-   * Maps to MCP `annotations.idempotentHint`.
-   */
+  /** Calling twice with the same params gives the same end state as once (setter semantics). */
   readonly idempotent?: boolean;
   /**
-   * When true: `execute()` must NOT append a new FeatureStep for this command. Covers three
-   * cases that are not replayable geometry steps: history meta-commands (which edit the
-   * featureHistory list itself — appending would recurse), `load_document` (wholesale doc
-   * replacement), and parameter-table commands (`set_parameter`/`delete_parameter`) whose
-   * effect is document INPUT state, not recipe geometry (architecture L8). Not emitted to
-   * MCP tool schemas.
+   * `execute()` appends no FeatureStep: history meta-commands (appending would recurse),
+   * `load_document` (wholesale replacement) and parameter-table commands (document INPUT state,
+   * architecture L8). Not emitted to MCP.
    */
   readonly metaHistory?: boolean;
   /**
-   * When true: the command needs `ExecutionContext.kernel`. `execute` no-ops it with an explicit
-   * "kernel not ready" summary when none is available, and `replayHistory` refuses to regenerate
-   * a history containing it (rather than silently dropping its geometry). Not emitted to MCP.
+   * Needs `ExecutionContext.kernel`: `execute` no-ops it with a "kernel not ready" summary when
+   * none is available and `replayHistory` refuses to regenerate a history containing it.
+   * Not emitted to MCP.
    */
   readonly requiresKernel?: boolean;
 }
 
-/**
- * A registered command, carrying enough metadata to auto-generate:
- *   - UI affordances
- *   - the AI tool schema
- *   - the MCP tool definition
- * Defining a command once gives you all three surfaces for free.
- */
+/** A registered command: enough metadata to generate the UI affordance, AI tool schema and MCP tool. */
 export interface CommandDefinition<P> {
-  /** Stable id, e.g. "add_box". Used as the MCP/AI tool name. */
+  /** Stable snake_case id, e.g. "add_box"; the MCP/AI tool name. */
   readonly name: string;
   /** One-line description shown to humans and to the AI. */
   readonly description: string;
-  /** JSON-schema-like parameter spec, consumed by the AI/MCP tool generators. */
+  /** JSON-schema-like parameter spec derived from the zod params by `defineCommand`. */
   readonly paramsSchema: ParamsSchema;
-  /**
-   * Runtime validator derived from the same zod schema as `paramsSchema` (set by
-   * `defineCommand`). `execute` no-ops with the failing path when params don't match.
-   */
+  /** Runtime validator from the same zod schema; `execute` no-ops with the failing path on mismatch. */
   readonly paramsValidator?: ZodType;
   readonly run: Command<P>;
-  /**
-   * Optional safety hints for AI agents and MCP clients.
-   * Emitted as MCP tool `annotations`. Absent means no special semantics.
-   */
   readonly annotations?: CommandAnnotations;
 }
 
@@ -126,23 +77,17 @@ export type ParamType = 'number' | 'string' | 'boolean' | 'array' | 'object';
 export interface ParamSpec {
   type: ParamType;
   description: string;
-  /**
-   * Constrained value set (JSON Schema `enum`). Emitted verbatim into the tool
-   * schema so agents see the allowed choices.
-   */
+  /** Constrained value set (JSON Schema `enum`). */
   enum?: readonly (string | number)[];
   /** For `type: 'array'`: the schema of each element. */
   items?: ParamItemSpec;
-  /** For `type: 'object'`: named child properties, each a full `ParamSpec`. */
+  /** For `type: 'object'`: named child properties. */
   properties?: Record<string, ParamSpec>;
-  /** For `type: 'object'`: child properties that must be present (JSON Schema `required`). */
+  /** For `type: 'object'`: child properties that must be present. */
   required?: readonly string[];
 }
 
-/**
- * Element/nested schema (array items). Same shape as `ParamSpec` but `description`
- * is optional — a primitive array element (`items: { type: 'number' }`) needs none.
- */
+/** Array element / nested schema: a `ParamSpec` whose `description` is optional. */
 export interface ParamItemSpec {
   type: ParamType;
   description?: string;

@@ -24,9 +24,6 @@ const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
 /** All legal joint kinds (must stay in sync with JointKind union in types.ts). */
 const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>(['revolute', 'prismatic']);
 
-/**
- * Validate a JointMateRef embedded object. Returns error string or null.
- */
 function validateJointMateRef(id: string, field: string, v: unknown): string | null {
   if (!isRecord(v)) return `joint '${id}': ${field} must be an object`;
   if (typeof v['instanceId'] !== 'string' || (v['instanceId'] as string).length === 0) {
@@ -41,10 +38,6 @@ function validateJointMateRef(id: string, field: string, v: unknown): string | n
   return null;
 }
 
-/**
- * Validate an axis field ('x'|'y'|'z' or a 3-element finite-number array).
- * Returns error string or null.
- */
 function validateJointAxis(id: string, axis: unknown): string | null {
   if (axis === 'x' || axis === 'y' || axis === 'z') return null;
   if (Array.isArray(axis) && axis.length === 3 && (axis as unknown[]).every(isFiniteNumber)) {
@@ -53,9 +46,6 @@ function validateJointAxis(id: string, axis: unknown): string | null {
   return `joint '${id}': axis must be 'x', 'y', 'z', or a [x,y,z] finite-number array, got ${JSON.stringify(axis)}`;
 }
 
-/**
- * Validate a Joint entry. Returns a descriptive error string on failure, or `null` on success.
- */
 function validateJointValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `joint '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `joint '${id}': id field must be a string`;
@@ -81,9 +71,6 @@ function validateJointValue(id: string, v: unknown): string | null {
   return null;
 }
 
-/**
- * Validate a DriveRelation entry. Returns a descriptive error string on failure, or `null` on success.
- */
 function validateDriveRelationValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `driveRelation '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `driveRelation '${id}': id field must be a string`;
@@ -99,9 +86,6 @@ function validateDriveRelationValue(id: string, v: unknown): string | null {
   return null;
 }
 
-/**
- * Validate a Constraint entry. Returns a descriptive error string on failure, or `null` on success.
- */
 function validateConstraintValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `constraint '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `constraint '${id}': id field must be a string`;
@@ -109,7 +93,6 @@ function validateConstraintValue(id: string, v: unknown): string | null {
   if (typeof kind !== 'string' || !VALID_CONSTRAINT_KINDS.has(kind)) {
     return `constraint '${id}': unknown kind '${String(kind)}'`;
   }
-  // Validate EntityRef a and b.
   for (const field of ['a', 'b'] as const) {
     const ref = v[field];
     if (!isRecord(ref)) return `constraint '${id}': ${field} must be an object`;
@@ -123,7 +106,6 @@ function validateConstraintValue(id: string, v: unknown): string | null {
       }
     }
   }
-  // Dimensional constraints require a value field.
   if (kind === 'distance' || kind === 'angle') {
     const val = v['value'];
     if (typeof val !== 'number' && typeof val !== 'string') {
@@ -133,9 +115,6 @@ function validateConstraintValue(id: string, v: unknown): string | null {
   return null;
 }
 
-/**
- * Validate a Recipe entry. Returns a descriptive error string on failure, or `null` on success.
- */
 function validateRecipeValue(name: string, v: unknown): string | null {
   if (!isRecord(v)) return `recipe '${name}' is not an object`;
   if (typeof v['name'] !== 'string') return `recipe '${name}': name field must be a string`;
@@ -174,8 +153,8 @@ export function validateDocumentShape(v: unknown): v is Record<string, unknown> 
 export function validateDocumentValues(v: Record<string, unknown>): string[] {
   const errors: string[] = [];
 
-  // Entities
   const entities = v['entities'] as Record<string, unknown>;
+  const layers = v['layers'] as Record<string, unknown>;
   for (const [eid, entity] of Object.entries(entities)) {
     const err = validateEntityValue(entity);
     if (err !== null) errors.push(err);
@@ -183,20 +162,15 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
       errors.push(`entity record key '${eid}' does not match entity.id '${String(entity['id'])}'`);
     }
 
-    // Validate layer reference
     const layerIdVal = isRecord(entity) ? entity['layerId'] : undefined;
-    const layers = v['layers'] as Record<string, unknown>;
-    if (
-      typeof layerIdVal === 'string' &&
-      !Object.prototype.hasOwnProperty.call(layers, layerIdVal)
-    ) {
+    if (typeof layerIdVal === 'string' && !Object.hasOwn(layers, layerIdVal)) {
       errors.push(`entity ${eid}: layerId '${layerIdVal}' does not reference a known layer`);
     }
   }
 
   // Order must reference existing entities (renderers index entities[id] directly)
   for (const orderedId of v['order'] as string[]) {
-    if (!Object.prototype.hasOwnProperty.call(entities, orderedId)) {
+    if (!Object.hasOwn(entities, orderedId)) {
       errors.push(`order: '${orderedId}' does not reference a known entity`);
     }
   }
@@ -209,7 +183,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
 
   // Selection must reference existing entities (policy: reject, same as order — no silent repair)
   for (const selectedId of v['selection'] as string[]) {
-    if (!Object.prototype.hasOwnProperty.call(entities, selectedId)) {
+    if (!Object.hasOwn(entities, selectedId)) {
       errors.push(`selection: '${selectedId}' does not reference a known entity`);
     }
   }
@@ -223,8 +197,6 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
     });
   }
 
-  // Layers
-  const layers = v['layers'] as Record<string, unknown>;
   for (const layer of Object.values(layers)) {
     if (!validateLayer(layer)) errors.push(`layer entry is malformed: ${JSON.stringify(layer)}`);
   }
