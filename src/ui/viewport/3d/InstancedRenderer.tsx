@@ -175,10 +175,10 @@ function InstanceBatchMesh({
 
   // --- Material ---
   // Uses batch.pbrMaterial for roughness/metalness in shaded mode.
-  const material = useMemo(() => {
-    const mat = new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, batch.pbrMaterial));
-    return mat;
-  }, [displayMode, batch.pbrMaterial]); // eslint-disable-line react-hooks/exhaustive-deps
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, batch.pbrMaterial)),
+    [displayMode, batch.pbrMaterial],
+  );
 
   // Dispose material on unmount or displayMode change.
   useEffect(() => () => material.dispose(), [material]);
