@@ -139,3 +139,11 @@ function buildAxisTriad(
   }
   return `  <g id="axis-triad">${parts.join('')}</g>`;
 }
+
+/** Inner XML of a `<svg>` document (outer open/close tags stripped). */
+export function extractSvgInner(svg: string): string {
+  const openEnd = svg.indexOf('>');
+  if (openEnd === -1) return svg;
+  const closeStart = svg.lastIndexOf('</svg>');
+  return svg.substring(openEnd + 1, closeStart === -1 ? undefined : closeStart);
+}

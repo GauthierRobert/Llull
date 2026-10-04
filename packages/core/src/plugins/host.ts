@@ -26,10 +26,6 @@ export function installPlugin(plugin: CadPlugin): void {
   }
 }
 
-export function installedPlugins(): ReadonlyArray<CadPlugin> {
-  return installed;
-}
-
 /** Called for every plugin installed after (and, immediately, before) subscription. */
 export function onPluginInstalled(listener: (plugin: CadPlugin) => void): void {
   listeners.push(listener);

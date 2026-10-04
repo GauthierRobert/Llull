@@ -2,7 +2,7 @@
  * @layer domain-aec
  */
 
-import type { Vec2 } from '@core/model/types';
+import type { Vec2, Vec3 } from '@core/model/types';
 import { toCounterClockwise } from '@lib/polygon';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
@@ -147,4 +147,35 @@ export function shape(context: Context, items: ReadonlyArray<string>): string {
     `IFCSHAPEREPRESENTATION(${context.body},'Body','SweptSolid',(${items.join(',')}))`,
   );
   return context.writer.add(`IFCPRODUCTDEFINITIONSHAPE($,$,(${representation}))`);
+}
+
+export function direction(context: Context, [x, y, z]: Vec3): string {
+  return context.writer.add(`IFCDIRECTION((${ifcReal(x)},${ifcReal(y)},${ifcReal(z)}))`);
+}
+
+/** Local placement at `origin` (mm) with local Z = `axis` and local X = `reference`. */
+export function framePlacement(
+  context: Context,
+  relativeTo: string,
+  origin: Vec3,
+  axis: Vec3,
+  reference: Vec3,
+): string {
+  const axes = context.writer.add(
+    `IFCAXIS2PLACEMENT3D(${point3(context, origin[0], origin[1], origin[2])},${direction(context, axis)},${direction(context, reference)})`,
+  );
+  return context.writer.add(`IFCLOCALPLACEMENT(${relativeTo},${axes})`);
+}
+
+export function circleProfile(context: Context, radius: number): string {
+  const position = context.writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, [0, 0])},$)`);
+  return context.writer.add(`IFCCIRCLEPROFILEDEF(.AREA.,$,${position},${ifcReal(radius)})`);
+}
+
+/** Closed profile of an outline given in document units (converted to mm). */
+export function scaledPolygonProfile(context: Context, points: ReadonlyArray<Vec2>): string {
+  return polygonProfile(
+    context,
+    points.map(([x, y]): Vec2 => [context.mm(x), context.mm(y)]),
+  );
 }

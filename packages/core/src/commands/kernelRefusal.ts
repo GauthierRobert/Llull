@@ -1,7 +1,7 @@
 /**
- * Kernel readiness for history operations: a replay whose live steps (including the steps of
- * every instantiated recipe) need the geometry kernel cannot run without one — it would silently
- * drop that geometry. Callers refuse up front with an explicit summary instead.
+ * Refusal summaries for kernel-dependent work while no geometry kernel is installed: single
+ * commands (`kernelUnavailable`) and replays whose live steps, recipes included, need the kernel
+ * (refusing beats silently dropping that geometry).
  *
  * @layer core/commands
  * @pure
@@ -49,4 +49,9 @@ export function kernelRefusal(
   return step === null
     ? null
     : `step '${step}' needs the geometry kernel, which is not available yet; document unchanged — retry once the kernel is ready.`;
+}
+
+/** No-op summary of a kernel-dependent command invoked while no kernel is installed. */
+export function kernelUnavailable(command: string): string {
+  return `${command}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`;
 }

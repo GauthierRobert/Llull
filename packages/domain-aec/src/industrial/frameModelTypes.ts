@@ -164,7 +164,7 @@ export function craneCapacityOf(member: SteelMemberElement): number | null {
 type HoistingClass = 'HC1' | 'HC2' | 'HC3' | 'HC4';
 
 /** EN 1991-3 Tab. 2.5: φ2 = φ2,min + β2 vh. */
-export const HOISTING_CLASSES: Readonly<
+const HOISTING_CLASSES: Readonly<
   Record<HoistingClass, { readonly beta2: number; readonly phi2Min: number }>
 > = {
   HC1: { beta2: 0.17, phi2Min: 1.05 },

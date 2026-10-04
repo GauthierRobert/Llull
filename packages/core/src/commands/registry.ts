@@ -9,6 +9,8 @@ import type { CommandDefinition, CommandResult } from './types';
 import type { ExecutionContext } from './context';
 import { currentContext, runInContext } from './context';
 import { guardCommand } from './guard';
+import { kernelUnavailable } from './kernelRefusal';
+import { noop } from './noop';
 import { stepIdSource } from '../lib/id';
 import { addWedge, addPyramid } from './geometryPrismatic';
 import { addCylinder, addSphere, addCone, addTorus } from './geometryRound';
@@ -69,15 +71,15 @@ import { setCamera, lookAt, fitView } from './camera';
 import { align, distribute, stackOn } from './place';
 import { arrayAlongPath, distributeOnArc } from './array_along_path';
 import { addConstraint, deleteConstraint, updateConstraint, solveConstraints } from './constraints';
-import { addMate, billOfMaterials } from './mates';
+import { addMate } from './mates';
+import { billOfMaterials } from './billOfMaterials';
 import { addDriveRelation, deleteDriveRelation, evaluateMotion, bakeMotion } from './jointsDrive';
 import { addJoint, deleteJoint, setJointValue } from './jointsEdit';
 import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
-import { deleteEntities } from './deleteMany';
+import { deleteEntities, moveEntities } from './batch';
 import { onPluginInstalled } from '../plugins/host';
-import { moveEntities } from './moveMany';
 
 const rawDefinitions = [
   addBox,
@@ -239,14 +241,10 @@ export function execute(
 ): CommandResult {
   const def = byName.get(commandName);
   if (!def) {
-    return { document: doc, summary: `Unknown command: ${commandName}`, affected: [] };
+    return noop(doc, `Unknown command: ${commandName}`);
   }
   if (def.annotations?.requiresKernel === true && ctx.kernel === null) {
-    return {
-      document: doc,
-      summary: `${commandName}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
-      affected: [],
-    };
+    return noop(doc, kernelUnavailable(commandName));
   }
   const ann = def.annotations;
   const recordsStep = ann?.readOnly !== true && ann?.metaHistory !== true;

@@ -9,7 +9,7 @@
 import type { CadDocument, Entity, FeatureStep, Vec3 } from '../model/types';
 import { is3D } from '../model/types';
 import type { CommandDefinition } from '../commands/types';
-import { replayHistory, type ReplayStepEvent } from '../commands/history';
+import { replayHistory, type ReplayStepEvent } from '../commands/replay';
 import { buildParamEnv } from '../commands/regenerate';
 import { evaluateExpression, extractReferences } from '../commands/expression';
 import { entityToTriangles } from '../commands/exportTriangulate';

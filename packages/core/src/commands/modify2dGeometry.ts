@@ -1,34 +1,5 @@
 import type { Vec2 } from '../model/types';
-
-/**
- * 2D cross product (scalar z-component of a × b).
- * Positive → b is CCW from a; negative → CW.
- */
-export function cross2(a: Vec2, b: Vec2): number {
-  return a[0] * b[1] - a[1] * b[0];
-}
-
-/** Dot product of two 2D vectors. */
-export function dot2(a: Vec2, b: Vec2): number {
-  return a[0] * b[0] + a[1] * b[1];
-}
-
-/** Length of a 2D vector. */
-export function len2(v: Vec2): number {
-  return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
-}
-
-/** Normalize a 2D vector. Returns [0,0] if the input has zero length. */
-export function normalize2(v: Vec2): Vec2 {
-  const l = len2(v);
-  if (l < 1e-12) return [0, 0];
-  return [v[0] / l, v[1] / l];
-}
-
-/** Left-perpendicular of v (90° CCW). */
-export function perp2(v: Vec2): Vec2 {
-  return [-v[1], v[0]];
-}
+import { normalize2, perp2, sub2 } from '../lib/vec2';
 
 /**
  * Segment intersection — parametric.
@@ -66,8 +37,7 @@ export function evalLine(p: Vec2, q: Vec2, t: number): Vec2 {
  * Returns the two endpoints of the offset segment.
  */
 export function offsetSegment(p: Vec2, q: Vec2, distance: number): [Vec2, Vec2] {
-  const dir: Vec2 = [q[0] - p[0], q[1] - p[1]];
-  const n = normalize2(perp2(dir));
+  const n = normalize2(perp2(sub2(q, p)));
   const dp: Vec2 = [distance * n[0], distance * n[1]];
   return [
     [p[0] + dp[0], p[1] + dp[1]],

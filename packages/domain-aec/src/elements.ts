@@ -12,7 +12,6 @@ import {
   getBuilding,
   hostOf,
   dependenciesOf,
-  isVec2,
   nextElementId,
   nextMark,
   resolveLevel,
@@ -202,7 +201,6 @@ export const moveBuildingElement = defineCommand({
     delta: vec2('Plan translation [dx, dy].'),
   }),
   run: (doc, { elementIds, delta }): CommandResult => {
-    if (!isVec2(delta)) return noop(doc, 'move_building_element failed: delta must be [dx, dy].');
     const building = getBuilding(doc);
     const known = elementIds.filter((id) => building.elements[id] !== undefined);
     if (known.length === 0) {
@@ -316,9 +314,8 @@ export const copyLevelElements = defineCommand({
   }),
   run: (doc, { sourceLevelId, targetLevelIds, categories }): CommandResult => {
     const building = getBuilding(doc);
-    const targets = targetLevelIds;
-    const missing = [sourceLevelId, ...targets].filter((id) => !building.levels[id]);
-    if (missing.length > 0 || targets.length === 0) {
+    const missing = [sourceLevelId, ...targetLevelIds].filter((id) => !building.levels[id]);
+    if (missing.length > 0 || targetLevelIds.length === 0) {
       return noop(
         doc,
         `copy_level_elements failed: unknown or missing level(s) ${missing.join(', ') || '(no targets)'}.`,
@@ -342,7 +339,7 @@ export const copyLevelElements = defineCommand({
     }
     let next = building;
     const created: string[] = [];
-    for (const targetLevelId of targets) {
+    for (const targetLevelId of targetLevelIds) {
       if (targetLevelId === sourceLevelId) continue;
       const levelIndex = next.levelOrder.indexOf(targetLevelId);
       const copiedIds = new Map<string, string>();
@@ -409,12 +406,12 @@ export const copyLevelElements = defineCommand({
         created.push(copyId);
       }
     }
-    const issues = openingFitIssues(next, new Set(targets));
+    const issues = openingFitIssues(next, new Set(targetLevelIds));
     if (issues.length > 0) return noop(doc, `copy_level_elements refused: ${issues[0]}.`);
     const document = regenerateBuilding(doc, next);
     return {
       document,
-      summary: `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targets.join(', ')}: ${created.length} new element(s).`,
+      summary: `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).`,
       affected: elementAffected(document, created),
       data: { elementIds: created },
     };

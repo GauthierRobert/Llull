@@ -1,16 +1,12 @@
 /**
- * Boolean solid commands — union, subtract, intersect.
- *
- * Each command consumes two 3D solid operands (by id) and produces a single
- * `MeshSolidEntity` whose geometry is evaluated by the injected GeometryKernel.
- * When the kernel is unavailable (null) or returns null, the command no-ops.
+ * Boolean solid commands (union, subtract, intersect): two 3D solid operands become one mesh
+ * entity evaluated by the injected GeometryKernel; a missing kernel or a null result is a no-op.
  *
  * @layer core/commands
  */
 
 import type { CadDocument, Entity } from '../model/types';
 import { is3D } from '../model/types';
-import type { MeshSolidEntity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import type { BooleanOp } from '../geometry/kernel';
@@ -18,39 +14,9 @@ import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { replaceEntities } from './entityOps';
+import { kernelUnavailable } from './kernelRefusal';
+import { newEntity } from './newEntity';
 import { noop } from './noop';
-
-function validateOperands(
-  doc: CadDocument,
-  opName: string,
-  a: string,
-  b: string,
-): CommandResult | null {
-  if (a === b) {
-    return noop(doc, `${opName}: operands a and b must be different ids (got '${a}').`);
-  }
-  const entA = doc.entities[a];
-  if (!entA) {
-    return noop(doc, `${opName}: entity '${a}' not found.`);
-  }
-  const entB = doc.entities[b];
-  if (!entB) {
-    return noop(doc, `${opName}: entity '${b}' not found.`);
-  }
-  if (!is3D(entA)) {
-    return noop(
-      doc,
-      `${opName}: entity '${a}' is a 2D shape; boolean operations require 3D solids.`,
-    );
-  }
-  if (!is3D(entB)) {
-    return noop(
-      doc,
-      `${opName}: entity '${b}' is a 2D shape; boolean operations require 3D solids.`,
-    );
-  }
-  return null;
-}
 
 function runBoolean(
   doc: CadDocument,
@@ -60,19 +26,24 @@ function runBoolean(
   b: string,
   ctx: ExecutionContext | undefined,
 ): CommandResult {
-  const invalid = validateOperands(doc, opName, a, b);
-  if (invalid) return invalid;
-
-  const entA = doc.entities[a] as Entity;
-  const entB = doc.entities[b] as Entity;
-
-  const k = (ctx ?? currentContext()).kernel;
-  if (!k) {
+  if (a === b) {
+    return noop(doc, `${opName}: operands a and b must be different ids (got '${a}').`);
+  }
+  const ids = [a, b];
+  const operands = ids.map((id) => doc.entities[id]);
+  const missing = ids.find((_, i) => !operands[i]);
+  if (missing !== undefined) return noop(doc, `${opName}: entity '${missing}' not found.`);
+  const flat = ids.find((_, i) => !is3D(operands[i] as Entity));
+  if (flat !== undefined) {
     return noop(
       doc,
-      `${opName}: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
+      `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`,
     );
   }
+  const [entA, entB] = operands as [Entity, Entity];
+
+  const k = (ctx ?? currentContext()).kernel;
+  if (!k) return noop(doc, kernelUnavailable(opName));
 
   const meshData = k.booleanOp(op, entA, entB);
   if (!meshData) {
@@ -83,15 +54,9 @@ function runBoolean(
   }
 
   const newId = nextId('mesh');
-  const meshEntity: MeshSolidEntity = {
-    id: newId,
-    kind: 'mesh',
-    mesh: meshData,
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
+  const meshEntity = newEntity('mesh', newId, { mesh: meshData }, [0, 0, 0], entA.color, {
     layerId: entA.layerId,
-    color: entA.color,
-  };
+  });
 
   const triangleCount = meshData.indices.length / 3;
   return {

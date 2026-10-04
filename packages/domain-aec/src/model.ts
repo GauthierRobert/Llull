@@ -195,10 +195,6 @@ export function withoutElements(building: BuildingModel, ids: ReadonlySet<string
   };
 }
 
-export function lengthOf(start: Vec2, end: Vec2): number {
-  return Math.hypot(end[0] - start[0], end[1] - start[1]);
-}
-
 /** ASCII file-name slug ("Rez-de-chaussée" → "Rez-de-chaussee"). */
 export function fileSlug(text: string, fallback: string): string {
   const slug = text

@@ -17,6 +17,7 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
+import { isHexColor } from '@lib/isHexColor';
 
 interface MaterialRowProps {
   material: Material;
@@ -102,7 +103,7 @@ function CreateMaterialForm(): React.ReactElement {
     name.trim() !== '' &&
     !isNaN(densityNum) &&
     densityNum > 0 &&
-    /^#[0-9a-fA-F]{6}$/.test(color) &&
+    isHexColor(color) &&
     !isNaN(metalnessNum) &&
     metalnessNum >= 0 &&
     metalnessNum <= 1 &&

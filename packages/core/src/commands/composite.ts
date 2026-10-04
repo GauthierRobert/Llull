@@ -5,9 +5,9 @@
  * @layer core/commands
  */
 
-import type { Entity, Vec3 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
+import { newEntity } from './newEntity';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
@@ -15,12 +15,9 @@ import { withEntity } from './entityOps';
 import { noop } from './noop';
 
 /**
- * Convert a unit-axis / angle rotation (Rodrigues) to an intrinsic XYZ Euler triple
- * [rx, ry, rz] matching the three.js convention used by `applyEulerXYZ` in render.ts
- * (combined matrix M = Rz * Ry * Rx).
- *
+ * Unit axis + angle (Rodrigues rotation matrix R) as the Euler XYZ triple [rx, ry, rz] of the
+ * three.js convention (M = Rz·Ry·Rx), with the standard gimbal-lock fallback at ry = ±π/2.
  * @pure
- * @invariant axis is a unit vector; angle in [0, π]
  */
 function axisAngleToEulerXYZ(axis: Vec3, angle: number): Vec3 {
   const [kx, ky, kz] = axis;
@@ -28,86 +25,34 @@ function axisAngleToEulerXYZ(axis: Vec3, angle: number): Vec3 {
   const s = Math.sin(angle);
   const t = 1 - c;
 
-  // Rodrigues rotation matrix R = t*k⊗k + c*I + s*[k]×
-  // Row-major indexing: R[row][col]
-  // R[0][0] = t*kx*kx + c
-  // R[0][1] = t*kx*ky - s*kz
-  // R[0][2] = t*kx*kz + s*ky
-  // R[1][0] = t*ky*kx + s*kz
-  // R[1][1] = t*ky*ky + c
-  // R[1][2] = t*ky*kz - s*kx
-  // R[2][0] = t*kz*kx - s*ky
-  // R[2][1] = t*kz*ky + s*kx
-  // R[2][2] = t*kz*kz + c
-
   const r00 = t * kx * kx + c;
   const r10 = t * ky * kx + s * kz;
   const r20 = t * kz * kx - s * ky;
   const r21 = t * kz * ky + s * kx;
   const r22 = t * kz * kz + c;
 
-  // Extract Euler XYZ from M = Rz*Ry*Rx:
-  //   M[2][0] = -sin(ry)
-  //   M[2][1] = cos(ry)*sin(rx)
-  //   M[2][2] = cos(ry)*cos(rx)
-  //   M[1][0] = cos(rz)*sin(ry)*sin(rx) + sin(rz)*cos(rx)  (not needed)
-  //   M[0][0] = cos(ry)*cos(rz)
-
-  // Clamp for numerical safety before asin
-  const sinRy = Math.max(-1, Math.min(1, -r20));
-  const ry = Math.asin(sinRy);
-  const cosRy = Math.cos(ry);
-
-  let rx: number;
-  let rz: number;
-
-  if (Math.abs(cosRy) < 1e-9) {
-    // Gimbal lock: ry = ±π/2. Pick rx = 0 and absorb into rz.
-    rx = 0;
-    // In this degenerate case M[1][0] and M[0][0] are both ~0;
-    // use M[0][1] and M[1][1] instead (standard gimbal-lock fallback).
-    // When ry = π/2: M = Rz * [[0,0,1],[0,1,0],[-1,0,0]] * Rx
-    //   M[0][1] = -sin(rz-rx), M[1][1] = cos(rz-rx)  → rz = atan2(-M[0][1], M[1][1]) with rx=0
+  // M[2][0] = -sin(ry); clamp for numerical safety before asin.
+  const ry = Math.asin(Math.max(-1, Math.min(1, -r20)));
+  if (Math.abs(Math.cos(ry)) < 1e-9) {
+    // Gimbal lock: rx = 0 and rz = atan2(-M[0][1], M[1][1]).
     const r01 = t * kx * ky - s * kz;
     const r11 = t * ky * ky + c;
-    rz = Math.atan2(-r01, r11);
-  } else {
-    rx = Math.atan2(r21, r22);
-    rz = Math.atan2(r10, r00);
+    return [0, ry, Math.atan2(-r01, r11)];
   }
-
-  return [rx, ry, rz];
+  return [Math.atan2(r21, r22), ry, Math.atan2(r10, r00)];
 }
 
 /**
- * Compute the intrinsic XYZ Euler rotation [rx, ry, rz] that orients a cylinder
- * (whose local +Z axis = [0,0,1]) to point along `dir` (unit vector).
- *
- * Strategy: axis = cross(+Z, dir); angle = acos(dir.z).
- * Edge cases:
- *   dir ≈ +Z → identity (0, 0, 0).
- *   dir ≈ -Z → 180° rotation about +X.
- *
+ * Euler XYZ rotation turning a cylinder's local +Z onto the unit vector `dir`
+ * (axis = +Z × dir, angle = acos(dir.z); ≈ +Z is identity, ≈ -Z a half turn about +X).
  * @pure
- * @invariant dir is a unit vector
  */
 function directionToEulerXYZ(dir: Vec3): Vec3 {
   const plusZ: Vec3 = [0, 0, 1];
   const cosAngle = Math.max(-1, Math.min(1, dot3(plusZ, dir)));
-
-  if (cosAngle > 1 - 1e-9) {
-    // dir ≈ +Z → identity
-    return [0, 0, 0];
-  }
-
-  if (cosAngle < -1 + 1e-9) {
-    // dir ≈ -Z → 180° around +X
-    return [Math.PI, 0, 0];
-  }
-
-  const angle = Math.acos(cosAngle);
-  const axis = normalize3(cross3(plusZ, dir));
-  return axisAngleToEulerXYZ(axis, angle);
+  if (cosAngle > 1 - 1e-9) return [0, 0, 0];
+  if (cosAngle < -1 + 1e-9) return [Math.PI, 0, 0];
+  return axisAngleToEulerXYZ(normalize3(cross3(plusZ, dir)), Math.acos(cosAngle));
 }
 
 /**
@@ -168,16 +113,9 @@ export const makeTubeBetween = defineCommand({
     const mid = scale3(add3(p1, p2), 0.5);
 
     const id = nextId('cyl');
-    const entity: Entity = {
-      id,
-      kind: 'cylinder',
-      radius,
-      height: length,
-      position: mid,
-      rotation,
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    const entity = newEntity('cylinder', id, { radius, height: length }, mid, color, {
+      rotation: rotation,
+    });
 
     const fmtPoint = (p: Vec3): string =>
       `[${p

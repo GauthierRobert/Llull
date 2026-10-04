@@ -95,25 +95,17 @@ export function rejectPlan(
   return { document: doc, summary, affected: [], data };
 }
 
-/**
- * Build an expression env from doc.parameters plus loop bindings ($i, $as, etc.).
- * Only numeric parameter values are included (expressions are already evaluated on the Parameter).
- */
+/** Expression env: every parameter value plus the loop variables (`$i`, `$<as>`). */
 export function buildEnv(doc: CadDocument, extras: Record<string, number>): Record<string, number> {
-  const env: Record<string, number> = {};
-  for (const [name, param] of Object.entries(doc.parameters)) {
-    env[name] = param.value;
-  }
-  for (const [k, v] of Object.entries(extras)) {
-    env[k] = v;
-  }
-  return env;
+  return {
+    ...Object.fromEntries(
+      Object.entries(doc.parameters).map(([name, param]) => [name, param.value]),
+    ),
+    ...extras,
+  };
 }
 
-/**
- * Resolve a count value: number literal or expression string (prefix `=`).
- * Expression is evaluated against doc.parameters.
- */
+/** A `repeat` count: number literal, or expression string (leading `=` optional) over the parameters. */
 export function resolveCount(
   raw: number | string,
   doc: CadDocument,
@@ -129,36 +121,22 @@ export function resolveCount(
 }
 
 /**
- * Resolve a `for_each` values entry: array literal or expression string.
- * Expression must evaluate to a number; we wrap a single number as a one-element array,
- * or if the expression is a param name pointing to an array stored in the doc this is
- * handled via a special array-params lookup (doc.parameters only holds numbers for now,
- * so we fall back to evaluating the expression as a number and wrapping it).
- *
- * Full array support: if `values` is already an array we use it directly.
- * String form: if the doc has a `parameters` entry with that name, treat it as a
- * series (the value itself is a number — wrap it). Otherwise evaluate as arithmetic
- * and wrap.
+ * `for_each` values: an array literal is used as is; a string is evaluated as arithmetic against
+ * the parameters and wrapped as a one-element array (parameters only hold numbers).
  */
 export function resolveForEachValues(
   raw: unknown[] | string,
   doc: CadDocument,
 ): { values: unknown[]; error: string | null } {
   if (Array.isArray(raw)) return { values: raw, error: null };
-  // String expression form.
   const expr = raw.startsWith('=') ? raw.slice(1) : raw;
   const env = buildEnv(doc, {});
   const result = evaluateExpression(expr, env);
   if (!result.ok) return { values: [], error: `for_each values expression error: ${result.error}` };
-  // A scalar expression wraps into a single-element array.
   return { values: [result.value], error: null };
 }
 
-/**
- * Resolve expression strings inside params when `$i` / `$as_name` numeric extras are available.
- * Expression strings are prefixed with `=`. Non-expression strings are passed through the
- * existing $alias resolver first, then checked for `=` prefix.
- */
+/** Resolve `$alias` refs and `=expr` strings (over `env`, incl. loop variables) in `value`'s string leaves. */
 export function resolveExprInParam(
   value: unknown,
   bindings: Record<string, string[]>,
@@ -167,15 +145,13 @@ export function resolveExprInParam(
   let firstError: string | null = null;
   const resolved = mapStringLeaves(value, (text) => {
     if (firstError !== null) return text;
-    // First try $alias resolution.
     if (REF.test(text)) {
       const ref = resolveRef(text, bindings);
       firstError = ref.error;
       return ref.value;
     }
     if (!text.startsWith('=')) return text;
-    // Inside an expression body, `$name` references the loop variable as a numeric value
-    // (e.g. `=$r * 2`); strip the `$` so the parser sees the bare identifier env binds.
+    // `$name` in an expression is a loop variable (`=$r * 2`): strip the `$` to match the env key.
     const expr = text.slice(1).replace(/\$([A-Za-z_]\w*)/g, '$1');
     const r = evaluateExpression(expr, env);
     if (!r.ok) {

@@ -4,7 +4,6 @@
  */
 
 import type { CableTrayElement } from '@core/model/building';
-import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import {
@@ -20,16 +19,9 @@ import {
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
-import { toVec3 } from './memberSupport';
+import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
 
-export function trayLength(tray: CableTrayElement): number {
-  return tray.points.reduce((sum, point, index) => {
-    const previous = tray.points[index - 1];
-    return previous
-      ? sum + Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2])
-      : sum;
-  }, 0);
-}
+export const trayLength = (tray: CableTrayElement): number => routeLength(tray.points);
 
 /**
  * @command add_cable_tray
@@ -53,20 +45,9 @@ export const addCableTray = defineCommand({
     levelId: z.string().optional().describe('Level id. Default: the active level.'),
   }),
   run: (doc, { points, width, height, system, levelId }): CommandResult => {
-    const route = Array.isArray(points) ? points.map(toVec3) : [];
-    if (route.length < 2 || route.some((point) => point === null)) {
-      return noop(doc, 'add_cable_tray failed: points must be ≥ 2 [x, y, z] points.');
-    }
-    const path = route as Vec3[];
-    const repeated = path.some((point, index) => {
-      const previous = path[index - 1];
-      return (
-        previous !== undefined &&
-        point[0] === previous[0] &&
-        point[1] === previous[1] &&
-        point[2] === previous[2]
-      );
-    });
+    const path = parseRoute(points);
+    if (!path) return noop(doc, 'add_cable_tray failed: points must be ≥ 2 [x, y, z] points.');
+    const repeated = hasRepeatedPoint(path);
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedHeight = height ?? fromMm(doc, 60);
     if (

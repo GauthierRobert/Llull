@@ -18,15 +18,16 @@ interface LineRendererProps {
 
 export function LineRenderer({ entity, selected }: LineRendererProps): React.ReactElement | null {
   const { start, end, position, color } = entity;
+  const [startX, startY] = start;
+  const [endX, endY] = end;
 
   const segmentsObject = useMemo(() => {
     const geo = new THREE.BufferGeometry();
-    const vertices = new Float32Array([start[0], start[1], 0, end[0], end[1], 0]);
+    const vertices = new Float32Array([startX, startY, 0, endX, endY, 0]);
     geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
     const mat = new THREE.LineBasicMaterial({ color: selected ? '#5b8dee' : color });
     return new THREE.LineSegments(geo, mat);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start[0], start[1], end[0], end[1], color, selected]);
+  }, [startX, startY, endX, endY, color, selected]);
 
   return <PlacedLineObject object={segmentsObject} position={position} />;
 }

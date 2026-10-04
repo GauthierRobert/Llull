@@ -17,7 +17,6 @@ import type {
 } from '@core/model/types';
 import {
   snapPerpendicular,
-  perpendicularFoot,
   tangentPointsToCircle,
   snapTangentToCircle,
   snapExtension,
@@ -525,40 +524,6 @@ describe('applyOrthoPolar', () => {
     const expected = (30 * Math.PI) / 180;
     expect(result[0]).toBeCloseTo(length * Math.cos(expected));
     expect(result[1]).toBeCloseTo(length * Math.sin(expected));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// perpendicularFoot
-// ---------------------------------------------------------------------------
-
-describe('perpendicularFoot', () => {
-  it('returns the foot on a horizontal segment', () => {
-    // Segment [0,0]→[10,0], point [5, 3] → foot at [5, 0]
-    const result = perpendicularFoot(5, 3, 0, 0, 10, 0);
-    expect(result).not.toBeNull();
-    expect(result![0]).toBeCloseTo(5);
-    expect(result![1]).toBeCloseTo(0);
-  });
-
-  it('returns the foot outside the segment when t < 0', () => {
-    // Segment [0,0]→[10,0], point [-2, 3] → foot at [-2, 0] (outside segment)
-    const result = perpendicularFoot(-2, 3, 0, 0, 10, 0);
-    expect(result).not.toBeNull();
-    expect(result![0]).toBeCloseTo(-2);
-    expect(result![1]).toBeCloseTo(0);
-  });
-
-  it('returns null for a degenerate zero-length segment', () => {
-    expect(perpendicularFoot(5, 5, 3, 3, 3, 3)).toBeNull();
-  });
-
-  it('returns the foot on a diagonal segment', () => {
-    // Segment [0,0]→[4,4], point [4, 0] → foot at [2, 2]
-    const result = perpendicularFoot(4, 0, 0, 0, 4, 4);
-    expect(result).not.toBeNull();
-    expect(result![0]).toBeCloseTo(2);
-    expect(result![1]).toBeCloseTo(2);
   });
 });
 

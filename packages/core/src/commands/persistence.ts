@@ -10,6 +10,7 @@
 import type { CadDocument, DocumentUnit, FeatureStep } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { noop } from './noop';
 import { isRecord } from '../lib/isRecord';
 import { derivedEntityIds } from '../model/partition';
 import { documentExtensions } from '../plugins/host';
@@ -22,17 +23,10 @@ interface DocumentEnvelope {
   document: CadDocument;
 }
 
-// ---------------------------------------------------------------------------
-// Current schema version — bump whenever a breaking field is added.
-// Migration steps in `migrate()` handle older documents.
-// ---------------------------------------------------------------------------
+/** Bump on a breaking field; `migrate()` upgrades older documents. */
 const CURRENT_SCHEMA_VERSION = 2;
 
-/**
- * Versions `deserializeDocument` reads. v1 → v2: step-scoped ids (`nextStepNumber`)
- * and building-generated entities omitted from the file (regenerated on load). v1 files load
- * unchanged — their legacy ids stay valid; new steps use the step counter from 1.
- */
+/** v1 files (legacy ids, building entities stored) load unchanged; v2 adds step-scoped ids. */
 const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2]);
 
 interface SerializeOptions {
@@ -43,13 +37,7 @@ interface SerializeOptions {
   readonly includeDerived?: boolean;
 }
 
-/**
- * Serialize a CadDocument to a stable JSON string.
- *
- * Wraps the document in an envelope `{ format: 'llull-document', version: 2, document }`.
- * The output is deterministic (standard JSON.stringify, no replacer). `order` and `selection`
- * are kept whole; entities derived from the building model are omitted unless `includeDerived`.
- */
+/** Deterministic `{ format: 'llull-document', version, document }` JSON; derived entities omitted unless `includeDerived`. */
 export function serializeDocument(doc: CadDocument, options: SerializeOptions = {}): string {
   const envelope: DocumentEnvelope = {
     format: 'llull-document',
@@ -141,22 +129,9 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * Parse and validate a JSON string produced by `serializeDocument`.
- *
- * Throws a descriptive `Error` on any failure:
- * - invalid JSON
- * - missing or wrong `format` field (expected 'llull-document')
- * - wrong or missing `version` field (expected 1)
- * - structurally invalid `document` (missing required fields / wrong types)
- * - value-level validation failure (NaN/infinite size, bad hex color, unknown kind,
- *   invalid material density/metalness/roughness, dangling layerId reference)
- *
- * The error message names the specific field that failed so callers can surface it.
- * `load_document` catches this and returns it as a graceful no-op summary.
- *
- * Back-compat: documents missing optional fields (`parameters`, `configurations`,
- * `materials`, `featureHistory`, `animations`, `groups`) load via `migrate()` which
- * fills in correct defaults — no manual ad-hoc defaults scattered elsewhere.
+ * Parse and validate a `serializeDocument` string (old files gain defaults via `migrate()`).
+ * @failure throws an Error naming the failing field (bad JSON, format, version, structure, values);
+ *   `load_document` turns it into a no-op summary
  */
 export function deserializeDocument(json: string): CadDocument {
   let parsed: unknown;
@@ -190,10 +165,8 @@ export function deserializeDocument(json: string): CadDocument {
     );
   }
 
-  // Apply migration (fills in back-compat defaults for optional fields).
   const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrate(rawDoc)));
 
-  // Deep value validation on the migrated document.
   const valueErrors = validateDocumentValues(migratedDoc);
   if (valueErrors.length > 0) {
     throw new Error(
@@ -223,11 +196,10 @@ export const loadDocument = defineCommand({
   run: (doc, { json }): CommandResult => {
     let parsed: CadDocument;
     try {
-      // deserializeDocument re-evaluates the building, so generated geometry matches its model.
       parsed = deserializeDocument(json);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return { document: doc, summary: message, affected: [] };
+      return noop(doc, message);
     }
 
     const entityCount = Object.keys(parsed.entities).length;

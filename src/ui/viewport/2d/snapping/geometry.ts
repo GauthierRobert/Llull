@@ -8,13 +8,6 @@
 import type { Entity, Vec2 } from '@core/model/types';
 import type { SnapPoint } from './types';
 
-/** Euclidean distance between two 2D points. */
-export function dist(ax: number, ay: number, bx: number, by: number): number {
-  const dx = bx - ax;
-  const dy = by - ay;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
 /** Midpoint of two 2D points. */
 export function mid(ax: number, ay: number, bx: number, by: number): [number, number] {
   return [(ax + bx) / 2, (ay + by) / 2];
@@ -96,28 +89,6 @@ export function entityToSegments(entity: Entity): Array<[number, number, number,
 }
 
 /**
- * Compute the foot of the perpendicular from point P to the infinite line
- * through (ax,ay)→(bx,by). Returns null when the segment has zero length.
- *
- * @pure
- */
-export function perpendicularFoot(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): [number, number] | null {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-20) return null;
-  const t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
-  return [ax + t * dx, ay + t * dy];
-}
-
-/**
  * Snap perpendicular to a segment from reference point `from`.
  * Returns the foot point only when it lies within the segment extents (0 ≤ t ≤ 1).
  * When `from` is null the snap is skipped (no previous point).
@@ -166,7 +137,7 @@ export function tangentPointsToCircle(
 ): Array<[number, number]> {
   const dx = px - cx;
   const dy = py - cy;
-  const d = Math.sqrt(dx * dx + dy * dy);
+  const d = Math.hypot(dx, dy);
   if (d < r - 1e-10) return []; // inside circle — no tangent
   if (d < 1e-10) return []; // degenerate: point at center
   const theta = Math.atan2(dy, dx);

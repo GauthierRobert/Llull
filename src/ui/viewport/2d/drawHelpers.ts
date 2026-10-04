@@ -75,14 +75,3 @@ export function ellipseParamsFromCenterCorner(center: Vec2, corner: Vec2): Ellip
   if (radiusX === 0 || radiusY === 0) return null;
   return { center, radiusX, radiusY };
 }
-
-/**
- * Validate that a candidate spline point list meets the minimum length for dispatch.
- * Returns the list unchanged when valid, null when too short.
- *
- * @pure
- * @failure returns null when fewer than 2 points are provided
- */
-export function validateSplinePoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> | null {
-  return points.length >= 2 ? points : null;
-}

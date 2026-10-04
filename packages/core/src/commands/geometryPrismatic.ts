@@ -1,11 +1,10 @@
-import type { Entity } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
+import { newEntity } from './newEntity';
 import { defineCommand, z, looseVec3, colorField } from './schema';
 import { nextId } from '../lib/id';
+import { ORIGIN } from '../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
-  ORIGIN,
   anchorField,
   commitSolid,
   positionField,
@@ -70,15 +69,9 @@ export const addWedge = defineCommand({
     // AABB half-extents from min corner: [w/2, h/2, d/2] (half-extents measured from min = stored origin).
     const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'min', anchor, position);
     const id = nextId('wdg');
-    const entity: Entity = {
-      id,
-      kind: 'wedge',
-      size,
-      position: storedPosition,
+    const entity = newEntity('wedge', id, { size }, storedPosition, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(doc, entity, `Added wedge ${id} of size ${size.join('×')}`);
   },
 });
@@ -161,17 +154,14 @@ export const addPyramid = defineCommand({
       position,
     );
     const id = nextId('pyr');
-    const entity: Entity = {
+    const entity = newEntity(
+      'pyramid',
       id,
-      kind: 'pyramid',
-      baseWidth,
-      baseDepth,
-      height,
-      position: storedPosition,
-      rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
+      { baseWidth, baseDepth, height },
+      storedPosition,
       color,
-    };
+      { rotation: resolveRotation(rotation) },
+    );
     return commitSolid(
       doc,
       entity,

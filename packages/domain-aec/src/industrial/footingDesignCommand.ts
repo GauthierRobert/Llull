@@ -4,34 +4,16 @@
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding, toMetres, withElement } from '../model';
+import { elementAffected, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { findProfile } from '../steel/profiles';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 import { baseReactions } from './frameModelSolve';
-import { SOIL_SHAPE } from './foundationCheckRun';
-import { findFooting, findPlate, ultimateCombinations, hasCase } from './foundationCombinations';
-import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationRows';
-import { clayLayerError } from './foundationSettlement';
-import {
-  COVER_MM,
-  DEFAULT_SOIL_BEARING,
-  DEFAULT_SOIL_MODULUS,
-  FALLBACK_COLUMN_MM,
-  type FootingDesignRow,
-  MAX_PLAN_MM,
-  MAX_THICKNESS_MM,
-  type PadSize,
-} from './footingModel';
-import {
-  type SizingContext,
-  evaluatePad,
-  geometryOf,
-  netLoads,
-  sizeText,
-  trialSizes,
-} from './footingSizing';
+import { SOIL_SHAPE, soilInputs } from './soilParams';
+import { findFooting } from './foundationCombinations';
+import { defaultThrustTie, groundSlabWeight, slidingHorizontalOf } from './foundationThrust';
+import { COVER_MM, type FootingDesignRow } from './footingModel';
+import { designFootingRow, isResized } from './footingDesignRow';
+import { sizeText } from './footingSizing';
 import { round } from '../numeric';
 
 const footingDesignParams = z.object({
@@ -78,18 +60,9 @@ export const designFootings = defineCommand({
     'Preliminary design, not a substitute for a structural engineer.',
   params: footingDesignParams,
   run: (doc, params): CommandResult => {
-    const soilBearing = params.soilBearing ?? DEFAULT_SOIL_BEARING;
-    const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
-    if (!isFiniteNumber(soilBearing) || soilBearing <= 0) {
-      return noop(doc, 'design_footings failed: soilBearing must be a number > 0 (kPa).');
-    }
-    if (!isFiniteNumber(soilModulus) || soilModulus <= 0) {
-      return noop(doc, 'design_footings failed: soilModulus must be a number > 0 (MPa).');
-    }
-    if (params.clayLayer !== undefined) {
-      const clayError = clayLayerError(params.clayLayer);
-      if (clayError) return noop(doc, `design_footings failed: ${clayError}.`);
-    }
+    const soil = soilInputs(params);
+    if ('reason' in soil) return noop(doc, `design_footings failed: ${soil.reason}`);
+    const { soilBearing, soilModulus } = soil;
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `design_footings failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
@@ -107,146 +80,32 @@ export const designFootings = defineCommand({
     let next = building;
     const changes: string[] = [];
     const changed: string[] = [];
-    const toMm = (value: number): number => toMetres(doc, value) * 1000;
     for (const reaction of reactions) {
       const column = building.elements[reaction.columnId];
       if (column?.category !== 'member') continue;
       const footing = findFooting(doc, building, levelId, column);
       if (!footing || seen.has(footing.id)) continue;
       seen.add(footing.id);
-      const plate = findPlate(building, column.id);
-      const profile = findProfile(column.profile);
-      const face = plate
-        ? { x: toMm(plate.length), y: toMm(plate.width) }
-        : { x: profile?.h ?? FALLBACK_COLUMN_MM, y: profile?.b ?? FALLBACK_COLUMN_MM };
-      const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
-      const current: PadSize = [toMm(footing.width), toMm(footing.length), toMm(footing.thickness)];
-      const base = { id: footing.id, mark: footing.mark, column: column.mark };
-      const unloadedNet = netLoads(
-        reaction,
-        ultimateCombinations(wind, crane, false),
-        geometryOf(doc, footing, face).leverM,
-      );
-      if (unloadedNet.length === 0) {
-        rows.push({
-          ...base,
-          status: 'unloaded',
-          sizeBefore: current,
-          sizeAfter: current,
-          barDiameter: null,
-          spacing: null,
-          asRequired: 0,
-          asProvided: null,
-          shearUtilisation: 0,
-          punchingUtilisation: 0,
-          punchingDistance: 0,
-          combination: '-',
-          note: 'no ULS combination with net compression; reinforcement not set',
-        });
-        continue;
-      }
-      const context: SizingContext = {
+      const outcome = designFootingRow({
         doc,
+        building,
         footing,
-        face,
+        column,
         reaction,
         wind,
-        crane,
+        allowShrink,
         soilBearing,
         soilModulus,
         clayLayer: params.clayLayer,
         slidingHorizontal: slidingHorizontalOf(reactions, reaction, thrustTie),
         slabShare,
-      };
-      const currentVerdict = evaluatePad(context, current);
-      const volume = (size: PadSize): number => size[0] * size[1] * size[2];
-      let size = current;
-      let verdict = currentVerdict;
-      if (!currentVerdict.passes || allowShrink) {
-        const candidates = trialSizes(current, face, !allowShrink);
-        const found = candidates.find((candidate) => {
-          if (currentVerdict.passes && volume(candidate) >= volume(current)) return false;
-          const trial = evaluatePad(context, candidate);
-          if (trial.passes) verdict = trial;
-          return trial.passes;
-        });
-        if (found) size = found;
-        else if (!currentVerdict.passes) {
-          const largest = candidates[candidates.length - 1];
-          if (largest) verdict = evaluatePad(context, largest);
-        }
-      }
-      const chosen = verdict.passes ? verdict.mat?.chosen : null;
-      if (chosen) {
-        const resized = size.some(
-          (value, index) => Math.round(value) !== Math.round(current[index] ?? 0),
-        );
-        const reinforcement = {
-          barDiameter: fromMm(doc, chosen.diameter),
-          spacing: fromMm(doc, chosen.spacing),
-          cover: fromMm(doc, COVER_MM),
-        };
-        const { reinforcement: previous, ...bare } = footing;
-        if (
-          resized ||
-          previous?.barDiameter !== reinforcement.barDiameter ||
-          previous.spacing !== reinforcement.spacing ||
-          previous.cover !== reinforcement.cover
-        ) {
-          next = withElement(next, {
-            ...bare,
-            ...(resized
-              ? {
-                  width: fromMm(doc, size[0]),
-                  length: fromMm(doc, size[1]),
-                  thickness: fromMm(doc, size[2]),
-                }
-              : {}),
-            reinforcement,
-          });
-          changed.push(footing.id);
-          changes.push(
-            `${footing.mark}${resized ? ` ${sizeText(current)} → ${sizeText(size)}` : ''} H${chosen.diameter} @ ${chosen.spacing}`,
-          );
-        }
-        rows.push({
-          ...base,
-          status: 'designed',
-          sizeBefore: current,
-          sizeAfter: size,
-          barDiameter: chosen.diameter,
-          spacing: chosen.spacing,
-          asRequired: chosen.asRequired,
-          asProvided: chosen.asProvided,
-          shearUtilisation: chosen.shear,
-          punchingUtilisation: chosen.punching,
-          punchingDistance: chosen.punchingDistance,
-          combination: chosen.combination,
-          note: '',
-        });
-        continue;
-      }
-      const closest = verdict.mat?.closest ?? null;
-      rows.push({
-        ...base,
-        status: 'failed',
-        sizeBefore: current,
-        sizeAfter: current,
-        barDiameter: null,
-        spacing: null,
-        asRequired: closest?.asRequired ?? 0,
-        asProvided: null,
-        shearUtilisation: closest?.shear ?? 0,
-        punchingUtilisation: closest?.punching ?? 0,
-        punchingDistance: closest?.punchingDistance ?? 0,
-        combination: closest?.combination ?? '-',
-        note:
-          verdict.soilUtilisation > 1
-            ? `no pad up to ${MAX_PLAN_MM}×${MAX_PLAN_MM}×${MAX_THICKNESS_MM} mm passes soil bearing / overturning / uplift / sliding / settlement (utilisation ${round(verdict.soilUtilisation)} at the largest pad); left unchanged`
-            : verdict.mat?.bendingLimited
-              ? 'bending needs more than H25 @ 100 within the size limits; left unchanged'
-              : 'shear, punching or bending fails with every pad within the size limits; left unchanged',
       });
+      rows.push(outcome.row);
+      if (outcome.updated) {
+        next = withElement(next, outcome.updated);
+        changed.push(footing.id);
+      }
+      if (outcome.change) changes.push(outcome.change);
     }
     if (rows.length === 0) {
       return noop(
@@ -261,10 +120,7 @@ export const designFootings = defineCommand({
     const maxShear = maxOf((row) => row.shearUtilisation);
     const maxPunching = maxOf((row) => row.punchingUtilisation);
     const format = (row: FootingDesignRow): string => {
-      const resized = row.sizeBefore.some(
-        (value, index) => Math.round(value) !== Math.round(row.sizeAfter[index] ?? 0),
-      );
-      return `${row.mark}${resized ? ` ${sizeText(row.sizeBefore)} → ${sizeText(row.sizeAfter)}` : ''} H${row.barDiameter} @ ${row.spacing} (As ${round(row.asRequired, 0)} ≤ ${round(row.asProvided ?? 0, 0)} mm²/m, shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)}${row.punchingDistance > 0 ? ` at a=${round(row.punchingDistance, 0)} mm` : ''})`;
+      return `${row.mark}${isResized(row.sizeBefore, row.sizeAfter) ? ` ${sizeText(row.sizeBefore)} → ${sizeText(row.sizeAfter)}` : ''} H${row.barDiameter} @ ${row.spacing} (As ${round(row.asRequired, 0)} ≤ ${round(row.asProvided ?? 0, 0)} mm²/m, shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)}${row.punchingDistance > 0 ? ` at a=${round(row.punchingDistance, 0)} mm` : ''})`;
     };
     const document = changed.length > 0 ? { ...doc, building: next } : doc;
     return {

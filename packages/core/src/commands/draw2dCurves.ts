@@ -1,6 +1,7 @@
-import type { Entity, Vec3, Vec2 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import type { Vec3, Vec2 } from '../model/types';
 import type { CommandResult } from './types';
+import { newEntity } from './newEntity';
+import { compactNumber } from '../lib/compactNumber';
 import { defineCommand, z, colorField, looseVec2 as vec2 } from './schema';
 import { nextId } from '../lib/id';
 import { finiteVec3OrZero } from '../lib/vec3';
@@ -8,7 +9,6 @@ import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from './limits';
 import { sampleInvolute } from './gears';
 import {
   DEFAULT_DRAW_COLOR,
-  fmtN,
   pointSeriesEntity,
   rejectTooFewPoints,
   workPlanePositionField,
@@ -54,17 +54,13 @@ export const drawEllipse = defineCommand({
     }
     const id = nextId('ellipse');
     const safeCenter: Vec2 = [center[0], center[1]];
-    const entity: Entity = {
+    const entity = newEntity(
+      'ellipse',
       id,
-      kind: 'ellipse',
-      center: safeCenter,
-      radiusX,
-      radiusY,
+      { center: safeCenter, radiusX, radiusY },
       position,
-      rotation: [0, 0, 0],
-      layerId: DEFAULT_LAYER_ID,
       color,
-    };
+    );
     return {
       document: withEntity(doc, entity),
       summary: `Drew ellipse ${id} center [${safeCenter.join(', ')}] radiusX ${radiusX} radiusY ${radiusY}.`,
@@ -242,23 +238,16 @@ export const drawInvolute = defineCommand({
     const { minX, minY, maxX, maxY } = pointsExtent(pts);
 
     const id = nextId('inv');
-    const entity: Entity = {
-      id,
-      kind: 'polyline',
-      points: pts,
-      closed: false,
-      position: resolvedPos,
+    const entity = newEntity('polyline', id, { points: pts, closed: false }, resolvedPos, color, {
       rotation: resolvedRot,
-      layerId: DEFAULT_LAYER_ID,
-      color,
-      ...(name !== undefined && name !== '' ? { name } : {}),
-    };
+      name,
+    });
 
     return {
       document: withEntity(doc, entity),
       summary:
-        `Drew involute ${id}: baseRadius=${fmtN(baseRadius)} t=[${fmtN(startAngle)}, ${fmtN(endAngle)}] ` +
-        `samples=${samplesInt} AABB x=[${fmtN(minX)}, ${fmtN(maxX)}] y=[${fmtN(minY)}, ${fmtN(maxY)}].`,
+        `Drew involute ${id}: baseRadius=${compactNumber(baseRadius)} t=[${compactNumber(startAngle)}, ${compactNumber(endAngle)}] ` +
+        `samples=${samplesInt} AABB x=[${compactNumber(minX)}, ${compactNumber(maxX)}] y=[${compactNumber(minY)}, ${compactNumber(maxY)}].`,
       affected: [id],
     };
   },

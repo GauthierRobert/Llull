@@ -2,19 +2,10 @@
  * @layer domain-aec
  */
 
-import type { CadDocument, Vec2 } from '@core/model/types';
+import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, OpeningElement, WallElement } from '@core/model/building';
 import { projectOntoSegment, distance } from '@lib/polygon';
 import { arcOffsetOf, tangentWall } from './curvedWallGeometry';
-
-export interface EvaluationContext {
-  readonly doc: CadDocument;
-  readonly building: BuildingModel;
-}
-
-// ---------------------------------------------------------------------------
-// Walls
-// ---------------------------------------------------------------------------
 
 interface WallFrame {
   readonly length: number;

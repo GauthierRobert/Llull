@@ -1,44 +1,23 @@
 /**
- * Camera control commands — write `document.camera` so an MCP agent or the UI
- * can frame the model deterministically without touching entity geometry.
+ * Camera commands: write `document.camera` (view state, `metaHistory`: no FeatureStep).
+ * Convention (+Z up, matches Viewport3D): polar 0 = above along +Z, π/2 = in the XY plane; the eye
+ * sits at target + distance·(sin p·sin a, sin p·cos a, cos p), azimuth measured from +Y toward +X.
  *
  * @layer core/commands
- *
- * All three commands are pure (return a new doc) and annotated `metaHistory:true`
- * so `execute()` does NOT append a FeatureStep — camera orientation is view state,
- * not a replayable geometry step.
- *
- * Convention (matches +Z-up sphericalToCartesian in Viewport3D.tsx):
- *   polar   = 0      → camera directly above along +Z
- *   polar   = π/2   → camera in the XY plane
- *   azimuth          → angle in XY plane measured from +Y toward +X; the eye sits at
- *                      target + distance·(sin p·sin a, sin p·cos a, cos p)
- *
- * Direction preset azimuths/polars (+Z-up right-handed; eye position → view direction):
- *   front   → azimuth=π,     polar=π/2   (eye at -Y, looking along +Y)
- *   back    → azimuth=0,     polar=π/2   (eye at +Y, looking along -Y)
- *   right   → azimuth=π/2,   polar=π/2   (eye at +X, looking along -X)
- *   left    → azimuth=-π/2,  polar=π/2   (eye at -X, looking along +X)
- *   top     → azimuth=π,     polar=0.01  (overhead, +Y up on screen; avoids gimbal lock)
- *   bottom  → azimuth=π,     polar=π-0.01 (below; avoids gimbal lock at polar=π)
- *   iso     → azimuth=3π/4,  polar=π/4   (eye at +X,-Y,+Z; XY plane reads unmirrored)
- *   current → preserve existing azimuth/polar; only adjust distance/target
  */
 
-import type { CameraState, Vec3 } from '../model/types';
+import type { CameraState } from '../model/types';
+import { dot3, scale3, sub3 } from '../lib/vec3';
+import { boundsCenter } from './sceneBounds';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { computeSceneSnapshot } from './scene';
 import { noop } from './noop';
 
-/** Default half-FOV in radians used by the viewport PerspectiveCamera (fov=60°). */
-const DEFAULT_FOV_DEG = 60;
-const HALF_FOV_RAD = (DEFAULT_FOV_DEG / 2) * (Math.PI / 180);
+/** Half of the viewport PerspectiveCamera's 60° field of view. */
+const HALF_FOV_RAD = (60 / 2) * (Math.PI / 180);
 
-/**
- * Direction presets → { azimuth, polar } in radians.
- * Follows +Z-up spherical convention matching Viewport3D.tsx.
- */
+/** Direction presets (eye position → view); top/bottom stop short of the poles to avoid gimbal lock. */
 const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
   front: { azimuth: Math.PI, polar: Math.PI / 2 },
   back: { azimuth: 0, polar: Math.PI / 2 },
@@ -99,17 +78,13 @@ export const setCamera = defineCommand({
 
     const prev: CameraState = doc.camera;
     const next: CameraState = {
-      target: p.target !== undefined ? (p.target as Vec3) : prev.target,
-      azimuth: p.azimuth !== undefined ? p.azimuth : prev.azimuth,
-      polar: p.polar !== undefined ? p.polar : prev.polar,
-      distance: p.distance !== undefined ? p.distance : prev.distance,
+      target: p.target ?? prev.target,
+      azimuth: p.azimuth ?? prev.azimuth,
+      polar: p.polar ?? prev.polar,
+      distance: p.distance ?? prev.distance,
     };
-
-    const changed = ([] as string[]).concat(
-      p.target !== undefined ? ['target'] : [],
-      p.azimuth !== undefined ? ['azimuth'] : [],
-      p.polar !== undefined ? ['polar'] : [],
-      p.distance !== undefined ? ['distance'] : [],
+    const changed = (['target', 'azimuth', 'polar', 'distance'] as const).filter(
+      (field) => p[field] !== undefined,
     );
 
     if (changed.length === 0) {
@@ -159,15 +134,15 @@ export const lookAt = defineCommand({
       ),
   }),
   run: (doc, p): CommandResult => {
-    if ((p.target as Vec3).some((v) => !isFinite(v))) {
+    if (!p.target.every(Number.isFinite)) {
       return noop(doc, `look_at: target must be a finite [x,y,z] array. Camera unchanged.`);
     }
 
     const prev: CameraState = doc.camera;
     const next: CameraState = {
-      target: p.target as Vec3,
-      azimuth: p.azimuth !== undefined ? p.azimuth : prev.azimuth,
-      polar: p.polar !== undefined ? p.polar : prev.polar,
+      target: p.target,
+      azimuth: p.azimuth ?? prev.azimuth,
+      polar: p.polar ?? prev.polar,
       distance: prev.distance,
     };
 
@@ -225,16 +200,13 @@ export const fitView = defineCommand({
       return noop(doc, `fit_view: padding must be > 0 (got ${padding}). Camera unchanged.`);
     }
 
-    // Compute scene bounds using the shared scene snapshot helper.
-    const snapshot = computeSceneSnapshot(doc);
-    const bounds = snapshot.bounds;
+    const { bounds } = computeSceneSnapshot(doc);
 
     const preset = direction === 'current' ? null : DIRECTION_PRESETS[direction];
     const azimuth = preset ? preset.azimuth : doc.camera.azimuth;
     const polar = preset ? preset.polar : doc.camera.polar;
 
     if (!bounds) {
-      // Empty document — use a sensible default view.
       const distance = 10;
       const next: CameraState = { target: [0, 0, 0], azimuth, polar, distance };
       return {
@@ -244,17 +216,10 @@ export const fitView = defineCommand({
       };
     }
 
-    // Scene has geometry — compute the bounding sphere centre and radius.
-    const cx = (bounds.min[0] + bounds.max[0]) / 2;
-    const cy = (bounds.min[1] + bounds.max[1]) / 2;
-    const cz = (bounds.min[2] + bounds.max[2]) / 2;
-    const target: Vec3 = [cx, cy, cz];
-
-    const dx = (bounds.max[0] - bounds.min[0]) / 2;
-    const dy = (bounds.max[1] - bounds.min[1]) / 2;
-    const dz = (bounds.max[2] - bounds.min[2]) / 2;
-    const boundsRadius = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    // Avoid degenerate distance for a single-point scene (e.g. lone PointEntity).
+    const target = boundsCenter(bounds);
+    const half = scale3(sub3(bounds.max, bounds.min), 0.5);
+    const boundsRadius = Math.sqrt(dot3(half, half));
+    // A lone point has no extent: avoid a degenerate distance.
     const safeRadius = boundsRadius < 0.001 ? 1 : boundsRadius;
     const distance = (safeRadius / Math.sin(HALF_FOV_RAD)) * padding;
 

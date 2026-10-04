@@ -3,7 +3,7 @@ import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { GoldenAction } from './plans';
 
-export interface PlanOutcome {
+interface PlanOutcome {
   document: CadDocument;
   affected: string[];
   failedSteps: string[];

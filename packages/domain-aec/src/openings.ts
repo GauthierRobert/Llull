@@ -16,14 +16,12 @@ import { projectOntoSegment } from '@lib/polygon';
 import {
   fromMm,
   getBuilding,
-  isVec2,
   nextElementId,
   nextMark,
   withElement,
   elementAffected,
 } from './model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
 import { arcOffsetOf, curvedWallExtent, curvedWallLength } from './curvedWallGeometry';
@@ -39,16 +37,16 @@ const DEFAULTS_MM: Readonly<
 };
 
 function resolveOffset(
-  wall: WallElement,
+  wall: WallElement | CurvedWallElement,
   offset: number | undefined,
   at: Vec2 | undefined,
-): number | null {
-  if (offset !== undefined) return isFiniteNumber(offset) ? offset : null;
-  if (at !== undefined) {
-    if (!isVec2(at)) return null;
-    return projectOntoSegment(at, wall.start, wall.end).t * wallFrame(wall).length;
+): number {
+  if (offset !== undefined) return offset;
+  if (wall.category === 'curvedWall') {
+    return at ? arcOffsetOf(wall, at) : curvedWallLength(wall) / 2;
   }
-  return wallFrame(wall).length / 2;
+  const { length } = wallFrame(wall);
+  return at ? projectOntoSegment(at, wall.start, wall.end).t * length : length / 2;
 }
 
 /** Built extent of a host wall along its axis (curved walls: the whole arc length). */
@@ -70,28 +68,9 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
   const width = params.width ?? fromMm(doc, defaults.width);
   const height = params.height ?? Math.min(fromMm(doc, defaults.height), wall.height);
   const sillHeight = params.sillHeight ?? fromMm(doc, defaults.sill);
-  const offset =
-    wall.category === 'wall'
-      ? resolveOffset(wall, params.offset, params.at)
-      : params.offset !== undefined
-        ? isFiniteNumber(params.offset)
-          ? params.offset
-          : null
-        : params.at !== undefined
-          ? isVec2(params.at)
-            ? arcOffsetOf(wall, params.at)
-            : null
-          : curvedWallLength(wall) / 2;
-  if (
-    offset === null ||
-    !isFiniteNumber(width) ||
-    !isFiniteNumber(height) ||
-    !isFiniteNumber(sillHeight) ||
-    width <= 0 ||
-    height <= 0 ||
-    sillHeight < 0
-  ) {
-    return noop(doc, `${name} failed: width/height must be > 0, sillHeight >= 0, offset finite.`);
+  const offset = resolveOffset(wall, params.offset, params.at);
+  if (width <= 0 || height <= 0 || sillHeight < 0) {
+    return noop(doc, `${name} failed: width/height must be > 0, sillHeight >= 0.`);
   }
   const opening: OpeningElement = {
     id: nextElementId(building, kind),
@@ -103,7 +82,7 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     width,
     height,
     sillHeight,
-    swing: params.swing === 'right' ? 'right' : 'left',
+    swing: params.swing ?? 'left',
     material: params.material?.trim() || defaults.material,
   };
   const fitError = openingFitError(
@@ -250,15 +229,7 @@ export const updateOpening = defineCommand({
       material: material?.trim() || opening.material,
       mark: mark?.trim() || opening.mark,
     };
-    if (
-      !isFiniteNumber(updated.offset) ||
-      !isFiniteNumber(updated.width) ||
-      !isFiniteNumber(updated.height) ||
-      !isFiniteNumber(updated.sillHeight) ||
-      updated.width <= 0 ||
-      updated.height <= 0 ||
-      updated.sillHeight < 0
-    ) {
+    if (updated.width <= 0 || updated.height <= 0 || updated.sillHeight < 0) {
       return noop(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
     }
     const fitError = openingFitError(

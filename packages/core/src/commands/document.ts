@@ -2,14 +2,9 @@
  * @command clear_document
  * @pure
  * @layer core/commands
- * @affects nothing — deletions are not surfaced as affected ids; affected:[]
- * @invariant Preserved: units, camera, displayPrecision.
- *            Cleared by default: entities, order, selection, groups, parameters,
- *            animations, featureHistory, configurations, materials, recipes, components.
- *            When keepLayers=true: layers and layerOrder are also preserved.
- *            When keepLayers=false (default): layers and layerOrder are reset to the
- *            single default layer matching createEmptyDocument().
- * @failure Already-empty document → no-op with idempotent summary, affected:[].
+ * @affects nothing surfaced; affected:[]
+ * @invariant keeps units, camera, displayPrecision; resets layers to the default unless keepLayers
+ * @failure already-empty document -> no-op, affected:[]
  */
 
 import type { CadDocument } from '../model/types';
@@ -43,31 +38,21 @@ export const clearDocument = defineCommand({
     const entityCount = Object.keys(doc.entities).length;
     const layerCount = Object.keys(doc.layers).length;
 
-    // Idempotent: if already empty (and layers are either being kept or already at default)
-    // return the same doc reference with a descriptive summary.
     const fresh = createEmptyDocument();
-    const isEntitiesEmpty = entityCount === 0;
-    const isGroupsEmpty = Object.keys(doc.groups).length === 0;
-    const isParamsEmpty = Object.keys(doc.parameters).length === 0;
-    const isAnimsEmpty = Object.keys(doc.animations).length === 0;
-    const isHistoryEmpty = doc.featureHistory.length === 0;
-    const isConfigsEmpty = Object.keys(doc.configurations).length === 0;
-    const isMaterialsEmpty = Object.keys(doc.materials).length === 0;
-    const isRecipesEmpty = Object.keys(doc.recipes).length === 0;
-    const isComponentsEmpty = Object.keys(doc.components).length === 0;
     const isLayersDefault =
       layerCount === 1 && doc.layerOrder.length === 1 && doc.layerOrder[0] === fresh.layerOrder[0];
-
     const isAlreadyEmpty =
-      isEntitiesEmpty &&
-      isGroupsEmpty &&
-      isParamsEmpty &&
-      isAnimsEmpty &&
-      isHistoryEmpty &&
-      isConfigsEmpty &&
-      isMaterialsEmpty &&
-      isRecipesEmpty &&
-      isComponentsEmpty &&
+      [
+        doc.entities,
+        doc.groups,
+        doc.parameters,
+        doc.animations,
+        doc.configurations,
+        doc.materials,
+        doc.recipes,
+        doc.components,
+      ].every((table) => Object.keys(table).length === 0) &&
+      doc.featureHistory.length === 0 &&
       doc.building === undefined &&
       (keepLayers || isLayersDefault);
 

@@ -5314,12 +5314,68 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. Returns the unchanged document plus a `data` object containing: `svg` (complete SVG string), `view` (resolved view name), `width`, `height`, `entityCount`, `bounds` (world AABB or null), and `camera` ({position, target, up}). Choose `view` to orient the render: \"iso\" (default isometric), \"top\", \"bottom\", \"front\", \"back\", \"left\", or \"right\" (all orthographic). Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. Does NOT modify the document; `affected` is always [].",
+    "description": "Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. Returns the unchanged document plus a `data` object containing: `svg` (complete SVG string), `view` (resolved view name), `width`, `height`, `entityCount`, `bounds` (world AABB or null), and `camera` ({position, target, up}). Choose `view` to orient the render: \"iso\" (default isometric), \"top\", \"bottom\", \"front\", \"back\", \"left\", or \"right\" (all orthographic). Adjust `width`/`height` (pixels, clamped to [64, 2000], default 800×600) for resolution. The SVG uses flat Lambertian shading on 3D solids and stroked paths for 2D shapes. Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), showLabels (entity id/name labels + key-point markers, default off). Does NOT modify the document; `affected` is always [].",
     "input_schema": {
       "properties": {
         "height": {
           "description": "Output image height in pixels. Clamped to [64, 2000]. Default: 600.",
           "type": "number"
+        },
+        "isolate": {
+          "description": "Entity id (or array of ids) to highlight. All other entities are rendered dimmed/desaturated; the specified id(s) are shown at full color.",
+          "type": "string"
+        },
+        "section": {
+          "description": "Render a section-plane view: entities on the negative side of the cut plane are dimmed; a colored dashed line marks the cut. axis: \"x\"|\"y\"|\"z\"; offset: world-space position of the plane.",
+          "properties": {
+            "axis": {
+              "description": "Axis normal to the cut plane: \"x\", \"y\", or \"z\".",
+              "enum": [
+                "x",
+                "y",
+                "z"
+              ],
+              "type": "string"
+            },
+            "offset": {
+              "description": "World-space position of the cut plane along the axis.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "axis",
+            "offset"
+          ],
+          "type": "object"
+        },
+        "showAxes": {
+          "description": "When true (default), overlay a world-frame X/Y/Z axis triad anchored at the world origin. X=red, Y=green, Z=blue. A scale label (e.g. \"1 mm = 42 px\") is also shown. Set to false to suppress.",
+          "type": "boolean"
+        },
+        "showDimensions": {
+          "description": "When true, overlay the bounding-box dimensions (W × D × H) as text labels on the image. Labels are placed near the bounding box edges in screen space.",
+          "type": "boolean"
+        },
+        "showGrid": {
+          "description": "When true (default), overlay a faint ground grid on the Z=0 plane so you can judge object placement relative to the world origin. Set to false to suppress.",
+          "type": "boolean"
+        },
+        "showLabels": {
+          "description": "When true, overlay per-entity id/name labels and key-point markers on the image. Each entity shows its name (or id) at the centroid of its key points (endpoints, center, corners, AABB corners for solids). Markers are color-coded by category: orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. A legend appears in the top-right corner. Default: false (opt in to avoid clutter).",
+          "type": "boolean"
+        },
+        "turntable": {
+          "description": "Produce a horizontal strip of N evenly-spaced rotation frames around the Z (up) axis. frames: integer 1..12. When omitted, behavior is unchanged (single frame).",
+          "properties": {
+            "frames": {
+              "description": "Number of frames (1..12). Each frame is a separate rotated view stitched into one wide strip.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "frames"
+          ],
+          "type": "object"
         },
         "view": {
           "description": "Camera direction. One of: \"iso\" (isometric — default, good for orienting in 3D), \"top\" (looking down the +Z axis), \"bottom\" (looking up the -Z axis), \"front\" (looking along the +Y axis), \"back\" (looking along the -Y axis), \"left\" (looking along the +X axis), \"right\" (looking along the -X axis). Omit for the default \"iso\" view.",

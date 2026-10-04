@@ -82,18 +82,10 @@ function InstanceEntityRenderer({
     [instance.id, onSelect],
   );
 
-  // Expand the instance into world-space entities, memoized on the instance
-  // transform fields + componentId.
-  // Use a stable string key for position/rotation/scale since array references
-  // are not stable across renders.
-  const posKey = instance.position.join(',');
-  const rotKey = instance.rotation.join(',');
-  const scaleKey = (instance.scale ?? [1, 1, 1]).join(',');
-  const expandedEntities = useMemo(() => {
-    if (!component) return [];
-    return expandInstance(instance, component);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [component, instance.componentId, posKey, rotKey, scaleKey]);
+  const expandedEntities = useMemo(
+    () => (component ? expandInstance(instance, component) : []),
+    [component, instance],
+  );
 
   if (!component || expandedEntities.length === 0) return null;
 
@@ -221,7 +213,6 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
     [select, toggleSelection, toggleClickAnimation],
   );
 
-  // --- Compute visible entity list (applies all visibility filters) ---
   const visibleEntities = useMemo(() => {
     return order
       .map((id) => entities[id])
@@ -235,16 +226,13 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
       });
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
 
-  // --- Split: batchable kinds (box/cylinder/sphere) go to InstancedRenderer ---
   const batchableEntities = useMemo(() => visibleEntities.filter(isBatchable), [visibleEntities]);
 
-  // --- Non-batchable kinds continue as per-entity meshes ---
   const nonBatchableEntities = useMemo(
     () => visibleEntities.filter((e) => !isBatchable(e)),
     [visibleEntities],
   );
 
-  // --- Group batchable entities into InstancedMesh batches ---
   // Pass the materials map so batches can carry per-batch PBR overrides.
   const batches = useMemo(
     () => groupEntitiesForInstancing(batchableEntities, materials),

@@ -2,7 +2,7 @@
  * @layer domain-aec
  */
 
-import type { DocumentUnit, Entity, Vec2 } from '@core/model/types';
+import type { DocumentUnit, Vec2 } from '@core/model/types';
 import { hatchSegments } from '@lib/hatch';
 import { triangulatePolygon } from '@lib/triangulate';
 import { DIMENSION_LAYER, type PlanFill, type PlanPrimitive } from './planModel';
@@ -54,7 +54,7 @@ export const fmt = (value: number): string => {
 };
 
 export class DxfWriter {
-  private readonly lines: string[] = [];
+  readonly lines: string[] = [];
   readonly layers = new Map<string, number>();
   entityCount = 0;
   private minX = Infinity;
@@ -156,10 +156,6 @@ export class DxfWriter {
   point2(layer: string, at: Vec2): void {
     this.start('POINT', layer);
     this.point(10, at);
-  }
-
-  entitiesSection(): string[] {
-    return this.lines;
   }
 }
 
@@ -289,12 +285,4 @@ export function writePrimitive(
       writeDimension(writer, primitive);
       return;
   }
-}
-
-/** Places a local 2D point of `entity` in world plan coordinates (position + Z rotation). */
-export function toWorld(entity: Entity, [x, y]: Vec2): Vec2 {
-  const angle = entity.rotation[2];
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  return [entity.position[0] + x * cos - y * sin, entity.position[1] + x * sin + y * cos];
 }

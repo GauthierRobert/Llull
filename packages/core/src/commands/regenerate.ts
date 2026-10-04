@@ -1,57 +1,38 @@
 /**
- * Parameter-expression resolution and id remapping for the regeneration pass.
- *
- * When a feature step's params contain strings that begin with `=`, those are
- * treated as parameter expressions and resolved against `doc.parameters` before
- * the step's command is executed. Non-`=` values pass through unchanged.
- *
- * Convention: `"=width*2"` strips the leading `=` and evaluates `"width*2"` via
- * the expression evaluator. On error (parse failure, missing reference) the
- * original `=expr` string is kept and the error is recorded in the returned
- * `ResolveResult.errors` array — the step is still run with whatever params could
- * be resolved (graceful degradation, never throws).
+ * Parameter-expression resolution and id remapping for the regeneration pass: string params
+ * starting with `=` are expressions resolved against `doc.parameters`; a failing one keeps its
+ * `=expr` text and is reported in `ResolveResult.errors` (never throws).
  *
  * @layer core/commands
- * @pure — every exported function is stateless and side-effect-free.
+ * @pure
  */
 
 import type { Parameter } from '../model/types';
 import { evaluateExpression } from './expression';
 
-/** A single expression-substitution failure. */
+/** One failed `=expr` substitution: `path` like `size[0]`, the original `expression`, the `reason`. */
 interface ResolveError {
-  /** The path to the key that failed, e.g. `"size[0]"` or `"radius"`. */
   readonly path: string;
-  /** The original `=expr` string (including the leading `=`). */
   readonly expression: string;
-  /** The reason evaluation failed. */
   readonly reason: string;
 }
 
 /** Outcome of resolving a step's params against the current parameter environment. */
 interface ResolveResult {
-  /** Params with all resolvable `=expr` strings replaced by their numeric values. */
+  /** Params with every resolvable `=expr` replaced by its numeric value. */
   readonly resolved: unknown;
-  /** One entry for each `=expr` that could not be evaluated. */
   readonly errors: readonly ResolveError[];
 }
 
-/**
- * Flat `env` map of parameter name → numeric value, skipping any parameter that has an
- * `error` (its value is stale and unreliable as a dependency).
- *
- * @pure
- */
+/** Parameter name → value, skipping parameters in error (stale values). @pure */
 export function buildParamEnv(
   parameters: Readonly<Record<string, Parameter>>,
 ): Readonly<Record<string, number>> {
-  const env: Record<string, number> = {};
-  for (const [name, param] of Object.entries(parameters)) {
-    if (!param.error) {
-      env[name] = param.value;
-    }
-  }
-  return env;
+  return Object.fromEntries(
+    Object.entries(parameters)
+      .filter(([, param]) => !param.error)
+      .map(([name, param]) => [name, param.value]),
+  );
 }
 
 /**
@@ -82,13 +63,17 @@ export function mapStringLeaves(
   return value;
 }
 
-/**
- * Resolve `=expr` strings in a step's params against `env`. A failed expression keeps its
- * original string and is pushed to `errors`; the function never throws.
- *
- * @pure
- * @invariant `params` is never mutated; a new object/array is always returned.
- */
+/** Every string leaf of `value` (arrays and plain objects walked recursively). */
+export function stringLeaves(value: unknown): string[] {
+  const leaves: string[] = [];
+  mapStringLeaves(value, (text) => {
+    leaves.push(text);
+    return text;
+  });
+  return leaves;
+}
+
+/** Resolve `=expr` strings in a step's params against `env`; `params` is not mutated. @pure */
 export function resolveStepParams(
   params: unknown,
   env: Readonly<Record<string, number>>,
@@ -105,26 +90,16 @@ export function resolveStepParams(
 }
 
 /**
- * Replace any STRING value in `params` that is a key in `idMap` with the mapped value
- * (rewrites stale entity-id references after earlier steps produced new ids).
- *
+ * Replace every string in `params` that is a key of `idMap` with its mapped id (stale entity-id
+ * references after earlier steps minted new ids). Blind walk: no per-command id-param allowlist.
  * @pure
- * @invariant `params` is never mutated; new objects/arrays are always returned.
  */
 export function remapIds(params: unknown, idMap: ReadonlyMap<string, string>): unknown {
-  // Blind walk (no per-command id-param allowlist): a free-text param equal to a prior
-  // id (`prefix-base36-base36`) would be rewritten, but such a collision is astronomically
-  // unlikely. If it ever matters, add an id-param-path allowlist.
   if (idMap.size === 0) return params;
   return mapStringLeaves(params, (text) => idMap.get(text) ?? text);
 }
 
-/**
- * Positional id-remap: record `recorded[i] -> replayed[i]` in `idMap` for every index where the
- * two ids differ (a recorded step's `affected` zipped with the replayed result's `affected`).
- *
- * @invariant undefined/shorter/longer lists zip over the common prefix only
- */
+/** Record `recorded[i] -> replayed[i]` in `idMap` wherever they differ (common prefix only). */
 export function extendIdMap(
   idMap: Map<string, string>,
   recorded: readonly string[] | undefined,

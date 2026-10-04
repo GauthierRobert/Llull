@@ -1,11 +1,10 @@
-import type { Entity } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
+import { newEntity } from './newEntity';
 import { defineCommand, z, colorField } from './schema';
 import { nextId } from '../lib/id';
+import { ORIGIN } from '../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
-  ORIGIN,
   anchorField,
   commitSolid,
   positionField,
@@ -71,16 +70,9 @@ export const addCylinder = defineCommand({
       position,
     );
     const id = nextId('cyl');
-    const entity: Entity = {
-      id,
-      kind: 'cylinder',
-      radius,
-      height,
-      position: storedPosition,
+    const entity = newEntity('cylinder', id, { radius, height }, storedPosition, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(
       doc,
       entity,
@@ -133,15 +125,9 @@ export const addSphere = defineCommand({
     // Half-extents from center: [radius, radius, radius].
     const storedPosition = resolvePosition([radius, radius, radius], 'center', anchor, position);
     const id = nextId('sph');
-    const entity: Entity = {
-      id,
-      kind: 'sphere',
-      radius,
-      position: storedPosition,
+    const entity = newEntity('sphere', id, { radius }, storedPosition, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(doc, entity, `Added sphere ${id} with radius ${radius}`);
   },
 });
@@ -211,16 +197,9 @@ export const addCone = defineCommand({
       position,
     );
     const id = nextId('cone');
-    const entity: Entity = {
-      id,
-      kind: 'cone',
-      radius,
-      height,
-      position: storedPosition,
+    const entity = newEntity('cone', id, { radius, height }, storedPosition, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(
       doc,
       entity,
@@ -297,16 +276,9 @@ export const addTorus = defineCommand({
       position,
     );
     const id = nextId('tor');
-    const entity: Entity = {
-      id,
-      kind: 'torus',
-      ringRadius,
-      tubeRadius,
-      position: storedPosition,
+    const entity = newEntity('torus', id, { ringRadius, tubeRadius }, storedPosition, color, {
       rotation: resolveRotation(rotation),
-      layerId: DEFAULT_LAYER_ID,
-      color,
-    };
+    });
     return commitSolid(
       doc,
       entity,

@@ -6,7 +6,7 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding, isVec2 } from './model';
+import { elementAffected, fromMm, getBuilding } from './model';
 import { noop } from '@core/commands/noop';
 import { addLevel, setProjectInfo } from './levels';
 import { addGridSystem } from './grid';
@@ -233,8 +233,8 @@ export const addBuildingTemplate = defineCommand({
     template: z.enum(['house', 'office']).describe('Which starter building.'),
     origin: vec2('Plan origin [x, y]. Default [0, 0].').optional(),
   }),
-  run: (doc, { template, origin = [0, 0] }): CommandResult => {
-    if (!isVec2(origin)) return noop(doc, 'add_building_template failed: origin must be [x, y].');
+  run: (doc, { template, origin: requestedOrigin }): CommandResult => {
+    const origin: Vec2 = requestedOrigin ?? [0, 0];
     let current = doc;
     const created: Record<string, string[]> = {};
     for (const [index, step] of steps(doc, template, origin, created).entries()) {

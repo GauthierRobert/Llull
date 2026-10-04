@@ -161,8 +161,6 @@ describe('check_crane_runways', () => {
       { craneCapacity: -1 },
       { craneCapacity: Number.NaN },
       { wheelBase: 0 },
-      { craneClass: 'S9' as 'S2' },
-      { hoistingClass: 'HC9' as 'HC1' },
       { hoistingSpeed: -1 },
       { minHookApproach: -1 },
       { craneSpan: 0 },
@@ -238,18 +236,18 @@ describe('local wheel stresses (EN 1993-6 §5.7.1)', () => {
     expect(find(rows, 'ltb').utilisation).toBeGreaterThan(1);
   });
 
-  it('is a no-op for a bad girder', () => {
-    const result = runwayCheck.run(hall(), { girder: 'cast' as 'rolled' });
-    expect(result.data).toBeUndefined();
-    expect(result.summary).toMatch(/^check_crane_runways failed: girder/);
-  });
-
-  it('is a no-op for a bad railSize', () => {
+  it('rejects enum values outside the schema', () => {
     const doc = hall();
-    const result = runwayCheck.run(doc, { railSize: 'X9' as 'A55' });
-    expect(result.document).toBe(doc);
-    expect(result.data).toBeUndefined();
-    expect(result.summary).toMatch(/^check_crane_runways failed: railSize/);
+    for (const params of [
+      { girder: 'cast' },
+      { railSize: 'X9' },
+      { craneClass: 'S9' },
+      { hoistingClass: 'HC9' },
+    ]) {
+      const result = execute(doc, 'check_crane_runways', params);
+      expect(result.document).toBe(doc);
+      expect(result.summary).toMatch(/^check_crane_runways rejected: invalid params/);
+    }
   });
 });
 

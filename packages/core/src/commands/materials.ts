@@ -12,12 +12,8 @@
 import type { CadDocument, Material } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { isHexColor } from '../lib/isHexColor';
 import { noop } from './noop';
-
-/** Validates a CSS hex color string: #rrggbb (6 hex digits). */
-function isValidHexColor(s: string): boolean {
-  return /^#[0-9a-fA-F]{6}$/.test(s);
-}
 
 /**
  * @command create_material
@@ -101,7 +97,7 @@ export const createMaterial = defineCommand({
       );
     }
 
-    if (!isValidHexColor(color)) {
+    if (!isHexColor(color)) {
       return noop(
         doc,
         `create_material '${name}' failed: color must be a 6-digit hex string like "#b0b0b0", got "${String(color)}".`,

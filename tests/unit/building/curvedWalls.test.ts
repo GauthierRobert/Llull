@@ -140,14 +140,14 @@ describe('add_curved_wall', () => {
 
 describe('curved wall review regressions', () => {
   it('is hatched as concrete when cut in a section', async () => {
-    const { buildElevationDrawing } = await import('@aec/elevation');
+    const { buildElevationDrawing } = await import('@aec/elevationProjection');
     const doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
     const drawing = buildElevationDrawing(doc, { direction: 'south', cutAt: 4000 })!;
     expect(drawing.cutRegions.map((region) => region.material)).toEqual(['concrete']);
   });
 
   it('rejects collinear curved walls on load and gives no clash boxes without a band', async () => {
-    const { elementBoxes } = await import('@aec/industrial/clash');
+    const { elementBoxes } = await import('@aec/industrial/clashBoxes');
     const doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
     const broken = JSON.parse(JSON.stringify(doc.building)) as {
       elements: Record<string, Record<string, unknown>>;

@@ -8,7 +8,7 @@
 import type { CadDocument, EntityId } from '@core/model/types';
 import { extendIdMap, remapIds } from '@core/commands/regenerate';
 import { fetchLiveSnapshot, postCommand } from './serverCommands';
-import type { CadStoreState } from './store';
+import type { CadStoreState, StoreGet, StoreSet } from './storeTypes';
 
 const SYNC_RETRY_BASE_MS = 1000;
 const SYNC_RETRY_MAX_MS = 30000;
@@ -22,11 +22,6 @@ export interface OutboxCommand {
   /** Ids the local run produced; zipped with the server's `affected` to remap later entries. */
   readonly affected: readonly string[];
 }
-
-export type StoreSet = (
-  partial: Partial<CadStoreState> | ((state: CadStoreState) => Partial<CadStoreState>),
-) => void;
-export type StoreGet = () => CadStoreState;
 
 /** Guards against concurrent pushes. */
 let syncInFlight = false;

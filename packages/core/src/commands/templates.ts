@@ -11,52 +11,23 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import type { Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 } from './schema';
 import { nextId } from '../lib/id';
+import { withEntity } from './entityOps';
+import { newEntity } from './newEntity';
+import { ORIGIN } from '../lib/vec3';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
-
-/** Append multiple entities to a document in one pass. Keeps the command pure. */
-function withEntities(doc: CadDocument, entities: Entity[]): CadDocument {
-  const newEntitiesMap = { ...doc.entities };
-  for (const e of entities) {
-    newEntitiesMap[e.id] = e;
-  }
-  return {
-    ...doc,
-    entities: newEntitiesMap,
-    order: [...doc.order, ...entities.map((e) => e.id)],
-  };
-}
 
 /** Build a circle entity at a given 2D center on the given work-plane position. */
 function makeCircle(center: Vec2, radius: number, position: Vec3, color: string): Entity {
-  return {
-    id: nextId('circ'),
-    kind: 'circle',
-    center,
-    radius,
-    position,
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color,
-  };
+  return newEntity('circle', nextId('circ'), { center, radius }, position, color);
 }
 
 /** Build a rectangle entity at the given work-plane position. */
 function makeRectangle(width: number, height: number, position: Vec3, color: string): Entity {
-  return {
-    id: nextId('rect'),
-    kind: 'rectangle',
-    width,
-    height,
-    position,
-    rotation: [0, 0, 0],
-    layerId: DEFAULT_LAYER_ID,
-    color,
-  };
+  return newEntity('rectangle', nextId('rect'), { width, height }, position, color);
 }
 
 const positive = (template: string, name: string, value: number): string | null =>
@@ -218,8 +189,6 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
   } as TemplateEntry<never>,
 };
 
-const ORIGIN: Vec3 = [0, 0, 0];
-
 const VALID_TEMPLATES: readonly TemplateName[] = [
   'bolt_hole_pattern',
   'flange',
@@ -309,7 +278,7 @@ export const instantiateTemplate = defineCommand({
     }
 
     const affected = entities.map((e) => e.id);
-    const newDoc = withEntities(doc, entities);
+    const newDoc = entities.reduce(withEntity, doc);
 
     return {
       document: newDoc,

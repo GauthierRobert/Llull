@@ -1,15 +1,15 @@
 /**
- * @layer server
+ * @layer mcp
  *
  * render_view showLabels overlay: per-entity id/name labels, key-point markers, legend.
  */
 
-import type { Entity } from '@core/model/types';
-import type { RenderViewData } from '@core/commands/renderTypes';
-import { entityBounds } from '@core/commands/sceneBounds';
-import { escapeXml } from '@lib/escapeXml';
-import { r2 } from '@core/commands/renderMath';
-import { computeOrthoHalf, makeProjector } from './svgHelpers';
+import type { Entity } from '../model/types';
+import type { RenderViewData } from './renderTypes';
+import { entityBounds } from './sceneBounds';
+import { escapeXml } from '../lib/escapeXml';
+import { r2 } from './renderMath';
+import { makeProjector, computeOrthoHalf } from './renderCamera';
 
 /**
  * Category of an entity for colour-coding in the label overlay.

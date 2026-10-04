@@ -1,158 +1,55 @@
 /**
- * distribute_along_path — place N instances of an existing Component at evenly-spaced
- * positions along a 2D path entity (polyline or spline), with optional tangent alignment.
- *
- * Tangent convention: a tangent of [1, 0] (pointing in the +X direction) maps to
- * rotation [0, 0, 0]. A tangent of [0, 1] (+Y) maps to rotation [0, 0, π/2].
- * In general, rotation[2] = atan2(ty, tx). This is a pure Z-axis rotation; the
- * work-plane normal (+Z) is always the rotation axis.
- *
- * Vertex tangent: at a polyline vertex shared by two segments the OUTGOING segment
- * direction is used (the tangent of the segment beginning at that vertex). This gives
- * a sharp snap-to-new-direction at corners, which is the natural chain-link behaviour.
- * For the very last vertex of an open path the INCOMING segment direction is used.
- *
- * Spline chord approximation: spline through-points are connected by linear chords for
- * arc-length computation and tangent sampling. The resulting placement is an approximation
- * of the true Catmull-Rom curve — acceptable for chain-link spacing where the link pitch
- * is small relative to the curve radius. True Catmull-Rom tessellation is delegated to
- * the viewport and is not available in the command layer.
- *
- * Closed path: startOffset rotates the whole pattern around the loop. endOffset is ignored.
- * Open path: instances span [startOffset, totalLength − endOffset].
- *
- * count = 1, open path: the single instance is placed at startOffset (not the midpoint).
+ * distribute_along_path: instances of a component at evenly-spaced arc-length positions along a
+ * polyline/spline path (splines use their through-point chords). A tangent [1, 0] maps to
+ * rotation [0, 0, 0]; rotation[2] = atan2(ty, tx). At a vertex the outgoing segment's tangent is
+ * used (the last vertex of an open path uses the incoming one).
  *
  * @layer core/commands
  */
 
-import type { CadDocument, InstanceEntity, Vec2, Vec3 } from '../model/types';
+import type { InstanceEntity, Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
 import { rotatePoint2 } from '../lib/polygon';
+import { add2, len2, normalize2, scale2, sub2 } from '../lib/vec2';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { noop } from './noop';
 import { withEntity } from './entityOps';
+import { instanceEntity } from './assemblies';
 
-function vec2Add(a: Vec2, b: Vec2): Vec2 {
-  return [a[0] + b[0], a[1] + b[1]];
-}
-
-function vec2Sub(a: Vec2, b: Vec2): Vec2 {
-  return [a[0] - b[0], a[1] - b[1]];
-}
-
-function vec2Length(v: Vec2): number {
-  return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
-}
-
-function vec2Normalize(v: Vec2): Vec2 {
-  const len = vec2Length(v);
-  if (len < 1e-12) return [1, 0];
-  return [v[0] / len, v[1] / len];
-}
-
-function vec2Scale(v: Vec2, s: number): Vec2 {
-  return [v[0] * s, v[1] * s];
-}
-
-/** Transform local-2D point into world-3D using path entity position+rotation. */
-function toWorld3D(local: Vec2, entityPos: Vec3, entityRotZ: number): Vec3 {
-  const rotated = rotatePoint2(local, entityRotZ);
-  return [rotated[0] + entityPos[0], rotated[1] + entityPos[1], entityPos[2]];
-}
-
-/**
- * Compute cumulative arc lengths for a polyline/chord sequence.
- * Returns an array of length `points.length` where [0] = 0 and
- * [i] = total length from points[0] to points[i].
- */
+/** Cumulative chord length at each point; a closed path gets one extra entry for the wrap-back chord. */
 function cumulativeLengths(points: ReadonlyArray<Vec2>, closed: boolean): number[] {
-  const cumul: number[] = [0];
-  for (let i = 1; i < points.length; i++) {
-    const seg = vec2Sub(points[i]!, points[i - 1]!);
-    cumul.push(cumul[i - 1]! + vec2Length(seg));
-  }
-  if (closed && points.length >= 2) {
-    const wrapSeg = vec2Sub(points[0]!, points[points.length - 1]!);
-    cumul.push(cumul[cumul.length - 1]! + vec2Length(wrapSeg));
+  const loop = closed && points.length >= 2 ? [...points, points[0] as Vec2] : points;
+  const cumul = [0];
+  for (let i = 1; i < loop.length; i++) {
+    cumul.push((cumul[i - 1] as number) + len2(sub2(loop[i] as Vec2, loop[i - 1] as Vec2)));
   }
   return cumul;
 }
 
-/** Total arc length (chord-based). Includes the wrap-back chord when closed. */
-function totalArcLength(points: ReadonlyArray<Vec2>, closed: boolean): number {
-  const cumul = cumulativeLengths(points, closed);
-  return cumul[cumul.length - 1] ?? 0;
-}
-
 /**
- * Sample the path at arc-length distance `s` from the start.
- * Returns { point, tangent } both in the LOCAL 2D work plane.
- *
- * For an open path `s` is clamped to [0, totalLength].
- * For a closed path the effective point list is treated as periodic:
- * the wrap-back segment from points[n-1] → points[0] is segment index n.
- *
- * Tangent convention (open path):
- *   - At any interior point, use the outgoing segment direction.
- *   - At the very end (s ≥ totalLength), use the last segment direction.
- * Tangent convention (closed path):
- *   - Use the outgoing segment direction at every sample.
+ * Point and unit tangent (local 2D) at arc length `s` (clamped to the path). A position exactly on
+ * a vertex belongs to the outgoing segment; the last segment catches the end point.
  */
-interface PathSample {
-  point: Vec2;
-  tangent: Vec2; // unit vector
-}
-
-function samplePath(points: ReadonlyArray<Vec2>, closed: boolean, s: number): PathSample {
-  if (points.length < 2) {
-    return { point: points[0] ?? [0, 0], tangent: [1, 0] };
-  }
-
-  // Build the effective point list (add wrap-back start for closed paths)
-  const effectivePoints: ReadonlyArray<Vec2> = closed ? [...points, points[0]!] : points;
-
+function samplePath(
+  points: ReadonlyArray<Vec2>,
+  closed: boolean,
+  s: number,
+): { point: Vec2; tangent: Vec2 } {
+  const loop: ReadonlyArray<Vec2> = closed ? [...points, points[0] as Vec2] : points;
   const cumul = cumulativeLengths(points, closed);
-  const total = cumul[cumul.length - 1] ?? 0;
-
-  // Clamp s
-  const sClamped = Math.max(0, Math.min(s, total));
-
-  // Find the segment that contains sClamped.
-  // "Outgoing segment" convention: when s falls exactly on a vertex (cumul[i] == s)
-  // and a next segment exists, use the next (outgoing) segment for the tangent.
-  // This gives the natural chain-link snap-to-new-direction at corners.
-  // For the very last point of an open path (no outgoing segment), the incoming
-  // segment direction is used (handled by the last-segment fallback).
-  for (let i = 1; i < effectivePoints.length; i++) {
-    const segStart = cumul[i - 1]!;
-    const segEnd = cumul[i]!;
-    const segLen = segEnd - segStart;
-
-    // Is sClamped within this segment? Use strict < for interior points so that
-    // a point exactly at cumul[i] falls through to the NEXT segment (outgoing).
-    // The last segment always catches the endpoint.
-    const isLastSeg = i === effectivePoints.length - 1;
-    if (sClamped < segEnd - 1e-10 || isLastSeg) {
-      const t = segLen > 1e-12 ? (sClamped - segStart) / segLen : 0;
-      const p0 = effectivePoints[i - 1]!;
-      const p1 = effectivePoints[i]!;
-      const seg = vec2Sub(p1, p0);
-      const point: Vec2 = vec2Add(p0, vec2Scale(seg, Math.max(0, Math.min(1, t))));
-      const tangent = vec2Normalize(seg);
-      return { point, tangent };
-    }
-  }
-
-  // Fallback: last point, last segment direction
-  const last = effectivePoints[effectivePoints.length - 1]!;
-  const secondLast = effectivePoints[effectivePoints.length - 2]!;
+  const clamped = Math.max(0, Math.min(s, cumul[cumul.length - 1] as number));
+  let i = 1;
+  while (i < loop.length - 1 && clamped >= (cumul[i] as number) - 1e-10) i++;
+  const [p0, p1] = [loop[i - 1] as Vec2, loop[i] as Vec2];
+  const segStart = cumul[i - 1] as number;
+  const segLen = (cumul[i] as number) - segStart;
+  const t = segLen > 1e-12 ? (clamped - segStart) / segLen : 0;
+  const seg = sub2(p1, p0);
   return {
-    point: last,
-    tangent: vec2Normalize(vec2Sub(last, secondLast)),
+    point: add2(p0, scale2(seg, Math.max(0, Math.min(1, t)))),
+    tangent: normalize2(seg, [1, 0]),
   };
 }
 
@@ -276,7 +173,8 @@ export const distributeAlongPath = defineCommand({
       );
     }
 
-    const totalLength = totalArcLength(pathPoints, pathClosed);
+    const cumulative = cumulativeLengths(pathPoints, pathClosed);
+    const totalLength = cumulative[cumulative.length - 1] ?? 0;
 
     if (!Number.isFinite(totalLength) || totalLength < 1e-12) {
       return noop(doc, `distribute_along_path: path "${pathId}" has zero or degenerate length.`);
@@ -321,34 +219,22 @@ export const distributeAlongPath = defineCommand({
 
     const instanceName = name ?? component.name;
     const createdIds: string[] = [];
-    let newDoc: CadDocument = doc;
+    let newDoc = doc;
 
-    for (let i = 0; i < placements.length; i++) {
-      const s = placements[i]!;
-      const sample = samplePath(pathPoints, pathClosed, s);
-
-      // Convert local 2D point to world 3D position
-      const worldPos: Vec3 = toWorld3D(sample.point, entityPos, entityRotZ);
-
-      const worldTangent = rotatePoint2(sample.tangent, entityRotZ);
-      const instanceRotation: Vec3 = [
-        0,
-        0,
-        tangentAlign ? Math.atan2(worldTangent[1], worldTangent[0]) : 0,
-      ];
-
+    for (const [i, s] of placements.entries()) {
+      const { point, tangent } = samplePath(pathPoints, pathClosed, s);
+      const [x, y] = rotatePoint2(point, entityRotZ);
+      const [tx, ty] = rotatePoint2(tangent, entityRotZ);
       const instanceId = nextId('instance');
       const instance: InstanceEntity = {
-        id: instanceId,
-        kind: 'instance',
-        componentId,
-        position: worldPos,
-        rotation: instanceRotation,
-        layerId: DEFAULT_LAYER_ID,
-        color: '#c8553d',
+        ...instanceEntity(
+          instanceId,
+          componentId,
+          [x + entityPos[0], y + entityPos[1], entityPos[2]],
+          [0, 0, tangentAlign ? Math.atan2(ty, tx) : 0],
+        ),
         name: `${instanceName}_${i}`,
-      } as InstanceEntity & { name: string };
-
+      };
       newDoc = withEntity(newDoc, instance);
       createdIds.push(instanceId);
     }

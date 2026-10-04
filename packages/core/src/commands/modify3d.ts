@@ -1,23 +1,21 @@
 /**
- * Non-boolean 3D solid modifier commands — fillet and chamfer.
- *
- * Each command takes a single 3D solid entity, delegates tessellation and
- * edge modification to the injected GeometryKernel, and produces a new
- * `mesh` entity. The source entity is consumed (pruned from the document).
- *
- * When the kernel returns null (Manifold graceful no-op, or OCC stub) the
- * document is returned unchanged with an explanatory summary.
+ * Fillet and chamfer: the injected GeometryKernel tessellates a 3D solid and rounds/bevels its
+ * edges; the source entity is replaced by the resulting `mesh` entity. A null kernel result is a no-op.
  *
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, MeshSolidEntity } from '../model/types';
+import type { CadDocument, Entity } from '../model/types';
+import type { GeometryKernel, MeshData } from '../geometry/kernel';
 import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { replaceEntities } from './entityOps';
+import { kernelUnavailable } from './kernelRefusal';
+import { newEntity } from './newEntity';
 import { noop } from './noop';
 
 function validateSolidTarget(
@@ -36,6 +34,54 @@ function validateSolidTarget(
     );
   }
   return { entity };
+}
+
+interface EdgeModification {
+  readonly command: 'fillet_edge' | 'chamfer_edge';
+  readonly pastTense: string;
+  readonly amountName: 'radius' | 'distance';
+  readonly amount: number;
+  readonly id: string;
+  readonly apply: (kernel: GeometryKernel, mesh: MeshData) => MeshData | null;
+}
+
+/** Shared body of fillet_edge / chamfer_edge: validate, tessellate, modify edges, replace the source. */
+function modifyEdges(
+  doc: CadDocument,
+  ctx: ExecutionContext | undefined,
+  { command, pastTense, amountName, amount, id, apply }: EdgeModification,
+): CommandResult {
+  if (amount <= 0) return noop(doc, `${command}: ${amountName} must be > 0 (got ${amount}).`);
+  const validation = validateSolidTarget(doc, command, id);
+  if ('summary' in validation) return validation;
+  const { entity } = validation;
+
+  const kernel = (ctx ?? currentContext()).kernel;
+  if (!kernel) return noop(doc, kernelUnavailable(command));
+  const meshData = kernel.tessellate(entity);
+  if (!meshData) {
+    return noop(
+      doc,
+      `${command}: kernel could not tessellate entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
+    );
+  }
+  const modified = apply(kernel, meshData);
+  if (!modified) {
+    return noop(
+      doc,
+      `${command}: kernel does not support ${command} for this operand (returned null). Try ?kernel=occt or a different operand.`,
+    );
+  }
+
+  const newId = nextId('mesh');
+  const meshEntity = newEntity('mesh', newId, { mesh: modified }, [0, 0, 0], entity.color, {
+    layerId: entity.layerId,
+  });
+  return {
+    document: replaceEntities(doc, [id], meshEntity),
+    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${modified.indices.length / 3} triangles). Source entity consumed.`,
+    affected: [newId],
+  };
 }
 
 /**
@@ -71,60 +117,15 @@ export const filletEdge = defineCommand({
       .optional(),
     radius: z.number().describe('Fillet radius in document units. Must be > 0.'),
   }),
-  run: (doc, { id, edgeIndices = [], radius }, ctx): CommandResult => {
-    if (radius <= 0) {
-      return noop(doc, `fillet_edge: radius must be > 0 (got ${radius}).`);
-    }
-
-    const validation = validateSolidTarget(doc, 'fillet_edge', id);
-    if ('summary' in validation) return validation;
-    const { entity } = validation;
-
-    const k = (ctx ?? currentContext()).kernel;
-    if (!k) {
-      return noop(
-        doc,
-        `fillet_edge: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
-      );
-    }
-
-    const meshData = k.tessellate(entity);
-    if (!meshData) {
-      return noop(
-        doc,
-        `fillet_edge: kernel could not tessellate entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
-      );
-    }
-
-    const filleted = k.filletEdges(meshData, edgeIndices, radius);
-    if (!filleted) {
-      return {
-        document: doc,
-        summary:
-          `fillet_edge: kernel does not support fillet_edge for this operand (returned null). ` +
-          `Try ?kernel=occt or a different operand.`,
-        affected: [],
-      };
-    }
-
-    const newId = nextId('mesh');
-    const meshEntity: MeshSolidEntity = {
-      id: newId,
-      kind: 'mesh',
-      mesh: filleted,
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      layerId: entity.layerId,
-      color: entity.color,
-    };
-
-    const triangleCount = filleted.indices.length / 3;
-    return {
-      document: replaceEntities(doc, [id], meshEntity),
-      summary: `fillet_edge: filleted '${id}' (kind '${entity.kind}', radius ${radius}) → mesh '${newId}' (${triangleCount} triangles). Source entity consumed.`,
-      affected: [newId],
-    };
-  },
+  run: (doc, { id, edgeIndices = [], radius }, ctx): CommandResult =>
+    modifyEdges(doc, ctx, {
+      command: 'fillet_edge',
+      pastTense: 'filleted',
+      amountName: 'radius',
+      amount: radius,
+      id,
+      apply: (kernel, mesh) => kernel.filletEdges(mesh, edgeIndices, radius),
+    }),
 });
 
 /**
@@ -160,58 +161,13 @@ export const chamferEdge = defineCommand({
       .optional(),
     distance: z.number().describe('Chamfer distance in document units. Must be > 0.'),
   }),
-  run: (doc, { id, edgeIndices = [], distance }, ctx): CommandResult => {
-    if (distance <= 0) {
-      return noop(doc, `chamfer_edge: distance must be > 0 (got ${distance}).`);
-    }
-
-    const validation = validateSolidTarget(doc, 'chamfer_edge', id);
-    if ('summary' in validation) return validation;
-    const { entity } = validation;
-
-    const k = (ctx ?? currentContext()).kernel;
-    if (!k) {
-      return noop(
-        doc,
-        `chamfer_edge: geometry kernel not available (still loading or not installed); document unchanged — retry once the kernel is ready.`,
-      );
-    }
-
-    const meshData = k.tessellate(entity);
-    if (!meshData) {
-      return noop(
-        doc,
-        `chamfer_edge: kernel could not tessellate entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
-      );
-    }
-
-    const chamfered = k.chamferEdges(meshData, edgeIndices, distance);
-    if (!chamfered) {
-      return {
-        document: doc,
-        summary:
-          `chamfer_edge: kernel does not support chamfer_edge for this operand (returned null). ` +
-          `Try ?kernel=occt or a different operand.`,
-        affected: [],
-      };
-    }
-
-    const newId = nextId('mesh');
-    const meshEntity: MeshSolidEntity = {
-      id: newId,
-      kind: 'mesh',
-      mesh: chamfered,
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      layerId: entity.layerId,
-      color: entity.color,
-    };
-
-    const triangleCount = chamfered.indices.length / 3;
-    return {
-      document: replaceEntities(doc, [id], meshEntity),
-      summary: `chamfer_edge: chamfered '${id}' (kind '${entity.kind}', distance ${distance}) → mesh '${newId}' (${triangleCount} triangles). Source entity consumed.`,
-      affected: [newId],
-    };
-  },
+  run: (doc, { id, edgeIndices = [], distance }, ctx): CommandResult =>
+    modifyEdges(doc, ctx, {
+      command: 'chamfer_edge',
+      pastTense: 'chamfered',
+      amountName: 'distance',
+      amount: distance,
+      id,
+      apply: (kernel, mesh) => kernel.chamferEdges(mesh, edgeIndices, distance),
+    }),
 });

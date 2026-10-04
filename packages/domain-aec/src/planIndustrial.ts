@@ -8,7 +8,7 @@ import { fromMm, getBuilding } from './model';
 import { MEMBER_LAYER } from './entities';
 import { sweepFrame } from './mesh';
 import { findProfile, profileOutline } from './steel/profiles';
-import { plateLayout } from './industrial/evaluate';
+import { plateLayout } from './industrial/evaluateConnections';
 import { type PlanPrimitive, type PlanSource, layerName } from './planModel';
 
 /** Both edges of a plan polyline offset by ±`half` (mitred at the bends). */
@@ -31,6 +31,24 @@ function offsetPolyline(points: ReadonlyArray<Vec2>, half: number): Vec2[][] {
       const factor = (side * half) / (before && after ? Math.max(along, 0.2) : 1);
       return [point[0] + nx * factor, point[1] + ny * factor];
     }),
+  );
+}
+
+/** Corners of a `2·hx × 2·hy` rectangle centred on `center`, rotated by `angle` (counter-clockwise). */
+function rectangleAt(center: readonly number[], hx: number, hy: number, angle = 0): Vec2[] {
+  const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
+  return (
+    [
+      [-hx, -hy],
+      [hx, -hy],
+      [hx, hy],
+      [-hx, hy],
+    ] as const
+  ).map(
+    ([x, y]): Vec2 => [
+      (center[0] as number) + x * cos - y * sin,
+      (center[1] as number) + x * sin + y * cos,
+    ],
   );
 }
 
@@ -92,21 +110,8 @@ export function industrialPrimitives(
       return [{ type: 'line', layer, style: 'hidden', a, b }];
     }
     case 'footing': {
-      const [x, y] = element.location;
-      const [hx, hy] = [element.width / 2, element.length / 2];
-      return [
-        {
-          type: 'polygon',
-          layer: layerName('footing'),
-          style: 'hidden',
-          points: [
-            [x - hx, y - hy],
-            [x + hx, y - hy],
-            [x + hx, y + hy],
-            [x - hx, y + hy],
-          ],
-        },
-      ];
+      const points = rectangleAt(element.location, element.width / 2, element.length / 2);
+      return [{ type: 'polygon', layer: layerName('footing'), style: 'hidden', points }];
     }
     case 'panel': {
       if (element.role !== 'wall') return [];
@@ -123,21 +128,8 @@ export function industrialPrimitives(
     }
     case 'equipment': {
       const [length, width] = element.size;
-      const [cos, sin] = [Math.cos(element.angle), Math.sin(element.angle)];
       const rectangle = (hx: number, hy: number): Vec2[] =>
-        (
-          [
-            [-hx, -hy],
-            [hx, -hy],
-            [hx, hy],
-            [-hx, hy],
-          ] as const
-        ).map(
-          ([x, y]): Vec2 => [
-            element.location[0] + x * cos - y * sin,
-            element.location[1] + x * sin + y * cos,
-          ],
-        );
+        rectangleAt(element.location, hx, hy, element.angle);
       const layer = layerName('equipment');
       return [
         { type: 'polygon', layer, style: 'thin', points: rectangle(length / 2, width / 2) },
@@ -184,19 +176,13 @@ export function industrialPrimitives(
       const layout =
         member?.category === 'member' && level ? plateLayout(doc, element, member, level) : null;
       if (!layout) return [];
-      const [cos, sin] = [Math.cos(layout.angle), Math.sin(layout.angle)];
-      const [hx, hy] = [element.length / 2, element.width / 2];
-      const corner = (x: number, y: number): Vec2 => [
-        layout.center[0] + x * cos - y * sin,
-        layout.center[1] + x * sin + y * cos,
-      ];
       const layer = layerName('plate');
       return [
         {
           type: 'polygon',
           layer,
           style: 'thin',
-          points: [corner(-hx, -hy), corner(hx, -hy), corner(hx, hy), corner(-hx, hy)],
+          points: rectangleAt(layout.center, element.length / 2, element.width / 2, layout.angle),
         },
         ...layout.bolts.map(
           (center): PlanPrimitive => ({
@@ -223,19 +209,13 @@ export function industrialPrimitives(
         );
       const layer = layerName('tray');
       if (points.length < 2) {
-        const [x, y] = points[0] as Vec2;
         const half = element.width / 2;
         return [
           {
             type: 'polygon',
             layer,
             style: 'thin',
-            points: [
-              [x - half, y - half],
-              [x + half, y - half],
-              [x + half, y + half],
-              [x - half, y + half],
-            ],
+            points: rectangleAt(points[0] as Vec2, half, half),
           },
         ];
       }

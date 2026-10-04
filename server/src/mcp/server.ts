@@ -37,20 +37,16 @@ import { getLiveDoc } from '../liveDocument';
 import { applyCommand } from '../commandBus';
 import type { ExchangeOptions } from '../pythonExchange';
 import { buildImageBlock, stripSvgFromData } from '../renderImage';
-import {
-  applyRenderViewEnrichments,
-  makeErrorResult,
-  stripEnrichParams,
-} from './renderViewEnrichment';
-import { augmentRenderViewTool } from './renderViewSchema';
+
+function makeErrorResult(message: string): CallToolResult {
+  return shapeToolCallContent({ summary: message, affected: [], isError: true }) as CallToolResult;
+}
 
 /** Tool list for a session: registry tools + exchange/discovery meta-tools, filtered by toolset. */
 function listTools(enabledToolsets: ReadonlySet<ToolsetName>): {
   tools: { name: string; description: string; inputSchema: { type: 'object' } }[];
 } {
-  const registryTools = buildMcpTools().map((t) =>
-    t.name === 'render_view' ? augmentRenderViewTool(t) : t,
-  );
+  const registryTools = buildMcpTools();
   const metaTools = [...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()];
   return {
     tools: [...registryTools, ...metaTools]
@@ -105,16 +101,7 @@ export function buildMcpServer(
     });
     if (exchangeResult !== null) return exchangeResult as unknown as CallToolResult;
 
-    // render_view enrichments are server-side; their params are stripped before the core command.
-    if (name === 'render_view' && args != null) {
-      const enriched = applyRenderViewEnrichments(args, getLiveDoc);
-      if (enriched !== null) return enriched;
-    }
-
-    const busResult = applyCommand(
-      name,
-      name === 'render_view' ? stripEnrichParams(args ?? {}) : (args ?? {}),
-    );
+    const busResult = applyCommand(name, args ?? {});
 
     // Vision loop: the PNG replaces the multi-KB SVG in the text/structured content.
     const imageBlock = buildImageBlock(busResult.data);

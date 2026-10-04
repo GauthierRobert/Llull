@@ -9,6 +9,7 @@
  * @pure
  */
 
+import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import type { Vec2 } from '@core/model/types';
 import type {
   CadDocument,
@@ -83,31 +84,9 @@ export function offsetSideSign(start: Vec2, end: Vec2, pick: Vec2): 1 | -1 {
   return cross >= 0 ? 1 : -1;
 }
 
-/**
- * Euclidean distance between two 2D points.
- * @pure
- */
-export function dist2(a: Vec2, b: Vec2): number {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-/**
- * Squared distance from point P to the segment AB.
- * @pure
- */
-export function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
-  const abx = b[0] - a[0];
-  const aby = b[1] - a[1];
-  const apx = p[0] - a[0];
-  const apy = p[1] - a[1];
-  const lenSq = abx * abx + aby * aby;
-  let t = lenSq > 0 ? (apx * abx + apy * aby) / lenSq : 0;
-  t = Math.max(0, Math.min(1, t));
-  const cx = a[0] + t * abx - p[0];
-  const cy = a[1] + t * aby - p[1];
-  return cx * cx + cy * cy;
+/** Squared distance from point P to the segment AB. @pure */
+function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
+  return projectOntoSegment(p, a, b).distance ** 2;
 }
 
 /**
@@ -169,7 +148,7 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
       );
     }
     case 'point':
-      return dist2(pick, [0, 0]);
+      return distance(pick, [0, 0]) ** 2;
     case 'arc': {
       const a = entity as ArcEntity;
       const d = Math.hypot(pick[0] - a.center[0], pick[1] - a.center[1]) - a.radius;
@@ -237,19 +216,6 @@ export function nearestEntityId(
   return bestId;
 }
 
-/** Point-in-polygon (even-odd ray cast) in local coordinates. @pure */
-function polygonContains(points: ReadonlyArray<Vec2>, pick: Vec2): boolean {
-  let inside = false;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    const [xi, yi] = points[i]!;
-    const [xj, yj] = points[j]!;
-    if (yi > pick[1] !== yj > pick[1] && pick[0] < ((xj - xi) * (pick[1] - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
 /**
  * Enclosed area of a closed 2D entity when `worldPick` lies inside it, else null.
  * Closed kinds: rectangle, circle, ellipse, closed polyline.
@@ -265,7 +231,7 @@ export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
     }
     case 'circle': {
       const c = entity as CircleEntity;
-      const inside = dist2(pick, c.center) <= c.radius * c.radius;
+      const inside = distance(pick, c.center) <= c.radius;
       return inside ? Math.PI * c.radius * c.radius : null;
     }
     case 'ellipse': {
@@ -277,15 +243,10 @@ export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
     }
     case 'polyline': {
       const poly = entity as PolylineEntity;
-      if (!poly.closed || poly.points.length < 3 || !polygonContains(poly.points, pick)) {
+      if (!poly.closed || poly.points.length < 3 || !pointInPolygon(pick, poly.points)) {
         return null;
       }
-      let twiceArea = 0;
-      for (let i = 0, j = poly.points.length - 1; i < poly.points.length; j = i++) {
-        twiceArea +=
-          poly.points[j]![0] * poly.points[i]![1] - poly.points[i]![0] * poly.points[j]![1];
-      }
-      return Math.abs(twiceArea) / 2;
+      return polygonArea(poly.points);
     }
     default:
       return null;

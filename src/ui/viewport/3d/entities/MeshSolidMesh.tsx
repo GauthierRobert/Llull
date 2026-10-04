@@ -30,7 +30,6 @@ export function MeshSolidMesh({
     // Mesh stores no normals; derive them for correct lighting.
     geo.computeVertexNormals();
     return geo;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesh]);
 
   return (

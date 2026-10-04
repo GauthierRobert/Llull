@@ -17,8 +17,8 @@ import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, type SteelProfile } from '../steel/profiles';
-import { refitPlates } from './plates';
-import { dropStaleConnections } from './connections';
+import { refitPlates } from './plateSupport';
+import { dropStaleConnections } from './connectionSupport';
 import {
   MEMBER_ROLES,
   appendMembers,

@@ -3,28 +3,23 @@
  * groups against check_portal_frames.
  * @layer domain-aec
  */
-
-import type {
-  BuildingModel,
-  MomentConnectionElement,
-  SteelMemberElement,
-} from '@core/model/building';
-import type { CadDocument, Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding, withElement } from '../model';
+import { elementAffected, getBuilding, withElement, fromMm } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
-import { refitPlates } from './plates';
+import { refitPlates } from './plateSupport';
 import { designFixedPlates } from './plateDesign';
 import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
-import { buildingConnectionSolids } from './evaluate';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
-import { sweepFrame } from '../mesh';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameCheckPortal';
-import { connectionCheck } from './frameCheckSolve';
+import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
+import { sizeBoltGroups } from './frameBoltDesign';
 import { checkFrames } from './frameCheckFrames';
+import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import type { CadDocument, Vec3 } from '@core/model/types';
+import { add3 } from '@lib/vec3';
+import { sweepFrame } from '../mesh';
 
 /**
  * Next heavier profile of the same family; at the top of the family, the lightest I-section
@@ -48,8 +43,6 @@ export function nextProfile(name: string): string | null {
   ).sort(byMass);
   return stronger[0]?.name ?? null;
 }
-
-const BOLT_SIZES_MM = [20, 24, 27, 30];
 
 /**
  * @command design_portal_frames
@@ -141,80 +134,12 @@ export const designPortalFrames = defineCommand({
       if (!progressed) break;
       if (iteration === 14) limited = true;
     }
-    // Bolt groups: smallest bolt diameter / row count that passes for every connection of a kind.
     const { rows } = checkFrames(current, levelId, loads);
-    let building = getBuilding(current);
-    for (const kind of ['eaves', 'apex'] as const) {
-      const targets = rows.filter((row) => {
-        const element = building.elements[row.elementId];
-        return element?.category === 'connection' && element.kind === kind && row.forces;
-      });
-      if (targets.length === 0) continue;
-      let chosen: { rows: number; diameter: number } | null = null;
-      // Fallback when nothing passes: the feasible group with the lowest worst utilisation.
-      let best: { rows: number; diameter: number; worst: number } | null = null;
-      search: for (const diameter of BOLT_SIZES_MM) {
-        for (let boltRows = kind === 'eaves' ? 3 : 2; boltRows <= 6; boltRows++) {
-          let worst = 0;
-          let feasible = true;
-          for (const row of targets) {
-            const original = building.elements[row.elementId] as MomentConnectionElement;
-            const trial: MomentConnectionElement = {
-              ...original,
-              boltRows,
-              boltDiameter: fromMm(current, diameter),
-            };
-            if (!rowSpacingOk(current, building, trial)) {
-              feasible = false;
-              break;
-            }
-            const trialBuilding = withElement(building, trial);
-            for (const forces of row.forces ?? []) {
-              const verdict = connectionCheck(
-                current,
-                trialBuilding,
-                trial,
-                forces.moment,
-                forces.shear,
-              );
-              if (verdict === null) {
-                feasible = false;
-                break;
-              }
-              worst = Math.max(worst, verdict.utilisation);
-            }
-            if (!feasible) break;
-          }
-          if (!feasible) continue;
-          if (best === null || worst < best.worst) best = { rows: boltRows, diameter, worst };
-          if (worst <= targetUtilisation) {
-            chosen = { rows: boltRows, diameter };
-            break search;
-          }
-        }
-      }
-      if (!chosen && best) {
-        limited = true;
-        chosen = { rows: best.rows, diameter: best.diameter };
-      }
-      if (!chosen) continue;
-      changes.push(`${kind} connections: ${chosen.rows * 2} × M${chosen.diameter}`);
-      for (const row of targets) {
-        const original = building.elements[row.elementId] as MomentConnectionElement;
-        if (
-          original.boltRows === chosen.rows &&
-          original.boltDiameter === fromMm(current, chosen.diameter)
-        ) {
-          continue;
-        }
-        building = withElement(building, {
-          ...original,
-          boltRows: chosen.rows,
-          boltDiameter: fromMm(current, chosen.diameter),
-        });
-        changed.add(original.id);
-      }
-    }
+    const bolts = sizeBoltGroups(current, getBuilding(current), rows, targetUtilisation);
+    let building = bolts.building;
+    changes.push(...bolts.changes);
+    for (const id of bolts.changed) changed.add(id);
+    if (bolts.limited) limited = true;
     const plates = designFixedPlates(current, building, levelId, loads, targetUtilisation);
     building = plates.building;
     if (plates.changed.length > 0) changes.push(...plates.descriptions);
@@ -265,7 +190,7 @@ export const designPortalFrames = defineCommand({
  * rafter normal, gable-post tops drop under a deeper rafter, side rails move out with a deeper
  * column (by half the depth change).
  */
-function reseatDependents(
+export function reseatDependents(
   doc: Pick<CadDocument, 'units'>,
   building: BuildingModel,
   resizedIds: ReadonlyArray<string>,
@@ -282,11 +207,6 @@ function reseatDependents(
     .filter((element): element is SteelMemberElement => element?.category === 'member');
   const onPlane = (member: SteelMemberElement, y: number): boolean =>
     Math.abs(member.start[1] - y) < tolerance && Math.abs(member.end[1] - y) < tolerance;
-  const shift = (point: Vec3, by: Vec3): Vec3 => [
-    point[0] + by[0],
-    point[1] + by[1],
-    point[2] + by[2],
-  ];
   let next = building;
   const moved: string[] = [];
   for (const element of Object.values(building.elements)) {
@@ -332,35 +252,11 @@ function reseatDependents(
     const by = offset;
     const updated: SteelMemberElement = topOnly
       ? element.start[2] >= element.end[2]
-        ? { ...element, start: shift(element.start, by) }
-        : { ...element, end: shift(element.end, by) }
-      : { ...element, start: shift(element.start, by), end: shift(element.end, by) };
+        ? { ...element, start: add3(element.start, by) }
+        : { ...element, end: add3(element.end, by) }
+      : { ...element, start: add3(element.start, by), end: add3(element.end, by) };
     next = withElement(next, updated);
     moved.push(element.id);
   }
   return { building: next, moved };
-}
-
-/** Bolt rows at least 2.2 d0 apart (EN 1993-1-8 Tab. 3.3; d0 = d + 2 mm up to M24, + 3 mm above). */
-function rowSpacingOk(
-  doc: Pick<CadDocument, 'units'>,
-  building: BuildingModel,
-  connection: MomentConnectionElement,
-): boolean {
-  if (connection.boltRows < 2) return true;
-  const solids = buildingConnectionSolids(doc, building, connection);
-  if (!solids) return false;
-  const diameter = connection.boltDiameter / fromMm(doc, 1);
-  const hole = fromMm(doc, diameter + (diameter <= 24 ? 2 : 3));
-  const ys = [
-    ...new Set(
-      solids
-        .filter((solid) => solid.part.startsWith('bolt') && solid.part.endsWith('-l'))
-        .map((solid) => {
-          const values = solid.outline.map(([, y]) => y);
-          return (Math.min(...values) + Math.max(...values)) / 2;
-        }),
-    ),
-  ].sort((a, b) => a - b);
-  return ys.every((y, index) => index === 0 || y - (ys[index - 1] as number) >= 2.2 * hole);
 }

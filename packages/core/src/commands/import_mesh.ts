@@ -5,12 +5,13 @@
  */
 
 import type { CadDocument, Entity } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { MAX_IMPORT_BODIES, MAX_IMPORT_TRIANGLES } from './limits';
+import { isHexColor } from '../lib/isHexColor';
 import { noop } from './noop';
+import { newEntity } from './newEntity';
 
 interface MeshBodyParams {
   positions: number[];
@@ -20,7 +21,6 @@ interface MeshBodyParams {
 }
 
 const DEFAULT_MESH_COLOR = '#9aa5b1';
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 /** Expand to a triangle soup (positions per corner, indices 0..n-1) so every consumer agrees. */
 function toTriangleSoup(body: MeshBodyParams): number[] | string {
@@ -100,19 +100,16 @@ export const importMesh = defineCommand({
       }
       const id = nextId('mesh');
       const name = typeof body.name === 'string' && body.name.trim() !== '' ? body.name : undefined;
-      const entity: Entity = {
+      const entity = newEntity(
+        'mesh',
         id,
-        kind: 'mesh',
-        mesh: { positions: soup, indices: Array.from({ length: soup.length / 3 }, (_, n) => n) },
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        layerId: DEFAULT_LAYER_ID,
-        color:
-          typeof body.color === 'string' && HEX_COLOR.test(body.color)
-            ? body.color
-            : DEFAULT_MESH_COLOR,
-        ...(name !== undefined ? { name } : {}),
-      };
+        {
+          mesh: { positions: soup, indices: Array.from({ length: soup.length / 3 }, (_, n) => n) },
+        },
+        [0, 0, 0],
+        isHexColor(body.color) ? body.color : DEFAULT_MESH_COLOR,
+        { name },
+      );
       entities[id] = entity;
       order.push(id);
       affected.push(id);

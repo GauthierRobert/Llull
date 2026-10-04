@@ -1,150 +1,78 @@
 /**
- * Procedural gear commands.
+ * add_spur_gear: parametric involute spur gear as one `extrusion` entity (pure math, no kernel).
  *
- * add_spur_gear — parametric involute spur gear computed in pure core math.
- * Produces one `extrusion` entity; no new EntityKind, no kernel call, no DOM.
- *
- * @module
+ * @layer core/commands
  */
 
-import type { Entity, Vec3 } from '../model/types';
-import { DEFAULT_LAYER_ID } from '../model/types';
+import type { Entity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
+import { compactNumber as fmt } from '../lib/compactNumber';
 import { rotatePoint2 } from '../lib/polygon';
 import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { withEntity } from './entityOps';
+import { newEntity } from './newEntity';
+import { boundsText } from './geometryShared';
 import { noop } from './noop';
 
+type Point = readonly [number, number];
+
 /**
- * Sample points along the involute of a circle with base radius `baseR`.
- *
- * Parametric equations:
- *   x(t) = baseR * (cos t + t * sin t)
- *   y(t) = baseR * (sin t - t * cos t)
- *
- * The curve is open and traces from `tStart` to `tEnd` linearly across `samples` points
- * (`samples - 1` segments). At t=0 the involute starts at `(baseR, 0)`.
- * The distance from the origin at parameter t is `baseR * sqrt(1 + t²)`.
- *
- * Exported so `draw_involute` and `add_spur_gear` share one implementation.
- *
- * @param baseR   Base circle radius (must be > 0).
- * @param tStart  Start parameter t.
- * @param tEnd    End parameter t (must be > tStart for a non-degenerate curve).
- * @param samples Number of points to generate (inclusive of both endpoints; minimum 2).
- * @returns ReadonlyArray of [x, y] points sampled linearly in t.
+ * `samples` points of the involute of a circle of radius `rb` (x = rb(cos t + t sin t),
+ * y = rb(sin t - t cos t)), t linear from `tStart` to `tEnd`. Shared by `draw_involute`.
  */
 export function sampleInvolute(
   rb: number,
   tStart: number,
   tEnd: number,
   samples: number,
-): ReadonlyArray<readonly [number, number]> {
-  const pts: Array<readonly [number, number]> = [];
+): ReadonlyArray<Point> {
   const n = Math.max(samples - 1, 1);
-  for (let i = 0; i <= n; i++) {
+  return Array.from({ length: n + 1 }, (_, i): Point => {
     const t = tStart + ((tEnd - tStart) * i) / n;
-    const x = rb * (Math.cos(t) + t * Math.sin(t));
-    const y = rb * (Math.sin(t) - t * Math.cos(t));
-    pts.push([x, y]);
-  }
-  return pts;
+    return [rb * (Math.cos(t) + t * Math.sin(t)), rb * (Math.sin(t) - t * Math.cos(t))];
+  });
 }
 
-/**
- * Mirror a 2D point about the X-axis (negate Y).
- */
-function mirrorY(pt: readonly [number, number]): readonly [number, number] {
-  return [pt[0], -pt[1]];
-}
-
-/**
- * Compute the `t` parameter at which the involute of base circle `rb` reaches
- * radius `r` from the origin:  rb * sqrt(1 + t^2) = r → t = sqrt((r/rb)^2 - 1).
- * Returns 0 if r <= rb (involute starts at the base circle).
- */
+/** Involute parameter t at which the curve reaches radius `r` (0 when r <= rb). */
 function involuteT(rb: number, r: number): number {
-  if (r <= rb) return 0;
-  return Math.sqrt((r / rb) ** 2 - 1);
+  return r <= rb ? 0 : Math.sqrt((r / rb) ** 2 - 1);
 }
 
-/**
- * Project a point at angle `angle` onto radius `r` around the origin.
- */
-function onCircle(r: number, angle: number): readonly [number, number] {
-  return [r * Math.cos(angle), r * Math.sin(angle)];
-}
-
-/**
- * Sample a circular arc at radius `r` from `startAngle` to `endAngle` (CCW),
- * with `segments` intermediate points (exclusive of start; inclusive of end).
- */
-function sampleArc(
-  r: number,
-  startAngle: number,
-  endAngle: number,
-  segments: number,
-): ReadonlyArray<readonly [number, number]> {
-  const pts: Array<readonly [number, number]> = [];
+/** `segments` points on the circle of radius `r`, from just after `startAngle` through `endAngle` (CCW). */
+function sampleArc(r: number, startAngle: number, endAngle: number, segments: number): Point[] {
   const n = Math.max(segments, 1);
-  for (let i = 1; i <= n; i++) {
-    const a = startAngle + ((endAngle - startAngle) * i) / n;
-    pts.push(onCircle(r, a));
-  }
-  return pts;
+  return Array.from({ length: n }, (_, i): Point => {
+    const a = startAngle + ((endAngle - startAngle) * (i + 1)) / n;
+    return [r * Math.cos(a), r * Math.sin(a)];
+  });
 }
 
-/** Format a number compactly for the summary string. */
-function fmt(v: number): string {
-  return parseFloat(v.toFixed(4)).toString();
-}
-
-/** Format an AABB for use in a summary string. */
-function boundsText(b: { min: Vec3; max: Vec3 }): string {
-  return `world AABB min [${b.min.map(fmt).join(', ')}] max [${b.max.map(fmt).join(', ')}]`;
-}
+const angleOf = (p: Point): number => Math.atan2(p[1], p[0]);
 
 /**
- * Build a closed CCW 2D involute spur gear profile centered at the origin.
- *
- * @param module        Gear module (metric) — pitch radius = module * teeth / 2.
- * @param teeth         Number of teeth (>= 3).
- * @param pressureAngle Pressure angle in radians (typical: Math.PI/9 = 20°).
- * @param flankSamples  Points per involute flank side (default 14).
- * @returns ReadonlyArray of [x, y] forming a closed polygon (first ≈ last).
- *
- * @invariant When baseRadius >= rootRadius (teeth < ~17), undercut occurs.
- *            The involute start is clamped to rootRadius via tStart; the flank
- *            is radially connected to the root circle. This is an approximation.
+ * Closed CCW involute spur gear outline centred at the origin (first point repeated last).
+ * @param pressureAngle radians (typical 20° = π/9)
+ * @invariant baseRadius >= rootRadius (teeth < ~17) undercuts: the flank starts on the root circle (approximation)
  */
 export function buildSpurGearProfile(
   module: number,
   teeth: number,
   pressureAngle: number,
   flankSamples = 14,
-): ReadonlyArray<readonly [number, number]> {
+): ReadonlyArray<Point> {
   const pitchRadius = (module * teeth) / 2;
   const baseRadius = pitchRadius * Math.cos(pressureAngle);
-  const addendum = module;
-  const dedendum = 1.25 * module;
-  const outerRadius = pitchRadius + addendum;
-  const rootRadius = pitchRadius - dedendum;
-
-  // Tooth pitch angle (one tooth + one gap = 2π/teeth).
+  const outerRadius = pitchRadius + module;
+  const rootRadius = pitchRadius - 1.25 * module;
   const toothAngle = (2 * Math.PI) / teeth;
-  // Half-tooth angle at the pitch circle: tooth thickness = π * module / 2 = pitchAngle / 2.
-  // The angular half-width of a tooth at the pitch circle is π / (2 * teeth).
   const halfToothPitchAngle = Math.PI / (2 * teeth);
 
-  // Involute t parameters.
   const tMax = involuteT(baseRadius, outerRadius);
-  // Angle of the involute point on the pitch circle (used to orient the tooth symmetrically).
   const tPitch = involuteT(baseRadius, pitchRadius);
-  // Involute angle at pitch circle: angle of the involute curve at t = tPitch.
   const involuteAngleAtPitch =
     baseRadius > 0
       ? Math.atan2(
@@ -152,97 +80,37 @@ export function buildSpurGearProfile(
           baseRadius * (Math.cos(tPitch) + tPitch * Math.sin(tPitch)),
         )
       : 0;
-
-  // The raw involute flank points start from angle 0 of the base circle.
-  // We need to rotate the flank so the tooth is symmetric about the tooth-center line.
-  // The tooth center angle for tooth 0 is 0. The right flank of tooth 0 is rotated
-  // so that the pitch-circle point lands at +halfToothPitchAngle.
+  // The pitch-circle point of the right flank lands at +halfToothPitchAngle (tooth symmetric about its centre line).
   const rightFlankRotation = halfToothPitchAngle - involuteAngleAtPitch;
-
-  // tStart: clamp to rootRadius if base circle is outside root circle (undercut regime).
+  const leftFlankRotation = -halfToothPitchAngle + involuteAngleAtPitch;
   const tStart = baseRadius >= rootRadius ? involuteT(baseRadius, rootRadius) : 0;
+  const rawFlank = sampleInvolute(baseRadius, tStart, tMax, flankSamples);
+  const rootArcSegments = teeth >= 10 ? 3 : 2;
 
-  const profile: Array<readonly [number, number]> = [];
-
+  const profile: Point[] = [];
   for (let t = 0; t < teeth; t++) {
     const toothCenter = t * toothAngle;
-
-    const rightFlank = sampleInvolute(baseRadius, tStart, tMax, flankSamples).map((pt) =>
-      rotatePoint2(pt, rightFlankRotation + toothCenter),
+    const rightFlank = rawFlank.map((pt) => rotatePoint2(pt, rightFlankRotation + toothCenter));
+    const leftFlank = rawFlank.map((pt) =>
+      rotatePoint2([pt[0], -pt[1]], leftFlankRotation + toothCenter),
     );
+    const rightTipAngle = angleOf(rightFlank[rightFlank.length - 1]!);
+    let tipArcEnd = angleOf(leftFlank[leftFlank.length - 1]!);
+    if (tipArcEnd < rightTipAngle) tipArcEnd += 2 * Math.PI;
 
-    const rightTipAngle = Math.atan2(
-      rightFlank[rightFlank.length - 1]![1],
-      rightFlank[rightFlank.length - 1]![0],
-    );
-    const leftFlankRaw = sampleInvolute(baseRadius, tStart, tMax, flankSamples);
-    // Left flank = mirror of right flank about tooth center line, then rotate to tooth position.
-    const leftFlankRotation = -halfToothPitchAngle + involuteAngleAtPitch;
-    const leftFlank = leftFlankRaw.map((pt) =>
-      rotatePoint2(mirrorY(pt), leftFlankRotation + toothCenter),
-    );
-    const leftTipAngle = Math.atan2(
-      leftFlank[leftFlank.length - 1]![1],
-      leftFlank[leftFlank.length - 1]![0],
-    );
-
-    // Tip arc CCW from right-flank tip to left-flank tip.
-    // The arc sweeps CCW so we need the shorter path across the tooth top.
-    let arcEnd = leftTipAngle;
-    if (arcEnd < rightTipAngle) arcEnd += 2 * Math.PI;
-
-    const tipArc = sampleArc(outerRadius, rightTipAngle, arcEnd, 2);
-
-    // Root point angles at bottom of flanks.
-    let leftRootAngle: number;
-    let nextRightRootAngle: number;
-
-    if (baseRadius >= rootRadius) {
-      // Undercut: flank starts at rootRadius; the bottom of the flank IS on the root circle.
-      leftRootAngle = Math.atan2(leftFlank[0]![1], leftFlank[0]![0]);
-      const nextToothCenter = ((t + 1) % teeth) * toothAngle;
-      const nextRightFlankFirst = rotatePoint2(
-        sampleInvolute(baseRadius, tStart, tMax, 2)[0]!,
-        rightFlankRotation + nextToothCenter,
-      );
-      nextRightRootAngle = Math.atan2(nextRightFlankFirst[1], nextRightFlankFirst[0]);
-    } else {
-      // Root arc from root-circle intersection of left flank to that of next right flank.
-      leftRootAngle = Math.atan2(leftFlank[0]![1], leftFlank[0]![0]);
-      const nextToothCenter = ((t + 1) % teeth) * toothAngle;
-      const nextRightFlankRoot = rotatePoint2(
-        sampleInvolute(baseRadius, 0, 0, 1)[0]!,
-        rightFlankRotation + nextToothCenter,
-      );
-      nextRightRootAngle = Math.atan2(nextRightFlankRoot[1], nextRightFlankRoot[0]);
-    }
-
-    // Ensure CCW direction (root arc sweeps CCW).
-    let rootArcEnd = nextRightRootAngle;
+    const leftRootAngle = angleOf(leftFlank[0]!);
+    const nextToothCenter = ((t + 1) % teeth) * toothAngle;
+    let rootArcEnd = angleOf(rotatePoint2(rawFlank[0]!, rightFlankRotation + nextToothCenter));
     if (rootArcEnd <= leftRootAngle) rootArcEnd += 2 * Math.PI;
 
-    // Build root arc points.
-    // For very small tooth counts we reduce segments to avoid bloating the profile.
-    const rootArcSegs = teeth >= 10 ? 3 : 2;
-    const rootArc = sampleArc(rootRadius, leftRootAngle, rootArcEnd, rootArcSegs);
-
-    // Assemble this tooth: right-flank → tip arc → left-flank (reversed) → root arc.
-    // Right flank: index 0 is at root, last is at tip.
-    // We walk: root of right flank → tip of right flank → tip arc → tip of left flank → root of left flank → root arc to next tooth.
-    for (const pt of rightFlank) profile.push(pt);
-    for (const pt of tipArc) profile.push(pt);
-    // Left flank goes from tip down to root (reversed order).
-    for (let i = leftFlank.length - 1; i >= 0; i--) {
-      profile.push(leftFlank[i]!);
-    }
-    for (const pt of rootArc) profile.push(pt);
+    profile.push(
+      ...rightFlank,
+      ...sampleArc(outerRadius, rightTipAngle, tipArcEnd, 2),
+      ...[...leftFlank].reverse(),
+      ...sampleArc(rootRadius, leftRootAngle, rootArcEnd, rootArcSegments),
+    );
   }
-
-  // Close the polygon.
-  if (profile.length > 0) {
-    profile.push(profile[0]!);
-  }
-
+  if (profile.length > 0) profile.push(profile[0]!);
   return profile;
 }
 
@@ -385,17 +253,14 @@ export const addSpurGear = defineCommand({
     const boreNote = bore > 0 ? ` bore=${bore} ignored — kernel hole not yet wired.` : '';
 
     const id = nextId('gear');
-    const entity: Entity = {
+    const entity = newEntity(
+      'extrusion',
       id,
-      kind: 'extrusion',
-      profile,
-      depth: faceWidth,
-      position: resolvedPosition,
-      rotation: resolvedRotation,
-      layerId: DEFAULT_LAYER_ID,
+      { profile, depth: faceWidth },
+      resolvedPosition,
       color,
-      ...(name !== undefined && name !== '' ? { name } : {}),
-    };
+      { rotation: resolvedRotation, name },
+    );
 
     const newDoc = withEntity(doc, entity);
     const b = rotatedEntityBounds(newDoc.entities[id] as Entity);

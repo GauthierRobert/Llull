@@ -4,8 +4,8 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { BuildingElement } from '@core/model/building';
-import { polygonArea } from '@lib/polygon';
-import { getBuilding, lengthOf, toMetres } from './model';
+import { distance, polygonArea } from '@lib/polygon';
+import { getBuilding, toMetres } from './model';
 import { findProfile } from './steel/profiles';
 import { polygonNormal, boltSize } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
@@ -15,7 +15,7 @@ import { curvedWallExtent } from './curvedWallGeometry';
 import {
   TakeoffAccumulator,
   type TakeoffLine,
-  curvedVoids,
+  openingsArea,
   elementsOf,
   footingRebarMass,
   scaleFor,
@@ -60,7 +60,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   for (const wall of elementsOf(building, 'curvedWall')) {
     const extent = curvedWallExtent(building, wall);
     const length = extent.end - extent.start;
-    const voids = curvedVoids(building, wall.id);
+    const voids = openingsArea(building, wall.id);
     takeoff.add(
       'wall',
       wall.material,
@@ -98,7 +98,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   }
   for (const slab of elementsOf(building, 'slab')) {
     const area = slabNetArea(slab);
-    const material = `${slab.material}`;
+    const { material } = slab;
     takeoff.add(
       'slab',
       material,
@@ -129,7 +129,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
     );
   }
   for (const beam of elementsOf(building, 'beam')) {
-    const span = lengthOf(beam.start, beam.end);
+    const span = distance(beam.start, beam.end);
     takeoff.add('beam', beam.material, 'm', `Beams, ${beam.material} — length`, scale.length(span));
     takeoff.add(
       'beam',

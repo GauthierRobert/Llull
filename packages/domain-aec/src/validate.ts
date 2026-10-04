@@ -10,27 +10,6 @@ import { arcThrough } from './curvedWallGeometry';
 import { parseWallLayers } from './wallLayers';
 import { isVec2 } from './model';
 
-const CATEGORIES: ReadonlySet<string> = new Set([
-  'grid',
-  'wall',
-  'door',
-  'window',
-  'slab',
-  'column',
-  'beam',
-  'stair',
-  'room',
-  'member',
-  'footing',
-  'panel',
-  'equipment',
-  'pipe',
-  'tray',
-  'plate',
-  'curvedWall',
-  'connection',
-]);
-
 /** Numeric fields each category must carry (finite numbers). */
 const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   grid: [],
@@ -53,6 +32,8 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   connection: ['plateThickness', 'boltRows', 'boltDiameter', 'haunchLength'],
 };
 
+const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));
+
 /** Fields that must be strictly positive. */
 const POSITIVE: Readonly<Record<string, ReadonlyArray<string>>> = {
   wall: ['thickness', 'height'],
@@ -71,26 +52,16 @@ const POSITIVE: Readonly<Record<string, ReadonlyArray<string>>> = {
   connection: ['plateThickness', 'boltRows', 'boltDiameter'],
 };
 
-/** Plan-point fields each category must carry. */
+/** Plan-point fields each category must carry (categories not listed carry none). */
 const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
   grid: ['start', 'end'],
   wall: ['start', 'end'],
-  door: [],
-  window: [],
-  slab: [],
   column: ['location'],
   beam: ['start', 'end'],
   stair: ['start'],
-  room: [],
-  member: [],
   footing: ['location'],
-  panel: [],
   equipment: ['location'],
-  pipe: [],
-  tray: [],
-  plate: [],
   curvedWall: ['start', 'through', 'end'],
-  connection: [],
 };
 
 const isPoint = (value: unknown): boolean =>
@@ -103,6 +74,71 @@ const isPolygon = (value: unknown): boolean =>
 
 const isStringArray = (value: unknown): boolean =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+type Elements = Record<string, unknown>;
+
+function wallLayerErrors(key: string, element: Elements): string[] {
+  const raw = element['layers'];
+  if (raw === undefined) return [];
+  const layers = parseWallLayers(raw);
+  const thickness = element['thickness'];
+  if (typeof layers === 'string') return [`building element ${key}: ${layers}`];
+  if (
+    !(raw as unknown[]).every((layer) => isRecord(layer) && typeof layer['function'] === 'string')
+  ) {
+    return [`building element ${key}: every stored layer needs a function`];
+  }
+  const total = layers.reduce((sum, layer) => sum + layer.thickness, 0);
+  return typeof thickness === 'number' &&
+    Math.abs(total - thickness) > 1e-6 * Math.max(1, thickness)
+    ? [`building element ${key}: layer thicknesses must add up to the wall thickness`]
+    : [];
+}
+
+function connectionErrors(key: string, element: Elements, elements: Elements): string[] {
+  const errors: string[] = [];
+  for (const field of ['rafterId', 'otherId']) {
+    const id = element[field];
+    const member = typeof id === 'string' ? elements[id] : undefined;
+    if (!isRecord(member) || member['category'] !== 'member') {
+      errors.push(`building element ${key}: ${field} '${String(id)}' is not a steel member`);
+    }
+  }
+  if (element['kind'] !== 'eaves' && element['kind'] !== 'apex') {
+    errors.push(`building element ${key}: kind must be eaves or apex`);
+  }
+  if (element['end'] !== 'start' && element['end'] !== 'end') {
+    errors.push(`building element ${key}: end must be start or end`);
+  }
+  return errors;
+}
+
+function plateErrors(key: string, element: Elements, elements: Elements): string[] {
+  const errors: string[] = [];
+  const memberId = element['memberId'];
+  const host = typeof memberId === 'string' ? elements[memberId] : undefined;
+  if (!isRecord(host) || host['category'] !== 'member' || host['role'] !== 'column') {
+    errors.push(`building element ${key}: memberId '${String(memberId)}' is not a steel column`);
+  }
+  const bolts = element['boltCount'];
+  if (!(typeof bolts === 'number' && Number.isInteger(bolts) && bolts % 2 === 0)) {
+    errors.push(`building element ${key}: boltCount must be an even integer`);
+  }
+  const fixity = element['fixity'];
+  if (fixity !== undefined && fixity !== 'pinned' && fixity !== 'fixed') {
+    errors.push(`building element ${key}: fixity must be pinned or fixed`);
+  }
+  return errors;
+}
+
+function openingHostErrors(key: string, element: Elements, elements: Elements): string[] {
+  const hostId = element['hostId'];
+  if (typeof hostId !== 'string') return [`building element ${key}: hostId must be a string`];
+  const host = elements[hostId];
+  return isRecord(host) && (host['category'] === 'wall' || host['category'] === 'curvedWall')
+    ? []
+    : [`building element ${key}: hostId '${hostId}' is not a wall`];
+}
 
 function elementErrors(
   key: string,
@@ -240,62 +276,11 @@ function elementErrors(
   ) {
     errors.push(`building element ${key}: start, through and end are collinear`);
   }
-  if (category === 'wall' && element['layers'] !== undefined) {
-    const raw = element['layers'];
-    const layers = parseWallLayers(raw);
-    const thickness = element['thickness'];
-    if (typeof layers === 'string') errors.push(`building element ${key}: ${layers}`);
-    else if (
-      !(raw as unknown[]).every((layer) => isRecord(layer) && typeof layer['function'] === 'string')
-    ) {
-      errors.push(`building element ${key}: every stored layer needs a function`);
-    } else if (
-      typeof thickness === 'number' &&
-      Math.abs(layers.reduce((sum, layer) => sum + layer.thickness, 0) - thickness) >
-        1e-6 * Math.max(1, thickness)
-    ) {
-      errors.push(`building element ${key}: layer thicknesses must add up to the wall thickness`);
-    }
-  }
-  if (category === 'connection') {
-    for (const field of ['rafterId', 'otherId']) {
-      const id = element[field];
-      const member = typeof id === 'string' ? elements[id] : undefined;
-      if (!isRecord(member) || member['category'] !== 'member') {
-        errors.push(`building element ${key}: ${field} '${String(id)}' is not a steel member`);
-      }
-    }
-    if (element['kind'] !== 'eaves' && element['kind'] !== 'apex') {
-      errors.push(`building element ${key}: kind must be eaves or apex`);
-    }
-    if (element['end'] !== 'start' && element['end'] !== 'end') {
-      errors.push(`building element ${key}: end must be start or end`);
-    }
-  }
-  if (category === 'plate') {
-    const memberId = element['memberId'];
-    const host = typeof memberId === 'string' ? elements[memberId] : undefined;
-    if (!isRecord(host) || host['category'] !== 'member' || host['role'] !== 'column') {
-      errors.push(`building element ${key}: memberId '${String(memberId)}' is not a steel column`);
-    }
-    const bolts = element['boltCount'];
-    if (!(typeof bolts === 'number' && Number.isInteger(bolts) && bolts % 2 === 0)) {
-      errors.push(`building element ${key}: boltCount must be an even integer`);
-    }
-    const fixity = element['fixity'];
-    if (fixity !== undefined && fixity !== 'pinned' && fixity !== 'fixed') {
-      errors.push(`building element ${key}: fixity must be pinned or fixed`);
-    }
-  }
+  if (category === 'wall') errors.push(...wallLayerErrors(key, element));
+  if (category === 'connection') errors.push(...connectionErrors(key, element, elements));
+  if (category === 'plate') errors.push(...plateErrors(key, element, elements));
   if (category === 'door' || category === 'window') {
-    const hostId = element['hostId'];
-    if (typeof hostId !== 'string') errors.push(`building element ${key}: hostId must be a string`);
-    else if (
-      !isRecord(elements[hostId]) ||
-      (elements[hostId]['category'] !== 'wall' && elements[hostId]['category'] !== 'curvedWall')
-    ) {
-      errors.push(`building element ${key}: hostId '${hostId}' is not a wall`);
-    }
+    errors.push(...openingHostErrors(key, element, elements));
   }
   return errors;
 }

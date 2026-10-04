@@ -1,97 +1,43 @@
 /**
- * @command set_parameter
- * @command delete_parameter
- * @pure
+ * set_parameter / delete_parameter: the parameter table is document INPUT state (architecture L8),
+ * so both are `metaHistory`; dependents re-evaluate in topological order after any change.
+ *
  * @layer core/commands
- * @affects parameters record in the CadDocument
- * @invariant All dependents are re-evaluated in topological order after any change.
- * @failure Invalid expression or missing name → no-op or error stored in parameter.error.
  */
 
 import type { CadDocument, Parameter } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { topologicalSort } from '../lib/topologicalSort';
 import { noop } from './noop';
 import { evaluateExpression, extractReferences } from './expression';
 import { regenerateParameterDependents } from './dependents';
 
-/**
- * Topological sort of parameter names by dependency order.
- * Returns both the sorted list and the set of names that are in a cycle
- * (i.e., nodes Kahn's algorithm could not process because inDegree never
- * reached 0).
- *
- * Uses Kahn's algorithm on the dependency graph.
- */
+/** Parameter names ordered by dependency; names in a reference cycle are appended and listed in `cycleSet`. */
 function topoSort(parameters: Readonly<Record<string, Parameter>>): {
   sorted: string[];
   cycleSet: Set<string>;
 } {
   const names = Object.keys(parameters);
-  const deps = new Map<string, Set<string>>();
-  const rdeps = new Map<string, Set<string>>(); // reverse: rdeps[a] = params that depend on a
-
-  for (const name of names) {
-    const refs = extractReferences(parameters[name]!.expression);
-    // Only count references to known parameters.
-    const knownRefs = new Set([...refs].filter((r) => r in parameters));
-    deps.set(name, knownRefs);
-    if (!rdeps.has(name)) rdeps.set(name, new Set());
-    for (const ref of knownRefs) {
-      if (!rdeps.has(ref)) rdeps.set(ref, new Set());
-      rdeps.get(ref)!.add(name);
-    }
-  }
-
-  // Kahn's: start with nodes that have no dependencies (in-degree 0).
-  const inDegree = new Map<string, number>();
-  for (const name of names) {
-    inDegree.set(name, deps.get(name)!.size);
-  }
-
-  const queue: string[] = [];
-  for (const name of names) {
-    if (inDegree.get(name) === 0) queue.push(name);
-  }
-
-  const sorted: string[] = [];
-  while (queue.length > 0) {
-    const name = queue.shift()!;
-    sorted.push(name);
-    for (const dependent of rdeps.get(name) ?? []) {
-      const newDeg = (inDegree.get(dependent) ?? 1) - 1;
-      inDegree.set(dependent, newDeg);
-      if (newDeg === 0) queue.push(dependent);
-    }
-  }
-
-  // Any remaining nodes (inDegree > 0) are genuinely in a cycle.
-  const cycleSet = new Set<string>();
-  for (const name of names) {
-    if (!sorted.includes(name)) {
-      sorted.push(name);
-      cycleSet.add(name);
-    }
-  }
-
-  return { sorted, cycleSet };
+  const edges = names.flatMap((name) =>
+    [...extractReferences((parameters[name] as Parameter).expression)]
+      .filter((ref) => ref in parameters)
+      .map((ref): [string, string] => [ref, name]),
+  );
+  const { sorted, cyclic } = topologicalSort(names, edges);
+  return { sorted: [...sorted, ...cyclic], cycleSet: new Set(cyclic) };
 }
 
 /**
- * Re-evaluate ALL parameters in topological order and return a new parameters
- * record. Parameters with cycles or unknown references are marked with `error`.
- *
- * Exported so that commands that batch-update parameters (e.g. `activate_configuration`)
- * can reuse the same topo-sort re-eval logic without duplicating it.
- *
- * @pure — does not mutate input.
+ * Re-evaluate every parameter in dependency order; cycles and unknown references get an `error`
+ * (the last good value is kept). Shared with `activate_configuration`.
+ * @pure
  */
 export function reEvaluateAll(
   parameters: Readonly<Record<string, Parameter>>,
 ): Record<string, Parameter> {
   const { sorted, cycleSet } = topoSort(parameters);
   const result: Record<string, Parameter> = {};
-  // Build env incrementally as we evaluate in topo order.
   const env: Record<string, number> = {};
 
   for (const name of sorted) {
@@ -101,9 +47,6 @@ export function reEvaluateAll(
       result[name] = { name, expression: param.expression, value: evalResult.value };
       env[name] = evalResult.value;
     } else {
-      // Only label as "cycle detected" when the node is genuinely in the Kahn
-      // residue (cycleSet). Otherwise surface the evaluator's real error string
-      // so parse errors and unknown-reference errors remain truthful (AC5).
       const errorMsg = cycleSet.has(name) ? `cycle detected involving: ${name}` : evalResult.error;
       result[name] = {
         name,
@@ -127,11 +70,6 @@ export function reEvaluateAll(
  */
 export const setParameter = defineCommand({
   name: 'set_parameter',
-  // metaHistory: parameters are first-class document state (the recipe's INPUTS),
-  // not geometry-recipe steps (architecture L8). They are excluded from
-  // featureHistory so editing a parameter and replaying re-evaluates dependent
-  // `=expr` steps against the CURRENT value (carried into replay via base.parameters)
-  // rather than replaying a stale set_parameter step at its historical position.
   annotations: { idempotent: true, metaHistory: true },
   description:
     'Create or update a named numeric parameter in the document. ' +
@@ -159,7 +97,6 @@ export const setParameter = defineCommand({
       ),
   }),
   run: (doc, { name, expression }): CommandResult => {
-    // Validate name: must be a valid identifier.
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
       return noop(
         doc,
@@ -170,13 +107,11 @@ export const setParameter = defineCommand({
       return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
     }
 
-    // Insert/update the parameter, then re-evaluate all parameters in topo order.
     const withNew: Record<string, Parameter> = {
       ...doc.parameters,
       [name]: {
         name,
         expression,
-        // Optimistic initial value; reEvaluateAll will overwrite with the real one.
         value: doc.parameters[name]?.value ?? 0,
       },
     };
@@ -223,8 +158,6 @@ export const setParameter = defineCommand({
  */
 export const deleteParameter = defineCommand({
   name: 'delete_parameter',
-  // metaHistory: see set_parameter — the parameter table is document state, not a
-  // replayable geometry-recipe step.
   annotations: { destructive: true, metaHistory: true },
   description:
     'Remove a named parameter from the document. ' +
@@ -249,15 +182,9 @@ export const deleteParameter = defineCommand({
       );
     }
 
-    // Build the new parameters map without the deleted name.
-    const withoutDeleted: Record<string, Parameter> = {};
-    for (const [k, v] of Object.entries(doc.parameters)) {
-      if (k !== name) withoutDeleted[k] = v;
-    }
-
-    // Re-evaluate all remaining parameters; dependents will fail with
-    // "unknown parameter: <name>" naturally via the evaluator.
-    const evaluated = reEvaluateAll(withoutDeleted);
+    const evaluated = reEvaluateAll(
+      Object.fromEntries(Object.entries(doc.parameters).filter(([key]) => key !== name)),
+    );
 
     const erroredDependents = Object.values(evaluated)
       .filter((p) => p.error)
