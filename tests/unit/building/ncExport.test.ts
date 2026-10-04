@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { exportNcFiles, type NcExport, type NcFile } from '@aec/industrial/ncExport';
+import { exportNcFiles, type NcExport } from '@aec/industrial/ncExport';
+import type { NcFile } from '@aec/industrial/ncFiles';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import { findProfile } from '@aec/steel/profiles';
 

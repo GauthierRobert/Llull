@@ -3,7 +3,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { BuildingElement, FootingElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
 import { type FootingDesignRow } from '@aec/industrial/footingModel';
-import { designMat } from '@aec/industrial/footingSizing';
+import { designMat } from '@aec/industrial/footingMat';
 import { designFootings } from '@aec/industrial/footingDesignCommand';
 import { type FoundationRow } from '@aec/industrial/foundationModel';
 import { foundationCheck } from '@aec/industrial/foundationCheckRun';

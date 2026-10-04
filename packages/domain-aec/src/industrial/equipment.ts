@@ -3,7 +3,6 @@
  * @layer domain-aec
  */
 
-import type { Vec3 } from '@core/model/types';
 import type { EquipmentElement, PipeElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -23,6 +22,7 @@ import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { toVec3 } from './memberSupport';
+import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
 
 /**
  * @command add_equipment
@@ -57,12 +57,7 @@ export const addEquipment = defineCommand({
     if (name.trim() === '' || !isVec2(location)) {
       return noop(doc, 'add_equipment failed: name and location [x, y] are required.');
     }
-    if (
-      !dimensions ||
-      dimensions.some((value) => !(value > 0)) ||
-      Array.isArray(size) === false ||
-      size.length !== 3
-    ) {
+    if (!dimensions || size.length !== 3 || dimensions.some((value) => !(value > 0))) {
       return noop(doc, 'add_equipment failed: size must be [length, width, height], all > 0.');
     }
     const resolvedClearance = clearance ?? fromMm(doc, 800);
@@ -124,18 +119,9 @@ export const addPipeRun = defineCommand({
     levelId: z.string().optional().describe('Level id. Default: the active level.'),
   }),
   run: (doc, { points, diameter, service, material, levelId }): CommandResult => {
-    const route = Array.isArray(points) ? points.map(toVec3) : [];
-    if (route.length < 2 || route.some((point) => point === null)) {
-      return noop(doc, 'add_pipe_run failed: points must be ≥ 2 [x, y, z] points.');
-    }
-    const path = route as Vec3[];
-    const repeated = path.some(
-      (point, index) =>
-        index > 0 &&
-        Math.hypot(
-          ...([0, 1, 2] as const).map((axis) => point[axis] - (path[index - 1] as Vec3)[axis]),
-        ) === 0,
-    );
+    const path = parseRoute(points);
+    if (!path) return noop(doc, 'add_pipe_run failed: points must be ≥ 2 [x, y, z] points.');
+    const repeated = hasRepeatedPoint(path);
     const resolvedDiameter = diameter ?? fromMm(doc, 114.3);
     if (repeated || !isFiniteNumber(resolvedDiameter) || resolvedDiameter <= 0) {
       return noop(doc, 'add_pipe_run failed: consecutive points must differ and diameter be > 0.');
@@ -154,16 +140,7 @@ export const addPipeRun = defineCommand({
       material: material?.trim() || 'steel',
     };
     const document = regenerateBuilding(doc, withElement(resolution.building, pipe));
-    const length = path.reduce(
-      (sum, point, index) =>
-        index === 0
-          ? 0
-          : sum +
-            Math.hypot(
-              ...([0, 1, 2] as const).map((axis) => point[axis] - (path[index - 1] as Vec3)[axis]),
-            ),
-      0,
-    );
+    const length = routeLength(path);
     return {
       document,
       summary: `Added ${pipe.service} pipe ${pipe.mark} (${pipe.id}) Ø${resolvedDiameter}, ${toMetres(doc, length).toFixed(2)} m, ${path.length - 2} bend(s).`,

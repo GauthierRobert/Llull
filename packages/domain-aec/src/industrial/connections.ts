@@ -3,29 +3,18 @@
  * @layer domain-aec
  */
 
-import type {
-  BuildingModel,
-  MomentConnectionElement,
-  SteelMemberElement,
-} from '@core/model/building';
-import type { CadDocument, Vec3 } from '@core/model/types';
+import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
+import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import {
-  elementAffected,
-  fromMm,
-  getBuilding,
-  nextElementId,
-  nextMark,
-  withElement,
-  withoutElements,
-} from '../model';
+import { elementAffected, fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
 import { boltSize } from './evaluate';
 import { buildingConnectionSolids } from './evaluateConnections';
+import { appendConnections, findMomentJoints } from './connectionSupport';
 import { polygonArea } from '@lib/polygon';
 
 /** Steel mass of a connection in kg: its modelled end plate(s) + haunch (half the rafter section per metre). */
@@ -44,100 +33,6 @@ export function connectionMass(
     .reduce((sum, solid) => sum + Math.abs(polygonArea(solid.outline)) * solid.depth, 0);
   const metres = connection.haunchLength / fromMm(doc, 1000);
   return cubicMetres(plates) * STEEL_DENSITY_KG_PER_M3 + (metres * profile.massPerMetre) / 2;
-}
-
-const distance = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-
-/** Unconnected rafter joints of `members`: rafter end on a column top (eaves) or a rafter end (apex). */
-export function findMomentJoints(
-  building: BuildingModel,
-  levelId: string,
-  rafterIds: ReadonlySet<string> | null,
-  tolerance: number,
-): Array<Pick<MomentConnectionElement, 'kind' | 'rafterId' | 'end' | 'otherId'>> {
-  const members = Object.values(building.elements).filter(
-    (element): element is SteelMemberElement =>
-      element.category === 'member' && element.levelId === levelId,
-  );
-  const existing = Object.values(building.elements).filter(
-    (element): element is MomentConnectionElement => element.category === 'connection',
-  );
-  const connected = new Set(existing.map((element) => `${element.rafterId}:${element.end}`));
-  const pairKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
-  const apexPairs = new Set(
-    existing
-      .filter((element) => element.kind === 'apex')
-      .map((element) => pairKey(element.rafterId, element.otherId)),
-  );
-  const joints: Array<Pick<MomentConnectionElement, 'kind' | 'rafterId' | 'end' | 'otherId'>> = [];
-  for (const rafter of members) {
-    if (rafter.role !== 'rafter' || (rafterIds && !rafterIds.has(rafter.id))) continue;
-    for (const end of ['start', 'end'] as const) {
-      if (connected.has(`${rafter.id}:${end}`)) continue;
-      const point = rafter[end];
-      const column = members.find(
-        (member) =>
-          member.role === 'column' &&
-          distance(member.start[2] >= member.end[2] ? member.start : member.end, point) <=
-            tolerance,
-      );
-      if (column) {
-        joints.push({ kind: 'eaves', rafterId: rafter.id, end, otherId: column.id });
-        continue;
-      }
-      const partner = members.find(
-        (member) =>
-          member.role === 'rafter' &&
-          member.id !== rafter.id &&
-          (distance(member.start, point) <= tolerance || distance(member.end, point) <= tolerance),
-      );
-      if (partner && !apexPairs.has(pairKey(rafter.id, partner.id))) {
-        apexPairs.add(pairKey(rafter.id, partner.id));
-        joints.push({ kind: 'apex', rafterId: rafter.id, end, otherId: partner.id });
-      }
-    }
-  }
-  return joints;
-}
-
-interface ConnectionSize {
-  readonly plateThickness?: number;
-  readonly boltDiameter?: number;
-  readonly haunchLength?: number;
-}
-
-/** Adds a moment connection per joint (no regeneration). */
-export function appendConnections(
-  doc: Pick<CadDocument, 'units'>,
-  building: BuildingModel,
-  levelId: string,
-  joints: ReadonlyArray<Pick<MomentConnectionElement, 'kind' | 'rafterId' | 'end' | 'otherId'>>,
-  size: ConnectionSize,
-): { building: BuildingModel; ids: string[] } {
-  let next = building;
-  const ids: string[] = [];
-  for (const joint of joints) {
-    const rafter = building.elements[joint.rafterId];
-    const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
-    if (!rafter || rafter.category !== 'member' || !profile) continue;
-    const horizontal = Math.hypot(rafter.end[0] - rafter.start[0], rafter.end[1] - rafter.start[1]);
-    const connection: MomentConnectionElement = {
-      id: nextElementId(next, 'connection'),
-      category: 'connection',
-      mark: nextMark(next, 'connection'),
-      entityIds: [],
-      levelId,
-      ...joint,
-      plateThickness: size.plateThickness ?? fromMm(doc, profile.h >= 400 ? 25 : 20),
-      boltRows: joint.kind === 'eaves' ? 4 : 3,
-      boltDiameter: size.boltDiameter ?? fromMm(doc, 20),
-      haunchLength: joint.kind === 'eaves' ? (size.haunchLength ?? horizontal / 5) : 0,
-      material: 'S355',
-    };
-    next = withElement(next, connection);
-    ids.push(connection.id);
-  }
-  return { building: next, ids };
 }
 
 /**
@@ -223,41 +118,6 @@ export const addMomentConnections = defineCommand({
     };
   },
 });
-
-/**
- * Connections of `memberId` whose joint no longer exists (rafter no longer a rafter, the column
- * top / partner rafter end moved away from the rafter end) are removed.
- */
-export function dropStaleConnections(
-  building: BuildingModel,
-  memberId: string,
-  tolerance: number,
-): { building: BuildingModel; removed: string[] } {
-  const member = (id: string): SteelMemberElement | undefined => {
-    const element = building.elements[id];
-    return element?.category === 'member' ? element : undefined;
-  };
-  const stale = Object.values(building.elements).filter(
-    (element): element is MomentConnectionElement => {
-      if (element.category !== 'connection') return false;
-      if (element.rafterId !== memberId && element.otherId !== memberId) return false;
-      const [rafter, other] = [member(element.rafterId), member(element.otherId)];
-      if (!rafter || !other || rafter.role !== 'rafter') return true;
-      const point = rafter[element.end];
-      if (element.kind === 'eaves') {
-        const top = other.start[2] >= other.end[2] ? other.start : other.end;
-        return other.role !== 'column' || distance(top, point) > tolerance;
-      }
-      return (
-        other.role !== 'rafter' ||
-        Math.min(distance(other.start, point), distance(other.end, point)) > tolerance
-      );
-    },
-  );
-  if (stale.length === 0) return { building, removed: [] };
-  const removed = new Set(stale.map((element) => element.id));
-  return { building: withoutElements(building, removed), removed: [...removed] };
-}
 
 export interface ConnectionWelds {
   /** Fillet throat thickness of the flange welds, mm. */
