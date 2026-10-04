@@ -69,13 +69,7 @@ export function portalInputs(
     return fail('roofPitch must be in [0, 45) degrees.');
   }
   const roofType = params.roofType ?? 'duopitch';
-  if (roofType !== 'duopitch' && roofType !== 'monopitch') {
-    return fail("roofType must be 'duopitch' or 'monopitch'.");
-  }
   const columnBase = params.columnBase ?? 'pinned';
-  if (columnBase !== 'pinned' && columnBase !== 'fixed') {
-    return fail("columnBase must be 'pinned' or 'fixed'.");
-  }
   if (columnBase === 'fixed' && params.basePlates === false) {
     return fail("columnBase 'fixed' needs base plates (basePlates must not be false).");
   }

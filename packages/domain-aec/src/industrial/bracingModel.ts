@@ -11,9 +11,6 @@ import { bufferForce, GAMMA_BUFFER } from './runwayCheckModel';
 /** ULS factor on the crane drive force HL (permanent-type variable crane action, groups 1 and 5). */
 const GAMMA_CRANE = 1.35;
 
-/** Bridge span (mm) when only one runway line is found. */
-export const DEFAULT_CRANE_SPAN = 20000;
-
 /** Crane longitudinal design force (kN) acting at rail level on the wall that carries one runway. */
 interface CraneWallForce {
   /** 1.35 · HL,i (group 1/5 drive force of one rail), kN. */

@@ -10,11 +10,11 @@ import { findProfile } from '../steel/profiles';
 import { round } from '../numeric';
 import { sectionResistance, yieldStrength } from './steelDesign';
 import { craneCapacityOf } from './frameModelTypes';
+import { DEFAULT_CRANE_SPAN } from './runwayCheckModel';
 import {
   type BracingRow,
   CP_GABLE,
   CP_POST,
-  DEFAULT_CRANE_SPAN,
   EAVES_X_TOLERANCE,
   EAVES_Z_TOLERANCE,
   GAMMA_G,

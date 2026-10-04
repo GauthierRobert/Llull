@@ -8,14 +8,11 @@ import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { craneCapacityOf, HOISTING_CLASSES, type CraneModel } from './frameModelTypes';
+import { craneCapacityOf, type CraneModel } from './frameModelTypes';
 import {
-  CLASSES,
   DEFAULT_BUFFER_STIFFNESS,
   DEFAULT_CRANE_SPAN,
   DEFAULT_TRAVEL_SPEED,
-  LOCAL_CATEGORIES,
-  RAILS,
   type RunwayCheckRow,
 } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
@@ -143,12 +140,6 @@ export const runwayCheck = defineCommand({
     if (!(isFiniteNumber(wheelBase) && wheelBase > 0)) {
       return noop(doc, 'check_crane_runways failed: wheelBase must be a number > 0 (mm).');
     }
-    if (!(hoistingClass in HOISTING_CLASSES)) {
-      return noop(
-        doc,
-        "check_crane_runways failed: hoistingClass must be 'HC1', 'HC2', 'HC3' or 'HC4'.",
-      );
-    }
     if (!(isFiniteNumber(hoistingSpeed) && hoistingSpeed >= 0)) {
       return noop(doc, 'check_crane_runways failed: hoistingSpeed must be a number >= 0 (m/s).');
     }
@@ -164,21 +155,6 @@ export const runwayCheck = defineCommand({
       if (value !== undefined && !(isFiniteNumber(value) && value > 0)) {
         return noop(doc, `check_crane_runways failed: ${name} must be a number > 0.`);
       }
-    }
-    if (!(craneClass in CLASSES)) {
-      return noop(doc, "check_crane_runways failed: craneClass must be 'S2', 'S3' or 'S4'.");
-    }
-    if (!(railSize in RAILS)) {
-      return noop(
-        doc,
-        "check_crane_runways failed: railSize must be 'A45', 'A55', 'A65', 'A75', 'A100' or 'flat50x30'.",
-      );
-    }
-    if (!(girder in LOCAL_CATEGORIES)) {
-      return noop(
-        doc,
-        "check_crane_runways failed: girder must be 'rolled', 'welded-full' or 'welded-fillet'.",
-      );
     }
     const building = getBuilding(doc);
     const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0];
