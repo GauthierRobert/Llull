@@ -9,6 +9,7 @@ import type { CommandDefinition, CommandResult } from './types';
 import type { ExecutionContext } from './context';
 import { currentContext, runInContext } from './context';
 import { guardCommand } from './guard';
+import { noop } from './noop';
 import { stepIdSource } from '../lib/id';
 import { addWedge, addPyramid } from './geometryPrismatic';
 import { addCylinder, addSphere, addCone, addTorus } from './geometryRound';
@@ -239,7 +240,7 @@ export function execute(
 ): CommandResult {
   const def = byName.get(commandName);
   if (!def) {
-    return { document: doc, summary: `Unknown command: ${commandName}`, affected: [] };
+    return noop(doc, `Unknown command: ${commandName}`);
   }
   if (def.annotations?.requiresKernel === true && ctx.kernel === null) {
     return {
