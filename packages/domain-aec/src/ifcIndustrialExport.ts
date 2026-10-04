@@ -16,13 +16,12 @@ import type {
   BuildingModel,
 } from '@core/model/building';
 import { sweepFrame } from './mesh';
+import { panelFrame, trayOutline } from './industrial/evaluate';
 import {
   buildingConnectionSolids,
-  panelFrame,
   plateLayout,
-  trayOutline,
   type ConnectionSolid,
-} from './industrial/evaluate';
+} from './industrial/evaluateConnections';
 import { findProfile } from './steel/profiles';
 import {
   type Context,

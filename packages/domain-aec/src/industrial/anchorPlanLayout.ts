@@ -11,7 +11,7 @@ import type {
 } from '@core/model/building';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { getBuilding } from '../model';
-import { plateLayout } from './evaluate';
+import { plateLayout } from './evaluateConnections';
 
 export const TITLE = 'Anchor bolt setting-out plan';
 

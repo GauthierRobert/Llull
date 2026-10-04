@@ -18,7 +18,8 @@ import { noop } from '@core/commands/noop';
 import { sweepFrame } from '../mesh';
 import { distanceSq3, dot3, sub3 } from '@lib/vec3';
 import { findProfile, STEEL_DENSITY_KG_PER_M3, type SteelProfile } from '../steel/profiles';
-import { atLevel, connectionSolids, plateLayout } from './evaluate';
+import { atLevel } from './evaluate';
+import { connectionSolids, plateLayout } from './evaluateConnections';
 
 const END_PLATE_HOLE_CLEARANCE_MM = 2;
 const ANCHOR_HOLE_CLEARANCE_MM = 4;

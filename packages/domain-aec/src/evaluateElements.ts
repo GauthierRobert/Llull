@@ -42,9 +42,8 @@ import {
   evaluatePanel,
   evaluatePipe,
   evaluateTray,
-  evaluatePlate,
-  evaluateConnection,
 } from './industrial/evaluate';
+import { evaluatePlate, evaluateConnection } from './industrial/evaluateConnections';
 import {
   base,
   CATEGORY_LAYER,
