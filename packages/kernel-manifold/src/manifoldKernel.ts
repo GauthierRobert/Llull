@@ -69,11 +69,12 @@ let _cachedModule: ManifoldModule | null = null;
 async function getManifoldModule(): Promise<ManifoldModule> {
   if (_cachedModule) return _cachedModule;
   // manifold-3d default export is an async factory.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const factory = (await import('manifold-3d')) as { default: (opts?: unknown) => Promise<any> };
-  const raw = await factory.default();
-  raw.setup();
-  _cachedModule = raw as ManifoldModule;
+  const factory = (await import('manifold-3d')) as unknown as {
+    default: (opts?: unknown) => Promise<ManifoldModule>;
+  };
+  const loaded = await factory.default();
+  loaded.setup();
+  _cachedModule = loaded;
   return _cachedModule;
 }
 

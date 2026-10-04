@@ -1,5 +1,5 @@
 /**
- * @layer server
+ * @layer mcp
  *
  * Multi-pass render_view enrichments: turntable frames, isolate, and section views.
  * Each re-renders partial / transformed copies of the document via the core

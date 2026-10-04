@@ -20,13 +20,13 @@ import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import type { RenderViewData } from '@core/commands/renderTypes';
 import { rasterizeSvg } from '../src/renderImage';
-import { appendEntityLabels } from '../src/renderViewEnrich/entityLabels';
-import { appendDimensionLabels, appendAxesAndGrid } from '../src/renderViewEnrich/overlays';
+import { appendEntityLabels } from '@mcp/renderViewEnrich/entityLabels';
+import { appendDimensionLabels, appendAxesAndGrid } from '@mcp/renderViewEnrich/overlays';
 import {
   buildTurntableFrames,
   buildIsolateSvg,
   buildSectionSvg,
-} from '../src/renderViewEnrich/multiPassViews';
+} from '@mcp/renderViewEnrich/multiPassViews';
 
 // ---------------------------------------------------------------------------
 // Constants
