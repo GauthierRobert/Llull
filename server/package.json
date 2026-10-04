@@ -13,7 +13,9 @@
     "test:watch": "vitest --config vitest.config.ts",
     "agent:example": "tsx examples/mcp-agent.ts",
     "demo:factory": "tsx examples/factory-demo.mts",
-    "quality:step": "vitest run --config vitest.quality.config.ts"
+    "quality:step": "vitest run --config vitest.quality.config.ts",
+    "production:scripted": "vitest run --config vitest.production.config.ts tests/production/scripted.gate.ts",
+    "production:agent": "vitest run --config vitest.production.config.ts tests/production/agent.gate.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -25,6 +27,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
