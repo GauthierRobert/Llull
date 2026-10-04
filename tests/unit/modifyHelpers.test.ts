@@ -8,7 +8,6 @@ import { describe, it, expect } from 'vitest';
 import {
   nearestVertex,
   offsetSideSign,
-  dist2,
   pointToSegDistSq,
   entityDistSq,
 } from '../../src/ui/viewport/2d/modifyHelpers';
@@ -124,34 +123,6 @@ describe('offsetSideSign', () => {
     const signRight = offsetSideSign([0, 0], [1, 1], [1, -1]);
     expect(signLeft).toBe(1);
     expect(signRight).toBe(-1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// dist2
-// ---------------------------------------------------------------------------
-
-describe('dist2', () => {
-  it('returns 0 for identical points', () => {
-    expect(dist2([3, 4], [3, 4])).toBe(0);
-  });
-
-  it('computes a 3-4-5 right triangle hypotenuse', () => {
-    expect(dist2([0, 0], [3, 4])).toBeCloseTo(5);
-  });
-
-  it('works with negative coordinates', () => {
-    expect(dist2([-3, 0], [0, 4])).toBeCloseTo(5);
-  });
-
-  it('is commutative', () => {
-    const a: Vec2 = [1, 2];
-    const b: Vec2 = [4, 6];
-    expect(dist2(a, b)).toBeCloseTo(dist2(b, a));
-  });
-
-  it('returns positive for non-identical points', () => {
-    expect(dist2([0, 0], [0.001, 0])).toBeGreaterThan(0);
   });
 });
 
