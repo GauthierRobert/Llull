@@ -11,6 +11,7 @@ import type {
 } from '@core/model/building';
 import { polygonArea, polygonPerimeter } from '@lib/polygon';
 import { getBuilding, lengthOf } from './model';
+import { round } from './numeric';
 import { openingsOf } from './wallGeometry';
 import { boltSize } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
@@ -56,11 +57,6 @@ export interface Schedule {
   readonly rows: Array<Array<string | number>>;
 }
 
-const round = (value: number, digits = 3): number => {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
-};
-
 function levelName(building: BuildingModel, levelId: string): string {
   return building.levels[levelId]?.name ?? levelId;
 }
@@ -98,13 +94,13 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
             return [
               wall.mark,
               levelName(building, wall.levelId),
-              round(quantities.length),
+              round(quantities.length, 3),
               wall.thickness,
               wall.height,
               wall.material,
               openingsOf(building, wall.id).length,
-              round(scale.area(quantities.netArea)),
-              round(scale.volume(quantities.volume)),
+              round(scale.area(quantities.netArea), 3),
+              round(scale.volume(quantities.volume), 3),
             ];
           }),
           ...elementsOf(building, 'curvedWall').map((wall) => {
@@ -113,12 +109,12 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
             return [
               wall.mark,
               levelName(building, wall.levelId),
-              round(length),
+              round(length, 3),
               wall.thickness,
               wall.height,
               wall.material,
               openingsOf(building, wall.id).length,
-              round(scale.area(length * wall.height - openingsArea(building, wall.id))),
+              round(scale.area(length * wall.height - openingsArea(building, wall.id)), 3),
               round(
                 scale.volume(
                   (length * wall.height - openingsArea(building, wall.id)) * wall.thickness,
@@ -151,7 +147,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
             opening.width,
             opening.height,
             opening.sillHeight,
-            kind === 'door' ? opening.swing : round(scale.area(opening.width * opening.height)),
+            kind === 'door' ? opening.swing : round(scale.area(opening.width * opening.height), 3),
             opening.material,
           ];
         }),
@@ -188,8 +184,8 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
             slab.role,
             slab.thickness,
             slab.material,
-            round(scale.area(area)),
-            round(scale.volume(area * slab.thickness)),
+            round(scale.area(area), 3),
+            round(scale.volume(area * slab.thickness), 3),
           ];
         }),
       };
@@ -217,7 +213,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
             column.shape === 'circular' ? `Ø${column.width}` : `${column.width}×${column.depth}`,
             column.height,
             column.material,
-            round(scale.volume(section * column.height)),
+            round(scale.volume(section * column.height), 3),
           ];
         }),
       };
@@ -237,10 +233,10 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           return [
             beam.mark,
             levelName(building, beam.levelId),
-            round(span),
+            round(span, 3),
             `${beam.width}×${beam.depth}`,
             beam.material,
-            round(scale.volume(span * beam.width * beam.depth)),
+            round(scale.volume(span * beam.width * beam.depth), 3),
           ];
         }),
       };
@@ -261,11 +257,11 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           stair.mark,
           levelName(building, stair.levelId),
           stair.riserCount,
-          round(stair.riserHeight),
+          round(stair.riserHeight, 3),
           stair.treadDepth,
           stair.width,
           stair.material,
-          round(scale.volume(stairVolume(stair))),
+          round(scale.volume(stairVolume(stair)), 3),
         ]),
       };
     case 'member':
@@ -312,7 +308,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           round(footing.location[1], 1),
           `${footing.width}×${footing.length}×${footing.thickness}`,
           footing.topOffset,
-          round(scale.volume(footing.width * footing.length * footing.thickness)),
+          round(scale.volume(footing.width * footing.length * footing.thickness), 3),
           footing.reinforcement
             ? `H${round(scale.length(footing.reinforcement.barDiameter * 1000), 0)} @ ${round(scale.length(footing.reinforcement.spacing * 1000), 0)} B1/B2`
             : '',
