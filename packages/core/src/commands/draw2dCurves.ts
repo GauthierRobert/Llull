@@ -1,7 +1,7 @@
 import type { Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { formatNumber } from '../lib/format';
+import { compactNumber } from '../lib/compactNumber';
 import { defineCommand, z, colorField, looseVec2 as vec2 } from './schema';
 import { nextId } from '../lib/id';
 import { finiteVec3OrZero } from '../lib/vec3';
@@ -257,8 +257,8 @@ export const drawInvolute = defineCommand({
     return {
       document: withEntity(doc, entity),
       summary:
-        `Drew involute ${id}: baseRadius=${formatNumber(baseRadius)} t=[${formatNumber(startAngle)}, ${formatNumber(endAngle)}] ` +
-        `samples=${samplesInt} AABB x=[${formatNumber(minX)}, ${formatNumber(maxX)}] y=[${formatNumber(minY)}, ${formatNumber(maxY)}].`,
+        `Drew involute ${id}: baseRadius=${compactNumber(baseRadius)} t=[${compactNumber(startAngle)}, ${compactNumber(endAngle)}] ` +
+        `samples=${samplesInt} AABB x=[${compactNumber(minX)}, ${compactNumber(maxX)}] y=[${compactNumber(minY)}, ${compactNumber(maxY)}].`,
       affected: [id],
     };
   },

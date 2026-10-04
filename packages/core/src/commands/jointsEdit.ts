@@ -1,8 +1,8 @@
-import type { CadDocument, Joint, JointMateRef, DriveRelation, Vec3 } from '../model/types';
+import type { Joint, JointMateRef } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { resolveJointValue, isValidAxis, isValidMateRef } from './jointsKinematics';
+import { resolveJointValue, isValidAxis } from './jointsKinematics';
 import { noop } from './noop';
 /**
  * @command add_joint
@@ -72,70 +72,48 @@ export const addJoint = defineCommand({
       ),
   }),
   run: (doc, { kind, a, b, axis, id }): CommandResult => {
-    if (!isValidMateRef(a)) {
-      return noop(doc, 'add_joint: "a" must be an object with a non-empty instanceId string.');
+    for (const [side, ref] of [
+      ['a', a],
+      ['b', b],
+    ] as const) {
+      if (ref.instanceId.length === 0) {
+        return noop(
+          doc,
+          `add_joint: "${side}" must be an object with a non-empty instanceId string.`,
+        );
+      }
     }
-    if (!isValidMateRef(b)) {
-      return noop(doc, 'add_joint: "b" must be an object with a non-empty instanceId string.');
-    }
-
     if (!isValidAxis(axis)) {
       return noop(
         doc,
         `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`,
       );
     }
-
-    const entityA = doc.entities[a.instanceId];
-    if (!entityA || entityA.kind !== 'instance') {
-      return noop(
-        doc,
-        `add_joint: a.instanceId '${a.instanceId}' does not exist or is not an InstanceEntity.`,
-      );
-    }
-    const entityB = doc.entities[b.instanceId];
-    if (!entityB || entityB.kind !== 'instance') {
-      return noop(
-        doc,
-        `add_joint: b.instanceId '${b.instanceId}' does not exist or is not an InstanceEntity.`,
-      );
+    for (const [side, ref] of [
+      ['a', a],
+      ['b', b],
+    ] as const) {
+      if (doc.entities[ref.instanceId]?.kind !== 'instance') {
+        return noop(
+          doc,
+          `add_joint: ${side}.instanceId '${ref.instanceId}' does not exist or is not an InstanceEntity.`,
+        );
+      }
     }
 
-    const jointId = typeof id === 'string' && id.length > 0 ? id : nextId('joint');
+    const jointId = id !== undefined && id.length > 0 ? id : nextId('joint');
     if (jointId in doc.joints) {
       return noop(doc, `add_joint: joint id '${jointId}' already exists — no change made.`);
     }
 
-    type FrameValue = 'origin' | 'axis-x' | 'axis-y' | 'axis-z';
-    const mateRefA: JointMateRef =
-      a.frame !== undefined
-        ? { instanceId: a.instanceId, frame: a.frame as FrameValue }
-        : { instanceId: a.instanceId };
-    const mateRefB: JointMateRef =
-      b.frame !== undefined
-        ? { instanceId: b.instanceId, frame: b.frame as FrameValue }
-        : { instanceId: b.instanceId };
-
+    const mateRef = ({ instanceId, frame }: typeof a): JointMateRef =>
+      frame !== undefined ? { instanceId, frame } : { instanceId };
+    const refs = { a: mateRef(a), b: mateRef(b), axis };
     const newJoint: Joint =
       kind === 'revolute'
-        ? {
-            id: jointId,
-            kind: 'revolute',
-            a: mateRefA,
-            b: mateRefB,
-            axis: axis as 'x' | 'y' | 'z' | Vec3,
-            angle: 0,
-          }
-        : {
-            id: jointId,
-            kind: 'prismatic',
-            a: mateRefA,
-            b: mateRefB,
-            axis: axis as 'x' | 'y' | 'z' | Vec3,
-            displacement: 0,
-          };
-
-    const newDoc: CadDocument = {
+        ? { id: jointId, kind, ...refs, angle: 0 }
+        : { id: jointId, kind, ...refs, displacement: 0 };
+    const newDoc = {
       ...doc,
       joints: { ...doc.joints, [jointId]: newJoint },
       jointOrder: [...doc.jointOrder, jointId],
@@ -180,26 +158,17 @@ export const deleteJoint = defineCommand({
     }
 
     const joint = doc.joints[id]!;
+    const removedDrIds = Object.entries(doc.driveRelations)
+      .filter(([, dr]) => dr.driver === id || dr.driven === id)
+      .map(([drId]) => drId);
+    const without = <T>(record: Record<string, T>, ids: readonly string[]): Record<string, T> =>
+      Object.fromEntries(Object.entries(record).filter(([key]) => !ids.includes(key)));
 
-    // Cascade: collect drive relations that reference this joint
-    const removedDrIds: string[] = [];
-    const newDriveRelations: Record<string, DriveRelation> = {};
-    for (const [drId, dr] of Object.entries(doc.driveRelations)) {
-      if (dr.driver === id || dr.driven === id) {
-        removedDrIds.push(drId);
-      } else {
-        newDriveRelations[drId] = dr;
-      }
-    }
-
-    const newJoints = { ...doc.joints };
-    delete newJoints[id];
-
-    const newDoc: CadDocument = {
+    const newDoc = {
       ...doc,
-      joints: newJoints,
+      joints: without(doc.joints, [id]),
       jointOrder: doc.jointOrder.filter((jid) => jid !== id),
-      driveRelations: newDriveRelations,
+      driveRelations: without(doc.driveRelations, removedDrIds),
       driveRelationOrder: doc.driveRelationOrder.filter((drid) => !removedDrIds.includes(drid)),
     };
 
@@ -249,39 +218,14 @@ export const setJointValue = defineCommand({
     }
 
     const existing = doc.joints[id]!;
-    let updatedJoint: Joint;
-
-    if (existing.kind === 'revolute') {
-      const resolved = resolveJointValue(value, doc);
-      updatedJoint = {
-        ...existing,
-        angle: typeof resolved === 'number' ? resolved : existing.angle,
-      };
-      // Store expression if it's a string (for round-trip); the numeric field stores the last resolved value.
-      if (typeof value === 'string') {
-        updatedJoint = { ...updatedJoint, angle: resolved ?? existing.angle };
-      }
-    } else {
-      const resolved = resolveJointValue(value, doc);
-      updatedJoint = {
-        ...existing,
-        displacement: typeof resolved === 'number' ? resolved : existing.displacement,
-      };
-      if (typeof value === 'string') {
-        updatedJoint = { ...updatedJoint, displacement: resolved ?? existing.displacement };
-      }
-    }
-
-    const newDoc: CadDocument = {
-      ...doc,
-      joints: { ...doc.joints, [id]: updatedJoint },
-    };
-
+    const resolved = resolveJointValue(value, doc);
     const fieldName = existing.kind === 'revolute' ? 'angle' : 'displacement';
-    const storedValue =
-      existing.kind === 'revolute'
-        ? (updatedJoint as typeof existing).angle
-        : (updatedJoint as Extract<Joint, { kind: 'prismatic' }>).displacement;
+    const current = existing.kind === 'revolute' ? existing.angle : existing.displacement;
+    const storedValue = resolved ?? current;
+    const newDoc = {
+      ...doc,
+      joints: { ...doc.joints, [id]: { ...existing, [fieldName]: storedValue } as Joint },
+    };
 
     return {
       document: newDoc,

@@ -9,7 +9,7 @@ import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
-import { formatNumber as fmt } from '../lib/format';
+import { compactNumber as fmt } from '../lib/compactNumber';
 import { rotatePoint2 } from '../lib/polygon';
 import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';

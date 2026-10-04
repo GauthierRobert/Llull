@@ -11,26 +11,14 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3, Vec2 } from '../model/types';
+import type { Entity, Vec3, Vec2 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 } from './schema';
 import { nextId } from '../lib/id';
+import { withEntity } from './entityOps';
 import { ORIGIN } from '../lib/vec3';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
-
-/** Append multiple entities to a document in one pass. Keeps the command pure. */
-function withEntities(doc: CadDocument, entities: Entity[]): CadDocument {
-  const newEntitiesMap = { ...doc.entities };
-  for (const e of entities) {
-    newEntitiesMap[e.id] = e;
-  }
-  return {
-    ...doc,
-    entities: newEntitiesMap,
-    order: [...doc.order, ...entities.map((e) => e.id)],
-  };
-}
 
 /** Build a circle entity at a given 2D center on the given work-plane position. */
 function makeCircle(center: Vec2, radius: number, position: Vec3, color: string): Entity {
@@ -308,7 +296,7 @@ export const instantiateTemplate = defineCommand({
     }
 
     const affected = entities.map((e) => e.id);
-    const newDoc = withEntities(doc, entities);
+    const newDoc = entities.reduce(withEntity, doc);
 
     return {
       document: newDoc,

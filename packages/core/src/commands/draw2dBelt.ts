@@ -1,7 +1,7 @@
 import type { Entity } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
-import { formatNumber } from '../lib/format';
+import { compactNumber } from '../lib/compactNumber';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { finiteVec3OrZero } from '../lib/vec3';
@@ -194,7 +194,7 @@ export const drawBeltAround = defineCommand({
       if (d < Math.abs(p1.radius - p2.radius)) {
         return noop(
           doc,
-          `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${formatNumber(d)} < |r1−r2|=${formatNumber(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
+          `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${compactNumber(d)} < |r1−r2|=${compactNumber(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
         );
       }
     }
@@ -280,8 +280,8 @@ export const drawBeltAround = defineCommand({
     return {
       document: withEntity(doc, entity),
       summary:
-        `Drew belt ${id}: ${n} pulleys, length ≈ ${formatNumber(totalLength)}, ` +
-        `bounds x=[${formatNumber(minX)}, ${formatNumber(maxX)}] y=[${formatNumber(minY)}, ${formatNumber(maxY)}].`,
+        `Drew belt ${id}: ${n} pulleys, length ≈ ${compactNumber(totalLength)}, ` +
+        `bounds x=[${compactNumber(minX)}, ${compactNumber(maxX)}] y=[${compactNumber(minY)}, ${compactNumber(maxY)}].`,
       affected: [id],
     };
   },

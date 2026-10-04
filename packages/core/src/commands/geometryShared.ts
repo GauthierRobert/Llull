@@ -5,7 +5,7 @@ import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { add3, finiteVec3OrZero } from '../lib/vec3';
 import { withEntity } from './entityOps';
 import { noop } from './noop';
-import { formatNumber } from '../lib/format';
+import { compactNumber } from '../lib/compactNumber';
 
 /** `entity` with its position offset by `delta` (the one translation used by every move command). */
 export function translated(entity: Entity, delta: Vec3): Entity {
@@ -116,7 +116,7 @@ export function resolvePosition(
 
 /** `world AABB min [...] max [...]` for command summaries. */
 export function boundsText(b: { min: Vec3; max: Vec3 }): string {
-  return `world AABB min [${b.min.map(formatNumber).join(', ')}] max [${b.max.map(formatNumber).join(', ')}]`;
+  return `world AABB min [${b.min.map(compactNumber).join(', ')}] max [${b.max.map(compactNumber).join(', ')}]`;
 }
 
 /** Default color of every placed primitive solid. */
