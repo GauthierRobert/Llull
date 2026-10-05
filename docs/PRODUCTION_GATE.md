@@ -13,12 +13,15 @@ npx vitest run tests/production   # in-process scripted run, part of npm run che
 npm run production:scripted       # the same calls through the real /mcp endpoint
 npm run production:ui             # a human-like flow in the browser (Playwright)
 npm run production:agent          # Claude gets only the brief and works through /mcp (API credentials, costs money)
+# agent env: PRODUCTION_SCENARIOS, PRODUCTION_AGENT_MODEL (claude-opus-5-5), PRODUCTION_AGENT_EFFORT (high),
+#            PRODUCTION_AGENT_MAX_TURNS (150), PRODUCTION_AGENT_TRIALS (1), PRODUCTION_AGENT_MAX_USD (20 per trial)
 npm run production                # scripted + ui
 ```
 
 Reports land in `.cache/production/reports/<driver>/<scenario>.json`, with
 `.cache/production/reports/SUMMARY.md` across every driver (✅ pass · ⚠️ known gap · ❌ regression).
-The agent driver also stores its transcript and final project file.
+The agent driver also stores its transcript and final project file, and records token use and the
+estimated spend; a trial stops when its estimate reaches `PRODUCTION_AGENT_MAX_USD`.
 
 ## One scenario, three drivers, one grader
 
