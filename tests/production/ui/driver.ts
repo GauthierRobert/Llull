@@ -29,6 +29,17 @@ const levelOf = (args: Record<string, unknown>): Record<string, string> =>
 const route = (points: unknown): string =>
   (Array.isArray(points) ? points : []).map((point) => asNumbers(point).join(',')).join('; ');
 
+/** Joint selects exist for beams, the base fixity select for columns (the form hides the others). */
+function memberFixity(args: Record<string, unknown>): Record<string, string> {
+  if (args['role'] === 'beam') {
+    return {
+      startJoint: text(args['startJoint'] ?? ''),
+      endJoint: text(args['endJoint'] ?? ''),
+    };
+  }
+  return args['role'] === 'column' ? { baseFixity: text(args['baseFixity'] ?? '') } : {};
+}
+
 export class UiDriver {
   readonly gaps = new Set<string>();
   /** Tool calls done through a panel form vs the command palette. */
@@ -90,10 +101,18 @@ export class UiDriver {
             x2: text(end[0]),
             y2: text(end[1]),
             z2: text(end[2]),
+            roll: degrees(Number(args['roll'] ?? 0)),
           },
-          { role: text(args['role']), profile: text(args['profile']), ...levelOf(args) },
+          {
+            role: text(args['role']),
+            profile: text(args['profile']),
+            ...memberFixity(args),
+            ...levelOf(args),
+          },
         );
       }
+      case 'add_pipe_support':
+        return this.addPipeSupport(args);
       case 'add_slab':
         return this.addSlab(args);
       case 'add_equipment': {
@@ -186,6 +205,22 @@ export class UiDriver {
       weight: text(record['weight']),
       clearance: text(record['clearance']),
     });
+  }
+
+  /** One submission of the Pipe support form: the line, the type and the points (or a spacing). */
+  private async addPipeSupport(args: Record<string, unknown>): Promise<string> {
+    const pipe =
+      typeof args['line'] === 'string' ? `line:${args['line']}` : `pipe:${text(args['pipeId'])}`;
+    return this.panel.applyTool(
+      'pipeSupport',
+      {
+        points: route(args['at']),
+        spacing: text(args['spacing'] ?? ''),
+        memberId: text(args['memberId'] ?? ''),
+        maxReach: text(args['maxReach'] ?? ''),
+      },
+      { pipe, type: text(args['type'] ?? 'shoe') },
+    );
   }
 
   private async addLevel(args: Record<string, unknown>): Promise<string> {

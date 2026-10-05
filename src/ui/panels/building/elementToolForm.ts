@@ -8,7 +8,7 @@
 type FieldKind = 'number' | 'text' | 'select' | 'checkbox';
 
 /** Live element lists a select field can offer. */
-export type ElementListKind = 'walls' | 'hosts' | 'stairs' | 'slabs' | 'levels';
+export type ElementListKind = 'walls' | 'hosts' | 'stairs' | 'slabs' | 'levels' | 'pipes';
 
 export interface ToolField {
   readonly key: string;
@@ -19,6 +19,8 @@ export interface ToolField {
   readonly options?: ReadonlyArray<readonly [string, string]> | ElementListKind;
   /** Optional numeric fields may be left blank → the command default applies. */
   readonly optional?: boolean;
+  /** Shown only while the form field `key` holds one of `values` (e.g. joints for beams). */
+  readonly showWhen?: { readonly key: string; readonly values: ReadonlyArray<string> };
 }
 
 interface ToolContext {
@@ -50,6 +52,30 @@ export function txt(key: string, label: string, defaultValue = '', optional = fa
 /** Level selector: blank = the active level, else a level id (relative z / placement is on it). */
 export function levelField(): ToolField {
   return { key: 'levelId', label: 'Level', kind: 'select', defaultValue: '', options: 'levels' };
+}
+
+/** Select field with a blank "Default" first option: blank = omit the param, the command default applies. */
+export function defaultedSelect(
+  key: string,
+  label: string,
+  blankLabel: string,
+  options: ReadonlyArray<readonly [string, string]>,
+  showWhen?: ToolField['showWhen'],
+): ToolField {
+  return {
+    key,
+    label,
+    kind: 'select',
+    defaultValue: '',
+    options: [['', blankLabel], ...options],
+    ...(showWhen !== undefined ? { showWhen } : {}),
+  };
+}
+
+export function isFieldShown(field: ToolField, values: Readonly<Record<string, string>>): boolean {
+  return (
+    field.showWhen === undefined || field.showWhen.values.includes(values[field.showWhen.key] ?? '')
+  );
 }
 
 export class FieldReader {

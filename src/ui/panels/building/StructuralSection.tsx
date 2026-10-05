@@ -20,6 +20,8 @@ interface ReportRow {
   readonly utilisation: number;
   /** False when the command reports the row as failing / not analysed whatever its utilisation. */
   readonly ok: boolean;
+  /** Shown instead of the utilisation when the check is not a ratio (pipe span vs allowed). */
+  readonly detail: string;
 }
 
 interface Report {
@@ -35,18 +37,44 @@ const CHECKS = [
   { command: 'check_foundations', label: 'Foundations', testId: 'foundation-check' },
   { command: 'check_crane_runways', label: 'Runways', testId: 'runway-check' },
   { command: 'check_steel_members', label: 'Steel members', testId: 'steel-members-check' },
+  { command: 'check_pipe_supports', label: 'Pipe supports', testId: 'pipe-support-check' },
 ] as const;
 
 type CheckCommand = (typeof CHECKS)[number]['command'];
 
 /** Multi-storey / rack check: its loads come from the model (slabs, equipment, pipes), not the form. */
-const loadsFromModel: ReadonlySet<CheckCommand> = new Set(['check_steel_members']);
+const loadsFromModel: ReadonlySet<CheckCommand> = new Set([
+  'check_steel_members',
+  'check_pipe_supports',
+]);
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null;
 }
 
+/** check_pipe_supports: one row per pipe, ratio = largest span / allowed span. */
+function toPipeRows(pipes: ReadonlyArray<unknown>): ReportRow[] {
+  return pipes.flatMap((pipe: unknown, index): ReportRow[] => {
+    if (!isRecord(pipe) || typeof pipe.largestSpanM !== 'number') return [];
+    const allowed = typeof pipe.allowedSpanM === 'number' ? pipe.allowedSpanM : 0;
+    const id = typeof pipe.id === 'string' ? pipe.id : '';
+    const name = [pipe.line, pipe.mark].find((part) => typeof part === 'string' && part !== '');
+    const dn = typeof pipe.dn === 'number' ? ` · DN${pipe.dn}` : '';
+    return [
+      {
+        key: `${index}:${id}`,
+        elementId: id,
+        label: `${typeof name === 'string' ? name : id}${dn}`,
+        utilisation: allowed > 0 ? pipe.largestSpanM / allowed : 0,
+        ok: pipe.ok !== false,
+        detail: `span ${pipe.largestSpanM.toFixed(1)} / ${allowed.toFixed(1)} m`,
+      },
+    ];
+  });
+}
+
 function toReportRows(data: unknown): ReportRow[] {
+  if (isRecord(data) && Array.isArray(data.pipes)) return toPipeRows(data.pipes);
   const rows: unknown = isRecord(data) ? (data.rows ?? data.members) : undefined;
   if (!Array.isArray(rows)) return [];
   return rows.flatMap((row: unknown, index): ReportRow[] => {
@@ -65,6 +93,7 @@ function toReportRows(data: unknown): ReportRow[] {
         label,
         utilisation: row.utilisation,
         ok: row.ok !== false,
+        detail: '',
       },
     ];
   });
@@ -182,7 +211,9 @@ export function StructuralSection(): React.ReactElement {
                 >
                   <span className="chip">{row.utilisation > 1 || !row.ok ? 'FAIL' : 'OK'}</span>
                   <span className="panel__row-main">{row.label}</span>
-                  <span className="panel__row-meta">{row.utilisation.toFixed(2)}</span>
+                  <span className="panel__row-meta">
+                    {row.detail !== '' ? row.detail : row.utilisation.toFixed(2)}
+                  </span>
                 </button>
               </li>
             ))}
