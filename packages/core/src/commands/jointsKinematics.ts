@@ -9,7 +9,7 @@ import { resolveNumeric } from './expression';
 import { topologicalSort } from '../lib/topologicalSort';
 import { add3, scale3, sub3 } from '../lib/vec3';
 /** Normalize a string axis shorthand ('x'|'y'|'z') to a Vec3 unit vector. */
-function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
+export function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
   if (axis === 'x') return [1, 0, 0];
   if (axis === 'y') return [0, 1, 0];
   if (axis === 'z') return [0, 0, 1];
@@ -47,7 +47,7 @@ export function isValidAxis(v: unknown): v is 'x' | 'y' | 'z' | Vec3 {
 function resolveInstance(ref: JointMateRef, doc: CadDocument): InstanceEntity | null {
   const e = doc.entities[ref.instanceId];
   if (!e || e.kind !== 'instance') return null;
-  return e as InstanceEntity;
+  return e;
 }
 
 /** Joint ids ordered driver before driven; joints on a drive cycle are omitted. */

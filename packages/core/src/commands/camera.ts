@@ -134,10 +134,6 @@ export const lookAt = defineCommand({
       ),
   }),
   run: (doc, p): CommandResult => {
-    if (!p.target.every(Number.isFinite)) {
-      return noop(doc, `look_at: target must be a finite [x,y,z] array. Camera unchanged.`);
-    }
-
     const prev: CameraState = doc.camera;
     const next: CameraState = {
       target: p.target,

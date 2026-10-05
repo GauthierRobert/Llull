@@ -70,10 +70,6 @@ export const addDriveRelation = defineCommand({
         `add_drive_relation: driver and driven cannot be the same joint ('${driver}').`,
       );
     }
-    if (!Number.isFinite(ratio)) {
-      return noop(doc, `add_drive_relation: ratio must be a finite number, got ${String(ratio)}.`);
-    }
-
     // Cycle detection
     const cyclePath = detectCycleOnAdd(doc.driveRelations, driver, driven);
     if (cyclePath !== null) {

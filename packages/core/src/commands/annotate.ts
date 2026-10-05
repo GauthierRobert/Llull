@@ -5,16 +5,20 @@
  * @layer core/commands
  */
 
-import type { DimensionEntity, Entity, TextEntity, Vec3 } from '../model/types';
+import type { CadDocument, DimensionEntity, Entity, TextEntity, Vec3 } from '../model/types';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
-
 import { nextId } from '../lib/id';
-import { withEntity } from './entityOps';
+import { commitEntity } from './commitEntity';
 import { noop } from './noop';
 
 type TextAnchor = NonNullable<TextEntity['anchor']>;
+
+/** `layer` when it names an existing layer, else the default layer. */
+function layerIdOrDefault(doc: CadDocument, layer: string | undefined): string {
+  return layer !== undefined && layer in doc.layers ? layer : DEFAULT_LAYER_ID;
+}
 
 /**
  * @command add_text
@@ -81,8 +85,6 @@ export const addText = defineCommand({
       return noop(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
     }
 
-    const layerId = layer !== undefined && layer in doc.layers ? layer : DEFAULT_LAYER_ID;
-
     const id = nextId('text');
     const entity = {
       id,
@@ -92,15 +94,15 @@ export const addText = defineCommand({
       position: [position[0], position[1], position[2]] as Vec3,
       rotation: [rotation[0] ?? 0, rotation[1] ?? 0, rotation[2] ?? 0] as Vec3,
       anchor: anchor as TextAnchor,
-      layerId,
+      layerId: layerIdOrDefault(doc, layer),
       color,
     };
 
-    return {
-      document: withEntity(doc, entity),
-      summary: `add_text: created text entity ${id} — "${content}" at [${position[0]}, ${position[1]}, ${position[2]}], height ${height}, anchor '${anchor}'.`,
-      affected: [id],
-    };
+    return commitEntity(
+      doc,
+      entity,
+      `add_text: created text entity ${id} — "${content}" at [${position[0]}, ${position[1]}, ${position[2]}], height ${height}, anchor '${anchor}'.`,
+    );
   },
 });
 
@@ -207,7 +209,6 @@ export const addDimension = defineCommand({
       );
     }
 
-    const layerId = layer !== undefined && layer in doc.layers ? layer : DEFAULT_LAYER_ID;
     const id = nextId('dim');
 
     const entity: DimensionEntity = {
@@ -215,19 +216,19 @@ export const addDimension = defineCommand({
       kind: 'dimension',
       dimensionKind: dimensionKind as DimensionEntity['dimensionKind'],
       entityIds: [...entityIds],
-      position: [0, 0, 0] as Vec3,
-      rotation: [0, 0, 0] as Vec3,
-      layerId,
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      layerId: layerIdOrDefault(doc, layer),
       color: '#333333',
       ...(offset !== undefined ? { offset } : {}),
       ...(precision !== undefined ? { precision } : {}),
       ...(label !== undefined ? { label } : {}),
     };
 
-    return {
-      document: withEntity(doc, entity),
-      summary: `add_dimension: created ${dimensionKind} dimension entity ${id} referencing [${entityIds.join(', ')}]${offset !== undefined ? `, offset ${offset}` : ''}.`,
-      affected: [id],
-    };
+    return commitEntity(
+      doc,
+      entity,
+      `add_dimension: created ${dimensionKind} dimension entity ${id} referencing [${entityIds.join(', ')}]${offset !== undefined ? `, offset ${offset}` : ''}.`,
+    );
   },
 });

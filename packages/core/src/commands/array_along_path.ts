@@ -5,12 +5,11 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
-import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
-import { withEntity } from './entityOps';
+import { addCopies } from './transform';
 import { add3, cross3, distanceSq3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { noop } from './noop';
 
@@ -34,22 +33,6 @@ function pointAtArcLength(path: Vec3[], t: number): Vec3 {
     remaining -= segLen;
   }
   return path[path.length - 1]!;
-}
-
-/** `doc` plus copies of `source` placed at each `[position, rotation]`; ids in placement order. */
-function placeCopies(
-  doc: CadDocument,
-  source: Entity,
-  placements: ReadonlyArray<readonly [Vec3, Vec3]>,
-): { document: CadDocument; createdIds: string[] } {
-  const createdIds: string[] = [];
-  let document = doc;
-  for (const [position, rotation] of placements) {
-    const id = nextId('e');
-    document = withEntity(document, { ...source, id, position, rotation } as Entity);
-    createdIds.push(id);
-  }
-  return { document, createdIds };
 }
 
 /**
@@ -95,7 +78,7 @@ export const arrayAlongPath = defineCommand({
         `array_along_path: path must contain at least 2 points (got ${path.length}).`,
       );
     }
-    if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
+    if (count < 1 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `array_along_path: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
@@ -121,13 +104,13 @@ export const arrayAlongPath = defineCommand({
     const totalLen = polylineLength(validatedPath);
 
     const step = intCount === 1 ? 0 : totalLen / (intCount - 1);
-    const { document: newDoc, createdIds } = placeCopies(
+    const { document: newDoc, newIds: createdIds } = addCopies(
       doc,
       source,
-      Array.from({ length: intCount }, (_, i): [Vec3, Vec3] => [
-        pointAtArcLength(validatedPath, intCount === 1 ? totalLen / 2 : i * step),
-        source.rotation,
-      ]),
+      Array.from({ length: intCount }, (_, i) => ({
+        position: pointAtArcLength(validatedPath, intCount === 1 ? totalLen / 2 : i * step),
+      })),
+      'e',
     );
 
     return {
@@ -174,10 +157,10 @@ export const distributeOnArc = defineCommand({
     if (!source) {
       return noop(doc, `distribute_on_arc: source entity "${sourceId}" not found.`);
     }
-    if (!Number.isFinite(radius) || radius <= 0) {
+    if (radius <= 0) {
       return noop(doc, `distribute_on_arc: radius must be > 0 (got ${radius}).`);
     }
-    if (!Number.isFinite(count) || count < 1 || count > MAX_COPIES_PER_COMMAND) {
+    if (count < 1 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `distribute_on_arc: count must be in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
@@ -207,13 +190,17 @@ export const distributeOnArc = defineCommand({
         ? startAngle + angleRange / 2
         : startAngle + (angleRange / (isFullCircle ? intCount : intCount - 1)) * i,
     );
-    const { document: newDoc, createdIds } = placeCopies(
+    const { document: newDoc, newIds: createdIds } = addCopies(
       doc,
       source,
-      angles.map((angle): [Vec3, Vec3] => [
-        add3(c, scale3(add3(scale3(u, Math.cos(angle)), scale3(v, Math.sin(angle))), radius)),
-        rotationForRadial(n, angle),
-      ]),
+      angles.map((angle) => ({
+        position: add3(
+          c,
+          scale3(add3(scale3(u, Math.cos(angle)), scale3(v, Math.sin(angle))), radius),
+        ),
+        rotation: rotationForRadial(n, angle),
+      })),
+      'e',
     );
 
     return {

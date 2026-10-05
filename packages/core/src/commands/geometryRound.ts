@@ -1,16 +1,12 @@
 import type { CommandResult } from './types';
-import { newEntity } from './newEntity';
 import { defineCommand, z, colorField } from './schema';
-import { nextId } from '../lib/id';
 import { ORIGIN } from '../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
   anchorField,
-  commitSolid,
+  placeSolid,
   positionField,
   rejectNonPositive,
-  resolveRotation,
-  resolvePosition,
   rotationField,
 } from './geometryShared';
 
@@ -61,23 +57,18 @@ export const addCylinder = defineCommand({
       ['height', height],
     ]);
     if (rejected) return rejected;
-    // Default anchor for cylinder is 'center': stored position is the geometric center.
-    // AABB half-extents from center: [radius, radius, height/2] (axis along +Z).
-    const storedPosition = resolvePosition(
-      [radius, radius, height / 2],
-      'center',
+    return placeSolid(doc, {
+      kind: 'cylinder',
+      idPrefix: 'cyl',
+      geometry: { radius, height },
+      halfExtents: [radius, radius, height / 2],
+      defaultAnchor: 'center',
       anchor,
       position,
-    );
-    const id = nextId('cyl');
-    const entity = newEntity('cylinder', id, { radius, height }, storedPosition, color, {
-      rotation: resolveRotation(rotation),
+      rotation,
+      color,
+      describe: (id) => `Added cylinder ${id} with radius ${radius} and height ${height}`,
     });
-    return commitSolid(
-      doc,
-      entity,
-      `Added cylinder ${id} with radius ${radius} and height ${height}`,
-    );
   },
 });
 
@@ -121,14 +112,18 @@ export const addSphere = defineCommand({
   ): CommandResult => {
     const rejected = rejectNonPositive(doc, 'add_sphere', [['radius', radius]]);
     if (rejected) return rejected;
-    // Default anchor for sphere is 'center': stored position is the geometric center.
-    // Half-extents from center: [radius, radius, radius].
-    const storedPosition = resolvePosition([radius, radius, radius], 'center', anchor, position);
-    const id = nextId('sph');
-    const entity = newEntity('sphere', id, { radius }, storedPosition, color, {
-      rotation: resolveRotation(rotation),
+    return placeSolid(doc, {
+      kind: 'sphere',
+      idPrefix: 'sph',
+      geometry: { radius },
+      halfExtents: [radius, radius, radius],
+      defaultAnchor: 'center',
+      anchor,
+      position,
+      rotation,
+      color,
+      describe: (id) => `Added sphere ${id} with radius ${radius}`,
     });
-    return commitSolid(doc, entity, `Added sphere ${id} with radius ${radius}`);
   },
 });
 
@@ -184,27 +179,18 @@ export const addCone = defineCommand({
       ['height', height],
     ]);
     if (rejected) return rejected;
-    // Default anchor for cone is 'base-center': stored position IS the base center.
-    // AABB from base-center origin: spans [−radius..+radius, −radius..+radius, 0..height].
-    // To use resolvePosition (which works from center), we express the base-center origin
-    // relative to the AABB center: AABB center is at [0, 0, height/2] from base-center.
-    // We pass half-extents as seen from the AABB center: [radius, radius, height/2].
-    // defaultAnchor='base-center' tells resolvePosition the stored origin is the base-center.
-    const storedPosition = resolvePosition(
-      [radius, radius, height / 2],
-      'base-center',
+    return placeSolid(doc, {
+      kind: 'cone',
+      idPrefix: 'cone',
+      geometry: { radius, height },
+      halfExtents: [radius, radius, height / 2],
+      defaultAnchor: 'base-center',
       anchor,
       position,
-    );
-    const id = nextId('cone');
-    const entity = newEntity('cone', id, { radius, height }, storedPosition, color, {
-      rotation: resolveRotation(rotation),
+      rotation,
+      color,
+      describe: (id) => `Added cone ${id} with base radius ${radius} and height ${height}`,
     });
-    return commitSolid(
-      doc,
-      entity,
-      `Added cone ${id} with base radius ${radius} and height ${height}`,
-    );
   },
 });
 
@@ -266,23 +252,19 @@ export const addTorus = defineCommand({
       ['tubeRadius', tubeRadius],
     ]);
     if (rejected) return rejected;
-    // Default anchor for torus is 'center': stored position is the geometric center.
-    // AABB half-extents from center: [ringRadius+tubeRadius, ringRadius+tubeRadius, tubeRadius].
     const outerRadius = ringRadius + tubeRadius;
-    const storedPosition = resolvePosition(
-      [outerRadius, outerRadius, tubeRadius],
-      'center',
+    return placeSolid(doc, {
+      kind: 'torus',
+      idPrefix: 'tor',
+      geometry: { ringRadius, tubeRadius },
+      halfExtents: [outerRadius, outerRadius, tubeRadius],
+      defaultAnchor: 'center',
       anchor,
       position,
-    );
-    const id = nextId('tor');
-    const entity = newEntity('torus', id, { ringRadius, tubeRadius }, storedPosition, color, {
-      rotation: resolveRotation(rotation),
+      rotation,
+      color,
+      describe: (id) =>
+        `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}`,
     });
-    return commitSolid(
-      doc,
-      entity,
-      `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}`,
-    );
   },
 });

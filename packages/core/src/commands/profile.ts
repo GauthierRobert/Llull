@@ -1,12 +1,14 @@
 import type { RevolutionEntity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
-import { ORIGIN } from '../lib/vec3';
+import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
+import { isValidAxis, normalizeAxis } from './jointsKinematics';
 import { noop } from './noop';
 import { newEntity } from './newEntity';
 import { nextId } from '../lib/id';
 import { compactNumber } from '../lib/compactNumber';
-import { commitSolid, resolveRotation } from './geometryShared';
+import { commitSolid } from './geometryShared';
+import { circlePoints } from './tessellation';
 
 /** Number of polygon segments used to approximate a circle. */
 const CIRCLE_SEGMENTS = 32;
@@ -63,12 +65,9 @@ export const extrudeSketch = defineCommand({
 
     if (source.kind === 'circle') {
       const { center, radius } = source;
-      const pts: Array<readonly [number, number]> = [];
-      for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
-        const angle = (2 * Math.PI * i) / CIRCLE_SEGMENTS;
-        pts.push([center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)]);
-      }
-      profile = pts;
+      profile = circlePoints(center[0], center[1], 0, radius, CIRCLE_SEGMENTS).map(
+        ([x, y]): readonly [number, number] => [x, y],
+      );
     } else if (source.kind === 'rectangle') {
       const { width, height } = source;
       // lower-left origin (RectangleEntity convention); corners in CCW order
@@ -108,7 +107,7 @@ export const extrudeSketch = defineCommand({
       source.position,
       '#c8553d',
       {
-        rotation: resolveRotation(rotation),
+        rotation: finiteVec3OrZero(rotation),
       },
     );
 
@@ -121,21 +120,15 @@ export const extrudeSketch = defineCommand({
 });
 
 /**
- * Normalise a raw axis param to a unit Vec3, or return null if invalid.
- * Accepts 'x'|'y'|'z' shorthand strings or a [number,number,number] array.
- * Default axis when omitted: +Z ([0,0,1]) per the document +Z-up convention.
+ * Unit Vec3 of a raw axis param ('x'|'y'|'z' or a finite 3-array), +Z when omitted (+Z-up document);
+ * null when invalid or zero-length.
  */
 function resolveAxis(raw: unknown): Vec3 | null {
-  if (raw === undefined || raw === null) return [0, 0, 1]; // default: Z-axis
-  if (raw === 'x') return [1, 0, 0];
-  if (raw === 'y') return [0, 1, 0];
-  if (raw === 'z') return [0, 0, 1];
-  if (!Array.isArray(raw) || raw.length !== 3) return null;
-  const [ax, ay, az] = raw as unknown[];
-  if (!Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(az)) return null;
-  const len = Math.sqrt((ax as number) ** 2 + (ay as number) ** 2 + (az as number) ** 2);
-  if (len < 1e-10) return null;
-  return [(ax as number) / len, (ay as number) / len, (az as number) / len];
+  if (raw === undefined) return [0, 0, 1];
+  if (!isValidAxis(raw)) return null;
+  const [ax, ay, az] = normalizeAxis(raw);
+  const len = Math.sqrt(ax ** 2 + ay ** 2 + az ** 2);
+  return len < 1e-10 ? null : [ax / len, ay / len, az / len];
 }
 
 /**
@@ -228,8 +221,8 @@ export const revolveProfile = defineCommand({
     }
 
     const TWO_PI = 2 * Math.PI;
-    const angle = rawAngle !== undefined ? rawAngle : TWO_PI;
-    if (!Number.isFinite(angle) || angle <= 0) {
+    const angle = rawAngle ?? TWO_PI;
+    if (angle <= 0) {
       return noop(
         doc,
         `revolve_profile: angle must be a finite number > 0 (got ${String(angle)}); no-op.`,
@@ -244,12 +237,7 @@ export const revolveProfile = defineCommand({
       );
     }
 
-    const segments = Math.max(
-      3,
-      Math.round(
-        typeof rawSegments === 'number' && Number.isFinite(rawSegments) ? rawSegments : 32,
-      ),
-    );
+    const segments = Math.max(3, Math.round(rawSegments ?? 32));
 
     const resolvedLayerId =
       typeof layerId === 'string' && doc.layers[layerId] !== undefined
@@ -265,7 +253,7 @@ export const revolveProfile = defineCommand({
       angle: Math.min(angle, TWO_PI),
       segments,
       position,
-      rotation: resolveRotation(rotation),
+      rotation: finiteVec3OrZero(rotation),
       layerId: resolvedLayerId,
       color,
     };

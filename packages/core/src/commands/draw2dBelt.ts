@@ -2,10 +2,10 @@ import type { CommandResult } from './types';
 import { compactNumber } from '../lib/compactNumber';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { finiteVec3OrZero } from '../lib/vec3';
+import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
 import { MAX_CURVE_SAMPLES } from './limits';
 import { DEFAULT_DRAW_COLOR, workPlanePositionField } from './draw2dShared';
-import { withEntity } from './entityOps';
+import { commitEntity } from './commitEntity';
 import { newEntity } from './newEntity';
 import { pointsExtent } from './sceneBounds';
 import { noop } from './noop';
@@ -16,65 +16,51 @@ interface PulleySpec {
   radius: number;
 }
 
+type Point = readonly [number, number];
+
 /**
- * Compute the two external tangent points for a pair of circles (same-side,
- * "open belt" convention).  Returns [tp1, tp2] on c1 and c2 respectively, on
- * the CCW outer envelope side (angle = θ + π/2 + α, where α = asin((r1−r2)/d)).
- *
- * Returns null when no external tangent exists (one circle inside the other).
+ * The two external tangent points of a pair of circles (same-side, "open belt" convention): [tp1, tp2]
+ * on `p1` and `p2`, on the CCW outer envelope side (angle = θ + π/2 + α, α = asin((r1−r2)/d)).
+ * @invariant centers distinct and neither circle inside the other (checked by the caller)
  */
-function externalTangentPoints(
-  c1x: number,
-  c1y: number,
-  r1: number,
-  c2x: number,
-  c2y: number,
-  r2: number,
-): readonly [readonly [number, number], readonly [number, number]] | null {
+function externalTangentPoints(p1: PulleySpec, p2: PulleySpec): readonly [Point, Point] {
+  const [c1x, c1y] = p1.center;
+  const [c2x, c2y] = p2.center;
   const dx = c2x - c1x;
   const dy = c2y - c1y;
   const d = Math.sqrt(dx * dx + dy * dy);
-  if (d === 0) return null;
-  const sinAlphaRaw = (r1 - r2) / d;
-  if (Math.abs(sinAlphaRaw) > 1) return null; // one inside the other
-  const alpha = Math.asin(Math.max(-1, Math.min(1, sinAlphaRaw)));
-  const theta = Math.atan2(dy, dx);
-  // Top-side tangent (CCW outer envelope)
-  const angle = theta + Math.PI / 2 + alpha;
-  const tp1: readonly [number, number] = [c1x + r1 * Math.cos(angle), c1y + r1 * Math.sin(angle)];
-  const tp2: readonly [number, number] = [c2x + r2 * Math.cos(angle), c2y + r2 * Math.sin(angle)];
-  return [tp1, tp2] as const;
+  const alpha = Math.asin((p1.radius - p2.radius) / d);
+  const angle = Math.atan2(dy, dx) + Math.PI / 2 + alpha;
+  return [
+    [c1x + p1.radius * Math.cos(angle), c1y + p1.radius * Math.sin(angle)],
+    [c2x + p2.radius * Math.cos(angle), c2y + p2.radius * Math.sin(angle)],
+  ];
 }
 
-/**
- * Sample a CCW arc on a circle centred at (cx,cy) with radius r,
- * from startAngle to endAngle (both in radians, CCW positive).
- * The arc goes CCW from startAngle to endAngle, wrapping if necessary.
- * Returns `arcSamples` interior chord points (not including the start point;
- * the end point IS included).  This means the caller can safely concatenate
- * arrays without duplicating the join point.
- */
-function sampleArc(
-  cx: number,
-  cy: number,
-  r: number,
-  startAngle: number,
-  endAngle: number,
-  arcSamples: number,
-): ReadonlyArray<readonly [number, number]> {
-  // Normalise endAngle so it is > startAngle (CCW sweep)
+/** CCW sweep from `startAngle` to `endAngle`, normalised into (0, 2π]. */
+function ccwSweep(startAngle: number, endAngle: number): number {
   let sweep = endAngle - startAngle;
   while (sweep <= 0) sweep += 2 * Math.PI;
   while (sweep > 2 * Math.PI) sweep -= 2 * Math.PI;
+  return sweep;
+}
 
-  const pts: Array<readonly [number, number]> = [];
-  // Emit arcSamples points: skip i=0 (that's the tangent point already added),
-  // include i=arcSamples (the outgoing tangent point on this pulley).
-  for (let i = 1; i <= arcSamples; i++) {
-    const t = startAngle + (sweep * i) / arcSamples;
-    pts.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
-  }
-  return pts;
+/**
+ * `arcSamples` chord points on `pulley` from `startAngle` CCW to `endAngle` (radians): the start point
+ * is excluded and the end point included, so consecutive runs concatenate without duplicates.
+ */
+function sampleArc(
+  pulley: PulleySpec,
+  startAngle: number,
+  endAngle: number,
+  arcSamples: number,
+): Point[] {
+  const [cx, cy] = pulley.center;
+  const sweep = ccwSweep(startAngle, endAngle);
+  return Array.from({ length: arcSamples }, (_, i): Point => {
+    const t = startAngle + (sweep * (i + 1)) / arcSamples;
+    return [cx + pulley.radius * Math.cos(t), cy + pulley.radius * Math.sin(t)];
+  });
 }
 
 /**
@@ -137,18 +123,19 @@ export const drawBeltAround = defineCommand({
     {
       pulleys: pulleyInput,
       arcSamples = 12,
-      position = [0, 0, 0] as const,
-      rotation = [0, 0, 0],
+      position = ORIGIN,
+      rotation = ORIGIN,
       color = DEFAULT_DRAW_COLOR,
       name,
     },
   ): CommandResult => {
     const pulleys = pulleyInput as unknown as PulleySpec[];
-    if (pulleys.length < 2) {
-      return noop(doc, `draw_belt_around: requires at least 2 pulleys (got ${pulleys.length}).`);
+    const n = pulleys.length;
+    if (n < 2) {
+      return noop(doc, `draw_belt_around: requires at least 2 pulleys (got ${n}).`);
     }
 
-    if (!Number.isFinite(arcSamples) || arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
+    if (arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
       return noop(
         doc,
         `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
@@ -156,7 +143,7 @@ export const drawBeltAround = defineCommand({
     }
     const samplesInt = Math.round(arcSamples);
 
-    for (let i = 0; i < pulleys.length; i++) {
+    for (let i = 0; i < n; i++) {
       const p = pulleys[i]!;
       if (p.center.length < 2) {
         return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
@@ -176,13 +163,12 @@ export const drawBeltAround = defineCommand({
       }
     }
 
-    const n = pulleys.length;
     for (let i = 0; i < n; i++) {
       const ni = (i + 1) % n;
       const p1 = pulleys[i]!;
       const p2 = pulleys[ni]!;
-      const dx = p2.center[0]! - p1.center[0]!;
-      const dy = p2.center[1]! - p1.center[1]!;
+      const dx = p2.center[0] - p1.center[0];
+      const dy = p2.center[1] - p1.center[1];
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d === 0) {
         return noop(
@@ -199,71 +185,33 @@ export const drawBeltAround = defineCommand({
     }
 
     // tangentPairs[i] = [outgoing TP on pulleys[i], incoming TP on pulleys[(i+1)%n]]
-    type TangentPair = readonly [readonly [number, number], readonly [number, number]];
-    const tangentPairs: TangentPair[] = [];
-    for (let i = 0; i < n; i++) {
-      const ni = (i + 1) % n;
-      const p1 = pulleys[i]!;
-      const p2 = pulleys[ni]!;
-      const result = externalTangentPoints(
-        p1.center[0]!,
-        p1.center[1]!,
-        p1.radius,
-        p2.center[0]!,
-        p2.center[1]!,
-        p2.radius,
-      );
-      if (result === null) {
-        return noop(
-          doc,
-          `draw_belt_around: failed to compute tangent between pulleys[${i}] and pulleys[${ni}].`,
-        );
-      }
-      tangentPairs.push(result);
-    }
+    const tangentPairs = pulleys.map((pulley, i) =>
+      externalTangentPoints(pulley, pulleys[(i + 1) % n]!),
+    );
 
-    // Per pulley i: outTP[i], then the wrap arc on pulleys[i+1] from inTP[i+1] to outTP[i+1].
-    const points: Array<readonly [number, number]> = [];
-
+    const points: Point[] = [];
     let totalLength = 0;
-
     for (let i = 0; i < n; i++) {
       const ni = (i + 1) % n;
-      const outTP = tangentPairs[i]![0]; // outgoing TP on pulley i
-      const inTP = tangentPairs[i]![1]; // incoming TP on pulley ni
-
+      const [outTP, inTP] = tangentPairs[i]!;
       points.push(outTP);
 
       const tdx = inTP[0] - outTP[0];
       const tdy = inTP[1] - outTP[1];
       totalLength += Math.sqrt(tdx * tdx + tdy * tdy);
 
+      // Wrap arc on pulleys[ni] from its incoming tangent point to its outgoing one.
       const pni = pulleys[ni]!;
-      const outTPni = tangentPairs[ni]![0]; // outgoing TP on pulley ni
-
-      const inAngle = Math.atan2(inTP[1] - pni.center[1]!, inTP[0] - pni.center[0]!);
-      const outAngle = Math.atan2(outTPni[1] - pni.center[1]!, outTPni[0] - pni.center[0]!);
-
-      const arcPts = sampleArc(
-        pni.center[0]!,
-        pni.center[1]!,
-        pni.radius,
-        inAngle,
-        outAngle,
-        samplesInt,
-      );
-      points.push(...arcPts);
-
-      let arcSweep = outAngle - inAngle;
-      while (arcSweep <= 0) arcSweep += 2 * Math.PI;
-      while (arcSweep > 2 * Math.PI) arcSweep -= 2 * Math.PI;
-      totalLength += pni.radius * arcSweep;
+      const outTPni = tangentPairs[ni]![0];
+      const inAngle = Math.atan2(inTP[1] - pni.center[1], inTP[0] - pni.center[0]);
+      const outAngle = Math.atan2(outTPni[1] - pni.center[1], outTPni[0] - pni.center[0]);
+      points.push(...sampleArc(pni, inAngle, outAngle, samplesInt));
+      totalLength += pni.radius * ccwSweep(inAngle, outAngle);
     }
 
     const { minX, minY, maxX, maxY } = pointsExtent(points);
 
     const id = nextId('belt');
-
     const entity = newEntity(
       'polyline',
       id,
@@ -273,12 +221,11 @@ export const drawBeltAround = defineCommand({
       { rotation: finiteVec3OrZero(rotation, true), name },
     );
 
-    return {
-      document: withEntity(doc, entity),
-      summary:
-        `Drew belt ${id}: ${n} pulleys, length ≈ ${compactNumber(totalLength)}, ` +
+    return commitEntity(
+      doc,
+      entity,
+      `Drew belt ${id}: ${n} pulleys, length ≈ ${compactNumber(totalLength)}, ` +
         `bounds x=[${compactNumber(minX)}, ${compactNumber(maxX)}] y=[${compactNumber(minY)}, ${compactNumber(maxY)}].`,
-      affected: [id],
-    };
+    );
   },
 });

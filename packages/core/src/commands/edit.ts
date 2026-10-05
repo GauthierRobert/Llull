@@ -10,7 +10,8 @@ import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { ORIGIN } from '../lib/vec3';
 import { noop } from './noop';
-import { replaceEntity, withEntity } from './entityOps';
+import { commitEntity } from './commitEntity';
+import { replaceEntity } from './entityOps';
 import { translated } from './geometryShared';
 
 /**
@@ -39,11 +40,11 @@ export const duplicateEntity = defineCommand({
     }
 
     const newId = nextId(source.kind);
-    return {
-      document: withEntity(doc, { ...translated(source, offset), id: newId }),
-      summary: `Duplicated ${id} → ${newId} at offset [${offset.join(', ')}].`,
-      affected: [newId],
-    };
+    return commitEntity(
+      doc,
+      { ...translated(source, offset), id: newId },
+      `Duplicated ${id} → ${newId} at offset [${offset.join(', ')}].`,
+    );
   },
 });
 

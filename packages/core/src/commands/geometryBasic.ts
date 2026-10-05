@@ -7,14 +7,13 @@ import {
   DEFAULT_SOLID_COLOR,
   anchorField,
   commitSolid,
+  placeSolid,
   positionField,
   rejectBadSize,
-  resolveRotation,
-  resolvePosition,
   rotationField,
   translated,
 } from './geometryShared';
-import { ORIGIN } from '../lib/vec3';
+import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
 import { noop } from './noop';
 
 /**
@@ -53,17 +52,21 @@ export const addBox = defineCommand({
     doc,
     { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    const [w, h, d] = size;
     const rejected = rejectBadSize(doc, 'add_box', size);
     if (rejected) return rejected;
-    // Default anchor for box is 'center': stored position IS the geometric center.
-    // Half-extents from center: [w/2, h/2, d/2].
-    const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'center', anchor, position);
-    const id = nextId('box');
-    const entity = newEntity('box', id, { size }, storedPosition, color, {
-      rotation: resolveRotation(rotation),
+    const [w, h, d] = size;
+    return placeSolid(doc, {
+      kind: 'box',
+      idPrefix: 'box',
+      geometry: { size },
+      halfExtents: [w / 2, h / 2, d / 2],
+      defaultAnchor: 'center',
+      anchor,
+      position,
+      rotation,
+      color,
+      describe: (id) => `Added box ${id} of size ${size.join('×')}`,
     });
-    return commitSolid(doc, entity, `Added box ${id} of size ${size.join('×')}`);
   },
 });
 
@@ -98,13 +101,13 @@ export const extrude = defineCommand({
     color: colorField('#c8553d'),
   }),
   run: (doc, { profile, depth, position = ORIGIN, rotation, color = '#c8553d' }): CommandResult => {
-    if (!Array.isArray(profile) || profile.length < 3) {
+    if (profile.length < 3) {
       return noop(
         doc,
         `extrude_profile: profile must be an array of at least 3 [x,y] points; no-op.`,
       );
     }
-    if (!Number.isFinite(depth) || depth <= 0) {
+    if (depth <= 0) {
       return noop(
         doc,
         `extrude_profile: depth must be a finite number > 0 (got ${String(depth)}); no-op.`,
@@ -112,7 +115,7 @@ export const extrude = defineCommand({
     }
     const id = nextId('ext');
     const entity = newEntity('extrusion', id, { profile, depth }, position, color, {
-      rotation: resolveRotation(rotation),
+      rotation: finiteVec3OrZero(rotation),
     });
     return commitSolid(doc, entity, `Extruded a ${profile.length}-point profile by ${depth}`);
   },

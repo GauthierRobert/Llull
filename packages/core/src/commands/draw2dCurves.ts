@@ -1,19 +1,14 @@
-import type { Vec3, Vec2 } from '../model/types';
+import type { Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { newEntity } from './newEntity';
 import { compactNumber } from '../lib/compactNumber';
 import { defineCommand, z, colorField, looseVec2 as vec2 } from './schema';
 import { nextId } from '../lib/id';
-import { finiteVec3OrZero } from '../lib/vec3';
+import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
 import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from './limits';
 import { sampleInvolute } from './gears';
-import {
-  DEFAULT_DRAW_COLOR,
-  pointSeriesEntity,
-  rejectTooFewPoints,
-  workPlanePositionField,
-} from './draw2dShared';
-import { withEntity } from './entityOps';
+import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlanePositionField } from './draw2dShared';
+import { commitEntity } from './commitEntity';
 import { pointsExtent } from './sceneBounds';
 import { noop } from './noop';
 
@@ -44,7 +39,7 @@ export const drawEllipse = defineCommand({
   }),
   run: (
     doc,
-    { center, radiusX, radiusY, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
+    { center, radiusX, radiusY, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (radiusX <= 0 || radiusY <= 0) {
       return noop(
@@ -61,11 +56,11 @@ export const drawEllipse = defineCommand({
       position,
       color,
     );
-    return {
-      document: withEntity(doc, entity),
-      summary: `Drew ellipse ${id} center [${safeCenter.join(', ')}] radiusX ${radiusX} radiusY ${radiusY}.`,
-      affected: [id],
-    };
+    return commitEntity(
+      doc,
+      entity,
+      `Drew ellipse ${id} center [${safeCenter.join(', ')}] radiusX ${radiusX} radiusY ${radiusY}.`,
+    );
   },
 });
 
@@ -102,23 +97,15 @@ export const drawSpline = defineCommand({
   }),
   run: (
     doc,
-    { points, closed = false, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
+    { points, closed = false, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
-    const tooFew = rejectTooFewPoints(doc, 'draw_spline', points);
-    if (tooFew) return tooFew;
     if (points.length > MAX_SPLINE_CONTROL_POINTS) {
       return noop(
         doc,
         `draw_spline: ${points.length} points exceeds MAX_SPLINE_CONTROL_POINTS (${MAX_SPLINE_CONTROL_POINTS}).`,
       );
     }
-    const id = nextId('spline');
-    const entity = pointSeriesEntity('spline', id, points, closed, position, color);
-    return {
-      document: withEntity(doc, entity),
-      summary: `Drew spline ${id} with ${points.length} points${closed ? ' (closed)' : ''}.`,
-      affected: [id],
-    };
+    return drawPointSeries(doc, 'spline', points, closed, position, color);
   },
 });
 
@@ -192,25 +179,12 @@ export const drawInvolute = defineCommand({
       startAngle = 0,
       endAngle,
       samples = 24,
-      position = [0, 0, 0] as const,
-      rotation = [0, 0, 0],
+      position = ORIGIN,
+      rotation = ORIGIN,
       color = DEFAULT_DRAW_COLOR,
       name,
     },
   ): CommandResult => {
-    if (!Number.isFinite(baseRadius)) {
-      return noop(doc, `draw_involute: baseRadius must be finite, got ${String(baseRadius)}.`);
-    }
-    if (!Number.isFinite(startAngle)) {
-      return noop(doc, `draw_involute: startAngle must be finite, got ${String(startAngle)}.`);
-    }
-    if (!Number.isFinite(endAngle)) {
-      return noop(doc, `draw_involute: endAngle must be finite, got ${String(endAngle)}.`);
-    }
-    if (!Number.isFinite(samples)) {
-      return noop(doc, `draw_involute: samples must be finite, got ${String(samples)}.`);
-    }
-
     if (baseRadius <= 0) {
       return noop(doc, `draw_involute: baseRadius must be > 0, got ${baseRadius}.`);
     }
@@ -228,27 +202,29 @@ export const drawInvolute = defineCommand({
       );
     }
 
-    const resolvedPos: Vec3 = finiteVec3OrZero(position);
-
-    const resolvedRot: Vec3 = finiteVec3OrZero(rotation);
-
-    const rawPoints = sampleInvolute(baseRadius, startAngle, endAngle, samplesInt);
-    const pts: ReadonlyArray<Vec2> = rawPoints.map(([x, y]) => [x, y] as Vec2);
-
-    const { minX, minY, maxX, maxY } = pointsExtent(pts);
+    const points: ReadonlyArray<Vec2> = sampleInvolute(
+      baseRadius,
+      startAngle,
+      endAngle,
+      samplesInt,
+    ).map(([x, y]) => [x, y]);
+    const { minX, minY, maxX, maxY } = pointsExtent(points);
 
     const id = nextId('inv');
-    const entity = newEntity('polyline', id, { points: pts, closed: false }, resolvedPos, color, {
-      rotation: resolvedRot,
-      name,
-    });
+    const entity = newEntity(
+      'polyline',
+      id,
+      { points, closed: false },
+      finiteVec3OrZero(position),
+      color,
+      { rotation: finiteVec3OrZero(rotation), name },
+    );
 
-    return {
-      document: withEntity(doc, entity),
-      summary:
-        `Drew involute ${id}: baseRadius=${compactNumber(baseRadius)} t=[${compactNumber(startAngle)}, ${compactNumber(endAngle)}] ` +
+    return commitEntity(
+      doc,
+      entity,
+      `Drew involute ${id}: baseRadius=${compactNumber(baseRadius)} t=[${compactNumber(startAngle)}, ${compactNumber(endAngle)}] ` +
         `samples=${samplesInt} AABB x=[${compactNumber(minX)}, ${compactNumber(maxX)}] y=[${compactNumber(minY)}, ${compactNumber(maxY)}].`,
-      affected: [id],
-    };
+    );
   },
 });

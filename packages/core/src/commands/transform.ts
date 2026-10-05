@@ -242,16 +242,17 @@ export const mirrorEntity = defineCommand({
   },
 });
 
-/** `doc` plus a copy of `source` per `[position, rotation]`; copy ids in order. */
-function addCopies(
+/** `doc` plus a copy of `source` per `{ position, rotation }` (rotation defaults to the source's); copy ids in order. */
+export function addCopies(
   doc: CadDocument,
   source: Entity,
   placements: ReadonlyArray<{ position: Vec3; rotation?: Vec3 }>,
+  idPrefix: string = source.kind,
 ): { document: CadDocument; newIds: string[] } {
   let document = doc;
   const newIds: string[] = [];
   for (const { position, rotation = source.rotation } of placements) {
-    const id = nextId(source.kind);
+    const id = nextId(idPrefix);
     document = withEntity(document, { ...source, id, position, rotation });
     newIds.push(id);
   }
@@ -292,13 +293,6 @@ export const arrayLinear = defineCommand({
         `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
       );
     }
-    if (!offset.every(Number.isFinite)) {
-      return noop(
-        doc,
-        `array_linear: offset must be finite (got [${offset.join(', ')}]); entity ${id} unchanged.`,
-      );
-    }
-
     const { document, newIds } = addCopies(
       doc,
       target,
