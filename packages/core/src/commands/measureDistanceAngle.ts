@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { formatLength } from './units';
 import { boundsCenter, entityBounds } from './sceneBounds';
-import { distanceSq3 } from '../lib/vec3';
+import { distanceSq3, dot3, sub3 } from '../lib/vec3';
 import { noop } from './noop';
 interface MeasureDistanceData {
   distance: number;
@@ -51,7 +51,7 @@ export const measureDistance = defineCommand({
   run: (doc, { point1, point2, entityId1, entityId2 }): CommandResult => {
     let locA: Vec3 | undefined;
     if (point1) {
-      locA = [point1[0], point1[1], point1[2]];
+      locA = point1;
     } else if (entityId1) {
       const e = doc.entities[entityId1];
       if (!e) {
@@ -62,7 +62,7 @@ export const measureDistance = defineCommand({
 
     let locB: Vec3 | undefined;
     if (point2) {
-      locB = [point2[0], point2[1], point2[2]];
+      locB = point2;
     } else if (entityId2) {
       const e = doc.entities[entityId2];
       if (!e) {
@@ -72,13 +72,11 @@ export const measureDistance = defineCommand({
     }
 
     if (!locA || !locB) {
-      return {
-        document: doc,
-        summary:
-          'measure_distance: provide two locations — each as a point [x,y,z] (point1/point2) ' +
+      return noop(
+        doc,
+        'measure_distance: provide two locations — each as a point [x,y,z] (point1/point2) ' +
           'or an entity id (entityId1/entityId2).',
-        affected: [],
-      };
+      );
     }
 
     const distance = Math.sqrt(distanceSq3(locA, locB));
@@ -136,8 +134,8 @@ export const measureAngle = defineCommand({
 
     if (points) {
       const [vertex, arm1, arm2] = points;
-      vA = [arm1[0] - vertex[0], arm1[1] - vertex[1], arm1[2] - vertex[2]];
-      vB = [arm2[0] - vertex[0], arm2[1] - vertex[1], arm2[2] - vertex[2]];
+      vA = sub3(arm1, vertex);
+      vB = sub3(arm2, vertex);
     } else if (lineId1 && lineId2) {
       const e1 = doc.entities[lineId1];
       const e2 = doc.entities[lineId2];
@@ -162,22 +160,19 @@ export const measureAngle = defineCommand({
       vA = [e1.end[0] - e1.start[0], e1.end[1] - e1.start[1], 0];
       vB = [e2.end[0] - e2.start[0], e2.end[1] - e2.start[1], 0];
     } else {
-      return {
-        document: doc,
-        summary:
-          'measure_angle: provide either points (3 world-space points) or lineId1 + lineId2.',
-        affected: [],
-      };
+      return noop(
+        doc,
+        'measure_angle: provide either points (3 world-space points) or lineId1 + lineId2.',
+      );
     }
 
-    const lenA = Math.sqrt(vA[0] * vA[0] + vA[1] * vA[1] + vA[2] * vA[2]);
-    const lenB = Math.sqrt(vB[0] * vB[0] + vB[1] * vB[1] + vB[2] * vB[2]);
+    const lenA = Math.sqrt(dot3(vA, vA));
+    const lenB = Math.sqrt(dot3(vB, vB));
     if (lenA < 1e-12 || lenB < 1e-12) {
       return noop(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
     }
 
-    const dot = vA[0] * vB[0] + vA[1] * vB[1] + vA[2] * vB[2];
-    const radians = Math.acos(Math.max(-1, Math.min(1, dot / (lenA * lenB))));
+    const radians = Math.acos(Math.max(-1, Math.min(1, dot3(vA, vB) / (lenA * lenB))));
     const degrees = (radians * 180) / Math.PI;
     const data: MeasureAngleData = { degrees, radians };
     return {

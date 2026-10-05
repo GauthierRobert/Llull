@@ -1,15 +1,15 @@
 /**
- * Shared tessellation constants and low-level pure geometry helpers.
- *
- * Both `render.ts` (SVG painter) and `export.ts` (STL/triangle-mesh) use the same
- * segmentation constants and `circlePoints` helper. Centralising them here ensures
- * both callers stay in sync and removes the duplicated definitions.
+ * Tessellation constants and low-level pure geometry helpers shared by the SVG renderer
+ * (`renderTessellation3D.ts`) and the triangle exporters (`exportTriangulate.ts`), so both
+ * segment and wind every primitive the same way.
  *
  * @layer core/commands
  * @pure all exports are side-effect-free pure functions
  */
 
 import type { Vec3 } from '../model/types';
+import { cross3, normalize3, sub3 } from '../lib/vec3';
+import { signedArea } from '../lib/polygon';
 
 /** Segments used for circular cross-sections (cylinder, cone, torus ring). */
 export const SEG_CIRCLE = 24;
@@ -43,6 +43,27 @@ export function circlePoints(cx: number, cy: number, cz: number, r: number, segs
     pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a), cz]);
   }
   return pts;
+}
+
+/** Unit facet normal of triangle `v0 v1 v2` (right-hand rule: counter-clockwise ⇒ outward). */
+export function facetNormal(v0: Vec3, v1: Vec3, v2: Vec3): Vec3 {
+  return normalize3(cross3(sub3(v1, v0), sub3(v2, v0)));
+}
+
+/** Consecutive vertex pairs `[ring[i], ring[i + 1]]` around a closed ring (the last wraps to the first). */
+export function ringEdges(ring: readonly Vec3[]): Array<[Vec3, Vec3]> {
+  return ring.map((vertex, i) => [vertex, ring[(i + 1) % ring.length] as Vec3]);
+}
+
+/** Side wall between two equal-length rings: one quad `[bottom[i], bottom[j], top[j], top[i]]` per edge (j = i + 1, wrapping). */
+export function sideQuads(
+  bottom: readonly Vec3[],
+  top: readonly Vec3[],
+): Array<[Vec3, Vec3, Vec3, Vec3]> {
+  return bottom.map((_, i) => {
+    const j = (i + 1) % bottom.length;
+    return [bottom[i] as Vec3, bottom[j] as Vec3, top[j] as Vec3, top[i] as Vec3];
+  });
 }
 
 /**
@@ -118,17 +139,8 @@ export function earClipTriangulate(
     return true;
   }
 
-  // Ensure CCW winding (shoelace sign).
-  let area2 = 0;
-  for (let i = 0; i < n; i++) {
-    const [ax, ay] = pts[i]!;
-    const [bx, by] = pts[(i + 1) % n]!;
-    area2 += ax * by - bx * ay;
-  }
-  if (area2 < 0) {
-    // CW polygon — reverse so all isEar tests use CCW convention.
-    indices.reverse();
-  }
+  // CW polygon — reverse so all isEar tests use CCW convention.
+  if (signedArea(pts) < 0) indices.reverse();
 
   // Ear-clipping loop: remove ears one by one until a triangle remains.
   let attempts = 0;

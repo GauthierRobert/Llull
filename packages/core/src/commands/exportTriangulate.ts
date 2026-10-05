@@ -10,6 +10,8 @@ import {
   extrusionRings,
   meshTriangles,
   pyramidCorners,
+  ringEdges,
+  sideQuads,
   sphereQuads,
   torusQuads,
   wedgeCorners,
@@ -17,10 +19,6 @@ import {
 import { type Triangle, fanTriangulate, earClipTriangulateVerts } from './exportMath';
 
 type Kind<K extends Entity['kind']> = Extract<Entity, { kind: K }>;
-
-/** Ring index pairs `[i, j]` around a closed ring of `count` vertices. */
-const ringEdges = (count: number): Array<[number, number]> =>
-  Array.from({ length: count }, (_, i) => [i, (i + 1) % count]);
 
 function triangulateBox(e: Kind<'box'>): Triangle[] {
   const { x0, x1, y0, y1, z0, z1 } = boxExtents(e.position, e.size);
@@ -72,42 +70,30 @@ function triangulateCylinder(e: Kind<'cylinder'>): Triangle[] {
   const zt = pz + e.height / 2;
   const bot = circlePoints(px, py, zb, e.radius, SEG_CIRCLE);
   const top = circlePoints(px, py, zt, e.radius, SEG_CIRCLE);
-  const edges = ringEdges(SEG_CIRCLE);
   return [
-    ...edges.map(([i, j]): Triangle => [[px, py, zb], bot[j]!, bot[i]!]),
-    ...edges.map(([i, j]): Triangle => [[px, py, zt], top[i]!, top[j]!]),
-    ...edges.flatMap(([i, j]): Triangle[] => [
-      [bot[i]!, bot[j]!, top[j]!],
-      [bot[i]!, top[j]!, top[i]!],
-    ]),
+    ...ringEdges(bot).map(([from, to]): Triangle => [[px, py, zb], to, from]),
+    ...ringEdges(top).map(([from, to]): Triangle => [[px, py, zt], from, to]),
+    ...sideQuads(bot, top).flatMap(fanTriangulate),
   ];
 }
 
 function triangulateSphere(e: Kind<'sphere'>): Triangle[] {
-  return sphereQuads(e.position, e.radius).flatMap(([v00, v01, v11, v10]): Triangle[] => [
-    [v00, v01, v11],
-    [v00, v11, v10],
-  ]);
+  return sphereQuads(e.position, e.radius).flatMap(fanTriangulate);
 }
 
 function triangulateCone(e: Kind<'cone'>): Triangle[] {
   const [px, py, pz] = e.position;
   const base = circlePoints(px, py, pz, e.radius, SEG_CIRCLE);
   const apex: Vec3 = [px, py, pz + e.height];
-  const edges = ringEdges(SEG_CIRCLE);
+  const edges = ringEdges(base);
   return [
-    ...edges.map(([i, j]): Triangle => [[px, py, pz], base[j]!, base[i]!]),
-    ...edges.map(([i, j]): Triangle => [base[i]!, base[j]!, apex]),
+    ...edges.map(([from, to]): Triangle => [[px, py, pz], to, from]),
+    ...edges.map(([from, to]): Triangle => [from, to, apex]),
   ];
 }
 
 function triangulateTorus(e: Kind<'torus'>): Triangle[] {
-  return torusQuads(e.position, e.ringRadius, e.tubeRadius).flatMap(
-    ([v00, v10, v11, v01]): Triangle[] => [
-      [v00, v10, v11],
-      [v00, v11, v01],
-    ],
-  );
+  return torusQuads(e.position, e.ringRadius, e.tubeRadius).flatMap(fanTriangulate);
 }
 
 function triangulateWedge(e: Kind<'wedge'>): Triangle[] {
@@ -139,18 +125,14 @@ function triangulateExtrusion(e: Kind<'extrusion'>): Triangle[] {
     // Ear clipping handles non-convex profiles; the bottom cap is reversed (face down).
     ...earClipTriangulateVerts([...bottom].reverse()),
     ...earClipTriangulateVerts([...top]),
-    ...ringEdges(e.profile.length).flatMap(([i, j]): Triangle[] => [
-      [bottom[i]!, bottom[j]!, top[j]!],
-      [bottom[i]!, top[j]!, top[i]!],
-    ]),
+    ...sideQuads(bottom, top).flatMap(fanTriangulate),
   ];
 }
 
 function applyRotationToTriangles(tris: Triangle[], position: Vec3, rotation: Vec3): Triangle[] {
   if (isZeroRotation(rotation)) return tris;
-  return tris.map(
-    (tri) => tri.map((v) => applyEulerXYZ(v, position, rotation)) as unknown as Triangle,
-  );
+  const rotate = (v: Vec3): Vec3 => applyEulerXYZ(v, position, rotation);
+  return tris.map(([a, b, c]): Triangle => [rotate(a), rotate(b), rotate(c)]);
 }
 
 /** Triangles of a non-instance entity before its own `rotation` is applied (world position baked in). */

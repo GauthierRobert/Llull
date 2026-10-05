@@ -41,19 +41,21 @@ export const measureArea = defineCommand({
   }),
   run: (doc, { entityId, points }): CommandResult => {
     const areaUnit = `${doc.units}²`;
+    const measured = (area: number, subject: string): CommandResult => {
+      const data: MeasureAreaData = { area, unit: areaUnit };
+      return {
+        document: doc,
+        summary: `Area${subject} = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`,
+        affected: [],
+        data,
+      };
+    };
 
     if (points) {
       if (points.length < 3) {
         return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
       }
-      const area = polygonArea(points);
-      const data: MeasureAreaData = { area, unit: areaUnit };
-      return {
-        document: doc,
-        summary: `Area = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`,
-        affected: [],
-        data,
-      };
+      return measured(polygonArea(points), '');
     }
 
     if (!entityId) {
@@ -65,15 +67,12 @@ export const measureArea = defineCommand({
       return noop(doc, `measure_area: entity '${entityId}' not found.`);
     }
 
-    let area: number;
     switch (e.kind) {
       case 'circle':
-        area = Math.PI * e.radius * e.radius;
-        break;
+        return measured(Math.PI * e.radius * e.radius, ` of ${entityId}`);
       case 'rectangle':
-        area = e.width * e.height;
-        break;
-      case 'polyline': {
+        return measured(e.width * e.height, ` of ${entityId}`);
+      case 'polyline':
         if (!e.closed) {
           return noop(
             doc,
@@ -83,23 +82,13 @@ export const measureArea = defineCommand({
         if (e.points.length < 3) {
           return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
         }
-        area = polygonArea(e.points);
-        break;
-      }
+        return measured(polygonArea(e.points), ` of ${entityId}`);
       default:
         return noop(
           doc,
           `measure_area: entity '${entityId}' is kind '${e.kind}'; supported kinds are 'circle', 'rectangle', 'polyline'.`,
         );
     }
-
-    const data: MeasureAreaData = { area, unit: areaUnit };
-    return {
-      document: doc,
-      summary: `Area of ${entityId} = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`,
-      affected: [],
-      data,
-    };
   },
 });
 
@@ -161,13 +150,11 @@ export const measurePerimeter = defineCommand({
         break;
       }
       default:
-        return {
-          document: doc,
-          summary:
-            `measure_perimeter: entity '${entityId}' is kind '${e.kind}'; ` +
+        return noop(
+          doc,
+          `measure_perimeter: entity '${entityId}' is kind '${e.kind}'; ` +
             "supported kinds are 'line', 'polyline', 'rectangle', 'circle', 'arc'.",
-          affected: [],
-        };
+        );
     }
 
     const data: MeasurePerimeterData = { perimeter, unit: doc.units };

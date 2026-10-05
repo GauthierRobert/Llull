@@ -4,34 +4,28 @@
  * partial / transformed copies of the document; the input document is never mutated.
  */
 
-import type { CadDocument } from '../model/types';
+import type { CadDocument, Vec3 } from '../model/types';
 import { escapeXml } from '../lib/escapeXml';
-import { r2 } from './renderMath';
-import { type ViewName, makeProjector, computeOrthoHalf } from './renderCamera';
+import { type ViewName, boundsExtent, makeProjector, computeOrthoHalf } from './renderCamera';
 import { renderDocument } from './renderScene';
-import { extractSvgInner } from './renderSvg';
+import type { RenderViewData } from './renderTypes';
+import { extractSvgInner, r2, svgDocument } from './renderSvg';
 import { computeSceneSnapshot } from './scene';
 import { boundsCenter } from './sceneBounds';
 import { ORIGIN } from '../lib/vec3';
 
-const BACKGROUND = '#1a1a2e';
-
-/** Wrap layers in a `width`×`height` SVG with the standard dark background. */
-function svgDocument(width: number, height: number, layers: string[]): string {
-  return [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-    `  <rect width="${width}" height="${height}" fill="${BACKGROUND}"/>`,
-    ...layers,
-    '</svg>',
-  ].join('\n');
-}
-
-/** Copy of `doc` holding only the entities whose id satisfies `keep` (order preserved). */
-function subDocument(doc: CadDocument, keep: (id: string) => boolean): CadDocument {
+/** Render only the entities of `doc` whose id satisfies `keep` (document order preserved). */
+function renderSubset(
+  doc: CadDocument,
+  keep: (id: string) => boolean,
+  view: ViewName,
+  width: number,
+  height: number,
+): RenderViewData {
   const order = doc.order.filter((id) => keep(id) && doc.entities[id] !== undefined);
   const entities: CadDocument['entities'] = {};
   for (const id of order) entities[id] = doc.entities[id] as CadDocument['entities'][string];
-  return { ...doc, entities, order };
+  return renderDocument({ ...doc, entities, order }, view, width, height);
 }
 
 /** Copy of `doc` with every entity rotated by `angleRad` about the vertical axis through (cx, cy). */
@@ -91,18 +85,8 @@ export function buildIsolateSvg(
   height: number,
 ): string {
   const highlighted = new Set(highlightIds);
-  const dim = renderDocument(
-    subDocument(doc, (id) => !highlighted.has(id)),
-    view,
-    width,
-    height,
-  );
-  const lit = renderDocument(
-    subDocument(doc, (id) => highlighted.has(id)),
-    view,
-    width,
-    height,
-  );
+  const dim = renderSubset(doc, (id) => !highlighted.has(id), view, width, height);
+  const lit = renderSubset(doc, (id) => highlighted.has(id), view, width, height);
   const caption = highlightIds.slice(0, 3).join(', ') + (highlightIds.length > 3 ? '…' : '');
   return svgDocument(width, height, [
     `  <g opacity="0.15">${extractSvgInner(dim.svg)}</g>`,
@@ -120,16 +104,11 @@ export function buildSectionSvg(
   width: number,
   height: number,
 ): string {
-  const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+  const axisIndex = 'xyz'.indexOf(axis);
   const onKeptSide = (id: string): boolean =>
     (doc.entities[id]?.position[axisIndex] ?? 0) >= offset;
-  const kept = renderDocument(subDocument(doc, onKeptSide), view, width, height);
-  const cut = renderDocument(
-    subDocument(doc, (id) => !onKeptSide(id)),
-    view,
-    width,
-    height,
-  );
+  const kept = renderSubset(doc, onKeptSide, view, width, height);
+  const cut = renderSubset(doc, (id) => !onKeptSide(id), view, width, height);
   return svgDocument(width, height, [
     `  <g opacity="0.25">${extractSvgInner(cut.svg)}</g>`,
     `  <g>${extractSvgInner(kept.svg)}</g>`,
@@ -138,38 +117,24 @@ export function buildSectionSvg(
   ]);
 }
 
-function sectionPlaneLine(
-  data: ReturnType<typeof renderDocument>,
-  axis: 'x' | 'y' | 'z',
-  offset: number,
-): string {
+function sectionPlaneLine(data: RenderViewData, axis: 'x' | 'y' | 'z', offset: number): string {
   const { bounds } = data;
-  const ext = bounds
-    ? Math.max(
-        bounds.max[0] - bounds.min[0],
-        bounds.max[1] - bounds.min[1],
-        bounds.max[2] - bounds.min[2],
-      ) * 1.5
-    : 10;
+  const ext = bounds ? boundsExtent(bounds) * 1.5 : 10;
   const [cx, cy, cz] = bounds ? boundsCenter(bounds) : ORIGIN;
-  const [p0, p1]: [[number, number, number], [number, number, number]] =
+  const along = (t: number): Vec3 =>
     axis === 'z'
-      ? [
-          [cx - ext, cy, offset],
-          [cx + ext, cy, offset],
-        ]
+      ? [cx + t, cy, offset]
       : axis === 'y'
-        ? [
-            [cx - ext, offset, cz],
-            [cx + ext, offset, cz],
-          ]
-        : [
-            [offset, cy - ext, cz],
-            [offset, cy + ext, cz],
-          ];
-  const project = makeProjector(data.camera, computeOrthoHalf(data), data.width, data.height);
-  const s0 = project(p0);
-  const s1 = project(p1);
+        ? [cx + t, offset, cz]
+        : [offset, cy + t, cz];
+  const project = makeProjector(
+    data.camera,
+    computeOrthoHalf(data.bounds),
+    data.width,
+    data.height,
+  );
+  const s0 = project(along(-ext));
+  const s1 = project(along(ext));
   return [
     `  <g id="section-plane">`,
     `    <line x1="${r2(s0[0])}" y1="${r2(s0[1])}" x2="${r2(s1[0])}" y2="${r2(s1[1])}"`,

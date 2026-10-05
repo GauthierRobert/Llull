@@ -112,8 +112,7 @@ async function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
     if (options.wasmBinary) opts['wasmBinary'] = options.wasmBinary;
     if (options.locateFile) opts['locateFile'] = options.locateFile;
 
-    const api = await factory(opts);
-    return api;
+    return factory(opts);
   })();
 
   return _modulePromise;
@@ -309,9 +308,8 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
       return withHandles((own) => {
         const shapeA = own(entityToOccShape(api, a));
         const shapeB = shapeA && own(entityToOccShape(api, b));
-        const builderName = BOOLEAN_BUILDERS[op];
-        if (!shapeA || !shapeB || !builderName) return null;
-        const builder = own(new api[builderName](shapeA, shapeB) as OccBuilder);
+        if (!shapeA || !shapeB) return null;
+        const builder = own(new api[BOOLEAN_BUILDERS[op]](shapeA, shapeB) as OccBuilder);
         builder.Build();
         return builder.IsDone() ? extractMeshData(api, own(builder.Shape())) : null;
       });

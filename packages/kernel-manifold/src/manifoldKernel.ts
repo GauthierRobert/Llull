@@ -286,8 +286,7 @@ export async function createManifoldKernel(): Promise<GeometryKernel> {
         const solidB = solidA && own(entityToManifold(mod, b));
         if (!solidA || !solidB) return null;
         const combine = { union: 'add', subtract: 'subtract', intersect: 'intersect' } as const;
-        const method = combine[op];
-        return method ? manifoldToMeshData(own(solidA[method](solidB))) : null;
+        return manifoldToMeshData(own(solidA[combine[op]](solidB)));
       });
     },
 

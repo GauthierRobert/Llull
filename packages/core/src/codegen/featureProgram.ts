@@ -84,29 +84,23 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
   const field = (key: string): unknown => child(raw, key);
   switch (entity.kind) {
     case 'box':
-      return { kind: 'box', size: term3(entity.size, field('size'), ctx) };
+    case 'wedge':
+      return { kind: entity.kind, size: term3(entity.size, field('size'), ctx) };
     case 'cylinder':
+    case 'cone':
       return {
-        kind: 'cylinder',
+        kind: entity.kind,
         radius: term(entity.radius, field('radius'), ctx),
         height: term(entity.height, field('height'), ctx),
       };
     case 'sphere':
       return { kind: 'sphere', radius: term(entity.radius, field('radius'), ctx) };
-    case 'cone':
-      return {
-        kind: 'cone',
-        radius: term(entity.radius, field('radius'), ctx),
-        height: term(entity.height, field('height'), ctx),
-      };
     case 'torus':
       return {
         kind: 'torus',
         ringRadius: term(entity.ringRadius, field('ringRadius'), ctx),
         tubeRadius: term(entity.tubeRadius, field('tubeRadius'), ctx),
       };
-    case 'wedge':
-      return { kind: 'wedge', size: term3(entity.size, field('size'), ctx) };
     case 'pyramid':
       return {
         kind: 'pyramid',
@@ -145,7 +139,7 @@ function solidFeature(
   raw: unknown,
   ctx: LowerContext,
   base: FeatureBase,
-): Feature {
+): Extract<Feature, { op: 'solid' }> {
   const shape = lowerShape(entity, doc, raw, ctx);
   const isMesh = shape.kind === 'mesh';
   return {
@@ -297,11 +291,7 @@ function lowerSnapshot(
       command: entity.kind,
       variable,
     });
-    features.push(
-      entity.name !== undefined && feature.op === 'solid'
-        ? { ...feature, name: entity.name }
-        : feature,
-    );
+    features.push(entity.name !== undefined ? { ...feature, name: entity.name } : feature);
   }
   return {
     units: doc.units,
@@ -339,8 +329,10 @@ function lowerStep(
   });
 
   const booleanKind = BOOLEAN_KINDS[step.name];
-  const left = variables.get(String(child(event.params, 'a')));
-  const right = variables.get(String(child(event.params, 'b')));
+  const operandA = String(child(event.params, 'a'));
+  const operandB = String(child(event.params, 'b'));
+  const left = variables.get(operandA);
+  const right = variables.get(operandB);
   if (
     booleanKind !== undefined &&
     createdSolid !== undefined &&
@@ -350,8 +342,8 @@ function lowerStep(
     left !== undefined &&
     right !== undefined
   ) {
-    variables.delete(String(child(event.params, 'b')));
-    variables.delete(String(child(event.params, 'a')));
+    variables.delete(operandB);
+    variables.delete(operandA);
     variables.set(createdSolid.id, left);
     return [{ ...base(left), op: 'boolean', kind: booleanKind, left, right }];
   }

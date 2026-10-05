@@ -6,9 +6,10 @@
  * @pure
  */
 
-import type { FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
+import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
 import {
   commentText,
+  featureLinesWithHeadings,
   formatDegrees,
   formatNumber,
   formatTerm,
@@ -17,7 +18,6 @@ import {
   provenance,
   quote,
   parameterLines,
-  stepHeading,
 } from './format';
 
 function vector(terms: readonly Term[]): string {
@@ -25,7 +25,7 @@ function vector(terms: readonly Term[]): string {
 }
 
 function polygon(profile: readonly Term2[]): string {
-  return `polygon([${profile.map((p) => vector(p)).join(', ')}])`;
+  return `polygon([${profile.map(vector).join(', ')}])`;
 }
 
 function half(term: Term): string {
@@ -132,38 +132,30 @@ export function emitOpenScad(program: FeatureProgram): string {
     version.set(variable, (version.get(variable) ?? 0) + 1);
     return current(variable);
   };
-  const colors = new Map<string, string>();
 
-  program.features.forEach((feature, i) => {
-    const heading = stepHeading(feature, program.features[i - 1]);
-    if (heading !== null) lines.push(`// ${heading}`);
+  const featureLine = (feature: Feature): string => {
     const v = feature.variable;
     switch (feature.op) {
       case 'solid': {
         const body = placed(shapeSource(feature.shape), feature.position, feature.rotation);
-        colors.set(v, feature.color);
-        lines.push(`module ${next(v)}() ${body};`);
-        break;
+        return `module ${next(v)}() ${body};`;
       }
       case 'boolean': {
         const left = current(feature.left);
         const right = current(feature.right);
-        lines.push(`module ${next(v)}() ${OPERATIONS[feature.kind]}() { ${left}(); ${right}(); }`);
-        break;
+        return `module ${next(v)}() ${OPERATIONS[feature.kind]}() { ${left}(); ${right}(); }`;
       }
       case 'translate': {
         const previous = current(v);
-        lines.push(`module ${next(v)}() translate(${vector(feature.delta)}) ${previous}();`);
-        break;
+        return `module ${next(v)}() translate(${vector(feature.delta)}) ${previous}();`;
       }
       case 'remove':
-        lines.push(`// ${v} removed`);
-        break;
+        return `// ${v} removed`;
       case 'label':
-        lines.push(`// ${v} labelled ${quote(feature.name)}`);
-        break;
+        return `// ${v} labelled ${quote(feature.name)}`;
     }
-  });
+  };
+  lines.push(...featureLinesWithHeadings(program, '//', featureLine));
 
   lines.push('', '// ── result ──');
   for (const output of program.outputs) {
