@@ -200,13 +200,11 @@ export const measureVolume = defineCommand({
         break;
       }
       default:
-        return {
-          document: doc,
-          summary:
-            `measure_volume: entity '${entityId}' is kind '${e.kind}'; ` +
+        return noop(
+          doc,
+          `measure_volume: entity '${entityId}' is kind '${e.kind}'; ` +
             "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
-          affected: [],
-        };
+        );
     }
 
     const data: MeasureVolumeData = { volume, unit: volumeUnit };

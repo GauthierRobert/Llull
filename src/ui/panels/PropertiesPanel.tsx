@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { is2D } from '@core/model/types';
@@ -173,10 +174,7 @@ function PropertiesBody(): React.ReactElement {
 
 export function PropertiesPanel({ className }: { className?: string }): React.ReactElement {
   return (
-    <aside
-      className={['panel properties-panel', className].filter(Boolean).join(' ')}
-      aria-label="Properties"
-    >
+    <aside className={classNames('panel properties-panel', className)} aria-label="Properties">
       <PanelHeader title="Properties" />
       <PropertiesBody />
     </aside>

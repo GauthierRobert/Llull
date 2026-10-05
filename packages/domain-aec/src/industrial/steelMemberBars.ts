@@ -7,7 +7,7 @@
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@core/model/building';
-import { fromMm, getBuilding } from '../model';
+import { elementsOf, fromMm, getBuilding } from '../model';
 import { findProfile, sectionProperties, type SteelProfile } from '../steel/profiles';
 import { yieldStrength } from './steelDesign';
 
@@ -115,9 +115,7 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
     if (element.category === 'plate')
       plateFixities.set(element.memberId, element.fixity ?? 'pinned');
   }
-  for (const id of building.elementOrder) {
-    const element = building.elements[id];
-    if (element?.category !== 'member') continue;
+  for (const element of elementsOf(building, 'member')) {
     const base = elevationMm(element.levelId);
     const point = (value: readonly number[]): Vec3 => [
       toMm(value[0] ?? 0),
@@ -216,6 +214,25 @@ export function compressionClass(profile: SteelProfile, fy: number): 1 | 2 | 3 |
       return null;
   }
 }
+
+/** Means of the groups of `values` whose neighbours (sorted) lie within `tolerance`: the levels they stand at. */
+export const clusterMeans = (values: ReadonlyArray<number>, tolerance: number): number[] => {
+  const groups: number[][] = [];
+  for (const value of [...values].sort((a, b) => a - b)) {
+    const last = groups[groups.length - 1];
+    if (last && value - (last[last.length - 1] as number) <= tolerance) last.push(value);
+    else groups.push([value]);
+  }
+  return groups.map((group) => group.reduce((sum, value) => sum + value, 0) / group.length);
+};
+
+/** Index of the value closest to `target` (the first on a tie). */
+export const nearestIndex = (values: ReadonlyArray<number>, target: number): number =>
+  values.reduce(
+    (best, value, index) =>
+      Math.abs(value - target) < Math.abs((values[best] as number) - target) ? index : best,
+    0,
+  );
 
 /** Shapes the beam check covers (principal-axis bending about the depth axis, no torsion). */
 export const isBeamShape = (profile: SteelProfile): boolean =>

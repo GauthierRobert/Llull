@@ -1,11 +1,9 @@
 /**
  * @layer ui/viewport/2d
  *
- * React hook: converts a raw cursor world position into a snapped position
- * by calling the pure helpers in snapping.ts against the live document.
- *
- * Deliberately thin — just wires the store read + pure helpers together.
- * No document mutation, no side effects (R1, R2).
+ * React hook: converts a raw cursor world position into a snapped position by calling the
+ * pure helpers in snapping/ against the live document. Deliberately thin — no document
+ * mutation, no side effects (R1, R2).
  */
 
 import { useMemo } from 'react';
@@ -13,6 +11,7 @@ import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { snap, applyOrthoPolar } from './snapping/resolveSnap';
 import { collectSnapCandidates } from './snapping/candidates';
+import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { SnapResult, SnapPoint, CollectOpts, OrthoPolarOpts } from './snapping/types';
 
 /** Shared empty result — avoids per-render allocation when no cursor snaps apply. */
@@ -120,4 +119,24 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
     cursorCandidates.length === 0 ? staticCandidates : [...staticCandidates, ...cursorCandidates];
 
   return snap(adjustedCursor, candidates, gridSize, tolerance);
+}
+
+/** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
+const SNAP_TOLERANCE_PX = 12;
+
+/**
+ * `useSnap` for the ortho 2D view at camera `zoom`: the snap grid tracks the visible adaptive mesh
+ * (selectable grid points at every zoom) and the aperture is pixel-constant, so geometric snaps
+ * stay grabbable from very zoomed out to very zoomed in.
+ */
+export function useZoomSnap(
+  cursor: Vec2 | null,
+  zoom: number,
+  drawOrigin: Vec2 | null = null,
+): SnapResult | null {
+  return useSnap(cursor, {
+    gridSize: adaptiveGridStep(zoom),
+    tolerance: pixelsToWorld(SNAP_TOLERANCE_PX, zoom),
+    drawOrigin,
+  });
 }

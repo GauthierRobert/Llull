@@ -7,6 +7,7 @@
 
 import type { BeamResult } from './steelFraming';
 import type { SteelBar } from './steelMemberBars';
+import { metres } from './steelMemberRows';
 
 /** Horizontal direction a frame resists: 'Y' for a frame in a plane x = const, 'X' for y = const. */
 export type FrameDirection = 'X' | 'Y';
@@ -37,8 +38,6 @@ export interface FrameDetection {
 /** A beam this close to the X or Y direction in plan lies in a vertical plane there, mm. */
 const PLANE_TOLERANCE = 50;
 const PLANE_SNAP = 100;
-
-const metres = (value: number): string => (value / 1000).toFixed(2);
 
 interface Candidate {
   readonly beam: BeamResult;

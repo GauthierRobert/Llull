@@ -12,18 +12,15 @@
 
 import type { CadDocument } from '../model/types';
 import { hashText } from '../lib/hash';
+import { LruCache } from '../lib/lruCache';
 
-export interface ReplayState {
+interface ReplayState {
   readonly doc: CadDocument;
   /** Legacy (pre-step-scoped) id remapping accumulated up to this state. */
   readonly idMap: ReadonlyMap<string, string>;
 }
 
-export interface ReplayCache {
-  get(key: string): ReplayState | undefined;
-  set(key: string, state: ReplayState): void;
-  readonly size: number;
-}
+export type ReplayCache = LruCache<ReplayState>;
 
 /** Key of the state after applying a step with `resolvedParams` to the state keyed `previous`. */
 export function nextStateKey(
@@ -36,26 +33,5 @@ export function nextStateKey(
 }
 
 export function createReplayCache(capacity = 256): ReplayCache {
-  const entries = new Map<string, ReplayState>();
-  return {
-    get(key) {
-      const state = entries.get(key);
-      if (state !== undefined) {
-        entries.delete(key);
-        entries.set(key, state);
-      }
-      return state;
-    },
-    set(key, state) {
-      entries.delete(key);
-      entries.set(key, state);
-      if (entries.size > capacity) {
-        const oldest = entries.keys().next().value;
-        if (oldest !== undefined) entries.delete(oldest);
-      }
-    },
-    get size() {
-      return entries.size;
-    },
-  };
+  return new LruCache(capacity);
 }

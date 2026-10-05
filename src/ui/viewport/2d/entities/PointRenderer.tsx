@@ -1,48 +1,33 @@
-/**
- * @layer ui/viewport/2d
- *
- * Render branch for `kind:'point'` entities.
- * Draws a small cross marker at the entity's position in the XY plane.
- * Geometry is memoized; disposed on unmount.
- */
+/** @layer ui/viewport/2d — render branch for `kind:'point'`: a small cross at the entity position. */
 
-import { useMemo } from 'react';
-import * as THREE from 'three';
 import type { PointEntity } from '@core/model/types';
-import { PlacedLineObject } from './PlacedLineObject';
-
-interface PointRendererProps {
-  entity: PointEntity;
-  selected: boolean;
-}
+import { flattenPoints } from '../../lineGeometry';
+import { ShapeLine } from './ShapeLine';
 
 const CROSS_SIZE = 0.1;
+/** Horizontal arm, then vertical arm — two independent segments. */
+const CROSS_POSITIONS = flattenPoints([
+  [-CROSS_SIZE, 0],
+  [CROSS_SIZE, 0],
+  [0, -CROSS_SIZE],
+  [0, CROSS_SIZE],
+]);
 
-export function PointRenderer({ entity, selected }: PointRendererProps): React.ReactElement | null {
-  const { position, color } = entity;
-
-  const segmentsObject = useMemo(() => {
-    // A small cross: horizontal + vertical arm drawn as two line segments.
-    const s = CROSS_SIZE;
-    const vertices = new Float32Array([
-      -s,
-      0,
-      0,
-      s,
-      0,
-      0, // horizontal arm
-      0,
-      -s,
-      0,
-      0,
-      s,
-      0, // vertical arm
-    ]);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    const mat = new THREE.LineBasicMaterial({ color: selected ? '#5b8dee' : color, linewidth: 2 });
-    return new THREE.LineSegments(geo, mat);
-  }, [color, selected]);
-
-  return <PlacedLineObject object={segmentsObject} position={position} />;
+export function PointRenderer({
+  entity: { position, color },
+  selected,
+}: {
+  entity: PointEntity;
+  selected: boolean;
+}): React.ReactElement {
+  return (
+    <ShapeLine
+      positions={CROSS_POSITIONS}
+      segments
+      linewidth={2}
+      position={position}
+      color={color}
+      selected={selected}
+    />
+  );
 }

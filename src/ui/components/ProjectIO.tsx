@@ -1,15 +1,9 @@
 /**
  * @layer ui/components
  *
- * ProjectIO — Save (export) and Open (import) the current llull document as a
- * JSON file. Pure UI: Save serialises the in-store document and triggers a
- * browser download; Open reads a chosen file and dispatches `load_document`
- * (the registered command — PRIME DIRECTIVE: never mutate the document outside
- * a command).
- *
- * Cross-session persistence between server restarts is handled separately by
- * the server-side autosave in `server/src/liveDocument.ts`; this surface lets
- * the user explicitly carry a project across machines / branches.
+ * ProjectIO — Save downloads the in-store document as JSON; Open reads a chosen file and
+ * dispatches `load_document` (PRIME DIRECTIVE: never mutate the document outside a command).
+ * Cross-session persistence is the server-side autosave in `server/src/liveDocument.ts`.
  */
 
 import React, { useRef } from 'react';
@@ -28,12 +22,11 @@ function timestamp(): string {
 }
 
 export function ProjectIO(): React.ReactElement {
-  const document = useStore((s) => s.document);
   const dispatch = useStore((s) => s.dispatch);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSave = (): void => {
-    const json = serializeDocument(document);
+    const json = serializeDocument(useStore.getState().document);
     downloadBlob(new Blob([json], { type: 'application/json' }), `llull-${timestamp()}.json`);
   };
 

@@ -16,7 +16,7 @@ import type {
   PipeElement,
   SteelMemberElement,
 } from '@core/model/building';
-import { fromMm } from '../model';
+import { fromMm, toMm } from '../model';
 import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../entities';
 import { prismMesh, sweepMesh } from '../mesh';
 import { findProfile, profileOutline } from '../steel/profiles';
@@ -152,6 +152,22 @@ export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLe
   ];
 }
 
+/** One swept mesh per segment of a polyline run (pipe, cable tray); degenerate segments are skipped. */
+function sweepRun(
+  run: PipeElement | CableTrayElement,
+  outline: ReadonlyArray<Vec2>,
+  points: ReadonlyArray<Vec3>,
+  label: string,
+  color: string,
+): Entity[] {
+  const segments: Entity[] = [];
+  for (let index = 0; index + 1 < points.length; index++) {
+    const mesh = sweepMesh(outline, [], points[index] as Vec3, points[index + 1] as Vec3, 0, 1);
+    if (mesh) segments.push(meshEntity(run, { part: `segment-${index}`, label }, mesh, color));
+  }
+  return segments;
+}
+
 const PIPE_SEGMENTS = 16;
 
 export function evaluatePipe(pipe: PipeElement, level: BuildingLevel): Entity[] {
@@ -162,19 +178,7 @@ export function evaluatePipe(pipe: PipeElement, level: BuildingLevel): Entity[] 
   });
   const color = colorForMaterial(pipe.material, '#2f9c8f');
   const points = pipe.points.map((point) => atLevel(level, point));
-  const entities: Entity[] = [];
-  for (let index = 0; index + 1 < points.length; index++) {
-    const mesh = sweepMesh(circle, [], points[index] as Vec3, points[index + 1] as Vec3, 0, 1);
-    if (!mesh) continue;
-    entities.push(
-      meshEntity(
-        pipe,
-        { part: `segment-${index}`, label: `Pipe ${pipe.mark} ${pipe.service}` },
-        mesh,
-        color,
-      ),
-    );
-  }
+  const entities = sweepRun(pipe, circle, points, `Pipe ${pipe.mark} ${pipe.service}`, color);
   for (let index = 1; index + 1 < points.length; index++) {
     const joint: SphereEntity = {
       ...base(
@@ -212,25 +216,16 @@ export function evaluateTray(
   tray: CableTrayElement,
   level: BuildingLevel,
 ): Entity[] {
-  const outline = trayOutline(tray.width, tray.height, fromMm(doc, 2));
-  const points = tray.points.map((point) => atLevel(level, point));
-  const entities: Entity[] = [];
-  for (let index = 0; index + 1 < points.length; index++) {
-    const mesh = sweepMesh(outline, [], points[index] as Vec3, points[index + 1] as Vec3, 0, 1);
-    if (!mesh) continue;
-    entities.push(
-      meshEntity(
-        tray,
-        { part: `segment-${index}`, label: `Cable tray ${tray.mark} ${tray.system}` },
-        mesh,
-        colorForMaterial('galvanized steel', '#a07c2c'),
-      ),
-    );
-  }
-  return entities;
+  return sweepRun(
+    tray,
+    trayOutline(tray.width, tray.height, fromMm(doc, 2)),
+    tray.points.map((point) => atLevel(level, point)),
+    `Cable tray ${tray.mark} ${tray.system}`,
+    colorForMaterial('galvanized steel', '#a07c2c'),
+  );
 }
 
 /** Anchor bolt size label, e.g. "M24" (diameter in document units). */
 export function boltSize(doc: Pick<CadDocument, 'units'>, diameter: number): string {
-  return `M${Math.round(diameter / fromMm(doc, 1))}`;
+  return `M${Math.round(toMm(doc, diameter))}`;
 }

@@ -4,7 +4,6 @@
  * @layer core/commands
  */
 
-import type { Entity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
@@ -13,7 +12,7 @@ import { rotatePoint2 } from '../lib/polygon';
 import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
-import { withEntity } from './entityOps';
+import { commitEntity } from './commitEntity';
 import { newEntity } from './newEntity';
 import { boundsText } from './geometryShared';
 import { noop } from './noop';
@@ -205,26 +204,26 @@ export const addSpurGear = defineCommand({
       name,
     },
   ): CommandResult => {
-    if (!Number.isFinite(mod) || mod <= 0) {
+    if (mod <= 0) {
       return noop(doc, `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`);
     }
 
     const teethInt = Math.round(teeth);
-    if (!Number.isFinite(teeth) || teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
+    if (teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
       return noop(
         doc,
         `add_spur_gear failed: teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
       );
     }
 
-    if (!Number.isFinite(pressureAngle) || pressureAngle <= 0 || pressureAngle >= Math.PI / 2) {
+    if (pressureAngle <= 0 || pressureAngle >= Math.PI / 2) {
       return noop(
         doc,
         `add_spur_gear failed: pressureAngle must be in (0, π/2), got ${String(pressureAngle)}.`,
       );
     }
 
-    if (!Number.isFinite(faceWidth) || faceWidth <= 0) {
+    if (faceWidth <= 0) {
       return noop(
         doc,
         `add_spur_gear failed: faceWidth must be finite and > 0, got ${String(faceWidth)}.`,
@@ -232,7 +231,7 @@ export const addSpurGear = defineCommand({
     }
 
     const pitchRadius = (mod * teethInt) / 2;
-    if (!Number.isFinite(bore) || bore < 0) {
+    if (bore < 0) {
       return noop(doc, `add_spur_gear failed: bore must be finite and >= 0, got ${String(bore)}.`);
     }
     if (bore >= pitchRadius) {
@@ -262,18 +261,14 @@ export const addSpurGear = defineCommand({
       { rotation: resolvedRotation, name },
     );
 
-    const newDoc = withEntity(doc, entity);
-    const b = rotatedEntityBounds(newDoc.entities[id] as Entity);
-
-    return {
-      document: newDoc,
-      summary:
-        `Created spur_gear ${id}: module=${fmt(mod)} teeth=${teethInt} ` +
+    return commitEntity(
+      doc,
+      entity,
+      `Created spur_gear ${id}: module=${fmt(mod)} teeth=${teethInt} ` +
         `pitchD=${fmt(pitchDiameter)} outerD=${fmt(outerDiameter)} ` +
         `bore=${bore} face=${fmt(faceWidth)} ` +
         `at [${resolvedPosition.map(fmt).join(', ')}].` +
-        `${boreNote} ${boundsText(b)}.`,
-      affected: [id],
-    };
+        `${boreNote} ${boundsText(rotatedEntityBounds(entity))}.`,
+    );
   },
 });

@@ -100,6 +100,10 @@ export function sectionResistance(
   };
 }
 
+/** Euler buckling force π² E I / L² (N) of second moment of area `inertia` (mm⁴) over `length` (mm). */
+export const eulerForce = (inertia: number, length: number): number =>
+  (Math.PI ** 2 * E_STEEL * inertia) / length ** 2;
+
 /** Flexural buckling reduction χ (EN 1993-1-1 §6.3.1.2) for a non-dimensional slenderness. */
 export function bucklingReduction(slenderness: number, imperfection: number): number {
   if (slenderness <= 0.2) return 1;
@@ -133,7 +137,7 @@ export function criticalMoment(profile: SteelProfile, length: number, c1 = 1): n
   const torsion =
     (2 * profile.b * profile.tf ** 3 + (profile.h - 2 * profile.tf) * profile.tw ** 3) / 3;
   const warping = (minor * (profile.h - profile.tf) ** 2) / 4;
-  const euler = (Math.PI ** 2 * E_STEEL * minor) / length ** 2;
+  const euler = eulerForce(minor, length);
   return c1 * euler * Math.sqrt(warping / minor + (G_STEEL * torsion) / euler);
 }
 
@@ -159,6 +163,10 @@ export function lateralTorsionalReduction(
     1 / (phi + Math.sqrt(phi * phi - 0.75 * slenderness ** 2)),
   );
 }
+
+/** Moment amplification 1 / (1 − 1/αcr) of EN 1993-1-1 §5.2.2(5): none from αcr = 10, capped at 20 near instability. */
+export const amplificationOf = (alphaCritical: number): number =>
+  alphaCritical >= 10 ? 1 : alphaCritical > 1.05 ? 1 / (1 - 1 / alphaCritical) : 20;
 
 interface BucklingCheck {
   readonly utilisation: number;
@@ -188,7 +196,7 @@ export function memberBuckling(
   const section = sectionProperties(profile);
   const resistance = sectionResistance(profile, fy);
   const slenderness = (inertia: number, length: number): number =>
-    Math.sqrt(resistance.axial / ((Math.PI ** 2 * E_STEEL * inertia) / length ** 2));
+    Math.sqrt(resistance.axial / eulerForce(inertia, length));
   const { major, minor } = curves(profile);
   const lambdaMajor = slenderness(section.inertia, lengths.major);
   const lambdaMinor = slenderness(section.minorInertia, lengths.minor);

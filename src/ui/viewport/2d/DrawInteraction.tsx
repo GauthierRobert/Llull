@@ -9,29 +9,18 @@
  *   3. CollectedPointMarkers (dots at already-placed vertices).
  *
  * Snapping is applied via useSnap before forwarding to useDrawTool.handleClick.
- * Double-click finishes a polyline or spline.
+ * Double-click finishes a polyline, spline or wall chain.
  *
  * Presentation only — no document mutations (R1).
  */
 
-import { useState, useCallback, useMemo } from 'react';
-import type { ThreeEvent } from '@react-three/fiber';
-import { useStore } from '@ui/store';
+import { useState } from 'react';
 import type { Vec2 } from '@core/model/types';
-import { useSnap } from './useSnap';
-import { DrawPreview, CollectedPointMarkers } from './DrawPreview';
-import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { DrawToolKind } from '@ui/store';
-import { useGroundPlane } from './useGroundPlane';
-
-/** three.js hit points are render-space (document − renderOrigin); input works in document space. */
-function toDocumentPoint(point: { x: number; y: number }): Vec2 {
-  const [ox, oy] = useStore.getState().renderOrigin;
-  return [point.x + ox, point.y + oy];
-}
-
-/** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
-const SNAP_TOLERANCE_PX = 12;
+import { useZoomSnap } from './useSnap';
+import { DrawPreview, CollectedPointMarkers } from './DrawPreview';
+import { CHAIN_DRAW_TOOLS } from './drawHelpers';
+import { GroundPlane, toDocumentPoint } from './GroundPlane';
 
 interface DrawInteractionProps {
   activeTool: DrawToolKind;
@@ -51,71 +40,30 @@ export function DrawInteraction({
 }: DrawInteractionProps): React.ReactElement | null {
   const [rawCursor, setRawCursor] = useState<Vec2 | null>(null);
 
-  // Last placed point (for ortho/polar tracking).
-  const drawOrigin: Vec2 | null =
-    collectedPoints.length > 0 ? collectedPoints[collectedPoints.length - 1]! : null;
-
-  // Snap grid tracks the visible adaptive mesh, so selectable grid points exist
-  // at every zoom level (the finest visible cell). Tolerance is pixel-constant
-  // so geometric snaps stay grabbable from very-zoomed-out to very-zoomed-in.
-  const snapResult = useSnap(rawCursor, {
-    gridSize: adaptiveGridStep(zoom),
-    tolerance: pixelsToWorld(SNAP_TOLERANCE_PX, zoom),
-    drawOrigin,
-  });
-
-  const snappedCursor: Vec2 | null = useMemo<Vec2 | null>(
-    () => (snapResult !== null ? [snapResult.x, snapResult.y] : null),
-    [snapResult],
-  );
-
-  const { geo, mat } = useGroundPlane();
-
-  const handleMove = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      if (activeTool === 'none') return;
-      e.stopPropagation();
-      setRawCursor(toDocumentPoint(e.point));
-    },
-    [activeTool],
-  );
-
-  const handleLeave = useCallback(() => {
-    setRawCursor(null);
-  }, []);
-
-  const handleClick = useCallback(
-    (e: ThreeEvent<MouseEvent>) => {
-      if (activeTool === 'none') return;
-      e.stopPropagation();
-      const pt: Vec2 = snappedCursor ?? toDocumentPoint(e.point);
-      onClickPoint(pt);
-    },
-    [activeTool, snappedCursor, onClickPoint],
-  );
-
-  const handleDoubleClick = useCallback(
-    (e: ThreeEvent<MouseEvent>) => {
-      if (activeTool !== 'polyline' && activeTool !== 'spline' && activeTool !== 'wall') return;
-      e.stopPropagation();
-      onDoubleClick();
-    },
-    [activeTool, onDoubleClick],
-  );
+  // The last placed point is the reference for perpendicular/tangent snaps.
+  const snapResult = useZoomSnap(rawCursor, zoom, collectedPoints.at(-1) ?? null);
+  const snappedCursor: Vec2 | null = snapResult && [snapResult.x, snapResult.y];
 
   // If no draw tool is active, don't intercept events.
   if (activeTool === 'none') return null;
 
   return (
     <>
-      <mesh
-        geometry={geo}
-        material={mat}
-        position={[0, 0, 0]}
-        onPointerMove={handleMove}
-        onPointerLeave={handleLeave}
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
+      <GroundPlane
+        onPointerMove={(e) => {
+          e.stopPropagation();
+          setRawCursor(toDocumentPoint(e.point));
+        }}
+        onPointerLeave={() => setRawCursor(null)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClickPoint(snappedCursor ?? toDocumentPoint(e.point));
+        }}
+        onDoubleClick={(e) => {
+          if (!CHAIN_DRAW_TOOLS.has(activeTool)) return;
+          e.stopPropagation();
+          onDoubleClick();
+        }}
       />
 
       <DrawPreview

@@ -18,9 +18,9 @@ across the existing agents; this skill is the playbook.
 ## The three pieces of any 2D feature
 
 ### 1. Model (if a new 2D kind is needed) — command-author
-Extend `Shape2DKind` + add the `*Entity` interface in `packages/core/src/model/types.ts`
-(Vec2 geometry in the entity's local plane; `position` places that plane in 3D) + add to the
-`Entity` union and `SHAPE2D_KINDS` (drives `is2D`). See model.md.
+Add the literal to `SHAPE2D_KINDS` (drives `Shape2DKind` and `is2D`) + add the `*Entity`
+interface in `packages/core/src/model/types.ts` (Vec2 geometry in the entity's local plane;
+`position` places that plane in 3D) + add it to the `Entity` union. See model.md.
 
 ### 2. Drawing command(s) — command-author / add-command skill
 Each draw op is a pure `defineCommand`, snake_case, drafting-verb named, in
@@ -46,7 +46,7 @@ A closed 2D shape (circle, rectangle, closed polyline) is the input to `extrude_
 re-encode the same shape separately for the 2D and 3D worlds.
 
 ## Done checklist
-- [ ] New 2D kinds added to `Shape2DKind`/`Entity`/`SHAPE2D_KINDS`; viewport has a render branch
+- [ ] New 2D kinds added to `SHAPE2D_KINDS`/`Entity`; viewport has a render branch
 - [ ] Draw commands are pure, registered, snake_case, tested (happy + failure)
 - [ ] Snap/ortho math is pure + unit-tested, applied (not computed) in components
 - [ ] Closed shapes feed `extrude_sketch` — no geometry duplicated across 2D/3D

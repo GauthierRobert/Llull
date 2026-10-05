@@ -5,6 +5,7 @@
 import type { DocumentUnit, Vec2 } from '@core/model/types';
 import { hatchSegments } from '@lib/hatch';
 import { triangulatePolygon } from '@lib/triangulate';
+import { round } from './numeric';
 import { DIMENSION_LAYER, type PlanFill, type PlanPrimitive } from './planModel';
 
 /** AutoCAD $INSUNITS codes. */
@@ -49,7 +50,7 @@ export function dxfText(content: string): string {
 }
 
 export const fmt = (value: number): string => {
-  const rounded = Math.round(value * 1e6) / 1e6;
+  const rounded = round(value, 6);
   return Object.is(rounded, -0) ? '0' : String(rounded);
 };
 

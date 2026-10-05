@@ -1,18 +1,12 @@
 /**
  * @layer ui/panels
  *
- * ConfigurationsPanel — lists `document.configurations`, lets the user create
- * new configurations, and activate an existing one.
- *
- * All mutations go through `dispatch`:
- *   - create_configuration — define or replace a named variant
- *   - activate_configuration — apply a configuration to the live document
- *
- * No business logic — the component only gathers input and dispatches.
- * (PRIME DIRECTIVE, architecture L1, react R1)
+ * ConfigurationsPanel — lists `document.configurations`; creates (create_configuration) and
+ * activates (activate_configuration) them.
  */
 
 import React, { useState } from 'react';
+import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Configuration } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
@@ -72,22 +66,23 @@ function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement
   );
 }
 
-interface ParameterValueRowProps {
-  index: number;
+interface PvEntry {
   paramName: string;
   expression: string;
-  onParamNameChange: (index: number, value: string) => void;
-  onExpressionChange: (index: number, value: string) => void;
+}
+
+interface ParameterValueRowProps {
+  index: number;
+  entry: PvEntry;
+  onChange: (index: number, patch: Partial<PvEntry>) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
 }
 
 function ParameterValueRow({
   index,
-  paramName,
-  expression,
-  onParamNameChange,
-  onExpressionChange,
+  entry,
+  onChange,
   onRemove,
   canRemove,
 }: ParameterValueRowProps): React.ReactElement {
@@ -96,8 +91,8 @@ function ParameterValueRow({
       <input
         type="text"
         className="config-pv-name-input"
-        value={paramName}
-        onChange={(e) => onParamNameChange(index, e.target.value)}
+        value={entry.paramName}
+        onChange={(e) => onChange(index, { paramName: e.target.value })}
         placeholder="param"
         aria-label={`Parameter name for row ${index + 1}`}
         autoComplete="off"
@@ -108,8 +103,8 @@ function ParameterValueRow({
       <input
         type="text"
         className="config-pv-expr-input"
-        value={expression}
-        onChange={(e) => onExpressionChange(index, e.target.value)}
+        value={entry.expression}
+        onChange={(e) => onChange(index, { expression: e.target.value })}
         placeholder="expression"
         aria-label={`Expression for row ${index + 1}`}
         autoComplete="off"
@@ -128,24 +123,16 @@ function ParameterValueRow({
   );
 }
 
-interface PvEntry {
-  paramName: string;
-  expression: string;
-}
+const EMPTY_ROW: PvEntry = { paramName: '', expression: '' };
 
 function CreateConfigurationForm(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [configName, setConfigName] = useState('');
-  const [pvRows, setPvRows] = useState<PvEntry[]>([{ paramName: '', expression: '' }]);
+  const [pvRows, setPvRows] = useState<PvEntry[]>([EMPTY_ROW]);
 
   const updateRow = (index: number, patch: Partial<PvEntry>): void =>
     setPvRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  const handleParamNameChange = (index: number, value: string): void =>
-    updateRow(index, { paramName: value });
-  const handleExpressionChange = (index: number, value: string): void =>
-    updateRow(index, { expression: value });
-  const handleAddRow = (): void =>
-    setPvRows((prev) => [...prev, { paramName: '', expression: '' }]);
+  const handleAddRow = (): void => setPvRows((prev) => [...prev, EMPTY_ROW]);
   const handleRemoveRow = (index: number): void =>
     setPvRows((prev) => prev.filter((_, i) => i !== index));
 
@@ -164,7 +151,7 @@ function CreateConfigurationForm(): React.ReactElement {
     for (const row of nonEmptyRows) parameterValues[row.paramName.trim()] = row.expression.trim();
     dispatch('create_configuration', { name: configName.trim(), parameterValues });
     setConfigName('');
-    setPvRows([{ paramName: '', expression: '' }]);
+    setPvRows([EMPTY_ROW]);
   };
 
   return (
@@ -201,10 +188,8 @@ function CreateConfigurationForm(): React.ReactElement {
           <ParameterValueRow
             key={index}
             index={index}
-            paramName={row.paramName}
-            expression={row.expression}
-            onParamNameChange={handleParamNameChange}
-            onExpressionChange={handleExpressionChange}
+            entry={row}
+            onChange={updateRow}
             onRemove={handleRemoveRow}
             canRemove={pvRows.length > 1}
           />
@@ -240,13 +225,10 @@ interface ConfigurationsPanelProps {
 
 export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): React.ReactElement {
   const configurations = useStore((s) => s.document.configurations);
-  const configList = Object.values(configurations).filter((c): c is Configuration => c != null);
+  const configList = Object.values(configurations);
 
   return (
-    <aside
-      className={['panel configs-panel', className].filter(Boolean).join(' ')}
-      aria-label="Configurations"
-    >
+    <aside className={classNames('panel configs-panel', className)} aria-label="Configurations">
       <PanelHeader
         title="Configurations"
         count={configList.length}

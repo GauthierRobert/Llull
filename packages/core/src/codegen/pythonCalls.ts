@@ -15,7 +15,7 @@ export function pythonTuple(terms: readonly Term[]): string {
 }
 
 function points(profile: readonly Term2[]): string {
-  return `[${profile.map((p) => pythonTuple(p)).join(', ')}]`;
+  return `[${profile.map(pythonTuple).join(', ')}]`;
 }
 
 /** Degrees in Python source (expressions stay symbolic over `math.pi`). */

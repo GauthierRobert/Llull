@@ -9,6 +9,7 @@ import type { Constraint } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
+import { instanceFrameRef } from './instanceFrameRef';
 import { noop } from './noop';
 
 /**
@@ -45,32 +46,18 @@ export const addMate = defineCommand({
           '"parallel": two instance axis frames are parallel in XY. ' +
           '"distance": the distance between two instance origins in XY equals value.',
       ),
-    a: z
-      .object({
-        instanceId: z.string().describe('Id of the first InstanceEntity.'),
-        frame: z
-          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
-          .optional()
-          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
-      })
-      .describe(
-        'First instance frame reference. ' +
-          '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
-          'instanceId must be an existing InstanceEntity in doc.entities. ' +
-          'frame defaults to "origin" (the instance world position).',
-      ),
-    b: z
-      .object({
-        instanceId: z.string().describe('Id of the second InstanceEntity.'),
-        frame: z
-          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
-          .optional()
-          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
-      })
-      .describe(
-        'Second instance frame reference. Same shape as "a". ' +
-          '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }.',
-      ),
+    a: instanceFrameRef(
+      'first',
+      'First instance frame reference. ' +
+        '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
+        'instanceId must be an existing InstanceEntity in doc.entities. ' +
+        'frame defaults to "origin" (the instance world position).',
+    ),
+    b: instanceFrameRef(
+      'second',
+      'Second instance frame reference. Same shape as "a". ' +
+        '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }.',
+    ),
     value: z
       .union([z.string(), z.number()])
       .optional()

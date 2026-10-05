@@ -6,7 +6,7 @@ import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { fromMm, toMetres } from '../model';
 import type { BaseReaction } from './frameModelSolve';
-import { type ClayLayer, type Combination } from './foundationModel';
+import type { Combination, FootingCheckContext } from './foundationModel';
 import { footingRows } from './foundationRows';
 import { combine, footingMoment, ultimateCombinations } from './foundationCombinations';
 import {
@@ -58,18 +58,10 @@ export const padVolume = (size: PadSize): number => size[0] * size[1] * size[2];
 
 export const sizeText = (size: PadSize): string => size.map((value) => Math.round(value)).join('×');
 
-export interface SizingContext {
-  doc: CadDocument;
-  footing: FootingElement;
-  face: { x: number; y: number };
-  reaction: BaseReaction;
-  wind: boolean;
-  crane: boolean;
-  soilBearing: number;
-  soilModulus: number;
-  clayLayer: ClayLayer | undefined;
-  slidingHorizontal: (factors: Combination['factors']) => number;
-  slabShare: number;
+export interface SizingContext extends FootingCheckContext {
+  readonly footing: FootingElement;
+  readonly face: { x: number; y: number };
+  readonly crane: boolean;
 }
 
 interface PadVerdict {
@@ -91,18 +83,7 @@ export function evaluatePad(
     length: fromMm(doc, lengthMm),
     thickness: fromMm(doc, thicknessMm),
   };
-  const rows = footingRows(
-    doc,
-    context.reaction,
-    '',
-    trial,
-    context.soilBearing,
-    context.wind,
-    context.slidingHorizontal,
-    context.slabShare,
-    context.soilModulus,
-    context.clayLayer,
-  );
+  const rows = footingRows(context, trial, '');
   const soilUtilisation = Math.max(0, ...rows.map((row) => row.utilisation));
   if (soilUtilisation > 1) return { soilUtilisation, mat: null, passes: false };
   const geometry = geometryOf(doc, trial, context.face);

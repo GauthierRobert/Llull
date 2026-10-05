@@ -9,19 +9,24 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { uint8ArrayToBase64 } from '../lib/base64';
 import { collectExportTriangles, exportSummary } from './exportTriangulate';
-import { facetNormal, type Triangle } from './exportMath';
+import type { Triangle } from './exportMath';
+import { facetNormal } from './tessellation';
+
+const entityIdsField = z
+  .array(z.string())
+  .optional()
+  .describe(
+    'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
+      '3D solid entities in the document. 2D and unknown ids are silently skipped.',
+  );
 
 /** Wavefront OBJ text: per-facet normals, 1-based `f v//vn` indices. */
 function buildObjText(tris: Triangle[], header: string, objectName: string): string {
   const lines: string[] = [header, `o ${objectName}`];
-  for (const [v0, v1, v2] of tris) {
-    lines.push(`v ${v0[0]} ${v0[1]} ${v0[2]}`, `v ${v1[0]} ${v1[1]} ${v1[2]}`);
-    lines.push(`v ${v2[0]} ${v2[1]} ${v2[2]}`);
+  for (const tri of tris) {
+    for (const vertex of tri) lines.push(`v ${vertex.join(' ')}`);
   }
-  for (const [v0, v1, v2] of tris) {
-    const n = facetNormal(v0, v1, v2);
-    lines.push(`vn ${n[0]} ${n[1]} ${n[2]}`);
-  }
+  for (const tri of tris) lines.push(`vn ${facetNormal(...tri).join(' ')}`);
   for (let i = 0; i < tris.length; i++) {
     const vi = i * 3 + 1;
     const ni = i + 1;
@@ -53,13 +58,7 @@ export const exportObj = defineCommand({
     'units: optional units label embedded in the OBJ comment (defaults to doc units). ' +
     'Does NOT modify the document.',
   params: z.object({
-    entityIds: z
-      .array(z.string())
-      .optional()
-      .describe(
-        'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
-          '3D solid entities in the document. 2D and unknown ids are silently skipped.',
-      ),
+    entityIds: entityIdsField,
     units: z
       .string()
       .optional()
@@ -117,15 +116,17 @@ function align4(n: number): number {
 }
 
 /**
- * Build a minimal valid glTF 2.0 JSON object from flat vertex positions.
- * Positions and normals are stored as separate bufferview/accessor pairs.
- * The binary buffer payload is returned as a separate Uint8Array.
+ * Minimal valid glTF 2.0 JSON for `positions` (+ equally sized normals): one mesh, one material,
+ * separate bufferView/accessor pairs. `bufferUri` inlines the BIN payload (JSON mode); GLB omits it.
  */
-function buildGltfJson(positions: Float32Array, binBuffer: Uint8Array): Record<string, unknown> {
+function buildGltfJson(
+  positions: Float32Array,
+  binBuffer: Uint8Array,
+  bufferUri?: string,
+): Record<string, unknown> {
   const vertexCount = positions.length / 3;
   const posByteLength = positions.byteLength;
   const normByteLength = positions.byteLength;
-
   const aabb = computeAabb(positions);
 
   return {
@@ -173,7 +174,9 @@ function buildGltfJson(positions: Float32Array, binBuffer: Uint8Array): Record<s
       { buffer: 0, byteOffset: 0, byteLength: posByteLength, target: 34962 }, // ARRAY_BUFFER
       { buffer: 0, byteOffset: posByteLength, byteLength: normByteLength, target: 34962 },
     ],
-    buffers: [{ byteLength: binBuffer.byteLength }],
+    buffers: [
+      { byteLength: binBuffer.byteLength, ...(bufferUri !== undefined && { uri: bufferUri }) },
+    ],
   };
 }
 
@@ -245,13 +248,7 @@ export const exportGltf = defineCommand({
     'binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. ' +
     'Does NOT modify the document.',
   params: z.object({
-    entityIds: z
-      .array(z.string())
-      .optional()
-      .describe(
-        'Array of entity ids to include in the export. Omit (or pass []) to export ALL ' +
-          '3D solid entities in the document. 2D and unknown ids are silently skipped.',
-      ),
+    entityIds: entityIdsField,
     binary: z
       .boolean()
       .optional()
@@ -271,10 +268,9 @@ export const exportGltf = defineCommand({
     const { positions, normals } = buildGltfBuffers(collected.tris);
     const binPayload = buildBinPayload(positions, normals);
     const summary = exportSummary('export_gltf', binary ? 'glb' : 'gltf', collected);
-    const jsonObj = buildGltfJson(positions, binPayload);
 
     if (binary) {
-      const base64 = uint8ArrayToBase64(buildGlb(jsonObj, binPayload));
+      const base64 = uint8ArrayToBase64(buildGlb(buildGltfJson(positions, binPayload), binPayload));
       return {
         document: doc,
         summary,
@@ -282,11 +278,11 @@ export const exportGltf = defineCommand({
         data: { format: 'glb', triangleCount, base64 },
       };
     }
-    if (binPayload.length > 0) {
-      const buffers = jsonObj['buffers'] as Array<Record<string, unknown>>;
-      buffers[0]!['uri'] = `data:application/octet-stream;base64,${uint8ArrayToBase64(binPayload)}`;
-    }
-    const text = JSON.stringify(jsonObj, null, 2);
+    const bufferUri =
+      binPayload.length > 0
+        ? `data:application/octet-stream;base64,${uint8ArrayToBase64(binPayload)}`
+        : undefined;
+    const text = JSON.stringify(buildGltfJson(positions, binPayload, bufferUri), null, 2);
     return { document: doc, summary, affected: [], data: { format: 'gltf', triangleCount, text } };
   },
 });

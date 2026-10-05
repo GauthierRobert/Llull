@@ -83,18 +83,16 @@ export const createMaterial = defineCommand({
       );
     }
 
-    if (metalness < 0 || metalness > 1) {
-      return noop(
-        doc,
-        `create_material '${name}' failed: metalness must be in [0, 1], got ${String(metalness)}.`,
-      );
-    }
-
-    if (roughness < 0 || roughness > 1) {
-      return noop(
-        doc,
-        `create_material '${name}' failed: roughness must be in [0, 1], got ${String(roughness)}.`,
-      );
+    for (const [field, value] of [
+      ['metalness', metalness],
+      ['roughness', roughness],
+    ] as const) {
+      if (value < 0 || value > 1) {
+        return noop(
+          doc,
+          `create_material '${name}' failed: ${field} must be in [0, 1], got ${String(value)}.`,
+        );
+      }
     }
 
     if (!isHexColor(color)) {

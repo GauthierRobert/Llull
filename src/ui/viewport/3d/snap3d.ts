@@ -6,6 +6,7 @@
 
 import type { Entity, CadDocument } from '@core/model/types';
 import { is3D } from '@core/model/types';
+import { nearestSnap } from '../nearestSnap';
 
 export type Snap3DType = 'vertex' | 'edge' | 'face-center' | 'grid' | 'none';
 
@@ -227,23 +228,12 @@ export function snap3d(
   tolerance: number,
   gridStep: number,
 ): SnapResult3D {
-  let bestDist = Infinity;
-  let best: SnapPoint3D | null = null;
-
-  for (const pt of candidates) {
-    const d = Math.hypot(pt.x - candidateX, pt.y - candidateY, pt.z - candidateZ);
-    if (d <= tolerance) {
-      const beatsByDist = d < bestDist - 1e-10;
-      const sameDist = Math.abs(d - bestDist) <= 1e-10;
-      const beatsByPriority =
-        sameDist && best !== null && SNAP3D_PRIORITY[pt.type] < SNAP3D_PRIORITY[best.type];
-
-      if (beatsByDist || beatsByPriority) {
-        bestDist = d;
-        best = pt;
-      }
-    }
-  }
+  const best = nearestSnap(
+    candidates,
+    (point) => Math.hypot(point.x - candidateX, point.y - candidateY, point.z - candidateZ),
+    tolerance,
+    SNAP3D_PRIORITY,
+  );
 
   if (best !== null) {
     return { x: best.x, y: best.y, z: best.z, type: best.type, snapped: true };

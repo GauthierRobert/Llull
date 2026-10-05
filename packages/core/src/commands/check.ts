@@ -14,7 +14,7 @@ import { dot3 } from '../lib/vec3';
 type IssueSeverity = 'error' | 'warning' | 'info';
 
 /** One finding of `check_model`; `entityId` when it concerns a specific entity. */
-export interface Issue {
+interface Issue {
   severity: IssueSeverity;
   /** Short machine-readable tag identifying the issue class. */
   code: string;

@@ -46,6 +46,19 @@ function steps(
   const door = (n: number): string => nth('door', n);
   const stair = (n: number): string => nth('stair', n);
   const perimeter = (): string[] => [wall(1), wall(2), wall(3), wall(4)];
+  const levelStep =
+    (name: string, elevation: number, height: number, makeActive = false): Step =>
+    (d) =>
+      addLevel.run(d, { name, elevation: mm(elevation), height: mm(height), makeActive });
+  const windowStep =
+    (wallNumber: number, offset: number, width: number, height?: number): Step =>
+    (d) =>
+      addWindow.run(d, {
+        wallId: wall(wallNumber),
+        offset: mm(offset),
+        width: mm(width),
+        ...(height === undefined ? {} : { height: mm(height) }),
+      });
   const naming: Step[] =
     building.project.name === 'Untitled project'
       ? [
@@ -58,16 +71,9 @@ function steps(
   if (template === 'house') {
     return [
       ...naming,
-      (d) => addLevel.run(d, { name: 'Ground floor', elevation: 0, height: mm(2900) }),
-      (d) =>
-        addLevel.run(d, {
-          name: 'First floor',
-          elevation: mm(2900),
-          height: mm(2900),
-          makeActive: false,
-        }),
-      (d) =>
-        addLevel.run(d, { name: 'Roof', elevation: mm(5800), height: mm(1000), makeActive: false }),
+      levelStep('Ground floor', 0, 2900, true),
+      levelStep('First floor', 2900, 2900),
+      levelStep('Roof', 5800, 1000),
       (d) =>
         addGridSystem.run(d, {
           xSpacings: [mm(5000), mm(5000)],
@@ -90,11 +96,11 @@ function steps(
         }),
       (d) => addDoor.run(d, { wallId: wall(1), offset: mm(2500) }),
       (d) => addDoor.run(d, { wallId: wall(5), offset: mm(4000), swing: 'right', width: mm(800) }),
-      (d) => addWindow.run(d, { wallId: wall(1), offset: mm(7500), width: mm(1800) }),
-      (d) => addWindow.run(d, { wallId: wall(2), offset: mm(4000), width: mm(1400) }),
-      (d) => addWindow.run(d, { wallId: wall(3), offset: mm(2500), width: mm(1800) }),
-      (d) => addWindow.run(d, { wallId: wall(3), offset: mm(7500), width: mm(1800) }),
-      (d) => addWindow.run(d, { wallId: wall(4), offset: mm(4000), width: mm(1400) }),
+      windowStep(1, 7500, 1800),
+      windowStep(2, 4000, 1400),
+      windowStep(3, 2500, 1800),
+      windowStep(3, 7500, 1800),
+      windowStep(4, 4000, 1400),
       (d) => addSlab.run(d, { wallIds: perimeter(), thickness: mm(200) }),
       (d) =>
         addStair.run(d, { start: at(5400, 6900), angle: 0, width: mm(900), treadDepth: mm(250) }),
@@ -108,7 +114,7 @@ function steps(
         }),
       (d) => deleteBuildingElement.run(d, { elementIds: [door(3)] }),
       (d) => addSlabOpening.run(d, { stairId: stair(1) }),
-      (d) => addWindow.run(d, { wallId: wall(6), offset: mm(2500), width: mm(1400) }),
+      windowStep(6, 2500, 1400),
       (d) =>
         addRoom.run(d, {
           name: 'Bedroom',
@@ -133,23 +139,10 @@ function steps(
   }
   return [
     ...naming,
-    (d) => addLevel.run(d, { name: 'Level 0', elevation: 0, height: mm(3600) }),
-    (d) =>
-      addLevel.run(d, {
-        name: 'Level 1',
-        elevation: mm(3600),
-        height: mm(3600),
-        makeActive: false,
-      }),
-    (d) =>
-      addLevel.run(d, {
-        name: 'Level 2',
-        elevation: mm(7200),
-        height: mm(3600),
-        makeActive: false,
-      }),
-    (d) =>
-      addLevel.run(d, { name: 'Roof', elevation: mm(10800), height: mm(1000), makeActive: false }),
+    levelStep('Level 0', 0, 3600, true),
+    levelStep('Level 1', 3600, 3600),
+    levelStep('Level 2', 7200, 3600),
+    levelStep('Roof', 10800, 1000),
     (d) =>
       addGridSystem.run(d, {
         xSpacings: [mm(7500), mm(7500), mm(7500)],
@@ -168,20 +161,9 @@ function steps(
       addBeam.run(d, { start: at(0, 7500), end: at(22500, 7500), width: mm(300), depth: mm(600) }),
     (d) =>
       addDoor.run(d, { wallId: wall(1), offset: mm(11250), width: mm(1800), height: mm(2400) }),
-    ...[3750, 7500 + 3750, 15000 + 3750].map(
-      (offset): Step =>
-        (d) =>
-          addWindow.run(d, {
-            wallId: wall(3),
-            offset: mm(offset),
-            width: mm(3000),
-            height: mm(1800),
-          }),
-    ),
-    (d) =>
-      addWindow.run(d, { wallId: wall(1), offset: mm(3750), width: mm(3000), height: mm(1800) }),
-    (d) =>
-      addWindow.run(d, { wallId: wall(1), offset: mm(18750), width: mm(3000), height: mm(1800) }),
+    ...[3750, 7500 + 3750, 15000 + 3750].map((offset) => windowStep(3, offset, 3000, 1800)),
+    windowStep(1, 3750, 3000, 1800),
+    windowStep(1, 18750, 3000, 1800),
     (d) => addSlab.run(d, { wallIds: perimeter(), thickness: mm(250) }),
     (d) =>
       addStair.run(d, { start: at(16000, 9000), angle: 0, width: mm(1200), treadDepth: mm(280) }),
@@ -195,16 +177,7 @@ function steps(
       }),
     (d) => deleteBuildingElement.run(d, { elementIds: [door(2), door(3)] }),
     (d) => addSlabOpening.run(d, { stairId: stair(1) }),
-    ...[2, 3].map(
-      (floor): Step =>
-        (d) =>
-          addWindow.run(d, {
-            wallId: wall(1 + floor * 4 - 4),
-            offset: mm(11250),
-            width: mm(3000),
-            height: mm(1800),
-          }),
-    ),
+    ...[2, 3].map((floor) => windowStep(1 + floor * 4 - 4, 11250, 3000, 1800)),
     (d) =>
       addSlab.run(d, {
         boundary: rectangle(-125, -125, 22625, 12625),

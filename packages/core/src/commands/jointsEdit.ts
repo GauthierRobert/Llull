@@ -3,7 +3,8 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { resolveNumeric } from './expression';
-import { isValidAxis } from './jointsKinematics';
+import { instanceFrameRef } from './instanceFrameRef';
+import { isValidAxis } from '../lib/axis';
 import { noop } from './noop';
 /**
  * @command add_joint
@@ -32,32 +33,18 @@ export const addJoint = defineCommand({
         'Joint type. "revolute": rotation about an axis (like a hinge or pin). ' +
           '"prismatic": linear translation along an axis (like a slider or piston).',
       ),
-    a: z
-      .object({
-        instanceId: z.string().describe('Id of the first InstanceEntity.'),
-        frame: z
-          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
-          .optional()
-          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
-      })
-      .describe(
-        'First instance frame reference (the fixed/anchor frame). ' +
-          '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
-          'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
-      ),
-    b: z
-      .object({
-        instanceId: z.string().describe('Id of the second InstanceEntity.'),
-        frame: z
-          .enum(['origin', 'axis-x', 'axis-y', 'axis-z'])
-          .optional()
-          .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
-      })
-      .describe(
-        'Second instance frame reference (the moving frame). ' +
-          '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
-          'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
-      ),
+    a: instanceFrameRef(
+      'first',
+      'First instance frame reference (the fixed/anchor frame). ' +
+        '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
+        'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
+    ),
+    b: instanceFrameRef(
+      'second',
+      'Second instance frame reference (the moving frame). ' +
+        '{ instanceId: "<id>", frame?: "origin"|"axis-x"|"axis-y"|"axis-z" }. ' +
+        'instanceId must be an existing InstanceEntity. frame defaults to "origin".',
+    ),
     axis: z
       .union([z.string(), z.array(z.number())])
       .describe(

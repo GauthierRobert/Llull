@@ -6,16 +6,18 @@
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { is2D } from '@core/model/types';
-import type { CollectOpts, SnapPoint } from './types';
+import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {
   entityToSegments,
   mid,
   nearestOnArc,
   nearestOnSegment,
+  normalizeAngle,
   segmentIntersection,
   snapExtension,
   snapPerpendicular,
   snapTangentToCircle,
+  type Segment,
 } from './geometry';
 
 /**
@@ -46,24 +48,26 @@ export function collectSnapCandidates(
   const cursor = cursorPoint ?? null;
 
   const candidates: SnapPoint[] = [];
+  const add = (type: SnapType, x: number, y: number): void => {
+    candidates.push({ x, y, type });
+  };
 
   // Collect all line segments first (needed for intersection computation).
-  const allSegments: Array<[number, number, number, number]> = [];
+  const allSegments: Segment[] = [];
 
   /** Perpendicular / extension / nearest snaps for each segment, then register it for intersections. */
-  const addSegmentSnaps = (segments: ReadonlyArray<[number, number, number, number]>): void => {
-    for (const seg of segments) {
+  const addSegmentSnaps = (segments: ReadonlyArray<Segment>): void => {
+    for (const [ax, ay, bx, by] of segments) {
       if (doPerpendiculars) {
-        const snap = snapPerpendicular(from, seg[0], seg[1], seg[2], seg[3]);
+        const snap = snapPerpendicular(from, ax, ay, bx, by);
         if (snap) candidates.push(snap);
       }
       if (doExtensions && cursor !== null) {
-        const snap = snapExtension(cursor[0], cursor[1], seg[0], seg[1], seg[2], seg[3]);
+        const snap = snapExtension(cursor[0], cursor[1], ax, ay, bx, by);
         if (snap) candidates.push(snap);
       }
       if (doNearest && cursor !== null) {
-        const [nx, ny] = nearestOnSegment(cursor[0], cursor[1], seg[0], seg[1], seg[2], seg[3]);
-        candidates.push({ x: nx, y: ny, type: 'nearest' });
+        add('nearest', ...nearestOnSegment(cursor[0], cursor[1], ax, ay, bx, by));
       }
     }
     allSegments.push(...segments);
@@ -80,8 +84,7 @@ export function collectSnapCandidates(
   ): void => {
     if (doTangents) candidates.push(...snapTangentToCircle(from, cx, cy, r));
     if (doNearest && cursor !== null) {
-      const [nx, ny] = nearestOnArc(cursor[0], cursor[1], cx, cy, r, startAngle, endAngle, full);
-      candidates.push({ x: nx, y: ny, type: 'nearest' });
+      add('nearest', ...nearestOnArc(cursor[0], cursor[1], cx, cy, r, startAngle, endAngle, full));
     }
   };
 
@@ -100,13 +103,10 @@ export function collectSnapCandidates(
         const by = entity.end[1] + oy;
 
         if (doEndpoints) {
-          candidates.push({ x: ax, y: ay, type: 'endpoint' });
-          candidates.push({ x: bx, y: by, type: 'endpoint' });
+          add('endpoint', ax, ay);
+          add('endpoint', bx, by);
         }
-        if (doMidpoints) {
-          const [mx, my] = mid(ax, ay, bx, by);
-          candidates.push({ x: mx, y: my, type: 'midpoint' });
-        }
+        if (doMidpoints) add('midpoint', ...mid(ax, ay, bx, by));
         addSegmentSnaps([[ax, ay, bx, by]]);
         break;
       }
@@ -118,60 +118,40 @@ export function collectSnapCandidates(
           const px = p[0] + ox;
           const py = p[1] + oy;
 
-          if (doEndpoints) {
-            candidates.push({ x: px, y: py, type: 'endpoint' });
-          }
+          if (doEndpoints) add('endpoint', px, py);
           if (doMidpoints && i < pts.length - 1) {
             const q = pts[i + 1]!;
-            const [mx, my] = mid(px, py, q[0] + ox, q[1] + oy);
-            candidates.push({ x: mx, y: my, type: 'midpoint' });
+            add('midpoint', ...mid(px, py, q[0] + ox, q[1] + oy));
           }
         }
         if (entity.closed && doMidpoints && pts.length >= 2) {
           const first = pts[0]!;
           const last = pts[pts.length - 1]!;
-          const [mx, my] = mid(first[0] + ox, first[1] + oy, last[0] + ox, last[1] + oy);
-          candidates.push({ x: mx, y: my, type: 'midpoint' });
+          add('midpoint', ...mid(first[0] + ox, first[1] + oy, last[0] + ox, last[1] + oy));
         }
-        const segs = entityToSegments(entity);
-        addSegmentSnaps(segs);
+        addSegmentSnaps(entityToSegments(entity));
         break;
       }
 
       case 'arc': {
         const cx = entity.center[0] + ox;
         const cy = entity.center[1] + oy;
-        const r = entity.radius;
+        const { radius: r, startAngle, endAngle } = entity;
+        const onArc = (angle: number): [number, number] => [
+          cx + r * Math.cos(angle),
+          cy + r * Math.sin(angle),
+        ];
 
-        if (doCenters) {
-          candidates.push({ x: cx, y: cy, type: 'center' });
-        }
+        if (doCenters) add('center', cx, cy);
         if (doEndpoints) {
-          candidates.push({
-            x: cx + r * Math.cos(entity.startAngle),
-            y: cy + r * Math.sin(entity.startAngle),
-            type: 'endpoint',
-          });
-          candidates.push({
-            x: cx + r * Math.cos(entity.endAngle),
-            y: cy + r * Math.sin(entity.endAngle),
-            type: 'endpoint',
-          });
+          add('endpoint', ...onArc(startAngle));
+          add('endpoint', ...onArc(endAngle));
         }
-        if (doMidpoints) {
-          // Midpoint along the SWEPT arc (direction-respecting), so an arc that
-          // crosses the 0/2π wrap still lands on the arc itself rather than the
-          // opposite side. sweep is normalized to [0, 2π).
-          const sweep =
-            (((entity.endAngle - entity.startAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-          const midAngle = entity.startAngle + sweep / 2;
-          candidates.push({
-            x: cx + r * Math.cos(midAngle),
-            y: cy + r * Math.sin(midAngle),
-            type: 'midpoint',
-          });
-        }
-        addCurveSnaps(cx, cy, r, entity.startAngle, entity.endAngle, false);
+        // Midpoint along the SWEPT arc (direction-respecting), so an arc that crosses the 0/2π
+        // wrap still lands on the arc itself rather than the opposite side.
+        if (doMidpoints)
+          add('midpoint', ...onArc(startAngle + normalizeAngle(endAngle - startAngle) / 2));
+        addCurveSnaps(cx, cy, r, startAngle, endAngle, false);
         break;
       }
 
@@ -180,15 +160,13 @@ export function collectSnapCandidates(
         const cy = entity.center[1] + oy;
         const r = entity.radius;
 
-        if (doCenters) {
-          candidates.push({ x: cx, y: cy, type: 'center' });
-        }
+        if (doCenters) add('center', cx, cy);
         // Cardinal points as endpoints (useful snaps for circles).
         if (doEndpoints) {
-          candidates.push({ x: cx + r, y: cy, type: 'endpoint' });
-          candidates.push({ x: cx - r, y: cy, type: 'endpoint' });
-          candidates.push({ x: cx, y: cy + r, type: 'endpoint' });
-          candidates.push({ x: cx, y: cy - r, type: 'endpoint' });
+          add('endpoint', cx + r, cy);
+          add('endpoint', cx - r, cy);
+          add('endpoint', cx, cy + r);
+          add('endpoint', cx, cy - r);
         }
         addCurveSnaps(cx, cy, r, 0, 0, true);
         break;
@@ -201,29 +179,24 @@ export function collectSnapCandidates(
         const y1 = oy + entity.height;
 
         if (doEndpoints) {
-          candidates.push({ x: x0, y: y0, type: 'endpoint' });
-          candidates.push({ x: x1, y: y0, type: 'endpoint' });
-          candidates.push({ x: x1, y: y1, type: 'endpoint' });
-          candidates.push({ x: x0, y: y1, type: 'endpoint' });
+          add('endpoint', x0, y0);
+          add('endpoint', x1, y0);
+          add('endpoint', x1, y1);
+          add('endpoint', x0, y1);
         }
         if (doMidpoints) {
-          candidates.push({ x: (x0 + x1) / 2, y: y0, type: 'midpoint' });
-          candidates.push({ x: x1, y: (y0 + y1) / 2, type: 'midpoint' });
-          candidates.push({ x: (x0 + x1) / 2, y: y1, type: 'midpoint' });
-          candidates.push({ x: x0, y: (y0 + y1) / 2, type: 'midpoint' });
+          add('midpoint', (x0 + x1) / 2, y0);
+          add('midpoint', x1, (y0 + y1) / 2);
+          add('midpoint', (x0 + x1) / 2, y1);
+          add('midpoint', x0, (y0 + y1) / 2);
         }
-        if (doCenters) {
-          candidates.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, type: 'center' });
-        }
-        const rectSegs = entityToSegments(entity);
-        addSegmentSnaps(rectSegs);
+        if (doCenters) add('center', (x0 + x1) / 2, (y0 + y1) / 2);
+        addSegmentSnaps(entityToSegments(entity));
         break;
       }
 
       case 'point': {
-        if (doEndpoints) {
-          candidates.push({ x: ox, y: oy, type: 'endpoint' });
-        }
+        if (doEndpoints) add('endpoint', ox, oy);
         break;
       }
 
@@ -234,15 +207,13 @@ export function collectSnapCandidates(
   }
 
   // Segment × segment intersections.
-  if (doIntersections && allSegments.length >= 2) {
+  if (doIntersections) {
     for (let i = 0; i < allSegments.length; i++) {
       for (let j = i + 1; j < allSegments.length; j++) {
         const a = allSegments[i]!;
         const b = allSegments[j]!;
-        const pt = segmentIntersection(a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]);
-        if (pt) {
-          candidates.push({ x: pt[0], y: pt[1], type: 'intersection' });
-        }
+        const pt = segmentIntersection(...a, ...b);
+        if (pt) add('intersection', ...pt);
       }
     }
   }

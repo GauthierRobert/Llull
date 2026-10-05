@@ -4,10 +4,6 @@
  */
 
 import type { SteelProfile } from '../steel/profiles';
-import type { appendMembers } from './memberSupport';
-
-type MemberSpecs = Parameters<typeof appendMembers>[2];
-export type MemberSpec = MemberSpecs[number];
 
 /** Resolved steel sections of a portal hall. */
 export interface PortalProfiles {

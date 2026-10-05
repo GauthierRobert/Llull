@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { classNames } from '@ui/classNames';
 
 const ICON_PATHS = {
   layers: 'M12 3 2.5 8 12 13l9.5-5L12 3ZM2.5 12.5 12 17.5l9.5-5M2.5 16.5 12 21.5l9.5-5',
@@ -44,8 +45,6 @@ const ICON_PATHS = {
   panelRight: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5ZM15 3v18',
   info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 16v-4M12 8h.01',
   cursor: 'M4 4l7 17 2.5-7.5L21 11 4 4Z',
-  sparkle:
-    'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   check: 'M20 6 9 17l-5-5',
   ruler:
@@ -119,7 +118,7 @@ export function Icon({
 }: IconProps): React.ReactElement {
   return (
     <svg
-      className={['icon', className].filter(Boolean).join(' ')}
+      className={classNames('icon', className)}
       width={size}
       height={size}
       viewBox="0 0 24 24"

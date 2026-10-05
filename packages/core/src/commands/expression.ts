@@ -32,7 +32,7 @@ interface EvalErr {
   readonly error: string;
 }
 
-type EvalResult = EvalOk | EvalErr;
+export type EvalResult = EvalOk | EvalErr;
 
 type TokenKind = 'number' | 'ident' | 'op' | 'lparen' | 'rparen' | 'eof';
 
@@ -43,66 +43,23 @@ interface Token {
 
 const EOF_TOKEN: Token = { kind: 'eof', text: '' };
 
+/** Optional whitespace, then one token (the group name is its kind) or the end of the input. */
+const TOKEN_PATTERN =
+  /[ \t\n\r]*(?:(?<number>\d+(?:\.\d*)?)|(?<ident>[A-Za-z_]\w*)|(?<op>[-+*/])|(?<lparen>\()|(?<rparen>\))|$)/y;
+
 function tokenize(src: string): Token[] | string {
+  const pattern = new RegExp(TOKEN_PATTERN);
   const tokens: Token[] = [];
-  let i = 0;
-  while (i < src.length) {
-    const ch = src[i]!;
-
-    // Skip whitespace.
-    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
-      i++;
-      continue;
+  while (pattern.lastIndex < src.length) {
+    const start = pattern.lastIndex;
+    const match = pattern.exec(src);
+    if (match === null) {
+      const at = start + src.slice(start).search(/[^ \t\n\r]/);
+      return `unexpected character '${src.charAt(at)}' at position ${at}`;
     }
-
-    // Number literal.
-    if (ch >= '0' && ch <= '9') {
-      let j = i;
-      while (j < src.length && src[j]! >= '0' && src[j]! <= '9') j++;
-      if (j < src.length && src[j] === '.') {
-        j++;
-        while (j < src.length && src[j]! >= '0' && src[j]! <= '9') j++;
-      }
-      tokens.push({ kind: 'number', text: src.slice(i, j) });
-      i = j;
-      continue;
-    }
-
-    // Identifier (parameter name reference).
-    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_') {
-      let j = i + 1;
-      while (
-        j < src.length &&
-        ((src[j]! >= 'a' && src[j]! <= 'z') ||
-          (src[j]! >= 'A' && src[j]! <= 'Z') ||
-          (src[j]! >= '0' && src[j]! <= '9') ||
-          src[j] === '_')
-      ) {
-        j++;
-      }
-      tokens.push({ kind: 'ident', text: src.slice(i, j) });
-      i = j;
-      continue;
-    }
-
-    // Operators and parens.
-    if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
-      tokens.push({ kind: 'op', text: ch });
-      i++;
-      continue;
-    }
-    if (ch === '(') {
-      tokens.push({ kind: 'lparen', text: ch });
-      i++;
-      continue;
-    }
-    if (ch === ')') {
-      tokens.push({ kind: 'rparen', text: ch });
-      i++;
-      continue;
-    }
-
-    return `unexpected character '${ch}' at position ${i}`;
+    const [kind, text] =
+      Object.entries(match.groups ?? {}).find(([, value]) => value !== undefined) ?? [];
+    if (kind !== undefined && text !== undefined) tokens.push({ kind: kind as TokenKind, text });
   }
   return tokens;
 }
@@ -124,31 +81,31 @@ function consume(s: ParseState): Token {
   return t;
 }
 
-function parseExpr(s: ParseState): EvalResult {
-  let left = parseTerm(s);
-  if (!left.ok) return left;
+function applyOperator(op: string, left: number, right: number): number {
+  if (op === '+') return left + right;
+  if (op === '-') return left - right;
+  return op === '*' ? left * right : left / right;
+}
 
-  while (peek(s).kind === 'op' && (peek(s).text === '+' || peek(s).text === '-')) {
+/** Left-associative chain of `parseOperand` separated by operators drawn from `operators`. */
+function parseBinary(
+  s: ParseState,
+  operators: string,
+  parseOperand: (s: ParseState) => EvalResult,
+): EvalResult {
+  let left = parseOperand(s);
+  while (left.ok && peek(s).kind === 'op' && operators.includes(peek(s).text)) {
     const op = consume(s).text;
-    const right = parseTerm(s);
+    const right = parseOperand(s);
     if (!right.ok) return right;
-    left = { ok: true, value: op === '+' ? left.value + right.value : left.value - right.value };
+    left = { ok: true, value: applyOperator(op, left.value, right.value) };
   }
   return left;
 }
 
-function parseTerm(s: ParseState): EvalResult {
-  let left = parseFactor(s);
-  if (!left.ok) return left;
+const parseExpr = (s: ParseState): EvalResult => parseBinary(s, '+-', parseTerm);
 
-  while (peek(s).kind === 'op' && (peek(s).text === '*' || peek(s).text === '/')) {
-    const op = consume(s).text;
-    const right = parseFactor(s);
-    if (!right.ok) return right;
-    left = { ok: true, value: op === '*' ? left.value * right.value : left.value / right.value };
-  }
-  return left;
-}
+const parseTerm = (s: ParseState): EvalResult => parseBinary(s, '*/', parseFactor);
 
 function parseFactor(s: ParseState): EvalResult {
   // Unary minus.
@@ -171,10 +128,10 @@ function parsePrimary(s: ParseState): EvalResult {
 
   if (t.kind === 'ident') {
     consume(s);
-    if (!(t.text in s.env)) {
-      return { ok: false, error: `unknown parameter: ${t.text}` };
-    }
-    return { ok: true, value: s.env[t.text]! };
+    const value = s.env[t.text];
+    return value === undefined
+      ? { ok: false, error: `unknown parameter: ${t.text}` }
+      : { ok: true, value };
   }
 
   if (t.kind === 'lparen') {
@@ -252,13 +209,19 @@ export function extractReferences(expression: string): ReadonlySet<string> {
   return refs;
 }
 
+/** Parameter name → last evaluated value (parameters in error keep their last good value). */
+export function parameterValues(
+  parameters: Readonly<Record<string, Parameter>>,
+): Record<string, number> {
+  return Object.fromEntries(Object.entries(parameters).map(([name, p]) => [name, p.value]));
+}
+
 /** A number, or an expression string evaluated over the parameter values; null when it fails. */
 export function resolveNumeric(
   raw: number | string,
   parameters: Readonly<Record<string, Parameter>>,
 ): number | null {
   if (typeof raw === 'number') return raw;
-  const env = Object.fromEntries(Object.entries(parameters).map(([name, p]) => [name, p.value]));
-  const result = evaluateExpression(raw, env);
+  const result = evaluateExpression(raw, parameterValues(parameters));
   return result.ok ? result.value : null;
 }

@@ -11,6 +11,7 @@
  * - Snap is applied by the caller via useSnap; this hook receives
  *   already-snapped world coords.
  * - Esc cancels the current in-progress shape; Esc with nothing in progress returns to Select.
+ * - Enter or double-click finishes a polyline, wall chain or spline in progress.
  * - 'move' translates the current selection by (second click - first click) via move_entity.
  * - The hook is purely React state + callbacks — no three.js here.
  */
@@ -22,19 +23,17 @@ import type { DrawToolKind } from '@ui/store';
 import { moveSelection } from '@ui/actions/selectionActions';
 import { isEditingKeyEvent } from '@ui/hooks/useKeyboardShortcuts';
 import {
+  CHAIN_DRAW_TOOLS,
   rectParamsFromCorners,
   circleRadiusFromPoints,
   ellipseParamsFromCenterCorner,
 } from './drawHelpers';
 
-interface DrawToolState {
+interface UseDrawToolResult {
   /** The currently active tool. */
   activeTool: DrawToolKind;
   /** Points collected so far in the current drawing operation. */
   collectedPoints: Vec2[];
-}
-
-interface UseDrawToolResult extends DrawToolState {
   /** Set the active draw tool; resets in-progress state. */
   setActiveTool: (tool: DrawToolKind) => void;
   /**
@@ -42,12 +41,8 @@ interface UseDrawToolResult extends DrawToolState {
    * Handles the state transitions and dispatch for each tool.
    */
   handleClick: (point: Vec2) => void;
-  /** Finish a polyline in progress (double-click or Enter). */
-  finishPolyline: (closed?: boolean) => void;
-  /** Finish a spline in progress (double-click or Enter). */
-  finishSpline: (closed?: boolean) => void;
-  /** Cancel the current in-progress shape. The tool stays active. */
-  cancel: () => void;
+  /** Finish the polyline / wall chain / spline in progress (double-click or Enter). */
+  finishChain: () => void;
 }
 
 /**
@@ -110,151 +105,65 @@ export function useDrawTool(): UseDrawToolResult {
     [setDrawTool, setCollectedPoints],
   );
 
-  const cancel = useCallback(() => {
+  const finishChain = useCallback(() => {
+    if (collectedPoints.length >= 2) {
+      if (activeTool === 'wall') dispatch('draw_walls', wallChainParams(collectedPoints, false));
+      else if (activeTool === 'spline')
+        dispatch('draw_spline', { points: collectedPoints, closed: false });
+      else dispatch('draw_polyline', { points: collectedPoints, closed: false });
+    }
     setCollectedPoints([]);
-  }, [setCollectedPoints]);
-
-  const finishPolyline = useCallback(
-    (closed = false) => {
-      if (collectedPoints.length < 2) {
-        setCollectedPoints([]);
-        return;
-      }
-      if (activeTool === 'wall') {
-        dispatch('draw_walls', wallChainParams(collectedPoints, closed));
-      } else {
-        dispatch('draw_polyline', { points: collectedPoints, closed });
-      }
-      setCollectedPoints([]);
-    },
-    [activeTool, collectedPoints, dispatch, setCollectedPoints],
-  );
-
-  const finishSpline = useCallback(
-    (closed = false) => {
-      if (collectedPoints.length < 2) {
-        setCollectedPoints([]);
-        return;
-      }
-      dispatch('draw_spline', { points: collectedPoints, closed });
-      setCollectedPoints([]);
-    },
-    [collectedPoints, dispatch, setCollectedPoints],
-  );
+  }, [activeTool, collectedPoints, dispatch, setCollectedPoints]);
 
   const handleClick = useCallback(
     (point: Vec2) => {
+      if (activeTool === 'none') return;
+      if (activeTool === 'point') {
+        dispatch('draw_point', { position: [point[0], point[1], 0] });
+        return;
+      }
+      // Each click appends a vertex; finishChain() (Enter / double-click) commits.
+      if (CHAIN_DRAW_TOOLS.has(activeTool)) {
+        setCollectedPoints((previous) => [...previous, point]);
+        return;
+      }
+      if (activeTool === 'move' && useStore.getState().document.selection.length === 0) return;
+
+      // Two-click tools: the first click records the anchor, the second one commits the shape.
+      const [first] = collectedPoints;
+      if (first === undefined) {
+        setCollectedPoints([point]);
+        return;
+      }
       switch (activeTool) {
-        case 'none':
+        case 'move':
+          moveSelection([point[0] - first[0], point[1] - first[1], 0]);
           break;
-
-        case 'move': {
-          if (useStore.getState().document.selection.length === 0) break;
-          if (collectedPoints.length === 0) {
-            setCollectedPoints([point]);
-            break;
-          }
-          const base = collectedPoints[0]!;
-          moveSelection([point[0] - base[0], point[1] - base[1], 0]);
-          setCollectedPoints([]);
+        case 'line':
+          dispatch('draw_line', { start: first, end: point });
           break;
-        }
-
-        case 'point': {
-          dispatch('draw_point', { position: [point[0], point[1], 0] });
-          break;
-        }
-
-        case 'line': {
-          const pts = [...collectedPoints, point];
-          if (pts.length === 1) {
-            // First click: record start.
-            setCollectedPoints(pts);
-          } else {
-            // Second click: complete the line.
-            const [start, end] = pts as [Vec2, Vec2];
-            dispatch('draw_line', { start, end });
-            setCollectedPoints([]);
-          }
-          break;
-        }
-
-        case 'polyline':
-        case 'wall': {
-          // Each click appends a vertex; finishPolyline() or Enter commits.
-          setCollectedPoints((prev) => [...prev, point]);
-          break;
-        }
-
         case 'circle': {
-          const pts = [...collectedPoints, point];
-          if (pts.length === 1) {
-            // First click: record center.
-            setCollectedPoints(pts);
-          } else {
-            // Second click: compute radius and dispatch.
-            const center = pts[0]!;
-            const rim = pts[1]!;
-            const radius = circleRadiusFromPoints(center, rim);
-            if (radius !== null) {
-              dispatch('draw_circle', { center, radius });
-            }
-            setCollectedPoints([]);
-          }
+          const radius = circleRadiusFromPoints(first, point);
+          if (radius !== null) dispatch('draw_circle', { center: first, radius });
           break;
         }
-
         case 'rectangle': {
-          const pts = [...collectedPoints, point];
-          if (pts.length === 1) {
-            // First click: record first corner.
-            setCollectedPoints(pts);
-          } else {
-            // Second click: compute and dispatch.
-            const params = rectParamsFromCorners(pts[0]!, pts[1]!);
-            if (params !== null) {
-              dispatch('draw_rectangle', {
-                width: params.width,
-                height: params.height,
-                position: params.position,
-              });
-            }
-            setCollectedPoints([]);
-          }
+          const params = rectParamsFromCorners(first, point);
+          if (params !== null) dispatch('draw_rectangle', params);
           break;
         }
-
         case 'ellipse': {
-          const pts = [...collectedPoints, point];
-          if (pts.length === 1) {
-            // First click: record center.
-            setCollectedPoints(pts);
-          } else {
-            // Second click: compute semi-axes from center + corner and dispatch.
-            const params = ellipseParamsFromCenterCorner(pts[0]!, pts[1]!);
-            if (params !== null) {
-              dispatch('draw_ellipse', {
-                center: params.center,
-                radiusX: params.radiusX,
-                radiusY: params.radiusY,
-              });
-            }
-            setCollectedPoints([]);
-          }
-          break;
-        }
-
-        case 'spline': {
-          // Each click appends a vertex; finishSpline() or Enter commits.
-          setCollectedPoints((prev) => [...prev, point]);
+          const params = ellipseParamsFromCenterCorner(first, point);
+          if (params !== null) dispatch('draw_ellipse', params);
           break;
         }
       }
+      setCollectedPoints([]);
     },
     [activeTool, collectedPoints, dispatch, setCollectedPoints],
   );
 
-  // Keyboard: Escape cancels; Enter finishes polyline or spline.
+  // Keyboard: Escape cancels; Enter finishes a polyline, wall chain or spline.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (isEditingKeyEvent(e)) return;
@@ -262,17 +171,16 @@ export function useDrawTool(): UseDrawToolResult {
         // First Esc drops the shape in progress; a second Esc returns to Select.
         if (activeTool === 'none') return;
         e.preventDefault();
-        if (inProgress) cancel();
+        if (inProgress) setCollectedPoints([]);
         else setActiveTool('none');
-      } else if (e.key === 'Enter') {
-        if (activeTool === 'polyline' || activeTool === 'wall') finishPolyline(false);
-        else if (activeTool === 'spline') finishSpline(false);
+      } else if (e.key === 'Enter' && CHAIN_DRAW_TOOLS.has(activeTool)) {
+        finishChain();
       }
     };
     // Capture phase: runs before the global shortcut handler, which skips consumed (prevented) keys.
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [activeTool, inProgress, cancel, finishPolyline, finishSpline, setActiveTool]);
+  }, [activeTool, inProgress, finishChain, setActiveTool, setCollectedPoints]);
 
   // Ctrl/Cmd+Z mid-operation removes the last collected point instead of undoing the document.
   // Capture phase + stopPropagation so the global undo shortcut never sees it.
@@ -290,13 +198,5 @@ export function useDrawTool(): UseDrawToolResult {
     return () => window.removeEventListener('keydown', onUndoKey, true);
   }, [inProgress, setCollectedPoints]);
 
-  return {
-    activeTool,
-    collectedPoints,
-    setActiveTool,
-    handleClick,
-    finishPolyline,
-    finishSpline,
-    cancel,
-  };
+  return { activeTool, collectedPoints, setActiveTool, handleClick, finishChain };
 }

@@ -17,7 +17,8 @@
 import type { ThreeEvent } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import type { TextEntity } from '@core/model/types';
-import { TEXT_FONT_URL } from '@ui/viewport/textFont';
+import { TEXT_FONT_URL, toAnchorX } from '@ui/viewport/textFont';
+import { SELECTION_COLOR } from '@ui/viewport/viewportPalette';
 
 interface TextMeshProps {
   entity: TextEntity;
@@ -25,18 +26,8 @@ interface TextMeshProps {
   onSelect: (id: string, additive: boolean) => void;
 }
 
-/** Derive anchorX value expected by drei <Text> from our anchor field. */
-function toAnchorX(anchor: TextEntity['anchor']): 'left' | 'center' | 'right' {
-  if (anchor === 'center') return 'center';
-  if (anchor === 'right') return 'right';
-  return 'left';
-}
-
 export function TextMesh({ entity, selected, onSelect }: TextMeshProps): React.ReactElement {
   const { content, height, position, rotation, color, anchor } = entity;
-
-  const anchorX = toAnchorX(anchor);
-  const textColor = selected ? '#5b8dee' : color;
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();
@@ -55,8 +46,8 @@ export function TextMesh({ entity, selected, onSelect }: TextMeshProps): React.R
       position={[position[0], position[1], position[2]]}
       rotation={[rotation[0], rotation[1], rotation[2]]}
       fontSize={height}
-      color={textColor}
-      anchorX={anchorX}
+      color={selected ? SELECTION_COLOR : color}
+      anchorX={toAnchorX(anchor)}
       anchorY="middle"
       onClick={handleClick}
     >

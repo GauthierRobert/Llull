@@ -7,7 +7,7 @@
  * never mutates the document.
  */
 
-import React, { useCallback, useId } from 'react';
+import React, { useId } from 'react';
 import { useViewportStore, useStore } from '@ui/store';
 import type { DisplayMode, ClipAxis, QualityOverride } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
@@ -102,27 +102,6 @@ function SectionPopover(): React.ReactElement | null {
   const setClipPlane = useViewportStore((s) => s.setClipPlane);
   const baseId = useId();
 
-  const handleAxisChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setClipPlane({ axis: e.target.value as ClipAxis });
-    },
-    [setClipPlane],
-  );
-
-  const handleOffsetChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setClipPlane({ offset: parseFloat(e.target.value) });
-    },
-    [setClipPlane],
-  );
-
-  const handleFlipChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setClipPlane({ flipped: e.target.checked });
-    },
-    [setClipPlane],
-  );
-
   if (!clipPlane.enabled) return null;
 
   return (
@@ -134,7 +113,7 @@ function SectionPopover(): React.ReactElement | null {
         id={`${baseId}-axis`}
         className="vp-select"
         value={clipPlane.axis}
-        onChange={handleAxisChange}
+        onChange={(e) => setClipPlane({ axis: e.target.value as ClipAxis })}
         aria-label="Section plane axis"
       >
         {CLIP_AXES.map(({ value, label }) => (
@@ -156,7 +135,7 @@ function SectionPopover(): React.ReactElement | null {
           max={50}
           step={0.5}
           value={clipPlane.offset}
-          onChange={handleOffsetChange}
+          onChange={(e) => setClipPlane({ offset: parseFloat(e.target.value) })}
           aria-label="Section plane offset"
           aria-valuemin={-50}
           aria-valuemax={50}
@@ -169,7 +148,7 @@ function SectionPopover(): React.ReactElement | null {
         <input
           type="checkbox"
           checked={clipPlane.flipped}
-          onChange={handleFlipChange}
+          onChange={(e) => setClipPlane({ flipped: e.target.checked })}
           aria-label="Flip section plane direction"
         />
         Flip direction
@@ -234,13 +213,6 @@ function QualityControl(): React.ReactElement {
   const setQualityOverride = useViewportStore((s) => s.setQualityOverride);
   const baseId = useId();
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setQualityOverride(e.target.value as QualityOverride);
-    },
-    [setQualityOverride],
-  );
-
   return (
     <div className="vp-group vp-quality" role="group" aria-label="Render quality settings">
       <label htmlFor={`${baseId}-quality`} className="vp-field-label vp-quality__label">
@@ -250,7 +222,7 @@ function QualityControl(): React.ReactElement {
         id={`${baseId}-quality`}
         className="vp-select vp-select--ghost"
         value={qualityOverride}
-        onChange={handleChange}
+        onChange={(e) => setQualityOverride(e.target.value as QualityOverride)}
         aria-label="Render quality"
         title="Render quality — controls shadow cost; Auto scales with scene size"
       >

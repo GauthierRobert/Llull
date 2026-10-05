@@ -59,9 +59,7 @@
   padding: 0 6px;
   border-radius: var(--radius-sm);
   color: var(--fg-muted);
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  transition: var(--transition-colors);
 }
 
 .tb-btn:hover:not(:disabled) {
@@ -102,12 +100,7 @@
   padding: 6px var(--space-3);
   font-size: var(--text-sm);
   color: var(--fg-muted);
-  background: var(--surface-float);
-  backdrop-filter: var(--backdrop);
-  -webkit-backdrop-filter: var(--backdrop);
-  border: 1px solid var(--border-float);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-float);
   pointer-events: none;
 }
 
@@ -156,10 +149,6 @@
   width: min(760px, 100%);
   max-height: 100%;
   overflow: auto;
-  background: var(--surface-popover);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-popover);
 }
 
 .shortcuts-dialog__header {

@@ -9,6 +9,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import type * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
+import { toRenderPosition } from './floatingOrigin';
 
 /**
  * Convert spherical CameraState → a cartesian THREE.Vector3 eye position.
@@ -19,7 +20,7 @@ import { useStore } from '@ui/store';
  *   azimuth   → angle in the XY plane from +Y axis toward +X
  */
 export function sphericalToCartesian(
-  target: [number, number, number],
+  target: readonly [number, number, number],
   azimuth: number,
   polar: number,
   distance: number,
@@ -58,16 +59,15 @@ export function CameraReactor(): null {
     if (!orbit) return;
 
     // The camera lives in render space (world − renderOrigin), like the entity group.
-    const [ox, oy, oz] = useStore.getState().renderOrigin;
-    const newPos = sphericalToCartesian(
-      docCamera.target as [number, number, number],
+    const { renderOrigin } = useStore.getState();
+    const eye = sphericalToCartesian(
+      docCamera.target,
       docCamera.azimuth,
       docCamera.polar,
       docCamera.distance,
     );
-
-    camera.position.set(newPos[0] - ox, newPos[1] - oy, newPos[2] - oz);
-    orbit.target.set(docCamera.target[0] - ox, docCamera.target[1] - oy, docCamera.target[2] - oz);
+    camera.position.set(...toRenderPosition(eye, renderOrigin));
+    orbit.target.set(...toRenderPosition(docCamera.target, renderOrigin));
 
     // Sync OrbitControls internal spherical state to new position/target.
     orbit.update();

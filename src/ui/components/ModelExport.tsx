@@ -23,12 +23,14 @@ const FORMATS: ReadonlyArray<{ value: ExportFormat; label: string }> = [
 ];
 
 export function ModelExport(): React.ReactElement {
-  const document = useStore((s) => s.document);
   const [format, setFormat] = useState<ExportFormat>('cadquery');
   const [status, setStatus] = useState('');
 
   const exportCode = (language: Exclude<ExportFormat, 'step'>): void => {
-    const result = execute(document, 'export_code', { language, name: 'model' });
+    const result = execute(useStore.getState().document, 'export_code', {
+      language,
+      name: 'model',
+    });
     const data = result.data as { text?: string; fileName?: string } | undefined;
     if (data?.text === undefined || data.fileName === undefined) {
       setStatus(result.summary);

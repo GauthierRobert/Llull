@@ -11,7 +11,8 @@ import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { nextId } from '../lib/id';
-import { replaceEntities, withEntity, withoutEntities } from './entityOps';
+import { commitEntity } from './commitEntity';
+import { replaceEntities, withoutEntities } from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { noop } from './noop';
 import { ORIGIN, add3 } from '../lib/vec3';
@@ -62,18 +63,13 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
         childEntity.position[1] * sy,
         childEntity.position[2] * sz,
       ];
-
       const rotatedPos: Vec3 = hasRotation ? applyEulerXYZ(localPos, [0, 0, 0], rot) : localPos;
-
-      const worldPos = add3(rotatedPos, pos);
-
-      const worldRot = add3(childEntity.rotation, rot);
 
       return {
         ...childEntity,
         id: expandedId(instance.id, childEntity.id),
-        position: worldPos,
-        rotation: worldRot,
+        position: add3(rotatedPos, pos),
+        rotation: add3(childEntity.rotation, rot),
       } as Entity;
     });
 }
@@ -195,11 +191,11 @@ export const insertInstance = defineCommand({
       scale ?? UNIT_SCALE,
     );
 
-    return {
-      document: withEntity(doc, instance),
-      summary: `Inserted instance ${instanceId} of component "${component.name}" (${componentId}) at position [${position.join(', ')}].`,
-      affected: [instanceId],
-    };
+    return commitEntity(
+      doc,
+      instance,
+      `Inserted instance ${instanceId} of component "${component.name}" (${componentId}) at position [${position.join(', ')}].`,
+    );
   },
 });
 
@@ -231,16 +227,15 @@ export const explodeInstance = defineCommand({
       return noop(doc, `explode_instance: entity "${id}" is not an instance or does not exist.`);
     }
 
-    const instance = entity as InstanceEntity;
-    const component = doc.components[instance.componentId];
+    const component = doc.components[entity.componentId];
     if (!component) {
       return noop(
         doc,
-        `explode_instance: component "${instance.componentId}" referenced by instance "${id}" not found.`,
+        `explode_instance: component "${entity.componentId}" referenced by instance "${id}" not found.`,
       );
     }
 
-    const bakedEntities = expandInstance(instance, component);
+    const bakedEntities = expandInstance(entity, component);
 
     const bakedIds = bakedEntities.map((e) => e.id);
     const { document: rest } = withoutEntities(doc, new Set([id]));
@@ -252,7 +247,7 @@ export const explodeInstance = defineCommand({
 
     return {
       document,
-      summary: `Exploded instance "${id}" (component "${component.name}", ${instance.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].`,
+      summary: `Exploded instance "${id}" (component "${component.name}", ${entity.componentId}) into ${bakedEntities.length} concrete entit${bakedEntities.length === 1 ? 'y' : 'ies'}: [${bakedIds.join(', ')}].`,
       affected: bakedIds,
     };
   },

@@ -1,119 +1,111 @@
 /**
  * @layer ui/viewport/2d
  *
- * Rubber-band previews rendered inside the r3f scene while a draw tool is active.
- *
- * Renders a memoized LineSegments / line-loop preview that follows the snapped
- * cursor. All geometry is memoized and disposed on unmount (R9).
+ * Rubber-band previews rendered inside the r3f scene while a draw tool is active, and the
+ * markers on already-placed vertices. Geometry is rebuilt per change and disposed (R9).
  *
  * Presentation only — no document mutations (R1). Reads draw state from props.
  */
 
-import { useEffect, useMemo, useRef } from 'react';
-import * as THREE from 'three';
+import { useMemo } from 'react';
+import type * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
-import { ellipseSegmentsGeometry } from './ellipseSegments';
 import type { DrawToolKind } from '@ui/store';
+import { chainSegments, ellipseOutline, loopSegments, segmentsGeometry } from '../lineGeometry';
+import { useDisposable } from '../useDisposable';
+import { useOverlayMaterial } from '../useOverlayMaterial';
 import {
+  CHAIN_DRAW_TOOLS,
   rectParamsFromCorners,
   circleRadiusFromPoints,
   ellipseParamsFromCenterCorner,
 } from './drawHelpers';
 
 const PREVIEW_COLOR = '#60a5fa'; // blue-400
-const PREVIEW_DASH_COLOR = '#94a3b8'; // slate-400
+const PREVIEW_HINT_COLOR = '#94a3b8'; // slate-400
+const MARKER_COLOR = '#f59e0b';
+const OUTLINE_SEGMENTS = 32;
+const CROSSHAIR_RADIUS = 0.15;
+const MARKER_RADIUS = 0.12;
 
-/** Small crosshair drawn at the cursor before the first point is placed. */
-function buildCrosshairGeo(cursor: Vec2): THREE.BufferGeometry {
-  const s = 0.15;
-  const verts = new Float32Array([
-    cursor[0] - s,
-    cursor[1],
-    0,
-    cursor[0] + s,
-    cursor[1],
-    0,
-    cursor[0],
-    cursor[1] - s,
-    0,
-    cursor[0],
-    cursor[1] + s,
-    0,
-  ]);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-  return geo;
+interface Preview {
+  /** Segment vertex pairs. */
+  vertices: Vec2[];
+  /** Faint style, used for the crosshair shown before the first point is placed. */
+  hint: boolean;
 }
 
-/** Two-point line segment geometry. */
-function buildLineGeo(a: Vec2, b: Vec2): THREE.BufferGeometry {
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute(
-    'position',
-    new THREE.BufferAttribute(new Float32Array([a[0], a[1], 0, b[0], b[1], 0]), 3),
-  );
-  return geo;
-}
+/** Outline previewed from the single placed point to the cursor; null while degenerate. */
+const ANCHORED_OUTLINES: Partial<
+  Record<DrawToolKind, (anchor: Vec2, cursor: Vec2) => Vec2[] | null>
+> = {
+  line: (anchor, cursor) => [anchor, cursor],
+  move: (anchor, cursor) => [anchor, cursor],
+  circle: (center, rim) => {
+    const radius = circleRadiusFromPoints(center, rim);
+    return radius === null
+      ? null
+      : ellipseOutline(center[0], center[1], radius, radius, OUTLINE_SEGMENTS);
+  },
+  rectangle: (a, b) => {
+    if (rectParamsFromCorners(a, b) === null) return null;
+    const [x0, x1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0])];
+    const [y0, y1] = [Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+    return loopSegments([
+      [x0, y0],
+      [x1, y0],
+      [x1, y1],
+      [x0, y1],
+    ]);
+  },
+  ellipse: (center, corner) => {
+    const ellipse = ellipseParamsFromCenterCorner(center, corner);
+    return ellipse === null
+      ? null
+      : ellipseOutline(
+          ellipse.center[0],
+          ellipse.center[1],
+          ellipse.radiusX,
+          ellipse.radiusY,
+          OUTLINE_SEGMENTS,
+        );
+  },
+};
 
-/** Polyline through an ordered list of points. */
-function buildPolylineGeo(points: Vec2[], cursor: Vec2): THREE.BufferGeometry {
-  const all = [...points, cursor];
-  const verts: number[] = [];
-  for (let i = 0; i < all.length - 1; i++) {
-    const a = all[i]!;
-    const b = all[i + 1]!;
-    verts.push(a[0], a[1], 0, b[0], b[1], 0);
+/** Chain tools preview a straight-segment rubber band; the others an outline from the one placed point. */
+function previewOf(tool: DrawToolKind, points: ReadonlyArray<Vec2>, cursor: Vec2): Preview | null {
+  if (CHAIN_DRAW_TOOLS.has(tool)) {
+    if (points.length > 0) return { vertices: chainSegments([...points, cursor]), hint: false };
+    const [x, y] = cursor;
+    const r = CROSSHAIR_RADIUS;
+    return {
+      vertices: [
+        [x - r, y],
+        [x + r, y],
+        [x, y - r],
+        [x, y + r],
+      ],
+      hint: true,
+    };
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-  return geo;
+  const anchor = points.length === 1 ? points[0] : undefined;
+  const vertices = anchor ? ANCHORED_OUTLINES[tool]?.(anchor, cursor) : null;
+  return vertices ? { vertices, hint: false } : null;
 }
 
-/** Rectangle outline from two corners. */
-function buildRectGeo(a: Vec2, b: Vec2): THREE.BufferGeometry {
-  const x0 = Math.min(a[0], b[0]);
-  const x1 = Math.max(a[0], b[0]);
-  const y0 = Math.min(a[1], b[1]);
-  const y1 = Math.max(a[1], b[1]);
-  const verts = new Float32Array([
-    x0,
-    y0,
-    0,
-    x1,
-    y0,
-    0,
-    x1,
-    y0,
-    0,
-    x1,
-    y1,
-    0,
-    x1,
-    y1,
-    0,
-    x0,
-    y1,
-    0,
-    x0,
-    y1,
-    0,
-    x0,
-    y0,
-    0,
-  ]);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-  return geo;
+interface OverlaySegmentsProps {
+  vertices: Vec2[];
+  material: THREE.LineBasicMaterial;
+  renderOrder: number;
 }
 
-/**
- * Spline rubber-band preview: draws straight segments from collected points
- * to the cursor. A full Catmull-Rom tessellation is intentionally avoided here
- * for performance — the actual curve tessellation happens in SplineRenderer.
- */
-function buildSplinePreviewGeo(points: Vec2[], cursor: Vec2): THREE.BufferGeometry {
-  // Show a polyline rubber-band while collecting; enough to indicate progress.
-  return buildPolylineGeo(points, cursor);
+function OverlaySegments({
+  vertices,
+  material,
+  renderOrder,
+}: OverlaySegmentsProps): React.ReactElement {
+  const geometry = useDisposable(() => segmentsGeometry(vertices), [vertices]);
+  return <lineSegments geometry={geometry} material={material} renderOrder={renderOrder} />;
 }
 
 interface DrawPreviewProps {
@@ -123,203 +115,46 @@ interface DrawPreviewProps {
   cursor: Vec2 | null;
 }
 
-/**
- * Imperative-style preview using a ref'ed THREE.LineSegments that is updated
- * every render. Geometry is rebuilt when relevant props change, then disposed.
- * Uses renderOrder 998 so it draws over entities but under snap glyphs.
- */
+/** Draws over entities (renderOrder 998) but under snap glyphs. */
 export function DrawPreview({
   activeTool,
   collectedPoints,
   cursor,
 }: DrawPreviewProps): React.ReactElement | null {
-  const objRef = useRef<THREE.LineSegments | null>(null);
-  const geoRef = useRef<THREE.BufferGeometry | null>(null);
-
-  const mat = useMemo(
-    () =>
-      new THREE.LineBasicMaterial({
-        color: PREVIEW_COLOR,
-        linewidth: 1,
-        depthTest: false,
-        transparent: true,
-        opacity: 0.85,
-      }),
-    [],
+  const solidMaterial = useOverlayMaterial(PREVIEW_COLOR, 0.85);
+  const hintMaterial = useOverlayMaterial(PREVIEW_HINT_COLOR, 0.5);
+  const preview = useMemo(
+    () => (cursor === null ? null : previewOf(activeTool, collectedPoints, cursor)),
+    [activeTool, collectedPoints, cursor],
   );
 
-  const dotMat = useMemo(
-    () =>
-      new THREE.LineBasicMaterial({
-        color: PREVIEW_DASH_COLOR,
-        linewidth: 1,
-        depthTest: false,
-        transparent: true,
-        opacity: 0.5,
-      }),
-    [],
+  if (!preview) return null;
+  return (
+    <OverlaySegments
+      vertices={preview.vertices}
+      material={preview.hint ? hintMaterial : solidMaterial}
+      renderOrder={998}
+    />
   );
-
-  // Dispose material on unmount.
-  useEffect(() => {
-    return () => {
-      mat.dispose();
-      dotMat.dispose();
-    };
-  }, [mat, dotMat]);
-
-  // Build preview geometry from current state.
-  const segments = useMemo<THREE.LineSegments | null>(() => {
-    if (activeTool === 'none' || cursor === null) return null;
-
-    let geo: THREE.BufferGeometry | null = null;
-    let useDash = false;
-
-    if (activeTool === 'line' || activeTool === 'move') {
-      if (collectedPoints.length === 1) {
-        geo = buildLineGeo(collectedPoints[0]!, cursor);
-      }
-    } else if (activeTool === 'polyline' || activeTool === 'wall') {
-      if (collectedPoints.length >= 1) {
-        geo = buildPolylineGeo(collectedPoints, cursor);
-      } else {
-        geo = buildCrosshairGeo(cursor);
-        useDash = true;
-      }
-    } else if (activeTool === 'circle') {
-      if (collectedPoints.length === 1) {
-        const radius = circleRadiusFromPoints(collectedPoints[0]!, cursor);
-        if (radius !== null) {
-          geo = ellipseSegmentsGeometry(
-            collectedPoints[0]![0],
-            collectedPoints[0]![1],
-            radius,
-            radius,
-            32,
-          );
-        }
-      }
-    } else if (activeTool === 'rectangle') {
-      if (collectedPoints.length === 1) {
-        const params = rectParamsFromCorners(collectedPoints[0]!, cursor);
-        if (params !== null) {
-          geo = buildRectGeo(collectedPoints[0]!, cursor);
-        }
-      }
-    } else if (activeTool === 'ellipse') {
-      if (collectedPoints.length === 1) {
-        const params = ellipseParamsFromCenterCorner(collectedPoints[0]!, cursor);
-        if (params !== null) {
-          geo = ellipseSegmentsGeometry(
-            params.center[0],
-            params.center[1],
-            params.radiusX,
-            params.radiusY,
-            32,
-          );
-        }
-      }
-    } else if (activeTool === 'spline') {
-      if (collectedPoints.length >= 1) {
-        geo = buildSplinePreviewGeo(collectedPoints, cursor);
-      } else {
-        geo = buildCrosshairGeo(cursor);
-        useDash = true;
-      }
-    }
-
-    if (!geo) return null;
-
-    const segs = new THREE.LineSegments(geo, useDash ? dotMat : mat);
-    segs.renderOrder = 998;
-    return segs;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTool, collectedPoints, cursor, mat, dotMat]);
-
-  // Dispose previous geometry when a new one is built.
-  useEffect(() => {
-    const prev = geoRef.current;
-    geoRef.current = segments?.geometry ?? null;
-    return () => {
-      prev?.dispose();
-    };
-  }, [segments]);
-
-  // Update ref.
-  useEffect(() => {
-    objRef.current = segments;
-  }, [segments]);
-
-  if (!segments) return null;
-  return <primitive object={segments} />;
 }
 
-interface PointMarkerProps {
-  points: Vec2[];
-}
-
-/** Small cross marker rendered at each already-collected vertex. */
-export function CollectedPointMarkers({ points }: PointMarkerProps): React.ReactElement | null {
-  const mat = useMemo(
-    () => new THREE.LineBasicMaterial({ color: '#f59e0b', depthTest: false }),
-    [],
+/** Small square marker at each already-collected vertex. */
+export function CollectedPointMarkers({ points }: { points: Vec2[] }): React.ReactElement | null {
+  const material = useOverlayMaterial(MARKER_COLOR);
+  const vertices = useMemo(
+    () =>
+      points.flatMap(([x, y]) => {
+        const r = MARKER_RADIUS;
+        return loopSegments([
+          [x - r, y - r],
+          [x + r, y - r],
+          [x + r, y + r],
+          [x - r, y + r],
+        ]);
+      }),
+    [points],
   );
 
-  useEffect(() => {
-    return () => {
-      mat.dispose();
-    };
-  }, [mat]);
-
-  const segsObject = useMemo(() => {
-    if (points.length === 0) return null;
-    const s = 0.12;
-    const verts: number[] = [];
-    for (const p of points) {
-      // Small square around each point.
-      verts.push(
-        p[0] - s,
-        p[1] - s,
-        0,
-        p[0] + s,
-        p[1] - s,
-        0,
-        p[0] + s,
-        p[1] - s,
-        0,
-        p[0] + s,
-        p[1] + s,
-        0,
-        p[0] + s,
-        p[1] + s,
-        0,
-        p[0] - s,
-        p[1] + s,
-        0,
-        p[0] - s,
-        p[1] + s,
-        0,
-        p[0] - s,
-        p[1] - s,
-        0,
-      );
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-    const segs = new THREE.LineSegments(geo, mat);
-    segs.renderOrder = 997;
-    return segs;
-  }, [points, mat]);
-
-  const geoRef = useRef<THREE.BufferGeometry | null>(null);
-  useEffect(() => {
-    const prev = geoRef.current;
-    geoRef.current = segsObject?.geometry ?? null;
-    return () => {
-      prev?.dispose();
-    };
-  }, [segsObject]);
-
-  if (!segsObject) return null;
-  return <primitive object={segsObject} />;
+  if (points.length === 0) return null;
+  return <OverlaySegments vertices={vertices} material={material} renderOrder={997} />;
 }

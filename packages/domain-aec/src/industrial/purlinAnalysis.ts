@@ -5,9 +5,9 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import { fromMm, getBuilding } from '../model';
+import { elementsOf, getBuilding, toMm } from '../model';
 import { findProfile } from '../steel/profiles';
-import { ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from './frameModelTypes';
+import { GAMMA_G, GAMMA_Q, ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from './frameModelTypes';
 import { purlinWind } from './purlinWind';
 import { yieldStrength } from './steelDesign';
 import {
@@ -15,8 +15,6 @@ import {
   CPI_PRESSURE,
   CPI_SUCTION,
   DEFAULT_TRIBUTARY,
-  GAMMA_G,
-  GAMMA_Q,
   GRAVITY,
   type Located,
   PURLIN_DEFLECTION_RATIO,
@@ -42,20 +40,17 @@ export function locatePurlinMembers(
   doc: CadDocument,
   levelId: string,
 ): { members: Located[]; skipped: string[] } {
-  const building = getBuilding(doc);
-  const unit = fromMm(doc, 1);
-  const toMm = (point: readonly number[]): Point => [
-    (point[0] ?? 0) / unit,
-    (point[1] ?? 0) / unit,
-    (point[2] ?? 0) / unit,
+  const toPointMm = (point: readonly number[]): Point => [
+    toMm(doc, point[0] ?? 0),
+    toMm(doc, point[1] ?? 0),
+    toMm(doc, point[2] ?? 0),
   ];
   const members: Located[] = [];
   const skipped: string[] = [];
-  for (const id of building.elementOrder) {
-    const element = building.elements[id];
-    if (element?.category !== 'member' || element.levelId !== levelId) continue;
+  for (const element of elementsOf(getBuilding(doc), 'member')) {
+    if (element.levelId !== levelId) continue;
     const profile = findProfile(element.profile);
-    const [start, end] = [toMm(element.start), toMm(element.end)];
+    const [start, end] = [toPointMm(element.start), toPointMm(element.end)];
     const length = Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
     if (!profile || length < TOLERANCE) {
       if (element.role === 'purlin' || element.role === 'rail') skipped.push(element.mark);
@@ -262,12 +257,8 @@ export function analysePurlins(
           kind: 'purlin',
           zone,
           span: purlin.length / 1000,
+          ...worst,
           check: `${worst.check} ${purlin.member.profile}, tributary ${tributary.toFixed(0)} mm, pitch ${((pitch * 180) / Math.PI).toFixed(1)}°`,
-          value: worst.value,
-          limit: worst.limit,
-          unit: worst.unit,
-          utilisation: worst.utilisation,
-          combination: worst.combination,
           upliftUtilisation: (uplift[0] as Verdict).utilisation,
         });
         record('roof', zone, cpe, worst.utilisation);
@@ -334,12 +325,8 @@ export function analysePurlins(
       kind: 'rail',
       zone,
       span: rail.length / 1000,
+      ...worst,
       check: `${worst.check} ${rail.member.profile}, tributary ${(trib * 1000).toFixed(0)} mm`,
-      value: worst.value,
-      limit: worst.limit,
-      unit: worst.unit,
-      utilisation: worst.utilisation,
-      combination: worst.combination,
     });
     record('wall', zone, CPE_WALL[zone], worst.utilisation);
   }

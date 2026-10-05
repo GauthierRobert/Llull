@@ -72,7 +72,7 @@ function envelope(geometry: Geometry, loads: ReadonlyArray<Load>, effectiveMm: n
   ].map((value) => value / 1000) as [number, number, number, number, number];
   const armX = Math.max(0, (widthM - faceX) / 2);
   const armY = Math.max(0, (lengthM - faceY) / 2);
-  const initial: Envelope = {
+  let result: Envelope = {
     momentX: 0,
     momentY: 0,
     shearX: 0,
@@ -81,7 +81,6 @@ function envelope(geometry: Geometry, loads: ReadonlyArray<Load>, effectiveMm: n
     faceStress: 0,
     combination: '-',
   };
-  let result = initial;
   let governingScore = -1;
   for (const load of loads) {
     const profile = pressureProfile(load, widthM, lengthM);
@@ -90,12 +89,11 @@ function envelope(geometry: Geometry, loads: ReadonlyArray<Load>, effectiveMm: n
     const meanY = load.normal / (Math.min(widthM, profile.contact) * lengthM);
     const momentY = (meanY * armY ** 2) / 2;
     const shearY = meanY * Math.max(0, armY - depthM);
-    const [columnX, columnY] = [faceX, faceY];
-    const beta = 1 + (1.8 * profile.eccentricity) / (columnX + 4 * depthM);
+    const beta = 1 + (1.8 * profile.eccentricity) / (faceX + 4 * depthM);
     const stresses = Array.from({ length: PUNCHING_STEPS }, (_, index) => {
       const distance = (2 * depthM * (index + 1)) / PUNCHING_STEPS;
       const inside = Math.min(
-        columnX * columnY + 2 * distance * (columnX + columnY) + Math.PI * distance ** 2,
+        faceX * faceY + 2 * distance * (faceX + faceY) + Math.PI * distance ** 2,
         widthM * lengthM,
       );
       const reduced = Math.max(0, load.normal - profile.mean * inside);

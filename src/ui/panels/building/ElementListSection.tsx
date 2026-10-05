@@ -11,6 +11,7 @@ import type { BuildingElement } from '@core/model/building';
 import type { DocumentUnit } from '@core/model/types';
 import { boltSize } from '@aec/industrial/evaluate';
 import { PanelSection, IconButton } from '@ui/panels/PanelParts';
+import { orderedValues } from '@ui/panels/orderedValues';
 
 const CATEGORY_LABEL: Readonly<Record<BuildingElement['category'], string>> = {
   grid: 'Grid',
@@ -117,13 +118,11 @@ export function ElementListSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const selection = useStore((s) => s.document.selection);
   const elements = building
-    ? building.elementOrder.flatMap((id) => {
-        const element = building.elements[id];
-        if (!element) return [];
+    ? orderedValues(building.elementOrder, building.elements).filter((element) => {
         const host = 'hostId' in element ? building.elements[element.hostId] : undefined;
         const levelId =
           'levelId' in element ? element.levelId : host && 'levelId' in host ? host.levelId : null;
-        return levelId === null || levelId === building.activeLevelId ? [element] : [];
+        return levelId === null || levelId === building.activeLevelId;
       })
     : [];
   const activeName = building?.activeLevelId

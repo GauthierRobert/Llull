@@ -8,6 +8,8 @@
  */
 
 import { pointInPolygon, polygonArea, projectOntoSegment, type Point2 } from '@lib/polygon';
+import { elementsOf } from '../model';
+import { round } from '../numeric';
 import { GRAVITY, type ModelUnits } from './steelMemberBars';
 import { depositArea, type BeamLoads } from './steelBeamLoads';
 
@@ -133,9 +135,8 @@ function rasterCells(surface: Surface): { centres: Point2[]; area: number } {
 function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>): Surface[] {
   const { building, toMm, elevationMm } = units;
   const surfaces: Surface[] = [];
-  for (const id of building.elementOrder) {
-    const slab = building.elements[id];
-    if (slab?.category !== 'slab' || slab.role !== 'floor') continue;
+  for (const slab of elementsOf(building, 'slab')) {
+    if (slab.role !== 'floor') continue;
     const top = elevationMm(slab.levelId) + toMm(slab.offset);
     surfaces.push({
       slabId: slab.id,
@@ -155,11 +156,9 @@ function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>): Surface
 function footprintsOf(units: ModelUnits): Array<{ id: string; footprint: Footprint }> {
   const { building, toMm, elevationMm } = units;
   const footprints: Array<{ id: string; footprint: Footprint }> = [];
-  for (const id of building.elementOrder) {
-    const equipment = building.elements[id];
-    if (equipment?.category !== 'equipment') continue;
+  for (const equipment of elementsOf(building, 'equipment')) {
     footprints.push({
-      id,
+      id: equipment.id,
       footprint: {
         center: toPoint2(equipment.location, toMm),
         size: [toMm(equipment.size[0]), toMm(equipment.size[1])],
@@ -255,8 +254,8 @@ function applyEquipment(
     if (weightKn > 0 && carried < weightKn * 0.999) {
       warnings.push(
         carried === 0
-          ? `equipment ${equipment.mark} (${equipment.name}) stands on grade: no steel beam or floor at its base, its ${round1(weightKn)} kN is not carried by the structure`
-          : `equipment ${equipment.mark} (${equipment.name}): ${round1(weightKn - carried)} kN of ${round1(weightKn)} kN stand outside the floor / beams and are not carried`,
+          ? `equipment ${equipment.mark} (${equipment.name}) stands on grade: no steel beam or floor at its base, its ${round(weightKn, 1)} kN is not carried by the structure`
+          : `equipment ${equipment.mark} (${equipment.name}): ${round(weightKn - carried, 1)} kN of ${round(weightKn, 1)} kN stand outside the floor / beams and are not carried`,
       );
     }
     reports.push({
@@ -271,8 +270,6 @@ function applyEquipment(
   }
   return reports;
 }
-
-const round1 = (value: number): number => Math.round(value * 10) / 10;
 
 /**
  * Deposit floor dead / imposed load and equipment weight on the beams.

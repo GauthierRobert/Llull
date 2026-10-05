@@ -3,9 +3,8 @@
  *
  * Visual snap indicator for the 2D drafting viewport.
  *
- * Tracks the pointer over the 2D canvas via an invisible ground plane
- * (onPointerMove on a large mesh at z=0), computes the snapped position,
- * and renders a small glyph whose shape encodes the snap type:
+ * Tracks the pointer over the 2D canvas via an invisible ground plane, computes the snapped
+ * position and renders a small glyph whose shape encodes the snap type:
  *
  *   endpoint      → square (magenta)
  *   midpoint      → triangle (cyan)
@@ -18,19 +17,18 @@
  *   grid          → plus (dim white)
  *
  * Presentation only — reads the document via useSnap; NEVER mutates it (R1).
- * Geometries/materials are memoized and disposed on unmount (R9).
+ * Geometries/materials are disposed on unmount (R9).
  */
 
-import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import * as THREE from 'three';
-import { useStore } from '@ui/store';
-import type { ThreeEvent } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
-import { useSnap } from './useSnap';
-import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
+import { chainSegments, ellipseOutline, loopSegments, segmentsGeometry } from '../lineGeometry';
+import { useDisposable } from '../useDisposable';
+import { useZoomSnap } from './useSnap';
+import { pixelsToWorld } from './gridHelpers';
 import type { SnapType } from './snapping/types';
-import { useGroundPlane } from './useGroundPlane';
-import { ellipseSegmentsGeometry } from './ellipseSegments';
+import { GroundPlane, toDocumentPoint } from './GroundPlane';
 
 const SNAP_COLORS: Record<SnapType, string> = {
   endpoint: '#e040fb', // magenta
@@ -45,207 +43,81 @@ const SNAP_COLORS: Record<SnapType, string> = {
 };
 
 /**
- * Base glyph half-size the geometry is built at (world units). The rendered
- * glyph is rescaled per-frame so its ON-SCREEN size stays ~GLYPH_TARGET_PX
- * regardless of zoom — otherwise it would be invisible when zoomed out and
- * enormous when zoomed in. GLYPH_SIZE × default-zoom (50) ≈ GLYPH_TARGET_PX,
- * so scale is 1 at the default zoom (no distortion of the original look).
+ * Base glyph half-size the geometry is built at (world units). The rendered glyph is rescaled so
+ * its ON-SCREEN size stays ~GLYPH_TARGET_PX regardless of zoom — otherwise it would be invisible
+ * when zoomed out and enormous when zoomed in. GLYPH_SIZE × default-zoom (50) ≈ GLYPH_TARGET_PX,
+ * so the scale is 1 at the default zoom.
  */
-const GLYPH_SIZE = 0.22; // world units (base; scaled to screen px at render)
+const GLYPH_SIZE = 0.22;
 
 /** Target on-screen glyph half-size in pixels (≈ GLYPH_SIZE × default zoom 50). */
 const GLYPH_TARGET_PX = 11;
 
-/** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
-const SNAP_TOLERANCE_PX = 12;
+const HALF = GLYPH_SIZE;
+const TRIANGLE_HEIGHT = HALF * Math.sqrt(3);
+const TICK = HALF * 0.35;
 
-function buildGlyphGeometry(type: SnapType): THREE.BufferGeometry {
-  const s = GLYPH_SIZE;
-  switch (type) {
-    case 'endpoint': {
-      // Square: 4 line segments forming a box.
-      const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([
-        -s,
-        -s,
-        0,
-        s,
-        -s,
-        0,
-        s,
-        -s,
-        0,
-        s,
-        s,
-        0,
-        s,
-        s,
-        0,
-        -s,
-        s,
-        0,
-        -s,
-        s,
-        0,
-        -s,
-        -s,
-        0,
-      ]);
-      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-      return geo;
-    }
-    case 'midpoint': {
-      // Equilateral triangle (pointing up).
-      const h = s * Math.sqrt(3);
-      const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([
-        0,
-        (h * 2) / 3,
-        0,
-        s,
-        -h / 3,
-        0,
-        s,
-        -h / 3,
-        0,
-        -s,
-        -h / 3,
-        0,
-        -s,
-        -h / 3,
-        0,
-        0,
-        (h * 2) / 3,
-        0,
-      ]);
-      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-      return geo;
-    }
-    case 'center': {
-      return ellipseSegmentsGeometry(0, 0, s, s, 16);
-    }
-    case 'intersection': {
-      // X: two diagonal lines.
-      const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([-s, -s, 0, s, s, 0, -s, s, 0, s, -s, 0]);
-      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-      return geo;
-    }
-    case 'perpendicular': {
-      // Right-angle symbol: two segments forming an L-shape with a corner tick.
-      const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([
-        0,
-        -s,
-        0,
-        0,
-        0,
-        0, // vertical leg
-        0,
-        0,
-        0,
-        s,
-        0,
-        0, // horizontal leg
-        // small corner square tick
-        s * 0.35,
-        0,
-        0,
-        s * 0.35,
-        s * 0.35,
-        0,
-        s * 0.35,
-        s * 0.35,
-        0,
-        0,
-        s * 0.35,
-        0,
-      ]);
-      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-      return geo;
-    }
-    case 'tangent': {
-      // T-mark: horizontal bar with vertical stem.
-      const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([
-        -s,
-        s * 0.5,
-        0,
-        s,
-        s * 0.5,
-        0, // top bar
-        0,
-        s * 0.5,
-        0,
-        0,
-        -s,
-        0, // stem
-      ]);
-      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-      return geo;
-    }
-    case 'extension': {
-      // Dashed line cap: short horizontal line with a gap-mark (two lines).
-      const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([
-        -s,
-        0,
-        0,
-        -s * 0.3,
-        0,
-        0, // left segment
-        s * 0.3,
-        0,
-        0,
-        s,
-        0,
-        0, // right segment (gap in middle)
-        -s * 0.1,
-        -s * 0.4,
-        0,
-        -s * 0.1,
-        s * 0.4,
-        0, // vertical tick at gap
-      ]);
-      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-      return geo;
-    }
-    case 'nearest': {
-      // Small dot (tiny circle) inside a larger circle ring.
-      const inner = 4;
-      const outer = 10;
-      const verts: number[] = [];
-      for (let i = 0; i < outer; i++) {
-        const a0 = (i / outer) * Math.PI * 2;
-        const a1 = ((i + 1) / outer) * Math.PI * 2;
-        verts.push(s * Math.cos(a0), s * Math.sin(a0), 0, s * Math.cos(a1), s * Math.sin(a1), 0);
-      }
-      for (let i = 0; i < inner; i++) {
-        const a0 = (i / inner) * Math.PI * 2;
-        const a1 = ((i + 1) / inner) * Math.PI * 2;
-        const r2 = s * 0.3;
-        verts.push(
-          r2 * Math.cos(a0),
-          r2 * Math.sin(a0),
-          0,
-          r2 * Math.cos(a1),
-          r2 * Math.sin(a1),
-          0,
-        );
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-      return geo;
-    }
-    case 'grid': {
-      // Plus: two orthogonal lines.
-      const geo = new THREE.BufferGeometry();
-      const v = new Float32Array([-s, 0, 0, s, 0, 0, 0, -s, 0, 0, s, 0]);
-      geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
-      return geo;
-    }
-  }
-}
+/** Segment vertex pairs of each glyph, centred on the snap point. */
+const GLYPH_VERTICES: Record<SnapType, Vec2[]> = {
+  endpoint: loopSegments([
+    [-HALF, -HALF],
+    [HALF, -HALF],
+    [HALF, HALF],
+    [-HALF, HALF],
+  ]),
+  midpoint: loopSegments([
+    [0, (TRIANGLE_HEIGHT * 2) / 3],
+    [HALF, -TRIANGLE_HEIGHT / 3],
+    [-HALF, -TRIANGLE_HEIGHT / 3],
+  ]),
+  center: ellipseOutline(0, 0, HALF, HALF, 16),
+  intersection: [
+    [-HALF, -HALF],
+    [HALF, HALF],
+    [-HALF, HALF],
+    [HALF, -HALF],
+  ],
+  // L-shaped right-angle symbol with a small corner tick.
+  perpendicular: [
+    ...chainSegments([
+      [0, -HALF],
+      [0, 0],
+      [HALF, 0],
+    ]),
+    ...chainSegments([
+      [TICK, 0],
+      [TICK, TICK],
+      [0, TICK],
+    ]),
+  ],
+  // Horizontal bar with a vertical stem.
+  tangent: [
+    [-HALF, HALF * 0.5],
+    [HALF, HALF * 0.5],
+    [0, HALF * 0.5],
+    [0, -HALF],
+  ],
+  // Short horizontal line with a gap, marked by a vertical tick.
+  extension: [
+    [-HALF, 0],
+    [-HALF * 0.3, 0],
+    [HALF * 0.3, 0],
+    [HALF, 0],
+    [-HALF * 0.1, -HALF * 0.4],
+    [-HALF * 0.1, HALF * 0.4],
+  ],
+  // Small dot inside a larger ring.
+  nearest: [
+    ...ellipseOutline(0, 0, HALF, HALF, 10),
+    ...ellipseOutline(0, 0, HALF * 0.3, HALF * 0.3, 4),
+  ],
+  grid: [
+    [-HALF, 0],
+    [HALF, 0],
+    [0, -HALF],
+    [0, HALF],
+  ],
+};
 
 interface GlyphProps {
   snapType: SnapType;
@@ -256,108 +128,46 @@ interface GlyphProps {
 }
 
 function SnapGlyph({ snapType, x, y, zoom }: GlyphProps): React.ReactElement {
-  const geoRef = useRef<THREE.BufferGeometry | null>(null);
-  const matRef = useRef<THREE.LineBasicMaterial | null>(null);
-  const objRef = useRef<THREE.LineSegments | null>(null);
-
-  const segments = useMemo<THREE.LineSegments>(() => {
-    const geo = buildGlyphGeometry(snapType);
-    const mat = new THREE.LineBasicMaterial({
-      color: SNAP_COLORS[snapType],
-      linewidth: 2, // hint — most WebGL impls ignore this
-      depthTest: false,
-    });
-    const segs = new THREE.LineSegments(geo, mat);
-    segs.renderOrder = 999; // draw on top
-    geoRef.current = geo;
-    matRef.current = mat;
-    objRef.current = segs;
-    return segs;
-  }, [snapType]);
-
-  useEffect(() => {
-    return () => {
-      geoRef.current?.dispose();
-      matRef.current?.dispose();
-    };
-  }, [segments]);
-
-  segments.position.set(x, y, 0.1);
-  // Rescale so the glyph stays ~GLYPH_TARGET_PX on screen at any zoom.
-  segments.scale.setScalar(pixelsToWorld(GLYPH_TARGET_PX, zoom) / GLYPH_SIZE);
-
-  return <primitive object={segments} />;
-}
-
-interface GroundPlaneProps {
-  onMove: (worldX: number, worldY: number) => void;
-  onLeave: () => void;
-}
-
-function GroundPlane({ onMove, onLeave }: GroundPlaneProps): React.ReactElement {
-  const { geo, mat } = useGroundPlane();
-
-  const handleMove = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      e.stopPropagation();
-      // Hit points are render-space; snapping works in document space.
-      const [originX, originY] = useStore.getState().renderOrigin;
-      onMove(e.point.x + originX, e.point.y + originY);
-    },
-    [onMove],
+  const geometry = useDisposable(() => segmentsGeometry(GLYPH_VERTICES[snapType]), [snapType]);
+  const material = useDisposable(
+    () =>
+      new THREE.LineBasicMaterial({ color: SNAP_COLORS[snapType], linewidth: 2, depthTest: false }),
+    [snapType],
   );
-
-  const handleLeave = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      e.stopPropagation();
-      onLeave();
-    },
-    [onLeave],
-  );
-
   return (
-    <mesh
-      geometry={geo}
-      material={mat}
-      position={[0, 0, 0]}
-      onPointerMove={handleMove}
-      onPointerLeave={handleLeave}
+    <lineSegments
+      geometry={geometry}
+      material={material}
+      position={[x, y, 0.1]}
+      scale={pixelsToWorld(GLYPH_TARGET_PX, zoom) / GLYPH_SIZE}
+      renderOrder={999}
     />
   );
 }
 
-/**
- * Mount inside the r3f scene (inside <Canvas>) in Viewport2D.
- *
- * Tracks pointer movement, computes the snap result via useSnap, and
- * renders the appropriate glyph. No document writes.
- */
 interface SnapIndicatorProps {
   /** Current ortho camera zoom — drives the adaptive snap grid + glyph size. */
   zoom: number;
 }
 
+/** Mount inside the r3f scene in Viewport2D: tracks the pointer and renders the snap glyph. */
 export function SnapIndicator({ zoom }: SnapIndicatorProps): React.ReactElement {
   const [cursor, setCursor] = useState<Vec2 | null>(null);
 
-  const handleMove = useCallback((wx: number, wy: number) => {
-    setCursor([wx, wy]);
-  }, []);
-
-  const handleLeave = useCallback(() => {
-    setCursor(null);
-  }, []);
-
-  // Snap grid tracks the visible adaptive mesh (selectable points at every
-  // zoom); tolerance is pixel-constant so geometric snaps stay grabbable.
-  const snapResult = useSnap(cursor, {
-    gridSize: adaptiveGridStep(zoom),
-    tolerance: pixelsToWorld(SNAP_TOLERANCE_PX, zoom),
-  });
+  const snapResult = useZoomSnap(cursor, zoom);
 
   return (
     <>
-      <GroundPlane onMove={handleMove} onLeave={handleLeave} />
+      <GroundPlane
+        onPointerMove={(e) => {
+          e.stopPropagation();
+          setCursor(toDocumentPoint(e.point));
+        }}
+        onPointerLeave={(e) => {
+          e.stopPropagation();
+          setCursor(null);
+        }}
+      />
       {snapResult?.snapped && snapResult.type !== null && (
         <SnapGlyph
           key={snapResult.type}

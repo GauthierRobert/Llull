@@ -9,6 +9,7 @@
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { parseKernelChoice, type KernelChoice } from '@core/geometry/kernelChoice';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
+import { errorMessage } from '@lib/errorMessage';
 
 let activeKernel: KernelChoice | null = null;
 
@@ -18,7 +19,7 @@ export function getActiveKernelName(): KernelChoice | null {
 }
 
 function warnUnavailable(label: string, error: unknown): void {
-  console.warn(`[server] ${label}:`, error instanceof Error ? error.message : String(error));
+  console.warn(`[server] ${label}:`, errorMessage(error));
 }
 
 /** Load the configured kernel; on failure commands keep their graceful "no kernel" no-op. */

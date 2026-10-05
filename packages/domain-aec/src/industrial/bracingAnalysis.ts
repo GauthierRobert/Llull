@@ -5,11 +5,11 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import { fromMm, getBuilding } from '../model';
+import { elementsOf, getBuilding, toMm } from '../model';
 import { findProfile } from '../steel/profiles';
 import { round } from '../numeric';
 import { sectionResistance, yieldStrength } from './steelDesign';
-import { craneCapacityOf } from './frameModelTypes';
+import { craneCapacityOf, GAMMA_G, GAMMA_Q } from './frameModelTypes';
 import { DEFAULT_CRANE_SPAN } from './runwayCheckModel';
 import {
   type BracingRow,
@@ -17,8 +17,6 @@ import {
   CP_POST,
   EAVES_X_TOLERANCE,
   EAVES_Z_TOLERANCE,
-  GAMMA_G,
-  GAMMA_Q,
   type Located,
   NO_MEMBER_UTILISATION,
   type Panel,
@@ -42,28 +40,28 @@ interface BracingInputs {
 
 /** Steel members of `levelId` with endpoints in mm. */
 export function locateMembers(doc: CadDocument, levelId: string): Located[] {
-  const building = getBuilding(doc);
-  const unit = fromMm(doc, 1);
+  const toPointMm = (point: readonly number[]): Point => [
+    toMm(doc, point[0] ?? 0),
+    toMm(doc, point[1] ?? 0),
+    toMm(doc, point[2] ?? 0),
+  ];
   const members: Located[] = [];
-  for (const id of building.elementOrder) {
-    const element = building.elements[id];
-    if (element?.category !== 'member' || element.levelId !== levelId) continue;
+  for (const element of elementsOf(getBuilding(doc), 'member')) {
+    if (element.levelId !== levelId) continue;
     const profile = findProfile(element.profile);
     if (!profile) continue;
-    const toMm = (point: readonly number[]): Point => [
-      (point[0] ?? 0) / unit,
-      (point[1] ?? 0) / unit,
-      (point[2] ?? 0) / unit,
-    ];
     members.push({
       member: element,
       profile,
-      start: toMm(element.start),
-      end: toMm(element.end),
+      start: toPointMm(element.start),
+      end: toPointMm(element.end),
     });
   }
   return members;
 }
+
+const axisLength = ({ start, end }: Located): number =>
+  Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
 
 /** Gable wind posts: columns in a gable plane that do not meet a rafter end (frame columns do). */
 function gablePostRows(
@@ -74,13 +72,10 @@ function gablePostRows(
   windPressure: number,
 ): BracingRow[] {
   const rows: BracingRow[] = [];
+  const sameSpot = (a: Point, b: Point): boolean =>
+    a.every((value, axis) => near(value, b[axis] ?? 0));
   const meetsRafter = ({ start, end }: Located): boolean =>
-    rafterEnds.some(
-      (point) => near(point[0], end[0]) && near(point[1], end[1]) && near(point[2], end[2]),
-    ) ||
-    rafterEnds.some(
-      (point) => near(point[0], start[0]) && near(point[1], start[1]) && near(point[2], start[2]),
-    );
+    rafterEnds.some((point) => sameSpot(point, start) || sameSpot(point, end));
   const columns = members.filter(({ member }) => member.role === 'column');
   for (const planeY of [y0, yEnd]) {
     const inPlane = columns
@@ -251,10 +246,7 @@ export function analyseBracing(
   const sorted = [...panels.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   for (const [, panel] of sorted) {
     const diagonal = panel.braces.reduce((best, candidate) =>
-      Math.hypot(...candidate.start.map((v, i) => v - (candidate.end[i] ?? 0))) >
-      Math.hypot(...best.start.map((v, i) => v - (best.end[i] ?? 0)))
-        ? candidate
-        : best,
+      axisLength(candidate) > axisLength(best) ? candidate : best,
     );
     const { start, end, profile, member } = diagonal;
     const [dx, dy, dz] = [
@@ -263,7 +255,7 @@ export function analyseBracing(
       Math.abs(end[2] - start[2]),
     ];
     if (dy < TOLERANCE) continue;
-    const length = Math.hypot(dx, dy, dz);
+    const length = axisLength(diagonal);
     const xLow = Math.min(start[0], end[0]);
     const xHigh = Math.max(start[0], end[0]);
     const hallWidth = x1 - x0;

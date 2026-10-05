@@ -2,7 +2,7 @@
 
 Ground-truth reference for `packages/core/src/commands` (`@core/commands/*`). Mirror these
 signatures exactly. Source: `types.ts`, `schema.ts`, `context.ts`, `registry.ts`,
-`geometryShared.ts`; ids in `packages/core/src/lib/id.ts`; plugins in `packages/core/src/plugins/`.
+`entityOps.ts`, `commitEntity.ts`; ids in `packages/core/src/lib/id.ts`; plugins in `packages/core/src/plugins/`.
 
 ## Contracts (`types.ts`)
 
@@ -14,14 +14,12 @@ interface CommandResult {
   data?: unknown;          // structured value for read-only/query commands
 }
 
-type Command<P> = (doc: CadDocument, params: P, ctx?: ExecutionContext) => CommandResult;
-
 interface CommandDefinition<P> {
   readonly name: string;              // snake_case; == AI/MCP tool name
   readonly description: string;       // shown to humans + AI
   readonly paramsSchema: ParamsSchema; // DERIVED by defineCommand — never hand-written
   readonly paramsValidator?: ZodType;  // set by defineCommand; execute validates with it
-  readonly run: Command<P>;
+  readonly run: (doc: CadDocument, params: P, ctx?: ExecutionContext) => CommandResult;
   readonly annotations?: CommandAnnotations;
 }
 
@@ -125,12 +123,14 @@ pluginToolNames(toolset): string[]
 interface DerivationGuard { readonly domain: string; check(previous, next): string | null }
 ```
 
-## Purity helper pattern (`geometryShared.ts`)
+## Purity helper pattern (`entityOps.ts`, `commitEntity.ts`)
 
 ```ts
 function withEntity(doc: CadDocument, entity: Entity): CadDocument {
   return { ...doc, entities: { ...doc.entities, [entity.id]: entity }, order: [...doc.order, entity.id] };
 }
+// The usual create-command tail: append one entity and report it as the created id.
+function commitEntity(doc: CadDocument, entity: Entity, summary: string): CommandResult;
 ```
 
 Commands to imitate: `add_box` (`geometryBasic.ts`), `set_units` (`units.ts`),

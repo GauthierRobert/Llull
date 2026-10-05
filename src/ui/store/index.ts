@@ -1,6 +1,7 @@
 /** Public API for the Zustand stores. Import from here, never from store.ts directly. */
 
 export { useStore } from './store';
+export type { LiveStatus } from './storeTypes';
 export { useThemeStore } from './themeStore';
 export type { Theme } from './themeStore';
 export { useViewportStore } from './viewportStore';

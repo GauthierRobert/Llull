@@ -50,12 +50,7 @@
   align-items: center;
   gap: 2px;
   padding: 3px;
-  background: var(--surface-float);
-  backdrop-filter: var(--backdrop);
-  -webkit-backdrop-filter: var(--backdrop);
-  border: 1px solid var(--border-float);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-float);
 }
 
 .vp-group {
@@ -73,12 +68,6 @@
   background: var(--border-strong);
 }
 
-.vp-divider--horizontal {
-  width: auto;
-  height: 1px;
-  margin: 2px var(--space-1);
-}
-
 /* ---- Buttons --------------------------------------------------------------- */
 
 .vp-btn {
@@ -94,9 +83,7 @@
   font-weight: var(--weight-medium);
   color: var(--fg-muted);
   white-space: nowrap;
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  transition: var(--transition-colors);
 }
 
 .vp-btn--icon {
@@ -160,13 +147,6 @@
 
 .vp-primary-btn:hover {
   background: var(--accent-hover);
-}
-
-.vp-kbd {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-regular);
-  opacity: 0.6;
 }
 
 /* ---- Form bits ------------------------------------------------------------- */
@@ -307,9 +287,7 @@
   white-space: nowrap;
   font-size: var(--text-sm);
   color: var(--fg-muted);
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  transition: var(--transition-colors);
 }
 
 .named-views-restore-btn:hover {
@@ -326,9 +304,7 @@
   height: 24px;
   border-radius: var(--radius-sm);
   color: var(--fg-faint);
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  transition: var(--transition-colors);
 }
 
 .named-views-delete-btn:hover {
@@ -369,12 +345,7 @@
   flex-direction: column;
   gap: 2px;
   padding: 3px;
-  background: var(--surface-float);
-  backdrop-filter: var(--backdrop);
-  -webkit-backdrop-filter: var(--backdrop);
-  border: 1px solid var(--border-float);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-float);
   user-select: none;
 }
 
@@ -386,9 +357,7 @@
   height: 28px;
   border-radius: var(--radius-sm);
   color: var(--fg-muted);
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  transition: var(--transition-colors);
 }
 
 .draw-tool-btn:hover {
@@ -435,12 +404,7 @@
   z-index: 10;
   max-width: calc(100% - 160px);
   padding: 6px var(--space-3);
-  background: var(--surface-float);
-  backdrop-filter: var(--backdrop);
-  -webkit-backdrop-filter: var(--backdrop);
-  border: 1px solid var(--border-float);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-float);
   font-size: var(--text-sm);
   color: var(--fg-muted);
   text-align: center;
@@ -457,12 +421,7 @@
   z-index: 20;
   min-width: 208px;
   max-width: 320px;
-  background: var(--surface-float);
-  backdrop-filter: var(--backdrop);
-  -webkit-backdrop-filter: var(--backdrop);
-  border: 1px solid var(--border-float);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-float);
   user-select: none;
 }
 
@@ -494,9 +453,7 @@
   height: 22px;
   border-radius: var(--radius-sm);
   color: var(--fg-subtle);
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  transition: var(--transition-colors);
 }
 
 .mhud-dismiss:hover {
@@ -558,11 +515,6 @@
 
 .vp-scalebar--2d {
   right: var(--space-4);
-}
-
-/* leaves the ~150px orientation gizmo in the bottom-right corner free */
-.vp-scalebar--3d {
-  right: 168px;
 }
 
 .vp-scalebar__label {

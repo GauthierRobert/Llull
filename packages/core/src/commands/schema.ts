@@ -30,6 +30,8 @@ interface Unwrapped {
   readonly description: string | undefined;
 }
 
+const WRAPPER_TYPES: ReadonlySet<string> = new Set(['optional', 'default', 'nullable', 'catch']);
+
 /** Strip optional/nullable/default wrappers, keeping the outermost description. */
 function unwrap(schema: z.ZodType): Unwrapped {
   let current: z.ZodType = schema;
@@ -37,19 +39,12 @@ function unwrap(schema: z.ZodType): Unwrapped {
   let description = schema.description;
   for (;;) {
     const def = current.def as { type: string; innerType?: z.ZodType };
-    if (
-      (def.type === 'optional' ||
-        def.type === 'default' ||
-        def.type === 'nullable' ||
-        def.type === 'catch') &&
-      def.innerType
-    ) {
-      optional = optional || def.type === 'optional' || def.type === 'default';
-      current = def.innerType;
-      description ??= current.description;
-      continue;
+    if (!WRAPPER_TYPES.has(def.type) || !def.innerType) {
+      return { core: current, optional, description };
     }
-    return { core: current, optional, description };
+    optional = optional || def.type === 'optional' || def.type === 'default';
+    current = def.innerType;
+    description ??= current.description;
   }
 }
 
@@ -104,13 +99,12 @@ function paramType(core: z.ZodType): ParamType {
 
 function itemSchema(core: z.ZodType): z.ZodType | undefined {
   const def = core.def as { type: string; element?: z.ZodType; items?: readonly z.ZodType[] };
-  // `untypedArray()` (element `any`) declares no `items` to agents.
-  if (def.type === 'array' && (def.element?.def as { type?: string } | undefined)?.type === 'any') {
-    return undefined;
-  }
-  if (def.type === 'array') return def.element;
   if (def.type === 'tuple') return def.items?.[0];
-  return undefined;
+  if (def.type !== 'array') return undefined;
+  // `untypedArray()` (element `any`) declares no `items` to agents.
+  return (def.element?.def as { type?: string } | undefined)?.type === 'any'
+    ? undefined
+    : def.element;
 }
 
 function objectShape(core: z.ZodType): Record<string, z.ZodType> | undefined {

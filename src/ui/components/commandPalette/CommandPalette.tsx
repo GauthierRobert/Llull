@@ -12,6 +12,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CommandDefinition } from '@core/commands/types';
 import { usePaletteStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
+import { trapTab } from '@ui/focusTrap';
 import { allPaletteItems, searchPaletteItems } from './paletteItems';
 import type { PaletteItem } from './paletteItems';
 import { CommandParamForm } from './CommandParamForm';
@@ -35,26 +36,6 @@ function needsForm(command: CommandDefinition<unknown>): boolean {
     Object.keys(command.paramsSchema.properties).length > 0 ||
     command.annotations?.destructive === true
   );
-}
-
-const FOCUSABLE = 'button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
-
-/** Keep Tab / Shift+Tab cycling inside `container`. */
-function trapTab(e: React.KeyboardEvent<HTMLElement>, container: HTMLElement): void {
-  const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (el) => !el.hasAttribute('disabled'),
-  );
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (first === undefined || last === undefined) return;
-  const active = document.activeElement;
-  if (e.shiftKey && (active === first || active === container)) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && active === last) {
-    e.preventDefault();
-    first.focus();
-  }
 }
 
 interface PaletteListProps {

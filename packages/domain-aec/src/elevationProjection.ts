@@ -206,12 +206,12 @@ export function buildElevationDrawing(
   const items: DrawItem[] = [];
   const cutLines: Array<readonly [Vec2, Vec2]> = [];
   const cutRegions: CutRegion[] = [];
-  const bounds = [Infinity, Infinity, -Infinity, -Infinity];
+  const bounds: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
   const grow = (point: Vec2): void => {
-    bounds[0] = Math.min(bounds[0] as number, point[0]);
-    bounds[1] = Math.min(bounds[1] as number, point[1]);
-    bounds[2] = Math.max(bounds[2] as number, point[0]);
-    bounds[3] = Math.max(bounds[3] as number, point[1]);
+    bounds[0] = Math.min(bounds[0], point[0]);
+    bounds[1] = Math.min(bounds[1], point[1]);
+    bounds[2] = Math.max(bounds[2], point[0]);
+    bounds[3] = Math.max(bounds[3], point[1]);
   };
   for (const id of doc.order) {
     const entity = doc.entities[id];
@@ -264,11 +264,5 @@ export function buildElevationDrawing(
   }
   if (items.length === 0 && cutLines.length === 0) return null;
   items.sort((a, b) => a.depth - b.depth);
-  return {
-    items,
-    cutLines,
-    cutRegions,
-    bounds: bounds as unknown as readonly [number, number, number, number],
-    projection,
-  };
+  return { items, cutLines, cutRegions, bounds, projection };
 }

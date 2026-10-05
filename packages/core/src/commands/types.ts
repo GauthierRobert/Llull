@@ -26,9 +26,6 @@ export interface CommandResult {
   data?: unknown;
 }
 
-/** @invariant `ctx` is always supplied by `execute`/`replayHistory`; optional only for direct `run` calls. */
-export type Command<P> = (doc: CadDocument, params: P, ctx?: ExecutionContext) => CommandResult;
-
 /** Safety annotations; emitted as MCP tool annotations (readOnlyHint, destructiveHint, idempotentHint). */
 export interface CommandAnnotations {
   /** Never mutates the document: returns the SAME document, `affected: []`, results in `data`. */
@@ -61,7 +58,8 @@ export interface CommandDefinition<P> {
   readonly paramsSchema: ParamsSchema;
   /** Runtime validator from the same zod schema; `execute` no-ops with the failing path on mismatch. */
   readonly paramsValidator?: ZodType;
-  readonly run: Command<P>;
+  /** @invariant `ctx` is always supplied by `execute`/`replayHistory`; optional only for direct `run` calls. */
+  readonly run: (doc: CadDocument, params: P, ctx?: ExecutionContext) => CommandResult;
   readonly annotations?: CommandAnnotations;
 }
 
@@ -74,9 +72,10 @@ export interface ParamsSchema {
 /** The JSON-schema value kinds a parameter (or nested element) may take. */
 export type ParamType = 'number' | 'string' | 'boolean' | 'array' | 'object';
 
-export interface ParamSpec {
+/** Array element / nested schema: the `description` is optional. */
+export interface ParamItemSpec {
   type: ParamType;
-  description: string;
+  description?: string;
   /** Constrained value set (JSON Schema `enum`). */
   enum?: readonly (string | number)[];
   /** For `type: 'array'`: the schema of each element. */
@@ -87,12 +86,7 @@ export interface ParamSpec {
   required?: readonly string[];
 }
 
-/** Array element / nested schema: a `ParamSpec` whose `description` is optional. */
-export interface ParamItemSpec {
-  type: ParamType;
-  description?: string;
-  enum?: readonly (string | number)[];
-  items?: ParamItemSpec;
-  properties?: Record<string, ParamSpec>;
-  required?: readonly string[];
+/** A named parameter: an item spec that must carry a `description`. */
+export interface ParamSpec extends ParamItemSpec {
+  description: string;
 }

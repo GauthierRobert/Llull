@@ -6,16 +6,23 @@
 
 import type { BasePlateElement, BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { fromMm, nextElementId, nextMark, withElement, withoutElements } from '../model';
+import {
+  elementsOf,
+  fromMm,
+  nextElementId,
+  nextMark,
+  withElement,
+  withoutElements,
+} from '../model';
 import { findProfile } from '../steel/profiles';
 
 interface PlateSize {
-  readonly margin?: number;
-  readonly thickness?: number;
-  readonly boltCount?: number;
-  readonly boltDiameter?: number;
+  readonly margin?: number | undefined;
+  readonly thickness?: number | undefined;
+  readonly boltCount?: number | undefined;
+  readonly boltDiameter?: number | undefined;
   /** Stored on the plate only when 'fixed' (absent = pinned). */
-  readonly fixity?: 'pinned' | 'fixed';
+  readonly fixity?: 'pinned' | 'fixed' | undefined;
 }
 
 /** Adds one base plate per column (sized from its profile + margin); no regeneration. */
@@ -96,10 +103,10 @@ export function columnsWithoutPlates(
       element.category === 'plate' ? [element.memberId] : [],
     ),
   );
-  return building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    if (element?.category !== 'member' || element.role !== 'column' || plated.has(id)) return [];
-    if (memberIds ? !memberIds.has(id) : element.levelId !== levelId) return [];
-    return [element];
-  });
+  return elementsOf(building, 'member').filter(
+    (element) =>
+      element.role === 'column' &&
+      !plated.has(element.id) &&
+      (memberIds ? memberIds.has(element.id) : element.levelId === levelId),
+  );
 }

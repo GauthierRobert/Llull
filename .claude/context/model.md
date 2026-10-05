@@ -10,11 +10,13 @@ constructed ONLY inside commands (core or a plugin).
 type EntityId = string;
 type Vec2 = readonly [number, number];          // local work-plane coordinates
 type Vec3 = readonly [number, number, number];  // world, right-handed, +Z up
-type DocumentUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
-type SolidKind = 'box' | 'cylinder' | 'sphere' | 'extrusion' | 'mesh' | 'cone' | 'torus'
-               | 'wedge' | 'pyramid' | 'revolution';
-type Shape2DKind = 'line' | 'polyline' | 'arc' | 'circle' | 'rectangle' | 'point' | 'ellipse'
-                 | 'spline' | 'text' | 'dimension';
+// Each union is derived from one `as const` array (the single source for types, zod enums
+// and persistence validation): DOCUMENT_UNITS, SOLID_KINDS, SHAPE2D_KINDS, CONSTRAINT_KINDS.
+type DocumentUnit = (typeof DOCUMENT_UNITS)[number];  // 'mm' | 'cm' | 'm' | 'in' | 'ft'
+type SolidKind = (typeof SOLID_KINDS)[number];  // 'box' | 'cylinder' | 'sphere' | 'extrusion'
+               // | 'mesh' | 'cone' | 'torus' | 'wedge' | 'pyramid' | 'revolution'
+type Shape2DKind = (typeof SHAPE2D_KINDS)[number];  // 'line' | 'polyline' | 'arc' | 'circle'
+               // | 'rectangle' | 'point' | 'ellipse' | 'spline' | 'text' | 'dimension'
 type EntityKind = SolidKind | Shape2DKind | 'instance';
 ```
 
@@ -57,9 +59,10 @@ DimensionEntity  'dimension'  dimensionKind: 'linear'|'aligned'|'radial'|'angula
 InstanceEntity   'instance'   componentId; scale?: Vec3
 ```
 
-`is2D(e)` / `is3D(e)` branch on `kind`. New kind ⇒ add the literal to `SolidKind` /
-`Shape2DKind`, the `*Entity` interface, the `Entity` union (and `SHAPE2D_KINDS` for 2D), the
-command(s) that create it, and a viewport render branch.
+`is2D(e)` / `is3D(e)` branch on `kind`. New kind ⇒ add the literal to the `SOLID_KINDS` /
+`SHAPE2D_KINDS` array (the unions, `is2D` and persistence validation derive from it), the
+`*Entity` interface, the `Entity` union, the command(s) that create it, and a viewport render
+branch.
 
 ## Document
 

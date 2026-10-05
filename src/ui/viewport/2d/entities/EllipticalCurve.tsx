@@ -2,13 +2,13 @@
  * @layer ui/viewport/2d
  *
  * Shared body of the circle / arc / ellipse render branches: an EllipseCurve outline in the
- * entity's XY plane, memoized on its inputs and disposed by PlacedLineObject.
+ * entity's XY plane, memoized on its inputs.
  */
 
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Vec2, Vec3 } from '@core/model/types';
-import { PlacedLineObject } from './PlacedLineObject';
+import { ShapeLine } from './ShapeLine';
 
 const CURVE_SEGMENTS = 64;
 
@@ -34,7 +34,7 @@ export function EllipticalCurve({
   selected,
 }: EllipticalCurveProps): React.ReactElement {
   const [centerX, centerY] = center;
-  const lineObject = useMemo(() => {
+  const positions = useMemo(() => {
     const curve = new THREE.EllipseCurve(
       centerX,
       centerY,
@@ -45,10 +45,8 @@ export function EllipticalCurve({
       false,
       0,
     );
-    const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(CURVE_SEGMENTS));
-    const mat = new THREE.LineBasicMaterial({ color: selected ? '#5b8dee' : color });
-    return new THREE.Line(geo, mat);
-  }, [centerX, centerY, radiusX, radiusY, startAngle, endAngle, color, selected]);
+    return curve.getPoints(CURVE_SEGMENTS).flatMap(({ x, y }) => [x, y, 0]);
+  }, [centerX, centerY, radiusX, radiusY, startAngle, endAngle]);
 
-  return <PlacedLineObject object={lineObject} position={position} />;
+  return <ShapeLine positions={positions} position={position} color={color} selected={selected} />;
 }

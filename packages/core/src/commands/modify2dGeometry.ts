@@ -1,5 +1,21 @@
-import type { Vec2 } from '../model/types';
-import { normalize2, perp2, sub2 } from '../lib/vec2';
+import type { CadDocument, PolylineEntity, Vec2 } from '../model/types';
+import type { CommandResult } from './types';
+import { add2, normalize2, perp2, scale2, sub2 } from '../lib/vec2';
+import { noop } from './noop';
+
+/** The polyline entity `id`, or the no-op result naming `command` when it is missing or another kind. */
+export function resolvePolyline(
+  doc: CadDocument,
+  command: string,
+  id: string,
+): PolylineEntity | CommandResult {
+  const entity = doc.entities[id];
+  if (!entity) return noop(doc, `${command}: entity ${id} not found.`);
+  if (entity.kind !== 'polyline') {
+    return noop(doc, `${command}: entity ${id} is kind '${entity.kind}', expected 'polyline'.`);
+  }
+  return entity;
+}
 
 /**
  * Segment intersection — parametric.
@@ -29,7 +45,7 @@ export function segIntersect(p: Vec2, q: Vec2, r: Vec2, s: Vec2): { t: number; u
  * Compute the point on the infinite line through p→q at parameter t.
  */
 export function evalLine(p: Vec2, q: Vec2, t: number): Vec2 {
-  return [p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])];
+  return add2(p, scale2(sub2(q, p), t));
 }
 
 /**
@@ -37,12 +53,8 @@ export function evalLine(p: Vec2, q: Vec2, t: number): Vec2 {
  * Returns the two endpoints of the offset segment.
  */
 export function offsetSegment(p: Vec2, q: Vec2, distance: number): [Vec2, Vec2] {
-  const n = normalize2(perp2(sub2(q, p)));
-  const dp: Vec2 = [distance * n[0], distance * n[1]];
-  return [
-    [p[0] + dp[0], p[1] + dp[1]],
-    [q[0] + dp[0], q[1] + dp[1]],
-  ];
+  const shift = scale2(normalize2(perp2(sub2(q, p))), distance);
+  return [add2(p, shift), add2(q, shift)];
 }
 
 /**

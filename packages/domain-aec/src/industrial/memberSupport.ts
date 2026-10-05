@@ -15,17 +15,8 @@ import { defineCommand, tolerant, z } from '@core/commands/schema';
 import { highestIndex, nextElementId, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { sub3 } from '@lib/vec3';
 import { findProfile, STEEL_PROFILES, type SteelProfile } from '../steel/profiles';
-
-export const MEMBER_ROLES: ReadonlyArray<MemberRole> = [
-  'column',
-  'rafter',
-  'beam',
-  'brace',
-  'purlin',
-  'rail',
-  'crane',
-];
 
 const ROLE_MARK: Readonly<Record<MemberRole, string>> = {
   column: 'SC',
@@ -36,6 +27,16 @@ const ROLE_MARK: Readonly<Record<MemberRole, string>> = {
   rail: 'SR',
   crane: 'CB',
 };
+
+export const MEMBER_ROLES: ReadonlyArray<MemberRole> = [
+  'column',
+  'rafter',
+  'beam',
+  'brace',
+  'purlin',
+  'rail',
+  'crane',
+];
 
 /** Next mark for a member role, e.g. "SC4", "PU12". */
 export function nextMemberMark(building: BuildingModel, role: MemberRole): string {
@@ -57,17 +58,17 @@ export function profileSummary(profile: SteelProfile): string {
   return `${profile.name} (${profile.massPerMetre} kg/m)`;
 }
 
-interface MemberSpec {
+export interface MemberSpec {
   role: MemberRole;
   profile: string;
   start: Vec3;
   end: Vec3;
-  roll?: number;
-  material?: string;
-  note?: string;
-  startJoint?: JointFixity;
-  endJoint?: JointFixity;
-  baseFixity?: BaseFixity;
+  roll?: number | undefined;
+  material?: string | undefined;
+  note?: string | undefined;
+  startJoint?: JointFixity | undefined;
+  endJoint?: JointFixity | undefined;
+  baseFixity?: BaseFixity | undefined;
 }
 
 export const jointFixitySchema = z.enum(['pinned', 'rigid']);
@@ -79,11 +80,7 @@ export const baseFixitySchema = z.enum(['pinned', 'fixed']);
  */
 export function fixityProblem(
   role: MemberRole,
-  fixity: {
-    startJoint?: JointFixity | undefined;
-    endJoint?: JointFixity | undefined;
-    baseFixity?: BaseFixity | undefined;
-  },
+  fixity: Pick<MemberSpec, 'startJoint' | 'endJoint' | 'baseFixity'>,
 ): string | null {
   if ((fixity.startJoint !== undefined || fixity.endJoint !== undefined) && role !== 'beam') {
     return `startJoint / endJoint apply to beams (role is '${role}')`;
@@ -109,11 +106,7 @@ export function appendMembers(
     const profile = findProfile(spec.profile);
     if (!profile)
       return { reason: `unknown steel profile '${spec.profile}' (see list_steel_profiles)` };
-    const length = Math.hypot(
-      spec.end[0] - spec.start[0],
-      spec.end[1] - spec.start[1],
-      spec.end[2] - spec.start[2],
-    );
+    const length = Math.hypot(...sub3(spec.end, spec.start));
     if (!(length > 0)) return { reason: 'start and end must differ' };
     const member: SteelMemberElement = {
       id: nextElementId(next, 'member'),

@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import type { BuildingModel } from '@core/model/building';
+import { isRecord } from '@lib/isRecord';
 import { PanelSection } from '@ui/panels/PanelParts';
 
 /** The fields every structural check row shares (frames, bracing, foundations, runways). */
@@ -47,10 +48,6 @@ const loadsFromModel: ReadonlySet<CheckCommand> = new Set([
   'check_steel_members',
   'check_pipe_supports',
 ]);
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null;
-}
 
 /** check_pipe_supports: one row per pipe, ratio = largest span / allowed span. */
 function toPipeRows(pipes: ReadonlyArray<unknown>): ReportRow[] {

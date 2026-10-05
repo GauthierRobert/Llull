@@ -3,7 +3,8 @@
  * @layer domain-aec
  */
 
-import type { HallGeometry, MemberSpec, PortalProfiles } from './portalGeometry';
+import type { MemberSpec } from './memberSupport';
+import type { HallGeometry, PortalProfiles } from './portalGeometry';
 
 interface HallMemberInput {
   readonly geometry: HallGeometry;

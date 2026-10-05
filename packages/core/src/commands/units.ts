@@ -7,12 +7,11 @@
  * @failure invalid unit or negative/non-integer precision -> no-op, affected:[]
  */
 
-import type { CadDocument, DocumentUnit } from '../model/types';
+import type { CadDocument } from '../model/types';
+import { DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
-
-const UNITS = ['mm', 'cm', 'm', 'in', 'ft'] as const satisfies readonly DocumentUnit[];
 
 export const setUnits = defineCommand({
   name: 'set_units',
@@ -23,7 +22,7 @@ export const setUnits = defineCommand({
     'At least one of units or displayPrecision should be provided.',
   params: z.object({
     units: z
-      .enum(UNITS)
+      .enum(DOCUMENT_UNITS)
       .optional()
       .describe(
         "Unit of length for the document. Allowed values: 'mm' (millimetres), " +

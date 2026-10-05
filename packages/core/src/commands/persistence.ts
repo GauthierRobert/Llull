@@ -7,14 +7,15 @@
  * @failure invalid JSON / wrong format or version / structural or value validation error -> no-op, affected:[]
  */
 
-import type { CadDocument, DocumentUnit, FeatureStep } from '../model/types';
+import type { CadDocument, FeatureStep } from '../model/types';
+import { DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
+import { errorMessage } from '../lib/errorMessage';
 import { isRecord } from '../lib/isRecord';
 import { derivedEntityIds } from '../model/partition';
 import { documentExtensions } from '../plugins/host';
-import { VALID_UNITS } from './persistenceGuards';
 import { validateDocumentShape, validateDocumentValues } from './persistenceValidation';
 
 interface DocumentEnvelope {
@@ -50,11 +51,8 @@ export function serializeDocument(doc: CadDocument, options: SerializeOptions = 
 function withoutDerivedEntities(doc: CadDocument): CadDocument {
   const derived = derivedEntityIds(doc);
   if (derived.size === 0) return doc;
-  const entities: CadDocument['entities'] = {};
-  for (const [id, entity] of Object.entries(doc.entities)) {
-    if (!derived.has(id)) entities[id] = entity;
-  }
-  return { ...doc, entities };
+  const entities = Object.entries(doc.entities).filter(([id]) => !derived.has(id));
+  return { ...doc, entities: Object.fromEntries(entities) };
 }
 
 const STEP_SCOPED_ID = /-(\d+)\.\d+$/;
@@ -106,10 +104,7 @@ const COLLECTION_DEFAULTS: ReadonlyArray<readonly [string, 'record' | 'array']> 
  * place for back-compat defaults. A new optional `CadDocument` field gets its default here.
  */
 function migrate(raw: Record<string, unknown>): Record<string, unknown> {
-  const units: DocumentUnit =
-    typeof raw['units'] === 'string' && VALID_UNITS.has(raw['units'])
-      ? (raw['units'] as DocumentUnit)
-      : 'mm';
+  const units = DOCUMENT_UNITS.find((unit) => unit === raw['units']) ?? 'mm';
   const displayPrecision: number =
     typeof raw['displayPrecision'] === 'number' &&
     raw['displayPrecision'] >= 0 &&
@@ -198,8 +193,7 @@ export const loadDocument = defineCommand({
     try {
       parsed = deserializeDocument(json);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return noop(doc, message);
+      return noop(doc, errorMessage(err));
     }
 
     const entityCount = Object.keys(parsed.entities).length;

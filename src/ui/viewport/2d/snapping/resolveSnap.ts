@@ -5,6 +5,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
+import { nearestSnap } from '../../nearestSnap';
 import type { OrthoPolarOpts, SnapPoint, SnapResult, SnapType } from './types';
 
 /**
@@ -42,25 +43,12 @@ export function snap(
   const cx = cursor[0];
   const cy = cursor[1];
 
-  let bestDist = Infinity;
-  let best: SnapPoint | null = null;
-
-  for (const candidate of candidates) {
-    const d = Math.hypot(candidate.x - cx, candidate.y - cy);
-    if (d <= tolerance) {
-      const beatsByDist = d < bestDist - 1e-10;
-      const sameDist = Math.abs(d - bestDist) <= 1e-10;
-      const beatsByPriority =
-        sameDist &&
-        best !== null &&
-        SNAP_TYPE_PRIORITY[candidate.type] < SNAP_TYPE_PRIORITY[best.type];
-
-      if (beatsByDist || beatsByPriority) {
-        bestDist = d;
-        best = candidate;
-      }
-    }
-  }
+  const best = nearestSnap(
+    candidates,
+    (candidate) => Math.hypot(candidate.x - cx, candidate.y - cy),
+    tolerance,
+    SNAP_TYPE_PRIORITY,
+  );
 
   if (best !== null) {
     return { x: best.x, y: best.y, type: best.type, snapped: true };

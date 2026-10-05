@@ -10,18 +10,20 @@ import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/pipeSizes';
 import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
 import {
   FieldReader,
+  INDUSTRIAL_TOOL_GROUP as GROUP,
+  checkbox,
   defaultedSelect,
   levelField,
   num,
   onLevel,
   placement,
+  radians,
   result,
+  select,
   txt,
   type ElementTool,
   type ToolField,
 } from './elementToolForm';
-
-const GROUP = 'Industrial / steel';
 
 const ALL_PROFILES: ReadonlyArray<readonly [string, string]> = STEEL_PROFILES.map(
   (profile): readonly [string, string] => [
@@ -33,13 +35,7 @@ const ALL_PROFILES: ReadonlyArray<readonly [string, string]> = STEEL_PROFILES.ma
 const I_PROFILES = ALL_PROFILES.filter(([name]) => /^(IPE|HEA|HEB)/.test(name));
 
 function profileField(key: string, label: string, defaultValue: string, iOnly = false): ToolField {
-  return {
-    key,
-    label,
-    kind: 'select',
-    defaultValue,
-    options: iOnly ? I_PROFILES : ALL_PROFILES,
-  };
+  return select(key, label, defaultValue, iOnly ? I_PROFILES : ALL_PROFILES);
 }
 
 const DN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
@@ -61,8 +57,6 @@ const BASES: ReadonlyArray<readonly [string, string]> = [
 const BEAM_ONLY = { key: 'role', values: ['beam'] } as const;
 const COLUMN_ONLY = { key: 'role', values: ['column'] } as const;
 
-const degrees = (value: number): number => (value * Math.PI) / 180;
-
 export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
   {
     id: 'hall',
@@ -72,46 +66,34 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('x', 'Origin X', '0'),
       num('y', 'Origin Y', '0'),
       num('span', 'Span (X)', '24000'),
-      { key: 'spans', label: 'Multi-span widths', kind: 'text', defaultValue: '' },
+      txt('spans', 'Multi-span widths'),
       num('length', 'Length (Y)', '48000'),
       num('baySpacing', 'Bay spacing', '6000'),
       num('eaveHeight', 'Eave height', '7000'),
       num('roofPitch', 'Roof pitch (°)', '6'),
-      {
-        key: 'roofType',
-        label: 'Roof type',
-        kind: 'select',
-        defaultValue: 'duopitch',
-        options: [
-          ['duopitch', 'Duopitch'],
-          ['monopitch', 'Monopitch (low eaves left)'],
-        ],
-      },
+      select('roofType', 'Roof type', 'duopitch', [
+        ['duopitch', 'Duopitch'],
+        ['monopitch', 'Monopitch (low eaves left)'],
+      ]),
       profileField('columnProfile', 'Columns', 'HEA400', true),
       profileField('rafterProfile', 'Rafters', 'IPE450', true),
       num('craneRailHeight', 'Crane rail height', '', true),
       num('craneCapacity', 'Crane capacity (t)', '10'),
-      { key: 'cladding', label: 'Roof & wall cladding', kind: 'checkbox', defaultValue: 'true' },
-      { key: 'footings', label: 'Pad footings', kind: 'checkbox', defaultValue: 'true' },
-      { key: 'basePlates', label: 'Base plates + anchors', kind: 'checkbox', defaultValue: 'true' },
-      {
-        key: 'columnBase',
-        label: 'Column bases',
-        kind: 'select',
-        defaultValue: 'pinned',
-        options: [
-          ['pinned', 'Pinned'],
-          ['fixed', 'Fixed (moment bases)'],
-        ],
-      },
-      { key: 'connections', label: 'Moment connections', kind: 'checkbox', defaultValue: 'true' },
-      { key: 'floorSlab', label: 'Ground slab', kind: 'checkbox', defaultValue: 'true' },
+      checkbox('cladding', 'Roof & wall cladding', true),
+      checkbox('footings', 'Pad footings', true),
+      checkbox('basePlates', 'Base plates + anchors', true),
+      select('columnBase', 'Column bases', 'pinned', [
+        ['pinned', 'Pinned'],
+        ['fixed', 'Fixed (moment bases)'],
+      ]),
+      checkbox('connections', 'Moment connections', true),
+      checkbox('floorSlab', 'Ground slab', true),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
       const railHeight = reader.optionalNumber('craneRailHeight');
       return result(reader, 'add_portal_frame_building', {
-        origin: [reader.number('x'), reader.number('y')],
+        origin: reader.point('x', 'y'),
         ...(reader.text('spans') === ''
           ? { span: reader.number('span') }
           : { spans: reader.numberList('spans') }),
@@ -141,21 +123,15 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     label: 'Steel member',
     group: GROUP,
     fields: [
-      {
-        key: 'role',
-        label: 'Role',
-        kind: 'select',
-        defaultValue: 'beam',
-        options: [
-          ['column', 'Column'],
-          ['beam', 'Beam'],
-          ['rafter', 'Rafter'],
-          ['brace', 'Brace'],
-          ['purlin', 'Purlin'],
-          ['rail', 'Side rail'],
-          ['crane', 'Crane beam'],
-        ],
-      },
+      select('role', 'Role', 'beam', [
+        ['column', 'Column'],
+        ['beam', 'Beam'],
+        ['rafter', 'Rafter'],
+        ['brace', 'Brace'],
+        ['purlin', 'Purlin'],
+        ['rail', 'Side rail'],
+        ['crane', 'Crane beam'],
+      ]),
       profileField('profile', 'Profile', 'IPE300'),
       num('x1', 'Start X', '0'),
       num('y1', 'Start Y', '0'),
@@ -185,7 +161,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         profile: reader.text('profile'),
         start: [reader.number('x1'), reader.number('y1'), reader.number('z1')],
         end: [reader.number('x2'), reader.number('y2'), reader.number('z2')],
-        roll: degrees(reader.number('roll')),
+        roll: radians(reader.number('roll')),
         startJoint: joint('startJoint'),
         endJoint: joint('endJoint'),
         baseFixity: role === 'column' ? reader.text('baseFixity') || undefined : undefined,
@@ -198,7 +174,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     label: 'Pad footing',
     group: GROUP,
     fields: [
-      { key: 'underColumns', label: 'Under every column', kind: 'checkbox', defaultValue: 'true' },
+      checkbox('underColumns', 'Under every column', true),
       num('x', 'X', '0', true),
       num('y', 'Y', '0', true),
       num('width', 'Width', '1500'),
@@ -208,7 +184,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       const reader = new FieldReader(values);
       const position = reader.flag('underColumns')
         ? { underColumns: true }
-        : { location: [reader.number('x'), reader.number('y')] };
+        : { location: reader.point('x', 'y') };
       return result(reader, 'add_footing', {
         ...position,
         width: reader.number('width'),
@@ -222,22 +198,11 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     label: 'Cladding panel',
     group: GROUP,
     fields: [
-      {
-        key: 'corners',
-        label: 'Corners x,y,z; …',
-        kind: 'text',
-        defaultValue: '0,0,0; 6000,0,0; 6000,0,4000; 0,0,4000',
-      },
-      {
-        key: 'role',
-        label: 'Role',
-        kind: 'select',
-        defaultValue: 'wall',
-        options: [
-          ['wall', 'Wall'],
-          ['roof', 'Roof'],
-        ],
-      },
+      txt('corners', 'Corners x,y,z; …', '0,0,0; 6000,0,0; 6000,0,4000; 0,0,4000'),
+      select('role', 'Role', 'wall', [
+        ['wall', 'Wall'],
+        ['roof', 'Roof'],
+      ]),
       num('thickness', 'Thickness', '80'),
     ],
     build: (values, context) => {
@@ -266,8 +231,8 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'add_crane_runway', {
-        start: [reader.number('x1'), reader.number('y1')],
-        end: [reader.number('x2'), reader.number('y2')],
+        start: reader.point('x1', 'y1'),
+        end: reader.point('x2', 'y2'),
         railHeight: reader.number('railHeight'),
         capacity: reader.number('capacity'),
         profile: reader.text('profile'),
@@ -281,7 +246,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     group: GROUP,
     fields: [
       txt('mark', 'Tag (E-301…)', '', true),
-      { key: 'name', label: 'Name', kind: 'text', defaultValue: 'Machine' },
+      txt('name', 'Name', 'Machine'),
       num('x', 'Centre X', '6000'),
       num('y', 'Centre Y', '6000'),
       num('length', 'Length', '3000'),
@@ -298,9 +263,9 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       return result(reader, 'add_equipment', {
         mark: reader.text('mark') || undefined,
         name: reader.text('name'),
-        location: [reader.number('x'), reader.number('y')],
+        location: reader.point('x', 'y'),
         size: [reader.number('length'), reader.number('width'), reader.number('height')],
-        angle: degrees(reader.number('angle')),
+        angle: radians(reader.number('angle')),
         clearance: reader.number('clearance'),
         weight: reader.optionalNumber('weight'),
         ...placement(reader, context),
@@ -312,24 +277,13 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     label: 'Pipe run',
     group: GROUP,
     fields: [
-      {
-        key: 'points',
-        label: 'Route x,y,z; …',
-        kind: 'text',
-        defaultValue: '2000,3000,4000; 20000,3000,4000',
-      },
+      txt('points', 'Route x,y,z; …', '2000,3000,4000; 20000,3000,4000'),
       txt('line', 'Line number (L-101…)', '', true),
-      {
-        key: 'dn',
-        label: 'Nominal size',
-        kind: 'select',
-        defaultValue: '100',
-        options: DN_OPTIONS,
-      },
+      select('dn', 'Nominal size', '100', DN_OPTIONS),
       num('diameter', 'Outside Ø (overrides DN)', '', true),
       txt('from', 'From (tag / tie-in)', '', true),
       txt('to', 'To (tag / tie-in)', '', true),
-      { key: 'service', label: 'Service', kind: 'text', defaultValue: 'compressed air' },
+      txt('service', 'Service', 'compressed air'),
       levelField(),
     ],
     build: (values, context) => {
@@ -357,15 +311,10 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     label: 'Cable tray',
     group: GROUP,
     fields: [
-      {
-        key: 'points',
-        label: 'Route x,y,z; …',
-        kind: 'text',
-        defaultValue: '2000,4000,5000; 20000,4000,5000',
-      },
+      txt('points', 'Route x,y,z; …', '2000,4000,5000; 20000,4000,5000'),
       num('width', 'Width', '300'),
       num('height', 'Side height', '60'),
-      { key: 'system', label: 'System', kind: 'text', defaultValue: 'power' },
+      txt('system', 'System', 'power'),
       levelField(),
     ],
     build: (values, context) => {

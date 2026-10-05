@@ -1,51 +1,30 @@
 /**
  * @layer ui/viewport/3d
  *
- * ViewPresets — floating overlay buttons for standard 3D view orientations
- * and fit-to-all / fit-to-selection.
+ * ViewPresets — floating overlay buttons for standard 3D view orientations (Front / Top / Right /
+ * Iso) and fit-to-all / fit-to-selection.
  *
- * Presets: Front / Top / Right / Isometric.
- * Fit: Fit All (all entities) / Fit Selection (selected entities only).
+ * CRITICAL: under frameloop="demand", any programmatic camera/target change MUST call both
+ * invalidate() AND controls.update(). Without invalidate() the demand loop never fires; without
+ * controls.update() the OrbitControls internal state is stale (the RenderOriginSyncer's useFrame
+ * relies on these invalidation sources).
  *
- * CRITICAL: under frameloop="demand", any programmatic
- * camera/target change MUST call both invalidate() AND controls.update()
- * to ensure the scene repaints. Without invalidate() the demand loop never
- * fires; without controls.update() the OrbitControls internal state is stale
- * (the RenderOriginSyncer's useFrame relies on these invalidation sources).
- *
- * This component is purely presentational. It reads from the store and
- * never mutates the document (PRIME DIRECTIVE).
+ * Purely presentational: reads the store and never mutates the document (PRIME DIRECTIVE).
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import type { Vec3 } from '@core/model/types';
+import { ORIGIN, add3 } from '@lib/vec3';
 import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { NamedViewsOverlay } from './NamedViews';
+import { toRenderPosition } from './floatingOrigin';
 import { PRESET_DIRECTIONS, type PresetDirection, type PresetName } from './viewPresetDirections';
 
-interface BoundingBox {
-  center: THREE.Vector3;
-  radius: number;
-}
-
-/**
- * Compute a bounding sphere around all entity positions and derive a camera
- * distance that comfortably frames the whole model.
- *
- * Uses entity positions as proxy for mesh extents (sufficient; mesh half-size
- * is accounted for by the `MESH_HALF_SIZE_ESTIMATE` addend). The final
- * distance is computed as:
- *
- *   distance = (positionSpreadRadius + MESH_HALF_SIZE_ESTIMATE) / tan(halfFov) * margin
- *
- * where halfFov = 37.5° (half of the 75° default PerspectiveCamera fov).
- * This ensures the bounding sphere fits inside the frustum with room to spare.
- *
- * Returns null when there are no entities to frame.
- */
+type EntityPositions = Record<string, { position: Vec3 }>;
 
 /** Rough estimate of each entity's mesh half-size to add to the position-only radius. */
 const MESH_HALF_SIZE_ESTIMATE = 3;
@@ -54,190 +33,113 @@ const HALF_FOV_TAN = Math.tan((75 / 2) * (Math.PI / 180)); // tan(37.5°) ≈ 0.
 /** Margin applied on top of the exact fit distance. */
 const FIT_MARGIN = 1.35;
 
+/**
+ * Framing for `ids`: the centroid of their positions and the camera distance that fits a
+ * bounding sphere (position spread + MESH_HALF_SIZE_ESTIMATE) inside the frustum with
+ * FIT_MARGIN to spare. Entity positions stand in for mesh extents.
+ *
+ * @failure no ids, or none with a known position -> null
+ */
 function computeSceneBounds(
-  entities: Record<string, { position: readonly [number, number, number] }>,
+  entities: EntityPositions,
   ids: string[],
-): BoundingBox | null {
-  if (ids.length === 0) return null;
-
+): { center: THREE.Vector3; radius: number } | null {
   const positions = ids
     .map((id) => entities[id]?.position)
-    .filter((p): p is readonly [number, number, number] => p !== undefined);
-
+    .filter((p): p is Vec3 => p !== undefined);
   if (positions.length === 0) return null;
 
-  // Compute centroid.
-  const sum = positions.reduce(
-    (acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]] as [number, number, number],
-    [0, 0, 0] as [number, number, number],
-  );
+  const sum = positions.reduce(add3, ORIGIN);
   const center = new THREE.Vector3(
     sum[0] / positions.length,
     sum[1] / positions.length,
     sum[2] / positions.length,
   );
 
-  // Max spread of positions from centroid, with a mesh-half-size addend so
-  // a single entity never collapses to radius=0.
+  // Max spread of positions from the centroid, plus a mesh-half-size addend so a single entity
+  // never collapses to radius 0.
   const positionSpread = Math.max(
     0,
     ...positions.map((p) => new THREE.Vector3(p[0], p[1], p[2]).distanceTo(center)),
   );
-
   const boundingSphereRadius = positionSpread + MESH_HALF_SIZE_ESTIMATE;
 
-  // Camera distance needed to fit the bounding sphere inside the view frustum,
-  // accounting for the camera FOV and applying a comfortable margin.
-  const radius = (boundingSphereRadius / HALF_FOV_TAN) * FIT_MARGIN;
-
-  return { center, radius };
+  // Camera distance that fits the bounding sphere in the frustum, with a comfortable margin.
+  return { center, radius: (boundingSphereRadius / HALF_FOV_TAN) * FIT_MARGIN };
 }
 
-interface Preset {
-  name: PresetName;
-  label: string;
-  /** Unit direction of the camera eye RELATIVE to the scene centre (+Z-up). */
-  direction: PresetDirection;
-}
-
-const PRESETS: Preset[] = [
-  { name: 'front', label: 'Front', direction: PRESET_DIRECTIONS.front },
-  { name: 'top', label: 'Top', direction: PRESET_DIRECTIONS.top },
-  { name: 'right', label: 'Right', direction: PRESET_DIRECTIONS.right },
-  { name: 'iso', label: 'Iso', direction: PRESET_DIRECTIONS.iso },
+const PRESETS: ReadonlyArray<{ name: PresetName; label: string }> = [
+  { name: 'front', label: 'Front' },
+  { name: 'top', label: 'Top' },
+  { name: 'right', label: 'Right' },
+  { name: 'iso', label: 'Iso' },
 ];
 
-/**
- * Mounted INSIDE the r3f Canvas so it can call useThree().
- * Receives the subset of store state it needs via props to avoid subscribing
- * to the store inside the Canvas (which would re-render the entire tree).
- */
-interface ViewPresetsInnerProps {
-  entities: Record<string, { position: readonly [number, number, number] }>;
-  selection: string[];
-  allEntityIds: string[];
-}
+type ApplyPreset = (direction: PresetDirection, target: THREE.Vector3, distance: number) => void;
 
-export function ViewPresetsInner({
-  entities,
-  selection,
-  allEntityIds,
-}: ViewPresetsInnerProps): null {
-  // useThree is only valid inside the Canvas — this component is always
-  // rendered inside SceneContents.
+// Module-level bridge between the inner (Canvas) and outer (DOM) layers: r3f has no portals or
+// context across the Canvas boundary. Holds ONLY the camera driver registered by
+// ViewPresetsInner; it never touches the document.
+const bridge: { applyPreset: ApplyPreset | null } = { applyPreset: null };
+
+/** Mounted INSIDE the r3f Canvas (useThree); registers the camera driver for the overlay. */
+export function ViewPresetsInner(): null {
   const { camera, controls, invalidate } = useThree();
 
-  const applyPreset = useCallback(
-    (direction: PresetDirection, target: THREE.Vector3, distance: number) => {
+  useEffect(() => {
+    bridge.applyPreset = (direction, target, distance) => {
       const orbit = controls as OrbitControlsImpl | null;
       if (!orbit) return;
 
       const dir = new THREE.Vector3(direction[0], direction[1], direction[2]).normalize();
       // `target` is world space; the camera lives in render space (world − renderOrigin).
-      const [ox, oy, oz] = useStore.getState().renderOrigin;
-      const renderTarget = target.clone().sub(new THREE.Vector3(ox, oy, oz));
-      const newPos = renderTarget.clone().addScaledVector(dir, distance);
+      const renderTarget = new THREE.Vector3(
+        ...toRenderPosition([target.x, target.y, target.z], useStore.getState().renderOrigin),
+      );
 
       camera.up.set(0, 0, 1);
-      camera.position.copy(newPos);
+      camera.position.copy(renderTarget.clone().addScaledVector(dir, distance));
       camera.lookAt(renderTarget);
       orbit.target.copy(renderTarget);
 
       // Must call both update() and invalidate() under frameloop="demand".
-      // update() syncs OrbitControls internal spherical state; invalidate()
-      // queues the next render frame (RenderOriginSyncer depends on this too).
       orbit.update();
       invalidate();
-    },
-    [camera, controls, invalidate],
-  );
-
-  // Expose applyPreset and bounds helpers via a global ref so the outer
-  // (non-Canvas) overlay can trigger them via a stable callback mechanism.
-  // We use a module-level mutable ref rather than a React ref to avoid the
-  // Canvas boundary problem.
-  _innerRef.applyPreset = applyPreset;
-  _innerRef.entities = entities;
-  _innerRef.selection = selection;
-  _innerRef.allEntityIds = allEntityIds;
-
-  // Cleanup: null all _innerRef fields on unmount so a stale closure
-  // capturing a disposed camera or controls cannot fire after Canvas teardown.
-  useEffect(() => {
-    return () => {
-      _innerRef.applyPreset = null;
-      _innerRef.entities = {};
-      _innerRef.selection = [];
-      _innerRef.allEntityIds = [];
     };
-  }, []);
+    // Unregister on unmount so a stale closure over a disposed camera cannot fire after teardown.
+    return () => {
+      bridge.applyPreset = null;
+    };
+  }, [camera, controls, invalidate]);
 
   return null;
 }
 
-// Module-level mutable bridge between the inner (Canvas) and outer (DOM) layers.
-// This is an intentional architectural exception: r3f does not support portals
-// or context across the Canvas boundary. The ref holds ONLY imperative callbacks
-// and read-only data — it never mutates the document.
-const _innerRef: {
-  applyPreset: ((dir: PresetDirection, target: THREE.Vector3, distance: number) => void) | null;
-  entities: Record<string, { position: readonly [number, number, number] }>;
-  selection: string[];
-  allEntityIds: string[];
-} = {
-  applyPreset: null,
-  entities: {},
-  selection: [],
-  allEntityIds: [],
-};
-
-/**
- * Rendered OUTSIDE the Canvas as a DOM overlay.
- * Reads from the Zustand store via narrow selectors (R3).
- */
+/** Rendered OUTSIDE the Canvas as a DOM overlay. */
 export function ViewPresetsOverlay(): React.ReactElement {
-  const document = useStore((s) => s.document);
-  const selection = document.selection;
-  const allIds = document.order;
+  const selection = useStore((s) => s.document.selection);
+  const allEntityIds = useStore((s) => s.document.order);
 
-  // Keep _innerRef in sync whenever store state relevant to fit changes.
-  // This is a side-effect-free reference update — no setState.
-  _innerRef.entities = document.entities as Record<
-    string,
-    { position: readonly [number, number, number] }
-  >;
-  _innerRef.selection = selection;
-  _innerRef.allEntityIds = allIds;
-
-  const handlePreset = useCallback((direction: PresetDirection) => {
-    if (!_innerRef.applyPreset) return;
-    // Default target: origin, default distance: 10.
-    const target = new THREE.Vector3(0, 0, 0);
-    _innerRef.applyPreset(direction, target, 10);
-  }, []);
-
-  const handleFit = useCallback((ids: string[]) => {
-    if (!_innerRef.applyPreset) return;
-    const bounds = computeSceneBounds(_innerRef.entities, ids);
-    if (!bounds) return;
-    // Use the current camera direction (iso) for fit operations.
-    _innerRef.applyPreset(PRESET_DIRECTIONS.iso, bounds.center, bounds.radius);
-  }, []);
+  const fit = (ids: string[]): void => {
+    const bounds = computeSceneBounds(useStore.getState().document.entities, ids);
+    if (bounds) bridge.applyPreset?.(PRESET_DIRECTIONS.iso, bounds.center, bounds.radius);
+  };
 
   return (
     <div className="vp-overlay vp-overlay--top-right">
       <div className="vp-toolbar" aria-label="View presets" role="group">
         <div className="vp-group">
-          {PRESETS.map((preset) => (
+          {PRESETS.map(({ name, label }) => (
             <button
-              key={preset.name}
+              key={name}
               type="button"
               className="vp-btn"
-              onClick={() => handlePreset(preset.direction)}
-              title={`${preset.label} view`}
-              aria-label={`${preset.label} view`}
+              // Look at the origin from distance 10.
+              onClick={() => bridge.applyPreset?.(PRESET_DIRECTIONS[name], new THREE.Vector3(), 10)}
+              title={`${label} view`}
+              aria-label={`${label} view`}
             >
-              {preset.label}
+              {label}
             </button>
           ))}
         </div>
@@ -246,7 +148,7 @@ export function ViewPresetsOverlay(): React.ReactElement {
           <button
             type="button"
             className="vp-btn vp-btn--icon"
-            onClick={() => handleFit(allIds)}
+            onClick={() => fit(allEntityIds)}
             title="Fit all entities into view"
             aria-label="Fit all into view"
           >
@@ -255,7 +157,7 @@ export function ViewPresetsOverlay(): React.ReactElement {
           <button
             type="button"
             className="vp-btn vp-btn--icon"
-            onClick={() => handleFit(selection)}
+            onClick={() => fit(selection)}
             title="Fit selected entities into view"
             aria-label="Fit selection into view"
             disabled={selection.length === 0}

@@ -19,6 +19,23 @@ const withLayer = (doc: CadDocument, layer: Layer): CadDocument => ({
   layers: { ...doc.layers, [layer.id]: layer },
 });
 
+/** `layer` `id` with boolean `flag` set to `value`; a missing layer is a no-op naming `command`. */
+function setLayerFlag(
+  doc: CadDocument,
+  command: string,
+  id: string,
+  flag: 'visible' | 'locked',
+  value: boolean,
+): CommandResult {
+  const layer = doc.layers[id];
+  if (!layer) return noop(doc, `No layer ${id} — ${command} is a no-op.`);
+  return {
+    document: withLayer(doc, { ...layer, [flag]: value }),
+    summary: `Layer ${id} ("${layer.name}"): ${flag} = ${value}.`,
+    affected: [id],
+  };
+}
+
 /**
  * @command add_layer
  * @pure
@@ -123,18 +140,8 @@ export const setLayerVisibility = defineCommand({
     id: z.string().describe('Id of the layer to change.'),
     visible: z.boolean().describe('true to make the layer visible; false to hide it.'),
   }),
-  run: (doc, { id, visible }): CommandResult => {
-    const layer = doc.layers[id];
-    if (!layer) {
-      return noop(doc, `No layer ${id} — set_layer_visibility is a no-op.`);
-    }
-
-    return {
-      document: withLayer(doc, { ...layer, visible }),
-      summary: `Layer ${id} ("${layer.name}"): visible = ${visible}.`,
-      affected: [id],
-    };
-  },
+  run: (doc, { id, visible }): CommandResult =>
+    setLayerFlag(doc, 'set_layer_visibility', id, 'visible', visible),
 });
 
 /**
@@ -156,18 +163,8 @@ export const setLayerLock = defineCommand({
     id: z.string().describe('Id of the layer to lock or unlock.'),
     locked: z.boolean().describe('true to lock the layer; false to unlock it.'),
   }),
-  run: (doc, { id, locked }): CommandResult => {
-    const layer = doc.layers[id];
-    if (!layer) {
-      return noop(doc, `No layer ${id} — set_layer_lock is a no-op.`);
-    }
-
-    return {
-      document: withLayer(doc, { ...layer, locked }),
-      summary: `Layer ${id} ("${layer.name}"): locked = ${locked}.`,
-      affected: [id],
-    };
-  },
+  run: (doc, { id, locked }): CommandResult =>
+    setLayerFlag(doc, 'set_layer_lock', id, 'locked', locked),
 });
 
 /**

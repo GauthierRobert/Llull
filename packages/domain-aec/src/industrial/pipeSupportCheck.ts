@@ -11,6 +11,7 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
+import { briefList } from './utilisation';
 import { collectSteelBars, modelUnits, type ModelUnits } from './steelMemberBars';
 import { spanCoordinate } from './routeSupport';
 import { createBeamLoads, type BeamLoads } from './steelBeamLoads';
@@ -262,17 +263,15 @@ export const checkPipeSupports = defineCommand({
         row.issues.join('; '),
       ]),
     );
-    const list = failing
-      .slice(0, 8)
-      .map((row) => `${row.mark}${row.line === '' ? '' : ` ${row.line}`} (${row.issues[0] ?? ''})`)
-      .join(', ');
+    const list = briefList(
+      failing,
+      (row) => `${row.mark}${row.line === '' ? '' : ` ${row.line}`} (${row.issues[0] ?? ''})`,
+    );
     return {
       document: doc,
       summary:
         `Pipe support check (span table × ${spanFactor}): ${pipes.length} pipe(s), ${pipes.length - failing.length} ok` +
-        (failing.length === 0
-          ? ''
-          : `, ${failing.length} failing: ${list}${failing.length > 8 ? ', …' : ''}`) +
+        (failing.length === 0 ? '' : `, ${failing.length} failing: ${list}`) +
         (unattached > 0 ? `; ${unattached} unattached support(s)` : '') +
         '.',
       affected: [],

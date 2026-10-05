@@ -8,7 +8,8 @@ import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel, BuildingModel } from '@core/model/building';
 import { fromMm } from '../model';
 import { sweepFrame } from '../mesh';
-import { cross3, dot3, sub3 } from '@lib/vec3';
+import { distance } from '@lib/polygon';
+import { cross3, dot3, scale3, sub3 } from '@lib/vec3';
 import { midpoint } from '../vec3';
 import { findProfile } from '../steel/profiles';
 import { atLevel } from './evaluate';
@@ -141,11 +142,7 @@ export function elementBoxes(
         return {
           center: [(point[0] + previous[0]) / 2, (point[1] + previous[1]) / 2, z],
           axes: zRotated(angle),
-          half: [
-            Math.hypot(point[0] - previous[0], point[1] - previous[1]) / 2,
-            element.thickness / 2,
-            element.height / 2,
-          ],
+          half: [distance(previous, point) / 2, element.thickness / 2, element.height / 2],
         };
       });
     }
@@ -171,7 +168,7 @@ export function elementBoxes(
             {
               center: entity.position,
               axes: zRotated(entity.rotation[2]),
-              half: [entity.size[0] / 2, entity.size[1] / 2, entity.size[2] / 2] as Vec3,
+              half: scale3(entity.size, 0.5),
             },
           ];
         }

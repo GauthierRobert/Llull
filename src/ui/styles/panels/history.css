@@ -52,15 +52,7 @@
   color: var(--warning);
 }
 
-/* Row actions float over the name on hover so the name keeps its width */
+/* Clear the suppress toggle at the row end */
 .history-step .panel__row-actions {
-  position: absolute;
-  top: 50%;
   right: 40px;
-  margin: 0;
-  padding: 0 2px;
-  transform: translateY(-50%);
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 0 0 1px var(--border);
 }

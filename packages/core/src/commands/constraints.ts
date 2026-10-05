@@ -14,11 +14,15 @@
  */
 
 import type { CadDocument, Constraint } from '../model/types';
+import { CONSTRAINT_KINDS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { runSolver } from './constraintSolver';
 import { noop } from './noop';
+
+/** Optional named point of a line / arc / circle (`EntityRef.kind`). */
+const SUB_POINT = z.enum(['start', 'end', 'center', 'mid']).optional();
 
 /** Semantic checks zod cannot express: non-empty entity ids; `value` on dimensional kinds. */
 function validateConstraintShape(c: {
@@ -27,8 +31,10 @@ function validateConstraintShape(c: {
   b: { entityId: string };
   value?: unknown;
 }): string | null {
-  if (c.a.entityId.length === 0) return `constraint.a must be a valid EntityRef (has entityId)`;
-  if (c.b.entityId.length === 0) return `constraint.b must be a valid EntityRef (has entityId)`;
+  for (const key of ['a', 'b'] as const) {
+    if (c[key].entityId.length === 0)
+      return `constraint.${key} must be a valid EntityRef (has entityId)`;
+  }
   if ((c.kind === 'distance' || c.kind === 'angle') && c.value === undefined) {
     return `constraint kind '${c.kind}' requires a numeric or string 'value' field`;
   }
@@ -56,7 +62,7 @@ export const addConstraint = defineCommand({
     constraint: z
       .object({
         kind: z
-          .enum(['coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle'])
+          .enum(CONSTRAINT_KINDS)
           .describe(
             'Constraint type. Geometric: "coincident" (two points share a location), ' +
               '"parallel" (two lines are parallel), "perpendicular" (two lines are at 90°), ' +
@@ -67,10 +73,7 @@ export const addConstraint = defineCommand({
         a: z
           .object({
             entityId: z.string().describe('Id of the first entity.'),
-            kind: z
-              .enum(['start', 'end', 'center', 'mid'])
-              .optional()
-              .describe('Sub-point selector: start, end, center, or mid.'),
+            kind: SUB_POINT.describe('Sub-point selector: start, end, center, or mid.'),
           })
           .describe(
             'First entity reference. Minimum: { entityId: "<id>" }. ' +
@@ -80,10 +83,7 @@ export const addConstraint = defineCommand({
         b: z
           .object({
             entityId: z.string().describe('Id of the second entity.'),
-            kind: z
-              .enum(['start', 'end', 'center', 'mid'])
-              .optional()
-              .describe('Sub-point selector: start, end, center, or mid.'),
+            kind: SUB_POINT.describe('Sub-point selector: start, end, center, or mid.'),
           })
           .describe(
             'Second entity reference. Same shape as "a". ' +
@@ -216,20 +216,14 @@ export const updateConstraint = defineCommand({
         a: z
           .object({
             entityId: z.string().describe('Entity id.'),
-            kind: z
-              .enum(['start', 'end', 'center', 'mid'])
-              .optional()
-              .describe('Sub-point selector.'),
+            kind: SUB_POINT.describe('Sub-point selector.'),
           })
           .optional()
           .describe('New first entity reference { entityId, kind? }.'),
         b: z
           .object({
             entityId: z.string().describe('Entity id.'),
-            kind: z
-              .enum(['start', 'end', 'center', 'mid'])
-              .optional()
-              .describe('Sub-point selector.'),
+            kind: SUB_POINT.describe('Sub-point selector.'),
           })
           .optional()
           .describe('New second entity reference { entityId, kind? }.'),
@@ -248,18 +242,16 @@ export const updateConstraint = defineCommand({
     const existing = doc.constraints[id]!;
     const updates: Record<string, unknown> = {};
 
-    if (patch.a !== undefined) {
-      if (patch.a.entityId.length === 0) {
-        return noop(doc, `update_constraint: patch.a is not a valid EntityRef — no change made.`);
+    for (const key of ['a', 'b'] as const) {
+      const ref = patch[key];
+      if (ref === undefined) continue;
+      if (ref.entityId.length === 0) {
+        return noop(
+          doc,
+          `update_constraint: patch.${key} is not a valid EntityRef — no change made.`,
+        );
       }
-      updates['a'] = patch.a;
-    }
-
-    if (patch.b !== undefined) {
-      if (patch.b.entityId.length === 0) {
-        return noop(doc, `update_constraint: patch.b is not a valid EntityRef — no change made.`);
-      }
-      updates['b'] = patch.b;
+      updates[key] = ref;
     }
 
     if (patch.value !== undefined) {

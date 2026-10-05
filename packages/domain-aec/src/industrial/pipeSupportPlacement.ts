@@ -9,7 +9,7 @@ import { RISER_SLOPE, arcLengths, pointAtArc } from './routeSupport';
 import { SAME_SUPPORT_DISTANCE, type EndCarrier, type PipeRun } from './pipeSupportLayout';
 
 /** Largest distance of an end / bend support from the end / bend, mm (a quarter of the spacing below that). */
-export const MAX_CORNER_OFFSET = 300;
+const MAX_CORNER_OFFSET = 300;
 
 /** Whether a shoe or hanger can sit at arc length `arc` (the segment there is not a riser). */
 export function isPlaceable(run: PipeRun, arc: number): boolean {

@@ -6,7 +6,6 @@
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { isVec2, fromMm } from '../model';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { findProfile, type SteelProfile } from '../steel/profiles';
 import type { PortalProfiles } from './portalGeometry';
 import type { portalFrameParams } from './portalParams';
@@ -40,9 +39,7 @@ export function portalInputs(
   });
   const mm = (value: number): number => fromMm(doc, value);
   const origin = params.origin ?? [0, 0];
-  const span = Array.isArray(params.spans)
-    ? Math.max(...params.spans.map(Number))
-    : (params.span ?? mm(24000));
+  const span = params.spans ? Math.max(...params.spans) : (params.span ?? mm(24000));
   const hallLength = params.length ?? mm(48000);
   const targetBay = params.baySpacing ?? mm(6000);
   const eave = params.eaveHeight ?? mm(7000);
@@ -50,22 +47,19 @@ export function portalInputs(
   const purlinSpacing = params.purlinSpacing ?? mm(1800);
   const railSpacing = params.railSpacing ?? mm(1800);
   if (
-    params.spans !== undefined &&
-    !(
-      Array.isArray(params.spans) &&
-      params.spans.length >= 1 &&
-      params.spans.length <= 10 &&
-      params.spans.every((width) => isFiniteNumber(width) && width > 0)
-    )
+    params.spans &&
+    (params.spans.length < 1 ||
+      params.spans.length > 10 ||
+      params.spans.some((width) => width <= 0))
   ) {
     return fail('spans must be 1–10 widths, each > 0.');
   }
   const spanCount = params.spans?.length ?? 1;
   const sizes = [span, hallLength, targetBay, eave, purlinSpacing, railSpacing];
-  if (!isVec2(origin) || sizes.some((value) => !(isFiniteNumber(value) && value > 0))) {
+  if (!isVec2(origin) || sizes.some((value) => value <= 0)) {
     return fail('origin [x, y] and all sizes > 0 required.');
   }
-  if (!(isFiniteNumber(pitchDegrees) && pitchDegrees >= 0 && pitchDegrees < 45)) {
+  if (pitchDegrees < 0 || pitchDegrees >= 45) {
     return fail('roofPitch must be in [0, 45) degrees.');
   }
   const roofType = params.roofType ?? 'duopitch';
@@ -91,14 +85,7 @@ export function portalInputs(
     );
   }
   const p = profiles as PortalProfiles;
-  if (
-    params.crane &&
-    !(
-      isFiniteNumber(params.crane.railHeight) &&
-      params.crane.railHeight > 0 &&
-      params.crane.railHeight < eave
-    )
-  ) {
+  if (params.crane && !(params.crane.railHeight > 0 && params.crane.railHeight < eave)) {
     return fail('crane.railHeight must be > 0 and below the eaves.');
   }
   return {

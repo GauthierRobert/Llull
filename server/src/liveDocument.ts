@@ -1,17 +1,8 @@
 /**
  * @layer server
- *
- * Shared live document — single source of truth for all MCP sessions.
- *
- * All MCP sessions read and write the SAME `CadDocument` held here.
- * Mutations (via `setLiveDoc`) are immediately broadcast to all SSE subscribers
- * so the browser UI sees every MCP tool call in real time.
- *
- * Architecture notes (L6):
- * - This module is TRANSPORT / STATE GLUE only. No command or geometry logic.
- * - `setLiveDoc` stores the document produced by `execute` and fires the SSE fan-out.
- *   It never creates or validates entities.
- * - Sync: one shared doc for every session, broadcast over GET /live.
+ * Shared live document — the ONE `CadDocument` every MCP session and the browser read and write.
+ * `setLiveDoc` stores the document produced by `execute` and broadcasts the change to all SSE
+ * subscribers (`GET /live`); transport/state glue only, it never creates or validates entities (L6).
  */
 
 import fs from 'fs';
@@ -26,9 +17,8 @@ import { documentHash } from '@mcp/liveSync';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 
 /**
- * Autosave path. Override via `LLULL_AUTOSAVE_PATH`; default lives next to the
- * server bundle. Autosave is disabled inside tests (vitest sets `VITEST`, our
- * own harness sets `TEST`) to avoid clobbering a user's saved project.
+ * Autosave path (override via `LLULL_AUTOSAVE_PATH`; default next to the server bundle). Disabled
+ * under tests (vitest sets `VITEST`, our harness sets `TEST`) so a user's saved project survives.
  */
 const AUTOSAVE_PATH =
   process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
@@ -58,11 +48,6 @@ const autosaver = createAutosaver({
   serialize: serializeDocument,
 });
 
-function writeAutosave(doc: CadDocument): void {
-  if (!AUTOSAVE_ENABLED) return;
-  autosaver.schedule(doc);
-}
-
 /** Write any debounced autosave immediately (shutdown path). */
 export function flushAutosave(): void {
   if (AUTOSAVE_ENABLED) autosaver.flush();
@@ -85,7 +70,6 @@ export function closeAllSubscribers(): void {
   _subscribers.clear();
 }
 
-/** The single live document shared across all MCP sessions and the browser UI. */
 let _liveDoc: CadDocument = loadAutosave();
 
 /** Number of changes applied to the live document since process start (the log position). */
@@ -94,7 +78,6 @@ let _seq = 0;
 /** Random per process: `_seq` restarts at 0 on restart, so clients compare `(epoch, seq)`. */
 const _epoch: string = randomUUID();
 
-/** Return the current shared document. */
 export function getLiveDoc(): CadDocument {
   return _liveDoc;
 }
@@ -104,18 +87,10 @@ export function getLiveSnapshot(): LiveSnapshotEvent {
   return { epoch: _epoch, seq: _seq, stateHash: documentHash(_liveDoc), document: _liveDoc };
 }
 
-/**
- * Active SSE subscribers — each entry is an Express `Response` whose connection
- * is kept open for the SSE stream.  Entries are added by `subscribeLive` and
- * removed when the client disconnects.
- */
+/** Open SSE streams: added by `subscribeLive`, removed on client disconnect. */
 const _subscribers = new Set<Response>();
 
-/**
- * Write a single SSE event to one response, with an event type and JSON data.
- * The named-event format (`event: <type>\ndata: <json>\n\n`) lets the browser
- * hook discriminate between patch and snapshot events via `addEventListener`.
- */
+/** One named SSE event (`event: <type>\ndata: <json>\n\n`); false when the connection is dead. */
 function writeSseEvent(res: Response, eventType: string, payload: unknown): boolean {
   try {
     res.write(`event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`);
@@ -141,18 +116,16 @@ interface LiveCommand {
 }
 
 /**
- * Replace the shared document and broadcast the change to all SSE subscribers.
+ * Replace the shared document and broadcast the change.
+ * With `command`: a `command` event `{ seq, name, params, stateHash }` (clients re-run it through
+ * `execute` and verify `stateHash`). Without it (undo/redo/bulk replacement): a full `snapshot`.
  *
- * With `command`: emits a `command` event `{ seq, name, params, stateHash }` — clients re-run the
- * same command through `execute` and verify `stateHash`. Without it (undo/redo/reset/bulk
- * replacement): emits a full `snapshot` event `{ seq, stateHash, document }`.
- *
- * @sideeffect replaces module-level `_liveDoc`, advances `_seq`, broadcasts to all subscribers.
+ * @sideeffect replaces `_liveDoc`, advances `_seq`, autosaves, broadcasts to all subscribers.
  */
 export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
   _liveDoc = next;
   _seq += 1;
-  writeAutosave(next);
+  if (AUTOSAVE_ENABLED) autosaver.schedule(next);
   if (command === undefined) {
     broadcast('snapshot', getLiveSnapshot());
     return;
@@ -168,44 +141,24 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
 }
 
 /**
- * Register an SSE subscriber (an Express `Response` already configured for
- * `text/event-stream`).
- *
- * Immediately writes the current document as the opening SSE message so the
- * browser has a snapshot as soon as it connects — no polling needed.
- *
- * Returns an unsubscribe function; call it when the client disconnects.
+ * Register an SSE subscriber (a `Response` already set up for `text/event-stream`) and send it the
+ * current snapshot as the opening message. Returns the unsubscribe function.
  */
 export function subscribeLive(res: Response): () => void {
   _subscribers.add(res);
-
-  // Send the current snapshot immediately so the browser is in sync from t=0.
-  // Named event `snapshot` — the browser hook listens for this distinct event type.
-  if (!writeSseEvent(res, 'snapshot', getLiveSnapshot())) {
-    // If the write fails immediately the client is already gone; clean up now.
-    _subscribers.delete(res);
-  }
+  if (!writeSseEvent(res, 'snapshot', getLiveSnapshot())) _subscribers.delete(res); // client already gone
 
   return (): void => {
     _subscribers.delete(res);
   };
 }
 
-/**
- * Replace the live document without broadcasting (test helper / reset).
- * Production code should always use `setLiveDoc` to ensure the browser is notified.
- *
- * @internal — exposed for tests only.
- */
+/** Replace the live document without broadcasting. @internal — exposed for tests only. */
 export function _resetLiveDoc(doc?: CadDocument): void {
   _liveDoc = doc ?? createEmptyDocument();
 }
 
-/**
- * Return the current subscriber count (test helper).
- *
- * @internal — exposed for tests only.
- */
+/** @internal — exposed for tests only. */
 export function _subscriberCount(): number {
   return _subscribers.size;
 }

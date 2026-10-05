@@ -5,6 +5,7 @@
  */
 
 import type { Vec3 } from '@core/model/types';
+import { add3, dot3, scale3, sub3 } from '@lib/vec3';
 import { toVec3 } from './memberSupport';
 
 /** Route as Vec3 points; null unless there are at least 2 well-formed [x, y, z] points. */
@@ -24,13 +25,30 @@ export const hasRepeatedPoint = (route: ReadonlyArray<Vec3>): boolean =>
     );
   });
 
-export const routeLength = (route: ReadonlyArray<Vec3>): number =>
-  route.reduce((sum, point, index) => {
-    const previous = route[index - 1];
-    return previous
-      ? sum + Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2])
-      : sum;
-  }, 0);
+export const routeLength = (route: ReadonlyArray<Vec3>): number => arcLengths(route).at(-1) ?? 0;
+
+interface Segment {
+  readonly a: Vec3;
+  readonly delta: Vec3;
+  readonly length: number;
+  /** Unit direction; meaningless for a zero-length segment. */
+  readonly direction: Vec3;
+}
+
+/** Consecutive point pairs of `route` (zero-length ones included). */
+function segmentsOf(route: ReadonlyArray<Vec3>): Segment[] {
+  return route.slice(1).map((b, index): Segment => {
+    const a = route[index] as Vec3;
+    const delta = sub3(b, a);
+    const length = Math.hypot(...delta);
+    return {
+      a,
+      delta,
+      length,
+      direction: [delta[0] / length, delta[1] / length, delta[2] / length],
+    };
+  });
+}
 
 /** Nearest point of a polyline route to `point`. */
 export interface RouteSnap {
@@ -52,35 +70,13 @@ export interface RouteSnap {
 export function nearestOnRoute(route: ReadonlyArray<Vec3>, point: Vec3): RouteSnap | null {
   let best: RouteSnap | null = null;
   let travelled = 0;
-  for (let index = 0; index + 1 < route.length; index++) {
-    const [a, b] = [route[index] as Vec3, route[index + 1] as Vec3];
-    const delta: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const length = Math.hypot(delta[0], delta[1], delta[2]);
+  for (const [index, { a, delta, length, direction }] of segmentsOf(route).entries()) {
     if (length > 0) {
-      const t = Math.max(
-        0,
-        Math.min(
-          1,
-          ((point[0] - a[0]) * delta[0] +
-            (point[1] - a[1]) * delta[1] +
-            (point[2] - a[2]) * delta[2]) /
-            (length * length),
-        ),
-      );
-      const snapped: Vec3 = [a[0] + delta[0] * t, a[1] + delta[1] * t, a[2] + delta[2] * t];
-      const distance = Math.hypot(
-        point[0] - snapped[0],
-        point[1] - snapped[1],
-        point[2] - snapped[2],
-      );
+      const t = Math.max(0, Math.min(1, dot3(sub3(point, a), delta) / (length * length)));
+      const snapped = add3(a, scale3(delta, t));
+      const distance = Math.hypot(...sub3(point, snapped));
       if (best === null || distance < best.distance - 1e-9) {
-        best = {
-          point: snapped,
-          distance,
-          arc: travelled + t * length,
-          segment: index,
-          direction: [delta[0] / length, delta[1] / length, delta[2] / length],
-        };
+        best = { point: snapped, distance, arc: travelled + t * length, segment: index, direction };
       }
     }
     travelled += length;
@@ -95,18 +91,10 @@ export function pointAtArc(
 ): { point: Vec3; direction: Vec3; segment: number } | null {
   let travelled = 0;
   let last: { point: Vec3; direction: Vec3; segment: number } | null = null;
-  for (let index = 0; index + 1 < route.length; index++) {
-    const [a, b] = [route[index] as Vec3, route[index + 1] as Vec3];
-    const delta: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const length = Math.hypot(delta[0], delta[1], delta[2]);
+  for (const [index, { a, delta, length, direction }] of segmentsOf(route).entries()) {
     if (length === 0) continue;
-    const direction: Vec3 = [delta[0] / length, delta[1] / length, delta[2] / length];
     const t = Math.max(0, Math.min(1, (arc - travelled) / length));
-    last = {
-      point: [a[0] + delta[0] * t, a[1] + delta[1] * t, a[2] + delta[2] * t],
-      direction,
-      segment: index,
-    };
+    last = { point: add3(a, scale3(delta, t)), direction, segment: index };
     if (arc <= travelled + length) return last;
     travelled += length;
   }
@@ -115,20 +103,12 @@ export function pointAtArc(
 
 /** Arc length of every route point from the first (same length as `route`). */
 export function arcLengths(route: ReadonlyArray<Vec3>): number[] {
-  const arcs: number[] = [];
   let travelled = 0;
-  route.forEach((point, index) => {
+  return route.map((point, index) => {
     const previous = route[index - 1];
-    if (previous) {
-      travelled += Math.hypot(
-        point[0] - previous[0],
-        point[1] - previous[1],
-        point[2] - previous[2],
-      );
-    }
-    arcs.push(travelled);
+    if (previous) travelled += Math.hypot(...sub3(point, previous));
+    return travelled;
   });
-  return arcs;
 }
 
 /** Segments steeper than this (|dz| / length) are risers: no shoe or hanger sits on them and their length is not a span. */
@@ -141,12 +121,10 @@ export const RISER_SLOPE = 0.7;
 export function spanCoordinate(route: ReadonlyArray<Vec3>, arc: number): number {
   let travelled = 0;
   let span = 0;
-  for (let index = 0; index + 1 < route.length && travelled < arc; index++) {
-    const [a, b] = [route[index] as Vec3, route[index + 1] as Vec3];
-    const length = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  for (const { delta, length } of segmentsOf(route)) {
+    if (travelled >= arc) break;
     if (length === 0) continue;
-    const used = Math.min(length, arc - travelled);
-    if (Math.abs(b[2] - a[2]) / length <= RISER_SLOPE) span += used;
+    if (Math.abs(delta[2]) / length <= RISER_SLOPE) span += Math.min(length, arc - travelled);
     travelled += length;
   }
   return span;
@@ -164,7 +142,7 @@ export interface RiserRun {
 }
 
 /** Risers shorter than this are fittings (offsets, drops to a nozzle), not checked as risers, mm. */
-export const MIN_RISER_LENGTH = 500;
+const MIN_RISER_LENGTH = 500;
 
 /** Maximal runs of consecutive riser segments (|dz| / length > RISER_SLOPE) of at least MIN_RISER_LENGTH. */
 export function riserRuns(route: ReadonlyArray<Vec3>): RiserRun[] {
@@ -185,13 +163,11 @@ export function riserRuns(route: ReadonlyArray<Vec3>): RiserRun[] {
       to: route[toIndex] as Vec3,
     });
   };
-  for (let index = 0; index + 1 < route.length; index++) {
-    const [a, b] = [route[index] as Vec3, route[index + 1] as Vec3];
-    const length = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-    const steep = length > 0 && Math.abs(b[2] - a[2]) / length > RISER_SLOPE;
+  segmentsOf(route).forEach(({ delta, length }, index) => {
+    const steep = length > 0 && Math.abs(delta[2]) / length > RISER_SLOPE;
     if (steep && open === null) open = index;
     if (!steep && length > 0) close(index);
-  }
+  });
   close(route.length - 1);
   return runs;
 }

@@ -1,17 +1,13 @@
 import type { CommandResult } from './types';
-import { newEntity } from './newEntity';
 import { defineCommand, z, looseVec3, colorField } from './schema';
-import { nextId } from '../lib/id';
 import { ORIGIN } from '../lib/vec3';
 import {
   DEFAULT_SOLID_COLOR,
   anchorField,
-  commitSolid,
+  placeSolid,
   positionField,
   rejectBadSize,
   rejectNonPositive,
-  resolveRotation,
-  resolvePosition,
   rotationField,
 } from './geometryShared';
 
@@ -62,17 +58,21 @@ export const addWedge = defineCommand({
     doc,
     { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
   ): CommandResult => {
-    const [w, h, d] = size;
     const rejected = rejectBadSize(doc, 'add_wedge', size);
     if (rejected) return rejected;
-    // Default anchor for wedge is 'min': stored position is the lower-front-left (min-XYZ) corner.
-    // AABB half-extents from min corner: [w/2, h/2, d/2] (half-extents measured from min = stored origin).
-    const storedPosition = resolvePosition([w / 2, h / 2, d / 2], 'min', anchor, position);
-    const id = nextId('wdg');
-    const entity = newEntity('wedge', id, { size }, storedPosition, color, {
-      rotation: resolveRotation(rotation),
+    const [w, h, d] = size;
+    return placeSolid(doc, {
+      kind: 'wedge',
+      idPrefix: 'wdg',
+      geometry: { size },
+      halfExtents: [w / 2, h / 2, d / 2],
+      defaultAnchor: 'min',
+      anchor,
+      position,
+      rotation,
+      color,
+      describe: (id) => `Added wedge ${id} of size ${size.join('×')}`,
     });
-    return commitSolid(doc, entity, `Added wedge ${id} of size ${size.join('×')}`);
   },
 });
 
@@ -143,29 +143,18 @@ export const addPyramid = defineCommand({
       ['height', height],
     ]);
     if (rejected) return rejected;
-    // Default anchor for pyramid is 'base-center': stored position IS the base center.
-    // AABB from base-center origin: spans [−bw/2..+bw/2, −bd/2..+bd/2, 0..height].
-    // Half-extents for resolvePosition (which works from AABB center internally):
-    // pass half-extents as seen from base-center: [baseWidth/2, baseDepth/2, height/2].
-    const storedPosition = resolvePosition(
-      [baseWidth / 2, baseDepth / 2, height / 2],
-      'base-center',
+    return placeSolid(doc, {
+      kind: 'pyramid',
+      idPrefix: 'pyr',
+      geometry: { baseWidth, baseDepth, height },
+      halfExtents: [baseWidth / 2, baseDepth / 2, height / 2],
+      defaultAnchor: 'base-center',
       anchor,
       position,
-    );
-    const id = nextId('pyr');
-    const entity = newEntity(
-      'pyramid',
-      id,
-      { baseWidth, baseDepth, height },
-      storedPosition,
+      rotation,
       color,
-      { rotation: resolveRotation(rotation) },
-    );
-    return commitSolid(
-      doc,
-      entity,
-      `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}`,
-    );
+      describe: (id) =>
+        `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}`,
+    });
   },
 });

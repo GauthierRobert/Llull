@@ -115,10 +115,7 @@ export function plateRows(
         };
       },
     );
-    const momentWorst = moments.reduce<(Candidate & { detail: string }) | null>(
-      (best, item) => (best === null || item.utilisation > best.utilisation ? item : best),
-      null,
-    );
+    const momentWorst = worst(moments);
     if (momentWorst) {
       rows.push(row(`base plate M+N (${momentWorst.detail})`, momentWorst, 'kN/bolt'));
     }

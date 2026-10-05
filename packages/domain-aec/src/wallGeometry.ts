@@ -3,9 +3,16 @@
  */
 
 import type { Vec2 } from '@core/model/types';
-import type { BuildingModel, OpeningElement, WallElement } from '@core/model/building';
+import type {
+  BuildingModel,
+  CurvedWallElement,
+  GridElement,
+  OpeningElement,
+  WallElement,
+} from '@core/model/building';
 import { projectOntoSegment, distance } from '@lib/polygon';
-import { arcOffsetOf, tangentWall } from './curvedWallGeometry';
+import { arcOffsetOf, curvedWallExtent, tangentWall } from './curvedWallGeometry';
+import { elementsOf, orderedElements } from './model';
 
 interface WallFrame {
   readonly length: number;
@@ -39,25 +46,22 @@ export function pointAlong(
   ];
 }
 
-export function openingsOf(building: BuildingModel, wallId: string): OpeningElement[] {
-  return building.elementOrder
-    .map((id) => building.elements[id])
-    .filter(
-      (element): element is OpeningElement =>
-        element !== undefined &&
-        (element.category === 'door' || element.category === 'window') &&
-        element.hostId === wallId,
-    )
-    .sort((a, b) => a.offset - b.offset);
+/** Bubble centres of a grid axis: one `radius` beyond each end, along the axis. */
+export function gridBubbleCenters(grid: GridElement, radius: number): [start: Vec2, end: Vec2] {
+  const { direction } = wallFrame(grid);
+  return [
+    [grid.start[0] - direction[0] * radius, grid.start[1] - direction[1] * radius],
+    [grid.end[0] + direction[0] * radius, grid.end[1] + direction[1] * radius],
+  ];
 }
 
-function wallsOnLevel(building: BuildingModel, levelId: string): WallElement[] {
-  return building.elementOrder
-    .map((id) => building.elements[id])
+export function openingsOf(building: BuildingModel, wallId: string): OpeningElement[] {
+  return orderedElements(building)
     .filter(
-      (element): element is WallElement =>
-        element !== undefined && element.category === 'wall' && element.levelId === levelId,
-    );
+      (element): element is OpeningElement =>
+        (element.category === 'door' || element.category === 'window') && element.hostId === wallId,
+    )
+    .sort((a, b) => a.offset - b.offset);
 }
 
 /**
@@ -78,14 +82,15 @@ export function endAdjustment(
   const away: Vec2 = end === 'start' ? frame.direction : [-frame.direction[0], -frame.direction[1]];
   const ownIndex = building.elementOrder.indexOf(wall.id);
   // Curved walls take part through their tangent at the arc point nearest this wall end.
-  const curved = new Set<string>();
-  const tangents = building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    if (element?.category !== 'curvedWall' || element.levelId !== wall.levelId) return [];
-    curved.add(element.id);
-    return [tangentWall(element, arcOffsetOf(element, point))];
-  });
-  for (const other of [...wallsOnLevel(building, wall.levelId), ...tangents]) {
+  const curvedWalls = elementsOf(building, 'curvedWall').filter(
+    (curved) => curved.levelId === wall.levelId,
+  );
+  const curvedIds = new Set(curvedWalls.map((curved) => curved.id));
+  const tangents = curvedWalls.map((curved) => tangentWall(curved, arcOffsetOf(curved, point)));
+  const straightWalls = elementsOf(building, 'wall').filter(
+    (candidate) => candidate.levelId === wall.levelId,
+  );
+  for (const other of [...straightWalls, ...tangents]) {
     if (other.id === wall.id) continue;
     const otherFrame = wallFrame(other);
     const sine = Math.abs(away[0] * otherFrame.direction[1] - away[1] * otherFrame.direction[0]);
@@ -100,7 +105,7 @@ export function endAdjustment(
     const atOtherStart = distance(point, other.start) <= tolerance;
     if (atOtherStart || distance(point, other.end) <= tolerance) {
       // A curved wall keeps its square end: the straight wall always closes the corner.
-      if (!curved.has(other.id) && building.elementOrder.indexOf(other.id) < ownIndex) {
+      if (!curvedIds.has(other.id) && building.elementOrder.indexOf(other.id) < ownIndex) {
         return retraction;
       }
       const otherAway: Vec2 = atOtherStart
@@ -129,4 +134,59 @@ export function wallExtent(building: BuildingModel, wall: WallElement): WallExte
     start: startAdjustment === 0 ? 0 : -startAdjustment,
     end: wallFrame(wall).length + endAdjustment(building, wall, 'end'),
   };
+}
+
+/** Plan swing of a door in a straight wall: hinge point, open-leaf end and the arc's angles. */
+export function doorSwing(
+  wall: Pick<WallElement, 'start' | 'end' | 'thickness'>,
+  door: OpeningElement,
+): { hinge: Vec2; leafEnd: Vec2; startAngle: number; endAngle: number } {
+  const frame = wallFrame(wall);
+  const hingeOffset =
+    door.swing === 'left' ? door.offset - door.width / 2 : door.offset + door.width / 2;
+  const hinge = pointAlong(wall, frame, hingeOffset, wall.thickness / 2);
+  const openAngle = frame.angle + Math.PI / 2;
+  const [startAngle, endAngle] =
+    door.swing === 'left' ? [frame.angle, openAngle] : [openAngle, frame.angle + Math.PI];
+  const leafEnd: Vec2 = [
+    hinge[0] + Math.cos(openAngle) * door.width,
+    hinge[1] + Math.sin(openAngle) * door.width,
+  ];
+  return { hinge, leafEnd, startAngle, endAngle };
+}
+
+/** Built extent of a straight wall, or of a curved wall along its arc (joints applied). */
+export function builtExtent(
+  building: BuildingModel,
+  wall: WallElement | CurvedWallElement,
+): WallExtent {
+  return wall.category === 'wall' ? wallExtent(building, wall) : curvedWallExtent(building, wall);
+}
+
+interface WallPiece {
+  readonly s0: number;
+  readonly s1: number;
+  readonly z0: number;
+  readonly z1: number;
+}
+
+/** Vertical rectangular pieces [s0,s1]×[z0,z1] (wall-local) left solid after cutting the openings. */
+export function wallPieces<Wall extends { readonly height: number }>(
+  wall: Wall,
+  openings: ReadonlyArray<OpeningElement>,
+  extent: WallExtent,
+): WallPiece[] {
+  const pieces: WallPiece[] = [];
+  let cursor = extent.start;
+  for (const opening of openings) {
+    const left = Math.max(opening.offset - opening.width / 2, extent.start);
+    const right = Math.min(opening.offset + opening.width / 2, extent.end);
+    if (left > cursor) pieces.push({ s0: cursor, s1: left, z0: 0, z1: wall.height });
+    if (opening.sillHeight > 0) pieces.push({ s0: left, s1: right, z0: 0, z1: opening.sillHeight });
+    const head = opening.sillHeight + opening.height;
+    if (head < wall.height) pieces.push({ s0: left, s1: right, z0: head, z1: wall.height });
+    cursor = Math.max(cursor, right);
+  }
+  if (extent.end > cursor) pieces.push({ s0: cursor, s1: extent.end, z0: 0, z1: wall.height });
+  return pieces.filter((piece) => piece.s1 - piece.s0 > 1e-9 && piece.z1 - piece.z0 > 1e-9);
 }

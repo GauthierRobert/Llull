@@ -6,6 +6,7 @@
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import type { BuildingModel, FootingElement, PanelElement } from '@core/model/building';
+import { distance } from '@lib/polygon';
 import { fromMm, nextElementId, nextMark, toVec2, withElement } from '../model';
 import { panelFrame } from './evaluate';
 
@@ -34,14 +35,7 @@ export function columnFeet(
           ? [element.start[0], element.start[1]]
           : [element.end[0], element.end[1]];
     }
-    if (
-      foot &&
-      !feet.some(
-        (existing) => Math.hypot(existing[0] - foot[0], existing[1] - foot[1]) <= tolerance,
-      )
-    ) {
-      feet.push(foot);
-    }
+    if (foot && !feet.some((existing) => distance(foot, existing) <= tolerance)) feet.push(foot);
   }
   return feet;
 }
@@ -57,10 +51,7 @@ export function withoutFootings(
     element.category === 'footing' && element.levelId === levelId ? [element.location] : [],
   );
   return locations.filter(
-    (location) =>
-      !existing.some(
-        (footing) => Math.hypot(footing[0] - location[0], footing[1] - location[1]) <= tolerance,
-      ),
+    (location) => !existing.some((footing) => distance(location, footing) <= tolerance),
   );
 }
 
@@ -71,11 +62,11 @@ export function appendFootings(
   levelId: string,
   locations: ReadonlyArray<Vec2>,
   size: {
-    width?: number;
-    length?: number;
-    thickness?: number;
-    topOffset?: number;
-    material?: string;
+    width?: number | undefined;
+    length?: number | undefined;
+    thickness?: number | undefined;
+    topOffset?: number | undefined;
+    material?: string | undefined;
   },
 ): { building: BuildingModel; ids: string[] } {
   let next = building;
@@ -106,7 +97,12 @@ export function appendPanel(
   doc: CadDocument,
   building: BuildingModel,
   levelId: string,
-  spec: { corners: Vec3[]; role: 'roof' | 'wall'; thickness?: number; material?: string },
+  spec: {
+    corners: Vec3[];
+    role: 'roof' | 'wall';
+    thickness?: number | undefined;
+    material?: string | undefined;
+  },
 ): { building: BuildingModel; id: string } | null {
   if (spec.corners.length < 3 || !panelFrame(spec.corners)) return null;
   const panel: PanelElement = {

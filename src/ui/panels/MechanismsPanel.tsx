@@ -1,26 +1,18 @@
 /**
  * @layer ui/panels
  *
- * MechanismsPanel — constraints, joints, and drive-relations inspector.
- *
- * Three collapsible sections:
- *   A — Constraints: kind chip, referenced entity ids, value for dimensional kinds,
- *       "Solve" button (dispatches solve_constraints), "Delete" button (delete_constraint).
- *   B — Joints: kind chip, instance ids, axis, current value, numeric input for
- *       set_joint_value, "Delete" button (delete_joint).
- *   C — Drive Relations: driver→driven, ratio, offset, "Delete" button (delete_drive_relation).
- *
- * Selecting a row highlights it in `mechanismSelection` (viewport-store UI state) so
- * `MechanismOverlay` can draw a visual cue in the 3D viewport.
- *
- * Pure presentation — no document mutations except through store.dispatch (PRIME DIRECTIVE).
+ * MechanismsPanel — collapsible sections for constraints (solve_constraints, delete_constraint),
+ * joints (set_joint_value, delete_joint) and drive relations (delete_drive_relation).
+ * Selecting a constraint / joint row highlights it in `mechanismSelection` so `MechanismOverlay`
+ * can draw a cue in the 3D viewport.
  */
 
 import React, { useState } from 'react';
-import { useStore } from '@ui/store';
-import { useViewportStore } from '@ui/store';
+import { classNames } from '@ui/classNames';
+import { useStore, useViewportStore } from '@ui/store';
 import type { Constraint, Joint, DriveRelation } from '@core/model/types';
 import { PanelEmpty, PanelHeader, PanelSection, IconButton } from '@ui/panels/PanelParts';
+import { orderedValues } from '@ui/panels/orderedValues';
 
 type ChipTone = 'accent' | 'success' | 'warning' | 'danger' | 'agent';
 
@@ -37,6 +29,12 @@ const JOINT_CHIP_TONE: Record<string, ChipTone> = {
   revolute: 'accent',
   prismatic: 'agent',
 };
+
+const mechanismRowClass = (highlighted: boolean): string =>
+  classNames(
+    'panel__row panel__row--overlay-actions mechanisms-row',
+    highlighted && 'panel__row--selected mechanisms-row--highlighted',
+  );
 
 /** Format an EntityRef for display: "entityId[:kind]". */
 function fmtEntityRef(ref: Constraint['a'] | Constraint['b']): string {
@@ -69,7 +67,7 @@ function ConstraintRow({
 
   return (
     <li
-      className={`panel__row mechanisms-row${highlighted ? ' panel__row--selected mechanisms-row--highlighted' : ''}`}
+      className={mechanismRowClass(highlighted)}
       data-testid={`constraint-row-${constraint.id}`}
       onClick={() => onHighlight(constraint.id)}
       aria-selected={highlighted}
@@ -126,14 +124,12 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   };
 
   const chipTone = JOINT_CHIP_TONE[joint.kind] ?? 'accent';
-  const axisLabel = Array.isArray(joint.axis)
-    ? `[${(joint.axis as number[]).join(',')}]`
-    : joint.axis;
+  const axisLabel = Array.isArray(joint.axis) ? `[${joint.axis.join(',')}]` : joint.axis;
   const unit = joint.kind === 'revolute' ? 'rad' : 'mm';
 
   return (
     <li
-      className={`panel__row mechanisms-row${highlighted ? ' panel__row--selected mechanisms-row--highlighted' : ''}`}
+      className={mechanismRowClass(highlighted)}
       data-testid={`joint-row-${joint.id}`}
       onClick={() => onHighlight(joint.id)}
       aria-selected={highlighted}
@@ -189,7 +185,10 @@ function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactEleme
       : '';
 
   return (
-    <li className="panel__row mechanisms-row" data-testid={`drive-row-${relation.id}`}>
+    <li
+      className="panel__row panel__row--overlay-actions mechanisms-row"
+      data-testid={`drive-row-${relation.id}`}
+    >
       <span className="panel__row-main mechanisms-row-info">
         <strong>{relation.driver.slice(-6)}</strong>
         {' → '}
@@ -215,6 +214,42 @@ function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactEleme
   );
 }
 
+interface MechanismSectionProps {
+  /** Plural section title; lower-cased it names the count and the empty state. */
+  title: string;
+  testId: string;
+  listLabel: string;
+  listRole: 'list' | 'listbox';
+  rows: ReadonlyArray<React.ReactElement>;
+}
+
+function MechanismSection({
+  title,
+  testId,
+  listLabel,
+  listRole,
+  rows,
+}: MechanismSectionProps): React.ReactElement {
+  const noun = title.toLowerCase();
+  return (
+    <PanelSection
+      collapsible
+      title={title}
+      count={rows.length}
+      countLabel={`${rows.length} ${noun}`}
+      testId={testId}
+    >
+      {rows.length === 0 ? (
+        <PanelEmpty compact icon="mechanism" message={`No ${noun} defined.`} />
+      ) : (
+        <ul className="panel__list" aria-label={listLabel} role={listRole}>
+          {rows}
+        </ul>
+      )}
+    </PanelSection>
+  );
+}
+
 interface MechanismsPanelProps {
   className?: string;
 }
@@ -237,83 +272,46 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
     (id: string): void =>
       setMechanismSelection(isHighlighted(kind, id) ? null : { kind, id });
 
-  const constraintList = constraintOrder
-    .map((id) => constraints[id])
-    .filter((c): c is Constraint => c !== undefined);
-  const jointList = jointOrder.map((id) => joints[id]).filter((j): j is Joint => j !== undefined);
-  const driveList = driveRelationOrder
-    .map((id) => driveRelations[id])
-    .filter((d): d is DriveRelation => d !== undefined);
-
   return (
-    <aside
-      className={['panel mechanisms-panel', className].filter(Boolean).join(' ')}
-      aria-label="Mechanisms"
-    >
+    <aside className={classNames('panel mechanisms-panel', className)} aria-label="Mechanisms">
       <PanelHeader title="Mechanisms" />
-      <PanelSection
-        collapsible
+      <MechanismSection
         title="Constraints"
-        count={constraintList.length}
-        countLabel={`${constraintList.length} constraints`}
         testId="mechanisms-section-constraints"
-      >
-        {constraintList.length === 0 ? (
-          <PanelEmpty compact icon="mechanism" message="No constraints defined." />
-        ) : (
-          <ul className="panel__list" aria-label="Constraint list" role="listbox">
-            {constraintList.map((c) => (
-              <ConstraintRow
-                key={c.id}
-                constraint={c}
-                highlighted={isHighlighted('constraint', c.id)}
-                onHighlight={highlight('constraint')}
-              />
-            ))}
-          </ul>
-        )}
-      </PanelSection>
-
-      <PanelSection
-        collapsible
+        listLabel="Constraint list"
+        listRole="listbox"
+        rows={orderedValues(constraintOrder, constraints).map((constraint) => (
+          <ConstraintRow
+            key={constraint.id}
+            constraint={constraint}
+            highlighted={isHighlighted('constraint', constraint.id)}
+            onHighlight={highlight('constraint')}
+          />
+        ))}
+      />
+      <MechanismSection
         title="Joints"
-        count={jointList.length}
-        countLabel={`${jointList.length} joints`}
         testId="mechanisms-section-joints"
-      >
-        {jointList.length === 0 ? (
-          <PanelEmpty compact icon="mechanism" message="No joints defined." />
-        ) : (
-          <ul className="panel__list" aria-label="Joint list" role="listbox">
-            {jointList.map((j) => (
-              <JointRow
-                key={j.id}
-                joint={j}
-                highlighted={isHighlighted('joint', j.id)}
-                onHighlight={highlight('joint')}
-              />
-            ))}
-          </ul>
-        )}
-      </PanelSection>
-
-      <PanelSection
-        collapsible
+        listLabel="Joint list"
+        listRole="listbox"
+        rows={orderedValues(jointOrder, joints).map((joint) => (
+          <JointRow
+            key={joint.id}
+            joint={joint}
+            highlighted={isHighlighted('joint', joint.id)}
+            onHighlight={highlight('joint')}
+          />
+        ))}
+      />
+      <MechanismSection
         title="Drive Relations"
-        count={driveList.length}
-        countLabel={`${driveList.length} drive relations`}
         testId="mechanisms-section-drive relations"
-      >
-        {driveList.length === 0 ? (
-          <PanelEmpty compact icon="mechanism" message="No drive relations defined." />
-        ) : (
-          <ul className="panel__list" aria-label="Drive relation list" role="list">
-            {driveList.map((d) => (
-              <DriveRelationRow key={d.id} relation={d} />
-            ))}
-          </ul>
-        )}
-      </PanelSection>
+        listLabel="Drive relation list"
+        listRole="list"
+        rows={orderedValues(driveRelationOrder, driveRelations).map((relation) => (
+          <DriveRelationRow key={relation.id} relation={relation} />
+        ))}
+      />
     </aside>
   );
 }

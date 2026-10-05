@@ -18,21 +18,20 @@ import {
   type GetPromptResult,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
-  buildMcpTools,
+  buildAllMcpTools,
   shapeToolCallContent,
   listMcpResources,
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
-  buildExchangeToolDefinitions,
   applyExchangeToolCall,
-  buildDiscoveryToolDefinitions,
   applyDiscoveryToolCall,
   isPromptEnabled,
   isToolEnabled,
   toolsetOf,
 } from '@mcp/index';
 import type { ToolsetName } from '@mcp/index';
+import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc } from '../liveDocument';
 import { applyCommand } from '../commandBus';
 import type { ExchangeOptions } from '../pythonExchange';
@@ -46,10 +45,8 @@ function makeErrorResult(message: string): CallToolResult {
 function listTools(enabledToolsets: ReadonlySet<ToolsetName>): {
   tools: { name: string; description: string; inputSchema: { type: 'object' } }[];
 } {
-  const registryTools = buildMcpTools();
-  const metaTools = [...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()];
   return {
-    tools: [...registryTools, ...metaTools]
+    tools: buildAllMcpTools()
       .filter((t) => isToolEnabled(t.name, enabledToolsets))
       .map((t) => ({
         name: t.name,
@@ -117,8 +114,7 @@ export function buildMcpServer(
     try {
       return await handleToolCall(req);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return makeErrorResult(`Tool ${req.params.name} failed: ${message}`);
+      return makeErrorResult(`Tool ${req.params.name} failed: ${errorMessage(err)}`);
     }
   });
 

@@ -172,7 +172,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   },
 };
 
-export interface ParsedToolsets {
+interface ParsedToolsets {
   /** Enabled toolsets; always contains `core`. */
   readonly enabled: ReadonlySet<ToolsetName>;
   /** Requested names that are not toolsets (ignored). */

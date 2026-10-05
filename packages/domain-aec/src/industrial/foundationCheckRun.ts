@@ -5,14 +5,13 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 import { DEFAULT_TIE_CAPACITY } from './foundationModel';
 import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { checkFoundations } from './foundationAssessment';
 import { defaultThrustTie } from './foundationThrust';
 import { round } from '../numeric';
-import { checkTable, failureSummary } from './checkReport';
+import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from './checkReport';
 
 const foundationCheckParams = z.object({
   ...FRAME_LOAD_SHAPE,
@@ -70,7 +69,7 @@ export const foundationCheck = defineCommand({
     if ('reason' in resolved) return noop(doc, `check_foundations failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     const tieCapacity = params.tieCapacity ?? DEFAULT_TIE_CAPACITY;
-    if (!isFiniteNumber(tieCapacity) || tieCapacity <= 0) {
+    if (tieCapacity <= 0) {
       return noop(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
     }
     const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
@@ -88,31 +87,11 @@ export const foundationCheck = defineCommand({
       csv,
       failures,
       worst: worstRow,
-    } = checkTable(
-      rows,
-      [
-        'Column',
-        'Footing',
-        'Check',
-        'Value',
-        'Limit',
-        'Unit',
-        'Utilisation',
-        'Status',
-        'Combination',
-      ],
-      (row, status) => [
-        row.column,
-        row.footing,
-        row.check,
-        round(row.value),
-        round(row.limit),
-        row.unit,
-        round(row.utilisation),
-        status,
-        row.combination,
-      ],
-    );
+    } = checkTable(rows, ['Column', 'Footing', ...LIMIT_COLUMNS], (row, status) => [
+      row.column,
+      row.footing,
+      ...limitCells(row, status),
+    ]);
     if (!worstRow) {
       return noop(
         doc,

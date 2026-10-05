@@ -25,6 +25,9 @@ export function getAllowedOrigins(): string[] {
     .filter((origin) => origin.length > 0);
 }
 
+/** JSON body of every 401 (REST mutation guard and `/mcp` bearer auth). */
+export const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
+
 const sha256 = (value: string): Buffer => crypto.createHash('sha256').update(value).digest();
 
 /** Constant-time `Authorization: Bearer <token>` check (digest compare: no length leak; scheme case-insensitive). */
@@ -127,12 +130,12 @@ export function guardMutation(): RequestHandler {
       next();
       return;
     }
-    if (token && process.env['LLULL_REQUIRE_TOKEN_FOR_REST'] === 'true') {
-      res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
-      return;
-    }
-    if (token && !isLoopbackAddress(req.socket?.remoteAddress)) {
-      res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
+    if (
+      token &&
+      (process.env['LLULL_REQUIRE_TOKEN_FOR_REST'] === 'true' ||
+        !isLoopbackAddress(req.socket?.remoteAddress))
+    ) {
+      res.status(401).json(UNAUTHORIZED_BODY);
       return;
     }
     const origin = req.headers['origin'];
@@ -141,30 +144,30 @@ export function guardMutation(): RequestHandler {
       return;
     }
     if (token && typeof origin !== 'string') {
-      res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
+      res.status(401).json(UNAUTHORIZED_BODY);
       return;
     }
     next();
   };
 }
 
-/** Per-IP limiter for REST routes. `LLULL_REST_RATE_LIMIT_MAX` (default 600) per `LLULL_REST_RATE_LIMIT_WINDOW_MS` (default 60000). */
-export function buildRestRateLimiter(): RequestHandler {
-  const max = Number.parseInt(process.env['LLULL_REST_RATE_LIMIT_MAX'] ?? '', 10) || 600;
-  const windowMs =
-    Number.parseInt(process.env['LLULL_REST_RATE_LIMIT_WINDOW_MS'] ?? '', 10) || 60_000;
-  return buildRateLimiter(max, windowMs);
-}
-
-/** Per-IP express-rate-limit with the standard JSON 429 body. */
-export function buildRateLimiter(max: number, windowMs: number): RequestHandler {
+/**
+ * Per-IP express-rate-limit with the standard JSON 429 body. The limit is the positive integer in
+ * env `maxVariable` (default 600) per `windowVariable` milliseconds (default 60000).
+ */
+export function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
   return rateLimit({
-    windowMs,
-    max,
+    windowMs: Number.parseInt(process.env[windowVariable] ?? '', 10) || 60_000,
+    max: Number.parseInt(process.env[maxVariable] ?? '', 10) || 600,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests — please slow down.' },
   });
+}
+
+/** Per-IP limiter for REST routes (`LLULL_REST_RATE_LIMIT_MAX` / `_WINDOW_MS`). */
+export function buildRestRateLimiter(): RequestHandler {
+  return buildRateLimiter('LLULL_REST_RATE_LIMIT_MAX', 'LLULL_REST_RATE_LIMIT_WINDOW_MS');
 }
 
 /** Reduce a user string to a safe download basename: [A-Za-z0-9._-], max 64 chars, no leading dot. */

@@ -1,4 +1,5 @@
-import type { ConstraintKind, JointKind } from '../model/types';
+import type { JointKind } from '../model/types';
+import { CONSTRAINT_KINDS } from '../model/types';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
 import { documentExtensions } from '../plugins/host';
@@ -11,15 +12,7 @@ import {
   validateParameterValue,
 } from './persistenceGuards';
 
-/** All legal constraint kinds (must stay in sync with ConstraintKind union in types.ts). */
-const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set<ConstraintKind>([
-  'coincident',
-  'parallel',
-  'perpendicular',
-  'tangent',
-  'distance',
-  'angle',
-]);
+const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
 
 /** All legal joint kinds (must stay in sync with JointKind union in types.ts). */
 const VALID_JOINT_KINDS: ReadonlySet<string> = new Set<JointKind>(['revolute', 'prismatic']);

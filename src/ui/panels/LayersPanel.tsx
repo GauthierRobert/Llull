@@ -1,28 +1,18 @@
 /**
  * @layer ui/panels
  *
- * LayersPanel — a right-docked read-only layer list.
- *
- * Displays: layer name, visibility state, lock state, color swatch, entity count.
- *
- * llull is now a LIVE READ-ONLY VIEWER: add/rename/delete/lock controls and
- * undo/redo buttons are removed. Layer state is driven exclusively by the MCP
- * agent; this panel only reflects what is in the document.
- *
- * Layer visibility (eye icon) is kept as a purely LOCAL viewport filter — it
- * toggles useViewportStore.hiddenLayerIds, which the renderers read, without
- * dispatching any command. This avoids desync: the server's authoritative layer
- * visible flag is unchanged; the local filter is a rendering convenience only.
- *
- * PRIME DIRECTIVE: this panel NEVER builds a Layer or dispatches commands.
- * (architecture L1, react R1)
+ * LayersPanel — read-only layer list: name, visibility, lock state, color swatch, entity count.
+ * The eye toggle is a LOCAL viewport filter (`useViewportStore.hiddenLayerIds`): it dispatches no
+ * command and never changes the document's `layer.visible`.
  */
 
 import React from 'react';
+import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import type { Layer } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelHeader } from '@ui/panels/PanelParts';
+import { orderedValues } from '@ui/panels/orderedValues';
 
 function useLayerEntityCounts(): Record<string, number> {
   const entities = useStore((s) => s.document.entities);
@@ -118,10 +108,7 @@ export function LayersPanel({ className }: LayersPanelProps): React.ReactElement
   const entityCounts = useLayerEntityCounts();
 
   return (
-    <aside
-      className={['panel layers-panel', className].filter(Boolean).join(' ')}
-      aria-label="Layers"
-    >
+    <aside className={classNames('panel layers-panel', className)} aria-label="Layers">
       <PanelHeader
         title="Layers"
         count={layerOrder.length}
@@ -129,11 +116,9 @@ export function LayersPanel({ className }: LayersPanelProps): React.ReactElement
       />
 
       <ul className="panel__list" aria-label="Layer list" role="list">
-        {layerOrder.map((id) => {
-          const layer = layers[id];
-          if (!layer) return null;
-          return <LayerRow key={id} layer={layer} entityCount={entityCounts[id] ?? 0} />;
-        })}
+        {orderedValues(layerOrder, layers).map((layer) => (
+          <LayerRow key={layer.id} layer={layer} entityCount={entityCounts[layer.id] ?? 0} />
+        ))}
       </ul>
     </aside>
   );

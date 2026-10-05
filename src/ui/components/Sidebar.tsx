@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import type { CadDocument } from '@core/model/types';
 import { useLayoutStore, useStore } from '@ui/store';
 import type { SidebarTab } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
@@ -21,30 +22,29 @@ import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { SIDEBAR_TAB_SPECS } from './sidebarTabs';
 import type { SidebarTabSpec } from './sidebarTabs';
 
+const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: string }>>> = {
+  building: BuildingPanel,
+  layers: LayersPanel,
+  assembly: AssemblyPanel,
+  mechanisms: MechanismsPanel,
+  parameters: ParametersPanel,
+  history: FeatureHistoryPanel,
+  configurations: ConfigurationsPanel,
+  materials: MaterialsPanel,
+};
+
 /** Item count shown as a badge on each rail button. */
-function useTabCount(tab: SidebarTab): number {
-  return useStore((s) => {
-    const doc = s.document;
-    switch (tab) {
-      case 'building':
-        return doc.building?.elementOrder.length ?? 0;
-      case 'layers':
-        return doc.layerOrder.length;
-      case 'assembly':
-        return Object.keys(doc.components).length;
-      case 'mechanisms':
-        return doc.constraintOrder.length + doc.jointOrder.length + doc.driveRelationOrder.length;
-      case 'parameters':
-        return Object.keys(doc.parameters).length;
-      case 'history':
-        return doc.featureHistory.length;
-      case 'configurations':
-        return Object.keys(doc.configurations).length;
-      case 'materials':
-        return Object.keys(doc.materials).length;
-    }
-  });
-}
+const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
+  building: (doc) => doc.building?.elementOrder.length ?? 0,
+  layers: (doc) => doc.layerOrder.length,
+  assembly: (doc) => Object.keys(doc.components).length,
+  mechanisms: (doc) =>
+    doc.constraintOrder.length + doc.jointOrder.length + doc.driveRelationOrder.length,
+  parameters: (doc) => Object.keys(doc.parameters).length,
+  history: (doc) => doc.featureHistory.length,
+  configurations: (doc) => Object.keys(doc.configurations).length,
+  materials: (doc) => Object.keys(doc.materials).length,
+};
 
 interface RailButtonProps {
   spec: SidebarTabSpec;
@@ -55,7 +55,7 @@ interface RailButtonProps {
 }
 
 function RailButton({ spec, active, focusable, onSelect }: RailButtonProps): React.ReactElement {
-  const count = useTabCount(spec.tab);
+  const count = useStore((s) => TAB_COUNTS[spec.tab](s.document));
   return (
     <button
       type="button"
@@ -79,48 +79,20 @@ function RailButton({ spec, active, focusable, onSelect }: RailButtonProps): Rea
   );
 }
 
-function ActivePanel({ tab }: { tab: SidebarTab }): React.ReactElement {
-  switch (tab) {
-    case 'building':
-      return <BuildingPanel className="sidebar-panel" />;
-    case 'layers':
-      return <LayersPanel className="sidebar-panel" />;
-    case 'assembly':
-      return <AssemblyPanel className="sidebar-panel" />;
-    case 'mechanisms':
-      return <MechanismsPanel className="sidebar-panel" />;
-    case 'parameters':
-      return <ParametersPanel className="sidebar-panel" />;
-    case 'history':
-      return <FeatureHistoryPanel className="sidebar-panel" />;
-    case 'configurations':
-      return <ConfigurationsPanel className="sidebar-panel" />;
-    case 'materials':
-      return <MaterialsPanel className="sidebar-panel" />;
-  }
-}
-
 /** ARIA tabs pattern: Arrow Up/Down move focus between rail tabs, Home/End jump to the ends. */
 function handleRailKeyDown(e: React.KeyboardEvent<HTMLElement>): void {
   const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
   const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
   if (current === -1) return;
   const last = tabs.length - 1;
-  const next =
-    e.key === 'ArrowDown'
-      ? current === last
-        ? 0
-        : current + 1
-      : e.key === 'ArrowUp'
-        ? current === 0
-          ? last
-          : current - 1
-        : e.key === 'Home'
-          ? 0
-          : e.key === 'End'
-            ? last
-            : null;
-  if (next === null) return;
+  const targets: Readonly<Record<string, number>> = {
+    ArrowDown: current === last ? 0 : current + 1,
+    ArrowUp: current === 0 ? last : current - 1,
+    Home: 0,
+    End: last,
+  };
+  const next = targets[e.key];
+  if (next === undefined) return;
   e.preventDefault();
   tabs[next]?.focus();
 }
@@ -129,6 +101,7 @@ export function Sidebar(): React.ReactElement {
   const sidebarTab = useLayoutStore((s) => s.sidebarTab);
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen);
   const selectSidebarTab = useLayoutStore((s) => s.selectSidebarTab);
+  const ActivePanel = TAB_PANELS[sidebarTab];
 
   return (
     <div className={`sidebar${sidebarOpen ? '' : ' sidebar--collapsed'}`}>
@@ -156,7 +129,7 @@ export function Sidebar(): React.ReactElement {
           id="sidebar-panel"
           aria-labelledby={`sidebar-tab-${sidebarTab}`}
         >
-          <ActivePanel tab={sidebarTab} />
+          <ActivePanel className="sidebar-panel" />
         </div>
       )}
     </div>

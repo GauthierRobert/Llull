@@ -15,6 +15,7 @@
  */
 
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
+import { errorMessage } from '@lib/errorMessage';
 import type { LiveSnapshotEvent } from '@mcp/liveSync';
 
 /**
@@ -44,20 +45,23 @@ export class ServerCommandError extends Error {
   }
 }
 
-async function postJson(path: string, body: unknown): Promise<ServerCommandResponse> {
+/** GET `path`, or POST it with `postBody` as JSON when given. Resolves to the parsed JSON response. */
+async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
   let response: Response;
   try {
-    response = await fetch(`${SERVER_BASE}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() },
-      body: JSON.stringify(body),
-    });
-  } catch (cause) {
-    throw new ServerCommandError(
-      `Network error: ${cause instanceof Error ? cause.message : String(cause)}`,
+    response = await fetch(
+      `${SERVER_BASE}${path}`,
+      postBody === undefined
+        ? { headers: serverAuthHeaders() }
+        : {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...serverAuthHeaders() },
+            body: JSON.stringify(postBody),
+          },
     );
+  } catch (cause) {
+    throw new ServerCommandError(`Network error: ${errorMessage(cause)}`);
   }
-
   if (!response.ok) {
     throw new ServerCommandError(
       `Server responded with HTTP ${response.status} for ${path}`,
@@ -65,64 +69,37 @@ async function postJson(path: string, body: unknown): Promise<ServerCommandRespo
       response.status,
     );
   }
-
-  return response.json() as Promise<ServerCommandResponse>;
+  return response.json() as Promise<Body>;
 }
 
 /**
  * POST /command — send a named command with params to the server.
- * The updated document arrives via the /live SSE stream, not in this response.
  * `commandId` makes the request idempotent server-side (a repeated id is not re-applied).
  *
- * @throws ServerCommandError on network failure or non-ok HTTP status.
+ * @throws ServerCommandError on network failure or non-ok HTTP status (also for undo / redo / snapshot).
  */
-export async function postCommand(
+export function postCommand(
   name: string,
   params: unknown,
   commandId?: string,
 ): Promise<ServerCommandResponse> {
-  return postJson(
+  return request(
     '/command',
     commandId === undefined ? { name, params } : { name, params, commandId },
   );
 }
 
-/**
- * POST /undo — walk back one step in server-side history.
- * The reverted document arrives via /live.
- *
- * @throws ServerCommandError on network failure or non-ok HTTP status.
- */
-export async function postUndo(): Promise<ServerCommandResponse> {
-  return postJson('/undo', {});
+/** POST /undo — walk back one step in server-side history. */
+export function postUndo(): Promise<ServerCommandResponse> {
+  return request('/undo', {});
 }
 
-/**
- * POST /redo — re-apply the last undone step.
- * The re-applied document arrives via /live.
- *
- * @throws ServerCommandError on network failure or non-ok HTTP status.
- */
-export async function postRedo(): Promise<ServerCommandResponse> {
-  return postJson('/redo', {});
+/** POST /redo — re-apply the last undone step. */
+export function postRedo(): Promise<ServerCommandResponse> {
+  return request('/redo', {});
 }
 
 /** GET /live/snapshot — the server document with its log position (resync). */
-export async function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
-  let response: Response;
-  try {
-    response = await fetch(`${SERVER_BASE}/live/snapshot`, { headers: serverAuthHeaders() });
-  } catch (cause) {
-    throw new ServerCommandError(
-      `Network error: ${cause instanceof Error ? cause.message : String(cause)}`,
-    );
-  }
-  if (!response.ok) {
-    throw new ServerCommandError(
-      `Server responded with HTTP ${response.status} for /live/snapshot`,
-      'http',
-      response.status,
-    );
-  }
-  return response.json() as Promise<LiveSnapshotEvent>;
+export function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
+  return request('/live/snapshot');
 }

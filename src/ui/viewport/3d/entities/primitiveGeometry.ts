@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import { revolutionTriangles } from '@core/geometry/revolution';
+import { positionsGeometry } from '../../lineGeometry';
 import { radialSegmentsForDiag, cylinderDiag, sphereDiag, torusDiag } from '../lodSegments';
 
 /** Cylinder: axis along +Z, centered at the origin. */
@@ -70,7 +71,7 @@ export function buildPyramidGeometry(
   const hd = baseDepth / 2;
 
   // prettier-ignore
-  const vertices = new Float32Array([
+  const geo = positionsGeometry([
     // Base (faces -Z)
     -hw, -hd, 0,  -hw,  hd, 0,   hw,  hd, 0,
     -hw, -hd, 0,   hw,  hd, 0,   hw, -hd, 0,
@@ -87,9 +88,6 @@ export function buildPyramidGeometry(
     // Left side (-X)
     -hw,  hd, 0,  -hw, -hd, 0,   0, 0, height,
   ]);
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
   geo.computeVertexNormals();
   return geo;
 }
@@ -115,7 +113,7 @@ export function buildPyramidGeometry(
  */
 export function buildWedgeGeometry(w: number, h: number, d: number): THREE.BufferGeometry {
   // prettier-ignore
-  const vertices = new Float32Array([
+  const geo = positionsGeometry([
     // Bottom face — two triangles
     0, 0, 0,   w, 0, d,   0, 0, d,   // tri 0 (v0,v5,v4)
     0, 0, 0,   w, 0, 0,   w, 0, d,   // tri 1 (v0,v1,v5)
@@ -134,9 +132,6 @@ export function buildWedgeGeometry(w: number, h: number, d: number): THREE.Buffe
     0, h, 0,   0, 0, d,   w, 0, d,   // tri 6 (v2,v4,v5)
     0, h, 0,   w, 0, d,   w, h, 0,   // tri 7 (v2,v5,v3)  — v3=(w,h,0) but slope meets at (w,0,d)
   ]);
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
   geo.computeVertexNormals();
   return geo;
 }
@@ -151,13 +146,10 @@ export function buildRevolutionGeometry(
   angle: number,
   segments: number,
 ): THREE.BufferGeometry {
-  const geo = new THREE.BufferGeometry();
-  if (profile.length < 3) return geo;
-  const out: number[] = [];
-  for (const [a, b, c] of revolutionTriangles(profile, axis, angle, segments)) {
-    out.push(...a, ...b, ...c);
-  }
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(out), 3));
+  if (profile.length < 3) return new THREE.BufferGeometry();
+  const geo = positionsGeometry(
+    revolutionTriangles(profile, axis, angle, segments).flatMap((triangle) => triangle.flat()),
+  );
   geo.computeVertexNormals();
   return geo;
 }

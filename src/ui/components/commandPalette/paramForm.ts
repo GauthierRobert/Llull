@@ -10,7 +10,7 @@
 import type { ParamSpec, ParamsSchema } from '@core/commands/types';
 import type { EntityId } from '@core/model/types';
 
-export type FieldKind = 'number' | 'text' | 'enum' | 'boolean' | 'numberList' | 'textList' | 'json';
+type FieldKind = 'number' | 'text' | 'enum' | 'boolean' | 'numberList' | 'textList' | 'json';
 
 export interface FormField {
   name: string;

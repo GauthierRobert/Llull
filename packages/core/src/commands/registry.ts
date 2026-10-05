@@ -243,11 +243,11 @@ export function execute(
   if (!def) {
     return noop(doc, `Unknown command: ${commandName}`);
   }
-  if (def.annotations?.requiresKernel === true && ctx.kernel === null) {
+  const annotations = def.annotations;
+  if (annotations?.requiresKernel === true && ctx.kernel === null) {
     return noop(doc, kernelUnavailable(commandName));
   }
-  const ann = def.annotations;
-  const recordsStep = ann?.readOnly !== true && ann?.metaHistory !== true;
+  const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true;
   if (!recordsStep || ctx.stepKey !== undefined) {
     // Queries, history meta-commands, and executes nested inside a running step append nothing.
     return runInContext(ctx, () => def.run(doc, params, ctx));
@@ -299,13 +299,12 @@ function toolAnnotations(def: CommandDefinition<unknown>): ToolSchema['annotatio
 /** Generate AI/MCP tool schemas from the registry. */
 export function toToolSchemas(): ToolSchema[] {
   return definitions.map((d) => {
-    const schema: ToolSchema = {
+    const annotations = toolAnnotations(d);
+    return {
       name: d.name,
       description: d.description,
       input_schema: d.paramsSchema,
+      ...(annotations ? { annotations } : {}),
     };
-    const annotations = toolAnnotations(d);
-    if (annotations) schema.annotations = annotations;
-    return schema;
   });
 }

@@ -8,8 +8,5 @@ import { documentExtensions } from '../plugins/host';
  * building plugin via `regenerateBuilding`). Persistence omits these and re-derives them on load.
  */
 export function derivedEntityIds(doc: CadDocument): Set<string> {
-  const ids = new Set<string>();
-  for (const extension of documentExtensions())
-    for (const id of extension.derivedEntityIds(doc)) ids.add(id);
-  return ids;
+  return new Set(documentExtensions().flatMap((extension) => [...extension.derivedEntityIds(doc)]));
 }

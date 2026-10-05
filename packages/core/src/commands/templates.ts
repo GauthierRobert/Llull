@@ -19,6 +19,8 @@ import { withEntity } from './entityOps';
 import { newEntity } from './newEntity';
 import { ORIGIN } from '../lib/vec3';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
+import { circlePoints } from './tessellation';
+import { noop } from './noop';
 
 /** Build a circle entity at a given 2D center on the given work-plane position. */
 function makeCircle(center: Vec2, radius: number, position: Vec3, color: string): Entity {
@@ -28,6 +30,19 @@ function makeCircle(center: Vec2, radius: number, position: Vec3, color: string)
 /** Build a rectangle entity at the given work-plane position. */
 function makeRectangle(width: number, height: number, position: Vec3, color: string): Entity {
   return newEntity('rectangle', nextId('rect'), { width, height }, position, color);
+}
+
+/** `count` equal circles of `holeRadius` spaced evenly on a bolt circle of `boltCircleRadius` about the origin. */
+function boltCircleHoles(
+  count: number,
+  boltCircleRadius: number,
+  holeRadius: number,
+  position: Vec3,
+  color: string,
+): Entity[] {
+  return circlePoints(0, 0, 0, boltCircleRadius, count).map(([x, y]) =>
+    makeCircle([x, y], holeRadius, position, color),
+  );
 }
 
 const positive = (template: string, name: string, value: number): string | null =>
@@ -76,7 +91,7 @@ interface TemplateEntry<P> {
   build(params: P, position: Vec3, color: string): Entity[];
 }
 
-// Using `unknown` here; each entry narrows internally. The outer command narrows via the map.
+// Entries are typed per template; the command erases the parameter type (`never`) after zod validated `template`.
 const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
   bolt_hole_pattern: {
     description:
@@ -94,16 +109,15 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       );
     },
     build(params: BoltHolePatternParams, position: Vec3, color: string): Entity[] {
-      const entities: Entity[] = [];
-      for (let i = 0; i < params.count; i++) {
-        const angle = (2 * Math.PI * i) / params.count;
-        const cx = params.boltCircleRadius * Math.cos(angle);
-        const cy = params.boltCircleRadius * Math.sin(angle);
-        entities.push(makeCircle([cx, cy], params.holeRadius, position, color));
-      }
-      return entities;
+      return boltCircleHoles(
+        params.count,
+        params.boltCircleRadius,
+        params.holeRadius,
+        position,
+        color,
+      );
     },
-  } as TemplateEntry<never>,
+  },
 
   flange: {
     description:
@@ -127,21 +141,19 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
     },
     build(params: FlangeParams, position: Vec3, color: string): Entity[] {
       // Order: [outerCircle, boreCircle, hole_0, hole_1, ..., hole_n-1]
-      const entities: Entity[] = [];
-      // Outer ring
-      entities.push(makeCircle([0, 0], params.outerRadius, position, color));
-      // Bore
-      entities.push(makeCircle([0, 0], params.boreRadius, position, color));
-      // Bolt holes
-      for (let i = 0; i < params.boltCount; i++) {
-        const angle = (2 * Math.PI * i) / params.boltCount;
-        const cx = params.boltCircleRadius * Math.cos(angle);
-        const cy = params.boltCircleRadius * Math.sin(angle);
-        entities.push(makeCircle([cx, cy], params.holeRadius, position, color));
-      }
-      return entities;
+      return [
+        makeCircle([0, 0], params.outerRadius, position, color),
+        makeCircle([0, 0], params.boreRadius, position, color),
+        ...boltCircleHoles(
+          params.boltCount,
+          params.boltCircleRadius,
+          params.holeRadius,
+          position,
+          color,
+        ),
+      ];
     },
-  } as TemplateEntry<never>,
+  },
 
   rectangular_plate_with_holes: {
     description:
@@ -186,7 +198,7 @@ const TEMPLATE_REGISTRY: Record<TemplateName, TemplateEntry<never>> = {
       }
       return entities;
     },
-  } as TemplateEntry<never>,
+  },
 };
 
 const VALID_TEMPLATES: readonly TemplateName[] = [
@@ -239,44 +251,12 @@ export const instantiateTemplate = defineCommand({
       ),
   }),
   run: (doc, { template, params, position = ORIGIN, color = '#4a90d9' }): CommandResult => {
-    // Validate template name
-    if (!VALID_TEMPLATES.includes(template as TemplateName)) {
-      return {
-        document: doc,
-        summary: `instantiate_template: unknown template "${String(template)}". Valid templates: ${VALID_TEMPLATES.join(', ')}.`,
-        affected: [],
-      };
-    }
-
-    const entry = TEMPLATE_REGISTRY[template as TemplateName];
-
-    // Validate per-template params
-    const validationError = (entry as TemplateEntry<Record<string, unknown>>).validate(
-      params as never,
-    );
-    if (validationError !== null) {
-      return {
-        document: doc,
-        summary: validationError,
-        affected: [],
-      };
-    }
+    const entry = TEMPLATE_REGISTRY[template];
+    const validationError = entry.validate(params as never);
+    if (validationError !== null) return noop(doc, validationError);
 
     // Build entities — deterministic order guaranteed by each builder
-    const entities = (entry as TemplateEntry<Record<string, unknown>>).build(
-      params as never,
-      position,
-      color,
-    );
-
-    if (entities.length === 0) {
-      return {
-        document: doc,
-        summary: `instantiate_template: template "${template}" produced 0 entities (no-op).`,
-        affected: [],
-      };
-    }
-
+    const entities = entry.build(params as never, position, color);
     const affected = entities.map((e) => e.id);
     const newDoc = entities.reduce(withEntity, doc);
 

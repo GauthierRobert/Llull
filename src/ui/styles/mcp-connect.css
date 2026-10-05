@@ -21,10 +21,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--surface-popover);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-popover);
   animation: mcp-rise var(--dur) var(--ease) both;
 }
 
@@ -172,10 +168,7 @@
   border-radius: var(--radius-xs);
 }
 
-.mcp-connect__copy-btn--copied {
-  color: var(--success);
-}
-
+.mcp-connect__copy-btn--copied,
 .mcp-connect__copy-btn--copied:hover {
   color: var(--success);
 }

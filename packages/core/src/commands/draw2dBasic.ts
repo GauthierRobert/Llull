@@ -2,14 +2,10 @@ import type { Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, colorField, looseVec2 as vec2, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
-import { withEntity } from './entityOps';
+import { ORIGIN } from '../lib/vec3';
+import { commitEntity } from './commitEntity';
 import { newEntity } from './newEntity';
-import {
-  DEFAULT_DRAW_COLOR,
-  pointSeriesEntity,
-  rejectTooFewPoints,
-  workPlanePositionField,
-} from './draw2dShared';
+import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlanePositionField } from './draw2dShared';
 import { noop } from './noop';
 
 /**
@@ -31,10 +27,7 @@ export const drawLine = defineCommand({
     position: workPlanePositionField(),
     color: colorField(DEFAULT_DRAW_COLOR),
   }),
-  run: (
-    doc,
-    { start, end, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
-  ): CommandResult => {
+  run: (doc, { start, end, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     if (start.length < 2 || end.length < 2) {
       return noop(doc, 'draw_line: start and end must each be [x, y] arrays.');
     }
@@ -46,11 +39,11 @@ export const drawLine = defineCommand({
       position,
       color,
     );
-    return {
-      document: withEntity(doc, entity),
-      summary: `Drew line ${id} from [${start.join(', ')}] to [${end.join(', ')}].`,
-      affected: [id],
-    };
+    return commitEntity(
+      doc,
+      entity,
+      `Drew line ${id} from [${start.join(', ')}] to [${end.join(', ')}].`,
+    );
   },
 });
 
@@ -85,17 +78,9 @@ export const drawPolyline = defineCommand({
   }),
   run: (
     doc,
-    { points, closed = false, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
+    { points, closed = false, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
-    const tooFew = rejectTooFewPoints(doc, 'draw_polyline', points);
-    if (tooFew) return tooFew;
-    const id = nextId('poly');
-    const entity = pointSeriesEntity('polyline', id, points, closed, position, color);
-    return {
-      document: withEntity(doc, entity),
-      summary: `Drew polyline ${id} with ${points.length} points${closed ? ' (closed)' : ''}.`,
-      affected: [id],
-    };
+    return drawPointSeries(doc, 'polyline', points, closed, position, color);
   },
 });
 
@@ -130,14 +115,7 @@ export const drawArc = defineCommand({
   }),
   run: (
     doc,
-    {
-      center,
-      radius,
-      startAngle,
-      endAngle,
-      position = [0, 0, 0] as const,
-      color = DEFAULT_DRAW_COLOR,
-    },
+    { center, radius, startAngle, endAngle, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
   ): CommandResult => {
     if (radius <= 0) {
       return noop(doc, `draw_arc: radius must be > 0 (got ${radius}).`);
@@ -151,11 +129,11 @@ export const drawArc = defineCommand({
       position,
       color,
     );
-    return {
-      document: withEntity(doc, entity),
-      summary: `Drew arc ${id} center [${safeCenter.join(', ')}] radius ${radius} from ${startAngle.toFixed(3)} to ${endAngle.toFixed(3)} rad.`,
-      affected: [id],
-    };
+    return commitEntity(
+      doc,
+      entity,
+      `Drew arc ${id} center [${safeCenter.join(', ')}] radius ${radius} from ${startAngle.toFixed(3)} to ${endAngle.toFixed(3)} rad.`,
+    );
   },
 });
 
@@ -177,21 +155,18 @@ export const drawCircle = defineCommand({
     position: workPlanePositionField(),
     color: colorField(DEFAULT_DRAW_COLOR),
   }),
-  run: (
-    doc,
-    { center, radius, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
-  ): CommandResult => {
+  run: (doc, { center, radius, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     if (radius <= 0) {
       return noop(doc, `draw_circle: radius must be > 0 (got ${radius}).`);
     }
     const id = nextId('circ');
     const safeCenter: Vec2 = [center[0], center[1]];
     const entity = newEntity('circle', id, { center: safeCenter, radius }, position, color);
-    return {
-      document: withEntity(doc, entity),
-      summary: `Drew circle ${id} center [${safeCenter.join(', ')}] radius ${radius}.`,
-      affected: [id],
-    };
+    return commitEntity(
+      doc,
+      entity,
+      `Drew circle ${id} center [${safeCenter.join(', ')}] radius ${radius}.`,
+    );
   },
 });
 
@@ -221,10 +196,7 @@ export const drawRectangle = defineCommand({
     ).optional(),
     color: colorField(DEFAULT_DRAW_COLOR),
   }),
-  run: (
-    doc,
-    { width, height, position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR },
-  ): CommandResult => {
+  run: (doc, { width, height, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     if (width <= 0 || height <= 0) {
       return noop(
         doc,
@@ -233,11 +205,11 @@ export const drawRectangle = defineCommand({
     }
     const id = nextId('rect');
     const entity = newEntity('rectangle', id, { width, height }, position, color);
-    return {
-      document: withEntity(doc, entity),
-      summary: `Drew rectangle ${id} ${width}×${height} at [${position.join(', ')}].`,
-      affected: [id],
-    };
+    return commitEntity(
+      doc,
+      entity,
+      `Drew rectangle ${id} ${width}×${height} at [${position.join(', ')}].`,
+    );
   },
 });
 
@@ -257,13 +229,9 @@ export const drawPoint = defineCommand({
     position: vec3('World-space position [x, y, z] of the point. Defaults to [0,0,0].').optional(),
     color: colorField(DEFAULT_DRAW_COLOR),
   }),
-  run: (doc, { position = [0, 0, 0] as const, color = DEFAULT_DRAW_COLOR }): CommandResult => {
+  run: (doc, { position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     const id = nextId('pt');
     const entity = newEntity('point', id, {}, position, color);
-    return {
-      document: withEntity(doc, entity),
-      summary: `Drew point ${id} at [${position.join(', ')}].`,
-      affected: [id],
-    };
+    return commitEntity(doc, entity, `Drew point ${id} at [${position.join(', ')}].`);
   },
 });

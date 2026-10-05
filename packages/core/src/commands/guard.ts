@@ -9,6 +9,7 @@ import { formatIssues } from './schema';
 import { derivationViolation } from './derivation';
 import { pluginGuards } from '../plugins/host';
 import { noop } from './noop';
+import { errorMessage } from '../lib/errorMessage';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
   if (typeof value === 'number') return !Number.isFinite(value);
@@ -63,6 +64,15 @@ function describePositionContract(schema: ParamsSchema): ParamsSchema {
   };
 }
 
+/** Log `message` with the error's stack and return its message for the agent-facing summary. */
+function warnAndDescribe(message: string, error: unknown): string {
+  console.warn(
+    `[llull] ${message}`,
+    error instanceof Error ? (error.stack ?? error.message) : error,
+  );
+  return errorMessage(error);
+}
+
 function corruptionReason(entity: unknown): string | null {
   if (containsNonFinite(entity)) return 'non-finite numbers (NaN/Infinity/undefined components)';
   if (hasMalformedPosition(entity)) return 'a malformed position (must be a 3-number [x, y, z])';
@@ -97,11 +107,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
         try {
           checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
         } catch (error) {
-          console.warn(
-            `[llull] command '${def.name}' params validation threw:`,
-            error instanceof Error ? (error.stack ?? error.message) : error,
-          );
-          const reason = error instanceof Error ? error.message : String(error);
+          const reason = warnAndDescribe(`command '${def.name}' params validation threw:`, error);
           return noop(doc, `${def.name} rejected: invalid params — ${reason}`);
         }
         if (!checked.success) {
@@ -115,11 +121,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
       try {
         result = def.run(doc, safeParams, ctx ?? currentContext());
       } catch (error) {
-        console.warn(
-          `[llull] command '${def.name}' threw:`,
-          error instanceof Error ? (error.stack ?? error.message) : error,
-        );
-        const reason = error instanceof Error ? error.message : String(error);
+        const reason = warnAndDescribe(`command '${def.name}' threw:`, error);
         return noop(doc, `${def.name} failed: ${reason}; document unchanged.`);
       }
       const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);

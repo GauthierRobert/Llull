@@ -9,6 +9,7 @@
  */
 
 import type { Entity } from '../model/types';
+import { LruCache } from '../lib/lruCache';
 import type { BooleanOp, GeometryKernel, MeshData } from './kernel';
 
 const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId']);
@@ -25,38 +26,6 @@ export function geometryKey(entity: Entity): string {
 
 function meshKey(mesh: MeshData): string {
   return JSON.stringify([mesh.positions, mesh.indices]);
-}
-
-/** Bounded least-recently-used map. */
-class LruCache<V> {
-  private readonly entries = new Map<string, V>();
-
-  constructor(private readonly capacity: number) {}
-
-  get(key: string): V | undefined {
-    const value = this.entries.get(key);
-    if (value === undefined) return undefined;
-    this.entries.delete(key);
-    this.entries.set(key, value);
-    return value;
-  }
-
-  has(key: string): boolean {
-    return this.entries.has(key);
-  }
-
-  set(key: string, value: V): void {
-    this.entries.delete(key);
-    this.entries.set(key, value);
-    if (this.entries.size > this.capacity) {
-      const oldest = this.entries.keys().next().value;
-      if (oldest !== undefined) this.entries.delete(oldest);
-    }
-  }
-
-  get size(): number {
-    return this.entries.size;
-  }
 }
 
 interface MemoizedKernel extends GeometryKernel {

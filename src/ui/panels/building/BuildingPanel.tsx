@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 import { ProjectSection } from './ProjectSection';
@@ -59,10 +60,7 @@ export function BuildingPanel({ className }: { className?: string }): React.Reac
   const hasBuilding = useStore((s) => s.document.building !== undefined);
   const elementCount = useStore((s) => s.document.building?.elementOrder.length ?? 0);
   return (
-    <div
-      className={['panel', 'building-panel', className].filter(Boolean).join(' ')}
-      data-testid="building-panel"
-    >
+    <div className={classNames('panel building-panel', className)} data-testid="building-panel">
       <PanelHeader
         title="Building"
         count={elementCount}

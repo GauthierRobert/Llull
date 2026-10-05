@@ -107,8 +107,7 @@ export const checkBracing = defineCommand({
         return noop(doc, `check_bracing failed: ${name} must be a number > 0.`);
       }
     }
-    const building = getBuilding(doc);
-    const levelId = existingLevelId(building, params.levelId);
+    const levelId = existingLevelId(getBuilding(doc), params.levelId);
     if (levelId === undefined) {
       return noop(doc, `check_bracing failed: no level '${params.levelId ?? ''}'.`);
     }

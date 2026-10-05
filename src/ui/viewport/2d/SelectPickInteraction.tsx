@@ -9,13 +9,10 @@
  * which would otherwise occlude this one; having no move handler, this plane lets moves through.
  */
 
-import { useCallback } from 'react';
-import type { ThreeEvent } from '@react-three/fiber';
-import type { Vec2 } from '@core/model/types';
 import type { Entity } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { pickEntityId } from './modifyHelpers';
-import { useGroundPlane } from './useGroundPlane';
+import { GroundPlane, toDocumentPoint } from './GroundPlane';
 
 /** Pick radius in screen pixels. */
 const PICK_RADIUS_PX = 10;
@@ -29,34 +26,30 @@ interface SelectPickInteractionProps {
 }
 
 export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): React.ReactElement {
-  const { geo, mat } = useGroundPlane();
-
-  const handleClick = useCallback(
-    (e: ThreeEvent<MouseEvent>) => {
-      if (e.delta > CLICK_MAX_TRAVEL_PX) return;
-      const state = useStore.getState();
-      const [originX, originY] = state.renderOrigin;
-      const worldPick: Vec2 = [e.point.x + originX, e.point.y + originY];
-      const tolerance = PICK_RADIUS_PX / (zoom > 0 ? zoom : 1);
-      const { hiddenLayerIds, hiddenEntityIds } = useViewportStore.getState();
-      const { layers } = state.document;
-      // Only what the 2D view draws is pickable (same filters as Entities2D).
-      const isVisible = (entity: Entity): boolean =>
-        layers[entity.layerId]?.visible !== false &&
-        !hiddenLayerIds.has(entity.layerId) &&
-        !hiddenEntityIds.has(entity.id);
-      const id = pickEntityId(state.document, worldPick, tolerance, isVisible);
-      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      if (id === null) {
-        if (!additive) state.clearSelection();
-      } else if (additive) {
-        state.toggleSelection(id);
-      } else {
-        state.select([id]);
-      }
-    },
-    [zoom],
+  return (
+    <GroundPlane
+      z={0.002}
+      onClick={(e) => {
+        if (e.delta > CLICK_MAX_TRAVEL_PX) return;
+        const state = useStore.getState();
+        const tolerance = PICK_RADIUS_PX / (zoom > 0 ? zoom : 1);
+        const { hiddenLayerIds, hiddenEntityIds } = useViewportStore.getState();
+        const { layers } = state.document;
+        // Only what the 2D view draws is pickable (same filters as Entities2D).
+        const isVisible = (entity: Entity): boolean =>
+          layers[entity.layerId]?.visible !== false &&
+          !hiddenLayerIds.has(entity.layerId) &&
+          !hiddenEntityIds.has(entity.id);
+        const id = pickEntityId(state.document, toDocumentPoint(e.point), tolerance, isVisible);
+        const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+        if (id === null) {
+          if (!additive) state.clearSelection();
+        } else if (additive) {
+          state.toggleSelection(id);
+        } else {
+          state.select([id]);
+        }
+      }}
+    />
   );
-
-  return <mesh geometry={geo} material={mat} position={[0, 0, 0.002]} onClick={handleClick} />;
 }

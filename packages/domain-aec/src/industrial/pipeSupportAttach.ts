@@ -8,10 +8,10 @@
 
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { fromMm } from '../model';
+import { elementsOf, fromMm } from '../model';
 import { collectSteelBars, modelUnits, type SteelBar } from './steelMemberBars';
 import { nearestOnRoute, RISER_SLOPE } from './routeSupport';
-import { pipeRunOf } from './pipeSupportLayout';
+import { absolutePointMm, pipeRunOf } from './pipeSupportLayout';
 import {
   bearingOf,
   findBearingMember,
@@ -25,7 +25,7 @@ export const REACH: Readonly<Record<'below' | 'above', number>> = { below: 500, 
 export const PLAN_TOLERANCE = 100;
 
 /** Drops unit-conversion noise (1e-9 of a document unit). */
-const clean = (value: number): number => Math.round(value * 1e9) / 1e9;
+export const clean = (value: number): number => Math.round(value * 1e9) / 1e9;
 
 /** The steel a support bears on, in mm. */
 export interface Bearing {
@@ -149,15 +149,13 @@ export function reconcilePipeSupports(
     kept: [],
   };
   if (!previous) return unchanged;
-  const candidates = next.elementOrder.flatMap((id) => {
-    const support = next.elements[id];
-    if (support?.category !== 'pipeSupport') return [];
-    const before = previous.elements[id];
+  const candidates = elementsOf(next, 'pipeSupport').filter((support) => {
+    const before = previous.elements[support.id];
     const dangling = support.memberId !== null && memberMark(next, support.memberId) === null;
     const changed =
       before?.category === 'pipeSupport' &&
       attachmentSignature(previous, before) !== attachmentSignature(next, support);
-    return dangling || changed || alsoIds.includes(id) ? [support] : [];
+    return dangling || changed || alsoIds.includes(support.id);
   });
   if (candidates.length === 0) return unchanged;
   const nextDoc: CadDocument = { ...doc, building: next };
@@ -170,12 +168,7 @@ export function reconcilePipeSupports(
     const pipe = next.elements[support.pipeId];
     if (pipe?.category !== 'pipe') continue;
     const run = pipeRunOf(units, pipe);
-    const base = units.elevationMm(support.levelId);
-    const point: Vec3 = [
-      units.toMm(support.position[0]),
-      units.toMm(support.position[1]),
-      base + units.toMm(support.position[2]),
-    ];
+    const point = absolutePointMm(units, support.levelId, support.position);
     const riser = isRiserPoint(run.points, point);
     const current =
       (riser ? (support.standoff ?? 0) : support.rodLength + support.pedestalHeight) / unit;

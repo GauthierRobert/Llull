@@ -20,10 +20,6 @@
   width: min(640px, 100%);
   max-height: min(560px, 100%);
   overflow: hidden;
-  background: var(--surface-popover);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-popover);
   animation: palette-rise var(--dur) var(--ease);
 }
 
@@ -336,10 +332,6 @@
   width: min(480px, calc(100% - var(--space-8)));
   padding: var(--space-3);
   transform: translateX(-50%);
-  background: var(--surface-popover);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-popover);
   animation: palette-toast-in var(--dur) var(--ease);
 }
 

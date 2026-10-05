@@ -70,6 +70,10 @@ class SegmentBuffer {
   }
 }
 
+function shapeOf(points: ReadonlyArray<Vec2>): THREE.Shape {
+  return new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
+}
+
 function arcPoints(center: Vec2, radius: number, start: number, end: number): Vec2[] {
   const sweep = end > start ? end - start : end - start + Math.PI * 2;
   return Array.from({ length: ARC_SEGMENTS + 1 }, (_, index): Vec2 => {
@@ -140,8 +144,7 @@ function buildGeometry(
     switch (primitive.type) {
       case 'polygon':
         target.ring(primitive.points, true, color);
-        if (primitive.style === 'cut')
-          shapes.push(new THREE.Shape(primitive.points.map(([x, y]) => new THREE.Vector2(x, y))));
+        if (primitive.style === 'cut') shapes.push(shapeOf(primitive.points));
         break;
       case 'polyline':
         target.ring(primitive.points, false, color);
@@ -159,8 +162,7 @@ function buildGeometry(
       case 'circle': {
         const points = arcPoints(primitive.center, primitive.radius, 0, Math.PI * 2).slice(0, -1);
         target.ring(points, true, color);
-        if (primitive.style === 'cut')
-          shapes.push(new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y))));
+        if (primitive.style === 'cut') shapes.push(shapeOf(points));
         break;
       }
       case 'text':

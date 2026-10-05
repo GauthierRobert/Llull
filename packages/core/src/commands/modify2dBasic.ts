@@ -1,9 +1,11 @@
-import type { Entity, Vec2, PolylineEntity } from '../model/types';
+import type { Entity, Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { offsetSegment, miterJoin } from './modify2dGeometry';
+import { offsetSegment, miterJoin, resolvePolyline } from './modify2dGeometry';
+import { commitEntity } from './commitEntity';
 import { withEntity, withoutEntity } from './entityOps';
+import { newEntity } from './newEntity';
 import { noop } from './noop';
 
 /**
@@ -24,48 +26,28 @@ export const explodePolyline = defineCommand({
     id: z.string().describe('Id of the polyline entity to explode.'),
   }),
   run: (doc, { id }): CommandResult => {
-    const entity = doc.entities[id];
-    if (!entity) {
-      return noop(doc, `explode_polyline: entity ${id} not found.`);
-    }
-    if (entity.kind !== 'polyline') {
-      return noop(
-        doc,
-        `explode_polyline: entity ${id} is kind '${entity.kind}', expected 'polyline'.`,
-      );
-    }
-    const poly = entity as PolylineEntity;
-    if (poly.points.length < 2) {
+    const polyline = resolvePolyline(doc, 'explode_polyline', id);
+    if ('summary' in polyline) return polyline;
+    if (polyline.points.length < 2) {
       return noop(
         doc,
         `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`,
       );
     }
 
-    const segments: Array<[Vec2, Vec2]> = [];
-    for (let i = 0; i < poly.points.length - 1; i++) {
-      segments.push([poly.points[i]!, poly.points[i + 1]!]);
-    }
-    if (poly.closed) {
-      segments.push([poly.points[poly.points.length - 1]!, poly.points[0]!]);
-    }
+    const ring = polyline.closed ? [...polyline.points, polyline.points[0]!] : polyline.points;
+    const segments = ring.slice(1).map((end, i): [Vec2, Vec2] => [ring[i]!, end]);
 
     // Remove the polyline, add one line per segment
     let newDoc = withoutEntity(doc, id);
     const createdIds: string[] = [];
-    for (const [a, b] of segments) {
+    for (const [start, end] of segments) {
       const lineId = nextId('line');
       createdIds.push(lineId);
-      const line: Entity = {
-        id: lineId,
-        kind: 'line',
-        start: a,
-        end: b,
-        position: poly.position,
-        rotation: poly.rotation,
-        layerId: poly.layerId,
-        color: poly.color,
-      };
+      const line = newEntity('line', lineId, { start, end }, polyline.position, polyline.color, {
+        rotation: polyline.rotation,
+        layerId: polyline.layerId,
+      });
       newDoc = withEntity(newDoc, line);
     }
 
@@ -125,13 +107,13 @@ export const offset2D = defineCommand({
       layerId: entity.layerId,
       color: entity.color,
     };
-    let newEntity: Entity;
+    let offsetEntity: Entity;
     let summary: string;
 
     switch (entity.kind) {
       case 'line': {
         const [start, end] = offsetSegment(entity.start, entity.end, distance);
-        newEntity = { ...base, id: newId, kind: 'line', start, end };
+        offsetEntity = { ...base, id: newId, kind: 'line', start, end };
         summary = `Offset line ${id} by ${distance} → new line ${newId}.`;
         break;
       }
@@ -149,7 +131,7 @@ export const offset2D = defineCommand({
         const points: Vec2[] = entity.closed
           ? joins
           : [segs[0]![0], ...joins, segs[segs.length - 1]![1]];
-        newEntity = { ...base, id: newId, kind: 'polyline', points, closed: entity.closed };
+        offsetEntity = { ...base, id: newId, kind: 'polyline', points, closed: entity.closed };
         summary = `Offset polyline ${id} by ${distance} → new polyline ${newId} (${points.length} points).`;
         break;
       }
@@ -158,7 +140,7 @@ export const offset2D = defineCommand({
         if (radius <= 0) {
           return noop(doc, `offset_2d: resulting circle radius ${radius} <= 0 — no-op.`);
         }
-        newEntity = { ...base, id: newId, kind: 'circle', center: entity.center, radius };
+        offsetEntity = { ...base, id: newId, kind: 'circle', center: entity.center, radius };
         summary = `Offset circle ${id} by ${distance} → new circle ${newId} radius ${radius}.`;
         break;
       }
@@ -173,7 +155,7 @@ export const offset2D = defineCommand({
         }
         // The origin shifts by -distance on X and Y so the rectangle grows/shrinks on every side.
         const [x, y, z] = entity.position;
-        newEntity = {
+        offsetEntity = {
           ...base,
           id: newId,
           kind: 'rectangle',
@@ -191,6 +173,6 @@ export const offset2D = defineCommand({
         );
     }
 
-    return { document: withEntity(doc, newEntity), summary, affected: [newId] };
+    return commitEntity(doc, offsetEntity, summary);
   },
 });

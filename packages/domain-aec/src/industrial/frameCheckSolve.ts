@@ -5,11 +5,11 @@
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { solveFrame, type FrameResult } from '@lib/frame2d';
-import { fromMm } from '../model';
+import { toMm } from '../model';
 import { buildingConnectionSolids } from './evaluateConnections';
 import { type FrameModel, type WindCase, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
-import { boltResistance } from './steelDesign';
+import { amplificationOf, boltResistance } from './steelDesign';
 
 export interface CheckRow {
   readonly frame: string;
@@ -206,8 +206,7 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     alphaCritical = 0.8 * alphaCritical * Math.max(0, 1 - rafterRatio);
     method = `modified Horne 0.8 αH (1 − N/Ncr), ${steep ? 'roof slope > 26°' : 'rafter N > 0.09 Ncr'}`;
   }
-  const amplification =
-    alphaCritical >= 10 ? 1 : alphaCritical > 1.05 ? 1 / (1 - 1 / alphaCritical) : 20;
+  const amplification = amplificationOf(alphaCritical);
   return { result, alphaCritical, criticalMember, method, amplification };
 }
 
@@ -222,21 +221,20 @@ export function connectionCheck(
   const solids = buildingConnectionSolids(doc, building, connection);
   const plate = solids?.find((solid) => solid.part === 'plate');
   if (!solids || !plate) return null;
-  const mm = (value: number): number => value / fromMm(doc, 1);
-  const plateYs = plate.outline.map(([, y]) => mm(y));
+  const plateYs = plate.outline.map(([, y]) => toMm(doc, y));
   // Hogging (negative) moment: tension at the top, compression at the bottom edge.
   const compression = moment < 0 ? Math.min(...plateYs) : Math.max(...plateYs);
   const levers = solids
     .filter((solid) => solid.part.startsWith('bolt'))
     .map((bolt) => {
-      const ys = bolt.outline.map(([, y]) => mm(y));
+      const ys = bolt.outline.map(([, y]) => toMm(doc, y));
       return Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - compression);
     });
   if (levers.length === 0) return null;
   const sumSquares = levers.reduce((sum, lever) => sum + lever * lever, 0);
   const tension = (Math.abs(moment) * Math.max(...levers)) / sumSquares;
   const perBoltShear = Math.abs(shear) / levers.length;
-  const resistance = boltResistance(mm(connection.boltDiameter));
+  const resistance = boltResistance(toMm(doc, connection.boltDiameter));
   const tensionRatio = tension / resistance.tension;
   const combined = perBoltShear / resistance.shear + tension / (1.4 * resistance.tension);
   return {

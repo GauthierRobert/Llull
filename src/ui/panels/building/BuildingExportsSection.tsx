@@ -10,6 +10,9 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { OptionSelect } from '@ui/panels/OptionSelect';
+import { capitalize } from '@ui/panels/capitalize';
+import { orderedValues } from '@ui/panels/orderedValues';
 import { downloadText } from '@ui/download';
 
 const PAPERS = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
@@ -17,7 +20,7 @@ const SCALES = ['auto', '20', '50', '100', '200', '500'] as const;
 const DIRECTIONS = ['south', 'north', 'east', 'west'] as const;
 
 export function BuildingExportsSection(): React.ReactElement {
-  const document = useStore((s) => s.document);
+  const building = useStore((s) => s.document.building);
   const [paper, setPaper] = useState<(typeof PAPERS)[number]>('A3');
   const [scale, setScale] = useState<(typeof SCALES)[number]>('auto');
   const [status, setStatus] = useState('');
@@ -25,12 +28,9 @@ export function BuildingExportsSection(): React.ReactElement {
   const [cutAt, setCutAt] = useState('');
   const [hideCladding, setHideCladding] = useState(false);
   const [levelChoice, setLevelChoice] = useState('');
-  const levels = document.building?.levelOrder.flatMap((id) => {
-    const level = document.building?.levels[id];
-    return level ? [level] : [];
-  });
+  const levels = building ? orderedValues(building.levelOrder, building.levels) : [];
   const levelParams =
-    levelChoice !== '' && levels?.some((level) => level.id === levelChoice)
+    levelChoice !== '' && levels.some((level) => level.id === levelChoice)
       ? { levelId: levelChoice }
       : {};
   const scaleParams = scale === 'auto' ? {} : { scale: Number(scale) };
@@ -41,7 +41,7 @@ export function BuildingExportsSection(): React.ReactElement {
     field: string,
     mimeType: string,
   ): void => {
-    const result = execute(document, command, params);
+    const result = execute(useStore.getState().document, command, params);
     const data = result.data as Record<string, string> | undefined;
     const content = data?.[field];
     const fileName = data?.['filename'];
@@ -50,7 +50,7 @@ export function BuildingExportsSection(): React.ReactElement {
   };
 
   const exportNcFiles = (): void => {
-    const result = execute(document, 'export_nc_files', {});
+    const result = execute(useStore.getState().document, 'export_nc_files', {});
     const files = (result.data as { files?: ReadonlyArray<{ name: string; content: string }> })
       ?.files;
     for (const file of files ?? []) downloadText(file.content, file.name, 'text/plain');
@@ -60,28 +60,14 @@ export function BuildingExportsSection(): React.ReactElement {
   return (
     <PanelSection title="Deliverables" collapsible testId="building-exports">
       <div className="building-inline-form">
-        <select
-          value={paper}
-          onChange={(event) => setPaper(event.target.value as (typeof PAPERS)[number])}
-          aria-label="Paper size"
-        >
-          {PAPERS.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
-        <select
+        <OptionSelect value={paper} options={PAPERS} label="Paper size" onChange={setPaper} />
+        <OptionSelect
           value={scale}
-          onChange={(event) => setScale(event.target.value as (typeof SCALES)[number])}
-          aria-label="Drawing scale"
-        >
-          {SCALES.map((value) => (
-            <option key={value} value={value}>
-              {value === 'auto' ? 'Fit scale' : `1:${value}`}
-            </option>
-          ))}
-        </select>
+          options={SCALES}
+          label="Drawing scale"
+          optionLabel={(value) => (value === 'auto' ? 'Fit scale' : `1:${value}`)}
+          onChange={setScale}
+        />
         <select
           value={levelParams.levelId ?? ''}
           onChange={(event) => setLevelChoice(event.target.value)}
@@ -89,7 +75,7 @@ export function BuildingExportsSection(): React.ReactElement {
           title="Level printed by the plan sheet, anchor plan and DXF"
         >
           <option value="">Active level</option>
-          {levels?.map((level) => (
+          {levels.map((level) => (
             <option key={level.id} value={level.id}>
               {level.name}
             </option>
@@ -125,18 +111,13 @@ export function BuildingExportsSection(): React.ReactElement {
         </button>
       </div>
       <div className="building-inline-form">
-        <select
+        <OptionSelect
           value={direction}
-          onChange={(event) => setDirection(event.target.value as (typeof DIRECTIONS)[number])}
-          aria-label="Elevation direction"
-        >
-          {DIRECTIONS.map((value) => (
-            <option key={value} value={value}>
-              {value[0]?.toUpperCase()}
-              {value.slice(1)}
-            </option>
-          ))}
-        </select>
+          options={DIRECTIONS}
+          label="Elevation direction"
+          optionLabel={capitalize}
+          onChange={setDirection}
+        />
         <input
           type="number"
           value={cutAt}

@@ -60,6 +60,15 @@ export function reEvaluateAll(
   return result;
 }
 
+/** `parameters` with `name` set to `expression`; the last value (0 when new) seeds the re-evaluation. */
+export function withParameterExpression(
+  parameters: Readonly<Record<string, Parameter>>,
+  name: string,
+  expression: string,
+): Record<string, Parameter> {
+  return { ...parameters, [name]: { name, expression, value: parameters[name]?.value ?? 0 } };
+}
+
 /**
  * @command set_parameter
  * @pure
@@ -100,23 +109,14 @@ export const setParameter = defineCommand({
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
       return noop(
         doc,
-        `set_parameter failed: name '${String(name)}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
+        `set_parameter failed: name '${name}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
       );
     }
     if (expression.trim() === '') {
       return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
     }
 
-    const withNew: Record<string, Parameter> = {
-      ...doc.parameters,
-      [name]: {
-        name,
-        expression,
-        value: doc.parameters[name]?.value ?? 0,
-      },
-    };
-
-    const evaluated = reEvaluateAll(withNew);
+    const evaluated = reEvaluateAll(withParameterExpression(doc.parameters, name, expression));
     const param = evaluated[name]!;
 
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
@@ -176,10 +176,7 @@ export const deleteParameter = defineCommand({
   }),
   run: (doc, { name }): CommandResult => {
     if (!(name in doc.parameters)) {
-      return noop(
-        doc,
-        `delete_parameter: parameter '${String(name)}' does not exist — no change made.`,
-      );
+      return noop(doc, `delete_parameter: parameter '${name}' does not exist — no change made.`);
     }
 
     const evaluated = reEvaluateAll(

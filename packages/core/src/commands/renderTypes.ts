@@ -1,23 +1,18 @@
 import type { Vec3 } from '../model/types';
 import type { Bounds } from './sceneTypes';
+import type { Camera, ViewName } from './renderCamera';
 
+/** The `data` payload of render_view. */
 export interface RenderViewData {
-  /** The resolved view name ('top'|'bottom'|'front'|'back'|'left'|'right'|'iso'). */
-  view: string;
-  /** Width of the rendered image in pixels. */
+  view: ViewName;
+  /** Image size in pixels. */
   width: number;
-  /** Height of the rendered image in pixels. */
   height: number;
-  /** Number of entities in the document at render time. */
   entityCount: number;
   /** World-space AABB of all entities, or null when the document is empty. */
   bounds: Bounds | null;
   /** Camera position, target, and up vector used for the render. */
-  camera: {
-    position: [number, number, number];
-    target: [number, number, number];
-    up: [number, number, number];
-  };
+  camera: Camera;
   /** Complete, self-contained SVG document string. */
   svg: string;
 }

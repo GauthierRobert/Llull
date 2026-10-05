@@ -6,7 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import type { BuildingElement, BuildingLevel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, toMetres } from './model';
+import { fileSlug, getBuilding, orderedElements, toMetres } from './model';
 import { noop } from '@core/commands/noop';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
 import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
@@ -143,9 +143,8 @@ function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
     storeys.push(storey);
     const contained: string[] = [];
     const spaces: string[] = [];
-    for (const id of building.elementOrder) {
-      const element = building.elements[id];
-      if (!element || !('levelId' in element) || element.levelId !== level.id) continue;
+    for (const element of orderedElements(building)) {
+      if (!('levelId' in element) || element.levelId !== level.id) continue;
       for (const exported of exportElement(context, doc, element, level, storeyPlacement)) {
         (element.category === 'room' ? spaces : contained).push(exported.ref);
         productCount += 1;

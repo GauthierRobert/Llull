@@ -11,7 +11,7 @@ import { newEntity } from './newEntity';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
-import { withEntity } from './entityOps';
+import { commitEntity } from './commitEntity';
 import { noop } from './noop';
 
 /**
@@ -87,13 +87,13 @@ export const makeTubeBetween = defineCommand({
       .optional(),
   }),
   run: (doc, { p1, p2, radius, color = '#6b8f9c' }): CommandResult => {
-    const isPoint = (p: unknown): boolean =>
-      Array.isArray(p) && p.length >= 3 && p.every((v) => typeof v === 'number' && isFinite(v));
-    if (!isPoint(p1)) {
-      return noop(doc, 'make_tube_between failed: p1 must be a numeric [x, y, z] array.');
-    }
-    if (!isPoint(p2)) {
-      return noop(doc, 'make_tube_between failed: p2 must be a numeric [x, y, z] array.');
+    for (const [label, point] of [
+      ['p1', p1],
+      ['p2', p2],
+    ] as const) {
+      if (point.length < 3) {
+        return noop(doc, `make_tube_between failed: ${label} must be a numeric [x, y, z] array.`);
+      }
     }
     if (radius <= 0) {
       return noop(doc, `make_tube_between failed: radius must be > 0, got ${radius}.`);
@@ -123,10 +123,10 @@ export const makeTubeBetween = defineCommand({
         .map((v) => v.toFixed(3))
         .join(',')}]`;
 
-    return {
-      document: withEntity(doc, entity),
-      summary: `Created tube ${id} from ${fmtPoint(p1)} to ${fmtPoint(p2)}, radius ${radius}, length ${length.toFixed(3)}.`,
-      affected: [id],
-    };
+    return commitEntity(
+      doc,
+      entity,
+      `Created tube ${id} from ${fmtPoint(p1)} to ${fmtPoint(p2)}, radius ${radius}, length ${length.toFixed(3)}.`,
+    );
   },
 });

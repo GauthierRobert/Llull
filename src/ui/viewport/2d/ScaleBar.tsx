@@ -11,7 +11,6 @@
  * scaleBarLength() for the math. No document mutation (R1).
  */
 
-import { useMemo } from 'react';
 import type { CadDocument } from '@core/model/types';
 import { formatLength } from '@core/commands/units';
 import { scaleBarLength } from './gridHelpers';
@@ -28,13 +27,11 @@ interface ScaleBarProps {
  * Must be placed OUTSIDE the r3f <Canvas> (HTML overlay).
  */
 export function ScaleBar({ zoom, document }: ScaleBarProps): React.ReactElement {
-  const { worldLength, pixelLength } = useMemo(() => scaleBarLength(zoom), [zoom]);
-
-  const label = useMemo(() => formatLength(document, worldLength), [document, worldLength]);
+  const { worldLength, pixelLength } = scaleBarLength(zoom);
 
   return (
     <div className="vp-scalebar vp-scalebar--2d">
-      <span className="vp-scalebar__label">{label}</span>
+      <span className="vp-scalebar__label">{formatLength(document, worldLength)}</span>
       <div className="vp-scalebar__bar" style={{ width: Math.round(pixelLength) }}>
         <div className="vp-scalebar__tick vp-scalebar__tick--start" />
         <div className="vp-scalebar__tick vp-scalebar__tick--end" />

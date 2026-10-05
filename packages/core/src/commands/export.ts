@@ -9,7 +9,8 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { uint8ArrayToBase64 } from '../lib/base64';
 import { collectExportTriangles, exportSummary } from './exportTriangulate';
-import { facetNormal, type Triangle } from './exportMath';
+import type { Triangle } from './exportMath';
+import { facetNormal } from './tessellation';
 
 const formatVec3 = (v: Vec3): string => v.join(' ');
 

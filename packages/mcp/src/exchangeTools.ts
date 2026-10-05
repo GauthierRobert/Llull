@@ -12,12 +12,14 @@
  *   import_step  STEP → port tessellates (names + colours kept) → import_mesh
  *   import_code  CadQuery/build123d source → port runs it → LLULL_TRACE → apply_code_trace
  *
- * Their schemas are hand-written (like bridgeTools.ts) because they are transport-level tools, not
- * registry commands; the registry commands they call keep `toToolSchemas()` as their contract (L5).
+ * Their schemas are hand-written because they are transport-level tools, not registry commands;
+ * the registry commands they call keep `toToolSchemas()` as their contract (L5).
  */
 
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { errorMessage } from '@lib/errorMessage';
+import { isRecord } from '@lib/isRecord';
 import type { McpToolDefinition } from './tools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
 
@@ -141,14 +143,8 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
   ];
 }
 
-const EXCHANGE_TOOLS = new Set(['export_step', 'import_step', 'import_code']);
-
 function failure(message: string): McpShapedResult {
   return shapeToolCallContent({ summary: message, affected: [], isError: true });
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function stringArg(args: Record<string, unknown>, key: string): string | undefined {
@@ -184,7 +180,7 @@ async function readInput(
   return port.readExchangeFile(path, encoding);
 }
 
-export interface StepFile {
+interface StepFile {
   readonly stepBase64: string;
   readonly fileName: string;
   readonly bytes: number;
@@ -257,6 +253,15 @@ async function exportStep(
   return { ...shaped, structuredContent: { ...data, stepBase64 } };
 }
 
+/** An import tool's outcome: a command that created nothing counts as a failure. */
+function importOutcome(summary: string, result: ExchangeCommandResult): McpShapedResult {
+  return shapeToolCallContent({
+    summary,
+    affected: result.affected,
+    isError: result.isError || result.affected.length === 0,
+  });
+}
+
 async function importStep(
   deps: ExchangeDeps,
   port: CadExchangePort,
@@ -270,11 +275,7 @@ async function importStep(
   );
   const { bodies } = await port.importStep(stepBase64);
   const result = deps.applyCommand('import_mesh', { bodies });
-  return shapeToolCallContent({
-    summary: `import_step: ${result.summary}`,
-    affected: result.affected,
-    isError: result.isError || result.affected.length === 0,
-  });
+  return importOutcome(`import_step: ${result.summary}`, result);
 }
 
 async function importCode(
@@ -298,12 +299,14 @@ async function importCode(
     ? 'parametric (feature history + parameters rebuilt)'
     : 'non-llull script: result shapes imported as meshes (wrap shapes with the llull runtime to keep them editable)';
   const log = run.log.trim() !== '' ? ` Script output: ${run.log.trim().slice(-2000)}` : '';
-  return shapeToolCallContent({
-    summary: `import_code (${language}, ${kind}): ${result.summary}${log}`,
-    affected: result.affected,
-    isError: result.isError || result.affected.length === 0,
-  });
+  return importOutcome(`import_code (${language}, ${kind}): ${result.summary}${log}`, result);
 }
+
+const EXCHANGE_HANDLERS = new Map([
+  ['export_step', exportStep],
+  ['import_step', importStep],
+  ['import_code', importCode],
+]);
 
 /**
  * Dispatch an exchange tool call; returns null for any other tool name.
@@ -315,15 +318,12 @@ export async function applyExchangeToolCall(
   rawArgs: unknown,
   deps: ExchangeDeps,
 ): Promise<McpShapedResult | null> {
-  if (!EXCHANGE_TOOLS.has(toolName)) return null;
+  const handler = EXCHANGE_HANDLERS.get(toolName);
+  if (handler === undefined) return null;
   if (deps.port === null) return failure(`${toolName} ${NO_PYTHON}`);
-  const args =
-    rawArgs !== null && typeof rawArgs === 'object' ? (rawArgs as Record<string, unknown>) : {};
   try {
-    if (toolName === 'export_step') return await exportStep(deps, deps.port, args);
-    if (toolName === 'import_step') return await importStep(deps, deps.port, args);
-    return await importCode(deps, deps.port, args);
+    return await handler(deps, deps.port, isRecord(rawArgs) ? rawArgs : {});
   } catch (error) {
-    return failure(`${toolName} failed: ${errorText(error)}`);
+    return failure(`${toolName} failed: ${errorMessage(error)}`);
   }
 }

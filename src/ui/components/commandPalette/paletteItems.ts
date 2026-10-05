@@ -19,7 +19,7 @@ import { SIDEBAR_TAB_SPECS } from '@ui/components/sidebarTabs';
 import { fuzzyScore } from './fuzzyMatch';
 import { humanizeName } from './paramForm';
 
-export type PaletteGroup = 'Recent' | 'Create' | 'Draw' | 'View' | 'Edit' | 'Panels' | 'Commands';
+type PaletteGroup = 'Recent' | 'Create' | 'Draw' | 'View' | 'Edit' | 'Panels' | 'Commands';
 
 interface PaletteItemBase {
   /** Stable id, used for recents (`action:…` / `command:<name>`). */
@@ -34,12 +34,12 @@ interface PaletteItemBase {
   shortcut?: string;
 }
 
-export interface PaletteAction extends PaletteItemBase {
+interface PaletteAction extends PaletteItemBase {
   kind: 'action';
   run(): void;
 }
 
-export interface PaletteCommand extends PaletteItemBase {
+interface PaletteCommand extends PaletteItemBase {
   kind: 'command';
   command: CommandDefinition<unknown>;
 }

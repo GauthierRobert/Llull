@@ -27,6 +27,11 @@ export function fromMm(doc: Pick<CadDocument, 'units'>, millimetres: number): nu
   return (millimetres * 0.001) / METRES_PER_UNIT[doc.units];
 }
 
+/** Converts a length in document units into millimetres (inverse of `fromMm`). */
+export function toMm(doc: Pick<CadDocument, 'units'>, value: number): number {
+  return value / fromMm(doc, 1);
+}
+
 /** Converts a length in document units to metres. */
 export function toMetres(doc: Pick<CadDocument, 'units'>, value: number): number {
   return value * METRES_PER_UNIT[doc.units];
@@ -34,6 +39,29 @@ export function toMetres(doc: Pick<CadDocument, 'units'>, value: number): number
 
 export function getBuilding(doc: Pick<CadDocument, 'building'>): BuildingModel {
   return doc.building ?? createEmptyBuilding();
+}
+
+/** Elements in `elementOrder` (ids without an element are skipped). */
+export function orderedElements(building: BuildingModel): BuildingElement[] {
+  return building.elementOrder.flatMap((id) => building.elements[id] ?? []);
+}
+
+/** Elements of one category, in `elementOrder`. */
+export function elementsOf<C extends BimCategory>(
+  building: BuildingModel,
+  category: C,
+): Array<Extract<BuildingElement, { category: C }>> {
+  return orderedElements(building).filter(
+    (element): element is Extract<BuildingElement, { category: C }> =>
+      element.category === category,
+  );
+}
+
+/** Elements placed on `levelId` (grids, doors and windows carry no level of their own). */
+export function elementsOnLevel(building: BuildingModel, levelId: string): BuildingElement[] {
+  return Object.values(building.elements).filter(
+    (element) => 'levelId' in element && element.levelId === levelId,
+  );
 }
 
 export function isVec2(value: unknown): value is Vec2 {
@@ -257,8 +285,17 @@ export function hostOf(element: BuildingElement): string | null {
 }
 
 /** Every element an element cannot exist without (deleted along with any of them). */
-export function dependenciesOf(element: BuildingElement): string[] {
+function dependenciesOf(element: BuildingElement): string[] {
   if (element.category === 'connection') return [element.rafterId, element.otherId];
   const host = hostOf(element);
   return host === null ? [] : [host];
+}
+
+/** `ids` plus the elements that depend on any of them (wall openings, column base plates, …). */
+export function withDependents(building: BuildingModel, ids: Iterable<string>): Set<string> {
+  const result = new Set(ids);
+  for (const element of Object.values(building.elements)) {
+    if (dependenciesOf(element).some((id) => result.has(id))) result.add(element.id);
+  }
+  return result;
 }

@@ -6,15 +6,16 @@ import type { GridElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, toMetres } from '../model';
+import { elementsOf, fileSlug, getBuilding, toMetres } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { distance } from '@lib/polygon';
 import {
   MARGIN,
   PAPER_MM,
   composeSheetSvg,
   TITLE_HEIGHT,
   fitScale,
+  n,
   sheetDrawingArea,
   type PaperSize,
   type Viewport,
@@ -35,13 +36,32 @@ import {
   compareMark,
   gridAxes,
   gridRef,
+  gridSpans,
   metres,
-  n,
   nearest,
   packBands,
   placePlates,
 } from './anchorPlanLayout';
 import { PlanCanvas, mmText, scheduleTable } from './anchorPlanCanvas';
+
+/** Offset dimension of a plate centre from its grid line, drawn once per (line, offset) pair. */
+function addOffsetDimension(
+  dims: BandDim[],
+  drawn: Set<string>,
+  axis: GridAxis | null,
+  centre: number,
+  offsetMm: number,
+): void {
+  if (!axis || Math.abs(offsetMm) <= OFFSET_TOLERANCE_MM) return;
+  const key = `${axis.mark}:${mmText(offsetMm)}`;
+  if (drawn.has(key)) return;
+  drawn.add(key);
+  dims.push({
+    from: Math.min(axis.position, centre),
+    to: Math.max(axis.position, centre),
+    label: mmText(Math.abs(offsetMm)),
+  });
+}
 
 /**
  * @command export_anchor_plan
@@ -82,10 +102,10 @@ export const exportAnchorPlan = defineCommand({
       ),
   }),
   run: (doc, { levelId, scale, paper, embedment }): CommandResult => {
-    if (scale !== undefined && !(isFiniteNumber(scale) && scale > 0)) {
+    if (scale !== undefined && !(scale > 0)) {
       return noop(doc, 'export_anchor_plan failed: scale must be a number > 0.');
     }
-    if (embedment !== undefined && !(isFiniteNumber(embedment) && embedment > 0)) {
+    if (embedment !== undefined && !(embedment > 0)) {
       return noop(doc, 'export_anchor_plan failed: embedment must be a number > 0.');
     }
     const building = getBuilding(doc);
@@ -157,9 +177,8 @@ export const exportAnchorPlan = defineCommand({
     }
 
     // Footings (dashed), plates, bolts.
-    for (const id of building.elementOrder) {
-      const footing = building.elements[id];
-      if (footing?.category !== 'footing' || footing.levelId !== level.id) continue;
+    for (const footing of elementsOf(building, 'footing')) {
+      if (footing.levelId !== level.id) continue;
       const [cx, cy] = [mm(footing.location[0]), mm(footing.location[1])];
       const [hx, hy] = [mm(footing.width) / 2, mm(footing.length) / 2];
       canvas.polygon(
@@ -213,47 +232,17 @@ export const exportAnchorPlan = defineCommand({
         labelBox.maxY = Math.max(labelBox.maxY, lineY + 0.6);
         labelParts.push({ at: [labelX, lineY], text: line });
       });
-      if (columnGrid && Math.abs(offsetX) > OFFSET_TOLERANCE_MM) {
-        const key = `${columnGrid.mark}:${mmText(offsetX)}`;
-        if (!drawnX.has(key)) {
-          drawnX.add(key);
-          bottomDims.push({
-            from: Math.min(columnGrid.position, placed.centre[0]),
-            to: Math.max(columnGrid.position, placed.centre[0]),
-            label: mmText(Math.abs(offsetX)),
-          });
-        }
-      }
-      if (rowGrid && Math.abs(offsetY) > OFFSET_TOLERANCE_MM) {
-        const key = `${rowGrid.mark}:${mmText(offsetY)}`;
-        if (!drawnY.has(key)) {
-          drawnY.add(key);
-          leftDims.push({
-            from: Math.min(rowGrid.position, placed.centre[1]),
-            to: Math.max(rowGrid.position, placed.centre[1]),
-            label: mmText(Math.abs(offsetY)),
-          });
-        }
-      }
+      addOffsetDimension(bottomDims, drawnX, columnGrid, placed.centre[0], offsetX);
+      addOffsetDimension(leftDims, drawnY, rowGrid, placed.centre[1], offsetY);
       // Bolt spacing of the first (typical) group.
       if (index === 0) {
         const perRow = Math.max(1, Math.floor(placed.bolts.length / 2));
         const [first, second, across] = [placed.bolts[0], placed.bolts[1], placed.bolts[perRow]];
         if (first && second && perRow > 1) {
-          canvas.dimension(
-            first,
-            second,
-            6,
-            mmText(Math.hypot(second[0] - first[0], second[1] - first[1])),
-          );
+          canvas.dimension(first, second, 6, mmText(distance(first, second)));
         }
         if (first && across) {
-          canvas.dimension(
-            first,
-            across,
-            -6,
-            mmText(Math.hypot(across[0] - first[0], across[1] - first[1])),
-          );
+          canvas.dimension(first, across, -6, mmText(distance(first, across)));
         }
       }
       const projection = placed.thickness + GROUT_MM + 2 * placed.diameter;
@@ -274,40 +263,22 @@ export const exportAnchorPlan = defineCommand({
     const bottomEdge = Math.max(canvas.map([minX, minY])[1] + bubbleSpan, labelBox.maxY) + 10;
     const leftEdge = Math.min(canvas.map([minX, minY])[0] - bubbleSpan, labelBox.minX) - 10;
     canvas.parts.push(`<g id="grid-dimensions">`);
-    const spans = (axes: ReadonlyArray<GridAxis>): Array<readonly [number, number]> =>
-      axes.slice(1).map((axis, index) => [(axes[index] as GridAxis).position, axis.position]);
-    const horizontalSpans = spans(vertical);
-    if (vertical.length > 2) {
-      horizontalSpans.push([
-        (vertical[0] as GridAxis).position,
-        (vertical[vertical.length - 1] as GridAxis).position,
-      ]);
-    }
-    horizontalSpans.forEach(([from, to], index) => {
-      const overall = vertical.length > 2 && index === horizontalSpans.length - 1;
+    for (const { from, to, overall } of gridSpans(vertical)) {
       canvas.dimension(
         [from, maxY],
         [to, maxY],
         canvas.map([from, maxY])[1] - topEdge + (overall ? 8 : 0),
         mmText(to - from),
       );
-    });
-    const verticalSpans = spans(horizontal);
-    if (horizontal.length > 2) {
-      verticalSpans.push([
-        (horizontal[0] as GridAxis).position,
-        (horizontal[horizontal.length - 1] as GridAxis).position,
-      ]);
     }
-    verticalSpans.forEach(([from, to], index) => {
-      const overall = horizontal.length > 2 && index === verticalSpans.length - 1;
+    for (const { from, to, overall } of gridSpans(horizontal)) {
       canvas.dimension(
         [minX, from],
         [minX, to],
         canvas.map([minX, from])[0] - leftEdge + (overall ? 8 : 0),
         mmText(to - from),
       );
-    });
+    }
     canvas.parts.push(`</g><g id="offset-dimensions">`);
     packBands(bottomDims).forEach(({ dim, level: band }) => {
       canvas.dimension(

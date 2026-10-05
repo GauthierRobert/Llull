@@ -7,6 +7,7 @@
 
 import type { PipeElement, PipeSupportElement } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
+import { elementsOf } from '../model';
 import type { ModelUnits } from './steelMemberBars';
 import { RISER_SLOPE, arcLengths, nearestOnRoute, spanCoordinate } from './routeSupport';
 import { pipeSpanLimit } from './pipeSpans';
@@ -40,12 +41,18 @@ export interface SupportStation {
 /** Supports closer than this along a pipe are one support, mm. */
 export const SAME_SUPPORT_DISTANCE = 100;
 
+/** Absolute mm position of a point given in document units relative to level `levelId`. */
+export function absolutePointMm(units: ModelUnits, levelId: string, point: Vec3): Vec3 {
+  return [
+    units.toMm(point[0]),
+    units.toMm(point[1]),
+    units.elevationMm(levelId) + units.toMm(point[2]),
+  ];
+}
+
 /** Absolute mm route of a pipe element. */
 export function pipeRunOf(units: ModelUnits, element: PipeElement): PipeRun {
-  const base = units.elevationMm(element.levelId);
-  const points = element.points.map(
-    (point): Vec3 => [units.toMm(point[0]), units.toMm(point[1]), base + units.toMm(point[2])],
-  );
+  const points = element.points.map((point) => absolutePointMm(units, element.levelId, point));
   return {
     element,
     points,
@@ -56,20 +63,12 @@ export function pipeRunOf(units: ModelUnits, element: PipeElement): PipeRun {
 
 /** Every pipe of the building, in model order. */
 export function pipeRunsOf(units: ModelUnits): PipeRun[] {
-  const { building } = units;
-  return building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    return element?.category === 'pipe' ? [pipeRunOf(units, element)] : [];
-  });
+  return elementsOf(units.building, 'pipe').map((pipe) => pipeRunOf(units, pipe));
 }
 
 /** Supports of pipe `pipeId`, in model order. */
 export function supportsOfPipe(units: ModelUnits, pipeId: string): PipeSupportElement[] {
-  const { building } = units;
-  return building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    return element?.category === 'pipeSupport' && element.pipeId === pipeId ? [element] : [];
-  });
+  return elementsOf(units.building, 'pipeSupport').filter((support) => support.pipeId === pipeId);
 }
 
 /** Support stations of a pipe sorted by arc length; unattached supports are listed with `attached` false. */
@@ -78,15 +77,12 @@ export function supportStations(
   run: PipeRun,
   supports: ReadonlyArray<PipeSupportElement>,
 ): SupportStation[] {
-  const base = units.elevationMm(run.element.levelId);
   return supports
     .flatMap((support): SupportStation[] => {
-      const world: Vec3 = [
-        units.toMm(support.position[0]),
-        units.toMm(support.position[1]),
-        base + units.toMm(support.position[2]),
-      ];
-      const snap = nearestOnRoute(run.points, world);
+      const snap = nearestOnRoute(
+        run.points,
+        absolutePointMm(units, run.element.levelId, support.position),
+      );
       if (snap === null) return [];
       const member =
         support.memberId === null ? undefined : units.building.elements[support.memberId];

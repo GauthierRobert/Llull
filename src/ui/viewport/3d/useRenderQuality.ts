@@ -1,29 +1,19 @@
 /**
  * @layer ui/viewport/3d
  *
- * useRenderQuality — derives the active render quality tier from entity count
- * and the user's quality override stored in the viewport store.
- *
- * The quality tier controls per-frame shadow cost:
+ * useRenderQuality — the render quality tier (per-frame shadow cost) from the entity count and the
+ * user's override in the viewport store. 'auto' derives the tier from the count; an explicit
+ * override pins it.
  *
  *   High   (≤ 50 entities)   : PCSS 16 samples, 2048² shadow map, ContactShadows on.
  *   Medium (51–200 entities) : PCSS 8 samples, 1024² shadow map, ContactShadows on.
  *   Low    (> 200 entities)  : SoftShadows off, 1024² shadow map, ContactShadows off.
  *
- * Frame-time budget target: ≤ 16 ms median at 500 entities on a mid-range laptop
- * (Intel UHD / Apple M1-class GPU). Low tier achieves this by dropping PCSS and
- * contact shadows entirely; Medium halves PCSS samples. High is unbounded quality
- * and is only auto-selected when the scene is small (≤ 50 entities).
- *
- * When qualityOverride is 'auto' the tier is derived from the current entity count;
- * explicit overrides bypass the count and pin the tier.
- *
- * R3 discipline: reads only the two narrowest slices needed.
+ * Budget: ≤ 16 ms median frame at 500 entities on a mid-range laptop GPU, which Low reaches by
+ * dropping PCSS and contact shadows.
  */
 
-import { useMemo } from 'react';
-import { useStore } from '@ui/store';
-import { useViewportStore } from '@ui/store';
+import { useStore, useViewportStore } from '@ui/store';
 import type { QualityTier, QualityOverride } from '@ui/store';
 
 /** Thresholds that map entity count to a quality tier (auto mode). */
@@ -100,14 +90,11 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
  *   - document.order.length — entity count proxy
  *   - viewportStore.qualityOverride — user preference
  *
- * Returns a stable reference when tier is unchanged (useMemo).
+ * Returns the stable per-tier settings object, so the reference only changes with the tier.
  */
 export function useRenderQuality(): RenderQualitySettings {
   const entityCount = useStore((s) => s.document.order.length);
   const qualityOverride = useViewportStore((s) => s.qualityOverride);
 
-  return useMemo((): RenderQualitySettings => {
-    const tier = resolveQualityTier(qualityOverride, entityCount);
-    return QUALITY_SETTINGS[tier];
-  }, [qualityOverride, entityCount]);
+  return QUALITY_SETTINGS[resolveQualityTier(qualityOverride, entityCount)];
 }

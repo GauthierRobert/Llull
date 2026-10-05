@@ -41,9 +41,9 @@ export const DEFLECTION_RATIO = 600;
 
 export const FATIGUE_PHI = 1.05;
 
+/** Detail category Δσc, N/mm². */
 export const FATIGUE_CATEGORY = 71;
 
-// N/mm²
 export const GAMMA_MF = 1.15;
 
 export const GAMMA_M0 = 1;
@@ -55,12 +55,12 @@ export const LOCAL_CATEGORIES: Readonly<Record<GirderType, number>> = {
   'welded-fillet': 36,
 };
 
+/** 2^(1/3) on λ: two stress cycles per wheel passage (EN 1993-6 §9.4.2). */
 export const LOCAL_LAMBDA_FACTOR = 1.26;
 
-// 2^(1/3): two stress cycles per wheel passage (EN 1993-6 §9.4.2)
+/** Simplified Ir reduction for 25 % head wear (EN 1993-6 §5.6.2(2)). */
 export const RAIL_WEAR_INERTIA_FACTOR = 0.75;
 
-// simplified Ir reduction for 25 % head wear (EN 1993-6 §5.6.2(2))
 /** Damage-equivalent factors λ for normal stresses (EN 1991-3 Tab. 2.12). */
 export const CLASSES: Readonly<Record<CraneClass, number>> = { S2: 0.315, S3: 0.397, S4: 0.5 };
 

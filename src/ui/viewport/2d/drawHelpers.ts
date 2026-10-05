@@ -10,6 +10,10 @@
  */
 
 import type { Vec2, Vec3 } from '@core/model/types';
+import type { DrawToolKind } from '@ui/store';
+
+/** Tools that collect any number of vertices until finished (Enter / double-click). */
+export const CHAIN_DRAW_TOOLS: ReadonlySet<DrawToolKind> = new Set(['polyline', 'wall', 'spline']);
 
 interface RectParams {
   width: number;

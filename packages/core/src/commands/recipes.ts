@@ -5,7 +5,7 @@ import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
-import { resolveStepForReplay, runReplayStep } from './replayStep';
+import { resolveStepForReplay, runReplayStep, unresolvedExpressionsNote } from './replayStep';
 
 /**
  * Replay `steps` ADDITIVELY on top of `base`, remapping ids within the recipe to the fresh ones the
@@ -177,17 +177,12 @@ function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
     warnings,
   );
 
-  const warnSuffix =
-    warnings.length > 0
-      ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`
-      : '';
-
   return {
     document: newDoc,
     summary:
       `instantiate_recipe '${name}': replayed ${recipe.steps.length} step${recipe.steps.length === 1 ? '' : 's'}, ` +
       `created ${allAffected.length} entit${allAffected.length === 1 ? 'y' : 'ies'} ` +
-      `(ids: ${allAffected.join(', ')}).${warnSuffix}`,
+      `(ids: ${allAffected.join(', ')}).${unresolvedExpressionsNote(warnings)}`,
     affected: allAffected,
   };
 }

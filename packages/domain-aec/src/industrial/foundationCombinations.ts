@@ -175,8 +175,8 @@ export interface Candidate {
   utilisation: number;
 }
 
-export function worst(candidates: Candidate[]): Candidate | null {
-  return candidates.reduce<Candidate | null>(
+export function worst<T extends Candidate>(candidates: ReadonlyArray<T>): T | null {
+  return candidates.reduce<T | null>(
     (best, item) => (best === null || item.utilisation > best.utilisation ? item : best),
     null,
   );

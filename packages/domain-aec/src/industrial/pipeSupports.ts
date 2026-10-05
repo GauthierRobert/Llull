@@ -3,7 +3,7 @@
  * @layer domain-aec
  */
 
-import type { PipeSupportElement, PipeSupportType } from '@core/model/building';
+import type { PipeSupportElement } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -11,6 +11,7 @@ import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { fromMm, nextElementId, nextMark, elementAffected, withElement } from '../model';
 import { regenerateBuilding } from '../evaluateElements';
+import { toVec3 } from './memberSupport';
 import { modelUnits, collectSteelBars } from './steelMemberBars';
 import { nearestOnRoute, pointAtArc } from './routeSupport';
 import {
@@ -26,15 +27,13 @@ import {
   PLAN_TOLERANCE,
   REACH,
   attachmentFields,
+  clean,
   isRiserPoint,
   resolveBearing,
 } from './pipeSupportAttach';
 
 const SUPPORT_TYPES = ['shoe', 'hanger', 'guide', 'anchor'] as const;
 const SNAP_DISTANCE = 500;
-
-/** Drops unit-conversion noise (1e-9 of a document unit). */
-const clean = (value: number): number => Math.round(value * 1e9) / 1e9;
 
 /**
  * @command add_pipe_support
@@ -175,16 +174,12 @@ export const addPipeSupport = defineCommand({
     const skipped: string[] = [];
     if (at !== undefined) {
       for (const raw of at) {
-        const point = raw.length === 3 && raw.every((n) => isFiniteNumber(n)) ? raw : null;
+        const point = raw.length === 3 ? toVec3(raw) : null;
         if (point === null) {
           skipped.push(`point [${raw.join(', ')}] is not [x, y, z]`);
           continue;
         }
-        const world: Vec3 = [
-          (point[0] as number) / unit,
-          (point[1] as number) / unit,
-          (point[2] as number) / unit,
-        ];
+        const world: Vec3 = [point[0] / unit, point[1] / unit, point[2] / unit];
         const snaps = targets.flatMap((run) => {
           const snap = nearestOnRoute(run.points, world);
           return snap ? [{ run, snap }] : [];
@@ -216,15 +211,12 @@ export const addPipeSupport = defineCommand({
     }
     let next = building;
     const created: PipeSupportElement[] = [];
-    const base = (run: PipeRun): number => units.elevationMm(run.element.levelId);
     for (const { run, arc } of wanted) {
-      const placed = [
-        ...supportStations(
-          units,
-          run,
-          supportsOfPipe({ ...units, building: next }, run.element.id),
-        ),
-      ];
+      const placed = supportStations(
+        units,
+        run,
+        supportsOfPipe({ ...units, building: next }, run.element.id),
+      );
       if (placed.some((station) => Math.abs(station.arc - arc) < SAME_SUPPORT_DISTANCE)) {
         skipped.push(`${run.element.mark} at ${Math.round(arc)} mm: a support is already there`);
         continue;
@@ -243,11 +235,11 @@ export const addPipeSupport = defineCommand({
         entityIds: [],
         levelId: run.element.levelId,
         pipeId: run.element.id,
-        type: type as PipeSupportType,
+        type,
         position: [
           clean(fromMm(doc, at3.point[0])),
           clean(fromMm(doc, at3.point[1])),
-          clean(fromMm(doc, at3.point[2] - base(run))),
+          clean(fromMm(doc, at3.point[2] - units.elevationMm(run.element.levelId))),
         ],
         ...attachmentFields(doc, type, hit),
       };

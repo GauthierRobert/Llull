@@ -11,7 +11,7 @@
 
 import type { EntityKind } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z } from './schema';
+import { defineCommand, vec3, z } from './schema';
 import { noop } from './noop';
 import { boundsCenter, boundsOverlap, entityBounds } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
@@ -42,8 +42,6 @@ const insideAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean =>
 const isInverted = (min: Corner, max: Corner): boolean => axes.some((i) => min[i] > max[i]);
 
 const POINT_3D = z.tuple([z.number(), z.number(), z.number()]);
-
-const vec3Exact = (description: string): typeof POINT_3D => POINT_3D.describe(description);
 
 /**
  * @command find_entities
@@ -118,17 +116,17 @@ export const findEntities = defineCommand({
       .describe(
         'Filter to entities that have this exact tag string in their tags array. Omit to match all entities regardless of tags.',
       ),
-    bboxMin: vec3Exact(
+    bboxMin: vec3(
       'World-space minimum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMax. ' +
         'Only entities whose world-space AABB overlaps this box are returned.',
     ).optional(),
-    bboxMax: vec3Exact(
+    bboxMax: vec3(
       'World-space maximum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMin. ' +
         'Only entities whose world-space AABB overlaps this box are returned.',
     ).optional(),
     nearPoint: z
       .object({
-        point: vec3Exact('World-space origin [x, y, z] of the proximity search.'),
+        point: vec3('World-space origin [x, y, z] of the proximity search.'),
         radius: z.number().describe('Maximum distance from point to entity centroid. Must be > 0.'),
       })
       .optional()

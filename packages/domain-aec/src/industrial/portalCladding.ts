@@ -4,6 +4,7 @@
  */
 
 import type { Vec2, Vec3 } from '@core/model/types';
+import { dot3 } from '@lib/vec3';
 import { panelFrame } from './evaluate';
 import type { HallGeometry, PortalProfiles } from './portalGeometry';
 
@@ -17,9 +18,7 @@ interface CladdingPanel {
 export function facing(corners: Vec3[], outward: Vec3): Vec3[] {
   const frame = panelFrame(corners);
   if (!frame) return corners;
-  const dot =
-    frame.normal[0] * outward[0] + frame.normal[1] * outward[1] + frame.normal[2] * outward[2];
-  return dot >= 0 ? corners : [...corners].reverse();
+  return dot3(frame.normal, outward) >= 0 ? corners : [...corners].reverse();
 }
 
 /** Roof, side-wall and gable panels of the hall envelope. */

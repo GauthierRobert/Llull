@@ -8,6 +8,7 @@
 
 import { Component } from 'react';
 import { Icon } from '@ui/components/Icon';
+import { errorMessage } from '@lib/errorMessage';
 import type { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
@@ -26,8 +27,7 @@ export class ViewportErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: unknown): State {
-    const message = error instanceof Error ? error.message : String(error);
-    return { hasError: true, message };
+    return { hasError: true, message: errorMessage(error) };
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo): void {

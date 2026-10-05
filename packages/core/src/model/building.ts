@@ -107,7 +107,7 @@ export interface OpeningElement extends ElementBase {
   material: string;
 }
 
-export type SlabRole = 'floor' | 'roof' | 'foundation';
+type SlabRole = 'floor' | 'roof' | 'foundation';
 
 /** A horizontal slab. Its TOP face sits at level elevation + `offset`. */
 export interface SlabElement extends LevelElementBase {

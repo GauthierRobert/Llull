@@ -10,25 +10,17 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import type { CadDocument, Vec2 } from '@core/model/types';
-import { getBuilding } from '../model';
+import { elementsOf, getBuilding } from '../model';
 import { plateLayout } from './evaluateConnections';
 
 export const TITLE = 'Anchor bolt setting-out plan';
-
 export const GROUT_MM = 30;
-
 export const DEFAULT_EMBEDMENT_MM = 300;
-
 export const TABLE_WIDTH = 120;
-
 export const ROW_HEIGHT = 4;
-
 export const BUBBLE_RADIUS = 3.5;
-
 export const INSET = 28;
-
 export const BAND_STEP = 6;
-
 export const OFFSET_TOLERANCE_MM = 1;
 
 export interface BandDim {
@@ -57,8 +49,6 @@ export function gridRef(axis: GridAxis | null, offsetMm: number): string {
   return `${axis.mark}${offsetMm > 0 ? '+' : '-'}${Math.round(Math.abs(offsetMm))}`;
 }
 
-export const n = (value: number): string => String(Math.round(value * 100) / 100);
-
 /** One base plate placed in plan, all lengths in millimetres. */
 interface PlacedPlate {
   readonly plate: BasePlateElement;
@@ -79,6 +69,21 @@ export interface GridAxis {
   readonly position: number;
   readonly from: Vec2;
   readonly to: Vec2;
+}
+
+/** Dimension spans between neighbouring grid axes, plus an overall span when there are more than two. */
+export function gridSpans(
+  axes: ReadonlyArray<GridAxis>,
+): Array<{ from: number; to: number; overall: boolean }> {
+  const spans = axes.slice(1).map((axis, index) => ({
+    from: (axes[index] as GridAxis).position,
+    to: axis.position,
+    overall: false,
+  }));
+  const [first, last] = [axes[0], axes[axes.length - 1]];
+  return first && last && axes.length > 2
+    ? [...spans, { from: first.position, to: last.position, overall: true }]
+    : spans;
 }
 
 export const compareMark = (a: string, b: string): number =>
@@ -131,9 +136,8 @@ export function placePlates(
       element.category === 'footing' && element.levelId === level.id,
   );
   const placed: PlacedPlate[] = [];
-  for (const id of building.elementOrder) {
-    const plate = building.elements[id];
-    if (plate?.category !== 'plate' || plate.levelId !== level.id) continue;
+  for (const plate of elementsOf(building, 'plate')) {
+    if (plate.levelId !== level.id) continue;
     const member = building.elements[plate.memberId];
     if (member?.category !== 'member' || (member as SteelMemberElement).role !== 'column') continue;
     const layout = plateLayout(doc, plate, member, level);

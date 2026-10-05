@@ -10,6 +10,7 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
+import { briefList, highestUtilisation } from './utilisation';
 import { analyseSteelStructure } from './steelStructureAnalysis';
 
 const ASSUMPTIONS: ReadonlyArray<string> = [
@@ -166,10 +167,7 @@ export const checkSteelMembers = defineCommand({
     const analysed = members.filter((row) => row.analysed);
     const failing = analysed.filter((row) => !row.ok);
     const notAnalysed = members.filter((row) => !row.analysed);
-    const worst = analysed.reduce<(typeof members)[number] | undefined>(
-      (best, row) => (best === undefined || row.utilisation > best.utilisation ? row : best),
-      undefined,
-    );
+    const worst = highestUtilisation(analysed);
     const steelMassKg = members.reduce((sum, row) => sum + (analysis.massKg.get(row.id) ?? 0), 0);
     const csv = toCsv(
       ['Mark', 'Role', 'Profile', 'Level', 'Check', 'Utilisation', 'Status', 'Governing', 'Detail'],
@@ -186,10 +184,10 @@ export const checkSteelMembers = defineCommand({
       ]),
     );
     const list = (rows: typeof members): string =>
-      `${rows
-        .slice(0, 8)
-        .map((row) => `${row.mark} ${row.profile}${row.analysed ? ` ${row.utilisation}` : ''}`)
-        .join(', ')}${rows.length > 8 ? ', …' : ''}`;
+      briefList(
+        rows,
+        (row) => `${row.mark} ${row.profile}${row.analysed ? ` ${row.utilisation}` : ''}`,
+      );
     const frameText =
       analysis.frames.length === 0 ? '' : `, ${analysis.frames.length} moment frame(s)`;
     const summary =

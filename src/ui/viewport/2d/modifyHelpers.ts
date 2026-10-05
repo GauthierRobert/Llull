@@ -10,19 +10,7 @@
  */
 
 import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
-import type { Vec2 } from '@core/model/types';
-import type {
-  CadDocument,
-  Entity,
-  EntityId,
-  LineEntity,
-  PolylineEntity,
-  CircleEntity,
-  RectangleEntity,
-  ArcEntity,
-  EllipseEntity,
-  SplineEntity,
-} from '@core/model/types';
+import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
 
 interface NearestVertexResult {
   /** 0-based index of the nearest vertex. */
@@ -84,6 +72,26 @@ export function offsetSideSign(start: Vec2, end: Vec2, pick: Vec2): 1 | -1 {
   return cross >= 0 ? 1 : -1;
 }
 
+/**
+ * `distance` signed by the side of the entity's first segment on which `worldPick` lies
+ * (offset_2d convention: positive = left of start→end). Unsigned when there is no pick, no
+ * entity, or the entity has no first segment.
+ *
+ * @pure
+ */
+export function signedOffsetDistance(
+  entity: Entity | undefined,
+  worldPick: Vec2 | null,
+  distance: number,
+): number {
+  if (entity === undefined || worldPick === null) return distance;
+  // Shift the world-space pick into the entity's local frame.
+  const localPick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
+  if (entity.kind === 'line') return distance * offsetSideSign(entity.start, entity.end, localPick);
+  const [first, second] = entity.kind === 'polyline' ? entity.points : [];
+  return first && second ? distance * offsetSideSign(first, second, localPick) : distance;
+}
+
 /** Squared distance from point P to the segment AB. @pure */
 function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
   return projectOntoSegment(p, a, b).distance ** 2;
@@ -109,66 +117,45 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
   const pick: Vec2 = [worldPick[0] - ox, worldPick[1] - oy];
 
   switch (entity.kind) {
-    case 'line': {
-      const l = entity as LineEntity;
-      return pointToSegDistSq(pick, l.start, l.end);
-    }
-    case 'polyline': {
-      const poly = entity as PolylineEntity;
-      let best = Infinity;
-      for (let i = 0; i < poly.points.length - 1; i++) {
-        const d = pointToSegDistSq(pick, poly.points[i]!, poly.points[i + 1]!);
-        if (d < best) best = d;
-      }
-      if (poly.closed && poly.points.length > 1) {
-        const d = pointToSegDistSq(pick, poly.points[poly.points.length - 1]!, poly.points[0]!);
-        if (d < best) best = d;
-      }
-      return best;
-    }
+    case 'line':
+      return pointToSegDistSq(pick, entity.start, entity.end);
+    case 'polyline':
+    case 'spline':
+      return chainDistSq(pick, entity.points, entity.closed);
     case 'circle': {
-      const c = entity as CircleEntity;
-      const dx = pick[0] - c.center[0];
-      const dy = pick[1] - c.center[1];
-      const d = Math.sqrt(dx * dx + dy * dy) - c.radius;
+      const dx = pick[0] - entity.center[0];
+      const dy = pick[1] - entity.center[1];
+      const d = Math.sqrt(dx * dx + dy * dy) - entity.radius;
+      return d * d;
+    }
+    case 'arc': {
+      // An arc is picked as its full circle.
+      const d = distance(pick, entity.center) - entity.radius;
       return d * d;
     }
     case 'rectangle': {
-      const r = entity as RectangleEntity;
       // Rectangle corners are in local space (lower-left at local origin).
-      const tl: Vec2 = [0, r.height];
-      const tr: Vec2 = [r.width, r.height];
-      const bl: Vec2 = [0, 0];
-      const br: Vec2 = [r.width, 0];
-      return Math.min(
-        pointToSegDistSq(pick, bl, br),
-        pointToSegDistSq(pick, br, tr),
-        pointToSegDistSq(pick, tr, tl),
-        pointToSegDistSq(pick, tl, bl),
+      const { width, height } = entity;
+      return chainDistSq(
+        pick,
+        [
+          [0, 0],
+          [width, 0],
+          [width, height],
+          [0, height],
+        ],
+        true,
       );
     }
     case 'point':
       return distance(pick, [0, 0]) ** 2;
-    case 'arc': {
-      const a = entity as ArcEntity;
-      const d = Math.hypot(pick[0] - a.center[0], pick[1] - a.center[1]) - a.radius;
-      return d * d;
-    }
     case 'ellipse': {
-      const el = entity as EllipseEntity;
-      const samples: Vec2[] = [];
-      for (let i = 0; i <= ELLIPSE_PICK_SAMPLES; i++) {
+      const { center, radiusX, radiusY } = entity;
+      const samples = Array.from({ length: ELLIPSE_PICK_SAMPLES + 1 }, (_, i): Vec2 => {
         const t = (i / ELLIPSE_PICK_SAMPLES) * 2 * Math.PI;
-        samples.push([
-          el.center[0] + el.radiusX * Math.cos(t),
-          el.center[1] + el.radiusY * Math.sin(t),
-        ]);
-      }
+        return [center[0] + radiusX * Math.cos(t), center[1] + radiusY * Math.sin(t)];
+      });
       return chainDistSq(pick, samples, false);
-    }
-    case 'spline': {
-      const sp = entity as SplineEntity;
-      return chainDistSq(pick, sp.points, sp.closed);
     }
     default:
       return Infinity;
@@ -225,28 +212,25 @@ export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
   const pick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
   switch (entity.kind) {
     case 'rectangle': {
-      const r = entity as RectangleEntity;
-      const inside = pick[0] >= 0 && pick[0] <= r.width && pick[1] >= 0 && pick[1] <= r.height;
-      return inside ? r.width * r.height : null;
+      const { width, height } = entity;
+      const inside = pick[0] >= 0 && pick[0] <= width && pick[1] >= 0 && pick[1] <= height;
+      return inside ? width * height : null;
     }
     case 'circle': {
-      const c = entity as CircleEntity;
-      const inside = distance(pick, c.center) <= c.radius;
-      return inside ? Math.PI * c.radius * c.radius : null;
+      const inside = distance(pick, entity.center) <= entity.radius;
+      return inside ? Math.PI * entity.radius * entity.radius : null;
     }
     case 'ellipse': {
-      const el = entity as EllipseEntity;
-      if (el.radiusX <= 0 || el.radiusY <= 0) return null;
-      const u = (pick[0] - el.center[0]) / el.radiusX;
-      const v = (pick[1] - el.center[1]) / el.radiusY;
-      return u * u + v * v <= 1 ? Math.PI * el.radiusX * el.radiusY : null;
+      const { center, radiusX, radiusY } = entity;
+      if (radiusX <= 0 || radiusY <= 0) return null;
+      const u = (pick[0] - center[0]) / radiusX;
+      const v = (pick[1] - center[1]) / radiusY;
+      return u * u + v * v <= 1 ? Math.PI * radiusX * radiusY : null;
     }
     case 'polyline': {
-      const poly = entity as PolylineEntity;
-      if (!poly.closed || poly.points.length < 3 || !pointInPolygon(pick, poly.points)) {
-        return null;
-      }
-      return polygonArea(poly.points);
+      const { closed, points } = entity;
+      if (!closed || points.length < 3 || !pointInPolygon(pick, points)) return null;
+      return polygonArea(points);
     }
     default:
       return null;

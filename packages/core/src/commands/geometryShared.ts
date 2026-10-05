@@ -1,9 +1,11 @@
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { BaseEntity, CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { z, looseVec3, tolerant } from './schema';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { add3, finiteVec3OrZero } from '../lib/vec3';
-import { withEntity } from './entityOps';
+import { nextId } from '../lib/id';
+import { commitEntity } from './commitEntity';
+import { newEntity } from './newEntity';
 import { noop } from './noop';
 import { compactNumber } from '../lib/compactNumber';
 
@@ -13,31 +15,15 @@ export function translated(entity: Entity, delta: Vec3): Entity {
 }
 
 /**
- * Validate an optional rotation param.
- * Returns [0,0,0] if rotation is absent, not length-3, or contains non-finite values.
- * Never throws — malformed rotation is silently ignored and the entity is created unrotated.
- */
-export function resolveRotation(rotation: unknown): Vec3 {
-  return finiteVec3OrZero(rotation);
-}
-
-/**
- * Placement anchor values.
+ * Which point of the entity's local, UNROTATED AABB lands at the caller's `position` (right-handed,
+ * +Z up). The stored `position` is the one that achieves this before rotation; the viewport rotates
+ * about the stored origin.
  *
- * These control how the caller's `position` input is interpreted for a 3D-creation
- * command. The anchor names the point on the entity's LOCAL, UNROTATED AABB that must
- * land at the caller's `position`. The stored `position` (persisted on the entity) is
- * then the one that achieves this in the entity's own coordinate space, i.e. the offset
- * is applied BEFORE rotation. Rotation is applied by the viewport about the stored
- * origin exactly as it is today — this is an intentional, documented interaction.
- *
- * Right-handed frame, +Z up (document convention).
- *
- * | value         | anchor point (in local AABB)                                 |
- * |---------------|--------------------------------------------------------------|
- * | 'center'      | geometric center: mid X, mid Y, mid Z                        |
- * | 'min'         | min corner: min X, min Y, min Z                               |
- * | 'base-center' | center of the bottom face: mid X, mid Y, min Z                |
+ * | value         | anchor point                                   |
+ * |---------------|------------------------------------------------|
+ * | 'center'      | geometric center: mid X, mid Y, mid Z          |
+ * | 'min'         | min corner: min X, min Y, min Z                |
+ * | 'base-center' | center of the bottom face: mid X, mid Y, min Z |
  */
 type PlacementAnchor = 'center' | 'min' | 'base-center';
 
@@ -47,23 +33,26 @@ const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>([
   'base-center',
 ]);
 
+/** Offset of `anchor` from the AABB center, given the positive half-extents `[hx, hy, hz]`. */
+function anchorOffsetFromCenter(anchor: PlacementAnchor, [hx, hy, hz]: Vec3): Vec3 {
+  switch (anchor) {
+    case 'center':
+      return [0, 0, 0];
+    case 'min':
+      return [-hx, -hy, -hz];
+    case 'base-center':
+      return [0, 0, -hz];
+  }
+}
+
 /**
- * Compute the stored `position` so that the requested anchor lands at `inputPosition`.
- *
- * The offset is computed in the LOCAL, UNROTATED frame. Rotation is NOT applied here —
- * it is applied later by the viewport about the stored origin.
- *
- * @param halfExtents  [hx, hy, hz]: half-extents of the AABB measured from its CENTER
- *                     (the entity spans ±hx in X, ±hy in Y, ±hz in Z about the AABB center).
- *                     Always positive. Independent of `defaultAnchor` — always center-relative,
- *                     so callers pass e.g. `height/2`, not the full height.
- * @param defaultAnchor  The anchor that the stored `position` natively represents
- *                       (each command's native convention, e.g. box='center', cone='base-center').
- * @param requestedAnchor  The anchor the CALLER named; unknown values fall back to `defaultAnchor`.
- * @param inputPosition    The world-space position the caller wants the named anchor to land at.
- * @returns The stored `position` to persist on the entity.
+ * The `position` to store so that the requested anchor lands at `inputPosition`:
+ * `inputPosition − offset(requested) + offset(defaultAnchor)`, offsets measured from the AABB center.
+ * @param halfExtents center-relative half-extents (e.g. `height / 2`, not the full height)
+ * @param defaultAnchor the anchor the stored position natively represents (box 'center', cone 'base-center')
+ * @param requestedAnchor the caller's anchor; anything but a valid anchor falls back to `defaultAnchor`
  */
-export function resolvePosition(
+function resolvePosition(
   halfExtents: Vec3,
   defaultAnchor: PlacementAnchor,
   requestedAnchor: unknown,
@@ -73,44 +62,14 @@ export function resolvePosition(
     typeof requestedAnchor === 'string' && VALID_ANCHORS.has(requestedAnchor)
       ? (requestedAnchor as PlacementAnchor)
       : defaultAnchor;
-
   if (anchor === defaultAnchor) return inputPosition;
 
-  const [hx, hy, hz] = halfExtents;
-
-  // Anchor point relative to AABB center (canonical frame):
-  // center      → [0,    0,    0   ]
-  // min         → [-hx, -hy,  -hz  ]
-  // base-center → [0,    0,   -hz  ]  (bottom face center; min-Z = aabbCenter.z − hz)
-
-  function anchorOffsetFromCenter(a: PlacementAnchor): Vec3 {
-    switch (a) {
-      case 'center':
-        return [0, 0, 0];
-      case 'min':
-        return [-hx, -hy, -hz];
-      case 'base-center':
-        return [0, 0, -hz];
-    }
-  }
-
-  // Derivation (all offsets relative to AABB center):
-  //   anchorPoint(a) = aabbCenter + anchorOffsetFromCenter(a)
-  //   storedOrigin   = aabbCenter + anchorOffsetFromCenter(defaultAnchor)   [by definition]
-  //   We want: storedOrigin + (anchorPoint(requested) - storedOrigin) = inputPosition
-  //     ↔ anchorPoint(requested) = inputPosition
-  //     ↔ aabbCenter + anchorOffsetFromCenter(requested) = inputPosition
-  //     ↔ aabbCenter = inputPosition - anchorOffsetFromCenter(requested)
-  //   And storedOrigin = aabbCenter + anchorOffsetFromCenter(defaultAnchor)
-  //     = inputPosition - anchorOffsetFromCenter(requested) + anchorOffsetFromCenter(defaultAnchor)
-
-  const defOffset = anchorOffsetFromCenter(defaultAnchor);
-  const reqOffset = anchorOffsetFromCenter(anchor);
-
+  const requestedOffset = anchorOffsetFromCenter(anchor, halfExtents);
+  const defaultOffset = anchorOffsetFromCenter(defaultAnchor, halfExtents);
   return [
-    inputPosition[0] - reqOffset[0] + defOffset[0],
-    inputPosition[1] - reqOffset[1] + defOffset[1],
-    inputPosition[2] - reqOffset[2] + defOffset[2],
+    inputPosition[0] - requestedOffset[0] + defaultOffset[0],
+    inputPosition[1] - requestedOffset[1] + defaultOffset[1],
+    inputPosition[2] - requestedOffset[2] + defaultOffset[2],
   ];
 }
 
@@ -184,11 +143,38 @@ export function rejectBadSize(doc: CadDocument, command: string, size: Vec3): Co
 
 /** Append `entity` and report it: `<description>; world AABB ...` with `affected: [entity.id]`. */
 export function commitSolid(doc: CadDocument, entity: Entity, description: string): CommandResult {
-  const newDoc = withEntity(doc, entity);
-  const bounds = rotatedEntityBounds(newDoc.entities[entity.id] as Entity);
-  return {
-    document: newDoc,
-    summary: `${description}; ${boundsText(bounds)}.`,
-    affected: [entity.id],
-  };
+  return commitEntity(doc, entity, `${description}; ${boundsText(rotatedEntityBounds(entity))}.`);
+}
+
+/**
+ * Create a primitive solid of `kind` with a fresh `idPrefix` id and report it via `commitSolid`.
+ * `position` is interpreted through `anchor` (see `PlacementAnchor`), `rotation` is sanitised.
+ * @param describe summary text for the new id, before the `; world AABB ...` suffix
+ */
+export function placeSolid<K extends Entity['kind']>(
+  doc: CadDocument,
+  spec: {
+    readonly kind: K;
+    readonly idPrefix: string;
+    readonly geometry: Omit<Extract<Entity, { kind: K }>, keyof BaseEntity>;
+    readonly halfExtents: Vec3;
+    readonly defaultAnchor: PlacementAnchor;
+    readonly anchor: unknown;
+    readonly position: Vec3;
+    readonly rotation: unknown;
+    readonly color: string;
+    readonly describe: (id: string) => string;
+  },
+): CommandResult {
+  const storedPosition = resolvePosition(
+    spec.halfExtents,
+    spec.defaultAnchor,
+    spec.anchor,
+    spec.position,
+  );
+  const id = nextId(spec.idPrefix);
+  const entity = newEntity(spec.kind, id, spec.geometry, storedPosition, spec.color, {
+    rotation: finiteVec3OrZero(spec.rotation),
+  });
+  return commitSolid(doc, entity, spec.describe(id));
 }

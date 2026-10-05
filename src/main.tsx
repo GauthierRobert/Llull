@@ -16,35 +16,30 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { parseKernelChoice } from '@core/geometry/kernelChoice';
 
-// Kernel selection: ?kernel=occt swaps in OCC (dev/power-user toggle).
-// Default is Manifold. OCC is opt-in only — never the default.
-//
-// Usage: http://localhost:5173/?kernel=occt
-//
-// OCC carries a 63 MB WASM binary (~800–1000 ms cold init). It is injected
-// asynchronously so the first render is never blocked. Commands no-op
-// gracefully until the kernel resolves (architecture L9 / SOLID S5).
-
+// Kernel selection: Manifold by default (fast, no large WASM asset); ?kernel=occt swaps in OCC
+// (dev/power-user toggle, opt-in only). OCC carries a 63 MB WASM binary (~800–1000 ms cold init),
+// so it is lazy-imported and injected asynchronously: the first render is never blocked and
+// commands no-op gracefully until the kernel resolves (architecture L9 / SOLID S5).
 const useOcct =
   typeof window !== 'undefined' &&
   parseKernelChoice(new URLSearchParams(window.location.search).get('kernel')) === 'occt';
 
+function installManifoldKernel(): void {
+  createManifoldKernel()
+    .then(setGeometryKernel)
+    .catch((e: unknown) => console.error('Manifold kernel init failed', e));
+}
+
 if (useOcct) {
-  // Lazy-import OCC so its 63 MB WASM is never fetched in the default path.
   import('@ui/geometry/occtKernelBrowser')
     .then(({ createBrowserOcctKernel }) => createBrowserOcctKernel())
     .then(setGeometryKernel)
     .catch((e: unknown) => {
       console.warn('OCC kernel init failed — falling back to Manifold', e);
-      createManifoldKernel()
-        .then(setGeometryKernel)
-        .catch((e2: unknown) => console.error('Manifold kernel init failed', e2));
+      installManifoldKernel();
     });
 } else {
-  // Default: Manifold — fast, no large WASM asset.
-  createManifoldKernel()
-    .then(setGeometryKernel)
-    .catch((e: unknown) => console.error('Manifold kernel init failed', e));
+  installManifoldKernel();
 }
 
 installDefaultPlugins();

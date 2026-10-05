@@ -11,7 +11,13 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import type { PurlinRow } from './purlinModel';
 import { analysePurlins, locatePurlinMembers } from './purlinAnalysis';
 import { round } from '../numeric';
-import { checkTable, existingLevelId, failureSummary } from './checkReport';
+import {
+  LIMIT_COLUMNS,
+  checkTable,
+  existingLevelId,
+  failureSummary,
+  limitCells,
+} from './checkReport';
 
 /**
  * @command check_purlins
@@ -75,8 +81,7 @@ export const checkPurlins = defineCommand({
         'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.',
       );
     }
-    const building = getBuilding(doc);
-    const levelId = existingLevelId(building, params.levelId);
+    const levelId = existingLevelId(getBuilding(doc), params.levelId);
     if (levelId === undefined) {
       return noop(doc, `check_purlins failed: no level '${params.levelId ?? ''}'.`);
     }
@@ -86,32 +91,8 @@ export const checkPurlins = defineCommand({
     const { rows, zones, monopitch, eAcross, eAlong } = analysis;
     const { csv, failures, worst } = checkTable(
       rows,
-      [
-        'Mark',
-        'Type',
-        'Zone',
-        'Span (m)',
-        'Check',
-        'Value',
-        'Limit',
-        'Unit',
-        'Utilisation',
-        'Status',
-        'Combination',
-      ],
-      (row, status) => [
-        row.mark,
-        row.kind,
-        row.zone,
-        round(row.span),
-        row.check,
-        round(row.value),
-        round(row.limit),
-        row.unit,
-        round(row.utilisation),
-        status,
-        row.combination,
-      ],
+      ['Mark', 'Type', 'Zone', 'Span (m)', ...LIMIT_COLUMNS],
+      (row, status) => [row.mark, row.kind, row.zone, round(row.span), ...limitCells(row, status)],
     );
     const purlinRows = rows.filter((row) => row.kind === 'purlin');
     const maxOf = (list: readonly PurlinRow[]): number =>

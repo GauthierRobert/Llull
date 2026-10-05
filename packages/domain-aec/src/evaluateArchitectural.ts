@@ -15,7 +15,6 @@ import type {
   LineEntity,
   PolylineEntity,
   TextEntity,
-  Vec2,
   Vec3,
 } from '@core/model/types';
 import type {
@@ -36,9 +35,17 @@ import { fromMm, toMetres } from './model';
 import { prismMesh } from './mesh';
 import { base, CATEGORY_LAYER, colorForMaterial, meshEntity, orientedBox } from './entities';
 import { curvedBandBetween } from './curvedWallGeometry';
-import { openingsOf, pointAlong, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
+import {
+  doorSwing,
+  gridBubbleCenters,
+  openingsOf,
+  pointAlong,
+  wallExtent,
+  wallFrame,
+  wallPieces,
+  type WallExtent,
+} from './wallGeometry';
 import { stairPoint } from './stairGeometry';
-import { wallPieces } from './wallPieces';
 
 export interface EvaluationContext {
   readonly doc: CadDocument;
@@ -95,19 +102,8 @@ export function evaluateOpening(
     ];
   }
   const leafThickness = Math.min(fromMm(context.doc, 40), wall.thickness);
-  const hingeS =
-    opening.swing === 'left'
-      ? opening.offset - opening.width / 2
-      : opening.offset + opening.width / 2;
-  const hinge = pointAlong(wall, frame, hingeS, wall.thickness / 2);
   const planZ = level.elevation + fromMm(context.doc, 10);
-  const openAngle = frame.angle + Math.PI / 2;
-  const leafEnd: Vec2 = [
-    hinge[0] + Math.cos(openAngle) * opening.width,
-    hinge[1] + Math.sin(openAngle) * opening.width,
-  ];
-  const [startAngle, endAngle] =
-    opening.swing === 'left' ? [frame.angle, openAngle] : [openAngle, frame.angle + Math.PI];
+  const { hinge, leafEnd, startAngle, endAngle } = doorSwing(wall, opening);
   const leaf: BoxEntity = orientedBox(
     opening,
     { part: 'leaf', label: `Door ${opening.mark}` },
@@ -277,15 +273,7 @@ export function evaluateRoom(
 export function evaluateGrid(context: EvaluationContext, grid: GridElement): Entity[] {
   const color = CATEGORY_LAYER.grid.color;
   const bubbleRadius = fromMm(context.doc, 400);
-  const frame = wallFrame(grid);
-  const offsetStart: Vec2 = [
-    grid.start[0] - frame.direction[0] * bubbleRadius,
-    grid.start[1] - frame.direction[1] * bubbleRadius,
-  ];
-  const offsetEnd: Vec2 = [
-    grid.end[0] + frame.direction[0] * bubbleRadius,
-    grid.end[1] + frame.direction[1] * bubbleRadius,
-  ];
+  const [startCenter, endCenter] = gridBubbleCenters(grid, bubbleRadius);
   const axis: LineEntity = {
     ...base(grid, { part: 'axis', label: `Grid ${grid.mark}` }, [0, 0, 0], [0, 0, 0], color),
     kind: 'line',
@@ -294,8 +282,8 @@ export function evaluateGrid(context: EvaluationContext, grid: GridElement): Ent
   };
   const entities: Entity[] = [axis];
   for (const [part, center] of [
-    ['start', offsetStart],
-    ['end', offsetEnd],
+    ['start', startCenter],
+    ['end', endCenter],
   ] as const) {
     const bubble: CircleEntity = {
       ...base(

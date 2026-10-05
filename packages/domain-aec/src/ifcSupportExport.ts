@@ -9,6 +9,7 @@ import type { BuildingModel, PipeElement, PipeSupportElement } from '@core/model
 import { supportShape } from './industrial/supportParts';
 import {
   type Context,
+  addPropertySet,
   circleProfile,
   extrusion,
   ifcReal,
@@ -48,17 +49,11 @@ export function exportPipeSupport(
   const ref = writer.add(
     `IFCBUILDINGELEMENTPROXY('${context.guid(support.id)}',$,${ifcString(support.mark)},${ifcString(description)},'PIPESUPPORT',${local},${shape(context, solids)},${ifcString(support.id)},.ELEMENT.)`,
   );
-  const properties = [
+  addPropertySet(context, { id: support.id, ref }, 'Pset_llullPipeSupport', [
     `IFCPROPERTYSINGLEVALUE('SupportType','Shoe, hanger, guide or anchor',IFCLABEL(${ifcString(support.type)}),$)`,
     `IFCPROPERTYSINGLEVALUE('Pipe','Mark of the supported pipe',IFCLABEL(${ifcString(pipe.mark)}),$)`,
     `IFCPROPERTYSINGLEVALUE('BearsOn','Mark of the steel member it bears on (empty = unattached)',IFCLABEL(${ifcString(bearsOn)}),$)`,
     `IFCPROPERTYSINGLEVALUE('RodLength','Hanger rod length, mm',IFCLENGTHMEASURE(${ifcReal(mm(support.rodLength))}),$)`,
-  ].map((property) => writer.add(property));
-  const propertySet = writer.add(
-    `IFCPROPERTYSET('${context.guid(`${support.id}:pset`)}',$,'Pset_llullPipeSupport',$,(${properties.join(',')}))`,
-  );
-  writer.add(
-    `IFCRELDEFINESBYPROPERTIES('${context.guid(`${support.id}:rel-pset`)}',$,$,$,(${ref}),${propertySet})`,
-  );
+  ]);
   return { ref, material: 'steel' };
 }

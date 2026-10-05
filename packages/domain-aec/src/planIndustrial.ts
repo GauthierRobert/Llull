@@ -4,18 +4,25 @@
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel } from '@core/model/building';
+import { distance } from '@lib/polygon';
 import { fromMm, getBuilding } from './model';
 import { MEMBER_LAYER } from './entities';
 import { sweepFrame } from './mesh';
 import { findProfile, profileOutline } from './steel/profiles';
 import { plateLayout } from './industrial/evaluateConnections';
-import { type PlanPrimitive, type PlanSource, layerName } from './planModel';
+import {
+  type PlanPrimitive,
+  type PlanSource,
+  annotationText,
+  layerName,
+  thinLine,
+} from './planModel';
 import { columnPrimitive } from './planArchitectural';
 
 /** Both edges of a plan polyline offset by ±`half` (mitred at the bends). */
 function offsetPolyline(points: ReadonlyArray<Vec2>, half: number): Vec2[][] {
   const normalOf = (a: Vec2, b: Vec2): Vec2 => {
-    const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const length = distance(a, b) || 1;
     return [-(b[1] - a[1]) / length, (b[0] - a[0]) / length];
   };
   return [1, -1].map((side) =>
@@ -107,7 +114,7 @@ export function industrialPrimitives(
         return [];
       if (element.role === 'brace' && low > 2 * cutHeight) return [];
       const [a, b] = [flat(element.start), flat(element.end)];
-      if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-9) return [];
+      if (distance(a, b) < 1e-9) return [];
       return [{ type: 'line', layer, style: 'hidden', a, b }];
     }
     case 'footing': {
@@ -121,11 +128,11 @@ export function industrialPrimitives(
       let [a, b, longest] = [points[0] as Vec2, points[0] as Vec2, -1];
       for (const p of points) {
         for (const q of points) {
-          const distance = Math.hypot(q[0] - p[0], q[1] - p[1]);
-          if (distance > longest) [a, b, longest] = [p, q, distance];
+          const separation = distance(p, q);
+          if (separation > longest) [a, b, longest] = [p, q, separation];
         }
       }
-      return [{ type: 'line', layer: layerName('panel'), style: 'thin', a, b }];
+      return [thinLine(layerName('panel'), a, b)];
     }
     case 'equipment': {
       const [length, width] = element.size;
@@ -144,14 +151,12 @@ export function industrialPrimitives(
               } as PlanPrimitive,
             ]
           : []),
-        {
-          type: 'text',
+        annotationText(
           layer,
-          style: 'annotation',
-          at: element.location,
-          height: fromMm(doc, 250),
-          content: `${element.mark} ${element.name}`,
-        },
+          element.location,
+          fromMm(doc, 250),
+          `${element.mark} ${element.name}`,
+        ),
       ];
     }
     case 'pipe': {
@@ -160,14 +165,12 @@ export function industrialPrimitives(
       const [a, b] = [points[0] as Vec2, points[1] as Vec2];
       return [
         { type: 'polyline', layer, style: 'thin', points },
-        {
-          type: 'text',
+        annotationText(
           layer,
-          style: 'annotation',
-          at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + fromMm(doc, 200)],
-          height: fromMm(doc, 180),
-          content: `${element.mark} ${element.service} Ø${element.diameter}`,
-        },
+          [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + fromMm(doc, 200)],
+          fromMm(doc, 180),
+          `${element.mark} ${element.service} Ø${element.diameter}`,
+        ),
       ];
     }
     case 'plate': {
@@ -201,12 +204,7 @@ export function industrialPrimitives(
       const points = element.points
         .map(flat)
         .filter(
-          (point, index, all) =>
-            index === 0 ||
-            Math.hypot(
-              point[0] - (all[index - 1] as Vec2)[0],
-              point[1] - (all[index - 1] as Vec2)[1],
-            ) > 1e-9,
+          (point, index, all) => index === 0 || distance(point, all[index - 1] as Vec2) > 1e-9,
         );
       const layer = layerName('tray');
       if (points.length < 2) {
@@ -225,14 +223,12 @@ export function industrialPrimitives(
         ...offsetPolyline(points, element.width / 2).map(
           (side): PlanPrimitive => ({ type: 'polyline', layer, style: 'hidden', points: side }),
         ),
-        {
-          type: 'text',
+        annotationText(
           layer,
-          style: 'annotation',
-          at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + element.width / 2 + fromMm(doc, 150)],
-          height: fromMm(doc, 180),
-          content: `${element.mark} ${element.system} ${element.width}×${element.height}`,
-        },
+          [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + element.width / 2 + fromMm(doc, 150)],
+          fromMm(doc, 180),
+          `${element.mark} ${element.system} ${element.width}×${element.height}`,
+        ),
       ];
     }
   }

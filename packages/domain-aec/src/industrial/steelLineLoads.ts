@@ -7,12 +7,14 @@
  */
 
 import type { CableTrayElement, PipeElement } from '@core/model/building';
+import { orderedElements } from '../model';
+import { round } from '../numeric';
 import { type ModelUnits, type SteelBar } from './steelMemberBars';
 import { addPointLoad, type BeamLoads } from './steelBeamLoads';
 import type { ColumnNode } from './steelFraming';
 import { pipeWeightPerMetre } from './pipeWeight';
 import { carriedByEnds, pipeRunOf, weightSupportsOf } from './pipeSupportLayout';
-import { applySupportedPipe } from './steelSupportLoads';
+import { applySupportedPipe, tributaryLengths } from './steelSupportLoads';
 
 export interface LineLoadParams {
   /** kg/m³ of the pipe contents (1000 = water, 0 = empty). */
@@ -69,7 +71,7 @@ interface Support {
 const SUPPORT_TOLERANCE = 10;
 /** A crossing this far beyond the beam end still counts, mm. */
 const END_TOLERANCE = 50;
-/** Supports of one run closer than this share one tributary, mm. */
+/** Resting supports closer than this share one tributary station, mm. */
 const GROUP_DISTANCE = 100;
 const NEARLY_HORIZONTAL = 0.1;
 
@@ -91,7 +93,7 @@ function runOf(
       id: element.id,
       mark: element.mark,
       kind: 'pipe',
-      label: `${element.service} Ø${Math.round(diameter * 10) / 10}`,
+      label: `${element.service} Ø${round(diameter, 1)}`,
       points,
       halfDepth: diameter / 2,
       weightPerMetre: pipeWeightPerMetre(diameter, params.pipeContentDensity),
@@ -110,13 +112,11 @@ function runOf(
 }
 
 function runsOf(units: ModelUnits, params: LineLoadParams): Run[] {
-  const { building } = units;
-  return building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    return element?.category === 'pipe' || element?.category === 'tray'
+  return orderedElements(units.building).flatMap((element) =>
+    element.category === 'pipe' || element.category === 'tray'
       ? [runOf(units, element, params)]
-      : [];
-  });
+      : [],
+  );
 }
 
 /** Arc lengths (mm) at which `pipe` rests on top of `beams` (the rule for pipes without supports). */
@@ -177,29 +177,6 @@ function supportsOf(
   return { supports: supports.sort((a, b) => a.s - b.s), length: travelled };
 }
 
-/** Group supports closer than GROUP_DISTANCE; each group gets the tributary of its mean position. */
-function tributaries(
-  supports: ReadonlyArray<Support>,
-  length: number,
-): Array<{ support: Support; tributary: number }> {
-  const groups: Support[][] = [];
-  for (const support of supports) {
-    const last = groups[groups.length - 1];
-    if (last && support.s - (last[last.length - 1] as Support).s < GROUP_DISTANCE)
-      last.push(support);
-    else groups.push([support]);
-  }
-  const positions = groups.map((group) => group.reduce((sum, { s }) => sum + s, 0) / group.length);
-  return groups.flatMap((group, index) => {
-    const here = positions[index] as number;
-    const previous = positions[index - 1];
-    const next = positions[index + 1];
-    const before = previous === undefined ? here : (here - previous) / 2;
-    const after = next === undefined ? length - here : (next - here) / 2;
-    return group.map((support) => ({ support, tributary: (before + after) / group.length }));
-  });
-}
-
 /**
  * Deposit pipe and tray weight as point loads on the supporting beams.
  * @invariant tributary lengths of one run sum to its length; weight is permanent
@@ -214,17 +191,20 @@ export function applyLineLoads(
   const warnings: string[] = [];
   const columnNodes: Array<readonly [string, ColumnNode]> = [];
   for (const run of runsOf(units, params)) {
+    const header = {
+      id: run.id,
+      mark: run.mark,
+      kind: run.kind,
+      label: run.label,
+      weightPerMetre: run.weightPerMetre,
+    };
     const pipeRun = run.pipe ? pipeRunOf(units, run.pipe) : null;
     if (pipeRun && weightSupportsOf(units, pipeRun).length > 0) {
       const supported = applySupportedPipe(units, pipeRun, run.weightPerMetre, beams, bars);
       warnings.push(...supported.warnings);
       columnNodes.push(...supported.columnNodes);
       runs.push({
-        id: run.id,
-        mark: run.mark,
-        kind: run.kind,
-        label: run.label,
-        weightPerMetre: run.weightPerMetre,
+        ...header,
         lengthM: pipeRun.lengthMm / 1000,
         supports: supported.supports,
         basis: 'supports',
@@ -235,18 +215,16 @@ export function applyLineLoads(
     const { supports, length } = supportsOf(run, beams);
     const nozzles = supports.length === 0 && pipeRun !== null && carriedByEnds(units, pipeRun);
     let carried = 0;
-    for (const { support, tributary } of tributaries(supports, length)) {
-      const weight = (run.weightPerMetre * tributary) / 1000;
+    const arcs = supports.map(({ s }) => s);
+    const tributaries = tributaryLengths(arcs, length, { groupDistance: GROUP_DISTANCE });
+    supports.forEach((support, index) => {
+      const weight = (run.weightPerMetre * (tributaries[index] as number)) / 1000;
       addPointLoad(support.beam, support.at, weight, 0, true);
       support.beam.lineSupport = true;
       carried += weight;
-    }
+    });
     runs.push({
-      id: run.id,
-      mark: run.mark,
-      kind: run.kind,
-      label: run.label,
-      weightPerMetre: run.weightPerMetre,
+      ...header,
       lengthM: length / 1000,
       supports: supports.length,
       basis: nozzles ? 'nozzles' : 'resting',

@@ -3,7 +3,7 @@
  * @layer domain-aec
  */
 
-import { FLAT_ROOF_LIMIT, roofCoefficients } from './windCoefficients';
+import { FLAT_ROOF_LIMIT, roofCoefficients, type ZoneCpe } from './windCoefficients';
 import { DOWNWIND_ROOF_FACTOR } from './frameModelTypes';
 import { pressureOf, suctionOf, TOLERANCE, zoneOf } from './purlinModel';
 import type { Located, WindOption } from './purlinModel';
@@ -38,6 +38,14 @@ interface PurlinWind {
   readonly pressureOption: WindOption;
 }
 
+/** Candidate of a roof zone: its governing suction and the positive pressure (0 = none) it brings. */
+const optionOf = (
+  zone: string,
+  coefficient: ZoneCpe | undefined,
+  pressure = 0,
+  direction = '',
+): WindOption => ({ zone, cpe: suctionOf(coefficient), pressure, direction });
+
 /** Governing uplift zone and the worst downward-pressure zone of a purlin. */
 export function purlinWind(input: PurlinWindInput): PurlinWind {
   const { purlin, eavesEnd, highEnd, pitchDegrees, monopitch, valleys } = input;
@@ -55,12 +63,7 @@ export function purlinWind(input: PurlinWindInput): PurlinWind {
     : nearGable(eAlong / 2)
       ? 'H'
       : 'I';
-  const alongOption: WindOption = {
-    zone: alongZone,
-    cpe: suctionOf(zoneOf(along, alongZone)),
-    pressure: 0,
-    direction: '',
-  };
+  const alongOption = optionOf(alongZone, zoneOf(along, alongZone));
   let options: WindOption[];
   if (pitchDegrees < FLAT_ROOF_LIMIT) {
     // Tab. 7.2: zones around the perimeter (F corners e/4 x e/10, G strips e/10, H to e/2, I inside).
@@ -78,12 +81,11 @@ export function purlinWind(input: PurlinWindInput): PurlinWind {
           ? 'H'
           : 'I';
     options = [
-      {
-        zone: flatZone === 'H' || flatZone === 'I' ? 'H/I' : flatZone,
-        cpe: suctionOf(flat[flatZone]),
-        pressure: pressureOf(flat[flatZone]),
-        direction: '',
-      },
+      optionOf(
+        flatZone === 'H' || flatZone === 'I' ? 'H/I' : flatZone,
+        flat[flatZone],
+        pressureOf(flat[flatZone]),
+      ),
     ];
   } else if (monopitch) {
     const monopitchZone = (distance: number): 'F' | 'G' | 'H' =>
@@ -97,18 +99,8 @@ export function purlinWind(input: PurlinWindInput): PurlinWind {
       monopitchZone(Math.abs(purlin.start[0] - highEnd.start[0])),
     ];
     options = [
-      {
-        zone: lowZone,
-        cpe: suctionOf(low[lowZone]),
-        pressure: pressureOf(low[lowZone]),
-        direction: ' (θ = 0°, wind on the low eaves)',
-      },
-      {
-        zone: highZone,
-        cpe: suctionOf(high[highZone]),
-        pressure: 0,
-        direction: ' (θ = 180°, wind on the high eaves)',
-      },
+      optionOf(lowZone, low[lowZone], pressureOf(low[lowZone]), ' (θ = 0°, wind on the low eaves)'),
+      optionOf(highZone, high[highZone], 0, ' (θ = 180°, wind on the high eaves)'),
       { ...alongOption, direction: ' (θ = 90°, wind along the eaves)' },
     ];
   } else {
@@ -130,18 +122,12 @@ export function purlinWind(input: PurlinWindInput): PurlinWind {
         horizontalEaves <= eAcross / 10 + TOLERANCE ? (nearGable(eAcross / 4) ? 'F' : 'G') : 'H';
       const leewardZone: 'I' | 'J' = horizontalRidge <= eAcross / 10 + TOLERANCE ? 'J' : 'I';
       options = [
-        {
-          zone: windwardZone === 'H' ? 'H/I' : windwardZone,
-          cpe: suctionOf(across[windwardZone]),
-          pressure: pressureOf(across[windwardZone]),
-          direction: '',
-        },
-        {
-          zone: leewardZone === 'I' ? 'H/I' : leewardZone,
-          cpe: suctionOf(across[leewardZone]),
-          pressure: 0,
-          direction: '',
-        },
+        optionOf(
+          windwardZone === 'H' ? 'H/I' : windwardZone,
+          across[windwardZone],
+          pressureOf(across[windwardZone]),
+        ),
+        optionOf(leewardZone === 'I' ? 'H/I' : leewardZone, across[leewardZone]),
       ];
     }
   }

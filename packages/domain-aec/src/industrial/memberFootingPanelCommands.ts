@@ -7,7 +7,6 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, fromMm, getBuilding, isVec2, resolveLevel, toVec2 } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { appendFootings, appendPanel, columnFeet, withoutFootings } from './footingPanelSupport';
 import { levelIdSchema, toVec3 } from './memberSupport';
@@ -38,13 +37,10 @@ export const addFooting = defineCommand({
     material: z.string().optional().describe('Default concrete.'),
   }),
   run: (doc, params): CommandResult => {
-    const positive = (value: number | undefined): boolean =>
-      value === undefined || (isFiniteNumber(value) && value > 0);
-    if (!positive(params.width) || !positive(params.length) || !positive(params.thickness)) {
+    const { width, length, thickness, topOffset, material } = params;
+    const positive = (value: number | undefined): boolean => value === undefined || value > 0;
+    if (!positive(width) || !positive(length) || !positive(thickness)) {
       return noop(doc, 'add_footing failed: width, length and thickness must be > 0.');
-    }
-    if (params.topOffset !== undefined && !isFiniteNumber(params.topOffset)) {
-      return noop(doc, 'add_footing failed: topOffset must be finite.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noop(doc, `add_footing failed: ${resolution.reason}.`);
@@ -67,11 +63,11 @@ export const addFooting = defineCommand({
       );
     }
     const added = appendFootings(doc, resolution.building, resolution.level.id, locations, {
-      ...(params.width !== undefined ? { width: params.width } : {}),
-      ...(params.length !== undefined ? { length: params.length } : {}),
-      ...(params.thickness !== undefined ? { thickness: params.thickness } : {}),
-      ...(params.topOffset !== undefined ? { topOffset: params.topOffset } : {}),
-      ...(params.material !== undefined ? { material: params.material } : {}),
+      width,
+      length,
+      thickness,
+      topOffset,
+      material,
     });
     const document = regenerateBuilding(doc, added.building);
     return {
@@ -103,11 +99,11 @@ export const addPanel = defineCommand({
     material: z.string().optional().describe('Default sandwich-panel (or steel-sheet, …).'),
   }),
   run: (doc, { corners, role = 'wall', thickness, levelId, material }): CommandResult => {
-    const points = Array.isArray(corners) ? corners.map(toVec3) : [];
+    const points = corners.map(toVec3);
     if (points.length < 3 || points.some((point) => point === null)) {
       return noop(doc, 'add_panel failed: corners must be ≥ 3 [x, y, z] points.');
     }
-    if (thickness !== undefined && !(isFiniteNumber(thickness) && thickness > 0)) {
+    if (thickness !== undefined && !(thickness > 0)) {
       return noop(doc, 'add_panel failed: thickness must be > 0.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
@@ -115,8 +111,8 @@ export const addPanel = defineCommand({
     const added = appendPanel(doc, resolution.building, resolution.level.id, {
       corners: points as Vec3[],
       role,
-      ...(thickness !== undefined ? { thickness } : {}),
-      ...(material !== undefined ? { material } : {}),
+      thickness,
+      material,
     });
     if (!added) return noop(doc, 'add_panel failed: the corners do not span a plane.');
     const document = regenerateBuilding(doc, added.building);

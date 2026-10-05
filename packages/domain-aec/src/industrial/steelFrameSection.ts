@@ -7,7 +7,7 @@
  */
 
 import type { SteelProfile } from '../steel/profiles';
-import { E_STEEL, memberBuckling, sectionResistance } from './steelDesign';
+import { eulerForce, memberBuckling, sectionResistance } from './steelDesign';
 import type { FrameDirection } from './steelFrameDetect';
 import { sectionOf } from './steelMemberBars';
 
@@ -82,9 +82,7 @@ export function weakAxisBuckling(
     major: length,
     minor: length,
   });
-  const lambda = Math.sqrt(
-    resistance.axial / ((Math.PI ** 2 * E_STEEL * section.minorInertia) / length ** 2),
-  );
+  const lambda = Math.sqrt(resistance.axial / eulerForce(section.minorInertia, length));
   const axial = Math.max(0, compression);
   const nMinor = axial / (chiMinor * resistance.axial);
   const nMajor = axial / (chiMajor * resistance.axial);

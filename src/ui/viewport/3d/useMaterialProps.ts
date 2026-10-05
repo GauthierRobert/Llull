@@ -16,8 +16,12 @@
 
 import { useMemo } from 'react';
 import * as THREE from 'three';
+import type { Material } from '@core/model/types';
 import { useViewportStore } from '@ui/store';
 import type { DisplayMode } from '@ui/store';
+
+/** Document-material fields that drive a mesh's PBR surface. */
+export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness'>;
 
 interface MaterialProps {
   color: string;
@@ -49,14 +53,7 @@ interface UseMaterialPropsInput {
    * When provided, replaces color/roughness/metalness for the shaded display mode.
    * Wireframe and x-ray modes ignore these to preserve their visual intent.
    */
-  pbrOverride?: {
-    /** Material diffuse/albedo color (hex). */
-    color: string;
-    /** PBR metalness in [0,1]. */
-    metalness: number;
-    /** PBR roughness in [0,1]. */
-    roughness: number;
-  };
+  pbrOverride?: PbrMaterial | undefined;
 }
 
 /**

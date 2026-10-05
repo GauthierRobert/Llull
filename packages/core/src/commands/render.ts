@@ -129,8 +129,6 @@ export const renderView = defineCommand({
     const width = clampPixels(params.width, 800);
     const height = clampPixels(params.height, 600);
     const base = renderDocument(doc, view, width, height);
-    const plural = base.entityCount === 1 ? 'y' : 'ies';
-    let summary = `Rendered ${view} view: ${base.entityCount} entit${plural}, ${width}×${height}.`;
 
     if (params.turntable) {
       const frames = Math.max(1, Math.min(12, Math.round(params.turntable.frames)));
@@ -144,6 +142,8 @@ export const renderView = defineCommand({
     }
 
     let svg = base.svg;
+    const plural = base.entityCount === 1 ? 'y' : 'ies';
+    let summary = `Rendered ${view} view: ${base.entityCount} entit${plural}, ${width}×${height}.`;
     if (params.isolate !== undefined) {
       const ids = typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
       svg = buildIsolateSvg(doc, ids, view, width, height);

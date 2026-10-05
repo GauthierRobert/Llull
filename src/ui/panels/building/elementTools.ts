@@ -7,15 +7,19 @@
 
 import {
   FieldReader,
+  checkbox,
   levelField,
   num,
   onLevel,
   placement,
+  radians,
   result,
+  select,
   txt,
   type ElementTool,
   type ToolField,
 } from './elementToolForm';
+
 const MATERIALS: ReadonlyArray<readonly [string, string]> = [
   ['concrete', 'Concrete'],
   ['masonry', 'Masonry'],
@@ -31,13 +35,7 @@ function wallSectionFields(thickness: string, material: string): ToolField[] {
   return [
     num('thickness', 'Thickness', thickness),
     num('height', 'Height', '', true),
-    {
-      key: 'material',
-      label: 'Material',
-      kind: 'select',
-      defaultValue: material,
-      options: MATERIALS,
-    },
+    select('material', 'Material', material, MATERIALS),
   ];
 }
 
@@ -54,12 +52,8 @@ function wallSection(reader: FieldReader): {
 }
 
 function rectangle(reader: FieldReader): Array<[number, number]> {
-  const [x1, y1, x2, y2] = [
-    reader.number('x1'),
-    reader.number('y1'),
-    reader.number('x2'),
-    reader.number('y2'),
-  ];
+  const [x1, y1] = reader.point('x1', 'y1');
+  const [x2, y2] = reader.point('x2', 'y2');
   return [
     [x1, y1],
     [x2, y1],
@@ -75,13 +69,23 @@ const RECTANGLE_FIELDS = [
   num('y2', 'Y2', '4000'),
 ];
 
+/** Slab / room outline: the level's walls, or the form's rectangle. */
+function outline(
+  reader: FieldReader,
+  wallIds: ReadonlyArray<string>,
+): { wallIds: string[] } | { boundary: Array<[number, number]> } {
+  return reader.text('source') === 'walls'
+    ? { wallIds: [...wallIds] }
+    : { boundary: rectangle(reader) };
+}
+
 export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
   {
     id: 'grid',
     label: 'Structural grid',
     fields: [
-      { key: 'xSpacings', label: 'Bays along X', kind: 'text', defaultValue: '6000, 6000' },
-      { key: 'ySpacings', label: 'Bays along Y', kind: 'text', defaultValue: '5000' },
+      txt('xSpacings', 'Bays along X', '6000, 6000'),
+      txt('ySpacings', 'Bays along Y', '5000'),
     ],
     build: (values) => {
       const reader = new FieldReader(values);
@@ -124,8 +128,8 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'add_wall', {
-        start: [reader.number('x1'), reader.number('y1')],
-        end: [reader.number('x2'), reader.number('y2')],
+        start: reader.point('x1', 'y1'),
+        end: reader.point('x2', 'y2'),
         ...wallSection(reader),
         ...onLevel(context),
       });
@@ -146,9 +150,9 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'add_curved_wall', {
-        start: [reader.number('x1'), reader.number('y1')],
-        through: [reader.number('xm'), reader.number('ym')],
-        end: [reader.number('x2'), reader.number('y2')],
+        start: reader.point('x1', 'y1'),
+        through: reader.point('xm', 'ym'),
+        end: reader.point('x2', 'y2'),
         ...wallSection(reader),
         ...onLevel(context),
       });
@@ -158,15 +162,13 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'wallLayers',
     label: 'Wall build-up',
     fields: [
-      { key: 'allWalls', label: 'Every wall of the level', kind: 'checkbox', defaultValue: 'true' },
-      { key: 'wallId', label: 'Wall', kind: 'select', defaultValue: '', options: 'walls' },
-      {
-        key: 'layers',
-        label: 'Layers (outside → inside)',
-        kind: 'text',
-        defaultValue:
-          '20 render finish; 120 mineral-wool insulation; 200 concrete structure; 13 gypsum finish',
-      },
+      checkbox('allWalls', 'Every wall of the level', true),
+      select('wallId', 'Wall', '', 'walls'),
+      txt(
+        'layers',
+        'Layers (outside → inside)',
+        '20 render finish; 120 mineral-wool insulation; 200 concrete structure; 13 gypsum finish',
+      ),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
@@ -196,20 +198,14 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'door',
     label: 'Door',
     fields: [
-      { key: 'wallId', label: 'Host wall', kind: 'select', defaultValue: '', options: 'hosts' },
+      select('wallId', 'Host wall', '', 'hosts'),
       num('offset', 'Offset from start', '', true),
       num('width', 'Width', '900'),
       num('height', 'Height', '2100'),
-      {
-        key: 'swing',
-        label: 'Hinge',
-        kind: 'select',
-        defaultValue: 'left',
-        options: [
-          ['left', 'Left'],
-          ['right', 'Right'],
-        ],
-      },
+      select('swing', 'Hinge', 'left', [
+        ['left', 'Left'],
+        ['right', 'Right'],
+      ]),
     ],
     build: (values) => {
       const reader = new FieldReader(values);
@@ -227,7 +223,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'window',
     label: 'Window',
     fields: [
-      { key: 'wallId', label: 'Host wall', kind: 'select', defaultValue: '', options: 'hosts' },
+      select('wallId', 'Host wall', '', 'hosts'),
       num('offset', 'Offset from start', '', true),
       num('width', 'Width', '1200'),
       num('height', 'Height', '1200'),
@@ -249,41 +245,25 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'slab',
     label: 'Slab / roof',
     fields: [
-      {
-        key: 'source',
-        label: 'Outline',
-        kind: 'select',
-        defaultValue: 'walls',
-        options: [
-          ['walls', 'Enclosed by level walls'],
-          ['rectangle', 'Rectangle'],
-        ],
-      },
+      select('source', 'Outline', 'walls', [
+        ['walls', 'Enclosed by level walls'],
+        ['rectangle', 'Rectangle'],
+      ]),
       ...RECTANGLE_FIELDS,
       num('thickness', 'Thickness', '200'),
       num('offset', 'Top offset', '0'),
-      {
-        key: 'role',
-        label: 'Role',
-        kind: 'select',
-        defaultValue: 'floor',
-        options: [
-          ['floor', 'Floor'],
-          ['roof', 'Roof'],
-          ['foundation', 'Foundation'],
-        ],
-      },
+      select('role', 'Role', 'floor', [
+        ['floor', 'Floor'],
+        ['roof', 'Roof'],
+        ['foundation', 'Foundation'],
+      ]),
       txt('material', 'Material (concrete, grating…)', '', true),
       levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      const outline =
-        reader.text('source') === 'walls'
-          ? { wallIds: [...context.wallIds] }
-          : { boundary: rectangle(reader) };
       return result(reader, 'add_slab', {
-        ...outline,
+        ...outline(reader, context.wallIds),
         thickness: reader.number('thickness'),
         offset: reader.number('offset'),
         role: reader.text('role'),
@@ -296,18 +276,12 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'slabOpening',
     label: 'Slab opening',
     fields: [
-      {
-        key: 'source',
-        label: 'Opening',
-        kind: 'select',
-        defaultValue: 'stair',
-        options: [
-          ['stair', 'Stair well (slab above)'],
-          ['rectangle', 'Rectangle in slab'],
-        ],
-      },
-      { key: 'stairId', label: 'Stair', kind: 'select', defaultValue: '', options: 'stairs' },
-      { key: 'slabId', label: 'Slab', kind: 'select', defaultValue: '', options: 'slabs' },
+      select('source', 'Opening', 'stair', [
+        ['stair', 'Stair well (slab above)'],
+        ['rectangle', 'Rectangle in slab'],
+      ]),
+      select('stairId', 'Stair', '', 'stairs'),
+      select('slabId', 'Slab', '', 'slabs'),
       num('x1', 'X1', '1000'),
       num('y1', 'Y1', '1000'),
       num('x2', 'X2', '3000'),
@@ -334,24 +308,13 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'column',
     label: 'Column',
     fields: [
-      {
-        key: 'atGrid',
-        label: 'At every grid intersection',
-        kind: 'checkbox',
-        defaultValue: 'false',
-      },
+      checkbox('atGrid', 'At every grid intersection', false),
       num('x', 'X', '0', true),
       num('y', 'Y', '0', true),
-      {
-        key: 'shape',
-        label: 'Shape',
-        kind: 'select',
-        defaultValue: 'rectangular',
-        options: [
-          ['rectangular', 'Rectangular'],
-          ['circular', 'Circular'],
-        ],
-      },
+      select('shape', 'Shape', 'rectangular', [
+        ['rectangular', 'Rectangular'],
+        ['circular', 'Circular'],
+      ]),
       num('width', 'Width / Ø', '300'),
       levelField(),
     ],
@@ -359,7 +322,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       const reader = new FieldReader(values);
       const position = reader.flag('atGrid')
         ? { atGridIntersections: true }
-        : { location: [reader.number('x'), reader.number('y')] };
+        : { location: reader.point('x', 'y') };
       return result(reader, 'add_column', {
         ...position,
         shape: reader.text('shape'),
@@ -383,8 +346,8 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'add_beam', {
-        start: [reader.number('x1'), reader.number('y1')],
-        end: [reader.number('x2'), reader.number('y2')],
+        start: reader.point('x1', 'y1'),
+        end: reader.point('x2', 'y2'),
         width: reader.number('width'),
         depth: reader.number('depth'),
         ...placement(reader, context),
@@ -405,8 +368,8 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     build: (values, context) => {
       const reader = new FieldReader(values);
       return result(reader, 'add_stair', {
-        start: [reader.number('x'), reader.number('y')],
-        angle: (reader.number('direction') * Math.PI) / 180,
+        start: reader.point('x', 'y'),
+        angle: radians(reader.number('direction')),
         width: reader.number('width'),
         treadDepth: reader.number('treadDepth'),
         ...placement(reader, context),
@@ -417,31 +380,21 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     id: 'room',
     label: 'Room',
     fields: [
-      { key: 'name', label: 'Name', kind: 'text', defaultValue: 'Room' },
-      { key: 'number', label: 'Number', kind: 'text', defaultValue: '' },
-      {
-        key: 'source',
-        label: 'Outline',
-        kind: 'select',
-        defaultValue: 'rectangle',
-        options: [
-          ['rectangle', 'Rectangle'],
-          ['walls', 'Inside level walls'],
-        ],
-      },
+      txt('name', 'Name', 'Room'),
+      txt('number', 'Number'),
+      select('source', 'Outline', 'rectangle', [
+        ['rectangle', 'Rectangle'],
+        ['walls', 'Inside level walls'],
+      ]),
       ...RECTANGLE_FIELDS,
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
       if (reader.text('name') === '') return { ok: false, reason: 'A room needs a name.' };
-      const outline =
-        reader.text('source') === 'walls'
-          ? { wallIds: [...context.wallIds] }
-          : { boundary: rectangle(reader) };
       return result(reader, 'add_room', {
         name: reader.text('name'),
         number: reader.text('number') || undefined,
-        ...outline,
+        ...outline(reader, context.wallIds),
         ...onLevel(context),
       });
     },

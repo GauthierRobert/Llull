@@ -3,7 +3,7 @@
  * (O(n²)); used to mesh slabs with openings. @layer lib
  */
 
-import { pointInPolygon, polygonArea, signedArea, type Point2 } from './polygon';
+import { pointInPolygon, polygonArea, segmentsIntersect, signedArea, type Point2 } from './polygon';
 
 function cross(o: Point2, a: Point2, b: Point2): number {
   return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
@@ -11,14 +11,6 @@ function cross(o: Point2, a: Point2, b: Point2): number {
 
 function pointInTriangle(p: Point2, a: Point2, b: Point2, c: Point2): boolean {
   return cross(a, b, p) >= 0 && cross(b, c, p) >= 0 && cross(c, a, p) >= 0;
-}
-
-function segmentsCross(a: Point2, b: Point2, c: Point2, d: Point2): boolean {
-  const d1 = cross(c, d, a);
-  const d2 = cross(c, d, b);
-  const d3 = cross(a, b, c);
-  const d4 = cross(a, b, d);
-  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
 }
 
 /** True when `p` lies on segment a–b strictly between its ends. */
@@ -59,7 +51,7 @@ function bridge(
     const crossesEdge = loops.some((loop) =>
       loop.some((vertex, index) => {
         const next = (loop[(index + 1) % loop.length] as Vertex).point;
-        return segmentsCross(from, to, vertex.point, next);
+        return segmentsIntersect(from, to, vertex.point, next);
       }),
     );
     const grazesVertex = loops.some((loop) =>

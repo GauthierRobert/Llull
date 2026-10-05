@@ -160,13 +160,13 @@ export const distributeAlongPath = defineCommand({
       );
     }
 
-    if (!Number.isFinite(startOffset) || startOffset < 0) {
+    if (startOffset < 0) {
       return noop(
         doc,
         `distribute_along_path: startOffset must be a finite non-negative number (got ${startOffset}).`,
       );
     }
-    if (!Number.isFinite(endOffset) || endOffset < 0) {
+    if (endOffset < 0) {
       return noop(
         doc,
         `distribute_along_path: endOffset must be a finite non-negative number (got ${endOffset}).`,

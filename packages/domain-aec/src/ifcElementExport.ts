@@ -8,6 +8,7 @@ import type {
   OpeningElement,
   WallElement,
 } from '@core/model/building';
+import { orderedElements } from './model';
 import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
 import {
   curvedBandBetween,
@@ -157,10 +158,9 @@ export function exportWallElement(
   const exported = exportWall(context, wall, wallExtent(building, wall), storeyPlacement);
   if (wall.layers) exportWallLayers(context, wall, exported.ref);
   const exports: Exported[] = [wall.layers ? { ...exported, material: null } : exported];
-  for (const id of building.elementOrder) {
-    const opening = building.elements[id];
+  for (const opening of orderedElements(building)) {
     if (
-      (opening?.category === 'door' || opening?.category === 'window') &&
+      (opening.category === 'door' || opening.category === 'window') &&
       opening.hostId === wall.id
     ) {
       exports.push(exportOpening(context, opening, wall, exported));

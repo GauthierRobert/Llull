@@ -12,6 +12,7 @@ import { noop } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
 import { escapeXml } from '@lib/escapeXml';
+import { round } from './numeric';
 
 export const PAPER_SIZES = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
 export type PaperSize = (typeof PAPER_SIZES)[number];
@@ -43,7 +44,8 @@ export function sheetDrawingArea(width: number, height: number): Viewport {
   };
 }
 
-const n = (value: number): string => String(Math.round(value * 100) / 100);
+/** SVG number text: two decimals, no trailing zeros. */
+export const n = (value: number): string => String(round(value));
 
 export interface Viewport {
   readonly x: number;

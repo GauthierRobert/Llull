@@ -119,9 +119,8 @@ export const designFootings = defineCommand({
       Math.max(0, ...designed.map(pick));
     const maxShear = maxOf((row) => row.shearUtilisation);
     const maxPunching = maxOf((row) => row.punchingUtilisation);
-    const format = (row: FootingDesignRow): string => {
-      return `${row.mark}${isResized(row.sizeBefore, row.sizeAfter) ? ` ${sizeText(row.sizeBefore)} → ${sizeText(row.sizeAfter)}` : ''} H${row.barDiameter} @ ${row.spacing} (As ${round(row.asRequired, 0)} ≤ ${round(row.asProvided ?? 0, 0)} mm²/m, shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)}${row.punchingDistance > 0 ? ` at a=${round(row.punchingDistance, 0)} mm` : ''})`;
-    };
+    const format = (row: FootingDesignRow): string =>
+      `${row.mark}${isResized(row.sizeBefore, row.sizeAfter) ? ` ${sizeText(row.sizeBefore)} → ${sizeText(row.sizeAfter)}` : ''} H${row.barDiameter} @ ${row.spacing} (As ${round(row.asRequired, 0)} ≤ ${round(row.asProvided ?? 0, 0)} mm²/m, shear ${round(row.shearUtilisation)}, punching ${round(row.punchingUtilisation)}${row.punchingDistance > 0 ? ` at a=${round(row.punchingDistance, 0)} mm` : ''})`;
     const document = changed.length > 0 ? { ...doc, building: next } : doc;
     return {
       document,
