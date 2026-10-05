@@ -10,6 +10,7 @@
  */
 
 import { Router, type RequestHandler } from 'express';
+import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
 import { subscribeLive, getLiveSnapshot } from './liveDocument';
 import { guardMutation } from './security';
@@ -41,15 +42,11 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
 
   router.post('/command', restLimiter, mutationGuard, (req, res) => {
     const body = req.body as unknown;
-    if (typeof body !== 'object' || body === null || !('name' in body)) {
+    if (!isRecord(body) || !('name' in body)) {
       res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
       return;
     }
-    const { name, params, commandId } = body as {
-      name: unknown;
-      params?: unknown;
-      commandId?: unknown;
-    };
+    const { name, params, commandId } = body;
     if (typeof name !== 'string' || name.length === 0) {
       res.status(400).json({ error: '"name" must be a non-empty string.' });
       return;

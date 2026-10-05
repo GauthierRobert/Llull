@@ -27,10 +27,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
-// ---------------------------------------------------------------------------
-// Types — narrow the loosely-typed SDK content array
-// ---------------------------------------------------------------------------
-
 interface TextContent {
   type: 'text';
   text: string;
@@ -41,10 +37,6 @@ type ContentItem = TextContent | { type: string };
 function isTextContent(item: ContentItem): item is TextContent {
   return item.type === 'text' && typeof (item as TextContent).text === 'string';
 }
-
-// ---------------------------------------------------------------------------
-// Parse tool result
-// ---------------------------------------------------------------------------
 
 interface ParsedToolResult {
   /** The command summary (first text block). */
@@ -68,9 +60,15 @@ function parseToolResult(result: { content: ContentItem[]; isError?: boolean }):
   return { summary, affected, isError: result.isError === true };
 }
 
-// ---------------------------------------------------------------------------
-// Pretty-print helpers
-// ---------------------------------------------------------------------------
+/** tools/call, with the SDK's compatibility result narrowed to the content form. */
+async function callAndParse(
+  client: Client,
+  name: string,
+  args: Record<string, unknown>,
+): Promise<ParsedToolResult> {
+  const raw = await client.callTool({ name, arguments: args });
+  return parseToolResult(raw as { content: ContentItem[]; isError?: boolean });
+}
 
 function printStep(step: number, toolName: string, result: ParsedToolResult): void {
   console.log(`\nStep ${step}: ${toolName}`);
@@ -83,15 +81,11 @@ function printStep(step: number, toolName: string, result: ParsedToolResult): vo
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 async function main(): Promise<void> {
   const mcpUrl = process.env['MCP_URL'] ?? 'http://localhost:3001/mcp';
   const authToken = process.env['MCP_AUTH_TOKEN'];
 
-  // Build request headers — only add Authorization when token is provided.
+  // Only add Authorization when a token is provided.
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
@@ -106,7 +100,6 @@ async function main(): Promise<void> {
     { capabilities: {} },
   );
 
-  // --- Connect ---
   console.log(`Connecting to llull MCP server at ${mcpUrl} ...`);
   // Cast to Transport: StreamableHTTPClientTransport's `sessionId` getter returns
   // `string | undefined`, which is incompatible with Transport's optional `sessionId?`
@@ -127,7 +120,6 @@ async function main(): Promise<void> {
 
   console.log('Connected.\n');
 
-  // --- Step 0: List tools ---
   const { tools } = await client.listTools();
   console.log(`tools/list → ${tools.length} tool(s) registered:`);
   tools.forEach((t) => console.log(`  - ${t.name}`));
@@ -137,39 +129,24 @@ async function main(): Promise<void> {
     await client.callTool({ name: 'enable_toolset', arguments: { toolset } });
   }
 
-  // --- Step 1: add_box ---
-  const boxRaw = await client.callTool({
-    name: 'add_box',
-    arguments: { size: [2, 2, 2], position: [0, 0, 0] },
+  const boxResult = await callAndParse(client, 'add_box', {
+    size: [2, 2, 2],
+    position: [0, 0, 0],
   });
-  // callTool can return a compatibility shape; narrow to the content form.
-  const boxResult = parseToolResult(boxRaw as { content: ContentItem[]; isError?: boolean });
   printStep(1, 'add_box', boxResult);
 
-  // --- Step 2: draw_circle ---
-  const circleRaw = await client.callTool({
-    name: 'draw_circle',
-    arguments: { center: [0, 0], radius: 1 },
-  });
-  const circleResult = parseToolResult(circleRaw as { content: ContentItem[]; isError?: boolean });
+  const circleResult = await callAndParse(client, 'draw_circle', { center: [0, 0], radius: 1 });
   printStep(2, 'draw_circle', circleResult);
 
-  // --- Step 3: extrude_sketch (uses the circle id from step 2) ---
+  // extrude_sketch uses the circle id from step 2.
   const circleId = circleResult.affected[0];
   if (!circleId) {
     console.error('\nCould not find circle entity id in step 2 result — skipping extrude_sketch.');
   } else {
-    const extrudeRaw = await client.callTool({
-      name: 'extrude_sketch',
-      arguments: { id: circleId, depth: 3 },
-    });
-    const extrudeResult = parseToolResult(
-      extrudeRaw as { content: ContentItem[]; isError?: boolean },
-    );
+    const extrudeResult = await callAndParse(client, 'extrude_sketch', { id: circleId, depth: 3 });
     printStep(3, `extrude_sketch (source: ${circleId})`, extrudeResult);
   }
 
-  // --- Done ---
   await client.close();
   console.log('\nDone. Client closed cleanly.');
 }

@@ -1,59 +1,32 @@
 /**
  * @layer mcp
- * Barrel — re-exports the public surface of the MCP tool layer.
- *
- * Consumers (server/mcp transport, tests) import from '.'.
- * The concrete transport (stdio / HTTP) belongs in `server/` — never here.
+ * Barrel — the public surface of the MCP tool layer, imported by `server/` and tests. Types and
+ * helpers used only inside one module stay private to it. The concrete transport (stdio / HTTP)
+ * belongs in `server/` — never here.
  */
 
-export type { McpToolDefinition } from './tools';
 export { buildMcpTools } from './tools';
-
-export type { McpTextContent, McpShapedResult } from './dispatch';
 export { shapeToolCallContent } from './dispatch';
-
-export type { McpResourceDescriptor, McpResourceContent, CadResourceUri } from './resources';
-export {
-  listMcpResources,
-  readMcpResource,
-  readConventionsResource,
-  CAD_RESOURCE_URIS,
-} from './resources';
-
+export { listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from './resources';
 export { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
-
-export type {
-  McpPromptMessage,
-  McpPromptArgument,
-  McpPromptDescriptor,
-  McpPromptResult,
-} from './prompts';
 export { listMcpPrompts, getMcpPrompt } from './prompts';
 
-export type {
-  CadExchangePort,
-  ExchangeDeps,
-  ExchangeCommandResult,
-  ProgramRun,
-  PythonLanguage,
-  StepFile,
-} from './exchangeTools';
+export type { CadExchangePort, ProgramRun, PythonLanguage } from './exchangeTools';
 export {
   buildExchangeToolDefinitions,
   applyExchangeToolCall,
   exportStepFile,
 } from './exchangeTools';
 
-export type { ToolSearchResult, DiscoveryOutcome } from './discovery';
+export type { ToolSearchResult } from './discovery';
 export {
+  buildAllMcpTools,
   buildDiscoveryToolDefinitions,
   applyDiscoveryToolCall,
   searchTools,
-  SEARCH_TOOLS_DEFAULT_LIMIT,
-  SEARCH_TOOLS_MAX_LIMIT,
 } from './discovery';
 
-export type { ToolsetName, ParsedToolsets } from './toolsets';
+export type { ToolsetName } from './toolsets';
 export {
   TOOLSET_NAMES,
   TOOLSETS,

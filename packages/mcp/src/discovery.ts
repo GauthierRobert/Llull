@@ -10,6 +10,7 @@
  * @pure the only mutation is the injected per-session `enabledToolsets` set, by `enable_toolset`.
  */
 
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { buildMcpTools, type McpToolDefinition } from './tools';
 import { buildExchangeToolDefinitions } from './exchangeTools';
@@ -23,16 +24,14 @@ export interface ToolSearchResult {
   readonly description: string;
 }
 
-export interface DiscoveryOutcome {
+interface DiscoveryOutcome {
   readonly result: McpShapedResult;
   /** true when the session's tool list changed (host must send tools/list_changed). */
   readonly toolsListChanged: boolean;
 }
 
-export const SEARCH_TOOLS_DEFAULT_LIMIT = 10;
-export const SEARCH_TOOLS_MAX_LIMIT = 50;
-
-const DISCOVERY_TOOLS = new Set(['search_tools', 'enable_toolset']);
+const SEARCH_TOOLS_DEFAULT_LIMIT = 10;
+const SEARCH_TOOLS_MAX_LIMIT = 50;
 
 export function buildDiscoveryToolDefinitions(): McpToolDefinition[] {
   return [
@@ -78,17 +77,13 @@ export function buildDiscoveryToolDefinitions(): McpToolDefinition[] {
   ];
 }
 
-interface CatalogEntry {
-  readonly name: string;
-  readonly description: string;
-}
-
-function toolCatalog(): CatalogEntry[] {
+/** Every tool a session can be served: registry commands + exchange + discovery meta-tools. */
+export function buildAllMcpTools(): McpToolDefinition[] {
   return [
     ...buildMcpTools(),
     ...buildExchangeToolDefinitions(),
     ...buildDiscoveryToolDefinitions(),
-  ].map(({ name, description }) => ({ name, description }));
+  ];
 }
 
 function tokenize(text: string): string[] {
@@ -99,13 +94,17 @@ function tokenize(text: string): string[] {
 }
 
 /** Keyword score: name-token match 10, name substring 5, toolset name 2, description substring 1. */
-function scoreEntry(entry: CatalogEntry, toolset: ToolsetName, tokens: readonly string[]): number {
-  const nameTokens = tokenize(entry.name);
-  const description = entry.description.toLowerCase();
+function scoreTool(
+  tool: McpToolDefinition,
+  toolset: ToolsetName,
+  tokens: readonly string[],
+): number {
+  const nameTokens = tokenize(tool.name);
+  const description = tool.description.toLowerCase();
   let score = 0;
   for (const token of tokens) {
     if (nameTokens.includes(token)) score += 10;
-    else if (entry.name.includes(token)) score += 5;
+    else if (tool.name.includes(token)) score += 5;
     if (toolset === token) score += 2;
     if (description.includes(token)) score += 1;
   }
@@ -123,19 +122,19 @@ export function searchTools(
 ): ToolSearchResult[] {
   const tokens = tokenize(query);
   if (tokens.length === 0) return [];
-  return toolCatalog()
-    .map((entry) => {
-      const toolset = toolsetOf(entry.name) ?? 'core';
-      return { entry, toolset, score: scoreEntry(entry, toolset, tokens) };
+  return buildAllMcpTools()
+    .map((tool) => {
+      const toolset = toolsetOf(tool.name) ?? 'core';
+      return { tool, toolset, score: scoreTool(tool, toolset, tokens) };
     })
     .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
+    .sort((a, b) => b.score - a.score || a.tool.name.localeCompare(b.tool.name))
     .slice(0, limit)
-    .map(({ entry, toolset }) => ({
-      name: entry.name,
+    .map(({ tool, toolset }) => ({
+      name: tool.name,
       toolset,
-      enabled: isToolEnabled(entry.name, enabledToolsets),
-      description: entry.description,
+      enabled: isToolEnabled(tool.name, enabledToolsets),
+      description: tool.description,
     }));
 }
 
@@ -157,12 +156,8 @@ function runSearchTools(
 ): DiscoveryOutcome {
   const query = typeof args.query === 'string' ? args.query.trim() : '';
   if (query === '') return outcome('search_tools: query must be a non-empty string.', true);
-  const rawLimit =
-    typeof args.limit === 'number' && Number.isFinite(args.limit) ? args.limit : null;
-  const limit = Math.min(
-    SEARCH_TOOLS_MAX_LIMIT,
-    Math.max(1, Math.floor(rawLimit ?? SEARCH_TOOLS_DEFAULT_LIMIT)),
-  );
+  const requestedLimit = isFiniteNumber(args.limit) ? args.limit : SEARCH_TOOLS_DEFAULT_LIMIT;
+  const limit = Math.min(SEARCH_TOOLS_MAX_LIMIT, Math.max(1, Math.floor(requestedLimit)));
   const results = searchTools(query, limit, enabledToolsets);
   if (results.length === 0) {
     return outcome(`search_tools: no tools match "${query}".`, false, { results });
@@ -209,9 +204,13 @@ export function applyDiscoveryToolCall(
   rawArgs: unknown,
   enabledToolsets: Set<ToolsetName>,
 ): DiscoveryOutcome | null {
-  if (!DISCOVERY_TOOLS.has(toolName)) return null;
   const args = isRecord(rawArgs) ? rawArgs : {};
-  return toolName === 'search_tools'
-    ? runSearchTools(args, enabledToolsets)
-    : runEnableToolset(args, enabledToolsets);
+  switch (toolName) {
+    case 'search_tools':
+      return runSearchTools(args, enabledToolsets);
+    case 'enable_toolset':
+      return runEnableToolset(args, enabledToolsets);
+    default:
+      return null;
+  }
 }

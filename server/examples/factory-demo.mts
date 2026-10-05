@@ -71,6 +71,8 @@ async function main(): Promise<void> {
   }
 
   const ids = (data: Data): string[] => (data['elementIds'] as string[] | undefined) ?? [];
+  const save = (name: string, text: unknown): void =>
+    writeFileSync(join(outDir, name), String(text ?? ''));
 
   // ── 1. Project ────────────────────────────────────────────────────────────────
   await call('clear_document');
@@ -372,19 +374,17 @@ async function main(): Promise<void> {
   });
   const estimate = await call('estimate_cost');
   const takeoff = await call('quantity_takeoff', {}, { quiet: true });
-  writeFileSync(join(outDir, 'quantity-takeoff.csv'), String(takeoff['csv'] ?? ''));
-  writeFileSync(join(outDir, 'cost-estimate.csv'), String(estimate['csv'] ?? ''));
+  save('quantity-takeoff.csv', takeoff['csv']);
+  save('cost-estimate.csv', estimate['csv']);
   for (const kind of ['member', 'connection', 'plate', 'door', 'window', 'room', 'equipment']) {
     const schedule = await call('building_schedule', { kind }, { quiet: true });
-    writeFileSync(join(outDir, `schedule-${kind}.csv`), String(schedule['csv'] ?? ''));
+    save(`schedule-${kind}.csv`, schedule['csv']);
   }
   console.log(
     '• building_schedule ×7 (members, connections, base plates, doors, windows, rooms, equipment)',
   );
 
   // ── 8. Deliverables ───────────────────────────────────────────────────────────
-  const save = (name: string, text: unknown): void =>
-    writeFileSync(join(outDir, name), String(text ?? ''));
   /** Drawing tools return their sheet as a PNG image block (the server rasterises SVG results). */
   const saveImage = (name: string, data: Data): void => {
     if (typeof data['png'] === 'string')

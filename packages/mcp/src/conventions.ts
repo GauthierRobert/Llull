@@ -1,23 +1,11 @@
 /**
  * @layer mcp
- *
- * Agent modeling conventions guide — pure, framework-agnostic.
- *
- * This module exports the authoritative guide an MCP agent should read BEFORE
- * modeling. It is exposed as the `cad://conventions` MCP resource.
- *
- * No DOM / fetch / react — this is a pure core module (L2).
- *
+ * The agent modeling conventions guide an MCP agent should read BEFORE modeling, exposed as the
+ * `cad://conventions` resource. A RESOURCE, never a registry command: the
+ * `buildMcpTools().length === listCommands().length` invariant must hold.
  * @pure
  */
 
-/**
- * The full modeling conventions guide as a Markdown string.
- *
- * CRITICAL: This is a RESOURCE, not a tool. It must NEVER be added to the
- * command registry. The `buildMcpTools().length === listCommands().length`
- * invariant must hold.
- */
 export const CONVENTIONS_GUIDE: string = `# llull CAD — Agent Modeling Conventions
 
 Read this BEFORE creating or editing geometry. It defines the world frame,
@@ -173,5 +161,4 @@ the code lists every parameter, dimension and feature in build order. Edit it an
 send it back with \`import_code\` to regenerate an editable feature history.
 `;
 
-/** The URI for the conventions resource. */
 export const CONVENTIONS_URI = 'cad://conventions' as const;

@@ -240,7 +240,7 @@ export function createPythonExchangePort(config: PythonExchangeConfig): CadExcha
     ...port,
     async readExchangeFile(relative, encoding): Promise<string> {
       const target = await confinedPath(root, relative, 'read');
-      return readFile(target, encoding === 'base64' ? 'base64' : 'utf8');
+      return readFile(target, encoding);
     },
     async writeExchangeFile(fileName, base64): Promise<string> {
       await mkdir(root, { recursive: true });

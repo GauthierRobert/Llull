@@ -1,18 +1,12 @@
 /**
  * @layer mcp
+ * MCP resources — read-only views of the live document, so an agent can orient without calling a
+ * mutating tool first. Pure over the document; transport wiring lives in `server/`.
  *
- * MCP resource builders — pure, framework-agnostic.
- *
- * Three read-only resources expose the server's current document state to an
- * MCP agent without the agent having to call any mutating tool first.
- *
- * Resource URIs:
- *   cad://document  — full serialized CadDocument (llull-document envelope, current version)
- *   cad://scene     — structured SceneSnapshot (entity ids/kinds/bounds/layers/groups/selection)
- *   cad://selection — currently selected entity ids + their kind/position summaries
- *
- * All functions are pure over the document: they read, never mutate.
- * No fetch, no DOM, no SDK imports — transport wiring lives in server/.
+ *   cad://document     full serialized CadDocument (llull-document envelope, current version)
+ *   cad://scene        structured SceneSnapshot (entity ids/kinds/bounds/layers/groups/selection)
+ *   cad://selection    selected entity ids + their kind/position summaries
+ *   cad://conventions  static agent modeling guide (Markdown)
  *
  * @pure
  */
@@ -22,28 +16,21 @@ import { serializeDocument } from '@core/commands/persistence';
 import { computeSceneSnapshot } from '@core/commands/scene';
 import { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 
-/**
- * A single resource listing entry, matching the MCP `Resource` schema.
- * The transport layer casts this to the SDK's type; we keep no SDK dep here.
- */
-export interface McpResourceDescriptor {
+/** A resource listing entry (MCP `Resource`); the transport casts it to the SDK type. */
+interface McpResourceDescriptor {
   uri: string;
   name: string;
   description: string;
   mimeType: string;
 }
 
-/**
- * A single text-content block for a resource read result.
- * Mirrors the MCP `TextResourceContents` schema.
- */
-export interface McpResourceContent {
+/** A text resource read result (MCP `TextResourceContents`). */
+interface McpResourceContent {
   uri: string;
   mimeType: string;
   text: string;
 }
 
-/** The URIs this module exposes. */
 export const CAD_RESOURCE_URIS = {
   document: 'cad://document',
   scene: 'cad://scene',
@@ -51,14 +38,7 @@ export const CAD_RESOURCE_URIS = {
   conventions: CONVENTIONS_URI,
 } as const;
 
-export type CadResourceUri = (typeof CAD_RESOURCE_URIS)[keyof typeof CAD_RESOURCE_URIS];
-
-/**
- * Return the static list of resource descriptors.
- *
- * @pure — no document needed; just metadata.
- * @layer mcp
- */
+/** @pure static metadata; needs no document */
 export function listMcpResources(): McpResourceDescriptor[] {
   return [
     {
@@ -99,90 +79,38 @@ export function listMcpResources(): McpResourceDescriptor[] {
   ];
 }
 
-/**
- * Read `cad://document` — full serialized CadDocument.
- *
- * @pure over doc
- * @layer mcp
- */
-function readDocumentResource(doc: CadDocument): McpResourceContent {
-  return {
-    uri: CAD_RESOURCE_URIS.document,
-    mimeType: 'application/json',
-    text: serializeDocument(doc),
-  };
-}
+const jsonResource = (uri: string, text: string): McpResourceContent => ({
+  uri,
+  mimeType: 'application/json',
+  text,
+});
 
-/**
- * Read `cad://scene` — structured SceneSnapshot.
- *
- * @pure over doc
- * @layer mcp
- */
-function readSceneResource(doc: CadDocument): McpResourceContent {
-  const snapshot = computeSceneSnapshot(doc);
-  return {
-    uri: CAD_RESOURCE_URIS.scene,
-    mimeType: 'application/json',
-    text: JSON.stringify(snapshot),
-  };
-}
-
-/**
- * Read `cad://selection` — selected entity ids + kind/position summaries.
- *
- * @pure over doc
- * @layer mcp
- */
-function readSelectionResource(doc: CadDocument): McpResourceContent {
-  const selected = doc.selection.map((id) => {
+/** `cad://selection` payload: selected ids with kind/position (`unknown` for a dangling id). */
+function selectionSummary(doc: CadDocument): { count: number; entities: unknown[] } {
+  const entities = doc.selection.map((id) => {
     const e = doc.entities[id];
-    if (!e) return { id, kind: 'unknown', position: null };
-    return { id, kind: e.kind, position: e.position };
+    return e ? { id, kind: e.kind, position: e.position } : { id, kind: 'unknown', position: null };
   });
-  return {
-    uri: CAD_RESOURCE_URIS.selection,
-    mimeType: 'application/json',
-    text: JSON.stringify({ count: selected.length, entities: selected }),
-  };
+  return { count: entities.length, entities };
 }
 
 /**
- * Read `cad://conventions` — static agent modeling guide (Markdown).
- *
- * Document-independent: the guide is static content, not derived from the doc.
- *
- * @pure
- * @layer mcp
- */
-export function readConventionsResource(): McpResourceContent {
-  return {
-    uri: CAD_RESOURCE_URIS.conventions,
-    mimeType: 'text/markdown',
-    text: CONVENTIONS_GUIDE,
-  };
-}
-
-/**
- * Dispatch a resource read by URI.
- *
- * Returns `null` when the URI is not one of the known resources
- * (the transport should reply with an appropriate error).
+ * Dispatch a resource read by URI. Document-independent resources (conventions) ignore `doc`.
  *
  * @pure over doc
  * @layer mcp
- * @failure unknown URI -> null
+ * @failure unknown URI -> null (the transport replies with an error)
  */
 export function readMcpResource(doc: CadDocument, uri: string): McpResourceContent | null {
   switch (uri) {
     case CAD_RESOURCE_URIS.document:
-      return readDocumentResource(doc);
+      return jsonResource(uri, serializeDocument(doc));
     case CAD_RESOURCE_URIS.scene:
-      return readSceneResource(doc);
+      return jsonResource(uri, JSON.stringify(computeSceneSnapshot(doc)));
     case CAD_RESOURCE_URIS.selection:
-      return readSelectionResource(doc);
+      return jsonResource(uri, JSON.stringify(selectionSummary(doc)));
     case CAD_RESOURCE_URIS.conventions:
-      return readConventionsResource();
+      return { uri, mimeType: 'text/markdown', text: CONVENTIONS_GUIDE };
     default:
       return null;
   }

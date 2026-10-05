@@ -5,7 +5,7 @@
  */
 
 import type { Request, RequestHandler, Response } from 'express';
-import { buildRateLimiter, hasValidBearer } from '../security';
+import { UNAUTHORIZED_BODY, buildRateLimiter, hasValidBearer } from '../security';
 
 /**
  * Bearer-token auth guard.
@@ -24,7 +24,7 @@ export function buildAuthMiddleware(): (req: Request, res: Response, next: () =>
   }
   return (req: Request, res: Response, next: () => void) => {
     if (!hasValidBearer(req, token)) {
-      res.status(401).json({ error: 'Unauthorized — valid Bearer token required.' });
+      res.status(401).json(UNAUTHORIZED_BODY);
       return;
     }
     next();
@@ -36,7 +36,5 @@ export function buildAuthMiddleware(): (req: Request, res: Response, next: () =>
  * minutes); override via `MCP_RATE_LIMIT_MAX` / `MCP_RATE_LIMIT_WINDOW_MS`.
  */
 export function buildMcpRateLimiter(): RequestHandler {
-  const windowMs = Number.parseInt(process.env['MCP_RATE_LIMIT_WINDOW_MS'] ?? '', 10) || 60_000;
-  const max = Number.parseInt(process.env['MCP_RATE_LIMIT_MAX'] ?? '', 10) || 600;
-  return buildRateLimiter(max, windowMs);
+  return buildRateLimiter('MCP_RATE_LIMIT_MAX', 'MCP_RATE_LIMIT_WINDOW_MS');
 }

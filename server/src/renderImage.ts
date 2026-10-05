@@ -1,25 +1,14 @@
 /**
  * @layer server
  *
- * SVG → PNG rasterization helper for MCP image content blocks.
- *
- * Uses @resvg/resvg-js (napi-rs, prebuilt binaries — no build toolchain needed).
- * Isolated here so mcp.ts stays transport-only and this helper is unit-testable.
- *
- * Architecture note: this file exists because rasterization is a server-side
- * side effect (native binary + I/O).  It MUST NOT be moved to core/mcp (L2:
- * core is fetch/native-free).
+ * SVG → PNG rasterization for MCP image content blocks, via @resvg/resvg-js (napi-rs, prebuilt
+ * binaries). Server-side because it is a native-binary side effect: it MUST NOT move to core/mcp (L2).
  */
 
 import { Resvg } from '@resvg/resvg-js';
+import { isRecord } from '@lib/isRecord';
 
-/**
- * An MCP image content block.
- *
- * Shape required by the MCP SDK's CallToolResult `content` array.
- * `data` is a base64-encoded PNG with NO `data:` URI prefix — the SDK
- * or host handles the URI wrapping when needed.
- */
+/** An MCP image content block; `data` is base64 PNG with NO `data:` URI prefix. */
 interface ImageContentBlock {
   type: 'image';
   data: string;
@@ -27,15 +16,9 @@ interface ImageContentBlock {
 }
 
 /**
- * Rasterize an SVG string to a base64-encoded PNG.
- *
- * Returns `null` (never throws) when rasterization fails — callers must treat
- * null as "no image available" and fall back to text-only content.
- *
- * @param svg   - A complete, self-contained SVG document string.
- * @param width - Render width in pixels (height scales proportionally).
- *                Defaults to the SVG's intrinsic width when omitted or ≤ 0.
- * @returns base64 PNG string (no `data:` prefix), or null on failure.
+ * Rasterize a complete SVG document to a base64 PNG, `width` px wide (height scales; intrinsic
+ * width when omitted or ≤ 0).
+ * @failure rasterization error → null (never throws): callers fall back to text-only content
  */
 export function rasterizeSvg(svg: string, width?: number): string | null {
   try {
@@ -43,76 +26,31 @@ export function rasterizeSvg(svg: string, width?: number): string | null {
       typeof width === 'number' && width > 0
         ? { fitTo: { mode: 'width' as const, value: width } }
         : {};
-    const resvg = new Resvg(svg, opts);
-    const pngBuffer = resvg.render().asPng();
-    return pngBuffer.toString('base64');
+    return new Resvg(svg, opts).render().asPng().toString('base64');
   } catch {
     return null;
   }
 }
 
 /**
- * Strip the `svg` field from a data record before text/structured content shaping.
- *
- * When a command result carries `data.svg` and we rasterize it to a PNG image
- * block, the raw SVG markup is redundant in the text/JSON representation — it is
- * multi-KB of `<polygon>` noise that burns agent context without adding value.
- * The other metadata fields (`bounds`, `camera`, `entityCount`, `width`, `height`,
- * `view`) remain so non-multimodal clients and programmatic agents keep them.
- *
- * Called by the `tools/call` handler in `mcp.ts` AFTER confirming an image block
- * was produced (i.e. `buildImageBlock` returned non-null). Only strips when `data`
- * is a plain record; returns `data` unchanged for arrays or non-objects.
- *
- * @pure — returns a new object, never mutates the input.
- * @layer server
- *
- * @param data - The `data` field from a CommandBusResult.
- * @returns A new record with `svg` omitted, or the original value if not a record.
+ * Drop `svg` from a data record once it is rasterized: the multi-KB markup burns agent context while
+ * the other fields (`bounds`, `camera`, `width`, …) stay for non-multimodal clients.
+ * @pure returns a new record; non-record data is returned unchanged
  */
 export function stripSvgFromData(data: unknown): unknown {
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-    return data;
-  }
-  const record = data as Record<string, unknown>;
-  const rest: Record<string, unknown> = {};
-  for (const key of Object.keys(record)) {
-    if (key !== 'svg') rest[key] = record[key];
-  }
-  return rest;
+  if (!isRecord(data)) return data;
+  return Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'svg'));
 }
 
 /**
- * Build an MCP image content block from a busResult's `data` field.
- *
- * Triggers when `data.svg` is a non-empty string — generic, not command-specific.
- * Any future SVG-emitting command gets an image block for free.
- *
- * Returns `null` when:
- *   - `data` is not a record with a string `svg` field.
- *   - Rasterization fails (malformed SVG, resvg error).
- *
- * @param data - The `data` field from a CommandBusResult (may be undefined).
- * @returns An image content block, or null when no image is available.
+ * Image block for a command result's `data` — generic: any command whose `data.svg` is a non-empty
+ * string gets one, sized by `data.width` when positive.
+ * @failure no svg / rasterization error → null
  */
 export function buildImageBlock(data: unknown): ImageContentBlock | null {
-  if (
-    typeof data !== 'object' ||
-    data === null ||
-    typeof (data as Record<string, unknown>)['svg'] !== 'string'
-  ) {
-    return null;
-  }
-
-  const record = data as Record<string, unknown>;
-  const svg = record['svg'] as string;
-  if (svg.length === 0) return null;
-
-  const width =
-    typeof record['width'] === 'number' && record['width'] > 0 ? record['width'] : undefined;
-
-  const base64 = rasterizeSvg(svg, width);
-  if (base64 === null) return null;
-
-  return { type: 'image', data: base64, mimeType: 'image/png' };
+  if (!isRecord(data)) return null;
+  const { svg, width } = data;
+  if (typeof svg !== 'string' || svg.length === 0) return null;
+  const base64 = rasterizeSvg(svg, typeof width === 'number' ? width : undefined);
+  return base64 === null ? null : { type: 'image', data: base64, mimeType: 'image/png' };
 }

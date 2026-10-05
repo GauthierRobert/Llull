@@ -18,15 +18,13 @@ import {
   type GetPromptResult,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
-  buildMcpTools,
+  buildAllMcpTools,
   shapeToolCallContent,
   listMcpResources,
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
-  buildExchangeToolDefinitions,
   applyExchangeToolCall,
-  buildDiscoveryToolDefinitions,
   applyDiscoveryToolCall,
   isPromptEnabled,
   isToolEnabled,
@@ -46,10 +44,8 @@ function makeErrorResult(message: string): CallToolResult {
 function listTools(enabledToolsets: ReadonlySet<ToolsetName>): {
   tools: { name: string; description: string; inputSchema: { type: 'object' } }[];
 } {
-  const registryTools = buildMcpTools();
-  const metaTools = [...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()];
   return {
-    tools: [...registryTools, ...metaTools]
+    tools: buildAllMcpTools()
       .filter((t) => isToolEnabled(t.name, enabledToolsets))
       .map((t) => ({
         name: t.name,

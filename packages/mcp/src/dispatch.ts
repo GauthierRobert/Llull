@@ -7,10 +7,8 @@
 
 import { isRecord } from '@lib/isRecord';
 
-/** A single content block in an MCP tool result (text variant). */
-export interface McpTextContent {
+interface McpTextContent {
   type: 'text';
-  /** The command `summary` — factual feedback for the calling agent. */
   text: string;
 }
 
@@ -39,35 +37,18 @@ export function shapeToolCallContent(result: {
   isError: boolean;
   data?: unknown;
 }): McpShapedResult {
-  const content: McpTextContent[] = [{ type: 'text', text: result.summary }];
-
-  if (result.affected.length > 0) {
-    content.push({
-      type: 'text',
-      text: `Affected entity ids: ${result.affected.join(', ')}`,
-    });
+  const { summary, affected, isError, data } = result;
+  const content: McpTextContent[] = [{ type: 'text', text: summary }];
+  if (affected.length > 0) {
+    content.push({ type: 'text', text: `Affected entity ids: ${affected.join(', ')}` });
   }
+  if (data === undefined) return { content, isError };
 
-  if (result.data !== undefined) {
-    // Source code (export_code) is shown verbatim so agents read it as code, not as a JSON string.
-    const code = codeText(result.data);
-    const jsonData =
-      code === null
-        ? result.data
-        : { ...(result.data as object), text: '(source code in the next block)' };
-    content.push({
-      type: 'text',
-      text: `\`\`\`json\n${JSON.stringify(jsonData, null, 2)}\n\`\`\``,
-    });
-    if (code !== null) content.push({ type: 'text', text: code });
-    if (isRecord(result.data)) {
-      return {
-        content,
-        isError: result.isError,
-        structuredContent: result.data,
-      };
-    }
-  }
-
-  return { content, isError: result.isError };
+  // Source code (export_code) is shown verbatim so agents read it as code, not as a JSON string.
+  const code = codeText(data);
+  const jsonData =
+    isRecord(data) && code !== null ? { ...data, text: '(source code in the next block)' } : data;
+  content.push({ type: 'text', text: `\`\`\`json\n${JSON.stringify(jsonData, null, 2)}\n\`\`\`` });
+  if (code !== null) content.push({ type: 'text', text: code });
+  return isRecord(data) ? { content, isError, structuredContent: data } : { content, isError };
 }
