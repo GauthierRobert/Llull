@@ -41,7 +41,7 @@ packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / wi
   geometry/                        kernel.ts (GeometryKernel) · kernelCache.ts · kernelChoice.ts
   plugins/                         plugin.ts (CadPlugin) · host.ts (installPlugin)
   codegen/                         CadQuery / build123d / OpenSCAD / FreeCAD emitters
-  lib/                      @lib   Tiny pure helpers (id, hash, polygon, triangulate)
+  lib/                      @lib   Tiny pure helpers (id, hash, polygon, triangulate, lruCache)
 packages/mcp/src/           @mcp   MCP tools/resources/prompts/toolsets/discovery/liveSync over the registry
 packages/domain-aec/src/    @aec   building + industrial plugins (commands, guard, document extension)
 packages/kernel-manifold/src/ @kernel-manifold   Manifold GeometryKernel

@@ -31,9 +31,10 @@ LOAD FIRST: `.claude/rules/architecture.md`, `.claude/rules/conventions.md`,
 1. Read neighbors in the target domain file (e.g. `geometryBasic.ts`, `units.ts`) and copy
    the `defineCommand` skeleton from `conventions.md` (C5). Match the existing style exactly.
    Domain commands (building, industrial) go in their plugin package, not core.
-2. If the op needs a new entity kind: for 3D extend `SolidKind`; for 2D extend
-   `Shape2DKind` (see `.claude/context/model.md`). Add the `*Entity` interface, add it
-   to the `Entity` union (and `SHAPE2D_KINDS` for 2D), and flag that the
+2. If the op needs a new entity kind: add the literal to `SOLID_KINDS` (3D) or
+   `SHAPE2D_KINDS` (2D) — `SolidKind` / `Shape2DKind` derive from them (see
+   `.claude/context/model.md`). Add the `*Entity` interface, add it to the `Entity` union,
+   and flag that the
    viewport needs a render branch (hand that to viewport-engineer). For 2D drafting
    specifics, follow the `draw-2d` skill.
 3. Register: core — import into `registry.ts`, append to `rawDefinitions`, add the name to

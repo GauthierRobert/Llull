@@ -42,7 +42,8 @@ export const arrayGrid = defineCommand({
 - Structured doc-comment tags (`@command @pure @affects @invariant @failure`).
 
 ### 2. New geometry? (only if needed)
-For 3D: extend `SolidKind`. For 2D: extend `Shape2DKind` + `SHAPE2D_KINDS` (see
+For 3D: add the literal to `SOLID_KINDS`. For 2D: add it to `SHAPE2D_KINDS` (the
+`SolidKind` / `Shape2DKind` unions derive from these arrays; see
 `.claude/context/model.md`, and the `draw-2d` skill for drafting specifics). Either way:
 add the `*Entity` interface to `packages/core/src/model/types.ts`, add it to the `Entity`
 union, and note that the viewport needs a matching render branch (hand to `viewport-engineer`).
