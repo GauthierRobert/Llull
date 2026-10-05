@@ -119,6 +119,7 @@ export function framesOf(
       const purlinGap = Math.max(
         ...stations.slice(1).map((x, index) => x - (stations[index] as number)),
       );
+      const unbraced = (purlinGap * length) / Math.max(Math.abs(x1 - x0), 1);
       analysis.push({
         geometry: {
           a: nodeAt(x0, z0, free),
@@ -146,11 +147,7 @@ export function framesOf(
             ]),
           ),
         },
-        lengths: {
-          major: length,
-          minor: (purlinGap * length) / Math.max(Math.abs(x1 - x0), 1),
-          lateralTorsional: (purlinGap * length) / Math.max(Math.abs(x1 - x0), 1),
-        },
+        lengths: { major: length, minor: unbraced, lateralTorsional: unbraced },
       });
     }
     const columnTops: { node: number; height: number; elementId: string }[] = [];

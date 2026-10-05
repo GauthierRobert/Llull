@@ -14,7 +14,7 @@ import { yieldStrength } from './steelDesign';
 /** m/s², converts kg to kN. */
 export const GRAVITY = 9.80665;
 
-export type BarKind = 'column' | 'beam' | 'brace' | 'skipped';
+type BarKind = 'column' | 'beam' | 'brace' | 'skipped';
 
 export interface SteelBar {
   readonly id: string;
@@ -216,6 +216,25 @@ export function compressionClass(profile: SteelProfile, fy: number): 1 | 2 | 3 |
       return null;
   }
 }
+
+/** Means of the groups of `values` whose neighbours (sorted) lie within `tolerance`: the levels they stand at. */
+export const clusterMeans = (values: ReadonlyArray<number>, tolerance: number): number[] => {
+  const groups: number[][] = [];
+  for (const value of [...values].sort((a, b) => a - b)) {
+    const last = groups[groups.length - 1];
+    if (last && value - (last[last.length - 1] as number) <= tolerance) last.push(value);
+    else groups.push([value]);
+  }
+  return groups.map((group) => group.reduce((sum, value) => sum + value, 0) / group.length);
+};
+
+/** Index of the value closest to `target` (the first on a tie). */
+export const nearestIndex = (values: ReadonlyArray<number>, target: number): number =>
+  values.reduce(
+    (best, value, index) =>
+      Math.abs(value - target) < Math.abs((values[best] as number) - target) ? index : best,
+    0,
+  );
 
 /** Shapes the beam check covers (principal-axis bending about the depth axis, no torsion). */
 export const isBeamShape = (profile: SteelProfile): boolean =>

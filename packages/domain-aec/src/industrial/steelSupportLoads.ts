@@ -7,6 +7,7 @@
  * @pure
  */
 
+import { projectOntoSegment } from '@lib/polygon';
 import type { ModelUnits, SteelBar } from './steelMemberBars';
 import type { ColumnNode } from './steelFraming';
 import { addPointLoad, type BeamLoads } from './steelBeamLoads';
@@ -34,7 +35,11 @@ export interface SupportedPipeLoad {
   readonly columnNodes: Array<readonly [string, ColumnNode]>;
 }
 
-/** Tributary length (mm) of each station of `stations`, grouping stations closer than SAME_SUPPORT_DISTANCE. */
+/**
+ * Tributary length (mm) of each support of a run, grouping supports closer than SAME_SUPPORT_DISTANCE.
+ * @param arcs support positions along the run, ascending, mm
+ * @param carriedStart the run start rests on equipment or a header (half span instead of the overhang)
+ */
 export function tributaryLengths(
   arcs: ReadonlyArray<number>,
   length: number,
@@ -102,15 +107,7 @@ export function applySupportedPipe(
     const bar = bars.find((candidate) => candidate.id === station.memberId);
     const beam = beams.find((candidate) => candidate.bar.id === station.memberId);
     if (beam) {
-      const [dx, dy] = [beam.b[0] - beam.a[0], beam.b[1] - beam.a[1]];
-      const squared = dx * dx + dy * dy || 1;
-      const t = Math.max(
-        0,
-        Math.min(
-          1,
-          ((station.point[0] - beam.a[0]) * dx + (station.point[1] - beam.a[1]) * dy) / squared,
-        ),
-      );
+      const { t } = projectOntoSegment([station.point[0], station.point[1]], beam.a, beam.b);
       addPointLoad(beam, t * beam.lengthM * 1000, weight, 0, true);
       if (station.type !== 'hanger') beam.lineSupport = true;
       carried += weight;

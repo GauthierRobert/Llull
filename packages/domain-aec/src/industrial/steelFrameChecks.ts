@@ -8,7 +8,7 @@
  */
 
 import type { FrameResult } from '@lib/frame2d';
-import { memberBuckling, sectionResistance } from './steelDesign';
+import { memberBuckling } from './steelDesign';
 import type { MomentFrame } from './steelFrameDetect';
 import type { BarLayout, FrameSystem } from './steelFrameModel';
 import {
@@ -19,8 +19,17 @@ import {
 } from './steelFrameSection';
 import { driftOf, type FrameSolutions } from './steelFrameSolve';
 import type { BeamResult } from './steelFraming';
-import { compressionClass, isBeamShape, type SteelBar } from './steelMemberBars';
-import { analysedRow, skippedRow, type CheckLine, type MemberRow } from './steelMemberRows';
+import type { SteelBar } from './steelMemberBars';
+import {
+  analysedRow,
+  beamSection,
+  columnSection,
+  metres,
+  skippedRow,
+  ULS_COMBINATION,
+  type CheckLine,
+  type MemberRow,
+} from './steelMemberRows';
 
 export interface FrameCheckInput {
   readonly frame: MomentFrame;
@@ -32,9 +41,11 @@ export interface FrameCheckInput {
   readonly phiText: string;
 }
 
-const metres = (value: number): string => (value / 1000).toFixed(2);
 const kilo = (value: number): number => value / 1000;
 const mega = (value: number): number => value / 1e6;
+
+const combinationOf = (input: FrameCheckInput): string =>
+  `${ULS_COMBINATION} + notional horizontal force ${input.phiText} (frame)`;
 
 /** Keeps the line of highest utilisation. */
 const worstOf = (current: CheckLine | undefined, next: CheckLine): CheckLine =>
@@ -105,25 +116,13 @@ function beamRow(
   layout: BarLayout,
   input: FrameCheckInput,
 ): MemberRow {
-  const profile = bar.profile;
-  if (!profile) return skippedRow(bar, bar.skipReason ?? 'profile not in the catalogue');
-  if (!isBeamShape(profile)) {
-    return skippedRow(
-      bar,
-      `${profile.name}: ${profile.shape} sections as beams (torsion from eccentric load, principal axes) are not covered`,
-    );
-  }
-  const resistance = sectionResistance(profile, bar.fy);
-  if (resistance.sectionClass === 4) {
-    return skippedRow(
-      bar,
-      `${profile.name} is class 4 in bending at fy ${bar.fy}: effective-section resistance is not covered`,
-    );
-  }
+  const gate = beamSection(bar);
+  if ('skipped' in gate) return gate.skipped;
+  const { profile, resistance } = gate;
   const { solutions } = input;
   const length = bar.length;
   const restrained = result.loads.floorSupport || result.loads.lineSupport;
-  const combination = `ULS 1.35 G + 1.5 Q + notional horizontal force ${input.phiText} (frame)`;
+  const combination = combinationOf(input);
   let interaction: CheckLine | undefined;
   let section: CheckLine | undefined;
   let shearLine: CheckLine | undefined;
@@ -183,13 +182,10 @@ function beamRow(
     });
   }
   const deflection = deflectionLine(bar, layout, solutions.slsGravity, input.deflectionRatio);
-  const lines = [interaction, section, shearLine, deflection.line].filter(
-    (line): line is CheckLine => line !== undefined,
-  );
   const jointForces: Record<string, number> = {};
   if (bar.startJoint === 'rigid') jointForces['jointMomentStart'] = mega(joints[0]);
   if (bar.endJoint === 'rigid') jointForces['jointMomentEnd'] = mega(joints[1]);
-  return analysedRow(bar, lines, {
+  return analysedRow(bar, [interaction, section, shearLine, deflection.line], {
     MEd: mega(maxMoment),
     VEd: kilo(maxShear),
     NEd: kilo(maxCompression),
@@ -230,17 +226,9 @@ function deflectionLine(
 }
 
 function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): MemberRow {
-  const profile = bar.profile;
-  if (!profile) return skippedRow(bar, bar.skipReason ?? 'profile not in the catalogue');
-  const sectionClass = compressionClass(profile, bar.fy);
-  if (sectionClass === null || sectionClass === 4) {
-    return skippedRow(
-      bar,
-      sectionClass === null
-        ? `${profile.name}: ${profile.shape} sections in compression (torsional-flexural buckling) are not covered`
-        : `${profile.name} is class 4 in compression at fy ${bar.fy}: effective-section resistance is not covered`,
-    );
-  }
+  const gate = columnSection(bar);
+  if ('skipped' in gate) return gate.skipped;
+  const { profile, sectionClass, resistance } = gate;
   const axis = columnBendingAxis(profile, bar.roll, input.frame.direction);
   if (axis === null) {
     return skippedRow(
@@ -249,10 +237,9 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
     );
   }
   const { solutions, system } = input;
-  const resistance = sectionResistance(profile, bar.fy);
   const bending =
     axis === 'strong' ? resistance : { ...resistance, ...weakAxisResistance(profile, bar.fy) };
-  const combination = `ULS 1.35 G + 1.5 Q + notional horizontal force ${input.phiText} (frame)`;
+  const combination = combinationOf(input);
   const axisText = axis === 'strong' ? 'strong axis' : 'weak axis';
   let interaction: CheckLine | undefined;
   let section: CheckLine | undefined;
@@ -333,10 +320,7 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
           detail: `${input.frame.label}: αcr ${solutions.alphaCritical.toFixed(1)} ≥ 3 (moments amplified by 1/(1 − 1/αcr) below 10)`,
         }
       : undefined;
-  const lines = [interaction, section, shearLine, drift, stability].filter(
-    (line): line is CheckLine => line !== undefined,
-  );
-  return analysedRow(bar, lines, {
+  return analysedRow(bar, [interaction, section, shearLine, drift, stability], {
     NEd: kilo(maxCompression),
     MEd: mega(maxMoment),
     VEd: kilo(maxShear),

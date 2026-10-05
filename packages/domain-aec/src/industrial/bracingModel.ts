@@ -4,7 +4,7 @@
 
 import type { SteelMemberElement } from '@core/model/building';
 import { sectionProperties, type SteelProfile } from '../steel/profiles';
-import { bucklingReduction, E_STEEL } from './steelDesign';
+import { bucklingReduction, eulerForce } from './steelDesign';
 import { CRANE_FACTORS, craneActions } from './frameModelTypes';
 import { bufferForce, GAMMA_BUFFER } from './runwayCheckModel';
 
@@ -47,12 +47,6 @@ export function craneWallForce(
     governing: bufferGroup7 > driveGroup1 ? 'group 7' : 'group 1',
   };
 }
-
-/** EN 1990 partial factor for variable (wind) actions. */
-export const GAMMA_Q = 1.5;
-
-/** EN 1990 6.10 permanent action factor for the equivalent stabilising force. */
-export const GAMMA_G = 1.35;
 
 /** EN 1991-1-4 whole gable (frame): windward pressure 0.8 + leeward suction 0.5. */
 export const CP_GABLE = 0.8 + 0.5;
@@ -118,7 +112,7 @@ function minorImperfection(profile: SteelProfile): number {
 export function bucklingResistance(profile: SteelProfile, fy: number, length: number): number {
   const section = sectionProperties(profile);
   const npl = section.area * fy;
-  const critical = (Math.PI ** 2 * E_STEEL * section.minorInertia) / length ** 2;
+  const critical = eulerForce(section.minorInertia, length);
   return bucklingReduction(Math.sqrt(npl / critical), minorImperfection(profile)) * npl;
 }
 

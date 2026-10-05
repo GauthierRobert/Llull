@@ -8,12 +8,27 @@
  * @pure
  */
 
+import type { StrutForce } from './steelBeamChecks';
 import { memberBuckling, sectionResistance } from './steelDesign';
 import { GAMMA_IMPOSED, GAMMA_PERMANENT, type BeamResult } from './steelFraming';
 import type { ColumnSegment } from './steelColumnChecks';
 import type { FrameCoverage } from './steelFrameDetect';
-import { compressionClass, minorRadius, type SteelBar } from './steelMemberBars';
-import { analysedRow, skippedRow, type CheckLine, type MemberRow } from './steelMemberRows';
+import {
+  clusterMeans,
+  compressionClass,
+  minorRadius,
+  nearestIndex,
+  type SteelBar,
+} from './steelMemberBars';
+import {
+  analysedRow,
+  metres,
+  noProfileRow,
+  skippedRow,
+  ULS_COMBINATION,
+  type CheckLine,
+  type MemberRow,
+} from './steelMemberRows';
 
 type Direction = 'X' | 'Y';
 
@@ -43,7 +58,7 @@ export interface StoreyReport {
 export interface BracingOutcome {
   readonly rows: MemberRow[];
   /** Compression a beam takes as chord of a braced bay, kN. */
-  readonly strutForces: Map<string, { force: number; note: string }>;
+  readonly strutForces: Map<string, StrutForce>;
   readonly storeys: StoreyReport[];
   readonly warnings: string[];
 }
@@ -65,28 +80,17 @@ export const notionalLabel = (factor: number): string =>
   `φ = ${factor > 0 && Math.round(1 / factor) === 1 / factor ? `1/${1 / factor}` : factor}`;
 
 const snap = (value: number): number => Math.round(value / COORDINATE_STEP) * COORDINATE_STEP;
-const metres = (value: number): string => (value / 1000).toFixed(2);
 
 /** Floor levels (top of steel, ascending) of the beams, and the nearest-level lookup. */
 function floorLevels(beams: ReadonlyArray<BeamResult>): {
   levels: number[];
   levelOf: (top: number) => number;
 } {
-  const tops = beams.map((beam) => beam.loads.top).sort((a, b) => a - b);
-  const groups: number[][] = [];
-  for (const top of tops) {
-    const last = groups[groups.length - 1];
-    if (last && top - (last[last.length - 1] as number) <= LEVEL_TOLERANCE) last.push(top);
-    else groups.push([top]);
-  }
-  const levels = groups.map((group) => group.reduce((sum, top) => sum + top, 0) / group.length);
-  const levelOf = (top: number): number =>
-    levels.reduce(
-      (best, level, index) =>
-        Math.abs(level - top) < Math.abs((levels[best] as number) - top) ? index : best,
-      0,
-    );
-  return { levels, levelOf };
+  const levels = clusterMeans(
+    beams.map((beam) => beam.loads.top),
+    LEVEL_TOLERANCE,
+  );
+  return { levels, levelOf: (top) => nearestIndex(levels, top) };
 }
 
 function geometryOf(bar: SteelBar, storey: number): BraceGeometry | undefined {
@@ -131,8 +135,8 @@ function braceRow(
 ): MemberRow {
   const { bar } = geometry;
   const profile = bar.profile;
-  if (!profile) return skippedRow(bar, bar.skipReason ?? 'profile not in the catalogue');
-  const combination = `ULS 1.35 G + 1.5 Q + notional horizontal force ${phiText} (${geometry.direction})`;
+  if (!profile) return noProfileRow(bar);
+  const combination = `${ULS_COMBINATION} + notional horizontal force ${phiText} (${geometry.direction})`;
   const force = (panelShear * bar.length) / geometry.horizontal;
   const resistance = sectionResistance(profile, bar.fy);
   const lines: CheckLine[] = [
@@ -184,7 +188,7 @@ export function checkBracing(
 ): BracingOutcome {
   const { levels, levelOf } = floorLevels(beams);
   const warnings: string[] = [];
-  const strutForces = new Map<string, { force: number; note: string }>();
+  const strutForces = new Map<string, StrutForce>();
   const phiText = notionalLabel(notionalFactor);
   if (levels.length === 0) {
     return {

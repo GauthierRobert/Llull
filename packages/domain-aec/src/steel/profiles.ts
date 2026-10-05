@@ -7,6 +7,7 @@
  */
 
 import type { Vec2 } from '@core/model/types';
+import { round } from '../numeric';
 
 type ProfileShape = 'I' | 'U' | 'C' | 'SHS' | 'RHS' | 'CHS' | 'L';
 
@@ -135,9 +136,16 @@ const UPN = rolled(
   'U',
 );
 
-function computed(base: Omit<SteelProfile, 'massPerMetre' | 'area'>, area: number): SteelProfile {
-  const rounded = Math.round(area * STEEL_DENSITY_KG_PER_MM2_M * 100) / 100;
-  return { ...base, area, massPerMetre: rounded };
+/** Constant-wall-thickness section: `t` is web and flange alike; the mass follows from the area. */
+function thin(
+  family: 'SHS' | 'RHS' | 'CHS' | 'L' | 'C',
+  name: string,
+  { h, b, t, lip = 0 }: { h: number; b: number; t: number; lip?: number },
+  perimeter: number,
+  area: number,
+): SteelProfile {
+  const massPerMetre = round(area * STEEL_DENSITY_KG_PER_MM2_M, 2);
+  return { name, family, shape: family, h, b, tw: t, tf: t, lip, perimeter, area, massPerMetre };
 }
 
 const SHS: SteelProfile[] = (
@@ -154,22 +162,7 @@ const SHS: SteelProfile[] = (
     [250, 10],
     [300, 10],
   ] as const
-).map(([b, t]) =>
-  computed(
-    {
-      name: `SHS${b}x${t}`,
-      family: 'SHS',
-      shape: 'SHS',
-      h: b,
-      b,
-      tw: t,
-      tf: t,
-      lip: 0,
-      perimeter: 4 * b,
-    },
-    4 * t * (b - t),
-  ),
-);
+).map(([b, t]) => thin('SHS', `SHS${b}x${t}`, { h: b, b, t }, 4 * b, 4 * t * (b - t)));
 
 const RHS: SteelProfile[] = (
   [
@@ -181,20 +174,7 @@ const RHS: SteelProfile[] = (
     [300, 200, 10],
   ] as const
 ).map(([h, b, t]) =>
-  computed(
-    {
-      name: `RHS${h}x${b}x${t}`,
-      family: 'RHS',
-      shape: 'RHS',
-      h,
-      b,
-      tw: t,
-      tf: t,
-      lip: 0,
-      perimeter: 2 * (h + b),
-    },
-    2 * t * (h + b - 2 * t),
-  ),
+  thin('RHS', `RHS${h}x${b}x${t}`, { h, b, t }, 2 * (h + b), 2 * t * (h + b - 2 * t)),
 );
 
 const CHS: SteelProfile[] = (
@@ -210,18 +190,11 @@ const CHS: SteelProfile[] = (
     [273, 10],
   ] as const
 ).map(([d, t]) =>
-  computed(
-    {
-      name: `CHS${d}x${t}`,
-      family: 'CHS',
-      shape: 'CHS',
-      h: d,
-      b: d,
-      tw: t,
-      tf: t,
-      lip: 0,
-      perimeter: Math.PI * d,
-    },
+  thin(
+    'CHS',
+    `CHS${d}x${t}`,
+    { h: d, b: d, t },
+    Math.PI * d,
     (Math.PI * (d * d - (d - 2 * t) ** 2)) / 4,
   ),
 );
@@ -238,22 +211,7 @@ const ANGLES: SteelProfile[] = (
     [120, 12],
     [150, 15],
   ] as const
-).map(([b, t]) =>
-  computed(
-    {
-      name: `L${b}x${t}`,
-      family: 'L',
-      shape: 'L',
-      h: b,
-      b,
-      tw: t,
-      tf: t,
-      lip: 0,
-      perimeter: 4 * b,
-    },
-    t * (2 * b - t),
-  ),
-);
+).map(([b, t]) => thin('L', `L${b}x${t}`, { h: b, b, t }, 4 * b, t * (2 * b - t)));
 
 const COLD_FORMED: SteelProfile[] = (
   [
@@ -264,18 +222,11 @@ const COLD_FORMED: SteelProfile[] = (
     [300, 90, 25, 3.0],
   ] as const
 ).map(([h, b, lip, t]) =>
-  computed(
-    {
-      name: `C${h}x${b}x${t.toFixed(1)}`,
-      family: 'C',
-      shape: 'C',
-      h,
-      b,
-      tw: t,
-      tf: t,
-      lip,
-      perimeter: 2 * (h + 2 * b + 2 * lip),
-    },
+  thin(
+    'C',
+    `C${h}x${b}x${t.toFixed(1)}`,
+    { h, b, t, lip },
+    2 * (h + 2 * b + 2 * lip),
     t * (h + 2 * b + 2 * lip - 4 * t),
   ),
 );
@@ -295,10 +246,25 @@ export const STEEL_PROFILES: ReadonlyArray<SteelProfile> = [
   ...ANGLES,
 ];
 
+/** Lightest catalogue profile accepted by `accept`; the first listed on equal mass. */
+export function lightestProfile(
+  accept: (candidate: SteelProfile) => boolean,
+): SteelProfile | undefined {
+  return STEEL_PROFILES.filter(accept).reduce<SteelProfile | undefined>(
+    (lightest, candidate) =>
+      lightest === undefined || candidate.massPerMetre < lightest.massPerMetre
+        ? candidate
+        : lightest,
+    undefined,
+  );
+}
+
 const BY_NAME = new Map(STEEL_PROFILES.map((profile) => [profile.name.toUpperCase(), profile]));
 
-/** Case- and space-insensitive lookup ("ipe 300", "HEA200", "shs100x5"). */
-/** @failure non-string / unknown name -> undefined */
+/**
+ * Case- and space-insensitive lookup ("ipe 300", "HEA200", "shs100x5").
+ * @failure non-string / unknown name -> undefined
+ */
 export function findProfile(name: unknown): SteelProfile | undefined {
   return typeof name === 'string' ? BY_NAME.get(name.replace(/\s+/g, '').toUpperCase()) : undefined;
 }

@@ -6,10 +6,6 @@ import type { SteelMemberElement } from '@core/model/building';
 import type { SteelProfile } from '../steel/profiles';
 import type { RoofCoefficients, RoofZone, ZoneCpe } from './windCoefficients';
 
-export const GAMMA_G = 1.35;
-
-export const GAMMA_Q = 1.5;
-
 /** Internal pressure coefficient: +0.2 maximises uplift / suction, -0.3 maximises wall pressure. */
 export const CPI_SUCTION = 0.2;
 
@@ -55,15 +51,9 @@ export const GRAVITY = 9.81;
 
 export type WallZone = keyof typeof CPE_WALL;
 
-export interface PurlinRow {
-  readonly elementId: string;
-  readonly mark: string;
-  readonly kind: 'purlin' | 'rail';
-  /** Governing wind zone: F / G / H/I (roof) or A / B / C / D (wall). */
-  readonly zone: string;
-  /** Member span between frames, m. */
-  readonly span: number;
-  /** Governing check with its parameters. */
+/** One verification of a member. */
+export interface Verdict {
+  /** Check name with its parameters (a row's governing check adds the member and its tributary). */
   readonly check: string;
   /** Design effect in `unit` (kNm, kN or mm). */
   readonly value: number;
@@ -72,6 +62,17 @@ export interface PurlinRow {
   readonly unit: 'kNm' | 'kN' | 'mm';
   readonly utilisation: number;
   readonly combination: string;
+}
+
+/** Governing verdict of a purlin or rail. */
+export interface PurlinRow extends Verdict {
+  readonly elementId: string;
+  readonly mark: string;
+  readonly kind: 'purlin' | 'rail';
+  /** Governing wind zone: F / G / H/I (roof) or A / B / C / D (wall). */
+  readonly zone: string;
+  /** Member span between frames, m. */
+  readonly span: number;
   /** Purlins only: utilisation of the wind-uplift bending check alone (the zone-dependent one). */
   readonly upliftUtilisation?: number;
 }
@@ -95,13 +96,4 @@ export interface Located {
   readonly length: number;
   readonly yMin: number;
   readonly yMax: number;
-}
-
-export interface Verdict {
-  readonly check: string;
-  readonly value: number;
-  readonly limit: number;
-  readonly unit: 'kNm' | 'kN' | 'mm';
-  readonly utilisation: number;
-  readonly combination: string;
 }

@@ -9,7 +9,7 @@ import { fromMm } from '../model';
 import { buildingConnectionSolids } from './evaluateConnections';
 import { type FrameModel, type WindCase, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
-import { boltResistance } from './steelDesign';
+import { amplificationOf, boltResistance } from './steelDesign';
 
 export interface CheckRow {
   readonly frame: string;
@@ -206,8 +206,7 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     alphaCritical = 0.8 * alphaCritical * Math.max(0, 1 - rafterRatio);
     method = `modified Horne 0.8 αH (1 − N/Ncr), ${steep ? 'roof slope > 26°' : 'rafter N > 0.09 Ncr'}`;
   }
-  const amplification =
-    alphaCritical >= 10 ? 1 : alphaCritical > 1.05 ? 1 / (1 - 1 / alphaCritical) : 20;
+  const amplification = amplificationOf(alphaCritical);
   return { result, alphaCritical, criticalMember, method, amplification };
 }
 

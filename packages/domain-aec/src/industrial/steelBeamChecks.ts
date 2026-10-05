@@ -7,19 +7,23 @@
  * @pure
  */
 
-import { lateralTorsionalReduction, memberBuckling, sectionResistance } from './steelDesign';
+import { lateralTorsionalReduction, memberBuckling } from './steelDesign';
 import type { BeamResult } from './steelFraming';
 import { shearReducedMoment } from './steelFrameSection';
-import { isBeamShape, type SteelBar } from './steelMemberBars';
-import { analysedRow, skippedRow, type CheckLine, type MemberRow } from './steelMemberRows';
+import type { SteelBar } from './steelMemberBars';
+import {
+  analysedRow,
+  beamSection,
+  ULS_COMBINATION,
+  type CheckLine,
+  type MemberRow,
+} from './steelMemberRows';
 
 export interface StrutForce {
   /** Compression, kN. */
   readonly force: number;
   readonly note: string;
 }
-
-const ULS = 'ULS 1.35 G + 1.5 Q';
 
 /**
  * Row of a floor beam.
@@ -32,21 +36,9 @@ export function checkBeam(
   deflectionRatio: number,
   strut: StrutForce | undefined,
 ): MemberRow {
-  const profile = bar.profile;
-  if (!profile) return skippedRow(bar, bar.skipReason ?? 'profile not in the catalogue');
-  if (!isBeamShape(profile)) {
-    return skippedRow(
-      bar,
-      `${profile.name}: ${profile.shape} sections as beams (torsion from eccentric load, principal axes) are not covered`,
-    );
-  }
-  const resistance = sectionResistance(profile, bar.fy);
-  if (resistance.sectionClass === 4) {
-    return skippedRow(
-      bar,
-      `${profile.name} is class 4 in bending at fy ${bar.fy}: effective-section resistance is not covered`,
-    );
-  }
+  const gate = beamSection(bar);
+  if ('skipped' in gate) return gate.skipped;
+  const { profile, resistance } = gate;
   const lengthMm = bar.length;
   const lengthText = `L ${(lengthMm / 1000).toFixed(2)} m`;
   const loads = result.loads;
@@ -70,13 +62,13 @@ export function checkBeam(
     {
       name: `bending (class ${resistance.sectionClass}, ${restrained ? 'LTB restrained' : 'LTB checked'})`,
       utilisation: momentEd / (chiLateral * momentResistance),
-      combination: ULS,
+      combination: ULS_COMBINATION,
       detail: `${profile.name} ${lengthText}, ${restraint}${elastic}: M ${momentEd.toFixed(1)} kNm ≤ ${restrained ? 'Mc,Rd' : `Mb,Rd (χLT ${chiLateral.toFixed(2)})`} ${(chiLateral * momentResistance).toFixed(1)} kNm${reduction}`,
     },
     {
       name: 'shear (§6.2.6)',
       utilisation: shearEd / shearResistance,
-      combination: ULS,
+      combination: ULS_COMBINATION,
       detail: `${profile.name}: V ${shearEd.toFixed(1)} kN ≤ Vpl,Rd ${shearResistance.toFixed(0)} kN`,
     },
   ];
@@ -96,7 +88,7 @@ export function checkBeam(
     lines.push({
       name: 'strut compression + bending (§6.3.3)',
       utilisation: buckling.utilisation,
-      combination: `${ULS} + notional horizontal force`,
+      combination: `${ULS_COMBINATION} + notional horizontal force`,
       detail: `${profile.name} ${lengthText}, ${strut.note}: N ${strut.force.toFixed(1)} kN with M ${momentEd.toFixed(1)} kNm, χ ${Math.min(buckling.chiMajor, buckling.chiMinor).toFixed(2)}, χLT ${buckling.chiLateralTorsional.toFixed(2)}`,
     });
   }

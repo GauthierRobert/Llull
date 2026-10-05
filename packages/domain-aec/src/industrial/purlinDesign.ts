@@ -11,18 +11,14 @@ import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, fromMm, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../evaluateElements';
 import { sweepFrame } from '../mesh';
-import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
-import { nextProfile } from './frameDesign';
+import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
+import { MAX_ITERATIONS, nextProfile } from './frameDesign';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
 import { type PurlinRow } from './purlinModel';
 import { checkPurlins } from './purlinCheckRun';
-
-const MAX_ITERATIONS = 15;
-
-const byMass = (a: { massPerMetre: number }, b: { massPerMetre: number }): number =>
-  a.massPerMetre - b.massPerMetre;
 
 /**
  * Next heavier secondary-steel profile: the next cold-formed C by mass, then the lightest IPE with a
@@ -33,15 +29,15 @@ export function nextSecondaryProfile(name: string): string | null {
   const profile = findProfile(name);
   if (!profile) return null;
   if (profile.shape !== 'C') return nextProfile(name);
-  const heavierC = STEEL_PROFILES.filter(
+  const heavierC = lightestProfile(
     (candidate) => candidate.family === 'C' && candidate.massPerMetre > profile.massPerMetre,
-  ).sort(byMass)[0];
+  );
   if (heavierC) return heavierC.name;
   const modulus = sectionProperties(profile).elasticModulus;
-  const ipe = STEEL_PROFILES.filter(
+  const ipe = lightestProfile(
     (candidate) =>
       candidate.family === 'IPE' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
-  ).sort(byMass)[0];
+  );
   return ipe?.name ?? null;
 }
 
@@ -198,11 +194,6 @@ function reseatResized(
   const rafters = members.filter((member) => member.role === 'rafter');
   const xs = members.flatMap((member) => [member.start[0], member.end[0]]);
   const centre = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const shift = (point: Vec3, by: Vec3): Vec3 => [
-    point[0] + by[0],
-    point[1] + by[1],
-    point[2] + by[2],
-  ];
   let next = building;
   for (const id of resizedIds) {
     const member = building.elements[id];
@@ -219,15 +210,15 @@ function reseatResized(
           member.start[0] < Math.max(candidate.start[0], candidate.end[0]) + margin,
       );
       const frame = rafter ? sweepFrame(rafter.start, rafter.end, rafter.roll) : null;
-      if (frame) offset = [frame.v[0] * half, frame.v[1] * half, frame.v[2] * half];
+      if (frame) offset = scale3(frame.v, half);
     } else if (member.role === 'rail') {
       offset = [Math.sign(member.start[0] - centre) * half, 0, 0];
     }
     if (!offset) continue;
     next = withElement(next, {
       ...member,
-      start: shift(member.start, offset),
-      end: shift(member.end, offset),
+      start: add3(member.start, offset),
+      end: add3(member.end, offset),
     });
   }
   return next;

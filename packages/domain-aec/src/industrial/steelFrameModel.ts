@@ -12,9 +12,15 @@ import { E_STEEL } from './steelDesign';
 import type { MomentFrame } from './steelFrameDetect';
 import { inPlaneInertia } from './steelFrameSection';
 import type { BeamResult, ColumnNode } from './steelFraming';
-import { sectionOf, selfWeightPerMetre, type SteelBar } from './steelMemberBars';
+import {
+  clusterMeans,
+  nearestIndex,
+  sectionOf,
+  selfWeightPerMetre,
+  type SteelBar,
+} from './steelMemberBars';
 
-export interface SystemMember {
+interface SystemMember {
   readonly geometry: Omit<FrameMember, 'load'>;
   readonly barId: string;
   readonly kind: 'column' | 'beam';
@@ -23,7 +29,7 @@ export interface SystemMember {
   readonly imposed: number;
 }
 
-export interface SystemLevel {
+interface SystemLevel {
   readonly z: number;
   /** Column nodes at this level (the horizontal force of the level is shared by them). */
   readonly nodes: number[];
@@ -81,23 +87,6 @@ interface ColumnState {
   readonly nodes: number[];
 }
 
-const clusterMeans = (values: ReadonlyArray<number>, tolerance: number): number[] => {
-  const groups: number[][] = [];
-  for (const value of [...values].sort((a, b) => a - b)) {
-    const last = groups[groups.length - 1];
-    if (last && value - (last[last.length - 1] as number) <= tolerance) last.push(value);
-    else groups.push([value]);
-  }
-  return groups.map((group) => group.reduce((sum, value) => sum + value, 0) / group.length);
-};
-
-const nearest = (values: ReadonlyArray<number>, target: number): number =>
-  values.reduce(
-    (best, value, index) =>
-      Math.abs(value - target) < Math.abs((values[best] as number) - target) ? index : best,
-    0,
-  );
-
 /** Beam end z (axis) at the given end. */
 const endZ = (beam: BeamResult, end: 0 | 1): number =>
   beam.loads.bar[end === 0 ? 'start' : 'end'][2];
@@ -132,7 +121,7 @@ export function buildFrameSystem(
     LEVEL_TOLERANCE,
   );
   const snapZ = (z: number): number => {
-    const level = levelZs[nearest(levelZs, z)];
+    const level = levelZs[nearestIndex(levelZs, z)];
     return level !== undefined && Math.abs(level - z) <= SNAP_TOLERANCE ? level : z;
   };
 
@@ -171,7 +160,7 @@ export function buildFrameSystem(
   const columnNode = (columnId: string, z: number): number => {
     const state = states.get(columnId);
     if (!state) return -1;
-    return state.nodes[nearest(state.zs, z)] as number;
+    return state.nodes[nearestIndex(state.zs, z)] as number;
   };
 
   const levels: SystemLevel[] = levelZs.map((z) => ({
@@ -184,7 +173,7 @@ export function buildFrameSystem(
     permanent: 0,
     imposed: 0,
   }));
-  const levelAt = (z: number): SystemLevel | undefined => levels[nearest(levelZs, z)];
+  const levelAt = (z: number): SystemLevel | undefined => levels[nearestIndex(levelZs, z)];
 
   const storeyPieces: StoreyPiece[] = [];
   for (const state of states.values()) {
@@ -328,7 +317,7 @@ export function buildFrameSystem(
       });
     }
     for (const point of points) {
-      const station = nearest(stations, Math.min(lengthM, Math.max(0, point.at)));
+      const station = nearestIndex(stations, Math.min(lengthM, Math.max(0, point.at)));
       nodeLoads.push({
         node: indices[station] as number,
         permanent: point.permanent * 1000,

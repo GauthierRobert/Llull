@@ -11,15 +11,18 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { refitPlates } from './plateSupport';
 import { designFixedPlates } from './plateDesign';
-import { findProfile, sectionProperties, STEEL_PROFILES } from '../steel/profiles';
+import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 import { sizeBoltGroups } from './frameBoltDesign';
 import { checkFrames } from './frameCheckFrames';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { add3 } from '@lib/vec3';
+import { add3, scale3 } from '@lib/vec3';
 import { sweepFrame } from '../mesh';
+
+/** Iteration cap of the design loops of design_portal_frames and design_purlins. */
+export const MAX_ITERATIONS = 15;
 
 /**
  * Next heavier profile of the same family; at the top of the family, the lightest I-section
@@ -28,20 +31,18 @@ import { sweepFrame } from '../mesh';
 export function nextProfile(name: string): string | null {
   const profile = findProfile(name);
   if (!profile) return null;
-  const byMass = (a: { massPerMetre: number }, b: { massPerMetre: number }): number =>
-    a.massPerMetre - b.massPerMetre;
-  const sameFamily = STEEL_PROFILES.filter(
+  const sameFamily = lightestProfile(
     (candidate) =>
       candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre,
-  ).sort(byMass);
-  if (sameFamily[0]) return sameFamily[0].name;
+  );
+  if (sameFamily) return sameFamily.name;
   if (profile.shape !== 'I') return null;
   const modulus = sectionProperties(profile).plasticModulus;
-  const stronger = STEEL_PROFILES.filter(
+  const stronger = lightestProfile(
     (candidate) =>
       candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
-  ).sort(byMass);
-  return stronger[0]?.name ?? null;
+  );
+  return stronger?.name ?? null;
 }
 
 /**
@@ -82,7 +83,7 @@ export const designPortalFrames = defineCommand({
     const changes: string[] = [];
     const changed = new Set<string>();
     let limited = false;
-    for (let iteration = 0; iteration < 15; iteration++) {
+    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       const { rows, frames } = checkFrames(current, levelId, loads);
       if (frames === 0) {
         return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
@@ -132,7 +133,7 @@ export const designPortalFrames = defineCommand({
       }
       current = { ...current, building: next };
       if (!progressed) break;
-      if (iteration === 14) limited = true;
+      if (iteration === MAX_ITERATIONS - 1) limited = true;
     }
     const { rows } = checkFrames(current, levelId, loads);
     const bolts = sizeBoltGroups(current, getBuilding(current), rows, targetUtilisation);
@@ -190,7 +191,7 @@ export const designPortalFrames = defineCommand({
  * rafter normal, gable-post tops drop under a deeper rafter, side rails move out with a deeper
  * column (by half the depth change).
  */
-export function reseatDependents(
+function reseatDependents(
   doc: Pick<CadDocument, 'units'>,
   building: BuildingModel,
   resizedIds: ReadonlyArray<string>,
@@ -231,8 +232,7 @@ export function reseatDependents(
         return inPlane && element.start[0] > low + margin && element.start[0] < high - margin;
       });
       const frame = rafter ? sweepFrame(rafter.start, rafter.end, rafter.roll) : null;
-      if (frame && element.role === 'purlin')
-        offset = [frame.v[0] * half, frame.v[1] * half, frame.v[2] * half];
+      if (frame && element.role === 'purlin') offset = scale3(frame.v, half);
       if (frame && element.role === 'column' && Math.abs(frame.v[2]) > 1e-6) {
         offset = [0, 0, -half / frame.v[2]];
         topOnly = true;

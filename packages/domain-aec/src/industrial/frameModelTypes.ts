@@ -152,6 +152,10 @@ export interface FrameLoads {
   readonly craneModel?: CraneModel;
 }
 
+/** EN 1990 6.10 ULS partial factors of the hall checks: permanent actions (G), variable actions (Q). */
+export const GAMMA_G = 1.35;
+export const GAMMA_Q = 1.5;
+
 /** Simplified external pressure coefficients of the walls (EN 1991-1-4 zones D / E). Roofs: `windCoefficients.ts`. */
 export const WIND_COEFFICIENTS = { windward: 0.8, leeward: 0.5 } as const;
 

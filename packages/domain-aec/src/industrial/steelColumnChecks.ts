@@ -6,10 +6,17 @@
  * @pure
  */
 
-import { memberBuckling, sectionResistance } from './steelDesign';
+import { memberBuckling } from './steelDesign';
 import { GAMMA_IMPOSED, GAMMA_PERMANENT, type ColumnNode } from './steelFraming';
-import { compressionClass, selfWeightPerMetre, type SteelBar } from './steelMemberBars';
-import { analysedRow, skippedRow, type CheckLine, type MemberRow } from './steelMemberRows';
+import { selfWeightPerMetre, type SteelBar } from './steelMemberBars';
+import {
+  analysedRow,
+  columnSection,
+  metres,
+  ULS_COMBINATION,
+  type CheckLine,
+  type MemberRow,
+} from './steelMemberRows';
 
 /** Beam ends whose axes differ by less than this are one level, mm. */
 const LEVEL_TOLERANCE = 300;
@@ -75,35 +82,20 @@ const curveText = (shape: string, slender: boolean): string =>
 
 /** Row of a column from its segments. */
 export function checkColumn(column: SteelBar, segments: ReadonlyArray<ColumnSegment>): MemberRow {
-  const profile = column.profile;
-  if (!profile) return skippedRow(column, column.skipReason ?? 'profile not in the catalogue');
-  const sectionClass = compressionClass(profile, column.fy);
-  if (sectionClass === null) {
-    return skippedRow(
-      column,
-      `${profile.name}: ${profile.shape} sections in compression (torsional-flexural buckling) are not covered`,
-    );
-  }
-  if (sectionClass === 4) {
-    return skippedRow(
-      column,
-      `${profile.name} is class 4 in compression at fy ${column.fy}: effective-section resistance is not covered`,
-    );
-  }
-  const resistance = sectionResistance(profile, column.fy);
-  const combination = 'ULS 1.35 G + 1.5 Q';
+  const gate = columnSection(column);
+  if ('skipped' in gate) return gate.skipped;
+  const { profile, sectionClass, resistance } = gate;
   let section: CheckLine | undefined;
   let buckling: CheckLine | undefined;
   for (const segment of segments) {
     const length = segment.to - segment.from;
     const axial = segment.axial * 1000;
-    const metres = (value: number): string => (value / 1000).toFixed(2);
     const sectionUtilisation = axial / resistance.axial;
     if (!section || sectionUtilisation > section.utilisation) {
       section = {
         name: 'cross-section compression (§6.2.4)',
         utilisation: sectionUtilisation,
-        combination,
+        combination: ULS_COMBINATION,
         detail: `${profile.name} class ${sectionClass}, z ${metres(segment.from)}–${metres(segment.to)} m: N ${segment.axial.toFixed(0)} kN ≤ Npl,Rd ${(resistance.axial / 1000).toFixed(0)} kN`,
       };
     }
@@ -113,13 +105,12 @@ export function checkColumn(column: SteelBar, segments: ReadonlyArray<ColumnSegm
       buckling = {
         name: 'flexural buckling (§6.3.1)',
         utilisation: result.utilisation,
-        combination,
+        combination: ULS_COMBINATION,
         detail: `${profile.name} (${curveText(profile.shape, profile.h / profile.b > 1.2)}), z ${metres(segment.from)}–${metres(segment.to)} m, Lcr ${metres(length)} m: N ${segment.axial.toFixed(0)} kN ≤ Nb,Rd ${((chi * resistance.axial) / 1000).toFixed(0)} kN (χ ${chi.toFixed(2)})`,
       };
     }
   }
-  const lines = [section, buckling].filter((line): line is CheckLine => line !== undefined);
-  return analysedRow(column, lines, {
+  return analysedRow(column, [section, buckling], {
     NEd: Math.max(0, ...segments.map((segment) => segment.axial)),
     segments: segments.length,
   });

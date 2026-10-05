@@ -7,7 +7,7 @@
 import type { CadDocument } from '@core/model/types';
 import { fromMm, getBuilding } from '../model';
 import { findProfile } from '../steel/profiles';
-import { ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from './frameModelTypes';
+import { GAMMA_G, GAMMA_Q, ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from './frameModelTypes';
 import { purlinWind } from './purlinWind';
 import { yieldStrength } from './steelDesign';
 import {
@@ -15,8 +15,6 @@ import {
   CPI_PRESSURE,
   CPI_SUCTION,
   DEFAULT_TRIBUTARY,
-  GAMMA_G,
-  GAMMA_Q,
   GRAVITY,
   type Located,
   PURLIN_DEFLECTION_RATIO,
@@ -262,12 +260,8 @@ export function analysePurlins(
           kind: 'purlin',
           zone,
           span: purlin.length / 1000,
+          ...worst,
           check: `${worst.check} ${purlin.member.profile}, tributary ${tributary.toFixed(0)} mm, pitch ${((pitch * 180) / Math.PI).toFixed(1)}°`,
-          value: worst.value,
-          limit: worst.limit,
-          unit: worst.unit,
-          utilisation: worst.utilisation,
-          combination: worst.combination,
           upliftUtilisation: (uplift[0] as Verdict).utilisation,
         });
         record('roof', zone, cpe, worst.utilisation);
@@ -334,12 +328,8 @@ export function analysePurlins(
       kind: 'rail',
       zone,
       span: rail.length / 1000,
+      ...worst,
       check: `${worst.check} ${rail.member.profile}, tributary ${(trib * 1000).toFixed(0)} mm`,
-      value: worst.value,
-      limit: worst.limit,
-      unit: worst.unit,
-      utilisation: worst.utilisation,
-      combination: worst.combination,
     });
     record('wall', zone, CPE_WALL[zone], worst.utilisation);
   }

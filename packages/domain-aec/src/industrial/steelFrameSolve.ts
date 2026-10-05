@@ -7,6 +7,8 @@
  */
 
 import { solveFrame, type FrameResult } from '@lib/frame2d';
+import type { LoadFactors } from './steelBeamAnalysis';
+import { amplificationOf } from './steelDesign';
 import type { FrameSystem, StoreyPiece } from './steelFrameModel';
 import { GAMMA_IMPOSED, GAMMA_PERMANENT } from './steelFraming';
 
@@ -24,18 +26,13 @@ export interface FrameSolutions {
   readonly amplification: number;
 }
 
-interface Factors {
-  readonly permanent: number;
-  readonly imposed: number;
-}
-
-const ULS: Factors = { permanent: GAMMA_PERMANENT, imposed: GAMMA_IMPOSED };
-const SLS: Factors = { permanent: 1, imposed: 1 };
+const ULS: LoadFactors = { permanent: GAMMA_PERMANENT, imposed: GAMMA_IMPOSED };
+const SLS: LoadFactors = { permanent: 1, imposed: 1 };
 /** Horne's reference horizontal force, 1/200 of the vertical load. */
 const HORNE_FACTOR = 1 / 200;
 
 /** One linear analysis; `sway` is the signed fraction of the level load applied horizontally. */
-function solveCase(system: FrameSystem, factors: Factors, sway: number): FrameResult | null {
+function solveCase(system: FrameSystem, factors: LoadFactors, sway: number): FrameResult | null {
   const loads = system.nodes.map(() => ({ fx: 0, fy: 0, mz: 0 }));
   for (const load of system.nodeLoads) {
     const target = loads[load.node];
@@ -67,10 +64,6 @@ export const driftOf = (result: FrameResult, piece: StoreyPiece): number =>
   Math.abs(
     (result.displacements[piece.top]?.[0] ?? 0) - (result.displacements[piece.bottom]?.[0] ?? 0),
   );
-
-/** Moment amplification for a critical load factor (as the portal checks). */
-export const amplificationOf = (alphaCritical: number): number =>
-  alphaCritical >= 10 ? 1 : alphaCritical > 1.05 ? 1 / (1 - 1 / alphaCritical) : 20;
 
 /**
  * @param notionalFactor φ of the equivalent horizontal forces

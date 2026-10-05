@@ -75,8 +75,7 @@ export const checkPurlins = defineCommand({
         'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.',
       );
     }
-    const building = getBuilding(doc);
-    const levelId = existingLevelId(building, params.levelId);
+    const levelId = existingLevelId(getBuilding(doc), params.levelId);
     if (levelId === undefined) {
       return noop(doc, `check_purlins failed: no level '${params.levelId ?? ''}'.`);
     }

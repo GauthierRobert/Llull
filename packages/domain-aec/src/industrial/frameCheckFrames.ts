@@ -19,6 +19,9 @@ import {
   ultimateCombinations,
 } from './frameCheckSolve';
 
+/** Forces of a row that reports a stability or deflection limit rather than member forces. */
+const NO_FORCES = { axial: 0, moment: 0, shear: 0 } as const;
+
 /**
  * Analyses and checks every portal frame of a level: worst row per element over all combinations.
  * @pure
@@ -147,9 +150,7 @@ export function checkFrames(
           mark: column?.mark ?? stability.column,
           kind: 'stability',
           combination: stability.combination,
-          axial: 0,
-          moment: 0,
-          shear: 0,
+          ...NO_FORCES,
           utilisation: 3 / stability.alpha,
           check: `sway stability αcr ${stability.alpha.toFixed(1)} ≥ 3 (${stability.method}; moments amplified when < 10)`,
         },
@@ -174,9 +175,7 @@ export function checkFrames(
           mark: member?.mark ?? analysis.elementId,
           kind: 'deflection',
           combination: 'SLS S',
-          axial: 0,
-          moment: 0,
-          shear: 0,
+          ...NO_FORCES,
           utilisation: deflection / limit,
           check: `vertical ${deflection.toFixed(0)} mm ≤ span/${SLS_VERTICAL} = ${limit.toFixed(0)} mm`,
         },
@@ -221,9 +220,7 @@ export function checkFrames(
             mark: member?.mark ?? point.elementId,
             kind: 'deflection',
             combination: swayCase.name,
-            axial: 0,
-            moment: 0,
-            shear: 0,
+            ...NO_FORCES,
             utilisation: sway / limit,
             check: `${swayCase.crane ? 'rail-level' : 'eaves'} sway ${sway.toFixed(0)} mm ≤ h/${ratio} = ${limit.toFixed(0)} mm`,
           },

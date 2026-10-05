@@ -15,7 +15,7 @@ import { sectionOf, type SteelBar } from './steelMemberBars';
 export const GAMMA_PERMANENT = 1.35;
 export const GAMMA_IMPOSED = 1.5;
 
-export type SupportRef =
+type SupportRef =
   | { readonly type: 'column'; readonly id: string }
   | { readonly type: 'beam'; readonly id: string; readonly at: number }
   | { readonly type: 'none' };
