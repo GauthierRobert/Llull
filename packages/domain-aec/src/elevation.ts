@@ -6,9 +6,10 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, toMetres } from './model';
+import { elementsOf, fileSlug, getBuilding, toMetres } from './model';
 import { noop } from '@core/commands/noop';
 import { escapeXml } from '@lib/escapeXml';
+import { sub2 } from '@lib/vec2';
 import {
   ELEVATION_DIRECTIONS,
   buildElevationDrawing,
@@ -21,6 +22,7 @@ import {
   type Viewport,
   composeSheetSvg,
   fitScale,
+  n,
   sheetDrawingArea,
 } from './sheet';
 
@@ -40,8 +42,6 @@ const ANNOTATION_RIGHT = 34;
  * @pure
  * @failure no 3D geometry / invalid scale -> null
  */
-const n = (value: number): string => String(Math.round(value * 100) / 100);
-
 function buildElevationSheet(
   doc: CadDocument,
   options: {
@@ -127,11 +127,9 @@ function buildElevationSheet(
   const screenAxis = 1 - drawing.projection.axis;
   const top = toPaper([0, maxZ])[1] - 4;
   const bottom = toPaper([0, minZ])[1] + 2;
-  for (const id of building.elementOrder) {
-    const grid = building.elements[id];
-    if (grid?.category !== 'grid') continue;
-    const direction = [grid.end[0] - grid.start[0], grid.end[1] - grid.start[1]];
-    const length = Math.hypot(direction[0] as number, direction[1] as number);
+  for (const grid of elementsOf(building, 'grid')) {
+    const direction = sub2(grid.end, grid.start);
+    const length = Math.hypot(direction[0], direction[1]);
     if (length === 0 || Math.abs((direction[screenAxis] as number) / length) > 0.01) continue;
     const x = toPaper([drawing.projection.u([grid.start[0], grid.start[1], 0]), 0])[0];
     annotations.push(

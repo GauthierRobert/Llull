@@ -99,6 +99,8 @@ export const setWallLayers = defineCommand({
     if (walls.length === 0 || walls.length !== wallIds.length) {
       return noop(doc, 'set_wall_layers failed: wallIds must list existing walls.');
     }
+    const ids = walls.map((wall) => wall.id);
+    const marks = walls.map((wall) => wall.mark).join(', ');
     if (layers === null) {
       let next = building;
       for (const wall of walls) {
@@ -109,11 +111,8 @@ export const setWallLayers = defineCommand({
       const document = regenerateBuilding(doc, next);
       return {
         document,
-        summary: `Removed the build-up of ${walls.map((wall) => wall.mark).join(', ')}.`,
-        affected: elementAffected(
-          document,
-          walls.map((wall) => wall.id),
-        ),
+        summary: `Removed the build-up of ${marks}.`,
+        affected: elementAffected(document, ids),
       };
     }
     const parsed = parseWallLayers(layers);
@@ -128,12 +127,8 @@ export const setWallLayers = defineCommand({
       document,
       summary:
         `Set a ${parsed.length}-layer build-up (${thickness} total: ` +
-        `${parsed.map((layer) => `${layer.thickness} ${layer.material}`).join(' + ')}) on ` +
-        `${walls.map((wall) => wall.mark).join(', ')}.`,
-      affected: elementAffected(
-        document,
-        walls.map((wall) => wall.id),
-      ),
+        `${parsed.map((layer) => `${layer.thickness} ${layer.material}`).join(' + ')}) on ${marks}.`,
+      affected: elementAffected(document, ids),
     };
   },
 });

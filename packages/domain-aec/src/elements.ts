@@ -11,14 +11,16 @@ import { isValidPolygon, polygonArea } from '@lib/polygon';
 import {
   getBuilding,
   hostOf,
-  dependenciesOf,
   nextElementId,
   nextMark,
+  orderedElements,
+  elementsOf,
   resolveLevel,
   toMetres,
   withElement,
   elementAffected,
   followLevelHeight,
+  withDependents,
   withoutElements,
 } from './model';
 import { noop } from '@core/commands/noop';
@@ -97,15 +99,6 @@ export const addRoom = defineCommand({
   },
 });
 
-/** Element ids plus the elements hosted by any of them (wall openings, column base plates). */
-function withHostedOpenings(building: BuildingModel, ids: ReadonlyArray<string>): Set<string> {
-  const result = new Set(ids);
-  for (const element of Object.values(building.elements)) {
-    if (dependenciesOf(element).some((id) => result.has(id))) result.add(element.id);
-  }
-  return result;
-}
-
 /**
  * @command delete_building_element
  * @pure
@@ -129,7 +122,7 @@ export const deleteBuildingElement = defineCommand({
     if (known.length === 0) {
       return noop(doc, 'delete_building_element: none of the given ids is a building element.');
     }
-    const doomed = withHostedOpenings(building, known);
+    const doomed = withDependents(building, known);
     const removedEntityIds = [...doomed].flatMap((id) => building.elements[id]?.entityIds ?? []);
     const supports = reconcilePipeSupports(doc, withoutElements(building, doomed));
     return {
@@ -146,6 +139,7 @@ export const deleteBuildingElement = defineCommand({
 
 function translated(element: BuildingElement, dx: number, dy: number): BuildingElement {
   const shift = (point: Vec2): Vec2 => [point[0] + dx, point[1] + dy];
+  const shift3 = ([x, y, z]: Vec3): Vec3 => [x + dx, y + dy, z];
   switch (element.category) {
     case 'grid':
     case 'wall':
@@ -173,24 +167,17 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'stair':
       return { ...element, start: shift(element.start) };
     case 'member':
-      return {
-        ...element,
-        start: [element.start[0] + dx, element.start[1] + dy, element.start[2]],
-        end: [element.end[0] + dx, element.end[1] + dy, element.end[2]],
-      };
+      return { ...element, start: shift3(element.start), end: shift3(element.end) };
     case 'footing':
     case 'equipment':
       return { ...element, location: shift(element.location) };
     case 'panel':
-      return { ...element, corners: element.corners.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
+      return { ...element, corners: element.corners.map(shift3) };
     case 'pipe':
     case 'tray':
-      return { ...element, points: element.points.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
+      return { ...element, points: element.points.map(shift3) };
     case 'pipeSupport':
-      return {
-        ...element,
-        position: [element.position[0] + dx, element.position[1] + dy, element.position[2]],
-      };
+      return { ...element, position: shift3(element.position) };
     case 'door':
     case 'window':
     case 'plate':
@@ -272,7 +259,7 @@ export const moveBuildingElement = defineCommand({
     if (issues.length > 0) return noop(doc, `move_building_element refused: ${issues[0]}.`);
     const supports = reconcilePipeSupports(doc, next);
     const document = regenerateBuilding(doc, supports.building);
-    const moved = withHostedOpenings(building, known);
+    const moved = withDependents(building, known);
     return {
       document,
       summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${reconciliationNote(supports)}`,
@@ -357,23 +344,21 @@ export const copyLevelElements = defineCommand({
     const allowed = new Set<string>(
       categories !== undefined && categories.length > 0 ? categories : COPYABLE,
     );
-    const sourceElements = building.elementOrder
-      .map((id) => building.elements[id])
-      .filter(
-        (element): element is Exclude<BuildingElement, { category: 'grid' | 'door' | 'window' }> =>
-          element !== undefined &&
-          'levelId' in element &&
-          element.levelId === sourceLevelId &&
-          allowed.has(element.category),
-      );
+    const allElements = orderedElements(building);
+    const sourceElements = allElements.filter(
+      (element): element is Exclude<BuildingElement, { category: 'grid' | 'door' | 'window' }> =>
+        'levelId' in element && element.levelId === sourceLevelId && allowed.has(element.category),
+    );
     if (sourceElements.length === 0) {
       return noop(doc, `copy_level_elements: level ${sourceLevelId} has nothing to copy.`);
     }
+    const sourceHeight = building.levels[sourceLevelId]?.height ?? 0;
     let next = building;
     const created: string[] = [];
     for (const targetLevelId of targetLevelIds) {
       if (targetLevelId === sourceLevelId) continue;
       const levelIndex = next.levelOrder.indexOf(targetLevelId);
+      const targetHeight = next.levels[targetLevelId]?.height ?? sourceHeight;
       const copiedIds = new Map<string, string>();
       for (const element of sourceElements) {
         const id = nextElementId(next, element.category);
@@ -383,8 +368,6 @@ export const copyLevelElements = defineCommand({
             : element.category === 'member'
               ? nextMemberMark(next, element.role)
               : nextMark(next, element.category);
-        const sourceHeight = building.levels[sourceLevelId]?.height ?? 0;
-        const targetHeight = next.levels[targetLevelId]?.height ?? sourceHeight;
         next = withElement(
           next,
           followLevelHeight(
@@ -395,10 +378,8 @@ export const copyLevelElements = defineCommand({
         );
         created.push(id);
         copiedIds.set(element.id, id);
-        for (const hostedId of building.elementOrder) {
-          const hosted = building.elements[hostedId];
+        for (const hosted of allElements) {
           if (
-            !hosted ||
             hostOf(hosted) !== element.id ||
             (hosted.category !== 'plate' &&
               hosted.category !== 'door' &&
@@ -417,9 +398,7 @@ export const copyLevelElements = defineCommand({
         }
       }
       // Moment connections follow when both connected members were copied.
-      for (const connectionId of building.elementOrder) {
-        const connection = building.elements[connectionId];
-        if (connection?.category !== 'connection') continue;
+      for (const connection of elementsOf(building, 'connection')) {
         const [rafterId, otherId] = [
           copiedIds.get(connection.rafterId),
           copiedIds.get(connection.otherId),

@@ -8,7 +8,7 @@
 import type { MeshData, Vec2, Vec3 } from '@core/model/types';
 import { triangulatePolygon } from '@lib/triangulate';
 import { toCounterClockwise } from '@lib/polygon';
-import { add3, cross3, dot3, scale3 } from '@lib/vec3';
+import { add3, cross3, dot3, scale3, sub3 } from '@lib/vec3';
 import { normalize } from './vec3';
 
 /**
@@ -59,8 +59,8 @@ interface SweepFrame {
  * @returns null for a zero-length axis
  */
 export function sweepFrame(start: Vec3, end: Vec3, roll = 0): SweepFrame | null {
-  const delta: Vec3 = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
-  const length = Math.hypot(delta[0], delta[1], delta[2]);
+  const delta = sub3(end, start);
+  const length = Math.hypot(...delta);
   if (length === 0) return null;
   const d = scale3(delta, 1 / length);
   const reference: Vec3 = Math.abs(d[2]) > 0.999 ? [1, 0, 0] : [0, 0, 1];

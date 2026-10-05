@@ -220,7 +220,7 @@ export function gridIntersections(building: BuildingModel): Vec2[] {
     for (let j = i + 1; j < grids.length; j++) {
       const a = grids[i];
       const b = grids[j];
-      if (!a || !b || a.category !== 'grid' || b.category !== 'grid') continue;
+      if (!a || !b) continue;
       const d1: Vec2 = [a.end[0] - a.start[0], a.end[1] - a.start[1]];
       const d2: Vec2 = [b.end[0] - b.start[0], b.end[1] - b.start[1]];
       const denominator = d1[0] * d2[1] - d1[1] * d2[0];

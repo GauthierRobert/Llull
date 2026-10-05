@@ -10,7 +10,7 @@ import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { priceTakeoff } from './costing';
 import { computeTakeoff } from './takeoffCompute';
-import { buildSchedule, toCsv, type ScheduleKind } from './scheduleBuild';
+import { SCHEDULE_KINDS, buildSchedule, toCsv } from './scheduleBuild';
 
 const TAKEOFF_COLUMNS = ['Key', 'Description', 'Quantity', 'Unit'];
 const UNIT_LABEL = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' } as const;
@@ -31,18 +31,18 @@ export const quantityTakeoff = defineCommand({
   params: z.object({}),
   run: (doc): CommandResult => {
     const lines = computeTakeoff(doc);
+    const csv = toCsv(
+      TAKEOFF_COLUMNS,
+      lines.map((line) => [line.key, line.description, line.quantity, UNIT_LABEL[line.unit]]),
+    );
     if (lines.length === 0) {
       return {
         document: doc,
         summary: 'Quantity takeoff: the building model is empty (add walls, slabs, columns…).',
         affected: [],
-        data: { lines, csv: toCsv(TAKEOFF_COLUMNS, []) },
+        data: { lines, csv },
       };
     }
-    const csv = toCsv(
-      TAKEOFF_COLUMNS,
-      lines.map((line) => [line.key, line.description, line.quantity, UNIT_LABEL[line.unit]]),
-    );
     const highlights = lines
       .filter((line) => line.unit === 'm3' || line.unit === 'ea' || line.unit === 'kg')
       .map(
@@ -56,26 +56,6 @@ export const quantityTakeoff = defineCommand({
     };
   },
 });
-
-const SCHEDULE_KINDS = [
-  'wall',
-  'door',
-  'window',
-  'room',
-  'slab',
-  'column',
-  'beam',
-  'stair',
-  'member',
-  'footing',
-  'panel',
-  'equipment',
-  'pipe',
-  'tray',
-  'plate',
-  'connection',
-  'support',
-] as const satisfies ReadonlyArray<ScheduleKind>;
 
 /**
  * @command building_schedule
@@ -104,13 +84,8 @@ export const buildingSchedule = defineCommand({
   },
 });
 
-function validRates(rates: unknown): rates is Record<string, number> {
-  return (
-    typeof rates === 'object' &&
-    rates !== null &&
-    !Array.isArray(rates) &&
-    Object.values(rates).every((rate) => isFiniteNumber(rate) && rate >= 0)
-  );
+function validRates(rates: Record<string, unknown>): rates is Record<string, number> {
+  return Object.values(rates).every((rate) => isFiniteNumber(rate) && rate >= 0);
 }
 
 /**

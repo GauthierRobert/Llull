@@ -6,7 +6,8 @@
 
 import type { BuildingModel, CurvedWallElement, WallElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
-import { toCounterClockwise } from '@lib/polygon';
+import { distance, toCounterClockwise } from '@lib/polygon';
+import { elementsOf } from './model';
 import type { WallExtent } from './wallGeometry';
 
 /** Circle arc through three points: centre, radius, start angle and signed sweep (radians). */
@@ -23,7 +24,7 @@ export function arcThrough(start: Vec2, through: Vec2, end: Vec2): Arc | null {
   const [bx, by] = through;
   const [cx, cy] = end;
   const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
-  const scale = Math.max(Math.hypot(cx - ax, cy - ay), Math.hypot(bx - ax, by - ay));
+  const scale = Math.max(distance(start, end), distance(start, through));
   if (!(scale > 0) || Math.abs(d) < 1e-9 * scale * scale) return null;
   const a2 = ax * ax + ay * ay;
   const b2 = bx * bx + by * by;
@@ -41,7 +42,7 @@ export function arcThrough(start: Vec2, through: Vec2, end: Vec2): Arc | null {
   const counterClockwise = turn(startAngle, angle(end));
   // The arc runs the way that passes through `through` (d > 0 ⇔ counter-clockwise).
   const sweep = d > 0 ? counterClockwise : counterClockwise - 2 * Math.PI;
-  return { center, radius: Math.hypot(ax - center[0], ay - center[1]), startAngle, sweep };
+  return { center, radius: distance(start, center), startAngle, sweep };
 }
 
 export function curvedWallArc(wall: CurvedWallElement): Arc | null {
@@ -149,14 +150,13 @@ export function curvedWallExtent(building: BuildingModel, wall: CurvedWallElemen
   const trimAt = (offset: number, inward: 1 | -1): number => {
     const { point, tangent } = arcFrame(arc, offset);
     const away: Vec2 = [tangent[0] * inward, tangent[1] * inward];
-    for (const id of building.elementOrder) {
-      const other = building.elements[id];
-      if (other?.category !== 'wall' || other.levelId !== wall.levelId) continue;
-      const atStart = Math.hypot(other.start[0] - point[0], other.start[1] - point[1]) <= tolerance;
-      const atEnd = Math.hypot(other.end[0] - point[0], other.end[1] - point[1]) <= tolerance;
+    for (const other of elementsOf(building, 'wall')) {
+      if (other.levelId !== wall.levelId) continue;
+      const atStart = distance(other.start, point) <= tolerance;
+      const atEnd = distance(other.end, point) <= tolerance;
       if (!atStart && !atEnd) continue;
       const [from, to] = atStart ? [other.start, other.end] : [other.end, other.start];
-      const span = Math.hypot(to[0] - from[0], to[1] - from[1]);
+      const span = distance(from, to);
       if (span === 0) continue;
       const direction: Vec2 = [(to[0] - from[0]) / span, (to[1] - from[1]) / span];
       const sine = Math.abs(away[0] * direction[1] - away[1] * direction[0]);

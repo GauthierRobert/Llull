@@ -3,7 +3,7 @@
  */
 
 import type { WallElement } from '@core/model/building';
-import { fromMm, getBuilding } from './model';
+import { elementsOf, fromMm, getBuilding, orderedElements } from './model';
 import { wallFrame } from './wallGeometry';
 import {
   type PlanDrawing,
@@ -33,18 +33,17 @@ import { supportPrimitives } from './planSupports';
 export function buildPlanDrawing(
   doc: PlanSource,
   levelId: string | undefined,
-  options: { cutHeight?: number; dimensions?: boolean } = {},
+  options: { dimensions?: boolean } = {},
 ): PlanDrawing | null {
   const building = getBuilding(doc);
   const resolvedId = levelId ?? building.activeLevelId ?? building.levelOrder[0];
   const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;
   if (!level) return null;
-  const cutHeight = options.cutHeight ?? fromMm(doc, 1200);
+  const cutHeight = fromMm(doc, 1200);
   const primitives: PlanPrimitive[] = [];
   const walls: WallElement[] = [];
-  for (const id of building.elementOrder) {
-    const element = building.elements[id];
-    if (!element || !('levelId' in element)) continue;
+  for (const element of orderedElements(building)) {
+    if (!('levelId' in element)) continue;
     if (element.levelId !== level.id) {
       primitives.push(...crossingColumnPrimitives(doc, element, level, cutHeight));
       continue;
@@ -91,10 +90,7 @@ export function buildPlanDrawing(
         break;
     }
   }
-  for (const id of building.elementOrder) {
-    const element = building.elements[id];
-    if (element?.category === 'grid') primitives.push(...gridPrimitives(doc, element));
-  }
+  for (const grid of elementsOf(building, 'grid')) primitives.push(...gridPrimitives(doc, grid));
   if (options.dimensions !== false) primitives.push(...dimensionPrimitives(doc, building, walls));
   return { level, primitives, bounds: boundsOf(primitives) };
 }

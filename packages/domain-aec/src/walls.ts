@@ -21,8 +21,7 @@ import {
 import { distance } from '@lib/polygon';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
-import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
-import { curvedWallExtent } from './curvedWallGeometry';
+import { builtExtent, openingsOf, wallFrame, type WallExtent } from './wallGeometry';
 
 /**
  * Why `opening` does not fit in `wall` (alongside `others`), or null when it fits.
@@ -288,10 +287,7 @@ export function openingFitIssues(building: BuildingModel, levelIds: ReadonlySet<
     if (element.category !== 'wall' && element.category !== 'curvedWall') continue;
     if (!levelIds.has(element.levelId)) continue;
     const openings = openingsOf(building, element.id);
-    const extent =
-      element.category === 'wall'
-        ? wallExtent(building, element)
-        : curvedWallExtent(building, element);
+    const extent = builtExtent(building, element);
     for (const opening of openings) {
       const error = openingFitError(element, opening, openings, extent);
       if (error) issues.push(error);

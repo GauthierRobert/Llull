@@ -4,6 +4,7 @@
 
 import type { Vec2, Vec3 } from '@core/model/types';
 import { toCounterClockwise } from '@lib/polygon';
+import { round } from './numeric';
 
 const GUID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
 
@@ -42,7 +43,7 @@ export function ifcString(text: string): string {
 
 /** STEP REAL: always carries a decimal point. */
 export function ifcReal(value: number): string {
-  const rounded = Math.round(value * 1e6) / 1e6;
+  const rounded = round(value, 6);
   if (rounded === 0) return '0.';
   const text = String(rounded);
   if (text.includes('e'))
@@ -147,6 +148,23 @@ export function shape(context: Context, items: ReadonlyArray<string>): string {
     `IFCSHAPEREPRESENTATION(${context.body},'Body','SweptSolid',(${items.join(',')}))`,
   );
   return context.writer.add(`IFCPRODUCTDEFINITIONSHAPE($,$,(${representation}))`);
+}
+
+/** Property set `name` (IFCPROPERTYSINGLEVALUE records) attached to the product `ref`. */
+export function addPropertySet(
+  context: Context,
+  owner: { readonly id: string; readonly ref: string },
+  name: string,
+  properties: ReadonlyArray<string>,
+): void {
+  const { writer } = context;
+  const refs = properties.map((property) => writer.add(property));
+  const propertySet = writer.add(
+    `IFCPROPERTYSET('${context.guid(`${owner.id}:pset`)}',$,'${name}',$,(${refs.join(',')}))`,
+  );
+  writer.add(
+    `IFCRELDEFINESBYPROPERTIES('${context.guid(`${owner.id}:rel-pset`)}',$,$,$,(${owner.ref}),${propertySet})`,
+  );
 }
 
 export function direction(context: Context, [x, y, z]: Vec3): string {

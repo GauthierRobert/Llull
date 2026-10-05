@@ -10,56 +10,65 @@ import type {
   WallElement,
 } from '@core/model/building';
 import { distance, polygonArea, polygonPerimeter } from '@lib/polygon';
-import { getBuilding } from './model';
+import { elementsOf, getBuilding } from './model';
 import { round } from './numeric';
 import { openingsOf } from './wallGeometry';
 import { boltSize } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
 import { plateMass } from './industrial/plates';
 import { supportSchedule } from './industrial/supportSchedule';
-import { connectionMass, connectionWelds } from './industrial/connections';
-import { curvedWallExtent } from './curvedWallGeometry';
+import { type ConnectionWelds, connectionMass, connectionWelds } from './industrial/connections';
 import {
-  openingsArea,
-  elementsOf,
+  columnSectionArea,
   scaleFor,
   slabNetArea,
   stairVolume,
   wallQuantities,
-  weldLabel,
 } from './takeoffBasics';
 import { memberLength, memberMass, panelArea, pipeLength } from './takeoffCompute';
 
-export type ScheduleKind =
-  | 'wall'
-  | 'door'
-  | 'window'
-  | 'room'
-  | 'slab'
-  | 'column'
-  | 'beam'
-  | 'stair'
-  | 'member'
-  | 'footing'
-  | 'panel'
-  | 'equipment'
-  | 'pipe'
-  | 'tray'
-  | 'plate'
-  | 'connection'
-  | 'support';
+export const SCHEDULE_KINDS = [
+  'wall',
+  'door',
+  'window',
+  'room',
+  'slab',
+  'column',
+  'beam',
+  'stair',
+  'member',
+  'footing',
+  'panel',
+  'equipment',
+  'pipe',
+  'tray',
+  'plate',
+  'connection',
+  'support',
+] as const;
+
+type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
+
+type Row = Array<string | number>;
 
 interface Schedule {
   readonly kind: ScheduleKind;
   readonly columns: string[];
-  readonly rows: Array<Array<string | number>>;
+  readonly rows: Row[];
 }
 
 function levelName(building: BuildingModel, levelId: string): string {
   return building.levels[levelId]?.name ?? levelId;
 }
 
-function hostOf(
+/** "a8 flanges / a5 web · 3.2 m" (empty without welds). */
+function weldLabel(welds: ConnectionWelds | null): string {
+  return welds
+    ? `a${welds.flangeThroat} flanges / a${welds.webThroat} web · ${(welds.length / 1000).toFixed(1)} m`
+    : '';
+}
+
+function hostWallOf(
   building: BuildingModel,
   opening: OpeningElement,
 ): WallElement | CurvedWallElement | undefined {
@@ -68,13 +77,31 @@ function hostOf(
 }
 
 export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
+  return { kind, ...scheduleTable(doc, kind) };
+}
+
+function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'kind'> {
   const building = getBuilding(doc);
   const scale = scaleFor(doc);
   const unit = doc.units;
   switch (kind) {
-    case 'wall':
+    case 'wall': {
+      // Curved-wall volumes are rounded to 2 decimals (straight walls: 3), as shipped.
+      const wallRow = (wall: WallElement | CurvedWallElement, volumeDigits: number): Row => {
+        const quantities = wallQuantities(building, wall);
+        return [
+          wall.mark,
+          levelName(building, wall.levelId),
+          round(quantities.length, 3),
+          wall.thickness,
+          wall.height,
+          wall.material,
+          openingsOf(building, wall.id).length,
+          round(scale.area(quantities.netArea), 3),
+          round(scale.volume(quantities.volume), volumeDigits),
+        ];
+      };
       return {
-        kind,
         columns: [
           'Mark',
           'Level',
@@ -87,45 +114,14 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           'Volume (m³)',
         ],
         rows: [
-          ...elementsOf(building, 'wall').map((wall) => {
-            const quantities = wallQuantities(building, wall);
-            return [
-              wall.mark,
-              levelName(building, wall.levelId),
-              round(quantities.length, 3),
-              wall.thickness,
-              wall.height,
-              wall.material,
-              openingsOf(building, wall.id).length,
-              round(scale.area(quantities.netArea), 3),
-              round(scale.volume(quantities.volume), 3),
-            ];
-          }),
-          ...elementsOf(building, 'curvedWall').map((wall) => {
-            const extent = curvedWallExtent(building, wall);
-            const length = extent.end - extent.start;
-            return [
-              wall.mark,
-              levelName(building, wall.levelId),
-              round(length, 3),
-              wall.thickness,
-              wall.height,
-              wall.material,
-              openingsOf(building, wall.id).length,
-              round(scale.area(length * wall.height - openingsArea(building, wall.id)), 3),
-              round(
-                scale.volume(
-                  (length * wall.height - openingsArea(building, wall.id)) * wall.thickness,
-                ),
-              ),
-            ];
-          }),
+          ...elementsOf(building, 'wall').map((wall) => wallRow(wall, 3)),
+          ...elementsOf(building, 'curvedWall').map((wall) => wallRow(wall, 2)),
         ],
       };
+    }
     case 'door':
     case 'window':
       return {
-        kind,
         columns: [
           'Mark',
           'Level',
@@ -137,7 +133,7 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           'Material',
         ],
         rows: elementsOf(building, kind).map((opening) => {
-          const wall = hostOf(building, opening);
+          const wall = hostWallOf(building, opening);
           return [
             opening.mark,
             wall ? levelName(building, wall.levelId) : '',
@@ -152,7 +148,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'room':
       return {
-        kind,
         columns: ['Number', 'Name', 'Level', 'Area (m²)', 'Perimeter (m)'],
         rows: elementsOf(building, 'room').map((room) => [
           room.mark,
@@ -164,7 +159,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'slab':
       return {
-        kind,
         columns: [
           'Mark',
           'Level',
@@ -189,7 +183,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'column':
       return {
-        kind,
         columns: [
           'Mark',
           'Level',
@@ -199,25 +192,18 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           'Material',
           'Volume (m³)',
         ],
-        rows: elementsOf(building, 'column').map((column) => {
-          const section =
-            column.shape === 'circular'
-              ? Math.PI * (column.width / 2) ** 2
-              : column.width * column.depth;
-          return [
-            column.mark,
-            levelName(building, column.levelId),
-            column.shape,
-            column.shape === 'circular' ? `Ø${column.width}` : `${column.width}×${column.depth}`,
-            column.height,
-            column.material,
-            round(scale.volume(section * column.height), 3),
-          ];
-        }),
+        rows: elementsOf(building, 'column').map((column) => [
+          column.mark,
+          levelName(building, column.levelId),
+          column.shape,
+          column.shape === 'circular' ? `Ø${column.width}` : `${column.width}×${column.depth}`,
+          column.height,
+          column.material,
+          round(scale.volume(columnSectionArea(column) * column.height), 3),
+        ]),
       };
     case 'beam':
       return {
-        kind,
         columns: [
           'Mark',
           'Level',
@@ -240,7 +226,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'stair':
       return {
-        kind,
         columns: [
           'Mark',
           'Level',
@@ -264,7 +249,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'member':
       return {
-        kind,
         columns: [
           'Mark',
           'Role',
@@ -288,7 +272,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'footing':
       return {
-        kind,
         columns: [
           'Mark',
           'Level',
@@ -314,7 +297,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'panel':
       return {
-        kind,
         columns: ['Mark', 'Level', 'Role', 'Material', `Thickness (${unit})`, 'Area (m²)'],
         rows: elementsOf(building, 'panel').map((panel) => [
           panel.mark,
@@ -327,7 +309,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'equipment':
       return {
-        kind,
         columns: [
           'Mark',
           'Name',
@@ -351,7 +332,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'pipe':
       return {
-        kind,
         columns: [
           'Mark',
           'Line',
@@ -381,7 +361,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'tray':
       return {
-        kind,
         columns: [
           'Mark',
           'System',
@@ -403,7 +382,6 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
       };
     case 'plate':
       return {
-        kind,
         columns: [
           'Mark',
           'Column',
@@ -426,10 +404,9 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
         ]),
       };
     case 'support':
-      return { kind, ...supportSchedule(doc) };
+      return supportSchedule(doc);
     case 'connection':
       return {
-        kind,
         columns: [
           'Mark',
           'Type',

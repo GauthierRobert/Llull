@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { round } from './numeric';
 import type { TakeoffLine } from './takeoffBasics';
 
 export interface CostLine extends TakeoffLine {
@@ -33,12 +34,12 @@ export function priceTakeoff(
     return {
       ...line,
       rate,
-      amount: rate === null ? null : Math.round(rate * line.quantity * 100) / 100,
+      amount: rate === null ? null : round(rate * line.quantity),
     };
   });
   return {
     lines,
-    total: Math.round(lines.reduce((sum, line) => sum + (line.amount ?? 0), 0) * 100) / 100,
+    total: round(lines.reduce((sum, line) => sum + (line.amount ?? 0), 0)),
     unpriced: lines.filter((line) => line.rate === null).map((line) => line.key),
   };
 }

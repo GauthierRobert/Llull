@@ -7,12 +7,14 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import type { BuildingLevel, BuildingModel, ProjectInfo } from '@core/model/building';
 import {
+  elementsOnLevel,
   followLevelHeight,
   fromMm,
   getBuilding,
-  dependenciesOf,
   nextLevelId,
+  orderedElements,
   sortLevelOrder,
+  withDependents,
   withLevel,
   withoutElements,
 } from './model';
@@ -127,17 +129,13 @@ export const updateLevel = defineCommand({
     return {
       document,
       summary: `Level ${levelId} "${updated.name}": elevation ${updated.elevation}, height ${updated.height} ${doc.units}.`,
-      affected: [levelId, ...elementEntityIdsOnLevel(document.building, levelId)],
+      affected: [
+        levelId,
+        ...elementsOnLevel(getBuilding(document), levelId).flatMap((element) => element.entityIds),
+      ],
     };
   },
 });
-
-function elementEntityIdsOnLevel(building: BuildingModel | undefined, levelId: string): string[] {
-  if (!building) return [];
-  return Object.values(building.elements)
-    .filter((element) => 'levelId' in element && element.levelId === levelId)
-    .flatMap((element) => element.entityIds);
-}
 
 /**
  * @command delete_level
@@ -160,14 +158,10 @@ export const deleteLevel = defineCommand({
   run: (doc, { levelId, deleteElements = false }): CommandResult => {
     const building = getBuilding(doc);
     if (!building.levels[levelId]) return noop(doc, `delete_level failed: no level '${levelId}'.`);
-    const onLevel = new Set(
-      Object.values(building.elements)
-        .filter((element) => 'levelId' in element && element.levelId === levelId)
-        .map((element) => element.id),
+    const onLevel = withDependents(
+      building,
+      elementsOnLevel(building, levelId).map((element) => element.id),
     );
-    for (const element of Object.values(building.elements)) {
-      if (dependenciesOf(element).some((id) => onLevel.has(id))) onLevel.add(element.id);
-    }
     if (onLevel.size > 0 && !deleteElements) {
       return noop(
         doc,
@@ -277,12 +271,9 @@ export const describeBuilding = defineCommand({
   params: z.object({}),
   run: (doc): CommandResult => {
     const building = getBuilding(doc);
-    const elements = building.elementOrder
-      .map((id) => building.elements[id])
-      .filter((element) => element !== undefined);
+    const elements = orderedElements(building);
     const levels = building.levelOrder
-      .map((id) => building.levels[id])
-      .filter((level): level is BuildingLevel => level !== undefined)
+      .flatMap((id) => building.levels[id] ?? [])
       .map((level) => ({
         ...level,
         active: level.id === building.activeLevelId,

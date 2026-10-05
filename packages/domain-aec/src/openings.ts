@@ -4,12 +4,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type {
-  BuildingModel,
-  CurvedWallElement,
-  OpeningElement,
-  WallElement,
-} from '@core/model/building';
+import type { CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { projectOntoSegment } from '@lib/polygon';
@@ -23,8 +18,8 @@ import {
 } from './model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
-import { openingsOf, wallExtent, wallFrame, type WallExtent } from './wallGeometry';
-import { arcOffsetOf, curvedWallExtent, curvedWallLength } from './curvedWallGeometry';
+import { builtExtent, openingsOf, wallFrame } from './wallGeometry';
+import { arcOffsetOf, curvedWallLength } from './curvedWallGeometry';
 import { openingFitError } from './walls';
 
 type OpeningKind = 'door' | 'window';
@@ -47,11 +42,6 @@ function resolveOffset(
   }
   const { length } = wallFrame(wall);
   return at ? projectOntoSegment(at, wall.start, wall.end).t * length : length / 2;
-}
-
-/** Built extent of a host wall along its axis (curved walls: the whole arc length). */
-function hostExtent(building: BuildingModel, host: WallElement | CurvedWallElement): WallExtent {
-  return host.category === 'wall' ? wallExtent(building, host) : curvedWallExtent(building, host);
 }
 
 function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParams): CommandResult {
@@ -89,7 +79,7 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     wall,
     opening,
     openingsOf(building, wall.id),
-    hostExtent(building, wall),
+    builtExtent(building, wall),
   );
   if (fitError) return noop(doc, `${name} failed: ${fitError}.`);
   const document = regenerateBuilding(doc, withElement(building, opening));
@@ -236,7 +226,7 @@ export const updateOpening = defineCommand({
       wall,
       updated,
       openingsOf(building, wall.id),
-      hostExtent(building, wall),
+      builtExtent(building, wall),
     );
     if (fitError) return noop(doc, `update_opening refused: ${fitError}.`);
     const document = regenerateBuilding(doc, withElement(building, updated));

@@ -4,6 +4,7 @@
  * @pure
  */
 
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { MEMBER_LAYER } from './entities';
 import { arcThrough } from './curvedWallGeometry';
@@ -66,9 +67,10 @@ const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
 };
 
 const isPoint = (value: unknown): boolean =>
-  Array.isArray(value) &&
-  value.length >= 2 &&
-  value.every((n) => typeof n === 'number' && Number.isFinite(n));
+  Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
+
+const isPoint3 = (value: unknown): boolean =>
+  Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
 
 const isPolygon = (value: unknown): boolean =>
   Array.isArray(value) && value.length >= 3 && value.every(isPoint);
@@ -142,12 +144,9 @@ function pipeSupportErrors(key: string, element: Elements, elements: Elements): 
   if (!['shoe', 'hanger', 'guide', 'anchor'].includes(String(element['type']))) {
     errors.push(`building element ${key}: type must be shoe, hanger, guide or anchor`);
   }
-  const position = element['position'];
-  const isPosition =
-    Array.isArray(position) &&
-    position.length === 3 &&
-    position.every((n) => typeof n === 'number' && Number.isFinite(n));
-  if (!isPosition) errors.push(`building element ${key}: position must be [x, y, z]`);
+  if (!isPoint3(element['position'])) {
+    errors.push(`building element ${key}: position must be [x, y, z]`);
+  }
   const memberId = element['memberId'];
   if (memberId !== null && typeof memberId !== 'string') {
     errors.push(`building element ${key}: memberId must be a steel member id or null`);
@@ -159,7 +158,7 @@ function pipeSupportErrors(key: string, element: Elements, elements: Elements): 
     }
   }
   const angle = element['standoffAngle'];
-  if (angle !== undefined && !(typeof angle === 'number' && Number.isFinite(angle))) {
+  if (angle !== undefined && !isFiniteNumber(angle)) {
     errors.push(`building element ${key}: standoffAngle must be a finite number`);
   }
   return errors;
@@ -193,7 +192,7 @@ function elementErrors(
     errors.push(`building element ${key}: entityIds must be a string array`);
   for (const field of NUMBERS[category] ?? []) {
     const value = element[field];
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
+    if (!isFiniteNumber(value)) {
       errors.push(`building element ${key}: ${field} must be a finite number`);
     }
   }
@@ -213,7 +212,7 @@ function elementErrors(
       isRecord(reinforcement) &&
       ['barDiameter', 'spacing', 'cover'].every((field) => {
         const value = reinforcement[field];
-        return typeof value === 'number' && Number.isFinite(value) && value > 0;
+        return isFiniteNumber(value) && value > 0;
       });
     if (!valid) {
       errors.push(
@@ -239,10 +238,6 @@ function elementErrors(
       errors.push(`building element ${key}: openings must be polygons`);
     }
   }
-  const isPoint3 = (value: unknown): boolean =>
-    Array.isArray(value) &&
-    value.length === 3 &&
-    value.every((n) => typeof n === 'number' && Number.isFinite(n));
   if (category === 'member' && (!isPoint3(element['start']) || !isPoint3(element['end']))) {
     errors.push(`building element ${key}: start and end must be [x, y, z]`);
   }
@@ -372,8 +367,7 @@ export function buildingErrors(raw: unknown): string[] {
       isRecord(level) &&
       level['id'] === key &&
       typeof level['name'] === 'string' &&
-      typeof level['elevation'] === 'number' &&
-      Number.isFinite(level['elevation']) &&
+      isFiniteNumber(level['elevation']) &&
       typeof level['height'] === 'number' &&
       level['height'] > 0;
     if (!valid) errors.push(`building level ${key} is malformed (id, name, elevation, height > 0)`);

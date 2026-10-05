@@ -7,12 +7,13 @@ import type {
   BimCategory,
   BuildingElement,
   BuildingModel,
+  CurvedWallElement,
   WallElement,
 } from '@core/model/building';
 import { polygonArea } from '@lib/polygon';
 import { toMetres } from './model';
-import { openingsOf, wallExtent } from './wallGeometry';
-import type { ConnectionWelds } from './industrial/connections';
+import { round } from './numeric';
+import { builtExtent, openingsOf } from './wallGeometry';
 
 type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
@@ -45,28 +46,23 @@ export function scaleFor(doc: CadDocument): Scale {
 
 interface WallQuantities {
   readonly length: number;
-  readonly grossArea: number;
-  readonly openingArea: number;
   readonly netArea: number;
   readonly volume: number;
 }
 
-/** Area of the openings hosted by a wall (for net face areas). */
-export function openingsArea(building: BuildingModel, wallId: string): number {
-  return openingsOf(building, wallId).reduce(
+/** Built body (joints applied) in document units: length, net one-face area, volume. */
+export function wallQuantities(
+  building: BuildingModel,
+  wall: WallElement | CurvedWallElement,
+): WallQuantities {
+  const extent = builtExtent(building, wall);
+  const length = extent.end - extent.start;
+  const openingArea = openingsOf(building, wall.id).reduce(
     (sum, opening) => sum + opening.width * opening.height,
     0,
   );
-}
-
-/** Wall quantities of the built body (joints applied) in document units: length, one-face areas, volume. */
-export function wallQuantities(building: BuildingModel, wall: WallElement): WallQuantities {
-  const extent = wallExtent(building, wall);
-  const length = extent.end - extent.start;
-  const grossArea = length * wall.height;
-  const openingArea = openingsArea(building, wall.id);
-  const netArea = grossArea - openingArea;
-  return { length, grossArea, openingArea, netArea, volume: netArea * wall.thickness };
+  const netArea = length * wall.height - openingArea;
+  return { length, netArea, volume: netArea * wall.thickness };
 }
 
 /** Slab plan area minus its openings (document units²). */
@@ -77,21 +73,17 @@ export function slabNetArea(slab: Extract<BuildingElement, { category: 'slab' }>
   );
 }
 
+export function columnSectionArea(
+  column: Extract<BuildingElement, { category: 'column' }>,
+): number {
+  return column.shape === 'circular'
+    ? Math.PI * (column.width / 2) ** 2
+    : column.width * column.depth;
+}
+
 export function stairVolume(stair: Extract<BuildingElement, { category: 'stair' }>): number {
   const stepCountSum = (stair.riserCount * (stair.riserCount + 1)) / 2;
   return stair.treadDepth * stair.width * stair.riserHeight * stepCountSum;
-}
-
-export function elementsOf<C extends BimCategory>(
-  building: BuildingModel,
-  category: C,
-): Array<Extract<BuildingElement, { category: C }>> {
-  return building.elementOrder
-    .map((id) => building.elements[id])
-    .filter(
-      (element): element is Extract<BuildingElement, { category: C }> =>
-        element !== undefined && element.category === category,
-    );
 }
 
 const REBAR_KG_PER_M3 = 7850;
@@ -122,38 +114,33 @@ export function footingRebarMass(
 export class TakeoffAccumulator {
   private readonly lines = new Map<string, TakeoffLine>();
 
+  /** Adds `quantity` per `[unit, what, quantity]` row; each line is described "<label> — <what>". */
   add(
     category: BimCategory,
     material: string,
-    unit: TakeoffUnit,
-    description: string,
-    quantity: number,
+    label: string,
+    rows: ReadonlyArray<readonly [unit: TakeoffUnit, what: string, quantity: number]>,
     group: string = category,
   ): void {
-    const key = `${group}.${material}.${unit}`;
-    const existing = this.lines.get(key);
-    this.lines.set(key, {
-      key,
-      group,
-      category,
-      material,
-      unit,
-      description: existing?.description ?? description,
-      quantity: (existing?.quantity ?? 0) + quantity,
-    });
+    for (const [unit, what, quantity] of rows) {
+      const key = `${group}.${material}.${unit}`;
+      const existing = this.lines.get(key);
+      this.lines.set(key, {
+        key,
+        group,
+        category,
+        material,
+        unit,
+        description: existing?.description ?? `${label} — ${what}`,
+        quantity: (existing?.quantity ?? 0) + quantity,
+      });
+    }
   }
 
   result(): TakeoffLine[] {
     return [...this.lines.values()].map((line) => ({
       ...line,
-      quantity: Math.round(line.quantity * 1000) / 1000,
+      quantity: round(line.quantity, 3),
     }));
   }
-}
-
-/** "a8 flanges / a5 web · 3.2 m" (empty without welds). */
-export function weldLabel(welds: ConnectionWelds | null): string {
-  return welds
-    ? `a${welds.flangeThroat} flanges / a${welds.webThroat} web · ${(welds.length / 1000).toFixed(1)} m`
-    : '';
 }

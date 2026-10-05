@@ -9,7 +9,13 @@
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
 import { fromMm } from './model';
-import { type PlanPrimitive, type PlanSource, layerName } from './planModel';
+import {
+  type PlanPrimitive,
+  type PlanSource,
+  annotationText,
+  layerName,
+  thinLine,
+} from './planModel';
 import { pipeAngle } from './industrial/supportParts';
 
 /** Side of a support symbol, mm (diameter for the hanger circle). */
@@ -31,7 +37,7 @@ export function supportPrimitives(
     centre[1] + along * sin + across * cos,
   ];
   const layer = layerName('pipeSupport');
-  const line = (a: Vec2, b: Vec2): PlanPrimitive => ({ type: 'line', layer, style: 'thin', a, b });
+  const line = (a: Vec2, b: Vec2): PlanPrimitive => thinLine(layer, a, b);
   const square: Vec2[] = [at(-half, -half), at(half, -half), at(half, half), at(-half, half)];
   const symbol = ((): PlanPrimitive[] => {
     switch (support.type) {
@@ -61,13 +67,11 @@ export function supportPrimitives(
   })();
   return [
     ...symbol,
-    {
-      type: 'text',
+    annotationText(
       layer,
-      style: 'annotation',
-      at: [centre[0] + half * 1.6, centre[1] + half * 1.6],
-      height: fromMm(doc, LABEL_HEIGHT),
-      content: support.mark,
-    },
+      [centre[0] + half * 1.6, centre[1] + half * 1.6],
+      fromMm(doc, LABEL_HEIGHT),
+      support.mark,
+    ),
   ];
 }

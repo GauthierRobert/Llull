@@ -16,17 +16,26 @@ import type {
 import { polygonArea, polygonCentroid } from '@lib/polygon';
 import { curvedBandBetween, curvedWallExtent, tangentWall } from './curvedWallGeometry';
 import { fromMm, toMetres } from './model';
-import { wallPieces } from './wallPieces';
-import { openingsOf, pointAlong, wallExtent, wallFrame } from './wallGeometry';
+import {
+  doorSwing,
+  gridBubbleCenters,
+  openingsOf,
+  pointAlong,
+  wallExtent,
+  wallFrame,
+  wallPieces,
+} from './wallGeometry';
 import { stairPoint } from './stairGeometry';
 import { layerBoundaries } from './wallLayers';
 import {
   DIMENSION_LAYER,
   type PlanPrimitive,
   type PlanSource,
+  annotationText,
   band,
   isCut,
   layerName,
+  thinLine,
 } from './planModel';
 
 /** Plan symbol of a door (leaf + swing) or window (three lines) in a straight wall frame. */
@@ -34,50 +43,33 @@ function openingSymbol(
   wall: Pick<WallElement, 'start' | 'end' | 'thickness'>,
   opening: OpeningElement,
 ): PlanPrimitive[] {
-  const frame = wallFrame(wall);
-  const half = wall.thickness / 2;
-  const primitives: PlanPrimitive[] = [];
-  const left = opening.offset - opening.width / 2;
-  const right = opening.offset + opening.width / 2;
+  const layer = layerName(opening.category);
   if (opening.category === 'window') {
-    for (const across of [-half, 0, half]) {
-      primitives.push({
-        type: 'line',
-        layer: layerName('window'),
-        style: 'thin',
-        a: pointAlong(wall, frame, left, across),
-        b: pointAlong(wall, frame, right, across),
-      });
-    }
-    return primitives;
+    const frame = wallFrame(wall);
+    const half = wall.thickness / 2;
+    const left = opening.offset - opening.width / 2;
+    const right = opening.offset + opening.width / 2;
+    return [-half, 0, half].map((across) =>
+      thinLine(
+        layer,
+        pointAlong(wall, frame, left, across),
+        pointAlong(wall, frame, right, across),
+      ),
+    );
   }
-  const hinge = pointAlong(wall, frame, opening.swing === 'left' ? left : right, half);
-  const openAngle = frame.angle + Math.PI / 2;
-  const [startAngle, endAngle] =
-    opening.swing === 'left' ? [frame.angle, openAngle] : [openAngle, frame.angle + Math.PI];
-  primitives.push(
+  const { hinge, leafEnd, startAngle, endAngle } = doorSwing(wall, opening);
+  return [
     {
       type: 'arc',
-      layer: layerName('door'),
+      layer,
       style: 'thin',
       center: hinge,
       radius: opening.width,
       startAngle,
       endAngle,
     },
-    {
-      type: 'line',
-      layer: layerName('door'),
-      style: 'thin',
-      a: hinge,
-      b: [
-        hinge[0] + Math.cos(openAngle) * opening.width,
-        hinge[1] + Math.sin(openAngle) * opening.width,
-      ],
-    },
-  );
-
-  return primitives;
+    thinLine(layer, hinge, leafEnd),
+  ];
 }
 
 export function wallPrimitives(
@@ -87,35 +79,28 @@ export function wallPrimitives(
 ): PlanPrimitive[] {
   const frame = wallFrame(wall);
   const half = wall.thickness / 2;
+  const layer = layerName('wall');
   const primitives: PlanPrimitive[] = [];
   const openings = openingsOf(building, wall.id);
   const extent = wallExtent(building, wall);
+  const addCut = (from: number, to: number): void => {
+    primitives.push({
+      type: 'polygon',
+      layer,
+      style: 'cut',
+      fill: 'hatch',
+      points: band(wall, from, to, half),
+    });
+  };
   let cursor = extent.start;
-  const finish = extent.end;
   for (const opening of openings.filter((candidate) =>
     isCut(candidate, cutHeight - wall.baseOffset),
   )) {
     const left = opening.offset - opening.width / 2;
-    if (left > cursor) {
-      primitives.push({
-        type: 'polygon',
-        layer: layerName('wall'),
-        style: 'cut',
-        fill: 'hatch',
-        points: band(wall, cursor, left, half),
-      });
-    }
+    if (left > cursor) addCut(cursor, left);
     cursor = Math.max(cursor, opening.offset + opening.width / 2);
   }
-  if (finish > cursor) {
-    primitives.push({
-      type: 'polygon',
-      layer: layerName('wall'),
-      style: 'cut',
-      fill: 'hatch',
-      points: band(wall, cursor, finish, half),
-    });
-  }
+  if (extent.end > cursor) addCut(cursor, extent.end);
   // Build-up: a thin line along every layer boundary of each cut piece.
   const boundaries = layerBoundaries(wall);
   if (boundaries.length > 0) {
@@ -130,13 +115,13 @@ export function wallPrimitives(
       );
       const [from, to] = [Math.min(...along), Math.max(...along)];
       for (const across of boundaries) {
-        primitives.push({
-          type: 'line',
-          layer: layerName('wall'),
-          style: 'thin',
-          a: pointAlong(wall, frame, from, across),
-          b: pointAlong(wall, frame, to, across),
-        });
+        primitives.push(
+          thinLine(
+            layer,
+            pointAlong(wall, frame, from, across),
+            pointAlong(wall, frame, to, across),
+          ),
+        );
       }
     }
   }
@@ -265,13 +250,7 @@ export function stairPrimitives(
   ];
   for (let index = 1; index < stair.riserCount; index++) {
     const along = index * stair.treadDepth;
-    primitives.push({
-      type: 'line',
-      layer,
-      style: 'thin',
-      a: at(along, -half),
-      b: at(along, half),
-    });
+    primitives.push(thinLine(layer, at(along, -half), at(along, half)));
   }
   primitives.push(
     {
@@ -280,14 +259,7 @@ export function stairPrimitives(
       style: 'thin',
       points: [at(stair.treadDepth / 2, 0), at(run - stair.treadDepth / 2, 0)],
     },
-    {
-      type: 'text',
-      layer,
-      style: 'annotation',
-      at: at(-fromMm(doc, 400), 0),
-      height: fromMm(doc, 200),
-      content: `UP ${stair.riserCount}R`,
-    },
+    annotationText(layer, at(-fromMm(doc, 400), 0), fromMm(doc, 200), `UP ${stair.riserCount}R`),
   );
   return primitives;
 }
@@ -329,14 +301,8 @@ export function slabPrimitives(slab: SlabElement): PlanPrimitive[] {
     const middle = Math.floor(opening.length / 2);
     primitives.push(
       { type: 'polygon', layer, style: 'thin', points: opening },
-      { type: 'line', layer, style: 'thin', a: opening[0] as Vec2, b: opening[middle] as Vec2 },
-      {
-        type: 'line',
-        layer,
-        style: 'thin',
-        a: opening[opening.length - 1] as Vec2,
-        b: opening[middle - 1] as Vec2,
-      },
+      thinLine(layer, opening[0] as Vec2, opening[middle] as Vec2),
+      thinLine(layer, opening[opening.length - 1] as Vec2, opening[middle - 1] as Vec2),
     );
   }
   return primitives;
@@ -371,51 +337,30 @@ export function roomPrimitives(doc: PlanSource, room: RoomElement): PlanPrimitiv
   const area = polygonArea(room.boundary) * toMetres(doc, 1) ** 2;
   const layer = layerName('room');
   return [
-    {
-      type: 'text',
+    annotationText(layer, [cx, cy + textHeight * 0.7], textHeight, room.name),
+    annotationText(
       layer,
-      style: 'annotation',
-      at: [cx, cy + textHeight * 0.7],
-      height: textHeight,
-      content: room.name,
-    },
-    {
-      type: 'text',
-      layer,
-      style: 'annotation',
-      at: [cx, cy - textHeight * 0.9],
-      height: textHeight * 0.8,
-      content: `${room.mark} · ${area.toFixed(2)} m²`,
-    },
+      [cx, cy - textHeight * 0.9],
+      textHeight * 0.8,
+      `${room.mark} · ${area.toFixed(2)} m²`,
+    ),
   ];
 }
 
 /** Axis line with a labelled bubble at each end. */
 export function gridPrimitives(doc: PlanSource, grid: GridElement): PlanPrimitive[] {
   const bubbleRadius = fromMm(doc, 400);
-  const { direction } = wallFrame(grid);
   const layer = layerName('grid');
-  const primitives: PlanPrimitive[] = [
-    { type: 'line', layer, style: 'thin', a: grid.start, b: grid.end },
-  ];
-  for (const [point, sign] of [
-    [grid.start, -1],
-    [grid.end, 1],
-  ] as const) {
-    const center: Vec2 = [
-      point[0] + sign * direction[0] * bubbleRadius,
-      point[1] + sign * direction[1] * bubbleRadius,
-    ];
+  const primitives: PlanPrimitive[] = [thinLine(layer, grid.start, grid.end)];
+  for (const center of gridBubbleCenters(grid, bubbleRadius)) {
     primitives.push(
       { type: 'circle', layer, style: 'thin', center, radius: bubbleRadius },
-      {
-        type: 'text',
+      annotationText(
         layer,
-        style: 'annotation',
-        at: [center[0], center[1] - bubbleRadius * 0.4],
-        height: bubbleRadius * 0.9,
-        content: grid.mark,
-      },
+        [center[0], center[1] - bubbleRadius * 0.4],
+        bubbleRadius * 0.9,
+        grid.mark,
+      ),
     );
   }
   return primitives;

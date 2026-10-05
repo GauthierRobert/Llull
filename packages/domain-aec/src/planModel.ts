@@ -101,6 +101,21 @@ export function band(
   ];
 }
 
+export const thinLine = (layer: string, a: Vec2, b: Vec2): PlanPrimitive => ({
+  type: 'line',
+  layer,
+  style: 'thin',
+  a,
+  b,
+});
+
+export const annotationText = (
+  layer: string,
+  at: Vec2,
+  height: number,
+  content: string,
+): PlanPrimitive => ({ type: 'text', layer, style: 'annotation', at, height, content });
+
 export function isCut(opening: OpeningElement, cutHeight: number): boolean {
   return opening.sillHeight < cutHeight && opening.sillHeight + opening.height > cutHeight;
 }

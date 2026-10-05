@@ -26,6 +26,7 @@ import {
 import { type SteelProfile, findProfile } from './steel/profiles';
 import {
   type Context,
+  addPropertySet,
   circleProfile,
   direction,
   extrusion,
@@ -179,16 +180,10 @@ export function exportIndustrial(
       const ref = writer.add(
         `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [extrusion(context, profile, mm(height))])},${ifcString(element.id)},.ELEMENT.)`,
       );
-      const properties = [
+      addPropertySet(context, { id: element.id, ref }, 'Pset_llullEquipment', [
         `IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(${ifcReal(element.weight)}),$)`,
         `IFCPROPERTYSINGLEVALUE('MaintenanceClearance','Free space around the footprint, mm',IFCLENGTHMEASURE(${ifcReal(mm(element.clearance))}),$)`,
-      ].map((property) => writer.add(property));
-      const propertySet = writer.add(
-        `IFCPROPERTYSET('${context.guid(`${element.id}:pset`)}',$,'Pset_llullEquipment',$,(${properties.join(',')}))`,
-      );
-      writer.add(
-        `IFCRELDEFINESBYPROPERTIES('${context.guid(`${element.id}:rel-pset`)}',$,$,$,(${ref}),${propertySet})`,
-      );
+      ]);
       return { ref, material: null };
     }
     case 'pipe': {

@@ -9,7 +9,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { buildingCommands, industrialCommands } from './index';
-import { buildingDerivationGuard } from './derivationGuard';
+import { buildingDerivationGuard } from './integrity';
 import { buildingErrors } from './validate';
 import { regenerateBuilding } from './evaluateElements';
 
