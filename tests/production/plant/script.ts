@@ -134,6 +134,12 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
       },
     });
   }
+  for (const support of intent.supports ?? []) {
+    calls.push({
+      tool: 'add_pipe_support',
+      args: { line: support.line, type: support.type, at: support.at },
+    });
+  }
   calls.push({ tool: 'check_clashes', args: {} });
   return calls;
 }

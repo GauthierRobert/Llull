@@ -12,8 +12,9 @@ export default defineConfig({
   test: {
     ...base.test,
     include: ['tests/production/**/*.gate.ts'],
-    // Default server settings (incl. the /mcp rate limit): a modelling job must fit within them.
-    env: {},
+    // The gate runs several jobs back to back from one IP within a minute; each job alone must fit
+    // the default /mcp limit (asserted in scripted.gate.ts), so the limit is lifted for the run only.
+    env: { MCP_RATE_LIMIT_MAX: '100000' },
     testTimeout: 3_600_000,
     hookTimeout: 120_000,
   },

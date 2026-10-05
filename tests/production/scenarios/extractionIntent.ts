@@ -3,6 +3,7 @@ import { section } from '../oracle/steel';
 import {
   gridCoordinates,
   type IntentMember,
+  type IntentSupport,
   type IntentPipe,
   type PlantIntent,
 } from '../plant/intent';
@@ -94,8 +95,67 @@ function members(): IntentMember[] {
     }
     for (const x of [X[0] ?? 0, X[4] ?? 0]) cross([x, Y[0] ?? 0], [x, Y[1] ?? 0]);
   }
+  result.push(...supportSteel());
   return result;
 }
+
+/** Secondary steel carrying the pipe supports (TOS 100 mm below the floor beams: no floor load). */
+function supportSteel(): IntentMember[] {
+  const purpose = 'Pipe-support steel';
+  const members: IntentMember[] = [9000, 15000, 21000].map((x) => ({
+    role: 'beam',
+    profile: 'IPE200',
+    start: [x, 7500, 5770],
+    end: [x, 15000, 5770],
+    level: 1,
+    purpose,
+  }));
+  members.push({
+    role: 'beam',
+    profile: 'IPE160',
+    start: [15000, 9250, 5790],
+    end: [18000, 9250, 5790],
+    level: 1,
+    purpose,
+  });
+  for (const y of [8700, 6200]) {
+    members.push({
+      role: 'column',
+      profile: 'HEA100',
+      start: [17500, y, 0],
+      end: [17500, y, 1955.5],
+      level: 0,
+      purpose,
+    });
+  }
+  return members;
+}
+
+const SUPPORTS: IntentSupport[] = [
+  {
+    line: 'L-101',
+    type: 'hanger',
+    at: [
+      [18000, 6600, 4500],
+      [17000, 7500, 4500],
+      [17000, 9250, 4500],
+    ],
+  },
+  {
+    line: 'L-102',
+    type: 'hanger',
+    at: [24000, 21000, 18000, 15000, 12000, 9000, 6000].map((x): Vec3 => [x, 14200, 4500]),
+  },
+  {
+    line: 'L-103',
+    type: 'shoe',
+    at: [
+      [17500, 8700, 2000],
+      [17500, 6200, 2000],
+    ],
+  },
+  { line: 'L-104', type: 'hanger', at: [[0, 11250, 16000]] },
+];
 
 const PIPES: IntentPipe[] = [
   {
@@ -220,6 +280,7 @@ export const extractionIntent: PlantIntent = {
     },
   ],
   pipes: PIPES,
+  supports: SUPPORTS,
   tieIns: { 'TI-1': [24500, 14200, 4500], 'TI-2': [-500, 11250, 16000] },
   stairs: [
     { level: 0, start: [7000, 8500], angle: 0, width: 1000 },

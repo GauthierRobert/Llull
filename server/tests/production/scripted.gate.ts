@@ -60,6 +60,21 @@ async function drive(scenario: Scenario): Promise<{ calls: number; ms: number }>
   return { calls: scenario.script.length, ms: Date.now() - started };
 }
 
+/** Default `/mcp` limit (server/src/mcp/middleware.ts): requests per minute per IP. */
+const DEFAULT_MCP_LIMIT = 600;
+
+describe('each job fits the default /mcp rate limit', () => {
+  for (const scenario of SCENARIOS) {
+    it(scenario.id, () => {
+      // One request per tool call, plus session setup (initialize + notification) and one
+      // enable_toolset per toolset, for the job itself (its starting model is already there).
+      const toolsets = new Set(scenario.script.map((call) => toolsetOf(call.tool)));
+      const requests = scenario.script.length + toolsets.size + 2;
+      expect(requests).toBeLessThan(DEFAULT_MCP_LIMIT);
+    });
+  }
+});
+
 describe('production scenarios — scripted driver over /mcp', () => {
   for (const scenario of SCENARIOS) {
     it(scenario.id, async () => {

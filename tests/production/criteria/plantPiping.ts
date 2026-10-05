@@ -121,6 +121,37 @@ function lineListCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
   };
 }
 
+interface SupportRow {
+  mark: string;
+  line?: string;
+  ok: boolean;
+  largestSpanM?: number;
+  allowedSpanM?: number;
+  issues?: string[];
+}
+
+/** check_pipe_supports: every pipe supported within its standard span, no unattached support. */
+function supportsCheck({ document, run }: GradeContext): CheckOutcome {
+  const result = run('check_pipe_supports');
+  const rows = ((result.data as { rows?: SupportRow[]; pipes?: SupportRow[] } | undefined)?.rows ??
+    (result.data as { pipes?: SupportRow[] } | undefined)?.pipes ??
+    []) as SupportRow[];
+  const pipes = elementsOf(document, 'pipe').length;
+  const failing = rows.filter((r) => !r.ok);
+  const problems = failing.map(
+    (r) =>
+      `${r.line ?? r.mark}: ${(r.issues ?? []).join(', ') || `span ${r.largestSpanM} m > ${r.allowedSpanM} m`}`,
+  );
+  if (rows.length !== pipes) problems.push(`${rows.length} pipe rows for ${pipes} pipes`);
+  return {
+    pass: pipes > 0 && problems.length === 0,
+    detail:
+      problems.length === 0
+        ? `${pipes} lines supported within their standard spans`
+        : problems.join('; '),
+  };
+}
+
 export function pipingCriteria(intent: PlantIntent): Criterion[] {
   return [
     {
@@ -143,6 +174,13 @@ export function pipingCriteria(intent: PlantIntent): Criterion[] {
       requirement:
         'The pipe schedule is a line list: line number, DN, from and to equipment per line.',
       check: (ctx) => lineListCheck(intent, ctx),
+    },
+    {
+      id: 'pipe-supports',
+      area: 'piping',
+      requirement:
+        'Every line is carried by supports on steel (or nozzles) within the MSS SP-69 / ASME B31.1 span for its DN.',
+      check: supportsCheck,
     },
   ];
 }

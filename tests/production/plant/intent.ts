@@ -31,6 +31,15 @@ export interface IntentMember {
   endJoint?: 'pinned' | 'rigid';
   /** Column base fixity. */
   baseFixity?: 'pinned' | 'fixed';
+  /** Secondary steel (pipe supports, stringers): listed on its own in the brief, outside the grid rules. */
+  purpose?: string;
+}
+
+/** Pipe supports on one line at absolute points on its centreline. */
+export interface IntentSupport {
+  line: string;
+  type: 'shoe' | 'hanger' | 'guide' | 'anchor';
+  at: Vec3[];
 }
 
 export interface IntentFloor {
@@ -100,6 +109,8 @@ export interface PlantIntent {
   stairs: IntentStair[];
   /** Cable trays (absent on jobs without any). */
   trays?: IntentTray[];
+  /** Pipe supports (shoes on steel below, hangers from steel above). */
+  supports?: IntentSupport[];
   /**
    * Structure rules in the brief's own words, replacing the multi-storey building rules that
    * `plantBrief` derives from the members (used by structures that are not a floored building).

@@ -13,6 +13,7 @@ interface SectionFacts {
 }
 
 const SECTIONS: Record<string, SectionFacts> = {
+  IPE160: { h: 160, kgPerM: 15.8 },
   IPE200: { h: 200, kgPerM: 22.4 },
   IPE240: { h: 240, kgPerM: 30.7 },
   IPE270: { h: 270, kgPerM: 36.1 },
@@ -22,6 +23,7 @@ const SECTIONS: Record<string, SectionFacts> = {
   IPE400: { h: 400, kgPerM: 66.3 },
   IPE450: { h: 450, kgPerM: 77.6 },
   IPE500: { h: 500, kgPerM: 90.7 },
+  HEA100: { h: 96, kgPerM: 16.7 },
   HEA160: { h: 152, kgPerM: 30.4 },
   HEA200: { h: 190, kgPerM: 42.3 },
   HEA220: { h: 210, kgPerM: 50.5 },
