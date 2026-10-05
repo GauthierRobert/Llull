@@ -113,7 +113,7 @@ export const addPipeRun = defineCommand({
     'from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME ' +
     'B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. ' +
     'Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind "pipe") is the line list; ' +
-    'clashes are reported by check_clashes.',
+    'clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports.',
   params: z.object({
     points: z
       .array(z.array(z.number()))

@@ -6,9 +6,13 @@
  * @pure
  */
 
-import { type ModelUnits } from './steelMemberBars';
+import type { CableTrayElement, PipeElement } from '@core/model/building';
+import { type ModelUnits, type SteelBar } from './steelMemberBars';
 import { addPointLoad, type BeamLoads } from './steelBeamLoads';
+import type { ColumnNode } from './steelFraming';
 import { pipeWeightPerMetre } from './pipeWeight';
+import { carriedByEnds, pipeRunOf, weightSupportsOf } from './pipeSupportLayout';
+import { applySupportedPipe } from './steelSupportLoads';
 
 export interface LineLoadParams {
   /** kg/m³ of the pipe contents (1000 = water, 0 = empty). */
@@ -26,13 +30,17 @@ export interface LineRunReport {
   readonly weightPerMetre: number;
   readonly lengthM: number;
   readonly supports: number;
-  /** Weight delivered to beams, kN. */
+  /** 'supports' = carried by the pipe's add_pipe_support supports; 'resting' = lying on top of steel; 'nozzles' = both ends carried by equipment / headers within the table span. */
+  readonly basis: 'resting' | 'supports' | 'nozzles';
+  /** Weight delivered to beams and columns, kN. */
   readonly carriedKn: number;
 }
 
 export interface LineLoadResult {
   readonly runs: LineRunReport[];
   readonly warnings: string[];
+  /** Pipe loads delivered to columns by supports: column id → nodes for the column check. */
+  readonly columnNodes: Array<readonly [string, ColumnNode]>;
 }
 
 interface Run {
@@ -45,6 +53,8 @@ interface Run {
   /** Distance from the centreline to the underside, mm. */
   readonly halfDepth: number;
   readonly weightPerMetre: number;
+  /** The pipe element (absent for trays). */
+  readonly pipe?: PipeElement;
 }
 
 interface Support {
@@ -63,42 +73,60 @@ const END_TOLERANCE = 50;
 const GROUP_DISTANCE = 100;
 const NEARLY_HORIZONTAL = 0.1;
 
-function runsOf(units: ModelUnits, params: LineLoadParams): Run[] {
-  const { building, toMm, elevationMm } = units;
-  const runs: Run[] = [];
-  for (const id of building.elementOrder) {
-    const element = building.elements[id];
-    if (element?.category !== 'pipe' && element?.category !== 'tray') continue;
-    const base = elevationMm(element.levelId);
-    const points = element.points.map((point): [number, number, number] => [
-      toMm(point[0] ?? 0),
-      toMm(point[1] ?? 0),
-      base + toMm(point[2] ?? 0),
-    ]);
-    if (element.category === 'pipe') {
-      const diameter = toMm(element.diameter);
-      runs.push({
-        id,
-        mark: element.mark,
-        kind: 'pipe',
-        label: `${element.service} Ø${Math.round(diameter * 10) / 10}`,
-        points,
-        halfDepth: diameter / 2,
-        weightPerMetre: pipeWeightPerMetre(diameter, params.pipeContentDensity),
-      });
-    } else {
-      runs.push({
-        id,
-        mark: element.mark,
-        kind: 'tray',
-        label: `${element.system} tray ${Math.round(toMm(element.width))} wide`,
-        points,
-        halfDepth: toMm(element.height) / 2,
-        weightPerMetre: (params.cableTrayWeight * 9.80665) / 1000,
-      });
-    }
+function runOf(
+  units: ModelUnits,
+  element: PipeElement | CableTrayElement,
+  params: LineLoadParams,
+): Run {
+  const { toMm, elevationMm } = units;
+  const base = elevationMm(element.levelId);
+  const points = element.points.map((point): [number, number, number] => [
+    toMm(point[0] ?? 0),
+    toMm(point[1] ?? 0),
+    base + toMm(point[2] ?? 0),
+  ]);
+  if (element.category === 'pipe') {
+    const diameter = toMm(element.diameter);
+    return {
+      id: element.id,
+      mark: element.mark,
+      kind: 'pipe',
+      label: `${element.service} Ø${Math.round(diameter * 10) / 10}`,
+      points,
+      halfDepth: diameter / 2,
+      weightPerMetre: pipeWeightPerMetre(diameter, params.pipeContentDensity),
+      pipe: element,
+    };
   }
-  return runs;
+  return {
+    id: element.id,
+    mark: element.mark,
+    kind: 'tray',
+    label: `${element.system} tray ${Math.round(toMm(element.width))} wide`,
+    points,
+    halfDepth: toMm(element.height) / 2,
+    weightPerMetre: (params.cableTrayWeight * 9.80665) / 1000,
+  };
+}
+
+function runsOf(units: ModelUnits, params: LineLoadParams): Run[] {
+  const { building } = units;
+  return building.elementOrder.flatMap((id) => {
+    const element = building.elements[id];
+    return element?.category === 'pipe' || element?.category === 'tray'
+      ? [runOf(units, element, params)]
+      : [];
+  });
+}
+
+/** Arc lengths (mm) at which `pipe` rests on top of `beams` (the rule for pipes without supports). */
+export function restingArcs(
+  units: ModelUnits,
+  pipe: PipeElement,
+  beams: ReadonlyArray<BeamLoads>,
+): number[] {
+  const run = runOf(units, pipe, { pipeContentDensity: 0, cableTrayWeight: 0 });
+  return supportsOf(run, beams).supports.map((support) => support.s);
 }
 
 /** Supports of a run on `beams`, sorted by arc length, and the run length (mm). */
@@ -180,11 +208,32 @@ export function applyLineLoads(
   units: ModelUnits,
   beams: ReadonlyArray<BeamLoads>,
   params: LineLoadParams,
+  bars: ReadonlyArray<SteelBar> = [],
 ): LineLoadResult {
   const runs: LineRunReport[] = [];
   const warnings: string[] = [];
+  const columnNodes: Array<readonly [string, ColumnNode]> = [];
   for (const run of runsOf(units, params)) {
+    const pipeRun = run.pipe ? pipeRunOf(units, run.pipe) : null;
+    if (pipeRun && weightSupportsOf(units, pipeRun).length > 0) {
+      const supported = applySupportedPipe(units, pipeRun, run.weightPerMetre, beams, bars);
+      warnings.push(...supported.warnings);
+      columnNodes.push(...supported.columnNodes);
+      runs.push({
+        id: run.id,
+        mark: run.mark,
+        kind: run.kind,
+        label: run.label,
+        weightPerMetre: run.weightPerMetre,
+        lengthM: pipeRun.lengthMm / 1000,
+        supports: supported.supports,
+        basis: 'supports',
+        carriedKn: supported.carriedKn,
+      });
+      continue;
+    }
     const { supports, length } = supportsOf(run, beams);
+    const nozzles = supports.length === 0 && pipeRun !== null && carriedByEnds(units, pipeRun);
     let carried = 0;
     for (const { support, tributary } of tributaries(supports, length)) {
       const weight = (run.weightPerMetre * tributary) / 1000;
@@ -200,13 +249,14 @@ export function applyLineLoads(
       weightPerMetre: run.weightPerMetre,
       lengthM: length / 1000,
       supports: supports.length,
+      basis: nozzles ? 'nozzles' : 'resting',
       carriedKn: carried,
     });
-    if (supports.length === 0 && length > 0) {
+    if (supports.length === 0 && length > 0 && !nozzles) {
       warnings.push(
-        `${run.kind} ${run.mark} (${run.label}) rests on no steel beam: its ${((run.weightPerMetre * length) / 1000).toFixed(1)} kN are not carried by any checked member`,
+        `${run.kind} ${run.mark} (${run.label}) rests on no steel beam: its ${((run.weightPerMetre * length) / 1000).toFixed(1)} kN are not carried by any checked member${run.kind === 'pipe' ? ' (add_pipe_support: shoes on steel below or hangers from steel above)' : ''}`,
       );
     }
   }
-  return { runs, warnings };
+  return { runs, warnings, columnNodes };
 }

@@ -123,4 +123,72 @@ describe('solveFrame', () => {
       ),
     ).toBeNull();
   });
+
+  describe('moment releases', () => {
+    it('makes a propped cantilever: M = qL²/8 at the fixed end, 0 at the hinge, δ per closed form', () => {
+      const [L, q, I] = [6000, -10, 8.356e7];
+      const result = solveFrame(
+        [
+          { x: 0, y: 0, restraint: fixed },
+          { x: L, y: 0, restraint: [false, true, false] },
+        ],
+        [{ a: 0, b: 1, E, A: 5380, I, load: { qx: 0, qy: q }, releaseB: true }],
+      )!;
+      const member = result.members[0]!;
+      expect(member.moment[0]).toBeCloseTo((q * L * L) / 8, 3);
+      expect(member.moment[1]).toBeCloseTo(0, 6);
+      // The hinge rotates: θb = qL³/(48 EI) (propped cantilever), recovered for the in-span deflection.
+      expect(member.maxMoment).toBeCloseTo((-q * L * L) / 8, 3);
+      expect(member.shear[0]).toBeCloseTo((-5 * q * L) / 8, 3);
+    });
+
+    it('simply supports a beam released at both ends without a singular rotation', () => {
+      const [L, q, I] = [6000, -10, 8.356e7];
+      const result = solveFrame(
+        [
+          { x: 0, y: 0, restraint: pinned },
+          { x: L, y: 0, restraint: [false, true, false] },
+        ],
+        [{ a: 0, b: 1, E, A: 5380, I, load: { qx: 0, qy: q }, releaseA: true, releaseB: true }],
+      )!;
+      const member = result.members[0]!;
+      expect(member.moment[0]).toBeCloseTo(0, 6);
+      expect(member.moment[1]).toBeCloseTo(0, 6);
+      expect(member.maxMoment).toBeCloseTo((-q * L * L) / 8, 3);
+      // Mid-span deflection 5qL⁴/384EI from the Hermite field with the recovered end rotations.
+      expect(member.maxDisplacement.y).toBeCloseTo((5 * Math.abs(q) * L ** 4) / (384 * E * I), 4);
+    });
+
+    it('lets a pin-jointed beam tie two fixed-base cantilever columns: base moment H h / 2 each', () => {
+      const [h, L, H, I] = [4000, 6000, 20000, 2e8];
+      const result = solveFrame(
+        [
+          { x: 0, y: 0, restraint: fixed },
+          { x: 0, y: h, restraint: [false, false, false], load: { fx: H, fy: 0, mz: 0 } },
+          { x: L, y: h, restraint: [false, false, false] },
+          { x: L, y: 0, restraint: fixed },
+        ],
+        [
+          { a: 0, b: 1, E, A: 1e5, I },
+          { a: 1, b: 2, E, A: 1e10, I: 1e9, releaseA: true, releaseB: true },
+          { a: 3, b: 2, E, A: 1e5, I },
+        ],
+      )!;
+      expect(Math.abs(result.members[0]!.moment[0])).toBeCloseTo((H * h) / 2, -1);
+      expect(Math.abs(result.members[2]!.moment[0])).toBeCloseTo((H * h) / 2, -1);
+      expect(result.members[1]!.moment[0]).toBeCloseTo(0, 3);
+      expect(result.members[1]!.moment[1]).toBeCloseTo(0, 3);
+    });
+
+    it('is a mechanism when a moment is applied where every member end is released', () => {
+      const nodes = [
+        { x: 0, y: 0, restraint: pinned },
+        { x: 3000, y: 0, restraint: [false, true, false] as FrameNode['restraint'] },
+      ];
+      const member = { a: 0, b: 1, E, A: 1e4, I: 1e8, releaseA: true, releaseB: true };
+      expect(solveFrame(nodes, [member])).not.toBeNull();
+      const loaded = [{ ...nodes[0]!, load: { fx: 0, fy: 0, mz: 1e6 } }, nodes[1]!];
+      expect(solveFrame(loaded, [member])).toBeNull();
+    });
+  });
 });

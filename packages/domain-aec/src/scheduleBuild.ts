@@ -16,6 +16,7 @@ import { openingsOf } from './wallGeometry';
 import { boltSize } from './industrial/evaluate';
 import { trayLength } from './industrial/trays';
 import { plateMass } from './industrial/plates';
+import { supportSchedule } from './industrial/supportSchedule';
 import { connectionMass, connectionWelds } from './industrial/connections';
 import { curvedWallExtent } from './curvedWallGeometry';
 import {
@@ -45,7 +46,8 @@ export type ScheduleKind =
   | 'pipe'
   | 'tray'
   | 'plate'
-  | 'connection';
+  | 'connection'
+  | 'support';
 
 interface Schedule {
   readonly kind: ScheduleKind;
@@ -423,6 +425,8 @@ export function buildSchedule(doc: CadDocument, kind: ScheduleKind): Schedule {
           levelName(building, plate.levelId),
         ]),
       };
+    case 'support':
+      return { kind, ...supportSchedule(doc) };
     case 'connection':
       return {
         kind,

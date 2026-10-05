@@ -12,6 +12,7 @@ import { PanelSection } from '@ui/panels/PanelParts';
 import { ELEMENT_TOOLS } from './elementTools';
 import {
   defaultValues,
+  isFieldShown,
   type ElementListKind,
   type ElementTool,
   type ToolField,
@@ -30,7 +31,14 @@ interface ElementOption {
 
 type ElementOptions = Readonly<Record<ElementListKind, ReadonlyArray<ElementOption>>>;
 
-const NO_OPTIONS: ElementOptions = { walls: [], hosts: [], stairs: [], slabs: [], levels: [] };
+const NO_OPTIONS: ElementOptions = {
+  walls: [],
+  hosts: [],
+  stairs: [],
+  slabs: [],
+  levels: [],
+  pipes: [],
+};
 
 const BLANK_LABEL: Readonly<Record<ElementListKind, string>> = {
   walls: 'Choose…',
@@ -38,6 +46,7 @@ const BLANK_LABEL: Readonly<Record<ElementListKind, string>> = {
   stairs: 'Choose…',
   slabs: 'Choose…',
   levels: 'Active level',
+  pipes: 'Choose…',
 };
 
 /** Active level's walls, every stair / slab (stair wells cut the slab above) and every level. */
@@ -49,11 +58,13 @@ function elementOptions(building: BuildingModel | undefined): ElementOptions {
     stairs: [],
     slabs: [],
     levels: [],
+    pipes: [],
   };
   for (const levelId of building.levelOrder) {
     const level = building.levels[levelId];
     if (level) options.levels.push({ id: levelId, label: `${level.name} · +${level.elevation}` });
   }
+  const lineNumbers = new Set<string>();
   for (const id of building.elementOrder) {
     const element = building.elements[id];
     if (!element) continue;
@@ -67,6 +78,17 @@ function elementOptions(building: BuildingModel | undefined): ElementOptions {
       options.hosts.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
     } else if (element.category === 'curvedWall' && onActiveLevel) {
       options.hosts.push({ id, label: `${element.mark} · curved` });
+    } else if (element.category === 'pipe') {
+      const line = element.line ?? '';
+      if (line === '') {
+        options.pipes.push({ id: `pipe:${id}`, label: `${element.mark} · DN${element.dn ?? '?'}` });
+      } else if (!lineNumbers.has(line)) {
+        lineNumbers.add(line);
+        options.pipes.push({
+          id: `line:${line}`,
+          label: `${line} · ${element.mark} · DN${element.dn ?? '?'}`,
+        });
+      }
     } else if (element.category === 'stair') {
       const level = building.levels[element.levelId]?.name ?? element.levelId;
       options.stairs.push({
@@ -184,15 +206,17 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
       onSubmit={handleSubmit}
       aria-label={`Add ${tool.label}`}
     >
-      {tool.fields.map((field) => (
-        <FieldInput
-          key={field.key}
-          field={field}
-          value={values[field.key] ?? ''}
-          lists={lists}
-          onChange={handleChange}
-        />
-      ))}
+      {tool.fields
+        .filter((field) => isFieldShown(field, values))
+        .map((field) => (
+          <FieldInput
+            key={field.key}
+            field={field}
+            value={values[field.key] ?? ''}
+            lists={lists}
+            onChange={handleChange}
+          />
+        ))}
       {error !== '' && (
         <p className="panel__error" role="alert">
           {error}

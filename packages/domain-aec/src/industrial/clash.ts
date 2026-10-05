@@ -32,7 +32,11 @@ interface Solid {
 /** Category pairs that are checked (structure–structure joints are intentional and skipped). */
 function relevant(a: BimCategory, b: BimCategory): boolean {
   const active = (category: BimCategory): boolean =>
-    category === 'pipe' || category === 'tray' || category === 'equipment';
+    category === 'pipe' ||
+    category === 'tray' ||
+    category === 'equipment' ||
+    category === 'pipeSupport';
+  if (a === 'pipeSupport' && b === 'pipeSupport') return false;
   if (active(a) || active(b)) return true;
   return (a === 'member') !== (b === 'member');
 }
@@ -76,7 +80,15 @@ function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number 
   return best;
 }
 
-/** Intentional connections: a pipe ending on another pipe (tee / joint) or inside equipment. */
+/** A pipe support touches its own pipe and the steel it bears on by design. */
+function bearsOn(support: BuildingElement, other: BuildingElement): boolean {
+  return (
+    support.category === 'pipeSupport' &&
+    (support.pipeId === other.id || support.memberId === other.id)
+  );
+}
+
+/** Intentional connections: a pipe ending on another pipe (tee / joint) or inside equipment, a support on its pipe / steel. */
 function connected(
   doc: CadDocument,
   building: BuildingModel,
@@ -85,6 +97,7 @@ function connected(
   boxA: OrientedBox,
   boxB: OrientedBox,
 ): boolean {
+  if (bearsOn(a, b) || bearsOn(b, a)) return true;
   const runSize = (run: BuildingElement): number =>
     run.category === 'pipe' ? run.diameter : run.category === 'tray' ? run.width : 0;
   if (a.category === b.category && (a.category === 'pipe' || a.category === 'tray')) {
@@ -176,7 +189,8 @@ export const checkClashes = defineCommand({
   description:
     'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel ' +
     'members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. ' +
-    'Steel-to-steel joints and run connections (a pipe end inside equipment, a pipe / tray ending on another) are not ' +
+    'Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe ' +
+    'support touching its own pipe and the steel it bears on are not ' +
     'reported. Returns element ids, kind and penetration depth (document units; summary in mm).',
   params: z.object({
     levelId: z.string().optional().describe('Only this level. Default: the whole building.'),

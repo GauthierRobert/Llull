@@ -23,7 +23,7 @@ const WIDTH = 4500; // column line A (y = 0) to B
 const TIERS = [5000, 6500] as const; // top of steel (TOS) of the lower and upper tier
 const COLUMN = 'HEB240';
 const TIER_BEAM = 'IPE300';
-const STRUT = 'IPE200';
+const STRUT = 'IPE240'; // longitudinal stringers in every bay (carry the mid-bay tier beams)
 const BRACE = 'CHS114.3x5';
 const TRAY_Y = 800; // centre of the 600 wide cable tray on the upper tier
 const EDGE_GAP = 500; // first line edge from column line A
@@ -59,6 +59,9 @@ function members(): IntentMember[] {
         start: [x, y, 0],
         end: [x, y, topOfColumns],
         level: 0,
+        // Strong axis in the bent plane: each bent is a moment frame across the rack.
+        roll: Math.PI / 2,
+        baseFixity: 'pinned',
       });
     }
     for (const tos of TIERS) {
@@ -69,27 +72,55 @@ function members(): IntentMember[] {
         start: [x, 0, z],
         end: [x, WIDTH, z],
         level: 0,
+        startJoint: 'rigid',
+        endJoint: 'rigid',
       });
     }
   }
-  // Bay 1 (bents 1–2): longitudinal struts on both column lines at both tiers, and X-bracing below
-  // the lower tier in both column planes (work points: column base, strut axis of the lower tier).
-  for (const y of [0, WIDTH]) {
+  // Stringers on both column lines at both tiers in every bay, and an intermediate tier beam at
+  // mid-bay on them: supports every 3 m keep small lines within their standard span.
+  for (let bay = 0; bay + 1 < X.length; bay++) {
+    const [x1, x2] = [X[bay] ?? 0, X[bay + 1] ?? 0];
     for (const tos of TIERS) {
-      const z = axisZ(tos, STRUT);
+      for (const y of [0, WIDTH]) {
+        const z = axisZ(tos, STRUT);
+        result.push({ role: 'beam', profile: STRUT, start: [x1, y, z], end: [x2, y, z], level: 0 });
+      }
+      const z = axisZ(tos, TIER_BEAM);
+      const mid = (x1 + x2) / 2;
       result.push({
         role: 'beam',
-        profile: STRUT,
-        start: [X[0] ?? 0, y, z],
-        end: [X[1] ?? 0, y, z],
+        profile: TIER_BEAM,
+        start: [mid, 0, z],
+        end: [mid, WIDTH, z],
         level: 0,
       });
     }
+  }
+  // Bay 1 (bents 1–2): X-bracing below the lower tier and between the tiers in both column planes
+  // (work points: column base, then the stringer axes of the lower and upper tier).
+  for (const y of [0, WIDTH]) {
     const top = axisZ(TIERS[0], STRUT);
     const a: Vec3 = [X[0] ?? 0, y, 0];
     const b: Vec3 = [X[1] ?? 0, y, 0];
     result.push({ role: 'brace', profile: BRACE, start: a, end: [b[0], y, top], level: 0 });
     result.push({ role: 'brace', profile: BRACE, start: b, end: [a[0], y, top], level: 0 });
+    // Between the tiers (struts as chords), in the column-line planes outside the pipes.
+    const upper = axisZ(TIERS[1], STRUT);
+    result.push({
+      role: 'brace',
+      profile: BRACE,
+      start: [a[0], y, top],
+      end: [b[0], y, upper],
+      level: 0,
+    });
+    result.push({
+      role: 'brace',
+      profile: BRACE,
+      start: [b[0], y, top],
+      end: [a[0], y, upper],
+      level: 0,
+    });
   }
   return result;
 }
@@ -184,13 +215,20 @@ export const pipeRackIntent: PlantIntent = {
   tieIns: tieIns(),
   stairs: [],
   trays: [TRAY],
+  // A shoe on every tier beam (bents and mid-bay beams): x = 0, 3000, … along each line.
+  supports: PIPES.map((pipe) => {
+    const [, y = 0, z = 0] = pipe.route[0] ?? [];
+    const stations = Array.from({ length: (X.at(-1) ?? 0) / 3000 + 1 }, (_, i) => i * 3000);
+    return { line: pipe.line, type: 'shoe' as const, at: stations.map((x): Vec3 => [x, y, z]) };
+  }),
   structureBrief: [
     '## Pipe rack structure (S355)',
-    `- Portal bents on every numbered axis, 6000 apart: two ${COLUMN} columns (one continuous member from 0 to +${TIERS[1] / 1000} m, on axes A and B) and two ${TIER_BEAM} tier beams (h = ${depth(TIER_BEAM)} mm) between the column axes, one member per tier, along Y.`,
+    `- Portal bents on every numbered axis, 6000 apart: two ${COLUMN} columns (one continuous member from 0 to +${TIERS[1] / 1000} m, on axes A and B) and two ${TIER_BEAM} tier beams (h = ${depth(TIER_BEAM)} mm) between the column axes, one member per tier, along Y. Each bent is a moment frame: tier beams rigidly connected to the columns at both ends (startJoint / endJoint 'rigid'), columns with the strong axis in the bent plane (roll π/2) on pinned bases.`,
     `- Two pipe tiers with top of steel (TOS) +${TIERS[0] / 1000} m (lower) and +${TIERS[1] / 1000} m (upper). Member axes are section centroid lines, so a tier beam axis is at TOS − ${depth(TIER_BEAM) / 2}.`,
-    `- Bay 1 (axes 1–2), on both column lines A and B: a ${STRUT} longitudinal strut at each tier (top of steel = TOS, axis at TOS − ${depth(STRUT) / 2}, one member per tier) and one X-bracing ${BRACE} below the lower tier (two diagonals per column line, from the column base at ground to the strut axis of the lower tier).`,
+    `- Every bay, on both column lines A and B: a ${STRUT} longitudinal stringer at each tier (top of steel = TOS, axis at TOS − ${depth(STRUT) / 2}, one member per bay and tier), and at mid-bay an intermediate ${TIER_BEAM} tier beam across the rack resting on the stringers (pinned ends, axis at TOS − ${depth(TIER_BEAM) / 2}): lines get a support every 3 m.`,
+    `- Bay 1 (axes 1–2), on both column lines: one X-bracing ${BRACE} below the lower tier (two diagonals per column line, from the column base at ground to the stringer axis of the lower tier), plus one X-bracing ${BRACE} between the tiers (from the lower stringer axis to the upper stringer axis).`,
     '- Lines and cable tray rest on top of steel: a pipe centreline is at TOS + OD/2, the cable tray centre at TOS + side height / 2.',
-    `- A ${road.xMax - road.xMin} mm wide road crosses the rack at x = ${road.xMin} to ${road.xMax} (bay 5, no steel inside): the clear height under the rack there (lowest underside of any steel, pipe or tray) must be at least ${roadClearHeight} mm.`,
+    `- A ${road.xMax - road.xMin} mm wide road crosses the rack at x = ${road.xMin} to ${road.xMax} (bay 5, no column inside): the clear height under the rack there (lowest underside of any steel, pipe or tray) must be at least ${roadClearHeight} mm.`,
     `- Lines on a tier keep at least ${minLineGap} mm clear between adjacent outside diameters (and the cable tray edge).`,
     '- Every line runs the full rack length, battery limit to battery limit: BL1 (west, x = ' +
       `${RACK_RULES.batteryLimits.west}) to BL2 (east, x = ${RACK_RULES.batteryLimits.east}), straight, no bends.`,

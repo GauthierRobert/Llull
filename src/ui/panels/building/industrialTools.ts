@@ -7,8 +7,10 @@
 
 import { STEEL_PROFILES } from '@aec/steel/profiles';
 import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/pipeSizes';
+import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
 import {
   FieldReader,
+  defaultedSelect,
   levelField,
   num,
   onLevel,
@@ -47,6 +49,17 @@ const DN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
     `DN${dn} · Ø${diameter}`,
   ]),
 ];
+
+const JOINTS: ReadonlyArray<readonly [string, string]> = [
+  ['pinned', 'Pinned'],
+  ['rigid', 'Rigid (moment connection)'],
+];
+const BASES: ReadonlyArray<readonly [string, string]> = [
+  ['pinned', 'Pinned'],
+  ['fixed', 'Fixed'],
+];
+const BEAM_ONLY = { key: 'role', values: ['beam'] } as const;
+const COLUMN_ONLY = { key: 'role', values: ['column'] } as const;
 
 const degrees = (value: number): number => (value * Math.PI) / 180;
 
@@ -151,16 +164,31 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('y2', 'End Y', '0'),
       num('z2', 'End Z', '4000'),
       num('roll', 'Roll (°)', '0'),
+      defaultedSelect('startJoint', 'Start joint', 'Default (pinned)', JOINTS, BEAM_ONLY),
+      defaultedSelect('endJoint', 'End joint', 'Default (pinned)', JOINTS, BEAM_ONLY),
+      defaultedSelect(
+        'baseFixity',
+        'Base fixity',
+        'Default (pinned / base plate)',
+        BASES,
+        COLUMN_ONLY,
+      ),
       levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
+      const role = reader.text('role');
+      const joint = (key: string): string | undefined =>
+        role === 'beam' ? reader.text(key) || undefined : undefined;
       return result(reader, 'add_steel_member', {
         role: reader.text('role'),
         profile: reader.text('profile'),
         start: [reader.number('x1'), reader.number('y1'), reader.number('z1')],
         end: [reader.number('x2'), reader.number('y2'), reader.number('z2')],
         roll: degrees(reader.number('roll')),
+        startJoint: joint('startJoint'),
+        endJoint: joint('endJoint'),
+        baseFixity: role === 'column' ? reader.text('baseFixity') || undefined : undefined,
         ...placement(reader, context),
       });
     },
@@ -323,6 +351,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       });
     },
   },
+  PIPE_SUPPORT_TOOL,
   {
     id: 'tray',
     label: 'Cable tray',

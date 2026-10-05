@@ -23,6 +23,34 @@ export interface AgentOptions {
   model: string;
   effort: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   maxTurns: number;
+  /** Stop the job once the estimated spend reaches this many US dollars (Infinity = no cap). */
+  maxUsd: number;
+}
+
+/** USD per million tokens (input, output, cache read, cache write) — Claude API list prices. */
+const PRICES: Record<
+  string,
+  { input: number; output: number; cacheRead: number; cacheWrite: number }
+> = {
+  'claude-opus-5-5': { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
+  'claude-sonnet-5-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  'claude-fable-5-1': { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
+};
+
+/** Estimated spend of a run so far; null when the model has no listed price. */
+export function estimateUsd(
+  model: string,
+  run: Pick<AgentRun, 'inputTokens' | 'outputTokens' | 'cacheReadTokens' | 'cacheWriteTokens'>,
+): number | null {
+  const price = PRICES[model];
+  if (!price) return null;
+  return (
+    (run.inputTokens * price.input +
+      run.outputTokens * price.output +
+      run.cacheReadTokens * price.cacheRead +
+      run.cacheWriteTokens * price.cacheWrite) /
+    1_000_000
+  );
 }
 
 export interface AgentTranscriptEntry {
@@ -42,6 +70,9 @@ export interface AgentRun {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** Estimated spend in USD (null when the model has no listed price). */
+  estimatedUsd: number | null;
   wallMs: number;
   transcript: AgentTranscriptEntry[];
 }
@@ -118,6 +149,8 @@ export async function runAgent(
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    estimatedUsd: 0,
     wallMs: 0,
     transcript: [],
   };
@@ -146,6 +179,12 @@ export async function runAgent(
       run.inputTokens += message.usage.input_tokens;
       run.outputTokens += message.usage.output_tokens;
       run.cacheReadTokens += message.usage.cache_read_input_tokens ?? 0;
+      run.cacheWriteTokens += message.usage.cache_creation_input_tokens ?? 0;
+      run.estimatedUsd = estimateUsd(options.model, run);
+      if (run.estimatedUsd !== null && run.estimatedUsd >= options.maxUsd) {
+        run.stopReason = `budget (${run.estimatedUsd.toFixed(2)} USD ≥ ${options.maxUsd} USD)`;
+        break;
+      }
       run.stopReason = message.stop_reason ?? '';
       const text = message.content.flatMap((block) => (block.type === 'text' ? [block.text] : []));
       if (text.length > 0) run.finalText = text.join('\n');

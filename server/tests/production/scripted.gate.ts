@@ -21,7 +21,7 @@ import type { Scenario, ToolCall } from '../../../tests/production/contract';
 import { gradeContext, gradeScenario } from '../../../tests/production/grade';
 import { formatReport, resetReports, writeReport } from '../../../tests/production/report';
 import { SCENARIOS, chainOf } from '../../../tests/production/scenarios';
-import { runAgent, type SendTurn } from './agentLoop';
+import { estimateUsd, runAgent, type SendTurn } from './agentLoop';
 import { liveDocument, openSession, resetDocument, startServer, stopServer } from './mcpHarness';
 
 beforeAll(async () => {
@@ -59,6 +59,21 @@ async function drive(scenario: Scenario): Promise<{ calls: number; ms: number }>
   }
   return { calls: scenario.script.length, ms: Date.now() - started };
 }
+
+/** Default `/mcp` limit (server/src/mcp/middleware.ts): requests per minute per IP. */
+const DEFAULT_MCP_LIMIT = 600;
+
+describe('each job fits the default /mcp rate limit', () => {
+  for (const scenario of SCENARIOS) {
+    it(scenario.id, () => {
+      // One request per tool call, plus session setup (initialize + notification) and one
+      // enable_toolset per toolset, for the job itself (its starting model is already there).
+      const toolsets = new Set(scenario.script.map((call) => toolsetOf(call.tool)));
+      const requests = scenario.script.length + toolsets.size + 2;
+      expect(requests).toBeLessThan(DEFAULT_MCP_LIMIT);
+    });
+  }
+});
 
 describe('production scenarios — scripted driver over /mcp', () => {
   for (const scenario of SCENARIOS) {
@@ -113,7 +128,7 @@ describe('AI-agent loop plumbing (stub model)', () => {
     };
     const run = await runAgent(
       scenario.brief,
-      { model: 'stub', effort: 'high', maxTurns: 50 },
+      { model: 'stub', effort: 'high', maxTurns: 50, maxUsd: 1 },
       send,
     );
     expect(seenTools).toBeGreaterThan(100);
@@ -127,7 +142,53 @@ describe('AI-agent loop plumbing (stub model)', () => {
   });
 });
 
-function stubMessage(content: unknown[]): Anthropic.Beta.BetaMessage {
+describe('AI-agent cost estimate and budget cap (stub model)', () => {
+  it('prices tokens at the model list price', () => {
+    const usd = estimateUsd('claude-opus-5-5', {
+      inputTokens: 1_000_000,
+      outputTokens: 100_000,
+      cacheReadTokens: 2_000_000,
+      cacheWriteTokens: 0,
+    });
+    expect(usd).toBeCloseTo(4 + 2 + 0.4, 6);
+    expect(
+      estimateUsd('unknown-model', {
+        inputTokens: 1,
+        outputTokens: 1,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it('stops the job when the estimated spend reaches the cap', async () => {
+    resetDocument(createEmptyDocument());
+    let turns = 0;
+    const send: SendTurn = () => {
+      turns++;
+      const probe = {
+        type: 'tool_use' as const,
+        id: `toolu_${turns}`,
+        name: 'describe_building',
+        input: {},
+      };
+      return Promise.resolve(stubMessage([probe], { input: 500_000, output: 50_000 }));
+    };
+    const run = await runAgent(
+      'Budget probe.',
+      { model: 'claude-opus-5-5', effort: 'high', maxTurns: 50, maxUsd: 5 },
+      send,
+    );
+    expect(run.stopReason).toMatch(/^budget/);
+    expect(turns).toBe(2); // 3 USD per turn: the second turn crosses 5 USD
+    expect(run.estimatedUsd).toBeCloseTo(6, 6);
+  });
+});
+
+function stubMessage(
+  content: unknown[],
+  tokens: { input: number; output: number } = { input: 0, output: 0 },
+): Anthropic.Beta.BetaMessage {
   const toolUse = content.some((block) => (block as { type: string }).type === 'tool_use');
   return {
     id: 'msg_stub',
@@ -137,6 +198,11 @@ function stubMessage(content: unknown[]): Anthropic.Beta.BetaMessage {
     content,
     stop_reason: toolUse ? 'tool_use' : 'end_turn',
     stop_sequence: null,
-    usage: { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0 },
+    usage: {
+      input_tokens: tokens.input,
+      output_tokens: tokens.output,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    },
   } as unknown as Anthropic.Beta.BetaMessage;
 }

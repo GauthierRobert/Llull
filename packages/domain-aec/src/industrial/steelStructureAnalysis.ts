@@ -1,6 +1,7 @@
 /**
  * Whole-structure load path and member verification behind check_steel_members:
- * loads → beams → columns, notional horizontal forces → bracing, one row per steel member.
+ * loads → beams → columns, notional horizontal forces → bracing and moment frames, one row per
+ * steel member.
  * @layer domain-aec
  * @pure
  */
@@ -12,6 +13,7 @@ import { checkBeam } from './steelBeamChecks';
 import { createBeamLoads } from './steelBeamLoads';
 import { checkBracing, type StoreyReport } from './steelBracingChecks';
 import { checkColumn, columnSegments, type ColumnSegment } from './steelColumnChecks';
+import { analyseFrames, type FrameReport } from './steelFrameAnalysis';
 import { analyseFraming, type BeamResult } from './steelFraming';
 import { collectSteelBars, modelUnits } from './steelMemberBars';
 import { skippedRow, type MemberRow } from './steelMemberRows';
@@ -29,6 +31,8 @@ export interface SteelCheckParams {
   readonly notionalFactor: number;
   /** Beam deflection limit as span / n. */
   readonly deflectionRatio: number;
+  /** Moment-frame storey drift limit as h / n. */
+  readonly swayRatio: number;
 }
 
 export interface SteelStructureAnalysis {
@@ -38,6 +42,8 @@ export interface SteelStructureAnalysis {
   readonly equipment: EquipmentLoadReport[];
   readonly lines: LineRunReport[];
   readonly storeys: StoreyReport[];
+  /** Moment frames (rigid beam-to-column joints) analysed as 2D frames. */
+  readonly frames: FrameReport[];
   readonly warnings: string[];
   /** Steel mass per member id, kg. */
   readonly massKg: ReadonlyMap<string, number>;
@@ -54,8 +60,11 @@ export function analyseSteelStructure(
   const braces = bars.filter((bar) => bar.kind === 'brace');
   const beams = bars.filter((bar) => bar.kind === 'beam').map(createBeamLoads);
   const area = applyAreaLoads(units, beams, params);
-  const lines = applyLineLoads(units, beams, params);
+  const lines = applyLineLoads(units, beams, params, bars);
   const framing = analyseFraming(beams, columns);
+  for (const [columnId, node] of lines.columnNodes) {
+    framing.columnNodes.set(columnId, [...(framing.columnNodes.get(columnId) ?? []), node]);
+  }
   const segments = new Map<string, ColumnSegment[]>(
     columns.map((column) => [
       column.id,
@@ -63,11 +72,13 @@ export function analyseSteelStructure(
     ]),
   );
   const results: BeamResult[] = [...framing.results.values()];
+  const frames = analyseFrames(results, columns, framing.columnNodes, params);
   const bracing = checkBracing(
     braces,
     results,
     [...segments.values()].flat(),
     params.notionalFactor,
+    frames.coverage,
   );
   const rowById = new Map<string, MemberRow>(bracing.rows.map((row) => [row.id, row]));
   for (const column of columns) {
@@ -84,6 +95,7 @@ export function analyseSteelStructure(
       ),
     );
   }
+  for (const [id, row] of frames.rows) rowById.set(id, row);
   const rows = bars.map(
     (bar) =>
       rowById.get(bar.id) ??
@@ -98,7 +110,14 @@ export function analyseSteelStructure(
     equipment: area.equipment,
     lines: lines.runs,
     storeys: bracing.storeys,
-    warnings: [...area.warnings, ...lines.warnings, ...framing.warnings, ...bracing.warnings],
+    frames: frames.reports,
+    warnings: [
+      ...area.warnings,
+      ...lines.warnings,
+      ...framing.warnings,
+      ...frames.warnings,
+      ...bracing.warnings,
+    ],
     massKg,
   };
 }

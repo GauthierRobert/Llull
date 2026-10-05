@@ -58,6 +58,10 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
         start: z(member.start),
         end: z(member.end),
         levelId: levelId(member.level),
+        ...(member.roll !== undefined ? { roll: member.roll } : {}),
+        ...(member.startJoint !== undefined ? { startJoint: member.startJoint } : {}),
+        ...(member.endJoint !== undefined ? { endJoint: member.endJoint } : {}),
+        ...(member.baseFixity !== undefined ? { baseFixity: member.baseFixity } : {}),
       },
     });
   }
@@ -128,6 +132,12 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
         height: tray.height,
         system: tray.system,
       },
+    });
+  }
+  for (const support of intent.supports ?? []) {
+    calls.push({
+      tool: 'add_pipe_support',
+      args: { line: support.line, type: support.type, at: support.at },
     });
   }
   calls.push({ tool: 'check_clashes', args: {} });

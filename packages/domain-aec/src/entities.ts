@@ -28,6 +28,7 @@ export const CATEGORY_LAYER: Readonly<Record<BimCategory, { name: string; color:
   plate: { name: 'S-CONN', color: '#5d6f80' },
   curvedWall: { name: 'A-WALL', color: '#8a8a8a' },
   connection: { name: 'S-CONN', color: '#5d6f80' },
+  pipeSupport: { name: 'P-SUPP', color: '#c9a227' },
 };
 
 /** Layer per steel member role (AIA structural sub-layers). */

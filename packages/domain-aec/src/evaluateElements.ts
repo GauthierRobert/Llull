@@ -21,6 +21,8 @@ import {
   evaluateTray,
 } from './industrial/evaluate';
 import { evaluatePlate, evaluateConnection } from './industrial/evaluateConnections';
+import { evaluatePipeSupport } from './industrial/evaluateSupports';
+import { reconcilePipeSupports } from './industrial/pipeSupportAttach';
 import { ensureLayers } from './entities';
 import { openingsOf } from './wallGeometry';
 import {
@@ -74,6 +76,15 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluatePipe(leveled, level);
     case 'tray':
       return evaluateTray(context.doc, leveled, level);
+    case 'pipeSupport': {
+      const pipe = building.elements[leveled.pipeId];
+      return evaluatePipeSupport(
+        context.doc,
+        leveled,
+        pipe?.category === 'pipe' ? pipe : undefined,
+        level,
+      );
+    }
     case 'connection': {
       const members: Record<string, SteelMemberElement | undefined> = {};
       for (const id of [leveled.rafterId, leveled.otherId]) {
@@ -99,12 +110,15 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
 }
 
 /**
- * Replaces all previously evaluated building entities with a fresh evaluation of `building`.
+ * Replaces all previously evaluated building entities with a fresh evaluation of `edited` (after
+ * re-attaching the pipe supports whose pipe or steel it changed).
  * @pure
  * @returns the new document and, per element id, the generated entity ids
  */
-export function regenerateBuilding(doc: CadDocument, building: BuildingModel): CadDocument {
+export function regenerateBuilding(doc: CadDocument, edited: BuildingModel): CadDocument {
   const previous = doc.building;
+  // Pipe supports follow edits of their pipe and steel (re-attached, or unattached when no steel is left).
+  const building = reconcilePipeSupports(doc, edited).building;
   const staleIds = new Set<string>();
   if (previous) {
     for (const element of Object.values(previous.elements)) {

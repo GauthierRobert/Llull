@@ -26,6 +26,8 @@ import { regenerateBuilding } from './evaluateElements';
 import { resolveOutline } from './structure';
 import { openingFitIssues } from './walls';
 import { nextMemberMark } from './industrial/memberSupport';
+import { copyPipeSupports } from './industrial/pipeSupportCopy';
+import { reconcilePipeSupports, reconciliationNote } from './industrial/pipeSupportAttach';
 
 /**
  * @command add_room
@@ -115,7 +117,9 @@ export const deleteBuildingElement = defineCommand({
   annotations: { destructive: true },
   description:
     'Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, ' +
-    'grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed.',
+    'grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed. Deleting a ' +
+    'steel member re-attaches the pipe supports bearing on it to the nearest steel in reach, or leaves them ' +
+    'unattached (the summary says which).',
   params: z.object({
     elementIds: z.array(z.string()).describe('Element ids, e.g. ["wall-2", "door-1"].'),
   }),
@@ -127,10 +131,15 @@ export const deleteBuildingElement = defineCommand({
     }
     const doomed = withHostedOpenings(building, known);
     const removedEntityIds = [...doomed].flatMap((id) => building.elements[id]?.entityIds ?? []);
+    const supports = reconcilePipeSupports(doc, withoutElements(building, doomed));
     return {
-      document: regenerateBuilding(doc, withoutElements(building, doomed)),
-      summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.`,
-      affected: [...doomed, ...removedEntityIds],
+      document: regenerateBuilding(doc, supports.building),
+      summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.${reconciliationNote(supports)}`,
+      affected: [
+        ...doomed,
+        ...removedEntityIds,
+        ...[...supports.reattached, ...supports.detached].map((change) => change.id),
+      ],
     };
   },
 });
@@ -177,6 +186,11 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'pipe':
     case 'tray':
       return { ...element, points: element.points.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
+    case 'pipeSupport':
+      return {
+        ...element,
+        position: [element.position[0] + dx, element.position[1] + dy, element.position[2]],
+      };
     case 'door':
     case 'window':
     case 'plate':
@@ -195,7 +209,9 @@ export const moveBuildingElement = defineCommand({
   name: 'move_building_element',
   description:
     'Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide ' +
-    'an opening along its wall use update_opening). Corner joins are recomputed.',
+    'an opening along its wall use update_opening). Corner joins are recomputed. A moved pipe takes its pipe ' +
+    'supports along and a moved steel member makes its supports re-check their reach: they re-attach to the ' +
+    'steel at the new position or become unattached (the summary says which).',
   params: z.object({
     elementIds: z.array(z.string()).describe('Element ids to move.'),
     delta: vec2('Plan translation [dx, dy].'),
@@ -231,7 +247,18 @@ export const moveBuildingElement = defineCommand({
       );
     }
     let next = building;
-    for (const id of known) {
+    // Pipe supports carry their own position: they travel with their moved pipe.
+    const travelling = [
+      ...known,
+      ...Object.values(building.elements).flatMap((element) =>
+        element.category === 'pipeSupport' &&
+        known.includes(element.pipeId) &&
+        !known.includes(element.id)
+          ? [element.id]
+          : [],
+      ),
+    ];
+    for (const id of travelling) {
       const element = building.elements[id] as BuildingElement;
       next = withElement(next, translated(element, delta[0], delta[1]));
     }
@@ -243,12 +270,16 @@ export const moveBuildingElement = defineCommand({
     );
     const issues = openingFitIssues(next, movedLevels);
     if (issues.length > 0) return noop(doc, `move_building_element refused: ${issues[0]}.`);
-    const document = regenerateBuilding(doc, next);
+    const supports = reconcilePipeSupports(doc, next);
+    const document = regenerateBuilding(doc, supports.building);
     const moved = withHostedOpenings(building, known);
     return {
       document,
-      summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.`,
-      affected: elementAffected(document, [...moved]),
+      summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${reconciliationNote(supports)}`,
+      affected: elementAffected(document, [
+        ...moved,
+        ...[...supports.reattached, ...supports.detached].map((change) => change.id),
+      ]),
     };
   },
 });
@@ -303,7 +334,8 @@ export const copyLevelElements = defineCommand({
   description:
     'Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the ' +
     'source level onto each target level (typical floors of a multi-storey building). Optionally restrict ' +
-    'to some categories.',
+    'to some categories. Copied pipes bring their pipe supports, re-attached to the steel found at their new ' +
+    'position (unattached when none is in reach).',
   params: z.object({
     sourceLevelId: z.string().describe('Level to copy from.'),
     targetLevelIds: z.array(z.string()).describe('Levels to copy to.'),
@@ -405,13 +437,21 @@ export const copyLevelElements = defineCommand({
         });
         created.push(copyId);
       }
+      const copiedSupports = copyPipeSupports(building, next, copiedIds, targetLevelId);
+      next = copiedSupports.building;
+      created.push(...copiedSupports.ids);
     }
     const issues = openingFitIssues(next, new Set(targetLevelIds));
     if (issues.length > 0) return noop(doc, `copy_level_elements refused: ${issues[0]}.`);
-    const document = regenerateBuilding(doc, next);
+    const supports = reconcilePipeSupports(
+      doc,
+      next,
+      created.filter((id) => next.elements[id]?.category === 'pipeSupport'),
+    );
+    const document = regenerateBuilding(doc, supports.building);
     return {
       document,
-      summary: `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).`,
+      summary: `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${reconciliationNote(supports)}`,
       affected: elementAffected(document, created),
       data: { elementIds: created },
     };

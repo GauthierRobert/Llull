@@ -24,6 +24,7 @@ import {
   wallPrimitives,
 } from './planArchitectural';
 import { crossingColumnPrimitives, industrialPrimitives } from './planIndustrial';
+import { supportPrimitives } from './planSupports';
 
 /**
  * Builds the plan of `levelId` (or the active / lowest level).
@@ -81,6 +82,9 @@ export function buildPlanDrawing(
       case 'tray':
       case 'plate':
         primitives.push(...industrialPrimitives(doc, element, cutHeight));
+        break;
+      case 'pipeSupport':
+        primitives.push(...supportPrimitives(doc, building, element));
         break;
       case 'room':
         primitives.push(...roomPrimitives(doc, element));

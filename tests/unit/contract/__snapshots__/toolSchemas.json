@@ -1125,7 +1125,7 @@
     "name": "add_panel"
   },
   {
-    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes.",
+    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports.",
     "input_schema": {
       "properties": {
         "diameter": {
@@ -1177,6 +1177,64 @@
       "type": "object"
     },
     "name": "add_pipe_run"
+  },
+  {
+    "description": "Place supports on an existing pipe (add_pipe_run) so its weight reaches the steel (check_steel_members) and its spans can be verified (check_pipe_supports). Select the pipe with `pipeId` (element id) or `line` (line number, every pipe carrying it) and give EITHER `at` (list of absolute [x, y, z] points, each snapped to the nearest point of the pipe centreline within `snapDistance`) OR `spacing` (auto-placed along the pipe at no more than that spacing, plus one support min(300 mm, spacing/4) from each free end and one near each bend; ends inside equipment or on another pipe are carried and get none; never on risers). `type`: \"shoe\" (pipe rests on steel below), \"hanger\" (rod from steel above), \"guide\" (shoe with side stops), \"anchor\" (shoe fixed to the steel); all four carry the pipe weight on a horizontal run. ON A RISER (a segment steeper than 44° from horizontal, |dz|/length > 0.7; give an `at` point on it, `spacing` never places there) only guide / shoe / anchor are allowed and they are clamps with a horizontal bracket to steel BESIDE the pipe: a guide restrains it laterally (checked by check_pipe_supports riser rule: lateral restraint spacing and a support carrying the riser weight), a shoe or anchor also carries the riser weight (an anchor is a guide and a weight support). The steel it bears on is `memberId` or the nearest steel member in the right direction (below for shoe / guide / anchor, above for a hanger) within `maxReach` vertically and within half its width + `planTolerance` in plan (riser: a column, or a horizontal member whose section reaches the clamp elevation ± planTolerance, with its face within `maxReach` horizontally of the pipe surface). A position with no steel in reach is still created but UNATTACHED (memberId null): it carries nothing and the summary warns. Supports follow their pipe (moved, copied, deleted with it) and follow edits of their steel: deleting or moving a member or moving the pipe re-attaches them to the nearest steel in reach, or leaves them unattached (the edit command's summary lists which). Marks PS1, PS2… data.supports lists { id, mark, pipeId, type, position (level-relative), memberId, rodLength, standoff (riser bracket length) }.",
+    "input_schema": {
+      "properties": {
+        "at": {
+          "description": "Absolute support points [[x, y, z], …] in document units (z = elevation, not level-relative), on or near the pipe centreline: each is snapped to the nearest point of the pipe. Give this OR `spacing`.",
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "line": {
+          "description": "Line number of the pipe(s), e.g. \"L-101\" (the `line` given to add_pipe_run). Or use `pipeId`.",
+          "type": "string"
+        },
+        "maxReach": {
+          "description": "Largest vertical gap between the pipe and its steel, document units, > 0: pedestal height for shoe / guide / anchor (default 500 mm), rod length for a hanger (default 3000 mm); on a riser the largest horizontal gap from the pipe surface to the member face (default 500 mm).",
+          "type": "number"
+        },
+        "memberId": {
+          "description": "Element id of the steel member (add_steel_member data.elementId) every support bears on. Default: the nearest member in reach for each support.",
+          "type": "string"
+        },
+        "pipeId": {
+          "description": "Element id of the pipe, e.g. \"pipe-3\" (from add_pipe_run data.elementId). Or use `line`.",
+          "type": "string"
+        },
+        "planTolerance": {
+          "description": "Plan distance allowed beyond half the member width between the support and the member axis, document units, ≥ 0. Default 100 mm.",
+          "type": "number"
+        },
+        "snapDistance": {
+          "description": "Largest distance from an `at` point to the pipe centreline, document units, > 0. Default 500 mm.",
+          "type": "number"
+        },
+        "spacing": {
+          "description": "Maximum distance between supports along the pipe, document units, > 0: supports are auto-placed along the pipe (also near free ends and bends). Give this OR `at`. Existing supports are kept and counted.",
+          "type": "number"
+        },
+        "type": {
+          "description": "\"shoe\" (rests on steel below, default), \"hanger\" (rod from steel above), \"guide\" (shoe with side stops; on a riser a lateral guide clamp) or \"anchor\" (fixed shoe; on a riser a clamp that guides and carries the weight).",
+          "enum": [
+            "shoe",
+            "hanger",
+            "guide",
+            "anchor"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "add_pipe_support"
   },
   {
     "description": "Generate a pre-engineered steel hall (factory / warehouse) in one step: portal frames every baySpacing along Y (columns + pitched rafters spanning X; several spans side by side with spans: [...]), gable posts, purlins and side rails, X-bracing in the end bays (roof and walls), pad footings under every column, roof / wall / gable cladding, a ground slab and optionally an overhead crane runway on brackets. All sizes in document units, roofPitch in degrees. Defaults: 24 m span, 48 m long, 6 m bays, 7 m eaves, 6° roof, HEA400 columns, IPE450 rafters.",
@@ -1645,15 +1703,31 @@
     "name": "add_stair"
   },
   {
-    "description": "Add a steel member with a catalogue section (e.g. \"HEA300\", \"IPE400\", \"CHS76.1x3.6\") between two 3D points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and along +X for vertical columns; roll (radians) turns it about the axis.",
+    "description": "Add a steel member with a catalogue section (e.g. \"HEA300\", \"IPE400\", \"CHS76.1x3.6\") between two 3D points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. Beams may declare startJoint / endJoint \"rigid\" (moment connection to the column they frame into; default pinned) and columns baseFixity \"fixed\" (column foot restrains rotation; default pinned or the base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames.",
     "input_schema": {
       "properties": {
+        "baseFixity": {
+          "description": "Columns only: \"pinned\" (default; or the fixity of its base plate) or \"fixed\" (the foot restrains rotation in check_steel_members).",
+          "enum": [
+            "pinned",
+            "fixed"
+          ],
+          "type": "string"
+        },
         "end": {
           "description": "Axis end [x, y, z].",
           "items": {
             "type": "number"
           },
           "type": "array"
+        },
+        "endJoint": {
+          "description": "Beams only: joint at the end end: \"pinned\" (default) or \"rigid\".",
+          "enum": [
+            "pinned",
+            "rigid"
+          ],
+          "type": "string"
         },
         "levelId": {
           "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
@@ -1694,6 +1768,14 @@
             "type": "number"
           },
           "type": "array"
+        },
+        "startJoint": {
+          "description": "Beams only: joint at the start end: \"pinned\" (default) or \"rigid\" (moment connection to the column it frames into).",
+          "enum": [
+            "pinned",
+            "rigid"
+          ],
+          "type": "string"
         }
       },
       "required": [
@@ -2330,7 +2412,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, slab, column, beam, stair, member (steel cut list), footing, panel, equipment or pipe — one row per element with mark, level, dimensions, material and quantities. data.csv is spreadsheet-ready.",
+    "description": "Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, slab, column, beam, stair, member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, connection or support (pipe supports: mark, line, pipe, type, steel it bears on, position, hanger rod length, attached / UNATTACHED) — one row per element with mark, level, dimensions, material and quantities. data.csv is spreadsheet-ready.",
     "input_schema": {
       "properties": {
         "kind": {
@@ -2351,7 +2433,8 @@
             "pipe",
             "tray",
             "plate",
-            "connection"
+            "connection",
+            "support"
           ],
           "type": "string"
         }
@@ -2468,7 +2551,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. Steel-to-steel joints and run connections (a pipe end inside equipment, a pipe / tray ending on another) are not reported. Returns element ids, kind and penetration depth (document units; summary in mm).",
+    "description": "Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind and penetration depth (document units; summary in mm).",
     "input_schema": {
       "properties": {
         "levelId": {
@@ -2713,6 +2796,36 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "Read-only support-spacing check of every pipe (add_pipe_run) against the standard maximum span of water-filled standard-wall steel pipe by DN (MSS SP-69 Table 3 / ASME B31.1 Table 121.5: DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, DN250 6.7 m, DN300 7.0 m …). Uses the pipe's add_pipe_support supports (only those bearing on steel count), else the beams it rests on. Ends inside equipment (nozzle) or on another pipe are carried; a free end needs a support within overhangRatio × allowed span. Returns data.pipes: one row per pipe { id, mark, line, dn, lengthM, maxSpanM (table), allowedSpanM (table × spanFactor), largestSpanM (actual), overhangM, supports, unattached, basis (\"supports\" | \"resting\" | \"nozzles\" | \"none\"), risers, ok, issues, notes }; data.ok is true only when every pipe passes. RISERS (runs ≥ 0.5 m steeper than 44° from horizontal) are checked too: risers[] = { fromZM, toZM, lengthM, guides, maxGuideSpacingM, allowedSpacingM, weightKn, weightBy (\"carried end\" | \"clamp\" | \"elbow support\" | null), ok, issues }; they need lateral guides (add_pipe_support type \"guide\" at a point on the riser, bracketed to steel beside it) at most the span table value apart and at most overhangRatio × span from a free elbow, and their weight carried by an end in equipment, a shoe / anchor clamp on the riser or a support within overhangRatio × span of an elbow; the pipe ok includes its risers. Fix a failing pipe with add_pipe_support (spacing or at points).",
+    "input_schema": {
+      "properties": {
+        "levelId": {
+          "description": "Only the pipes of this level id. Default: every level.",
+          "type": "string"
+        },
+        "line": {
+          "description": "Only the pipe(s) with this line number, e.g. \"L-101\".",
+          "type": "string"
+        },
+        "overhangRatio": {
+          "description": "Largest overhang of a free pipe end beyond its last support, as a fraction of the allowed span, ≥ 0. Default 0.5.",
+          "type": "number"
+        },
+        "spanFactor": {
+          "description": "Multiplier on the table span, > 0, e.g. 0.8 for insulated lines or many valves. Default 1.",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "check_pipe_supports"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "Structural check of the steel portal frames of a level. Each frame (rafters in a vertical plane + the columns under them; bases pinned, or fixed when the base plates have columnBase 'fixed') is solved as a 2D frame (direct stiffness, section properties from the profile outline, no root radii) for every EN 1990 combination of dead G (deadLoad + self-weight), snow S, wind W (windPressure, both directions, incl. uplift) and crane C (from add_crane_runway capacity, EN 1991-3 load groups 1 and 5: wheel reactions by statics at the minimum hook approach with φ1 / φ2 (hoisting class) / φ4, transverse drive forces HT (φ5) and skewing forces HS at the brackets; combinations C / C5 with the crane at the left or right rail), with sway imperfections and Horne αcr per storey (all moments amplified by 1/(1−1/αcr) when αcr < 10). Checks: member cross-section (EN 1993-1-1 §6.2), flexural buckling with N–M interaction and lateral-torsional buckling (§6.3; columns full height, LTB between side rails, rafters between purlins, compression flanges assumed fly-braced at purlins / rails), frame sway stability (αcr ≥ 3), end-plate bolt groups (EN 1993-1-8, grade 8.8) and SLS deflections (rafters span/200 under snow, eaves h/150 under wind, rail level h/400 under crane). Returns the worst utilisation per element; values > 1 fail. Bracing, foundations and crane runway beams are checked by check_bracing, check_foundations and check_crane_runways. A preliminary design check, not a substitute for the engineer of record.",
     "input_schema": {
       "properties": {
@@ -2803,7 +2916,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "General EN 1993-1-1 member verification of a steel structure built from add_steel_member (multi-storey process structures, pipe racks, platforms, halls), with the loads derived from the model: self weight, floor slabs (add_slab role floor) with dead + imposed load, equipment operating weight (add_equipment weight, kg), pipes (add_pipe_run, steel + contents) and cable trays resting on beams. ULS 1.35 G + 1.5 Q, SLS G + Q. Beams (role beam, horizontal) are simply supported between end nodes, with floor load shared by the 45° tributary rule and equipment by footprint area per bay; checked for bending (+ lateral-torsional buckling when nothing restrains the top flange), shear and deflection ≤ span/250. Columns are checked per storey segment between beam levels for Npl,Rd and flexural buckling Nb,Rd (Lcr = segment length). Braces (role brace, in an X or Y vertical plane) carry the EN 1993-1-1 §5.3.2 equivalent horizontal forces (notionalFactor × factored vertical load per level), tension-only in X-bracing, with slenderness ≤ 300; the horizontal members of a braced bay are checked as struts. Returns data.members: one row per steel member { id, mark, role, profile, check (governing check), utilisation (1.0 = at resistance), ok, governing (combination), detail, checks, forces } — members that cannot be analysed (profile not in the catalogue, class 4, roles rafter / purlin / rail / crane, inclined columns) appear with check \"not analysed\", ok false and the reason; data.ok is true only when every member is analysed and passes. data.warnings lists model gaps (equipment on grade, pipes resting on nothing, directions without bracing, beam ends bearing on nothing). Beam-column connections are assumed pinned; a preliminary check, not a substitute for the engineer of record. See data.loads.assumptions for every load-path rule.",
+    "description": "General EN 1993-1-1 member verification of a steel structure built from add_steel_member (multi-storey process structures, pipe racks, platforms, halls), with the loads derived from the model: self weight, floor slabs (add_slab role floor) with dead + imposed load, equipment operating weight (add_equipment weight, kg), pipes (add_pipe_run, steel + contents; carried by their add_pipe_support supports, else resting on beams) and cable trays resting on beams. ULS 1.35 G + 1.5 Q, SLS G + Q. Beams (role beam, horizontal) are simply supported between end nodes, with floor load shared by the 45° tributary rule and equipment by footprint area per bay; checked for bending (+ lateral-torsional buckling when nothing restrains the top flange), shear and deflection ≤ span/250. Columns are checked per storey segment between beam levels for Npl,Rd and flexural buckling Nb,Rd (Lcr = segment length). Braces (role brace, in an X or Y vertical plane) carry the EN 1993-1-1 §5.3.2 equivalent horizontal forces (notionalFactor × factored vertical load per level), tension-only in X-bracing, with slenderness ≤ 300; the horizontal members of a braced bay are checked as struts. Returns data.members: one row per steel member { id, mark, role, profile, check (governing check), utilisation (1.0 = at resistance), ok, governing (combination), detail, checks, forces } — members that cannot be analysed (profile not in the catalogue, class 4, roles rafter / purlin / rail / crane, inclined columns) appear with check \"not analysed\", ok false and the reason; data.ok is true only when every member is analysed and passes. data.warnings lists model gaps (equipment on grade, pipes resting on nothing, directions without bracing or moment frames, beam ends bearing on nothing). Beam-column connections are pinned unless a beam declares startJoint / endJoint \"rigid\" (add_steel_member / update_steel_member): columns and rigidly connected beams in one X or Y vertical plane (a pipe rack bent) are then analysed as a 2D moment frame (column bases pinned or baseFixity \"fixed\"): 1.35 G + 1.5 Q with the notional forces in both directions, joint moments in forces.jointMomentStart / jointMomentEnd, N + M interaction, storey drift ≤ h / swayRatio, αcr ≥ 3 (moments amplified below 10); data.frames lists them and they count as the lateral system of their direction. A rigid joint to nothing or to a beam, a frame mechanism or a column roll between the principal axes leave the members \"not analysed\" with the reason. A preliminary check, not a substitute for the engineer of record. See data.loads.assumptions for every load-path rule.",
     "input_schema": {
       "properties": {
         "cableTrayWeight": {
@@ -2833,6 +2946,10 @@
         "pipeContentDensity": {
           "description": "Density of the pipe contents, kg/m³: 1000 = water-filled (default, operating / hydrotest), 0 = empty pipes.",
           "type": "number"
+        },
+        "swayRatio": {
+          "description": "Storey drift limit of moment frames as storey height / n under G + Q + notional horizontal forces. Default 300 (h/300).",
+          "type": "number"
         }
       },
       "required": [],
@@ -2858,7 +2975,7 @@
     "name": "clear_document"
   },
   {
-    "description": "Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the source level onto each target level (typical floors of a multi-storey building). Optionally restrict to some categories.",
+    "description": "Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the source level onto each target level (typical floors of a multi-storey building). Optionally restrict to some categories. Copied pipes bring their pipe supports, re-attached to the steel found at their new position (unattached when none is in reach).",
     "input_schema": {
       "properties": {
         "categories": {
@@ -2999,7 +3116,7 @@
     "annotations": {
       "destructiveHint": true
     },
-    "description": "Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed.",
+    "description": "Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed. Deleting a steel member re-attaches the pipe supports bearing on it to the nearest steel in reach, or leaves them unattached (the summary says which).",
     "input_schema": {
       "properties": {
         "elementIds": {
@@ -5233,7 +5350,7 @@
     "name": "motion_study"
   },
   {
-    "description": "Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide an opening along its wall use update_opening). Corner joins are recomputed.",
+    "description": "Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide an opening along its wall use update_opening). Corner joins are recomputed. A moved pipe takes its pipe supports along and a moved steel member makes its supports re-check their reach: they re-attach to the steel at the new position or become unattached (the summary says which).",
     "input_schema": {
       "properties": {
         "delta": {
@@ -6282,15 +6399,31 @@
     "name": "update_opening"
   },
   {
-    "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade or note.",
+    "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or unattached (the summary says which).",
     "input_schema": {
       "properties": {
+        "baseFixity": {
+          "description": "Columns only: new base fixity, \"pinned\" or \"fixed\".",
+          "enum": [
+            "pinned",
+            "fixed"
+          ],
+          "type": "string"
+        },
         "end": {
           "description": "New axis end [x, y, z].",
           "items": {
             "type": "number"
           },
           "type": "array"
+        },
+        "endJoint": {
+          "description": "Beams only: new joint at the end end, \"pinned\" or \"rigid\".",
+          "enum": [
+            "pinned",
+            "rigid"
+          ],
+          "type": "string"
         },
         "material": {
           "description": "New steel grade.",
@@ -6331,6 +6464,14 @@
             "type": "number"
           },
           "type": "array"
+        },
+        "startJoint": {
+          "description": "Beams only: new joint at the start end, \"pinned\" or \"rigid\" (moment connection).",
+          "enum": [
+            "pinned",
+            "rigid"
+          ],
+          "type": "string"
         }
       },
       "required": [

@@ -30,6 +30,7 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   plate: ['length', 'width', 'thickness', 'boltCount', 'boltDiameter'],
   curvedWall: ['thickness', 'height', 'baseOffset'],
   connection: ['plateThickness', 'boltRows', 'boltDiameter', 'haunchLength'],
+  pipeSupport: ['rodLength', 'pedestalHeight'],
 };
 
 const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));
@@ -131,6 +132,39 @@ function plateErrors(key: string, element: Elements, elements: Elements): string
   return errors;
 }
 
+function pipeSupportErrors(key: string, element: Elements, elements: Elements): string[] {
+  const errors: string[] = [];
+  const pipeId = element['pipeId'];
+  const pipe = typeof pipeId === 'string' ? elements[pipeId] : undefined;
+  if (!isRecord(pipe) || pipe['category'] !== 'pipe') {
+    errors.push(`building element ${key}: pipeId '${String(pipeId)}' is not a pipe`);
+  }
+  if (!['shoe', 'hanger', 'guide', 'anchor'].includes(String(element['type']))) {
+    errors.push(`building element ${key}: type must be shoe, hanger, guide or anchor`);
+  }
+  const position = element['position'];
+  const isPosition =
+    Array.isArray(position) &&
+    position.length === 3 &&
+    position.every((n) => typeof n === 'number' && Number.isFinite(n));
+  if (!isPosition) errors.push(`building element ${key}: position must be [x, y, z]`);
+  const memberId = element['memberId'];
+  if (memberId !== null && typeof memberId !== 'string') {
+    errors.push(`building element ${key}: memberId must be a steel member id or null`);
+  }
+  for (const field of ['rodLength', 'pedestalHeight', 'standoff']) {
+    const value = element[field];
+    if (typeof value === 'number' && value < 0) {
+      errors.push(`building element ${key}: ${field} must be >= 0`);
+    }
+  }
+  const angle = element['standoffAngle'];
+  if (angle !== undefined && !(typeof angle === 'number' && Number.isFinite(angle))) {
+    errors.push(`building element ${key}: standoffAngle must be a finite number`);
+  }
+  return errors;
+}
+
 function openingHostErrors(key: string, element: Elements, elements: Elements): string[] {
   const hostId = element['hostId'];
   if (typeof hostId !== 'string') return [`building element ${key}: hostId must be a string`];
@@ -215,6 +249,19 @@ function elementErrors(
   if (category === 'member' && typeof element['profile'] !== 'string') {
     errors.push(`building element ${key}: profile must be a string`);
   }
+  if (category === 'member') {
+    const allowed: Readonly<Record<string, ReadonlyArray<string>>> = {
+      startJoint: ['pinned', 'rigid'],
+      endJoint: ['pinned', 'rigid'],
+      baseFixity: ['pinned', 'fixed'],
+    };
+    for (const [field, values] of Object.entries(allowed)) {
+      const value = element[field];
+      if (value !== undefined && !(typeof value === 'string' && values.includes(value))) {
+        errors.push(`building element ${key}: ${field} must be ${values.join(' or ')}`);
+      }
+    }
+  }
   if (
     category === 'equipment' &&
     !(isPoint3(element['size']) && (element['size'] as number[]).every((n) => n > 0))
@@ -290,6 +337,7 @@ function elementErrors(
   if (category === 'wall') errors.push(...wallLayerErrors(key, element));
   if (category === 'connection') errors.push(...connectionErrors(key, element, elements));
   if (category === 'plate') errors.push(...plateErrors(key, element, elements));
+  if (category === 'pipeSupport') errors.push(...pipeSupportErrors(key, element, elements));
   if (category === 'door' || category === 'window') {
     errors.push(...openingHostErrors(key, element, elements));
   }

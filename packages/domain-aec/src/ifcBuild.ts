@@ -12,6 +12,7 @@ import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from
 import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
 import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrialExport';
 import { exportOther } from './ifcOtherExport';
+import { exportPipeSupport } from './ifcSupportExport';
 
 type LevelElement = Extract<BuildingElement, { levelId: string }>;
 
@@ -43,6 +44,18 @@ function exportElement(
     case 'pipe':
     case 'tray': {
       const exported = exportIndustrial(context, element, storeyPlacement);
+      return exported ? [exported] : [];
+    }
+    case 'pipeSupport': {
+      const pipe = building.elements[element.pipeId];
+      const exported = exportPipeSupport(
+        context,
+        doc,
+        building,
+        element,
+        pipe?.category === 'pipe' ? pipe : undefined,
+        storeyPlacement,
+      );
       return exported ? [exported] : [];
     }
     case 'connection':

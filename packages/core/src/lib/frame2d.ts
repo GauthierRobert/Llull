@@ -23,6 +23,9 @@ export interface FrameMember {
   readonly I: number;
   /** Uniform load per unit member length, global components. */
   readonly load?: { readonly qx: number; readonly qy: number };
+  /** Moment release (hinge): the member end at `a` / `b` transmits no bending moment. */
+  readonly releaseA?: boolean;
+  readonly releaseB?: boolean;
 }
 
 interface MemberResult {
@@ -90,6 +93,31 @@ interface Local {
   readonly f0: number[];
   readonly qAxial: number;
   readonly qTransverse: number;
+  /** Unreduced stiffness / fixed-end forces, kept to recover the rotation of released ends. */
+  readonly full: { readonly k: number[][]; readonly f0: number[] };
+}
+
+/** Rotation dof (local index) released at end a / b. */
+const ROTATION_A = 2;
+const ROTATION_B = 5;
+
+/** Static condensation of the rotation dof `r`: k and f0 of the member without that dof. */
+function condense(k: number[][], f0: number[], r: number): { k: number[][]; f0: number[] } {
+  const pivot = (k[r] as number[])[r] as number;
+  const column = k.map((row) => row[r] as number);
+  const reduced = k.map((row, i) =>
+    row.map((value, j) =>
+      i === r || j === r
+        ? 0
+        : value - ((column[i] as number) * ((k[r] as number[])[j] as number)) / pivot,
+    ),
+  );
+  return {
+    k: reduced,
+    f0: f0.map((value, i) =>
+      i === r ? 0 : value - ((column[i] as number) * (f0[r] as number)) / pivot,
+    ),
+  };
 }
 
 function localOf(nodes: ReadonlyArray<FrameNode>, member: FrameMember): Local | null {
@@ -122,7 +150,45 @@ function localOf(nodes: ReadonlyArray<FrameNode>, member: FrameMember): Local | 
     (qTransverse * L) / 2,
     (-qTransverse * L * L) / 12,
   ];
-  return { length, c, s, k, f0, qAxial, qTransverse };
+  const released = [
+    member.releaseA === true ? ROTATION_A : -1,
+    member.releaseB === true ? ROTATION_B : -1,
+  ];
+  const condensed = released
+    .filter((index) => index >= 0)
+    .reduce((state, index) => condense(state.k, state.f0, index), { k, f0 });
+  return { length, c, s, k: condensed.k, f0: condensed.f0, qAxial, qTransverse, full: { k, f0 } };
+}
+
+/** Local end displacements with the rotations of released ends recovered from the full member. */
+function withReleasedRotations(local: Local, member: FrameMember, d: number[]): number[] {
+  const result = [...d];
+  const released = [
+    ...(member.releaseA === true ? [ROTATION_A] : []),
+    ...(member.releaseB === true ? [ROTATION_B] : []),
+  ];
+  if (released.length === 0) return result;
+  const { k, f0 } = local.full;
+  const rhs = released.map(
+    (r) =>
+      (f0[r] as number) -
+      (k[r] as number[]).reduce(
+        (sum, value, j) => (released.includes(j) ? sum : sum + value * (d[j] as number)),
+        0,
+      ),
+  );
+  const entry = (i: number, j: number): number =>
+    (k[released[i] as number] as number[])[released[j] as number] as number;
+  if (released.length === 1) {
+    result[released[0] as number] = (rhs[0] as number) / entry(0, 0);
+  } else {
+    const determinant = entry(0, 0) * entry(1, 1) - entry(0, 1) * entry(1, 0);
+    result[released[0] as number] =
+      ((rhs[0] as number) * entry(1, 1) - entry(0, 1) * (rhs[1] as number)) / determinant;
+    result[released[1] as number] =
+      (entry(0, 0) * (rhs[1] as number) - entry(1, 0) * (rhs[0] as number)) / determinant;
+  }
+  return result;
 }
 
 /** local = T · global for one 6-vector. */
@@ -167,10 +233,13 @@ export function solveFrame(
   const K = Array.from({ length: size }, () => new Array<number>(size).fill(0));
   const F = new Array<number>(size).fill(0);
   const locals: Local[] = [];
+  const rotationStiff = new Set<number>();
   for (const member of members) {
     const local = localOf(nodes, member);
     if (!local) return null;
     locals.push(local);
+    if (member.releaseA !== true) rotationStiff.add(3 * member.a + 2);
+    if (member.releaseB !== true) rotationStiff.add(3 * member.b + 2);
     const dofs = memberDofs(member);
     // Kg = Tᵀ k T, built column by column from unit vectors.
     for (let j = 0; j < 6; j++) {
@@ -198,11 +267,15 @@ export function solveFrame(
     F[3 * index + 2] = (F[3 * index + 2] as number) + node.load.mz;
   });
   const free: number[] = [];
-  nodes.forEach((node, index) => {
-    node.restraint.forEach((restrained, axis) => {
-      if (!restrained) free.push(3 * index + axis);
-    });
-  });
+  for (const [index, node] of nodes.entries()) {
+    for (const [axis, restrained] of node.restraint.entries()) {
+      const dof = 3 * index + axis;
+      // A rotation touched only by released member ends has no stiffness: it is inert, not a mechanism.
+      if (axis === 2 && !restrained && !rotationStiff.has(dof)) {
+        if (Math.abs(F[dof] as number) > 0) return null;
+      } else if (!restrained) free.push(dof);
+    }
+  }
   // Symmetric diagonal scaling: translational and rotational stiffnesses differ by many orders.
   const scale = free.map((dof) => {
     const diagonal = (K[dof] as number[])[dof] as number;
@@ -230,7 +303,8 @@ export function solveFrame(
   const results = members.map((member, index): MemberResult => {
     const local = locals[index] as Local;
     const global = memberDofs(member).map((dof) => u[dof] as number);
-    const d = toLocal(local.c, local.s, global);
+    const nodal = toLocal(local.c, local.s, global);
+    const d = withReleasedRotations(local, member, nodal);
     const end = local.k.map(
       (row, i) =>
         row.reduce((sum, value, j) => sum + value * (d[j] as number), 0) - (local.f0[i] as number),

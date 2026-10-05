@@ -13,12 +13,15 @@ npx vitest run tests/production   # in-process scripted run, part of npm run che
 npm run production:scripted       # the same calls through the real /mcp endpoint
 npm run production:ui             # a human-like flow in the browser (Playwright)
 npm run production:agent          # Claude gets only the brief and works through /mcp (API credentials, costs money)
+# agent env: PRODUCTION_SCENARIOS, PRODUCTION_AGENT_MODEL (claude-opus-5-5), PRODUCTION_AGENT_EFFORT (high),
+#            PRODUCTION_AGENT_MAX_TURNS (150), PRODUCTION_AGENT_TRIALS (1), PRODUCTION_AGENT_MAX_USD (20 per trial)
 npm run production                # scripted + ui
 ```
 
 Reports land in `.cache/production/reports/<driver>/<scenario>.json`, with
 `.cache/production/reports/SUMMARY.md` across every driver (✅ pass · ⚠️ known gap · ❌ regression).
-The agent driver also stores its transcript and final project file.
+The agent driver also stores its transcript and final project file, and records token use and the
+estimated spend; a trial stops when its estimate reaches `PRODUCTION_AGENT_MAX_USD`.
 
 ## One scenario, three drivers, one grader
 
@@ -52,7 +55,7 @@ stay green.
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `desmet-extraction-building`   | Solvent extraction building of a 2 000 t/d soybean plant: 24 × 15 m, 4 levels (±0, +6, +12, +18), HEB300 columns, IPE450 / IPE300 floor beams under 30 mm gratings, 36 CHS bracing diagonals, extractor / desolventizer-toaster / miscella tank / conditioner (162 t operating), floor openings, two stair flights, four process lines with battery-limit tie-ins. Issue: IFC, DXF and plan sheet per level, south elevation, schedules, takeoff, project file. |
 | `desmet-extraction-revision-b` | Change order on the issued model: extractor uprated (18 m, 72 t), pump E-502 and line L-105 added, revision B. The office edits the model; every untouched element must keep its id, mark and IFC GlobalId.                                                                                                                                                                                                                                                     |
-| `desmet-pipe-rack`             | Inter-unit pipe rack: 54 m, 10 portal bents (HEB240 / IPE300) with tiers at +5.0 and +6.5 m, nine lines DN50–DN300 battery limit to battery limit, a 600 mm cable tray, a road crossing needing 4.5 m clear. Rack checks: every line supported at every bent, clear height, line spacing, line metres per DN across design / takeoff / schedule.                                                                                                                |
+| `desmet-pipe-rack`             | Inter-unit pipe rack: 54 m, 10 moment-frame bents (HEB240 / IPE300, rigid joints) with tiers at +5.0 and +6.5 m, IPE240 stringers and mid-bay tier beams (a shoe every 3 m), nine lines DN50–DN300 battery limit to battery limit, a 600 mm cable tray, a road crossing needing 4.5 m clear. Rack checks: every line supported at every bent, clear height, line spacing, line metres per DN across design / takeoff / schedule.                                |
 
 ## Acceptance criteria
 
@@ -60,8 +63,8 @@ stay green.
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | structure                  | levels, grid, columns, floor beams, bracing (every member at its absolute axis, right section), floors, steel tonnage vs an independent section table                                                                                         |
 | equipment                  | tags placed (level, position, envelope, weight, clearance), gratings cut where equipment passes through a floor, elevated equipment standing on a floor                                                                                       |
-| piping                     | lines between their ends at DN outside diameter and routed length, no dangling pipe end, a line list (number, DN, from, to)                                                                                                                   |
-| coordination / engineering | clash-free, stair flights (rise, 2R+G, wells), every steel member covered by a structural check                                                                                                                                               |
+| piping                     | lines between their ends at DN outside diameter and routed length, no dangling pipe end, a line list (number, DN, from, to), supports within the standard span                                                                                |
+| coordination / engineering | clash-free, stair flights (rise, 2R+G, wells), every steel member verified and passing, every storey braced or framed in both directions                                                                                                      |
 | deliverables               | IFC (well-formed, unique GlobalIds, counts, profiles, storeys + containment, equipment weights), DXF plans (cut columns, equipment, grid), plan sheets (ISO paper, standard scale, title block, tags), elevation datums, schedules vs takeoff |
 | data integrity             | save → reopen identical, history replay identical; revisions keep ids, marks and GlobalIds                                                                                                                                                    |
 
@@ -69,14 +72,15 @@ stay green.
 
 | scenario            | scripted | ui      | agent                           |
 | ------------------- | -------- | ------- | ------------------------------- |
-| extraction building | 25 / 25  | 25 / 25 | not run (needs API credentials) |
-| revision B          | 28 / 28  | 28 / 28 | not run                         |
-| pipe rack           | 26 / 26  | 26 / 26 | not run                         |
+| extraction building | 27 / 27  | 27 / 27 | not run (needs API credentials) |
+| revision B          | 30 / 30  | 30 / 30 | not run                         |
+| pipe rack           | 28 / 28  | 28 / 28 | not run                         |
 
 Every acceptance criterion passes through `/mcp` and through the browser; `knownIssues` is empty
 for both drivers. The structure, equipment, lines, openings and stairs are modelled exactly; the
 model is clash-free; the steel tonnage matches an independent table to 0.02 %; every steel member
-passes `check_steel_members`; the IFC parses with unique GlobalIds, correct storeys, containment and
+passes `check_steel_members` and every storey has a lateral system (bracing or moment frames) in
+both directions; every line is carried on supports within its standard span; the IFC parses with unique GlobalIds, correct storeys, containment and
 equipment weights; DXF plans and plan sheets show the columns crossing each level and a complete
 title block; the line list carries line number, DN, from and to; schedules agree with the takeoff;
 the project reopens and replays identically; a revision keeps every id, mark and IFC GlobalId.
@@ -89,13 +93,17 @@ the project reopens and replays identically; a revision keeps every id, mark and
 | 2   | No structural verification outside portal frames (0 / 117 and 0 / 48 members)            | `structural-coverage` | `check_steel_members` (EN 1993, loads from the model — see INDUSTRIAL.md)                                        |
 | 3   | IFC equipment had no property set (operating weight)                                     | `ifc-equipment-data`  | `Pset_llullEquipment` (operating weight, clearance), GlobalIds stable across revisions                           |
 | 4   | Upper-floor plans did not draw the columns passing through                               | `dxf-plans`           | plans / DXF draw every column crossing the level's cut height                                                    |
-| 5   | The default `/mcp` rate limit (60 / min / IP) throttled a real job (140–300 calls)       | —                     | default raised to 600 / min; the gate runs on default server settings                                            |
+| 5   | The default `/mcp` rate limit (60 / min / IP) throttled a real job (140–300 calls)       | —                     | default raised to 600 / min; the gate asserts every job fits it                                                  |
 | 6   | UI: no slab material, no equipment tag, no equipment editing, no level picker on exports | (UI driver)           | Building panel fields, Equipment section editor (`update_equipment`), "Export level" picker; no palette fallback |
 | 7   | Design: IPE450 main beams under the 60 t extractor fail deflection (1.05)                | `structural-coverage` | the scenario design was corrected (IPE500), as an engineer would — the check was not weakened                    |
+| 8   | No pipe supports: line weight never reached the steel, spans unchecked                   | `pipe-supports`       | `add_pipe_support` (shoe / hanger / guide / anchor on steel) and `check_pipe_supports` (MSS SP-69 spans)         |
+| 9   | Only braced frames: a pipe rack's bents had no verifiable transverse stability           | `lateral-stability`   | rigid joints / base fixity on steel members; `check_steel_members` solves moment frames (N+M, sway, αcr)         |
+| 10  | Design: 6 m rack bents exceed the support span of 7 of 9 lines                           | `pipe-supports`       | the rack design was corrected: stringers and mid-bay tier beams, a shoe every 3 m                                |
+| 11  | Risers were not checked; supports kept a dangling member after edits; no plan symbol     | `pipe-supports`       | riser rule (guide spacing, weight carried), supports re-attach on delete / move / copy, P-SUPP plan symbols      |
 
-`check_steel_members` still warns (without failing) about two things the scenario designs leave
-out: the process lines of the extraction building rest on no modelled pipe support, and the pipe
-rack's transverse bents have no modelled stability system. Both are next scenario refinements.
+`check_steel_members` warnings left are informational: equipment standing on grade (carried by
+foundations, not by the steel). The two long risers (into the extractor, out of the desolventizer)
+are guided from HEA100 posts and pass the riser rule.
 
 The UI driver does every call through the Building panel forms: no command-palette fallback and no
 `uiGaps`. Placement is explicit (each form has a Level selector), equipment is revised in the

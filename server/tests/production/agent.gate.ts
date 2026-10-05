@@ -9,7 +9,8 @@
  *   npm run production:agent        # needs Anthropic API credentials; costs real money
  *
  * Env: PRODUCTION_SCENARIOS (comma ids, default all) · PRODUCTION_AGENT_MODEL (claude-opus-5-5) ·
- * PRODUCTION_AGENT_EFFORT (high) · PRODUCTION_AGENT_MAX_TURNS (150) · PRODUCTION_AGENT_TRIALS (1)
+ * PRODUCTION_AGENT_EFFORT (high) · PRODUCTION_AGENT_MAX_TURNS (150) · PRODUCTION_AGENT_TRIALS (1) ·
+ * PRODUCTION_AGENT_MAX_USD (20, estimated spend cap per trial; the report records the estimate)
  *
  * Scoring: only the job's criteria count — those that fail on the starting document and are not
  * known product gaps (`knownIssues.scripted`) — plus any criterion that passed on the starting
@@ -44,10 +45,16 @@ function positiveInteger(name: string, fallback: number): number {
   if (!Number.isInteger(value) || value < 1) throw new Error(`${name} must be a positive integer`);
   return value;
 }
+function positiveNumber(name: string, fallback: number): number {
+  const value = Number(process.env[name] ?? fallback);
+  if (!(value > 0)) throw new Error(`${name} must be a positive number`);
+  return value;
+}
 const OPTIONS: AgentOptions = {
   model: process.env['PRODUCTION_AGENT_MODEL'] ?? 'claude-opus-5-5',
   effort: effort as AgentOptions['effort'],
   maxTurns: positiveInteger('PRODUCTION_AGENT_MAX_TURNS', 150),
+  maxUsd: positiveNumber('PRODUCTION_AGENT_MAX_USD', 20),
 };
 const TRIALS = positiveInteger('PRODUCTION_AGENT_TRIALS', 1);
 const SELECTED = (process.env['PRODUCTION_SCENARIOS'] ?? '').split(',').filter((id) => id !== '');
@@ -106,7 +113,7 @@ describe('production scenarios — AI agent over /mcp', () => {
           `${formatReport(report)}\n\njob criteria done ${done.length}/${job.length}, broken: ` +
             `${broken.join(', ') || 'none'}; ` +
             `agent: ${run.turns} turns, ${run.toolCalls} tool calls ` +
-            `(${run.toolErrors} errors), stop ${run.stopReason}\n${run.finalText}`,
+            `(${run.toolErrors} errors), stop ${run.stopReason}, ~${run.estimatedUsd?.toFixed(2) ?? '?'} USD\n${run.finalText}`,
         ).toBeGreaterThanOrEqual(scenario.agentBaseline);
       });
     }

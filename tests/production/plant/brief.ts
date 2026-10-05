@@ -13,8 +13,49 @@ import { OPENING_MARGIN } from './script';
 const mm = (value: number): string => `${Math.round(value * 10) / 10}`;
 const point = (values: readonly number[]): string => `(${values.map(mm).join(', ')})`;
 
+/** Primary (grid) members: secondary steel with a `purpose` is listed separately. */
+const primary = (intent: PlantIntent): IntentMember[] =>
+  intent.members.filter((m) => m.purpose === undefined);
+
 function profilesOf(intent: PlantIntent, role: string): string[] {
-  return [...new Set(intent.members.filter((m) => m.role === role).map((m) => m.profile))];
+  return [
+    ...new Set(
+      primary(intent)
+        .filter((m) => m.role === role)
+        .map((m) => m.profile),
+    ),
+  ];
+}
+
+/** Secondary steel, grouped by purpose, every member with its exact axis. */
+function secondarySteel(intent: PlantIntent): string[] {
+  const groups = new Map<string, IntentMember[]>();
+  for (const m of intent.members) {
+    if (m.purpose !== undefined) groups.set(m.purpose, [...(groups.get(m.purpose) ?? []), m]);
+  }
+  if (groups.size === 0) return [];
+  return [
+    '## Secondary steel (S355, absolute axis end points)',
+    ...[...groups].flatMap(([purpose, members]) => [
+      `- ${purpose}:`,
+      ...members.map(
+        (m) =>
+          `  - ${m.role} ${m.profile} on "${intent.levels[m.level]?.name ?? ''}" from ${point(m.start)} to ${point(m.end)}${m.startJoint === 'rigid' || m.endJoint === 'rigid' ? ' (rigid joints)' : ''}.`,
+      ),
+    ]),
+    '',
+  ];
+}
+
+function supportLines(intent: PlantIntent): string[] {
+  const supports = intent.supports ?? [];
+  if (supports.length === 0) return [];
+  return [
+    '## Pipe supports (absolute points on the line centreline; each bears on the steel below — shoe — or above — hanger)',
+    ...supports.map((s) => `- ${s.line}: ${s.type} at ${s.at.map(point).join(', ')}.`),
+    'Every line must keep its supports within the standard maximum span for its DN (MSS SP-69 / ASME B31.1, water-filled).',
+    '',
+  ];
 }
 
 type Axis = 'x' | 'y';
@@ -26,7 +67,7 @@ function beamRule(
   intent: PlantIntent,
   axis: Axis,
 ): { profile: string; exceptions: IntentMember[] } {
-  const beams = intent.members.filter((m) => m.role === 'beam' && runsAlong(m) === axis);
+  const beams = primary(intent).filter((m) => m.role === 'beam' && runsAlong(m) === axis);
   const counts = new Map<string, number>();
   for (const beam of beams) counts.set(beam.profile, (counts.get(beam.profile) ?? 0) + 1);
   const profile = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
@@ -46,7 +87,13 @@ export function plantBrief(intent: PlantIntent, extra: string[] = []): string {
   const grating = intent.floors[0]?.thickness ?? 0;
   const buildingRules: string[] = [
     '## Steel structure (S355)',
-    `- Columns ${profilesOf(intent, 'column').join(', ')} at every grid intersection, one continuous member from ${mm(0)} to ${mm(Math.max(...intent.members.filter((m) => m.role === 'column').map((m) => m.end[2])))} (belongs to the ground level).`,
+    `- Columns ${profilesOf(intent, 'column').join(', ')} at every grid intersection, one continuous member from ${mm(0)} to ${mm(
+      Math.max(
+        ...primary(intent)
+          .filter((m) => m.role === 'column')
+          .map((m) => m.end[2]),
+      ),
+    )} (belongs to the ground level).`,
     `- Every floor level above ground carries ${grating} mm gratings on steel beams: top of steel = FFL − ${grating}. Member axes are section centroid lines, so a beam axis is at FFL − ${grating} − h/2.`,
     `- Main beams ${main.profile} (h = ${section(main.profile)?.h ?? '?'} mm) along Y on every numbered axis, one member per bay between lettered axes.`,
     `- Secondary beams ${secondary.profile} (h = ${section(secondary.profile)?.h ?? '?'} mm) along X on every lettered axis, one member per bay between numbered axes.`,
@@ -94,6 +141,7 @@ export function plantBrief(intent: PlantIntent, extra: string[] = []): string {
     ),
     '',
     ...(intent.structureBrief ?? buildingRules),
+    ...secondarySteel(intent),
     ...(intent.equipment.length > 0 || intent.stairs.length > 0 ? equipmentAndAccess : []),
     '## Process lines (absolute centreline routes)',
     '| Line | Service | DN (OD) | From | To | Route |',
@@ -107,6 +155,7 @@ export function plantBrief(intent: PlantIntent, extra: string[] = []): string {
       .join('; ')}.`,
     '',
     ...(intent.trays !== undefined && intent.trays.length > 0 ? trayLines : []),
+    ...supportLines(intent),
     '## Deliverables and acceptance',
     '- The model must be clash-free (no hard clash, no clearance violation).',
     '- The office will issue from the model: IFC for coordination, a DXF plan and a plan sheet per level, a south elevation, member / equipment schedules, the line list (line number, DN, from and to of every line) and the quantity takeoff, and the saved project file.',
