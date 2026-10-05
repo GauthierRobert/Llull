@@ -24,6 +24,13 @@ export interface IntentMember {
   end: Vec3;
   /** Index into `levels` of the storey the member belongs to. */
   level: number;
+  /** Section roll about the axis (radians); columns: π/2 puts the strong axis along Y. */
+  roll?: number;
+  /** Beam end joints: 'rigid' = moment connection to the member it frames into. */
+  startJoint?: 'pinned' | 'rigid';
+  endJoint?: 'pinned' | 'rigid';
+  /** Column base fixity. */
+  baseFixity?: 'pinned' | 'fixed';
 }
 
 export interface IntentFloor {

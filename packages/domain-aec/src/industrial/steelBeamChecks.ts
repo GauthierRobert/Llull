@@ -9,7 +9,8 @@
 
 import { lateralTorsionalReduction, memberBuckling, sectionResistance } from './steelDesign';
 import type { BeamResult } from './steelFraming';
-import { isBeamShape, sectionOf, type SteelBar } from './steelMemberBars';
+import { shearReducedMoment } from './steelFrameSection';
+import { isBeamShape, type SteelBar } from './steelMemberBars';
 import { analysedRow, skippedRow, type CheckLine, type MemberRow } from './steelMemberRows';
 
 export interface StrutForce {
@@ -59,20 +60,11 @@ export function checkBeam(
   const momentEd = result.uls.maxMoment;
   const shearEd = result.uls.maxShear;
   const shearResistance = resistance.shear / 1000;
-  let momentResistance = resistance.moment / 1e6;
-  let reduction = '';
-  if (result.uls.shearAtMoment > 0.5 * shearResistance) {
-    const rho = ((2 * result.uls.shearAtMoment) / shearResistance - 1) ** 2;
-    const section = sectionOf(profile);
-    momentResistance =
-      profile.shape === 'I' && resistance.sectionClass <= 2
-        ? ((section.plasticModulus -
-            (rho * ((profile.h - 2 * profile.tf) * profile.tw) ** 2) / (4 * profile.tw)) *
-            bar.fy) /
-          1e6
-        : momentResistance * (1 - rho);
-    reduction = `, reduced for V ${result.uls.shearAtMoment.toFixed(0)} kN (§6.2.8)`;
-  }
+  const shearCase = shearReducedMoment(profile, bar.fy, result.uls.shearAtMoment);
+  const momentResistance = shearCase.moment / 1e6;
+  const reduction = shearCase.reduced
+    ? `, reduced for V ${result.uls.shearAtMoment.toFixed(0)} kN (§6.2.8)`
+    : '';
   const chiLateral = restrained ? 1 : lateralTorsionalReduction(profile, bar.fy, lengthMm, 1);
   const lines: CheckLine[] = [
     {

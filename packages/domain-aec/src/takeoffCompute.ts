@@ -248,6 +248,26 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       plate.boltCount,
     );
   }
+  for (const support of elementsOf(building, 'pipeSupport')) {
+    takeoff.add(
+      'pipeSupport',
+      support.type,
+      'ea',
+      `Pipe supports (${support.type}) — count`,
+      1,
+      'pipe-support',
+    );
+    if (support.type === 'hanger') {
+      takeoff.add(
+        'pipeSupport',
+        'hanger-rod',
+        'm',
+        'Pipe hanger rods — length',
+        scale.length(support.rodLength),
+        'pipe-support',
+      );
+    }
+  }
   for (const connection of elementsOf(building, 'connection')) {
     takeoff.add(
       'connection',

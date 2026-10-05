@@ -13,6 +13,7 @@ import { midpoint } from '../vec3';
 import { findProfile } from '../steel/profiles';
 import { atLevel } from './evaluate';
 import { arcPoints, curvedWallArc, curvedWallBand } from '../curvedWallGeometry';
+import { supportShape } from './supportParts';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
 export interface OrientedBox {
@@ -108,6 +109,27 @@ export function elementBoxes(
       return level
         ? polylineBoxes(level, element.points, element.width / 2, element.height / 2)
         : [];
+    case 'pipeSupport': {
+      const pipe = building.elements[element.pipeId];
+      if (!level || pipe?.category !== 'pipe') return [];
+      const { angle, parts } = supportShape(doc, element, pipe);
+      const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
+      return parts.map((part): OrientedBox => {
+        const half: Vec3 =
+          part.kind === 'box'
+            ? [part.size[0] / 2, part.size[1] / 2, part.size[2] / 2]
+            : [part.radius, part.radius, part.height / 2];
+        return {
+          center: [
+            element.position[0] - sin * part.across,
+            element.position[1] + cos * part.across,
+            level.elevation + part.z,
+          ],
+          axes: zRotated(angle),
+          half,
+        };
+      });
+    }
     case 'curvedWall': {
       const arc = curvedWallArc(element);
       if (!level || !arc || !curvedWallBand(element)) return [];

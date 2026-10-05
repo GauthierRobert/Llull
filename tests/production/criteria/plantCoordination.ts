@@ -146,6 +146,39 @@ function coverageCheck({ document, run }: GradeContext): CheckOutcome {
   };
 }
 
+interface StoreyStability {
+  storey: number;
+  topOfSteel: number;
+  X: { planes: number };
+  Y: { planes: number };
+  frames?: { X: number; Y: number };
+}
+
+/** Every storey has a lateral system (bracing planes or moment frames) in both plan directions. */
+function stabilityCheck({ run }: GradeContext): CheckOutcome {
+  const data = run('check_steel_members').data as { storeys?: StoreyStability[] } | undefined;
+  const storeys = data?.storeys ?? [];
+  const problems: string[] = [];
+  for (const storey of storeys) {
+    for (const direction of ['X', 'Y'] as const) {
+      const systems = storey[direction].planes + (storey.frames?.[direction] ?? 0);
+      if (systems === 0) {
+        problems.push(
+          `storey ${storey.storey} (below +${storey.topOfSteel / 1000} m) has no lateral system in ${direction}`,
+        );
+      }
+    }
+  }
+  if (storeys.length === 0) problems.push('check_steel_members reported no storeys');
+  return {
+    pass: problems.length === 0,
+    detail:
+      problems.length === 0
+        ? `${storeys.length} storey(s) braced or framed in X and Y`
+        : problems.join('; '),
+  };
+}
+
 export function coordinationCriteria(intent: PlantIntent): Criterion[] {
   return [
     {
@@ -167,6 +200,13 @@ export function coordinationCriteria(intent: PlantIntent): Criterion[] {
       requirement:
         'Every steel member is verified (EN 1993) under its equipment, floor and pipe loads by a structural check, and passes (utilisation ≤ 1).',
       check: coverageCheck,
+    },
+    {
+      id: 'lateral-stability',
+      area: 'engineering',
+      requirement:
+        'Every storey has a verified lateral system (bracing or moment frames) in both directions.',
+      check: stabilityCheck,
     },
   ];
 }

@@ -21,6 +21,7 @@ building workspace ([`CONSTRUCTION.md`](CONSTRUCTION.md)): same constructive bui
 | Equipment               | `add_equipment`                           | Machine footprint with height, rotation, maintenance clearance (drawn dashed in plan) and operating weight (IFC property set `Pset_llullEquipment`); edit in place with `update_equipment`.                                                                                                                                                                                                                                           |
 | Cable tray              | `add_cable_tray`                          | Open U-section tray along a 3D route with width, side height and cable system (power, data…). Layer `E-TRAY`, marks CT, `IfcCableCarrierSegment`.                                                                                                                                                                                                                                                                                     |
 | Pipe run                | `add_pipe_run`                            | 3D polyline with service, line number, DN (outside diameter from the EN 10220 table) and from / to ends — the pipe schedule is the line list; bends at every interior point.                                                                                                                                                                                                                                                          |
+| Pipe support            | `add_pipe_support`, `check_pipe_supports` | Shoe / guide / anchor on steel below, hanger (rod) from steel above, on a pipe chosen by `pipeId` or `line`, at `at` points (snapped to the centreline) or every `spacing`. Bears on the nearest steel member in reach (or `memberId`); none found ⇒ unattached (warned). Block / rod geometry on layer `P-SUPP`, marks PS, `IfcBuildingElementProxy` (PIPESUPPORT). Follows its pipe.                                                |
 
 ## Coordination
 
@@ -103,18 +104,90 @@ from it:
   covers. Equipment on grade is reported, not carried.
 - **Pipes and trays** resting on a beam (underside at top of steel ±10 mm): water-filled steel pipe
   (standard wall by OD) and `cableTrayWeight` (75 kg/m), tributary length to the neighbouring
-  supports.
+  supports. A pipe that has `add_pipe_support` supports is carried by them only: each support on
+  steel takes weight/m × half the span to its neighbours (the whole overhang to a free end) as a
+  point load on its beam — a shoe / guide / anchor on the top flange, a hanger at the rod
+  attachment — or axially on a column (a bracket off a column is noted); an unattached support is
+  warned. A pipe with both ends in equipment or on a header within the table span rests on its
+  nozzles.
 - **Self weight** from the catalogue.
 
-ULS 1.35 G + 1.5 Q. Beams (simply supported): bending with LTB (restrained by a floor or by pipes),
-shear, deflection ≤ L/`deflectionRatio` (250) under G + Q. Columns: Npl and flexural buckling per
-storey segment between beam levels. Bracing: equivalent horizontal forces (`notionalFactor` 1/200,
+ULS 1.35 G + 1.5 Q. Beams (simply supported unless a joint is rigid): bending with LTB (restrained by
+a floor or by pipes), shear, deflection ≤ L/`deflectionRatio` (250) under G + Q. Columns: Npl and
+flexural buckling per storey segment between beam levels. Bracing: equivalent horizontal forces (`notionalFactor` 1/200,
 EN 1993-1-1 §5.3.2) shared by the bracing planes; X-bracing tension-only with λ ≤ 300; chord beams
 of braced bays as struts. `data.members` has one verdict row per member (`utilisation`, `ok`,
 governing check); members it cannot analyse (rafters, purlins, crane beams — use the dedicated
 checks — or sections outside the catalogue) are listed with the reason. `data.loads.assumptions`
 states every rule above; `data.warnings` lists model gaps (equipment on grade, pipes resting on no
-beam, a storey without bracing in one direction).
+beam, a storey without bracing or a moment frame in one direction).
+
+#### Moment frames (rigid joints)
+
+Beam-to-column joints are pinned by default. A beam declares `startJoint` / `endJoint: 'rigid'`
+(`add_steel_member`, `update_steel_member`) when it is moment-connected to the column it frames
+into, and a column declares `baseFixity: 'fixed'` (default: its base plate's fixity — a plate
+created with `fixity: 'fixed'`, as the portal-hall generator does for `columnBase: 'fixed'` — else
+pinned; `check_steel_members` warns when the member and its plate disagree, because
+`check_foundations` only sees the plate). Columns and beams in one vertical plane (`x = const` or
+`y = const`) joined by rigid joints form a **moment frame**; the pinned end of a frame beam is
+released, a free end is a cantilever, a column belongs to one frame plane (a second plane's rigid
+joints on it are rejected with the reason). Each frame is solved as a 2D frame (direct stiffness,
+the `@lib/frame2d` solver with member end releases):
+
+- **Loads**: the beam loads of the load path above (floor, equipment, pipes, point loads of
+  secondary beams), the reactions of the pinned beams and pipes on the frame columns, column self
+  weight, and the §5.3.2 notional forces φ × the factored vertical load at each beam level, toward
+  both sides.
+- **Checks** (one row per member, as for any member): `frame N+M (§6.3.3)` — beams with LTB over the
+  span (sagging; restrained by a floor or pipes) and over the **hogging length** at rigid ends,
+  columns with Lcr = the storey piece on the axis the frame plane bends (the column `roll` decides:
+  at roll 0 the depth lies along X, so a bent in a plane `x = const` bends the **weak** axis — use
+  roll π/2 for the strong axis; rolls between the axes are not analysed); `cross-section N+M
+(§6.2.9)` with the shear reduction of §6.2.8; `shear (§6.2.6)`; beam `deflection` relative to the
+  chord; column `sway h/300` (`swayRatio`) storey drift under G + Q + the notional forces; and
+  `sway stability αcr ≥ 3` on the column with the lowest αcr = h / (200 δ) (drift δ under V/200,
+  Horne). When αcr < 10 all moments are amplified by 1 / (1 − 1 / αcr) (conservative).
+- **Joint moments** for the connection design: `forces.jointMomentStart` / `jointMomentEnd` of the
+  beam rows (kNm, hogging negative, worst of both sway directions), column `forces.baseMoment` for
+  fixed bases, and `data.frames[].jointMoments`.
+- A frame is the lateral system of its direction for the storeys below its highest beam: those
+  storeys no longer warn "no bracing in direction …". Bracing in the same direction keeps taking
+  the full storey force (both systems are verified for it — conservative).
+- Failures: a rigid joint at a beam end that bears on nothing or on a beam, a beam outside the X / Y
+  planes, a column already in another frame plane, or a beam with no length between its columns
+  leave the beam **not analysed** (reason in its row and in `data.warnings`); a frame that is a
+  mechanism (for example a pinned-base column with a rigid cantilever) leaves all its members not
+  analysed.
+
+A pipe-rack bent is the typical case: IPE tier beams with rigid joints to HEB columns (roll π/2,
+pinned or fixed bases) in every bent, longitudinal X-bracing in the column-line planes (the pipes
+run through the bents, so the transverse direction cannot be braced).
+
+### Pipe supports and spans: `add_pipe_support`, `check_pipe_supports`
+
+`add_pipe_support` { `pipeId` | `line`, `at` | `spacing`, `type`, `memberId?`, `maxReach?`,
+`planTolerance?` } places supports on a pipe: `type` shoe (default), guide, anchor (rest on steel
+below, pedestal height = gap pipe underside → steel top) or hanger (rod from steel above, rod length
+= gap steel underside → pipe top). The steel is `memberId`, else the nearest member in reach:
+vertical gap ≤ `maxReach` (500 mm below, 3 m for a hanger), plan distance ≤ half the member width +
+`planTolerance` (100 mm); columns carry shoes / guides / anchors (on top or as a bracket). No steel in
+reach ⇒ the support is created **unattached** (`memberId` null; the summary warns, it carries
+nothing and fails the span check). `spacing` auto-places supports at most that far apart, one
+`min(300 mm, spacing/4)` from each free end and bend; ends in equipment or on another pipe are carried
+and risers are skipped. Supports follow their pipe (moved, copied, deleted with it) and appear in
+`building_schedule` kind `support` (Mark, Line, Pipe, Type, Bears on, x, y, z, Rod length), the
+takeoff (`pipe-support.<type>.ea`, `pipe-support.hanger-rod.m`) and the IFC; a support touching its
+own pipe and steel is not a clash.
+
+`check_pipe_supports` (read-only) gives one row per pipe: the support spacing against the standard
+maximum span of horizontal water-filled standard-wall steel pipe (MSS SP-69 Table 3 / ASME B31.1
+Table 121.5: DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, DN250 6.7 m,
+DN300 7.0 m … DN600 9.8 m) × `spanFactor`. Spans run along the centreline between supports that bear
+on steel (risers are not counted); a pipe end in equipment or on another pipe is carried (a nozzle);
+a free end needs a support within `overhangRatio` (0.5) × the allowed span; a pipe without supports
+uses the beams it rests on (`basis` "resting"). Row: `{ id, mark, line, dn, maxSpanM, allowedSpanM,
+largestSpanM, overhangM, supports, unattached, basis, ok, issues }`.
 
 ### Design workflow
 
@@ -148,7 +221,7 @@ surface (m²)**, footing count and concrete volume, cladding area by role, equip
 pipe length by service and diameter, cable tray length by system and size, base plate mass and anchor bolt counts by diameter — all priceable with `set_cost_rates` (keys like
 `member.HEA400.kg`, `member.paint.m2`, `panel-roof.sandwich-panel.m2`). `building_schedule`
 kinds `member` (cut list: mark, role, profile, length, mass, grade), `footing`, `panel`,
-`equipment`, `pipe`, `tray`, `plate` (base plates with bolts and mass) and `connection` (end plates, bolts, haunches, mass).
+`equipment`, `pipe`, `tray`, `plate` (base plates with bolts and mass), `connection` (end plates, bolts, haunches, mass) and `support` (pipe supports).
 
 ## Drawings and exchange
 

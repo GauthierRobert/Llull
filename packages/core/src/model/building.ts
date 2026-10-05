@@ -28,7 +28,8 @@ export type BimCategory =
   | 'tray'
   | 'plate'
   | 'curvedWall'
-  | 'connection';
+  | 'connection'
+  | 'pipeSupport';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -165,6 +166,12 @@ export interface RoomElement extends LevelElementBase {
 /** Structural role of a steel member (drives layer, mark prefix and IFC class). */
 export type MemberRole = 'column' | 'rafter' | 'beam' | 'brace' | 'purlin' | 'rail' | 'crane';
 
+/** End connection of a beam to the column it frames into: moment-transmitting or not. */
+export type JointFixity = 'pinned' | 'rigid';
+
+/** Column base: free to rotate, or restraining the column foot rotation. */
+export type BaseFixity = 'pinned' | 'fixed';
+
 /**
  * A steel member: a catalogue section swept from `start` to `end` (z relative to the level).
  * `roll` rotates the section about its axis (radians).
@@ -179,6 +186,11 @@ export interface SteelMemberElement extends LevelElementBase {
   material: string;
   /** Free note carried to schedules, e.g. "Crane 10 t, hook 6.5 m". */
   note?: string;
+  /** Beams: joint at `start` / `end`; absent = pinned. 'rigid' makes the beam a moment-frame member. */
+  startJoint?: JointFixity;
+  endJoint?: JointFixity;
+  /** Columns: base fixity in check_steel_members; absent = the base plate's fixity, else pinned. */
+  baseFixity?: BaseFixity;
 }
 
 /** A concrete pad footing; its TOP sits at level elevation + `topOffset` (usually negative). */
@@ -234,6 +246,27 @@ export interface PipeElement extends LevelElementBase {
   from?: string;
   /** Destination: equipment tag or battery-limit / tie-in id. */
   to?: string;
+}
+
+export type PipeSupportType = 'shoe' | 'hanger' | 'guide' | 'anchor';
+
+/**
+ * A support on a pipe: shoe / guide / anchor rest on steel below, a hanger hangs by a rod from
+ * steel above. Hosted by its pipe (moves, copies and is deleted with it).
+ */
+export interface PipeSupportElement extends LevelElementBase {
+  readonly category: 'pipeSupport';
+  /** The pipe it carries. */
+  pipeId: string;
+  type: PipeSupportType;
+  /** Point on the pipe centreline: plan x / y, z relative to the level (like pipe points). */
+  position: Vec3;
+  /** Steel member it bears on (below for shoe / guide / anchor, above for a hanger); null = unattached. */
+  memberId: string | null;
+  /** Hanger rod length, pipe top to the member underside (0 for other types and unattached hangers). */
+  rodLength: number;
+  /** Shoe / guide / anchor block height, pipe underside down to the member top (0 for hangers). */
+  pedestalHeight: number;
 }
 
 /** A cable tray run through 3D points (z = tray centre, relative to the level). */
@@ -316,7 +349,8 @@ export type BuildingElement =
   | CableTrayElement
   | BasePlateElement
   | CurvedWallElement
-  | MomentConnectionElement;
+  | MomentConnectionElement
+  | PipeSupportElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */

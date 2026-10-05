@@ -74,6 +74,7 @@ const SCHEDULE_KINDS = [
   'tray',
   'plate',
   'connection',
+  'support',
 ] as const satisfies ReadonlyArray<ScheduleKind>;
 
 /**
@@ -87,8 +88,10 @@ export const buildingSchedule = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only schedule table (like Revit schedules) for one element category: wall, door, window, room, ' +
-    'slab, column, beam, stair, member (steel cut list), footing, panel, equipment or pipe — one row per element with mark, level, dimensions, material and ' +
-    'quantities. data.csv is spreadsheet-ready.',
+    'slab, column, beam, stair, member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, ' +
+    'connection or support (pipe supports: mark, line, pipe, type, steel it bears on, position, hanger rod length, ' +
+    'attached / UNATTACHED) — one row per element with mark, level, dimensions, material and quantities. ' +
+    'data.csv is spreadsheet-ready.',
   params: z.object({ kind: z.enum(SCHEDULE_KINDS).describe('Which schedule to produce.') }),
   run: (doc, { kind }): CommandResult => {
     const schedule = buildSchedule(doc, kind);

@@ -3,7 +3,13 @@
  */
 
 import type { Vec3 } from '@core/model/types';
-import type { BuildingModel, MemberRole, SteelMemberElement } from '@core/model/building';
+import type {
+  BaseFixity,
+  BuildingModel,
+  JointFixity,
+  MemberRole,
+  SteelMemberElement,
+} from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, tolerant, z } from '@core/commands/schema';
 import { highestIndex, nextElementId, withElement } from '../model';
@@ -59,6 +65,33 @@ interface MemberSpec {
   roll?: number;
   material?: string;
   note?: string;
+  startJoint?: JointFixity;
+  endJoint?: JointFixity;
+  baseFixity?: BaseFixity;
+}
+
+export const jointFixitySchema = z.enum(['pinned', 'rigid']);
+export const baseFixitySchema = z.enum(['pinned', 'fixed']);
+
+/**
+ * Joint / base fixity only make sense on the member that owns them.
+ * @returns the reason, or null when the combination is valid
+ */
+export function fixityProblem(
+  role: MemberRole,
+  fixity: {
+    startJoint?: JointFixity | undefined;
+    endJoint?: JointFixity | undefined;
+    baseFixity?: BaseFixity | undefined;
+  },
+): string | null {
+  if ((fixity.startJoint !== undefined || fixity.endJoint !== undefined) && role !== 'beam') {
+    return `startJoint / endJoint apply to beams (role is '${role}')`;
+  }
+  if (fixity.baseFixity !== undefined && role !== 'column') {
+    return `baseFixity applies to columns (role is '${role}')`;
+  }
+  return null;
 }
 
 /**
@@ -95,6 +128,9 @@ export function appendMembers(
       roll: spec.roll ?? 0,
       material: spec.material?.trim() || 'S355',
       ...(spec.note ? { note: spec.note } : {}),
+      ...(spec.startJoint !== undefined ? { startJoint: spec.startJoint } : {}),
+      ...(spec.endJoint !== undefined ? { endJoint: spec.endJoint } : {}),
+      ...(spec.baseFixity !== undefined ? { baseFixity: spec.baseFixity } : {}),
     };
     next = withElement(next, member);
     ids.push(member.id);

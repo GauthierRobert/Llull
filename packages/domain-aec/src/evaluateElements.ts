@@ -21,6 +21,7 @@ import {
   evaluateTray,
 } from './industrial/evaluate';
 import { evaluatePlate, evaluateConnection } from './industrial/evaluateConnections';
+import { evaluatePipeSupport } from './industrial/evaluateSupports';
 import { ensureLayers } from './entities';
 import { openingsOf } from './wallGeometry';
 import {
@@ -74,6 +75,15 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluatePipe(leveled, level);
     case 'tray':
       return evaluateTray(context.doc, leveled, level);
+    case 'pipeSupport': {
+      const pipe = building.elements[leveled.pipeId];
+      return evaluatePipeSupport(
+        context.doc,
+        leveled,
+        pipe?.category === 'pipe' ? pipe : undefined,
+        level,
+      );
+    }
     case 'connection': {
       const members: Record<string, SteelMemberElement | undefined> = {};
       for (const id of [leveled.rafterId, leveled.otherId]) {

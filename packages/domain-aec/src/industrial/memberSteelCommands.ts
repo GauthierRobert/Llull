@@ -22,11 +22,28 @@ import { dropStaleConnections } from './connectionSupport';
 import {
   MEMBER_ROLES,
   appendMembers,
+  baseFixitySchema,
+  fixityProblem,
+  jointFixitySchema,
   levelIdSchema,
   nextMemberMark,
   profileSummary,
   toVec3,
 } from './memberSupport';
+
+const fixityText = (
+  startJoint: string | undefined,
+  endJoint: string | undefined,
+  baseFixity: string | undefined,
+): string =>
+  [
+    startJoint === 'rigid' ? 'rigid start joint' : '',
+    endJoint === 'rigid' ? 'rigid end joint' : '',
+    baseFixity === 'fixed' ? 'fixed base' : '',
+  ]
+    .filter((part) => part !== '')
+    .map((part) => `, ${part}`)
+    .join('');
 
 /**
  * @command add_steel_member
@@ -40,7 +57,10 @@ export const addSteelMember = defineCommand({
     'Add a steel member with a catalogue section (e.g. "HEA300", "IPE400", "CHS76.1x3.6") between two 3D ' +
     'points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, ' +
     'brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and ' +
-    'along +X for vertical columns; roll (radians) turns it about the axis.',
+    'along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. ' +
+    'Beams may declare startJoint / endJoint "rigid" (moment connection to the column they frame into; ' +
+    'default pinned) and columns baseFixity "fixed" (column foot restrains rotation; default pinned or the ' +
+    'base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames.',
   params: z.object({
     profile: z.string().describe('Catalogue section name (list_steel_profiles).'),
     start: z.array(z.number()).describe('Axis start [x, y, z], z relative to the level.'),
@@ -53,10 +73,35 @@ export const addSteelMember = defineCommand({
     levelId: levelIdSchema,
     material: z.string().optional().describe('Steel grade. Default S355.'),
     note: z.string().optional().describe('Note carried to the member schedule.'),
+    startJoint: jointFixitySchema
+      .optional()
+      .describe(
+        'Beams only: joint at the start end: "pinned" (default) or "rigid" (moment connection to the column it frames into).',
+      ),
+    endJoint: jointFixitySchema
+      .optional()
+      .describe('Beams only: joint at the end end: "pinned" (default) or "rigid".'),
+    baseFixity: baseFixitySchema
+      .optional()
+      .describe(
+        'Columns only: "pinned" (default; or the fixity of its base plate) or "fixed" (the foot restrains rotation in check_steel_members).',
+      ),
   }),
   run: (
     doc,
-    { profile, start, end, role = 'beam', roll = 0, levelId, material, note },
+    {
+      profile,
+      start,
+      end,
+      role = 'beam',
+      roll = 0,
+      levelId,
+      material,
+      note,
+      startJoint,
+      endJoint,
+      baseFixity,
+    },
   ): CommandResult => {
     const from = toVec3(start);
     const to = toVec3(end);
@@ -64,6 +109,8 @@ export const addSteelMember = defineCommand({
     if (!isFiniteNumber(roll)) {
       return noop(doc, 'add_steel_member failed: roll must be finite.');
     }
+    const problem = fixityProblem(role, { startJoint, endJoint, baseFixity });
+    if (problem) return noop(doc, `add_steel_member failed: ${problem}.`);
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_steel_member failed: ${resolution.reason}.`);
     const added = appendMembers(resolution.building, resolution.level.id, [
@@ -75,6 +122,9 @@ export const addSteelMember = defineCommand({
         roll,
         ...(material !== undefined ? { material } : {}),
         ...(note !== undefined ? { note } : {}),
+        ...(startJoint !== undefined ? { startJoint } : {}),
+        ...(endJoint !== undefined ? { endJoint } : {}),
+        ...(baseFixity !== undefined ? { baseFixity } : {}),
       },
     ]);
     if ('reason' in added) return noop(doc, `add_steel_member failed: ${added.reason}.`);
@@ -85,7 +135,7 @@ export const addSteelMember = defineCommand({
     const metres = toMetres(doc, length);
     return {
       document,
-      summary: `Added ${role} ${member?.mark ?? ''} (${added.ids[0] ?? ''}) ${profileSummary(section)}, length ${length.toFixed(1)} ${doc.units}, ${(metres * section.massPerMetre).toFixed(1)} kg.`,
+      summary: `Added ${role} ${member?.mark ?? ''} (${added.ids[0] ?? ''}) ${profileSummary(section)}, length ${length.toFixed(1)} ${doc.units}, ${(metres * section.massPerMetre).toFixed(1)} kg${fixityText(startJoint, endJoint, baseFixity)}.`,
       affected: elementAffected(document, added.ids),
       data: { elementId: added.ids[0] },
     };
@@ -100,7 +150,8 @@ export const addSteelMember = defineCommand({
 export const updateSteelMember = defineCommand({
   name: 'update_steel_member',
   description:
-    'Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade or note.',
+    'Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, ' +
+    'beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed).',
   params: z.object({
     memberId: z.string().describe('Member element id, e.g. "member-3".'),
     profile: z.string().optional().describe('New catalogue section.'),
@@ -113,8 +164,20 @@ export const updateSteelMember = defineCommand({
     roll: z.number().optional().describe('New roll, radians.'),
     material: z.string().optional().describe('New steel grade.'),
     note: z.string().optional().describe('New schedule note.'),
+    startJoint: jointFixitySchema
+      .optional()
+      .describe('Beams only: new joint at the start end, "pinned" or "rigid" (moment connection).'),
+    endJoint: jointFixitySchema
+      .optional()
+      .describe('Beams only: new joint at the end end, "pinned" or "rigid".'),
+    baseFixity: baseFixitySchema
+      .optional()
+      .describe('Columns only: new base fixity, "pinned" or "fixed".'),
   }),
-  run: (doc, { memberId, profile, start, end, role, roll, material, note }): CommandResult => {
+  run: (
+    doc,
+    { memberId, profile, start, end, role, roll, material, note, startJoint, endJoint, baseFixity },
+  ): CommandResult => {
     const building = getBuilding(doc);
     const member = building.elements[memberId];
     if (member?.category !== 'member')
@@ -130,8 +193,21 @@ export const updateSteelMember = defineCommand({
     if (Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]) === 0) {
       return noop(doc, 'update_steel_member failed: start and end would coincide.');
     }
+    const nextRole = role ?? member.role;
+    const problem = fixityProblem(nextRole, { startJoint, endJoint, baseFixity });
+    if (problem) return noop(doc, `update_steel_member failed: ${problem}.`);
+    const { startJoint: oldStart, endJoint: oldEnd, baseFixity: oldBase, ...rest } = member;
+    const isBeam = nextRole === 'beam';
+    const fixities = {
+      ...(isBeam && (startJoint ?? oldStart) ? { startJoint: startJoint ?? oldStart } : {}),
+      ...(isBeam && (endJoint ?? oldEnd) ? { endJoint: endJoint ?? oldEnd } : {}),
+      ...(nextRole === 'column' && (baseFixity ?? oldBase)
+        ? { baseFixity: baseFixity ?? oldBase }
+        : {}),
+    };
     const updated: SteelMemberElement = {
-      ...member,
+      ...rest,
+      ...fixities,
       profile: section.name,
       start: from,
       end: to,
@@ -143,8 +219,8 @@ export const updateSteelMember = defineCommand({
       ...(note !== undefined ? { note } : {}),
     };
     const refit = refitPlates(doc, withElement(building, updated), updated, member.profile);
-    const joints = dropStaleConnections(refit.building, memberId, fromMm(doc, 10));
-    const document = regenerateBuilding(doc, joints.building);
+    const stale = dropStaleConnections(refit.building, memberId, fromMm(doc, 10));
+    const document = regenerateBuilding(doc, stale.building);
     const plateNote =
       refit.resized.length > 0
         ? ` Base plate(s) ${refit.resized.join(', ')} re-sized.`
@@ -155,7 +231,7 @@ export const updateSteelMember = defineCommand({
       document,
       summary:
         `Updated ${updated.role} ${updated.mark} (${memberId}): ${profileSummary(section)}.${plateNote}` +
-        `${joints.removed.length > 0 ? ` Moment connection(s) ${joints.removed.join(', ')} removed (joint no longer exists).` : ''}`,
+        `${stale.removed.length > 0 ? ` Moment connection(s) ${stale.removed.join(', ')} removed (joint no longer exists).` : ''}`,
       affected: elementAffected(document, [memberId, ...refit.resized]),
     };
   },

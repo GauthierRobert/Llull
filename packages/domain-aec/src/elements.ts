@@ -26,6 +26,7 @@ import { regenerateBuilding } from './evaluateElements';
 import { resolveOutline } from './structure';
 import { openingFitIssues } from './walls';
 import { nextMemberMark } from './industrial/memberSupport';
+import { copyPipeSupports } from './industrial/pipeSupportCopy';
 
 /**
  * @command add_room
@@ -177,6 +178,11 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'pipe':
     case 'tray':
       return { ...element, points: element.points.map(([x, y, z]): Vec3 => [x + dx, y + dy, z]) };
+    case 'pipeSupport':
+      return {
+        ...element,
+        position: [element.position[0] + dx, element.position[1] + dy, element.position[2]],
+      };
     case 'door':
     case 'window':
     case 'plate':
@@ -231,7 +237,18 @@ export const moveBuildingElement = defineCommand({
       );
     }
     let next = building;
-    for (const id of known) {
+    // Pipe supports carry their own position: they travel with their moved pipe.
+    const travelling = [
+      ...known,
+      ...Object.values(building.elements).flatMap((element) =>
+        element.category === 'pipeSupport' &&
+        known.includes(element.pipeId) &&
+        !known.includes(element.id)
+          ? [element.id]
+          : [],
+      ),
+    ];
+    for (const id of travelling) {
       const element = building.elements[id] as BuildingElement;
       next = withElement(next, translated(element, delta[0], delta[1]));
     }
@@ -405,6 +422,9 @@ export const copyLevelElements = defineCommand({
         });
         created.push(copyId);
       }
+      const copiedSupports = copyPipeSupports(building, next, copiedIds, targetLevelId);
+      next = copiedSupports.building;
+      created.push(...copiedSupports.ids);
     }
     const issues = openingFitIssues(next, new Set(targetLevelIds));
     if (issues.length > 0) return noop(doc, `copy_level_elements refused: ${issues[0]}.`);

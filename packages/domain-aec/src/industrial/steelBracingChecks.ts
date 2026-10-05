@@ -11,6 +11,7 @@
 import { memberBuckling, sectionResistance } from './steelDesign';
 import { GAMMA_IMPOSED, GAMMA_PERMANENT, type BeamResult } from './steelFraming';
 import type { ColumnSegment } from './steelColumnChecks';
+import type { FrameCoverage } from './steelFrameDetect';
 import { compressionClass, minorRadius, type SteelBar } from './steelMemberBars';
 import { analysedRow, skippedRow, type CheckLine, type MemberRow } from './steelMemberRows';
 
@@ -35,6 +36,8 @@ export interface StoreyReport {
   readonly shear: number;
   readonly X: { readonly planes: number; readonly bays: number; readonly perBay: number };
   readonly Y: { readonly planes: number; readonly bays: number; readonly perBay: number };
+  /** Moment frames stabilising the storey in each direction. */
+  readonly frames: { readonly X: number; readonly Y: number };
 }
 
 export interface BracingOutcome {
@@ -56,6 +59,10 @@ interface BraceGeometry {
   readonly high: number;
   readonly horizontal: number;
 }
+
+/** Label of the notional factor in combination names, e.g. "φ = 1/200". */
+export const notionalLabel = (factor: number): string =>
+  `φ = ${factor > 0 && Math.round(1 / factor) === 1 / factor ? `1/${1 / factor}` : factor}`;
 
 const snap = (value: number): number => Math.round(value / COORDINATE_STEP) * COORDINATE_STEP;
 const metres = (value: number): string => (value / 1000).toFixed(2);
@@ -173,11 +180,12 @@ export function checkBracing(
   beams: ReadonlyArray<BeamResult>,
   columnSegments: ReadonlyArray<ColumnSegment>,
   notionalFactor: number,
+  frames: ReadonlyArray<FrameCoverage> = [],
 ): BracingOutcome {
   const { levels, levelOf } = floorLevels(beams);
   const warnings: string[] = [];
   const strutForces = new Map<string, { force: number; note: string }>();
-  const phiText = `φ = ${Math.round(1 / notionalFactor) === 1 / notionalFactor ? `1/${1 / notionalFactor}` : notionalFactor}`;
+  const phiText = notionalLabel(notionalFactor);
   if (levels.length === 0) {
     return {
       rows: braces.map((brace) =>
@@ -266,6 +274,11 @@ export function checkBracing(
         perBay: slot === 0 || total === 0 ? 0 : shearOf(storey) / total,
       };
     };
+    const framed = (direction: Direction): number =>
+      frames.filter(
+        (frame) =>
+          frame.direction === direction && frame.beamTops.some((top) => levelOf(top) >= storey),
+      ).length;
     return {
       storey: storey + 1,
       topOfSteel: level,
@@ -273,11 +286,12 @@ export function checkBracing(
       shear: shearOf(storey),
       X: share('X'),
       Y: share('Y'),
+      frames: { X: framed('X'), Y: framed('Y') },
     };
   });
   for (const report of storeys) {
     for (const direction of ['X', 'Y'] as const) {
-      if (report[direction].planes > 0) continue;
+      if (report[direction].planes > 0 || report.frames[direction] > 0) continue;
       warnings.push(
         `storey ${report.storey} (below +${metres(report.topOfSteel)} m): no bracing in direction ${direction}, ` +
           `its notional force ${report.shear.toFixed(1)} kN must be carried by frame action (not verified)`,

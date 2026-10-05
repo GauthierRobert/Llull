@@ -59,6 +59,9 @@ function members(): IntentMember[] {
         start: [x, y, 0],
         end: [x, y, topOfColumns],
         level: 0,
+        // Strong axis in the bent plane: each bent is a moment frame across the rack.
+        roll: Math.PI / 2,
+        baseFixity: 'pinned',
       });
     }
     for (const tos of TIERS) {
@@ -69,6 +72,8 @@ function members(): IntentMember[] {
         start: [x, 0, z],
         end: [x, WIDTH, z],
         level: 0,
+        startJoint: 'rigid',
+        endJoint: 'rigid',
       });
     }
   }
@@ -90,6 +95,22 @@ function members(): IntentMember[] {
     const b: Vec3 = [X[1] ?? 0, y, 0];
     result.push({ role: 'brace', profile: BRACE, start: a, end: [b[0], y, top], level: 0 });
     result.push({ role: 'brace', profile: BRACE, start: b, end: [a[0], y, top], level: 0 });
+    // Between the tiers (struts as chords), in the column-line planes outside the pipes.
+    const upper = axisZ(TIERS[1], STRUT);
+    result.push({
+      role: 'brace',
+      profile: BRACE,
+      start: [a[0], y, top],
+      end: [b[0], y, upper],
+      level: 0,
+    });
+    result.push({
+      role: 'brace',
+      profile: BRACE,
+      start: [b[0], y, top],
+      end: [a[0], y, upper],
+      level: 0,
+    });
   }
   return result;
 }
@@ -186,9 +207,9 @@ export const pipeRackIntent: PlantIntent = {
   trays: [TRAY],
   structureBrief: [
     '## Pipe rack structure (S355)',
-    `- Portal bents on every numbered axis, 6000 apart: two ${COLUMN} columns (one continuous member from 0 to +${TIERS[1] / 1000} m, on axes A and B) and two ${TIER_BEAM} tier beams (h = ${depth(TIER_BEAM)} mm) between the column axes, one member per tier, along Y.`,
+    `- Portal bents on every numbered axis, 6000 apart: two ${COLUMN} columns (one continuous member from 0 to +${TIERS[1] / 1000} m, on axes A and B) and two ${TIER_BEAM} tier beams (h = ${depth(TIER_BEAM)} mm) between the column axes, one member per tier, along Y. Each bent is a moment frame: tier beams rigidly connected to the columns at both ends (startJoint / endJoint 'rigid'), columns with the strong axis in the bent plane (roll π/2) on pinned bases.`,
     `- Two pipe tiers with top of steel (TOS) +${TIERS[0] / 1000} m (lower) and +${TIERS[1] / 1000} m (upper). Member axes are section centroid lines, so a tier beam axis is at TOS − ${depth(TIER_BEAM) / 2}.`,
-    `- Bay 1 (axes 1–2), on both column lines A and B: a ${STRUT} longitudinal strut at each tier (top of steel = TOS, axis at TOS − ${depth(STRUT) / 2}, one member per tier) and one X-bracing ${BRACE} below the lower tier (two diagonals per column line, from the column base at ground to the strut axis of the lower tier).`,
+    `- Bay 1 (axes 1–2), on both column lines A and B: a ${STRUT} longitudinal strut at each tier (top of steel = TOS, axis at TOS − ${depth(STRUT) / 2}, one member per tier) and one X-bracing ${BRACE} below the lower tier (two diagonals per column line, from the column base at ground to the strut axis of the lower tier), plus one X-bracing ${BRACE} between the tiers (from the lower strut axis to the upper strut axis) on each column line.`,
     '- Lines and cable tray rest on top of steel: a pipe centreline is at TOS + OD/2, the cable tray centre at TOS + side height / 2.',
     `- A ${road.xMax - road.xMin} mm wide road crosses the rack at x = ${road.xMin} to ${road.xMax} (bay 5, no steel inside): the clear height under the rack there (lowest underside of any steel, pipe or tray) must be at least ${roadClearHeight} mm.`,
     `- Lines on a tier keep at least ${minLineGap} mm clear between adjacent outside diameters (and the cable tray edge).`,

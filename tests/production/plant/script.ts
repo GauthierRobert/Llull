@@ -58,6 +58,10 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
         start: z(member.start),
         end: z(member.end),
         levelId: levelId(member.level),
+        ...(member.roll !== undefined ? { roll: member.roll } : {}),
+        ...(member.startJoint !== undefined ? { startJoint: member.startJoint } : {}),
+        ...(member.endJoint !== undefined ? { endJoint: member.endJoint } : {}),
+        ...(member.baseFixity !== undefined ? { baseFixity: member.baseFixity } : {}),
       },
     });
   }

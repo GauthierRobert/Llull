@@ -6,7 +6,7 @@
  */
 
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type { BuildingModel, MemberRole } from '@core/model/building';
+import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@core/model/building';
 import { fromMm, getBuilding } from '../model';
 import { findProfile, sectionProperties, type SteelProfile } from '../steel/profiles';
 import { yieldStrength } from './steelDesign';
@@ -32,6 +32,15 @@ export interface SteelBar {
   readonly kind: BarKind;
   /** Why a `skipped` bar is not analysed. */
   readonly skipReason: string | undefined;
+  /** Section rotation about the axis, radians (decides which axis a frame plane bends). */
+  readonly roll: number;
+  /** Beam joints at start / end (pinned unless declared rigid). */
+  readonly startJoint: JointFixity;
+  readonly endJoint: JointFixity;
+  /** Column base: the member's own `baseFixity`, else its base plate's, else pinned. */
+  readonly baseFixity: BaseFixity;
+  /** Fixity of the column's base plate, undefined without a plate. */
+  readonly plateFixity: BaseFixity | undefined;
 }
 
 /** Document-unit → mm conversion and level elevations of a building. */
@@ -101,6 +110,11 @@ function classify(
 export function collectSteelBars(doc: CadDocument): SteelBar[] {
   const { building, toMm, elevationMm } = modelUnits(doc);
   const bars: SteelBar[] = [];
+  const plateFixities = new Map<string, BaseFixity>();
+  for (const element of Object.values(building.elements)) {
+    if (element.category === 'plate')
+      plateFixities.set(element.memberId, element.fixity ?? 'pinned');
+  }
   for (const id of building.elementOrder) {
     const element = building.elements[id];
     if (element?.category !== 'member') continue;
@@ -134,6 +148,11 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
       length,
       kind,
       skipReason: reason,
+      roll: element.roll,
+      startJoint: element.startJoint ?? 'pinned',
+      endJoint: element.endJoint ?? 'pinned',
+      baseFixity: element.baseFixity ?? plateFixities.get(element.id) ?? 'pinned',
+      plateFixity: plateFixities.get(element.id),
     });
   }
   return bars;
