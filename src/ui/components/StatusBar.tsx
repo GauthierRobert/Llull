@@ -1,15 +1,8 @@
 /**
  * @layer ui/components
  *
- * StatusBar — slim bottom bar that surfaces live document state at a glance.
- *
- * Reads (all via narrow Zustand selectors — react R3):
- *   - liveStatus + syncState + hasUnsyncedLocalEdits → live / syncing / sync-failed indicator
- *   - document.units + document.displayPrecision → formatted unit label
- *   - document.order.length / document.selection.length → entity + selection counts
- *   - lastSummary                             → most recent command feedback
- *
- * Presentation ONLY. No document mutations (PRIME DIRECTIVE).
+ * StatusBar — slim bottom bar: live / syncing / sync-failed indicator, last command summary,
+ * entity + selection counts, units. Presentation only (PRIME DIRECTIVE).
  */
 
 import React from 'react';

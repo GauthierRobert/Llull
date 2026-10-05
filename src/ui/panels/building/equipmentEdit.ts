@@ -7,7 +7,7 @@
  */
 
 import type { EquipmentElement } from '@core/model/building';
-import { FieldReader, result } from './elementToolForm';
+import { FieldReader, radians, result } from './elementToolForm';
 
 export type EquipmentEditKey =
   | 'mark'
@@ -81,7 +81,7 @@ export function buildEquipmentUpdate(
   if (changed('length', 'width', 'height')) {
     changes['size'] = [reader.number('length'), reader.number('width'), reader.number('height')];
   }
-  if (changed('angle')) changes['angle'] = (reader.number('angle') * Math.PI) / 180;
+  if (changed('angle')) changes['angle'] = radians(reader.number('angle'));
   if (changed('clearance')) changes['clearance'] = reader.number('clearance');
   if (changed('weight')) changes['weight'] = reader.number('weight');
   if (changed('levelId')) changes['levelId'] = reader.text('levelId');

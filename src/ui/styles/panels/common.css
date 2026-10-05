@@ -159,6 +159,19 @@
   opacity: 1;
 }
 
+/* Overlay variant: the actions float over the row end on hover so the main text keeps its width */
+.panel__row--overlay-actions .panel__row-actions {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  margin: 0;
+  padding: 0 2px;
+  transform: translateY(-50%);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
 .panel__row .icon-btn {
   width: 24px;
   height: 24px;

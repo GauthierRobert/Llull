@@ -1,80 +1,57 @@
 /**
  * @layer ui/components
  *
- * McpConnect — modal dialog that shows how to connect an MCP agent to llull.
- *
- * Exports:
- *   McpConnectButton  — trigger button (mounts in TopBar)
- *   McpConnect        — modal itself (opened by McpConnectButton)
- *
- * Presentation ONLY. No document mutations (PRIME DIRECTIVE).
- * Focus management: focus trap on open, focus restore on close.
+ * McpConnect — modal dialog showing how to connect an MCP agent (McpConnectButton in the TopBar
+ * opens it). Focus is trapped while open and restored to the trigger on close.
+ * Presentation ONLY (PRIME DIRECTIVE).
  */
 
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { SERVER_BASE } from '@ui/serverConfig';
 import { Icon } from '@ui/components/Icon';
+import { focusableElements, trapTab } from '@ui/focusTrap';
 
 const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server run dev';
 const SERVER_START_CMD = 'npm --prefix server run dev';
 const ENDPOINT_URL = `${SERVER_BASE}/mcp`;
 
-interface CapabilityBadge {
-  readonly label: string;
-}
-
-const CAPABILITY_BADGES: readonly CapabilityBadge[] = [
-  { label: '60 tools' },
-  { label: 'structuredContent' },
-  { label: 'prompts (EN2)' },
-  { label: 'session isolation' },
+const CAPABILITY_BADGES: readonly string[] = [
+  '60 tools',
+  'structuredContent',
+  'prompts (EN2)',
+  'session isolation',
 ];
 
 interface AgentLoopStep {
-  readonly index: number;
   readonly tool: string;
   readonly description: string;
 }
 
 const AGENT_LOOP_STEPS: readonly AgentLoopStep[] = [
   {
-    index: 1,
     tool: 'read cad://conventions',
     description:
       'Load the llull conventions resource to understand coordinate axes, units, and entity kinds.',
   },
   {
-    index: 2,
     tool: 'describe_scene',
     description: 'Inspect the current document: all entities, layers, and their properties.',
   },
   {
-    index: 3,
     tool: 'add_box (or any create/edit command)',
     description:
       'Create or modify geometry via any registered command (add_box, draw_line, extrude_profile, …).',
   },
   {
-    index: 4,
     tool: 'render_view',
     description:
       'Render a screenshot with axes, grid, units, and showLabels:true to verify the result visually.',
   },
   {
-    index: 5,
     tool: 'check_model',
     description: 'Validate the model (watertight, no self-intersections) after modifications.',
   },
 ];
-
-/** Return every focusable element inside a container, in DOM order. */
-function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(
-      'a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((el) => !el.hasAttribute('hidden'));
-}
 
 interface CopyButtonProps {
   readonly text: string;
@@ -84,12 +61,12 @@ interface CopyButtonProps {
 function CopyButton({ text, label }: CopyButtonProps): React.ReactElement {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = (): void => {
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     });
-  }, [text]);
+  };
 
   return (
     <button
@@ -104,16 +81,42 @@ function CopyButton({ text, label }: CopyButtonProps): React.ReactElement {
   );
 }
 
+interface ConnectStepProps {
+  readonly step: number;
+  readonly ariaLabel: string;
+  readonly label: React.ReactNode;
+  readonly children: React.ReactNode;
+}
+
+function ConnectStep({ step, ariaLabel, label, children }: ConnectStepProps): React.ReactElement {
+  return (
+    <section className="mcp-connect__section" aria-label={ariaLabel}>
+      <span className="mcp-connect__step-num" aria-hidden="true">
+        {step}
+      </span>
+      <p className="mcp-connect__section-label">{label}</p>
+      {children}
+    </section>
+  );
+}
+
+function CodeRow({ code, copyLabel }: { code: string; copyLabel: string }): React.ReactElement {
+  return (
+    <div className="mcp-connect__code-row">
+      <pre className="mcp-connect__code">
+        <code>{code}</code>
+      </pre>
+      <CopyButton text={code} label={copyLabel} />
+    </div>
+  );
+}
+
 function McpAgentLoop(): React.ReactElement {
   return (
-    <section className="mcp-connect__section" aria-label="Recommended agent loop">
-      <span className="mcp-connect__step-num" aria-hidden="true">
-        3
-      </span>
-      <p className="mcp-connect__section-label">Recommended agent loop</p>
+    <ConnectStep step={3} ariaLabel="Recommended agent loop" label="Recommended agent loop">
       <ol className="mcp-connect__loop-list">
         {AGENT_LOOP_STEPS.map((step) => (
-          <li key={step.index} className="mcp-connect__loop-item">
+          <li key={step.tool} className="mcp-connect__loop-item">
             <div className="mcp-connect__loop-tool-row">
               <code className="mcp-connect__loop-tool">{step.tool}</code>
               <CopyButton text={step.tool} label={`${step.tool} tool name`} />
@@ -122,7 +125,7 @@ function McpAgentLoop(): React.ReactElement {
           </li>
         ))}
       </ol>
-    </section>
+    </ConnectStep>
   );
 }
 
@@ -138,68 +141,32 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
   // Focus the first focusable element when the modal opens.
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusable = getFocusableElements(dialog);
-    focusable[0]?.focus();
+    if (dialog) focusableElements(dialog)[0]?.focus();
   }, []);
 
-  // Trap focus within the modal and handle Esc.
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusable = getFocusableElements(dialog);
-      if (focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-
-      if (e.shiftKey) {
-        // Shift+Tab: if we are on the first element, wrap to last.
-        if (active === first) {
-          e.preventDefault();
-          last?.focus();
-        }
-      } else {
-        // Tab: if we are on the last element, wrap to first.
-        if (active === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    },
-    [onClose],
-  );
-
-  // Backdrop click: close when clicking outside the dialog panel.
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) {
-        onClose();
-      }
-    },
-    [onClose],
-  );
-
   return (
-    <div className="mcp-connect-backdrop" onClick={handleBackdropClick} aria-hidden="false">
+    <div
+      className="mcp-connect-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      aria-hidden="false"
+    >
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className="mcp-connect"
-        onKeyDown={handleKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            onClose();
+          } else if (e.key === 'Tab' && dialogRef.current) {
+            trapTab(e, dialogRef.current);
+          }
+        }}
       >
-        {/* Header */}
         <div className="mcp-connect__header">
           <span className="mcp-connect__header-icon" aria-hidden="true">
             <Icon name="plug" size={16} />
@@ -221,55 +188,36 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
           </button>
         </div>
 
-        {/* Body */}
         <div className="mcp-connect__body">
-          {/* Capability badges */}
           <div className="mcp-connect__badges" aria-label="Capabilities">
             {CAPABILITY_BADGES.map((badge) => (
-              <span key={badge.label} className="mcp-connect__badge">
-                {badge.label}
+              <span key={badge} className="mcp-connect__badge">
+                {badge}
               </span>
             ))}
           </div>
 
-          {/* 1. Install + start the server */}
-          <section className="mcp-connect__section" aria-label="Install and start server">
-            <span className="mcp-connect__step-num" aria-hidden="true">
-              1
-            </span>
-            <p className="mcp-connect__section-label">Install &amp; start the MCP server</p>
-            <div className="mcp-connect__code-row">
-              <pre className="mcp-connect__code">
-                <code>{SERVER_INSTALL_CMD}</code>
-              </pre>
-              <CopyButton text={SERVER_INSTALL_CMD} label="install and start command" />
-            </div>
+          <ConnectStep
+            step={1}
+            ariaLabel="Install and start server"
+            label="Install & start the MCP server"
+          >
+            <CodeRow code={SERVER_INSTALL_CMD} copyLabel="install and start command" />
             <p className="mcp-connect__hint mcp-connect__hint--inline">
               If the server is already installed, use:{' '}
               <code className="mcp-connect__inline-code">{SERVER_START_CMD}</code>
             </p>
-          </section>
+          </ConnectStep>
 
-          {/* 2. Endpoint URL */}
-          <section className="mcp-connect__section" aria-label="Endpoint URL">
-            <span className="mcp-connect__step-num" aria-hidden="true">
-              2
-            </span>
-            <p className="mcp-connect__section-label">MCP endpoint</p>
-            <div className="mcp-connect__code-row">
-              <pre className="mcp-connect__code">
-                <code>{ENDPOINT_URL}</code>
-              </pre>
-              <CopyButton text={ENDPOINT_URL} label="endpoint URL" />
-            </div>
+          <ConnectStep step={2} ariaLabel="Endpoint URL" label="MCP endpoint">
+            <CodeRow code={ENDPOINT_URL} copyLabel="endpoint URL" />
             <p className="mcp-connect__hint mcp-connect__hint--inline">
               Point your MCP client (Claude Desktop, Cursor, etc.) at this URL. Set{' '}
               <code className="mcp-connect__inline-code">MCP_AUTH_TOKEN</code> to protect the
               endpoint in production.
             </p>
-          </section>
+          </ConnectStep>
 
-          {/* 3. Agent loop */}
           <McpAgentLoop />
         </div>
       </div>
@@ -279,16 +227,13 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
 
 export function McpConnectButton(): React.ReactElement {
   const [open, setOpen] = useState(false);
-  // Ref to the trigger button so we can restore focus on close.
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const handleOpen = useCallback(() => setOpen(true), []);
-
-  const handleClose = useCallback(() => {
+  const handleClose = (): void => {
     setOpen(false);
     // Restore focus to the trigger after the next paint.
     setTimeout(() => triggerRef.current?.focus(), 0);
-  }, []);
+  };
 
   return (
     <>
@@ -296,7 +241,7 @@ export function McpConnectButton(): React.ReactElement {
         ref={triggerRef}
         type="button"
         className="mcp-connect-trigger"
-        onClick={handleOpen}
+        onClick={() => setOpen(true)}
         aria-label="Connect an MCP agent"
         title="Connect an MCP agent"
       >

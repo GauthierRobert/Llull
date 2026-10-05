@@ -8,18 +8,10 @@
  */
 
 import { create } from 'zustand';
+import { isRecord } from '@lib/isRecord';
+import { readStored, writeStored } from './persistence';
 
-export type SidebarTab =
-  | 'building'
-  | 'layers'
-  | 'assembly'
-  | 'mechanisms'
-  | 'parameters'
-  | 'history'
-  | 'configurations'
-  | 'materials';
-
-const SIDEBAR_TABS: readonly SidebarTab[] = [
+const SIDEBAR_TABS = [
   'building',
   'layers',
   'assembly',
@@ -28,12 +20,14 @@ const SIDEBAR_TABS: readonly SidebarTab[] = [
   'history',
   'configurations',
   'materials',
-];
+] as const;
+
+export type SidebarTab = (typeof SIDEBAR_TABS)[number];
 
 const STORAGE_KEY = 'llull-layout';
 
 /** Matches the shell.css breakpoint below which the docks float over the viewport as drawers. */
-export const DRAWER_LAYOUT_QUERY = '(max-width: 1024px)';
+const DRAWER_LAYOUT_QUERY = '(max-width: 1024px)';
 
 function isDrawerLayout(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.(DRAWER_LAYOUT_QUERY).matches === true;
@@ -52,36 +46,20 @@ const DEFAULT_LAYOUT: PersistedLayout = {
 };
 
 function isSidebarTab(value: unknown): value is SidebarTab {
-  return typeof value === 'string' && (SIDEBAR_TABS as readonly string[]).includes(value);
+  return SIDEBAR_TABS.some((tab) => tab === value);
 }
+
+const booleanOr = (value: unknown, fallback: boolean): boolean =>
+  typeof value === 'boolean' ? value : fallback;
 
 function readStoredLayout(): PersistedLayout {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_LAYOUT;
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return DEFAULT_LAYOUT;
-    const record = parsed as Record<string, unknown>;
-    return {
-      sidebarTab: isSidebarTab(record.sidebarTab) ? record.sidebarTab : DEFAULT_LAYOUT.sidebarTab,
-      sidebarOpen:
-        typeof record.sidebarOpen === 'boolean' ? record.sidebarOpen : DEFAULT_LAYOUT.sidebarOpen,
-      inspectorOpen:
-        typeof record.inspectorOpen === 'boolean'
-          ? record.inspectorOpen
-          : DEFAULT_LAYOUT.inspectorOpen,
-    };
-  } catch {
-    return DEFAULT_LAYOUT;
-  }
-}
-
-function persistLayout(layout: PersistedLayout): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
-  } catch {
-    // localStorage unavailable (test env or sandboxed iframe)
-  }
+  const stored = readStored(STORAGE_KEY);
+  if (!isRecord(stored)) return DEFAULT_LAYOUT;
+  return {
+    sidebarTab: isSidebarTab(stored.sidebarTab) ? stored.sidebarTab : DEFAULT_LAYOUT.sidebarTab,
+    sidebarOpen: booleanOr(stored.sidebarOpen, DEFAULT_LAYOUT.sidebarOpen),
+    inspectorOpen: booleanOr(stored.inspectorOpen, DEFAULT_LAYOUT.inspectorOpen),
+  };
 }
 
 interface LayoutStoreState extends PersistedLayout {
@@ -95,7 +73,7 @@ export const useLayoutStore = create<LayoutStoreState>()((set, get) => {
   // Persist only what changed, over the stored layout: a dock forced closed by the drawer layout
   // never overwrites the stored desktop preference.
   const commit = (patch: Partial<PersistedLayout>): void => {
-    persistLayout({ ...readStoredLayout(), ...patch });
+    writeStored(STORAGE_KEY, { ...readStoredLayout(), ...patch });
     set(patch);
   };
 

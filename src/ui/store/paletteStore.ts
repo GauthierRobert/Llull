@@ -7,27 +7,16 @@
  */
 
 import { create } from 'zustand';
+import { readStored, writeStored } from './persistence';
 
 const STORAGE_KEY = 'llull-palette-recent';
-export const RECENT_LIMIT = 5;
+const RECENT_LIMIT = 5;
 
 function readRecent(): string[] {
-  try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
-    return Array.isArray(parsed)
-      ? parsed.filter((id): id is string => typeof id === 'string').slice(0, RECENT_LIMIT)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistRecent(recentIds: readonly string[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(recentIds));
-  } catch {
-    // localStorage unavailable (test env or sandboxed iframe)
-  }
+  const stored = readStored(STORAGE_KEY);
+  return Array.isArray(stored)
+    ? stored.filter((id): id is string => typeof id === 'string').slice(0, RECENT_LIMIT)
+    : [];
 }
 
 /** Outcome of a command run from the palette, shown as a toast. */
@@ -74,7 +63,7 @@ export const usePaletteStore = create<PaletteStoreState>()((set, get) => ({
       0,
       RECENT_LIMIT,
     );
-    persistRecent(recentIds);
+    writeStored(STORAGE_KEY, recentIds);
     set({ recentIds });
   },
 }));

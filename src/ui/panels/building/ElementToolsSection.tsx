@@ -31,35 +31,27 @@ interface ElementOption {
 
 type ElementOptions = Readonly<Record<ElementListKind, ReadonlyArray<ElementOption>>>;
 
-const NO_OPTIONS: ElementOptions = {
+const emptyOptions = (): Record<ElementListKind, ElementOption[]> => ({
   walls: [],
   hosts: [],
   stairs: [],
   slabs: [],
   levels: [],
   pipes: [],
-};
+});
 
-const BLANK_LABEL: Readonly<Record<ElementListKind, string>> = {
-  walls: 'Choose…',
-  hosts: 'Choose…',
-  stairs: 'Choose…',
-  slabs: 'Choose…',
-  levels: 'Active level',
-  pipes: 'Choose…',
-};
+const NO_OPTIONS: ElementOptions = emptyOptions();
+
+/** Label of the blank first option of a live list. */
+function blankOptionLabel(listKind: ElementListKind, listLength: number): string {
+  if (listKind === 'levels') return 'Active level';
+  return listLength === 0 ? 'None available' : 'Choose…';
+}
 
 /** Active level's walls, every stair / slab (stair wells cut the slab above) and every level. */
 function elementOptions(building: BuildingModel | undefined): ElementOptions {
   if (!building) return NO_OPTIONS;
-  const options: Record<ElementListKind, ElementOption[]> = {
-    walls: [],
-    hosts: [],
-    stairs: [],
-    slabs: [],
-    levels: [],
-    pipes: [],
-  };
+  const options = emptyOptions();
   for (const levelId of building.levelOrder) {
     const level = building.levels[levelId];
     if (level) options.levels.push({ id: levelId, label: `${level.name} · +${level.elevation}` });
@@ -127,11 +119,9 @@ function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.R
   }
   if (field.kind === 'select') {
     const listKind = typeof field.options === 'string' ? field.options : null;
-    const live = listKind !== null ? lists[listKind] : null;
-    const options = live
-      ? live.map((option): readonly [string, string] => [option.id, option.label])
-      : typeof field.options === 'string'
-        ? []
+    const options: ReadonlyArray<readonly [string, string]> =
+      typeof field.options === 'string'
+        ? lists[field.options].map((option): readonly [string, string] => [option.id, option.label])
         : (field.options ?? []);
     return (
       <label className="field">
@@ -141,12 +131,8 @@ function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.R
           onChange={(event) => onChange(field.key, event.target.value)}
           data-testid={testId}
         >
-          {listKind !== null && live && (
-            <option value="">
-              {live.length === 0 && listKind !== 'levels'
-                ? 'None available'
-                : BLANK_LABEL[listKind]}
-            </option>
+          {listKind !== null && (
+            <option value="">{blankOptionLabel(listKind, lists[listKind].length)}</option>
           )}
           {options.map(([optionValue, label]) => (
             <option key={optionValue} value={optionValue}>

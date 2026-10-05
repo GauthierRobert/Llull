@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from 'react';
+import { classNames } from '@ui/classNames';
 import { Icon } from '@ui/components/Icon';
 import type { IconName } from '@ui/components/Icon';
 
@@ -127,7 +128,7 @@ export function IconButton({
   return (
     <button
       type="button"
-      className={['icon-btn', danger && 'icon-btn--danger', className].filter(Boolean).join(' ')}
+      className={classNames('icon-btn', danger && 'icon-btn--danger', className)}
       data-testid={testId}
       disabled={disabled}
       aria-pressed={pressed}

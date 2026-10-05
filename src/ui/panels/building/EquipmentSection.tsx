@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingLevel, EquipmentElement } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { orderedValues } from '@ui/panels/orderedValues';
 import {
   EQUIPMENT_EDIT_FIELDS,
   buildEquipmentUpdate,
@@ -92,10 +93,7 @@ export function EquipmentSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const select = useStore((s) => s.select);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const levels = (building?.levelOrder ?? []).flatMap((id) => {
-    const level = building?.levels[id];
-    return level ? [level] : [];
-  });
+  const levels = building ? orderedValues(building.levelOrder, building.levels) : [];
   const equipment = (building?.elementOrder ?? []).flatMap((id) => {
     const element = building?.elements[id];
     return element?.category === 'equipment' ? [element] : [];

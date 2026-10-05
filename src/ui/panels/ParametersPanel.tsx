@@ -1,21 +1,13 @@
 /**
  * @layer ui/panels
  *
- * ParametersPanel — lists `document.parameters`, supports editing expressions,
- * adding new parameters, and deleting existing ones.
- *
- * All mutations go through `dispatch`:
- *   - set_parameter  — create or update a parameter expression
- *   - delete_parameter — remove a parameter
- *
- * Shows the evaluated `value` alongside the `expression`. When a parameter has
- * an `error` the error message is displayed in red with an aria-live region.
- *
- * No business logic here — the component only gathers input and dispatches.
- * (PRIME DIRECTIVE, architecture L1, react R1)
+ * ParametersPanel — lists `document.parameters` with their evaluated value; edits expressions
+ * (set_parameter), adds parameters (set_parameter) and deletes them (delete_parameter).
+ * A parameter `error` is shown under its row in an aria-live region.
  */
 
 import React, { useRef, useState } from 'react';
+import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Parameter } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
@@ -163,13 +155,10 @@ interface ParametersPanelProps {
 
 export function ParametersPanel({ className }: ParametersPanelProps): React.ReactElement {
   const parameters = useStore((s) => s.document.parameters);
-  const paramList = Object.values(parameters).filter((p): p is Parameter => p != null);
+  const paramList = Object.values(parameters);
 
   return (
-    <aside
-      className={['panel params-panel', className].filter(Boolean).join(' ')}
-      aria-label="Parameters"
-    >
+    <aside className={classNames('panel params-panel', className)} aria-label="Parameters">
       <PanelHeader
         title="Parameters"
         count={paramList.length}

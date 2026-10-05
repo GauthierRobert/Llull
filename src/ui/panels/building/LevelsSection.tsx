@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
 import { PanelSection, IconButton } from '@ui/panels/PanelParts';
+import { orderedValues } from '@ui/panels/orderedValues';
 
 const EMPTY_LEVELS: ReadonlyArray<BuildingLevel> = [];
 
@@ -92,11 +93,7 @@ function AddLevelForm(): React.ReactElement {
 export function LevelsSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
-  const levels = building
-    ? building.levelOrder
-        .map((id) => building.levels[id])
-        .filter((level): level is BuildingLevel => level !== undefined)
-    : EMPTY_LEVELS;
+  const levels = building ? orderedValues(building.levelOrder, building.levels) : EMPTY_LEVELS;
   return (
     <PanelSection
       title="Levels"

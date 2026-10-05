@@ -1,19 +1,15 @@
 /**
  * @layer ui/components
  *
- * TopBar — 48px application header.
- *
- * Slots (left → right):
- *   - Sidebar toggle, brand mark + wordmark, file breadcrumbs
- *   - Command palette trigger (Ctrl/Cmd+K) — search every action and registry command
- *   - Agent pill (liveStatus), project Open/Save, Connect agent, theme toggle,
- *     inspector toggle
- *
- * No document mutation here — purely presentational (react R1).
+ * TopBar — application header: sidebar toggle, brand, file breadcrumbs, command-palette trigger
+ * (Ctrl/Cmd+K), agent pill (liveStatus), project / export / connect actions, theme and inspector
+ * toggles. Presentation only (react R1).
  */
 
 import React from 'react';
+import { classNames } from '@ui/classNames';
 import { useLayoutStore, usePaletteStore, useStore } from '@ui/store';
+import type { LiveStatus } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { ThemeToggle } from '@ui/components/ThemeToggle';
 import { ProjectIO } from '@ui/components/ProjectIO';
@@ -21,29 +17,19 @@ import { ModelExport } from '@ui/components/ModelExport';
 import { McpConnectButton } from '@ui/components/McpConnect';
 import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
 
-interface AgentPillProps {
-  status: 'connected' | 'connecting' | 'disconnected';
-}
-
-function AgentPill({ status }: AgentPillProps): React.ReactElement {
+function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
   const isConnected = status === 'connected';
   const isConnecting = status === 'connecting';
 
-  const label = isConnected
-    ? 'MCP agent: connected'
-    : isConnecting
-      ? 'MCP agent: connecting'
-      : 'MCP agent: disconnected';
+  const label = `MCP agent: ${status}`;
 
   return (
     <div
-      className={[
+      className={classNames(
         'agent-pill',
-        isConnected ? 'agent-pill--connected' : '',
-        isConnecting ? 'agent-pill--connecting' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        isConnected && 'agent-pill--connected',
+        isConnecting && 'agent-pill--connecting',
+      )}
       aria-label={label}
       title={label}
     >

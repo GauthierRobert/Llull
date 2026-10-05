@@ -1,20 +1,15 @@
 /**
  * @layer ui/components
  *
- * MeasurementHUD — an HTML overlay that displays the result of the most recent
- * read-only/query command (measure_distance, measure_angle, measure_area,
- * measure_perimeter, measure_bounding_box, measure_volume, mass_properties).
- *
- * Reads `lastMeasure` from the Zustand store (narrow selector — R3).
- * Renders nothing when there is no current measurement.
- * Dismissable via a close button that calls `clearLastMeasure()`.
- *
- * Presentation ONLY — never mutates the document (PRIME DIRECTIVE).
- * Styled with CSS variables from the design system.
+ * MeasurementHUD — overlay showing the result of the most recent read-only query command
+ * (`lastMeasure`: measure_distance / angle / area / perimeter / bounding_box / volume,
+ * mass_properties). Renders nothing without a measurement; the close button clears it.
+ * Presentation ONLY (PRIME DIRECTIVE).
  */
 
 import React from 'react';
 import { useStore } from '@ui/store';
+import { isRecord } from '@lib/isRecord';
 import { Icon } from './Icon';
 
 interface DistanceData {
@@ -49,47 +44,43 @@ interface MassPropertiesData {
   unit: string;
 }
 
-function isDistanceData(d: unknown): d is DistanceData {
+/** Shape probe: an object holding every `required` key and none of the `forbidden` ones. */
+function hasShape(
+  data: unknown,
+  required: readonly string[],
+  forbidden: readonly string[] = [],
+): boolean {
   return (
-    typeof d === 'object' &&
-    d !== null &&
-    'distance' in d &&
-    'unit' in d &&
-    !('area' in d) &&
-    !('perimeter' in d) &&
-    !('volume' in d)
+    isRecord(data) && required.every((key) => key in data) && !forbidden.some((key) => key in data)
   );
 }
 
-function isAngleData(d: unknown): d is AngleData {
-  return typeof d === 'object' && d !== null && 'degrees' in d && 'radians' in d;
+function isDistanceData(data: unknown): data is DistanceData {
+  return hasShape(data, ['distance', 'unit'], ['area', 'perimeter', 'volume']);
 }
 
-function isAreaData(d: unknown): d is AreaData {
-  return typeof d === 'object' && d !== null && 'area' in d && 'unit' in d;
+function isAngleData(data: unknown): data is AngleData {
+  return hasShape(data, ['degrees', 'radians']);
 }
 
-function isPerimeterData(d: unknown): d is PerimeterData {
-  return typeof d === 'object' && d !== null && 'perimeter' in d && 'unit' in d;
+function isAreaData(data: unknown): data is AreaData {
+  return hasShape(data, ['area', 'unit']);
 }
 
-function isBoundingBoxData(d: unknown): d is BoundingBoxData {
-  return typeof d === 'object' && d !== null && 'min' in d && 'max' in d && 'size' in d;
+function isPerimeterData(data: unknown): data is PerimeterData {
+  return hasShape(data, ['perimeter', 'unit']);
 }
 
-function isVolumeData(d: unknown): d is VolumeData {
-  return typeof d === 'object' && d !== null && 'volume' in d && 'unit' in d && !('density' in d);
+function isBoundingBoxData(data: unknown): data is BoundingBoxData {
+  return hasShape(data, ['min', 'max', 'size']);
 }
 
-function isMassPropertiesData(d: unknown): d is MassPropertiesData {
-  return (
-    typeof d === 'object' &&
-    d !== null &&
-    'volume' in d &&
-    'density' in d &&
-    'mass' in d &&
-    'unit' in d
-  );
+function isVolumeData(data: unknown): data is VolumeData {
+  return hasShape(data, ['volume', 'unit'], ['density']);
+}
+
+function isMassPropertiesData(data: unknown): data is MassPropertiesData {
+  return hasShape(data, ['volume', 'density', 'mass', 'unit']);
 }
 
 function fmt(n: number, precision = 3): string {

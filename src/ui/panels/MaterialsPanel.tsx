@@ -1,19 +1,12 @@
 /**
  * @layer ui/panels
  *
- * MaterialsPanel — lists `document.materials`, lets the user create new materials,
- * and assign the selected material to the currently selected entities.
- *
- * All mutations go through `dispatch`:
- *   - create_material  — define or replace a named material
- *   - assign_material  — assign a material name to selected entity ids
- *
- * Displays each material's color swatch, name, and density.
- * No business logic — the component only gathers input and dispatches.
- * (PRIME DIRECTIVE, architecture L1, react R1)
+ * MaterialsPanel — lists `document.materials` (swatch, name, density); creates
+ * (create_material) and assigns them to the selection (assign_material).
  */
 
 import React, { useState } from 'react';
+import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
@@ -85,15 +78,25 @@ function MaterialRow({
   );
 }
 
-const DEFAULT_COLOR = '#b0b0b0';
+const EMPTY_FORM = {
+  name: '',
+  density: '',
+  color: '#b0b0b0',
+  metalness: '0.08',
+  roughness: '0.45',
+};
+
+/** NaN is outside the interval. */
+const isUnitInterval = (value: number): boolean => value >= 0 && value <= 1;
 
 function CreateMaterialForm(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const [name, setName] = useState('');
-  const [density, setDensity] = useState('');
-  const [color, setColor] = useState(DEFAULT_COLOR);
-  const [metalness, setMetalness] = useState('0.08');
-  const [roughness, setRoughness] = useState('0.45');
+  const [form, setForm] = useState(EMPTY_FORM);
+  const { name, density, color, metalness, roughness } = form;
+  const setField =
+    (field: keyof typeof EMPTY_FORM) =>
+    (e: React.ChangeEvent<HTMLInputElement>): void =>
+      setForm((previous) => ({ ...previous, [field]: e.target.value }));
 
   const densityNum = parseFloat(density);
   const metalnessNum = parseFloat(metalness);
@@ -101,15 +104,10 @@ function CreateMaterialForm(): React.ReactElement {
 
   const isValid =
     name.trim() !== '' &&
-    !isNaN(densityNum) &&
     densityNum > 0 &&
     isHexColor(color) &&
-    !isNaN(metalnessNum) &&
-    metalnessNum >= 0 &&
-    metalnessNum <= 1 &&
-    !isNaN(roughnessNum) &&
-    roughnessNum >= 0 &&
-    roughnessNum <= 1;
+    isUnitInterval(metalnessNum) &&
+    isUnitInterval(roughnessNum);
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -121,11 +119,7 @@ function CreateMaterialForm(): React.ReactElement {
       metalness: metalnessNum,
       roughness: roughnessNum,
     });
-    setName('');
-    setDensity('');
-    setColor(DEFAULT_COLOR);
-    setMetalness('0.08');
-    setRoughness('0.45');
+    setForm(EMPTY_FORM);
   };
 
   return (
@@ -147,7 +141,7 @@ function CreateMaterialForm(): React.ReactElement {
           type="text"
           className="material-create-input"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={setField('name')}
           placeholder="e.g. steel, pla"
           aria-label="New material name"
           autoComplete="off"
@@ -165,7 +159,7 @@ function CreateMaterialForm(): React.ReactElement {
           min="0"
           className="material-create-input"
           value={density}
-          onChange={(e) => setDensity(e.target.value)}
+          onChange={setField('density')}
           placeholder="e.g. 0.00785"
           aria-label="Material density (g/mm³)"
           autoComplete="off"
@@ -181,7 +175,7 @@ function CreateMaterialForm(): React.ReactElement {
           type="color"
           className="material-create-color-picker"
           value={color}
-          onChange={(e) => setColor(e.target.value)}
+          onChange={setField('color')}
           aria-label="Material color"
         />
         <span className="material-create-color-hex" aria-hidden="true">
@@ -201,7 +195,7 @@ function CreateMaterialForm(): React.ReactElement {
           step="0.01"
           className="material-create-range"
           value={metalness}
-          onChange={(e) => setMetalness(e.target.value)}
+          onChange={setField('metalness')}
           aria-label="Material metalness (0 to 1)"
           aria-valuemin={0}
           aria-valuemax={1}
@@ -221,7 +215,7 @@ function CreateMaterialForm(): React.ReactElement {
           step="0.01"
           className="material-create-range"
           value={roughness}
-          onChange={(e) => setRoughness(e.target.value)}
+          onChange={setField('roughness')}
           aria-label="Material roughness (0 to 1)"
           aria-valuemin={0}
           aria-valuemax={1}
@@ -249,7 +243,7 @@ interface MaterialsPanelProps {
 export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactElement {
   const materials = useStore((s) => s.document.materials);
   const selection = useStore((s) => s.document.selection);
-  const materialList = Object.values(materials).filter((m): m is Material => m != null);
+  const materialList = Object.values(materials);
 
   const [activeMaterialName, setActiveMaterialName] = useState<string | null>(null);
 
@@ -257,10 +251,7 @@ export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactE
     setActiveMaterialName((prev) => (prev === name ? null : name));
 
   return (
-    <aside
-      className={['panel materials-panel', className].filter(Boolean).join(' ')}
-      aria-label="Materials"
-    >
+    <aside className={classNames('panel materials-panel', className)} aria-label="Materials">
       <PanelHeader
         title="Materials"
         count={materialList.length}

@@ -43,18 +43,13 @@ const KEYS_3D: Readonly<Record<string, GizmoMode>> = {
   s: 'scale',
 };
 
-/** Display key for each draw tool, as shown in tooltips (undefined = no single-key shortcut). */
-export const DRAW_TOOL_KEYS: Readonly<Partial<Record<DrawToolKind, string>>> = {
-  none: 'V',
-  move: 'M',
-  line: 'L',
-  polyline: 'P',
-  wall: 'W',
-  circle: 'C',
-  rectangle: 'R',
-  spline: 'S',
-  point: '.',
-};
+/** Display key for each draw tool, derived from the lookup tables so an advertised key always works. */
+export const DRAW_TOOL_KEYS: Readonly<Partial<Record<DrawToolKind, string>>> = Object.fromEntries(
+  [...Object.entries(DRAW_KEYS), ...Object.entries(KEYS_2D)].map(([key, tool]) => [
+    tool,
+    key.toUpperCase(),
+  ]),
+);
 
 /** Display key for each gizmo mode in the 3D view. */
 export const GIZMO_KEYS: Readonly<Record<GizmoMode, string>> = {

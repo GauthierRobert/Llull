@@ -3,18 +3,8 @@
  *
  * Render-only viewport presentation state — NOT part of CadDocument.
  *
- * Tracks:
- *   - `displayMode` — shaded / wireframe / x-ray render mode.
- *   - `clipPlane`   — optional axis-aligned section plane for revealing solid interiors.
- *   - `hiddenEntityIds` — entity ids suppressed from the 3D render (UI-only visibility override).
- *   - `qualityOverride` — user-selected render quality tier (or 'auto' to derive from entity count).
- *   - `animationPlaying` — global play/pause for `trigger:'auto'` animations.
- *   - `activeClickAnimationIds` — set of `trigger:'click'` animation ids currently toggled on.
- *   - `animationResetNonce` — bumped by `resetAnimations()` to tell the player to zero its phase accumulators.
- *
- * PRIME DIRECTIVE: no document mutations ever happen here.
- * These are pure presentation/render overrides; they are never serialised
- * into CadDocument and never touch the command layer.
+ * PRIME DIRECTIVE: no document mutations ever happen here. These are pure presentation/render
+ * overrides; they are never serialised into CadDocument and never touch the command layer.
  */
 
 import { create } from 'zustand';
@@ -40,144 +30,72 @@ export type QualityOverride = QualityTier | 'auto';
 /** Which world axis the section plane is normal to. */
 export type ClipAxis = 'x' | 'y' | 'z';
 
-/** Section-plane state — all fields are render-only. */
 interface ClipPlaneState {
-  /** Whether the clipping plane is active. */
   enabled: boolean;
   /** Axis the plane is normal to. Default: 'z' (horizontal cut, Z-up). */
   axis: ClipAxis;
-  /**
-   * Signed offset along the axis in world units.
-   * Positive = moved in the positive-axis direction.
-   */
+  /** Signed offset along the axis in world units. */
   offset: number;
   /** When true the plane normal is flipped (cuts the other half). */
   flipped: boolean;
 }
 
-/** Identifies a selected mechanism item for overlay rendering. */
-type MechanismSelectionKind = 'constraint' | 'joint';
-
 /** Currently highlighted constraint or joint in the MechanismsPanel. */
 interface MechanismSelection {
-  kind: MechanismSelectionKind;
+  kind: 'constraint' | 'joint';
   id: string;
 }
 
 interface ViewportStoreState {
-  /** Active render style for all 3D solid entities. Default: 'shaded'. */
   displayMode: DisplayMode;
-
-  /** Section plane configuration. */
   clipPlane: ClipPlaneState;
 
-  /** Set of entity ids suppressed from the 3D render. Never touches the document. */
+  /** Entity ids suppressed from the 3D render. Never touches the document. */
   hiddenEntityIds: ReadonlySet<EntityId>;
 
   /**
-   * Set of layer ids locally hidden from the viewport.
-   * This is a pure render override — it does NOT dispatch set_layer_visibility
-   * and does NOT touch the server document. A local viewer convenience.
+   * Layer ids locally hidden from the viewport — a pure render override: it does NOT dispatch
+   * set_layer_visibility and does NOT touch the server document.
    */
   hiddenLayerIds: ReadonlySet<string>;
 
-  /**
-   * User-selected quality override. Default: 'auto'.
-   * 'auto' derives the tier from document.order.length via deriveQualityTier().
-   * Explicit values pin the tier regardless of entity count.
-   * Stored as a viewer preference — never serialised into CadDocument.
-   */
+  /** 'auto' derives the tier from document.order.length via deriveQualityTier(); explicit values pin it. */
   qualityOverride: QualityOverride;
 
-  /**
-   * Whether 3D object snapping is active during gizmo translate drags.
-   * Render-only flag — never serialised into CadDocument.
-   * Default: true.
-   */
+  /** Whether 3D object snapping is active during gizmo translate drags. */
   snap3dEnabled: boolean;
 
-  /**
-   * Global play/pause for `trigger:'auto'` animations.
-   * `trigger:'click'` animations are controlled independently via `activeClickAnimationIds`.
-   * Default: false.
-   */
+  /** Global play/pause for `trigger:'auto'` animations. */
   animationPlaying: boolean;
 
-  /**
-   * Set of animation ids (whose `trigger === 'click'`) that are currently toggled ON.
-   * A click on a target entity adds/removes its animation ids from this set.
-   * Render-only — never serialised into CadDocument.
-   */
+  /** Ids of `trigger:'click'` animations currently toggled ON (a click on a target entity flips its ids). */
   activeClickAnimationIds: ReadonlySet<string>;
 
   /**
-   * Bumped by `resetAnimations()` to signal the AnimationPlayer to zero all
-   * phase accumulators on the next frame. An incrementing integer is used so
-   * any subscriber can detect the bump with a simple reference comparison.
-   * Default: 0.
+   * Bumped by `resetAnimations()` to signal the AnimationPlayer to zero all phase accumulators on
+   * the next frame; an incrementing integer lets any subscriber detect the bump by comparison.
    */
   animationResetNonce: number;
 
-  /**
-   * Currently highlighted mechanism item (constraint or joint) for the 3D overlay.
-   * Null when no mechanism item is selected in the panel.
-   * UI-only state — never serialised into CadDocument.
-   */
+  /** Highlighted mechanism item for the 3D overlay; null when none is selected in the panel. */
   mechanismSelection: MechanismSelection | null;
 
-  /** Set the global display mode ('shaded' | 'wireframe' | 'xray'). */
   setDisplayMode(mode: DisplayMode): void;
 
-  /** Update clip-plane fields (partial update; unchanged fields are preserved). */
+  /** Partial update; unchanged fields are preserved. */
   setClipPlane(patch: Partial<ClipPlaneState>): void;
-
-  /** Toggle the clip plane on/off. */
   toggleClipPlane(): void;
-
-  /**
-   * Toggle a single entity's render-visibility.
-   * Hidden → visible: removes from the set.
-   * Visible → hidden: adds to the set.
-   */
   toggleEntityVisibility(id: EntityId): void;
-
-  /** Make all hidden entities visible again. */
   showAllEntities(): void;
-
-  /**
-   * Toggle a layer's local viewport visibility.
-   * Does NOT dispatch any command — purely a render-side filter.
-   */
   toggleLayerVisibility(layerId: string): void;
-
-  /** Toggle 3D object snapping on/off. */
   toggleSnap3d(): void;
-
-  /** Set the quality override ('high' | 'medium' | 'low' | 'auto'). */
   setQualityOverride(quality: QualityOverride): void;
-
-  /** Toggle global animation playback (Play ↔ Pause for `trigger:'auto'` animations). */
   toggleAnimationPlaying(): void;
-
-  /** Explicitly set global animation playback state. */
   setAnimationPlaying(playing: boolean): void;
 
-  /**
-   * Stop playback, clear all active click animations, and bump the reset nonce
-   * so the AnimationPlayer zeroes all phase accumulators on the next frame.
-   */
+  /** Stop playback, clear active click animations and bump the reset nonce. */
   resetAnimations(): void;
-
-  /**
-   * Add or remove an animation id from `activeClickAnimationIds`.
-   * If the id is already in the set it is removed (toggle off); otherwise it is added (toggle on).
-   */
   toggleClickAnimation(animId: string): void;
-
-  /**
-   * Set the highlighted mechanism item (constraint/joint) for the 3D overlay.
-   * Pass null to clear the selection.
-   */
   setMechanismSelection(selection: MechanismSelection | null): void;
 }
 
@@ -188,6 +106,13 @@ const DEFAULT_CLIP_PLANE: ClipPlaneState = {
   flipped: false,
 };
 
+/** A copy of `members` with `member` removed if present, else added. */
+function toggled<Member>(members: ReadonlySet<Member>, member: Member): Set<Member> {
+  const next = new Set(members);
+  if (!next.delete(member)) next.add(member);
+  return next;
+}
+
 export const useViewportStore = create<ViewportStoreState>()((set) => ({
   displayMode: 'shaded',
   clipPlane: DEFAULT_CLIP_PLANE,
@@ -196,7 +121,6 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   snap3dEnabled: true,
   qualityOverride: 'auto',
 
-  // Animation runtime defaults
   animationPlaying: false,
   activeClickAnimationIds: new Set<string>(),
   animationResetNonce: 0,
@@ -218,15 +142,7 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   },
 
   toggleEntityVisibility(id: EntityId): void {
-    set((state) => {
-      const next = new Set(state.hiddenEntityIds);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return { hiddenEntityIds: next };
-    });
+    set((state) => ({ hiddenEntityIds: toggled(state.hiddenEntityIds, id) }));
   },
 
   showAllEntities(): void {
@@ -234,15 +150,7 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   },
 
   toggleLayerVisibility(layerId: string): void {
-    set((state) => {
-      const next = new Set(state.hiddenLayerIds);
-      if (next.has(layerId)) {
-        next.delete(layerId);
-      } else {
-        next.add(layerId);
-      }
-      return { hiddenLayerIds: next };
-    });
+    set((state) => ({ hiddenLayerIds: toggled(state.hiddenLayerIds, layerId) }));
   },
 
   toggleSnap3d(): void {
@@ -270,15 +178,7 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   },
 
   toggleClickAnimation(animId: string): void {
-    set((state) => {
-      const next = new Set(state.activeClickAnimationIds);
-      if (next.has(animId)) {
-        next.delete(animId);
-      } else {
-        next.add(animId);
-      }
-      return { activeClickAnimationIds: next };
-    });
+    set((state) => ({ activeClickAnimationIds: toggled(state.activeClickAnimationIds, animId) }));
   },
 
   setMechanismSelection(selection: MechanismSelection | null): void {

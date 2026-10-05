@@ -49,9 +49,22 @@ export function txt(key: string, label: string, defaultValue = '', optional = fa
   return { key, label, kind: 'text', defaultValue, optional };
 }
 
+export function select(
+  key: string,
+  label: string,
+  defaultValue: string,
+  options: NonNullable<ToolField['options']>,
+): ToolField {
+  return { key, label, kind: 'select', defaultValue, options };
+}
+
+export function checkbox(key: string, label: string, checked: boolean): ToolField {
+  return { key, label, kind: 'checkbox', defaultValue: String(checked) };
+}
+
 /** Level selector: blank = the active level, else a level id (relative z / placement is on it). */
 export function levelField(): ToolField {
-  return { key: 'levelId', label: 'Level', kind: 'select', defaultValue: '', options: 'levels' };
+  return select('levelId', 'Level', '', 'levels');
 }
 
 /** Select field with a blank "Default" first option: blank = omit the param, the command default applies. */
@@ -63,13 +76,16 @@ export function defaultedSelect(
   showWhen?: ToolField['showWhen'],
 ): ToolField {
   return {
-    key,
-    label,
-    kind: 'select',
-    defaultValue: '',
-    options: [['', blankLabel], ...options],
+    ...select(key, label, '', [['', blankLabel], ...options]),
     ...(showWhen !== undefined ? { showWhen } : {}),
   };
+}
+
+/** Picker group of the steel hall / plant tools. */
+export const INDUSTRIAL_TOOL_GROUP = 'Industrial / steel';
+
+export function radians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
 }
 
 export function isFieldShown(field: ToolField, values: Readonly<Record<string, string>>): boolean {
@@ -82,6 +98,11 @@ export class FieldReader {
   readonly missing: string[] = [];
 
   constructor(private readonly values: Readonly<Record<string, string>>) {}
+
+  /** Two numeric fields as an `[x, y]` point. */
+  point(xKey: string, yKey: string): [number, number] {
+    return [this.number(xKey), this.number(yKey)];
+  }
 
   number(key: string): number {
     const value = Number(this.values[key]);

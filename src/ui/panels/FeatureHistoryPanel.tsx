@@ -1,22 +1,13 @@
 /**
  * @layer ui/panels
  *
- * FeatureHistoryPanel — a timeline list of `document.featureHistory` steps.
- *
- * Per step:
- *   - Toggle suppress → dispatch('set_step_suppressed', { stepId, suppressed })
- *   - Reorder up/down → dispatch('reorder_step', { stepId, newIndex })
- *   - Delete → dispatch('delete_step', { stepId })
- *   - Replay → dispatch('replay_history', {})
- * Label is shown read-only: no rename_step command exists yet (future command-author work).
- *
- * Only the suppressed toggle is inline; the other destructive actions use buttons per row.
- *
- * No business logic here — the component only gathers input and dispatches.
- * (PRIME DIRECTIVE, architecture L1, react R1)
+ * FeatureHistoryPanel — timeline of `document.featureHistory` steps.
+ * Dispatches: set_step_suppressed, reorder_step, delete_step, replay_history.
+ * The step label is read-only: no rename_step command exists yet.
  */
 
 import React from 'react';
+import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { FeatureStep } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
@@ -36,7 +27,10 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
 
   return (
     <li
-      className={`panel__row history-step${isSuppressed ? ' history-step--suppressed' : ''}`}
+      className={classNames(
+        'panel__row panel__row--overlay-actions history-step',
+        isSuppressed && 'history-step--suppressed',
+      )}
       data-testid={`history-step-${step.id}`}
       aria-label={`Step ${index + 1}: ${displayLabel}${isSuppressed ? ' (suppressed)' : ''}`}
     >
@@ -103,10 +97,7 @@ export function FeatureHistoryPanel({ className }: FeatureHistoryPanelProps): Re
   const suppressedCount = featureHistory.filter((s) => s.suppressed === true).length;
 
   return (
-    <aside
-      className={['panel history-panel', className].filter(Boolean).join(' ')}
-      aria-label="Feature history"
-    >
+    <aside className={classNames('panel history-panel', className)} aria-label="Feature history">
       <PanelHeader title="History" count={stepCount} countLabel={`${stepCount} steps`}>
         {suppressedCount > 0 && (
           <span className="chip chip--warning" title={`${suppressedCount} suppressed`}>

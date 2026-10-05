@@ -11,6 +11,7 @@ import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import type { CostLine } from '@aec/index';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { OptionSelect, capitalize } from '@ui/panels/OptionSelect';
 import { downloadText } from '@ui/download';
 
 const UNIT_LABEL: Readonly<Record<string, string>> = {
@@ -159,18 +160,13 @@ export function QuantitiesSection(): React.ReactElement {
         </button>
       </div>
       <div className="building-inline-form">
-        <select
+        <OptionSelect
           value={schedule}
-          onChange={(event) => setSchedule(event.target.value as (typeof SCHEDULES)[number])}
-          aria-label="Schedule"
-        >
-          {SCHEDULES.map((kind) => (
-            <option key={kind} value={kind}>
-              {kind[0]?.toUpperCase()}
-              {kind.slice(1)} schedule
-            </option>
-          ))}
-        </select>
+          options={SCHEDULES}
+          label="Schedule"
+          optionLabel={(kind) => `${capitalize(kind)} schedule`}
+          onChange={setSchedule}
+        />
         <button type="button" className="btn btn--ghost btn--sm" onClick={downloadSchedule}>
           Schedule CSV
         </button>

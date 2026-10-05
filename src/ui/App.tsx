@@ -1,23 +1,9 @@
 /**
  * @layer ui
  *
- * App shell — the outermost layout component.
- *
- * Layout grid (4 rows):
- *   - Row 0: TopBar — brand, file, workspace tabs, agent status, project + theme actions.
- *   - Row 1: Toolbar — select/transform, 3D solids, 2D drawing, edit actions.
- *   - Row 2: Content — icon-rail Sidebar (document browser panels) docked left,
- *             viewport (with contextual HintBar) in the middle, Properties inspector right.
- *   - Row 3: StatusBar — live-connection indicator, last command, counts, units.
- *
- * The human builds and edits directly (toolbar, viewport, properties) and an MCP agent can
- * drive the same document; both go through the command layer.
- *
- * Theme: reads the active theme from useThemeStore and applies it as
- * `data-theme` on <html> and the root <div> so CSS variables cascade everywhere.
- *
- * View mode (2D / 3D) lives in useToolStore — presentation only, never document
- * state (architecture L7).
+ * App shell: top bar, toolbar, content row (sidebar | viewport with hint bar | inspector), status
+ * bar. View mode (2D / 3D) lives in useToolStore (architecture L7); the theme is mirrored to
+ * `data-theme` on <html> so portals inherit it. Edits go through the command layer.
  */
 
 import React, { useEffect } from 'react';

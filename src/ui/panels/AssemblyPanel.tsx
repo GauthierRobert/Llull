@@ -2,26 +2,17 @@
  * @layer ui/panels
  *
  * AssemblyPanel — component library + instance tree.
- *
- * Section A — Components: lists all entries in `doc.components` with their
- *   name, entity count, and an "Insert" button that dispatches `insert_instance`
- *   at the world origin with a fresh id.
- *
- * Section B — Instances: lists all entities with `kind === 'instance'`, showing
- *   the component name, position, and selection state. Clicking a row selects
- *   the instance. Each row has an "Explode" button that dispatches `explode_instance`.
- *
- * Pure presentation — never mutates the document directly (PRIME DIRECTIVE).
- * All document changes are routed through `store.dispatch(name, params)`.
- *
- * @see create_component, insert_instance, explode_instance
+ * Components: name, entity count, "Insert" (insert_instance at the origin).
+ * Instances: component name + position; click selects, "Explode" dispatches explode_instance.
  */
 
 import React from 'react';
+import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Component, InstanceEntity } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
+import { orderedValues } from '@ui/panels/orderedValues';
 
 interface ComponentRowProps {
   component: Component;
@@ -127,19 +118,16 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
   const order = useStore((s) => s.document.order);
   const selection = useStore((s) => s.document.selection);
 
-  const componentList = Object.values(components).filter(Boolean) as Component[];
+  const componentList = Object.values(components);
 
-  const instanceList = order
-    .map((id) => entities[id])
-    .filter((e): e is InstanceEntity => e !== undefined && e.kind === 'instance');
+  const instanceList = orderedValues(order, entities).filter(
+    (entity): entity is InstanceEntity => entity.kind === 'instance',
+  );
 
   const selectionSet = new Set(selection);
 
   return (
-    <aside
-      className={['panel assembly-panel', className].filter(Boolean).join(' ')}
-      aria-label="Assembly"
-    >
+    <aside className={classNames('panel assembly-panel', className)} aria-label="Assembly">
       <PanelHeader title="Assembly" />
       <PanelSection
         title="Components"

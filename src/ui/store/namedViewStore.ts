@@ -1,20 +1,15 @@
 /**
  * @layer ui/store
  *
- * Named-view store — camera bookmarks for the 3D viewport.
- *
- * Stores a list of user-named camera positions (position + target).
- * Persists to localStorage so bookmarks survive page reloads — guards
- * for unavailable storage (sandboxed iframes, test environments).
- *
- * This is UI-only presentation state, intentionally NOT part of CadDocument
- * Named views hold only
- * camera position/target; they do not encode document content.
+ * Named-view store — user-named camera bookmarks (position + target) for the 3D viewport,
+ * persisted to localStorage. UI-only presentation state, intentionally NOT part of CadDocument.
  *
  * PRIME DIRECTIVE: no document mutations ever happen here.
  */
 
 import { create } from 'zustand';
+import { isRecord } from '@lib/isRecord';
+import { readStored, writeStored } from './persistence';
 
 /** Minimal camera bookmark: eye position + orbit target in world space. */
 export interface NamedViewCamera {
@@ -35,69 +30,45 @@ interface NamedView {
 const STORAGE_KEY = 'llull-named-views';
 
 function readStoredViews(): NamedView[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    // Basic shape validation — discard malformed entries.
-    return parsed.filter(
-      (v): v is NamedView =>
-        typeof v === 'object' &&
-        v !== null &&
-        typeof (v as Record<string, unknown>)['id'] === 'string' &&
-        typeof (v as Record<string, unknown>)['name'] === 'string' &&
-        typeof (v as Record<string, unknown>)['camera'] === 'object',
-    );
-  } catch {
-    // localStorage unavailable or JSON malformed — start fresh.
-    return [];
-  }
-}
-
-function persistViews(views: NamedView[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(views));
-  } catch {
-    // ignore — storage quota exceeded or unavailable
-  }
+  const stored = readStored(STORAGE_KEY);
+  // Basic shape validation — discard malformed entries.
+  return Array.isArray(stored)
+    ? stored.filter(
+        (view): view is NamedView =>
+          isRecord(view) &&
+          typeof view.id === 'string' &&
+          typeof view.name === 'string' &&
+          typeof view.camera === 'object',
+      )
+    : [];
 }
 
 function generateId(): string {
   return `nv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+type ApplyCamera = (
+  position: readonly [number, number, number],
+  target: readonly [number, number, number],
+) => void;
+
 interface NamedViewStoreState {
-  /** Current list of saved named views, in creation order. */
+  /** Saved named views, in creation order. */
   namedViews: NamedView[];
 
   /**
-   * Capture the current camera and save it as a named view.
-   * `getCameraSnapshot` is a callback injected by the inner Canvas component
-   * (via the bridge ref) that returns the live camera position and target.
-   * Returns the new view's id, or null if the snapshot could not be captured.
+   * Save the camera returned by `getCameraSnapshot` (injected by the inner Canvas component) as a
+   * named view. Returns the new view's id, or null if the snapshot could not be captured.
    */
   saveNamedView(name: string, getCameraSnapshot: () => NamedViewCamera | null): string | null;
 
   /**
-   * Restore a previously saved named view by id.
-   * `applyCamera` is a callback injected by the inner Canvas component
-   * that drives OrbitControls + calls update() + invalidate().
-   * No-ops silently if the id is not found or the callback is unavailable.
+   * Restore a saved view through `applyCamera` (injected by the inner Canvas component; drives
+   * OrbitControls). No-op if the id is not found or the callback is unavailable.
    */
-  restoreNamedView(
-    id: string,
-    applyCamera:
-      | ((
-          position: readonly [number, number, number],
-          target: readonly [number, number, number],
-        ) => void)
-      | null,
-  ): void;
+  restoreNamedView(id: string, applyCamera: ApplyCamera | null): void;
 
-  /**
-   * Delete a saved named view by id. No-op if the id is not found.
-   */
+  /** Delete a saved named view by id. No-op if the id is not found. */
   deleteNamedView(id: string): void;
 }
 
@@ -116,22 +87,14 @@ export const useNamedViewStore = create<NamedViewStoreState>()((set, get) => ({
 
     set((state) => {
       const next = [...state.namedViews, newView];
-      persistViews(next);
+      writeStored(STORAGE_KEY, next);
       return { namedViews: next };
     });
 
     return newView.id;
   },
 
-  restoreNamedView(
-    id: string,
-    applyCamera:
-      | ((
-          position: readonly [number, number, number],
-          target: readonly [number, number, number],
-        ) => void)
-      | null,
-  ): void {
+  restoreNamedView(id: string, applyCamera: ApplyCamera | null): void {
     if (!applyCamera) return;
     const view = get().namedViews.find((v) => v.id === id);
     if (!view) return;
@@ -141,7 +104,7 @@ export const useNamedViewStore = create<NamedViewStoreState>()((set, get) => ({
   deleteNamedView(id: string): void {
     set((state) => {
       const next = state.namedViews.filter((v) => v.id !== id);
-      persistViews(next);
+      writeStored(STORAGE_KEY, next);
       return { namedViews: next };
     });
   },

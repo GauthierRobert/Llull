@@ -16,7 +16,7 @@ import type { CadDocument, EntityId } from '@core/model/types';
 import { flushOutbox, onSseDisconnected, resetSyncBookkeeping, withLocalSelection } from './outbox';
 import { isLocalMode, refuseDuringSync, runLocally, stepLocalHistory } from './localMode';
 import { postDispatch, postHistoryStep } from './onlineMode';
-import type { CadStoreState, DispatchOptions } from './storeTypes';
+import type { CadStoreState, DispatchOptions, LiveStatus } from './storeTypes';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import { applyLiveCommand } from '@mcp/liveSync';
 
@@ -125,7 +125,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
       return true;
     },
 
-    setLiveStatus(status: 'connecting' | 'connected' | 'disconnected'): void {
+    setLiveStatus(status: LiveStatus): void {
       set(
         status === 'connected'
           ? { liveStatus: status, sseEverConnected: true }
