@@ -7,7 +7,6 @@
  * COUPLING: camera-driving code must `invalidate()` + `controls.update()` so this frame runs.
  */
 
-import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
@@ -15,18 +14,12 @@ import { shouldRebase, snapOriginToTarget } from './3d/floatingOrigin';
 
 export function RenderOriginSyncer(): null {
   const { camera, controls } = useThree();
-  const renderOrigin = useStore((s) => s.renderOrigin);
-  const setRenderOrigin = useStore((s) => s.setRenderOrigin);
-
-  const originRef = useRef<[number, number, number]>(renderOrigin);
-  useEffect(() => {
-    originRef.current = renderOrigin;
-  }, [renderOrigin]);
 
   useFrame(() => {
     const orbit = controls as OrbitControlsImpl | null;
     if (!orbit?.target) return;
-    const origin = originRef.current;
+    // Read per frame: the store updates synchronously, so a rebase is visible to the next frame.
+    const { renderOrigin: origin, setRenderOrigin } = useStore.getState();
     const worldTarget: [number, number, number] = [
       orbit.target.x + origin[0],
       orbit.target.y + origin[1],
@@ -44,7 +37,6 @@ export function RenderOriginSyncer(): null {
     orbit.target.y -= dy;
     orbit.target.z -= dz;
     orbit.update();
-    originRef.current = newOrigin;
     setRenderOrigin(newOrigin);
   });
 

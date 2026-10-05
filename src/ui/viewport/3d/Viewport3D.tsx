@@ -7,10 +7,8 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+// First among the three.js imports: its three-mesh-bvh typings must win over drei's older copy.
 import { ensureBvhSetup } from './bvhSetup';
-
-// Engage BVH prototype patch once at module load — idempotent, safe under StrictMode.
-ensureBvhSetup();
 import { Canvas, useThree } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -20,12 +18,11 @@ import {
   PerspectiveCamera,
 } from '@react-three/drei';
 import * as THREE from 'three';
-import { useStore } from '@ui/store';
-import { useToolStore, useViewportStore } from '@ui/store';
+import { useStore, useToolStore, useViewportStore } from '@ui/store';
+import type { GizmoMode } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo } from './TransformGizmo';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
-import type { GizmoMode } from '@ui/store';
 import { ViewPresetsInner, ViewPresetsOverlay } from './ViewPresets';
 import { NamedViewsInner } from './NamedViews';
 import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
@@ -39,35 +36,31 @@ import { MechanismOverlay } from './MechanismOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator } from '../StoreInvalidator';
 
+// Engage BVH prototype patch once at module load — idempotent, safe under StrictMode.
+ensureBvhSetup();
+
 /**
- * Subscribes to the viewport store (displayMode, clipPlane, hiddenEntityIds)
+ * Subscribes to the viewport store (displayMode, clipPlane, hiddenEntityIds, qualityOverride)
  * and calls r3f invalidate() on any change so the Canvas repaints under
- * frameloop="demand". Pattern mirrors StoreInvalidator above.
+ * frameloop="demand". Pattern mirrors StoreInvalidator.
  */
 function ViewportStoreInvalidator(): null {
   const invalidate = useThree((s) => s.invalidate);
 
-  useEffect(() => {
-    let prevMode = useViewportStore.getState().displayMode;
-    let prevClip = useViewportStore.getState().clipPlane;
-    let prevHidden = useViewportStore.getState().hiddenEntityIds;
-    let prevQuality = useViewportStore.getState().qualityOverride;
-
-    return useViewportStore.subscribe((state) => {
-      if (
-        state.displayMode !== prevMode ||
-        state.clipPlane !== prevClip ||
-        state.hiddenEntityIds !== prevHidden ||
-        state.qualityOverride !== prevQuality
-      ) {
-        prevMode = state.displayMode;
-        prevClip = state.clipPlane;
-        prevHidden = state.hiddenEntityIds;
-        prevQuality = state.qualityOverride;
-        invalidate();
-      }
-    });
-  }, [invalidate]);
+  useEffect(
+    () =>
+      useViewportStore.subscribe((state, previous) => {
+        if (
+          state.displayMode !== previous.displayMode ||
+          state.clipPlane !== previous.clipPlane ||
+          state.hiddenEntityIds !== previous.hiddenEntityIds ||
+          state.qualityOverride !== previous.qualityOverride
+        ) {
+          invalidate();
+        }
+      }),
+    [invalidate],
+  );
 
   return null;
 }
@@ -86,8 +79,6 @@ function SceneContents({
 }: SceneContentsProps): React.ReactElement {
   const document = useStore((s) => s.document);
   const renderOrigin = useStore((s) => s.renderOrigin);
-  const selection = useStore((s) => s.document.selection);
-  const allEntityIds = useStore((s) => s.document.order);
   const { camera: cam } = document;
 
   // R3 narrow selector: quality settings derived from entity count + user override.
@@ -96,12 +87,7 @@ function SceneContents({
 
   // Initial camera only: later camera changes are applied imperatively by CameraReactor.
   const [initialCamera] = useState(() => ({
-    position: sphericalToCartesian(
-      cam.target as [number, number, number],
-      cam.azimuth,
-      cam.polar,
-      cam.distance,
-    ),
+    position: sphericalToCartesian(cam.target, cam.azimuth, cam.polar, cam.distance),
     target: new THREE.Vector3(cam.target[0], cam.target[1], cam.target[2]),
   }));
 
@@ -149,13 +135,7 @@ function SceneContents({
       <RenderOriginSyncer />
       <AdaptiveClipping />
 
-      <ViewPresetsInner
-        entities={
-          document.entities as Record<string, { position: readonly [number, number, number] }>
-        }
-        selection={selection}
-        allEntityIds={allEntityIds}
-      />
+      <ViewPresetsInner />
 
       <NamedViewsInner />
 

@@ -1,25 +1,18 @@
 /**
  * @layer ui/viewport/3d
  *
- * Pure helpers for floating-origin / camera-relative rendering.
- *
- * three.js renders in float32. Geometry far from world (0,0,0) jitters because
- * vertex positions lose precision. The fix: render the scene relative to a
- * "render origin" that tracks the camera target. Document coordinates stay
- * double-precision; the offset is subtracted only at render time.
- *
- * These are pure functions so they can be unit-tested without a DOM/canvas.
+ * Pure helpers for floating-origin rendering. three.js renders in float32, so geometry far from
+ * world (0,0,0) jitters; the scene is rendered relative to a "render origin" that tracks the
+ * camera target. Document coordinates stay double-precision; the offset is subtracted only at
+ * render time.
  */
 
 import { distanceSq3 } from '@lib/vec3';
 
 /**
- * Returns true when the camera target has drifted far enough from the current
- * render origin to warrant rebasing.
- *
- * threshold: distance in world units beyond which we rebase (default 1e4).
- * Rebasing too eagerly causes a one-frame jump; too lazily causes jitter at
- * extreme distances. 1e4 keeps float32 error below ~1 mm for coordinates up to ~1e7.
+ * True when the camera target has drifted more than `threshold` world units (default 1e4) from the
+ * render origin. 1e4 keeps float32 error below ~1 mm for coordinates up to ~1e7; rebasing more
+ * eagerly causes a one-frame jump, less eagerly causes jitter.
  */
 export function shouldRebase(
   cameraTarget: readonly [number, number, number],
@@ -30,11 +23,8 @@ export function shouldRebase(
 }
 
 /**
- * Snap the render origin to the camera target, rounded to a grid to avoid
- * sub-unit micro-rebases on every pan. Grid size matches the rebase threshold.
- *
- * Snapping to a grid means the origin jumps in discrete steps, which avoids
- * accumulating floating-point drift in the offset itself.
+ * The camera target rounded to a `gridSize` grid (default = the rebase threshold), so the origin
+ * jumps in discrete steps instead of accumulating drift or micro-rebasing on every pan.
  */
 export function snapOriginToTarget(
   cameraTarget: readonly [number, number, number],
@@ -48,11 +38,7 @@ export function snapOriginToTarget(
 }
 
 /**
- * Subtract the render origin from an entity's world-space position so it is
- * expressed relative to the render origin. The result is what three.js receives
- * as the mesh position — float32-safe because the magnitude is bounded by the
- * rebase threshold.
- *
+ * `worldPos` relative to the render origin: the float32-safe mesh position three.js receives.
  * The DOCUMENT position is never touched — this is purely a render-time transform.
  */
 export function toRenderPosition(

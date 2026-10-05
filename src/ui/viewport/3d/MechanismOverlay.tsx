@@ -5,13 +5,15 @@
  * prismatic = magenta). Presentational only; mounted inside the floating-origin group.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore, useViewportStore } from '@ui/store';
 import type { CadDocument, Constraint, Joint, Vec3 } from '@core/model/types';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
+import { positionsGeometry } from '../lineGeometry';
+import { useDisposable } from '../useDisposable';
 
 const REVOLUTE_COLOR = '#00e5ff';
 const PRISMATIC_COLOR = '#e040fb';
@@ -44,30 +46,19 @@ function ConstraintLine({
   const posA = positionOf(constraint.a.entityId, entities);
   const posB = positionOf(constraint.b.entityId, entities);
 
-  const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute([...posA, ...posB], 3));
-    geo.computeBoundingBox();
-    geo.computeBoundingSphere();
-    return geo;
-  }, [posA, posB]);
-
-  const material = useMemo(
+  const geometry = useDisposable(() => positionsGeometry([...posA, ...posB]), [posA, posB]);
+  const material = useDisposable(
     () =>
       new THREE.LineDashedMaterial({
         color: CONSTRAINT_COLOR,
         dashSize: 0.3,
         gapSize: 0.15,
-        linewidth: 1,
         depthTest: false,
         transparent: true,
         opacity: 0.85,
       }),
     [],
   );
-
-  useEffect(() => () => geometry.dispose(), [geometry]);
-  useEffect(() => () => material.dispose(), [material]);
 
   if (Math.hypot(posB[0] - posA[0], posB[1] - posA[1], posB[2] - posA[2]) < 1e-6) return null;
 
@@ -103,7 +94,7 @@ function JointArrow({ joint, entities }: { joint: Joint; entities: Entities }): 
   const origin = positionOf(joint.a.instanceId, entities);
   const color = joint.kind === 'revolute' ? REVOLUTE_COLOR : PRISMATIC_COLOR;
 
-  const arrowHelper = useMemo(
+  const arrowHelper = useDisposable(
     () =>
       new THREE.ArrowHelper(
         resolveAxis(joint.axis),
@@ -114,16 +105,6 @@ function JointArrow({ joint, entities }: { joint: Joint; entities: Entities }): 
         ARROW_HEAD_WIDTH,
       ),
     [origin, joint.axis, color],
-  );
-
-  useEffect(
-    () => () => {
-      arrowHelper.line.geometry.dispose();
-      if (arrowHelper.line.material instanceof THREE.Material) arrowHelper.line.material.dispose();
-      arrowHelper.cone.geometry.dispose();
-      if (arrowHelper.cone.material instanceof THREE.Material) arrowHelper.cone.material.dispose();
-    },
-    [arrowHelper],
   );
 
   return <primitive object={arrowHelper} renderOrder={998} />;

@@ -1,240 +1,195 @@
-/** @layer ui/viewport/2d — pure three.js geometry builders for 2D dimension entities. */
+/**
+ * @layer ui/viewport/2d
+ * Pure drawing of 2D dimension entities: the measured value, the label anchor and the
+ * LineSegments (dimension / extension lines, arrowheads) for each dimension kind.
+ */
 
 import * as THREE from 'three';
-import type { Entity, LineEntity } from '@core/model/types';
+import type {
+  ArcEntity,
+  CircleEntity,
+  DimensionEntity,
+  EllipseEntity,
+  Entity,
+  LineEntity,
+  PointEntity,
+  Vec2,
+} from '@core/model/types';
+import { chainSegments, segmentsGeometry } from '../../lineGeometry';
 
 const ARROWHEAD_SIZE = 0.3;
 const ANGULAR_ARC_SEGMENTS = 32;
+const EPSILON = 1e-9;
 export const DEFAULT_OFFSET = 5;
 
-/** Get the world-space centroid of a line or point entity as [x, y]. */
-export function entityCentroid(e: Entity): [number, number] | null {
-  const [px, py] = e.position;
-  if (e.kind === 'point') {
-    return [px, py];
-  }
-  if (e.kind === 'line') {
-    const le = e as LineEntity;
-    return [px + (le.start[0] + le.end[0]) / 2, py + (le.start[1] + le.end[1]) / 2];
-  }
-  // Fallback: use entity position for unknown centroid-able kinds.
-  return [px, py];
+interface DimensionDrawing {
+  /** Measured value: a length, a radius, or an angle in degrees. */
+  value: number;
+  /** Label anchor in the entity's XY plane. */
+  textX: number;
+  textY: number;
+  /** Null when the measured geometry is degenerate (only the label is drawn). */
+  lines: THREE.LineSegments | null;
 }
 
-/** Build arrowhead vertices at tip pointing toward direction (dx, dy). Returns 6 floats (2 pts). */
-function arrowheadPoints(
-  tipX: number,
-  tipY: number,
-  dx: number,
-  dy: number,
-): [
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-] {
-  const len = Math.sqrt(dx * dx + dy * dy);
-  if (len < 1e-9) {
-    return [tipX, tipY, 0, tipX, tipY, 0, tipX, tipY, 0, tipX, tipY, 0];
-  }
-  const nx = dx / len;
-  const ny = dy / len;
-  // Perpendicular
+type Locatable = PointEntity | LineEntity;
+type Radial = CircleEntity | ArcEntity | EllipseEntity;
+
+function isLocatable(entity: Entity | null | undefined): entity is Locatable {
+  return entity?.kind === 'point' || entity?.kind === 'line';
+}
+
+function isRadial(entity: Entity | null | undefined): entity is Radial {
+  return entity?.kind === 'circle' || entity?.kind === 'arc' || entity?.kind === 'ellipse';
+}
+
+/** World-space centroid of a point or line entity. */
+function centroid(entity: Locatable): Vec2 {
+  const [px, py] = entity.position;
+  if (entity.kind === 'point') return [px, py];
+  return [px + (entity.start[0] + entity.end[0]) / 2, py + (entity.start[1] + entity.end[1]) / 2];
+}
+
+/** The two wing segments of an arrowhead with its tip at `tip`, pointing along (dx, dy). */
+function arrowhead(tip: Vec2, dx: number, dy: number): Vec2[] {
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (length < EPSILON) return [tip, tip, tip, tip];
+  const nx = dx / length;
+  const ny = dy / length;
   const px = -ny;
   const py = nx;
   const s = ARROWHEAD_SIZE;
-  // Two lines from tip: one to each wing of the arrowhead.
   return [
-    tipX,
-    tipY,
-    0,
-    tipX - nx * s + px * s * 0.5,
-    tipY - ny * s + py * s * 0.5,
-    0,
-    tipX,
-    tipY,
-    0,
-    tipX - nx * s - px * s * 0.5,
-    tipY - ny * s - py * s * 0.5,
-    0,
+    tip,
+    [tip[0] - nx * s + px * s * 0.5, tip[1] - ny * s + py * s * 0.5],
+    tip,
+    [tip[0] - nx * s - px * s * 0.5, tip[1] - ny * s - py * s * 0.5],
   ];
 }
 
-/** Format a number with a given number of decimal places. */
-export function formatValue(value: number, precision: number): string {
-  return value.toFixed(precision);
+function drawLines(vertices: ReadonlyArray<Vec2>, color: string): THREE.LineSegments {
+  return new THREE.LineSegments(segmentsGeometry(vertices), new THREE.LineBasicMaterial({ color }));
 }
 
-/** Build the geometry for a linear or aligned dimension. */
-export function buildLinearGeometry(
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
+/** Linear: horizontal distance, line above the higher ref. Aligned: true distance, line parallel. */
+function linearDrawing(
+  a: Vec2,
+  b: Vec2,
   offset: number,
   aligned: boolean,
   color: string,
-): THREE.Group | null {
-  // Direction vector from A to B.
-  const dx = bx - ax;
-  const dy = by - ay;
-  const segLen = Math.sqrt(dx * dx + dy * dy);
-  if (segLen < 1e-9) return null;
-
-  let dimAx: number, dimAy: number, dimBx: number, dimBy: number;
-  let perpX: number, perpY: number;
-
-  if (aligned) {
-    // Dimension line is parallel to A→B, offset perpendicularly.
-    perpX = -dy / segLen;
-    perpY = dx / segLen;
-    dimAx = ax + perpX * offset;
-    dimAy = ay + perpY * offset;
-    dimBx = bx + perpX * offset;
-    dimBy = by + perpY * offset;
-  } else {
-    // Linear: horizontal distance; dimension line is horizontal, offset vertically above the higher ref.
-    const topY = Math.max(ay, by);
-    perpX = 0;
-    perpY = 1;
-    dimAx = ax;
-    dimAy = topY + offset;
-    dimBx = bx;
-    dimBy = topY + offset;
-  }
-
-  const group = new THREE.Group();
-  const mat = new THREE.LineBasicMaterial({ color });
-
-  // Extension lines: from each reference point to the dimension line.
-  const extVerts = new Float32Array([ax, ay, 0, dimAx, dimAy, 0, bx, by, 0, dimBx, dimBy, 0]);
-  const extGeo = new THREE.BufferGeometry();
-  extGeo.setAttribute('position', new THREE.BufferAttribute(extVerts, 3));
-  group.add(new THREE.LineSegments(extGeo, mat));
-
-  // Dimension line from dimA to dimB.
-  const dimLineVerts = new Float32Array([dimAx, dimAy, 0, dimBx, dimBy, 0]);
-  const dimLineGeo = new THREE.BufferGeometry();
-  dimLineGeo.setAttribute('position', new THREE.BufferAttribute(dimLineVerts, 3));
-  group.add(new THREE.Line(dimLineGeo, mat));
-
-  // Arrowheads: at dimA pointing toward dimB, at dimB pointing toward dimA.
-  const dirABx = dimBx - dimAx;
-  const dirABy = dimBy - dimAy;
-  const arrowA = arrowheadPoints(dimAx, dimAy, -dirABx, -dirABy);
-  const arrowB = arrowheadPoints(dimBx, dimBy, dirABx, dirABy);
-  const arrowVerts = new Float32Array([...arrowA, ...arrowB]);
-  const arrowGeo = new THREE.BufferGeometry();
-  arrowGeo.setAttribute('position', new THREE.BufferAttribute(arrowVerts, 3));
-  group.add(new THREE.LineSegments(arrowGeo, mat));
-
-  return group;
+): DimensionDrawing {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const length = Math.sqrt(dx * dx + dy * dy);
+  const degenerate = length < EPSILON;
+  const perp: Vec2 = degenerate ? [0, 1] : [-dy / length, dx / length];
+  const topY = Math.max(a[1], b[1]);
+  const dimA: Vec2 = aligned
+    ? [a[0] + perp[0] * offset, a[1] + perp[1] * offset]
+    : [a[0], topY + offset];
+  const dimB: Vec2 = aligned
+    ? [b[0] + perp[0] * offset, b[1] + perp[1] * offset]
+    : [b[0], topY + offset];
+  const dirX = dimB[0] - dimA[0];
+  const dirY = dimB[1] - dimA[1];
+  return {
+    value: aligned ? length : Math.abs(dx),
+    textX: (a[0] + b[0]) / 2 + (aligned ? perp[0] * offset : 0),
+    textY: aligned ? (a[1] + b[1]) / 2 + perp[1] * offset : topY + offset,
+    lines: degenerate
+      ? null
+      : drawLines(
+          [
+            a,
+            dimA,
+            b,
+            dimB,
+            dimA,
+            dimB,
+            ...arrowhead(dimA, -dirX, -dirY),
+            ...arrowhead(dimB, dirX, dirY),
+          ],
+          color,
+        ),
+  };
 }
 
-/** Build the geometry for a radial dimension. */
-export function buildRadialGeometry(
-  cx: number,
-  cy: number,
-  radius: number,
-  offset: number,
-  color: string,
-): THREE.Group {
-  // Direction at 45 degrees by default (entity offset interpreted as angle in radians if > 2π, else use as angle directly)
-  // We treat offset > 0 as the angle (radians) for the radial line direction.
-  // Default: 45 degrees (π/4).
+/** Radial: radius line from the centre to the rim (radiusX for an ellipse) with an arrowhead. */
+function radialDrawing(ref: Radial, offset: number, color: string): DimensionDrawing {
+  const [cx, cy] = [ref.position[0] + ref.center[0], ref.position[1] + ref.center[1]];
+  const radius = ref.kind === 'ellipse' ? ref.radiusX : ref.radius;
+  // The offset doubles as the radius-line angle (radians) when it is a plausible angle.
   const angle = offset > 0 && offset < Math.PI * 2 ? offset : Math.PI / 4;
-  const ex = cx + Math.cos(angle) * radius;
-  const ey = cy + Math.sin(angle) * radius;
-
-  const group = new THREE.Group();
-  const mat = new THREE.LineBasicMaterial({ color });
-
-  // Line from center to point on curve.
-  const verts = new Float32Array([cx, cy, 0, ex, ey, 0]);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-  group.add(new THREE.Line(geo, mat));
-
-  // Arrowhead at end of radius line (pointing outward from center).
-  const arrowVerts = new Float32Array(arrowheadPoints(ex, ey, ex - cx, ey - cy));
-  const arrowGeo = new THREE.BufferGeometry();
-  arrowGeo.setAttribute('position', new THREE.BufferAttribute(arrowVerts, 3));
-  group.add(new THREE.LineSegments(arrowGeo, mat));
-
-  return group;
+  const rim: Vec2 = [cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius];
+  return {
+    value: radius,
+    textX: cx + Math.cos(Math.PI / 4) * radius * 1.15,
+    textY: cy + Math.sin(Math.PI / 4) * radius * 1.15,
+    lines: drawLines([[cx, cy], rim, ...arrowhead(rim, rim[0] - cx, rim[1] - cy)], color),
+  };
 }
 
-/** Build the geometry for an angular dimension arc. */
-export function buildAngularGeometry(
-  vx: number,
-  vy: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
+/** Angular: minor arc between the two arms, with extension lines from the vertex. */
+function angularDrawing(
+  vertex: Vec2,
+  armA: Vec2,
+  armB: Vec2,
   offset: number,
   color: string,
-): THREE.Group | null {
-  // Compute angle from vertex to each arm point.
-  const angleA = Math.atan2(ay - vy, ax - vx);
-  const angleB = Math.atan2(by - vy, bx - vx);
-  let startAngle = angleA;
-  let endAngle = angleB;
-
-  // Normalize so arc sweeps the smaller angle.
-  let sweep = endAngle - startAngle;
+): DimensionDrawing {
+  const [vx, vy] = vertex;
+  const angleA = Math.atan2(armA[1] - vy, armA[0] - vx);
+  const angleB = Math.atan2(armB[1] - vy, armB[0] - vx);
+  let sweep = angleB - angleA;
   if (sweep < 0) sweep += Math.PI * 2;
-  if (sweep > Math.PI) {
-    // Swap to get the minor arc.
-    startAngle = angleB;
-    endAngle = angleA;
-  }
+  const swapped = sweep > Math.PI;
+  const startAngle = swapped ? angleB : angleA;
+  const endAngle = swapped ? angleA : angleB;
+  const minorSweep = swapped ? Math.PI * 2 - sweep : sweep;
 
   const arcRadius = offset > 0 ? offset : DEFAULT_OFFSET;
-  const curve = new THREE.EllipseCurve(
-    vx,
-    vy,
-    arcRadius,
-    arcRadius,
-    startAngle,
-    endAngle,
-    false,
-    0,
-  );
-  const pts = curve.getPoints(ANGULAR_ARC_SEGMENTS);
+  const arc = new THREE.EllipseCurve(vx, vy, arcRadius, arcRadius, startAngle, endAngle, false, 0)
+    .getPoints(ANGULAR_ARC_SEGMENTS)
+    .map(({ x, y }): Vec2 => [x, y]);
+  const arcEnd = (angle: number): Vec2 => [
+    vx + Math.cos(angle) * arcRadius,
+    vy + Math.sin(angle) * arcRadius,
+  ];
+  const midAngle = startAngle + minorSweep / 2;
+  return {
+    value: (minorSweep * 180) / Math.PI,
+    textX: vx + Math.cos(midAngle) * arcRadius * 1.4,
+    textY: vy + Math.sin(midAngle) * arcRadius * 1.4,
+    lines: drawLines(
+      [...chainSegments(arc), vertex, arcEnd(startAngle), vertex, arcEnd(endAngle)],
+      color,
+    ),
+  };
+}
 
-  const group = new THREE.Group();
-  const mat = new THREE.LineBasicMaterial({ color });
-
-  const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  group.add(new THREE.Line(geo, mat));
-
-  // Extension lines from vertex to arms at arcRadius distance.
-  const extVerts = new Float32Array([
-    vx,
-    vy,
-    0,
-    vx + Math.cos(startAngle) * arcRadius,
-    vy + Math.sin(startAngle) * arcRadius,
-    0,
-    vx,
-    vy,
-    0,
-    vx + Math.cos(endAngle) * arcRadius,
-    vy + Math.sin(endAngle) * arcRadius,
-    0,
-  ]);
-  const extGeo = new THREE.BufferGeometry();
-  extGeo.setAttribute('position', new THREE.BufferAttribute(extVerts, 3));
-  group.add(new THREE.LineSegments(extGeo, mat));
-
-  return group;
+/**
+ * Drawing of one dimension entity from the entities it references (null entries = dangling).
+ * @failure missing or wrong-kind references -> null (nothing is drawn)
+ */
+export function dimensionDrawing(
+  kind: DimensionEntity['dimensionKind'],
+  refs: ReadonlyArray<Entity | null | undefined>,
+  offset: number,
+  color: string,
+): DimensionDrawing | null {
+  const [first, second, third] = refs;
+  switch (kind) {
+    case 'linear':
+    case 'aligned':
+      return isLocatable(first) && isLocatable(second)
+        ? linearDrawing(centroid(first), centroid(second), offset, kind === 'aligned', color)
+        : null;
+    case 'radial':
+      return isRadial(first) ? radialDrawing(first, offset, color) : null;
+    case 'angular':
+      return isLocatable(first) && isLocatable(second) && isLocatable(third)
+        ? angularDrawing(centroid(first), centroid(second), centroid(third), offset, color)
+        : null;
+  }
 }

@@ -6,22 +6,21 @@
  * dispatch.
  */
 
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { Suspense, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera, MapControls } from '@react-three/drei';
-import { ZoomExtents2D } from './ZoomExtents2D';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
+import type { DrawToolKind, ModifyToolKind } from '@ui/store';
+import { ZoomExtents2D } from './ZoomExtents2D';
 import { Entities2D } from './Entities2D';
 import { BuildingPlan2D } from './BuildingPlan2D';
 import { SnapIndicator } from './SnapIndicator';
 import { DrawInteraction } from './DrawInteraction';
 import { useDrawTool } from './useDrawTool';
-import type { DrawToolKind } from '@ui/store';
 import { ModifyTools } from './ModifyTools';
 import { useModifyTool } from './useModifyTool';
-import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
 import { ModifyPickInteraction } from './ModifyPickInteraction';
 import { SelectPickInteraction } from './SelectPickInteraction';
@@ -147,7 +146,7 @@ function SceneContents2D({
 }
 
 export function Viewport2D(): React.ReactElement {
-  const { activeTool, collectedPoints, handleClick, finishPolyline, finishSpline } = useDrawTool();
+  const { activeTool, collectedPoints, handleClick, finishChain } = useDrawTool();
 
   const {
     activeTool: activeModifyTool,
@@ -165,11 +164,6 @@ export function Viewport2D(): React.ReactElement {
   // ScaleBar outside it. Initial value matches the OrthographicCamera zoom prop.
   const [cameraZoom, setCameraZoom] = useState<number>(50);
 
-  const onDoubleClick = useCallback(() => {
-    if (activeTool === 'spline') finishSpline(false);
-    else finishPolyline(false);
-  }, [activeTool, finishPolyline, finishSpline]);
-
   return (
     <div className="viewport-2d-wrapper">
       <Canvas
@@ -184,7 +178,7 @@ export function Viewport2D(): React.ReactElement {
             activeTool={activeTool}
             collectedPoints={collectedPoints}
             onClickPoint={handleClick}
-            onDoubleClick={onDoubleClick}
+            onDoubleClick={finishChain}
             onZoom={setCameraZoom}
             zoom={cameraZoom}
             activeModifyTool={activeModifyTool}

@@ -11,7 +11,7 @@
  * through the passed callbacks.
  */
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Icon } from '@ui/components/Icon';
 import type { IconName } from '@ui/components/Icon';
 import type { ModifyToolKind } from '@ui/store';
@@ -75,9 +75,7 @@ function phaseHint(tool: ModifyToolKind, phase: ModifyToolPhase): string | null 
 }
 
 function valueLabel(tool: ModifyToolKind): string {
-  if (tool === 'fillet') return 'Radius';
-  if (tool === 'offset') return 'Distance';
-  return 'Distance';
+  return tool === 'fillet' ? 'Radius' : 'Distance';
 }
 
 export function ModifyTools({
@@ -97,24 +95,6 @@ export function ModifyTools({
       inputRef.current.select();
     }
   }, [phase]);
-
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const v = parseFloat(e.target.value);
-      if (!isNaN(v)) onSetValue(v);
-    },
-    [onSetValue],
-  );
-
-  const handleInputKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        onCommitValue();
-      }
-    },
-    [onCommitValue],
-  );
 
   const hint = phaseHint(activeTool, phase);
 
@@ -152,8 +132,16 @@ export function ModifyTools({
               min={0.001}
               step={0.1}
               value={pendingValue}
-              onChange={handleInputChange}
-              onKeyDown={handleInputKeyDown}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value)) onSetValue(value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onCommitValue();
+                }
+              }}
               aria-label={`${valueLabel(activeTool)} value`}
             />
             <button

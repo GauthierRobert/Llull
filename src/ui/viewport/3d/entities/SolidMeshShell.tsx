@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { BaseEntity } from '@core/model/types';
-import { useMaterialProps } from '../useMaterialProps';
+import { useMaterialProps, type PbrMaterial } from '../useMaterialProps';
 
 export interface SolidSurface {
   roughness: number;
@@ -30,7 +30,7 @@ export interface SolidMeshKindProps<E extends BaseEntity> {
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
   /** Optional PBR material override from an assigned document material. */
-  pbrMaterial?: { color: string; metalness: number; roughness: number };
+  pbrMaterial?: PbrMaterial | undefined;
 }
 
 interface SolidMeshShellProps {
@@ -38,7 +38,7 @@ interface SolidMeshShellProps {
   geometry: THREE.BufferGeometry;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
-  pbrMaterial?: { color: string; metalness: number; roughness: number };
+  pbrMaterial?: PbrMaterial | undefined;
   surface?: SolidSurface;
   /** Render both faces regardless of display mode. */
   doubleSided?: boolean;
@@ -68,12 +68,7 @@ export function SolidMeshShell({
     };
   }, [geometry, boundsTree]);
 
-  const matProps = useMaterialProps({
-    color,
-    selected,
-    ...surface,
-    ...(pbrMaterial ? { pbrOverride: pbrMaterial } : {}),
-  });
+  const matProps = useMaterialProps({ color, selected, ...surface, pbrOverride: pbrMaterial });
 
   function handleClick(e: ThreeEvent<MouseEvent>): void {
     e.stopPropagation();
@@ -91,19 +86,7 @@ export function SolidMeshShell({
       castShadow
       receiveShadow
     >
-      <meshStandardMaterial
-        color={matProps.color}
-        emissive={matProps.emissive}
-        emissiveIntensity={matProps.emissiveIntensity}
-        roughness={matProps.roughness}
-        metalness={matProps.metalness}
-        envMapIntensity={matProps.envMapIntensity}
-        wireframe={matProps.wireframe}
-        transparent={matProps.transparent}
-        opacity={matProps.opacity}
-        depthWrite={matProps.depthWrite}
-        side={doubleSided ? THREE.DoubleSide : matProps.side}
-      />
+      <meshStandardMaterial {...matProps} side={doubleSided ? THREE.DoubleSide : matProps.side} />
     </mesh>
   );
 }

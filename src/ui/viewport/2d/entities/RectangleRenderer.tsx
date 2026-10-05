@@ -1,52 +1,31 @@
 /**
  * @layer ui/viewport/2d
- *
- * Render branch for `kind:'rectangle'` entities.
- * Draws a 4-corner closed loop in the XY plane.
- * Origin is at the lower-left corner; width extends along +X, height along +Y.
- * Geometry is memoized on the entity's width/height fields; disposed on unmount.
+ * Render branch for `kind:'rectangle'`: closed 4-corner loop, lower-left at the entity origin,
+ * width along +X and height along +Y.
  */
 
 import { useMemo } from 'react';
-import * as THREE from 'three';
 import type { RectangleEntity } from '@core/model/types';
-import { PlacedLineObject } from './PlacedLineObject';
-
-interface RectangleRendererProps {
-  entity: RectangleEntity;
-  selected: boolean;
-}
+import { flattenPoints } from '../../lineGeometry';
+import { ShapeLine } from './PlacedLineObject';
 
 export function RectangleRenderer({
-  entity,
+  entity: { width, height, position, color },
   selected,
-}: RectangleRendererProps): React.ReactElement | null {
-  const { width, height, position, color } = entity;
-
-  const lineObject = useMemo(() => {
-    // Lower-left origin; 5 points to close the loop.
-    const vertices = new Float32Array([
-      0,
-      0,
-      0,
-      width,
-      0,
-      0,
-      width,
-      height,
-      0,
-      0,
-      height,
-      0,
-      0,
-      0,
-      0,
-    ]);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    const mat = new THREE.LineBasicMaterial({ color: selected ? '#5b8dee' : color });
-    return new THREE.Line(geo, mat);
-  }, [width, height, color, selected]);
-
-  return <PlacedLineObject object={lineObject} position={position} />;
+}: {
+  entity: RectangleEntity;
+  selected: boolean;
+}): React.ReactElement {
+  const positions = useMemo(
+    () =>
+      flattenPoints([
+        [0, 0],
+        [width, 0],
+        [width, height],
+        [0, height],
+        [0, 0],
+      ]),
+    [width, height],
+  );
+  return <ShapeLine positions={positions} position={position} color={color} selected={selected} />;
 }

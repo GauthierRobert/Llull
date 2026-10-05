@@ -14,18 +14,15 @@ import { useStore } from '@ui/store';
 export function StoreInvalidator(): null {
   const invalidate = useThree((s) => s.invalidate);
 
-  useEffect(() => {
-    let prevDocument = useStore.getState().document;
-    let prevOrigin = useStore.getState().renderOrigin;
-
-    return useStore.subscribe((state) => {
-      if (state.document !== prevDocument || state.renderOrigin !== prevOrigin) {
-        prevDocument = state.document;
-        prevOrigin = state.renderOrigin;
-        invalidate();
-      }
-    });
-  }, [invalidate]);
+  useEffect(
+    () =>
+      useStore.subscribe((state, previous) => {
+        if (state.document !== previous.document || state.renderOrigin !== previous.renderOrigin) {
+          invalidate();
+        }
+      }),
+    [invalidate],
+  );
 
   return null;
 }

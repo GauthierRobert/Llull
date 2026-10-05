@@ -8,6 +8,14 @@
 import type { Entity, Vec2 } from '@core/model/types';
 import type { SnapPoint } from './types';
 
+/** Line segment as [x1, y1, x2, y2]. */
+export type Segment = [number, number, number, number];
+
+/** `angle` wrapped into [0, 2π). */
+export function normalizeAngle(angle: number): number {
+  return ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+}
+
 /** Midpoint of two 2D points. */
 export function mid(ax: number, ay: number, bx: number, by: number): [number, number] {
   return [(ax + bx) / 2, (ay + by) / 2];
@@ -48,7 +56,7 @@ export function segmentIntersection(
  * Extract line segments as [x1,y1,x2,y2] pairs from a 2D entity,
  * offset by the entity's world position.
  */
-export function entityToSegments(entity: Entity): Array<[number, number, number, number]> {
+export function entityToSegments(entity: Entity): Segment[] {
   const ox = entity.position[0];
   const oy = entity.position[1];
 
@@ -57,7 +65,7 @@ export function entityToSegments(entity: Entity): Array<[number, number, number,
       return [[entity.start[0] + ox, entity.start[1] + oy, entity.end[0] + ox, entity.end[1] + oy]];
     }
     case 'polyline': {
-      const segs: Array<[number, number, number, number]> = [];
+      const segs: Segment[] = [];
       const pts = entity.points;
       for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i]!;
@@ -89,6 +97,24 @@ export function entityToSegments(entity: Entity): Array<[number, number, number,
 }
 
 /**
+ * Unclamped parameter t of the foot of (px,py) on the line a→b (0 at a, 1 at b).
+ * @failure returns null when a and b coincide
+ */
+function footParameter(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number | null {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  return lenSq < 1e-20 ? null : ((px - ax) * dx + (py - ay) * dy) / lenSq;
+}
+
+/**
  * Snap perpendicular to a segment from reference point `from`.
  * Returns the foot point only when it lies within the segment extents (0 ≤ t ≤ 1).
  * When `from` is null the snap is skipped (no previous point).
@@ -103,13 +129,9 @@ export function snapPerpendicular(
   by: number,
 ): SnapPoint | null {
   if (from === null) return null;
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-20) return null;
-  const t = ((from[0] - ax) * dx + (from[1] - ay) * dy) / lenSq;
-  if (t < 0 || t > 1) return null; // foot is outside segment
-  return { x: ax + t * dx, y: ay + t * dy, type: 'perpendicular' };
+  const t = footParameter(from[0], from[1], ax, ay, bx, by);
+  if (t === null || t < 0 || t > 1) return null; // degenerate segment, or foot outside it
+  return { x: ax + t * (bx - ax), y: ay + t * (by - ay), type: 'perpendicular' };
 }
 
 /**
@@ -184,15 +206,9 @@ export function snapExtension(
   bx: number,
   by: number,
 ): SnapPoint | null {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-20) return null;
-  const t = ((cursorX - ax) * dx + (cursorY - ay) * dy) / lenSq;
-  if (t >= 0 && t <= 1) return null; // within segment — not an extension
-  const fx = ax + t * dx;
-  const fy = ay + t * dy;
-  return { x: fx, y: fy, type: 'extension' };
+  const t = footParameter(cursorX, cursorY, ax, ay, bx, by);
+  if (t === null || (t >= 0 && t <= 1)) return null; // degenerate segment, or within it
+  return { x: ax + t * (bx - ax), y: ay + t * (by - ay), type: 'extension' };
 }
 
 /**
@@ -209,12 +225,10 @@ export function nearestOnSegment(
   bx: number,
   by: number,
 ): [number, number] {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-20) return [ax, ay];
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
-  return [ax + t * dx, ay + t * dy];
+  const rawT = footParameter(px, py, ax, ay, bx, by);
+  if (rawT === null) return [ax, ay];
+  const t = Math.max(0, Math.min(1, rawT));
+  return [ax + t * (bx - ax), ay + t * (by - ay)];
 }
 
 /**
@@ -238,11 +252,9 @@ export function nearestOnArc(
     const angle = Math.atan2(py - cy, px - cx);
     return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
   }
-  // Normalize sweep to [0, 2π)
-  const sweep = (((endAngle - startAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  const rawAngle = Math.atan2(py - cy, px - cx);
-  // Offset to measure from startAngle
-  const offset = (((rawAngle - startAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const sweep = normalizeAngle(endAngle - startAngle);
+  // Offset of the cursor direction, measured from startAngle.
+  const offset = normalizeAngle(Math.atan2(py - cy, px - cx) - startAngle);
   const clampedOffset = Math.max(0, Math.min(sweep, offset));
   const clampedAngle = startAngle + clampedOffset;
   return [cx + r * Math.cos(clampedAngle), cy + r * Math.sin(clampedAngle)];

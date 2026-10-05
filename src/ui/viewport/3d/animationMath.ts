@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import type { Animation } from '@core/model/types';
+import type { Animation, Vec3 } from '@core/model/types';
 
 /**
  * Given an animation definition and the current accumulated phase (seconds),
@@ -57,16 +57,13 @@ export function rotatePointAboutPivot(
   return result;
 }
 
-/** A position expressed as a plain triple (avoids THREE import at call sites). */
-type PositionTuple = [number, number, number];
-
 /** A quaternion expressed as [x, y, z, w]. */
 type QuaternionTuple = [number, number, number, number];
 
 /**
  * One animation contribution that may be composed onto an existing pose.
  */
-interface AnimationContribution {
+export interface AnimationContribution {
   /** 'rotation' applies an axis-angle on top of the current quaternion and
    *  also rotates the position around `pivot`. */
   channel: 'rotation' | 'position';
@@ -93,10 +90,10 @@ interface AnimationContribution {
  * @pure — returns new tuples; no input mutation.
  */
 export function composeAnimatedPose(
-  basePosition: PositionTuple,
-  baseRotationEulerXYZ: PositionTuple,
-  contributions: AnimationContribution[],
-): { position: PositionTuple; quaternion: QuaternionTuple } {
+  basePosition: Vec3,
+  baseRotationEulerXYZ: Vec3,
+  contributions: ReadonlyArray<AnimationContribution>,
+): { position: [number, number, number]; quaternion: QuaternionTuple } {
   const pos = new THREE.Vector3(...basePosition);
   const quat = new THREE.Quaternion().setFromEuler(
     new THREE.Euler(

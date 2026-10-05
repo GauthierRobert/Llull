@@ -13,6 +13,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { MeshSolidEntity } from '@core/model/types';
+import { positionsGeometry } from '../../lineGeometry';
 import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './SolidMeshShell';
 
 const MESH_SOLID_SURFACE: SolidSurface = { roughness: 0.5, metalness: 0.15, envMapIntensity: 0.8 };
@@ -24,8 +25,7 @@ export function MeshSolidMesh({
   const { mesh } = entity;
 
   const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(mesh.positions), 3));
+    const geo = positionsGeometry(mesh.positions);
     geo.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.indices), 1));
     // Mesh stores no normals; derive them for correct lighting.
     geo.computeVertexNormals();

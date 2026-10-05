@@ -1,56 +1,27 @@
 /**
  * @layer ui/viewport/3d
  *
- * Transform gizmo for the selected 3D entity.
+ * Transform gizmo for the single selected 3D entity.
  *
- * Attaches drei <TransformControls> using the CHILDREN pattern — a <group>
- * rendered inside <TransformControls> is the transform target. Because that
- * group is a real scene-graph node, TransformControls.attach() succeeds and
- * the "attached object must be part of the scene graph" error never fires.
+ * drei <TransformControls> attaches to a sibling <group> that is a real scene-graph node (so the
+ * "attached object must be part of the scene graph" error never fires). On drag END the delta vs
+ * the pre-drag baseline is dispatched as move_entity | rotate_entity | scale_entity — the gizmo
+ * NEVER mutates the entity itself (PRIME DIRECTIVE / R1).
  *
- * On drag END the component computes the delta vs the entity's stored transform
- * and dispatches the appropriate command — it NEVER mutates the entity directly
- * (PRIME DIRECTIVE / R1).
+ * Feedback-loop prevention: the target group is synced FROM the entity only when the entity or the
+ * render origin changes (new selection, or the store update that follows a dispatch). During a drag
+ * the gizmo owns the target transform.
  *
- * Feedback-loop prevention
- * ─────────────────────────
- * The target group is only synced FROM the entity store at two safe moments:
- *   1. When the selected entity id changes (new selection).
- *   2. After a dispatch completes (store updates → entity has new transform).
- * During a drag the store is read-only from the gizmo's perspective; the gizmo
- * owns the target transform. After dispatch the store update re-flows through
- * React → the entity's stored position/rotation is the new baseline → the
- * target is reset to that baseline → ready for the next drag.
+ * Scale: `scale_entity` takes one uniform factor — the mean of the gizmo's three scale axes
+ * relative to the pre-drag mean. Entity geometry encodes its own size, so the gizmo scale resets
+ * to (1,1,1) after each commit.
  *
- * Scale → uniform factor
- * ──────────────────────
- * `scale_entity` accepts a single uniform factor. We derive it as the arithmetic
- * mean of the gizmo's three scale axes after drag end. The entity geometry
- * encodes its own size so the gizmo scale resets to (1,1,1) after each commit.
+ * 3D snapping (translate mode, `snap3dEnabled`): a `useFrame` poll runs the pure `snap3d()` against
+ * the other entities' key-points while dragging. The nearest snap is kept in a ref and applied at
+ * drag end; a SnapIndicator3D marks it. React state changes only when the indicator changes (R9).
  *
- * Mode state
- * ──────────
- * `mode` comes from useToolStore via Viewport3D (main toolbar Move/Rotate/Scale + G/R/S keys).
- *
- * 3D Snapping (translate mode only)
- * ──────────────────────────────────
- * When `snap3dEnabled` is true and mode is 'translate', a `useFrame` poll
- * reads the live gizmo target position each frame and runs `snap3d()` against
- * scene entity key-points. The nearest snap (within tolerance) is stored in a
- * ref so `handleDraggingChanged` can apply it at drag-end. A `SnapIndicator3D`
- * marker is rendered at the snapped position during the drag.
- * This keeps all snap math in the pure `snap3d.ts` helper (unit-tested) and
- * avoids per-frame `setState` (R9).
- *
- * Demand-mode invalidation
- * ─────────────────────────
- * During a drag, `useFrame` runs on every frame (OrbitControls are disabled and
- * TransformControls calls invalidate() on each pointer-move). The
- * `SnapIndicator3D` also calls `invalidate()` on mount/unmount to ensure the
- * indicator appears and disappears cleanly.
- *
- * When no drag is in progress the gizmo is IDLE: no invalidate() is called by
- * this component — the demand frameloop quiesces correctly.
+ * Demand frameloop: during a drag TransformControls invalidates on every pointer move; when idle
+ * this component never invalidates, so the loop quiesces.
  *
  * @affects dispatches move_entity | rotate_entity | scale_entity on drag end
  */
@@ -60,10 +31,8 @@ import { TransformControls } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
-import { useStore } from '@ui/store';
+import { useStore, useViewportStore } from '@ui/store';
 import type { GizmoMode } from '@ui/store';
-import { useViewportStore } from '@ui/store';
-import type { Entity } from '@core/model/types';
 import { toRenderPosition } from './floatingOrigin';
 import { collectSnapCandidates3D, snap3d } from './snap3d';
 import type { Snap3DType, SnapPoint3D } from './snap3d';
@@ -104,6 +73,21 @@ export function computeScaleFactor(scale: THREE.Vector3): number {
   return (scale.x + scale.y + scale.z) / 3;
 }
 
+/** Deltas below this length are drags that did not move anything. */
+const MIN_DELTA = 1e-6;
+
+function isNegligible(delta: readonly [number, number, number]): boolean {
+  return Math.sqrt(delta[0] ** 2 + delta[1] ** 2 + delta[2] ** 2) < MIN_DELTA;
+}
+
+/** Snap marker shown while dragging; `position` is in render space. */
+interface Indicator {
+  position: readonly [number, number, number];
+  type: Snap3DType;
+}
+
+const NO_INDICATOR: Indicator = { position: [0, 0, 0], type: 'none' };
+
 interface TransformGizmoProps {
   /** Current transform mode — owned by the parent to share with the overlay. */
   mode: GizmoMode;
@@ -115,94 +99,84 @@ export function TransformGizmo({
   mode,
   onDraggingChanged,
 }: TransformGizmoProps): React.ReactElement | null {
-  // Narrow selectors (R3).
-  const selection = useStore((s) => s.document.selection);
-  const entities = useStore((s) => s.document.entities);
+  // Narrow selectors (R3). Single-entity selection only; gizmo hidden for 0 or multi-select (v1).
+  const selectedId = useStore((s) =>
+    s.document.selection.length === 1 ? s.document.selection[0] : undefined,
+  );
+  const entity = useStore((s) =>
+    selectedId === undefined ? undefined : s.document.entities[selectedId],
+  );
   const dispatch = useStore((s) => s.dispatch);
   const renderOrigin = useStore((s) => s.renderOrigin);
   const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
 
-  // Single-entity selection only; gizmo hidden for 0 or multi-select (v1).
-  const selectedId = selection.length === 1 ? selection[0] : undefined;
-  const entity: Entity | undefined = selectedId != null ? entities[selectedId] : undefined;
-
-  // Ref to the <group> sibling that TransformControls attaches to.
-  // Typed as THREE.Group | null so React gives us a MutableRefObject (current
-  // is writable). The group IS rendered into the scene — parent != null after
-  // mount — so controls.attach(targetRef.current) succeeds without error.
+  // The <group> sibling that TransformControls attaches to.
   const targetRef = useRef<THREE.Group | null>(null);
 
-  // Pre-drag baseline — captured in the dragging-changed → true handler so
-  // the delta on drag end is always relative to where the drag started.
+  // Pre-drag baseline — captured when a drag starts so the delta on drag end is relative to it.
   const preDragPos = useRef<THREE.Vector3>(new THREE.Vector3());
   const preDragRot = useRef<THREE.Euler>(new THREE.Euler());
   const preDragScale = useRef<THREE.Vector3>(new THREE.Vector3(1, 1, 1));
 
-  // Ref to the TransformControls instance. TransformControlsImpl extends Object3D
-  // and IS a DraggingDispatcher at runtime; we cast when wiring events.
+  // The TransformControls instance; it IS a DraggingDispatcher at runtime (cast when wiring events).
   const controlsRef = useRef<TransformControlsImpl>(null);
 
   const isDraggingRef = useRef(false);
-  // Snap candidates: rebuilt when entities change (or selection changes).
+  // Snap candidates: rebuilt when the selection changes and at drag start.
   const snapCandidatesRef = useRef<ReadonlyArray<SnapPoint3D>>([]);
   // Current snap result — updated per-frame, read at drag-end for dispatch.
   const activeSnapRef = useRef<{ x: number; y: number; z: number; type: Snap3DType } | null>(null);
 
-  // Indicator state: React state is fine here because it updates only on snap
-  // type/position changes — not every frame (activeSnapRef drives the decision).
-  const [indicatorPos, setIndicatorPos] = useState<readonly [number, number, number]>([0, 0, 0]);
-  const [indicatorType, setIndicatorType] = useState<Snap3DType>('none');
+  // Indicator state is pushed to React only when it changes, never per frame; the ref holds the
+  // last value pushed.
+  const [indicator, setIndicator] = useState<Indicator>(NO_INDICATOR);
+  const indicatorRef = useRef<Indicator>(NO_INDICATOR);
+  const showIndicator = useCallback((next: Indicator) => {
+    const last = indicatorRef.current;
+    if (
+      next.type === last.type &&
+      next.position[0] === last.position[0] &&
+      next.position[1] === last.position[1] &&
+      next.position[2] === last.position[2]
+    ) {
+      return;
+    }
+    indicatorRef.current = next;
+    setIndicator(next);
+  }, []);
 
-  // Cached indicator pos ref to avoid duplicate setState calls.
-  const prevIndicatorPosRef = useRef<readonly [number, number, number]>([0, 0, 0]);
-  const prevIndicatorTypeRef = useRef<Snap3DType>('none');
-
-  // ---- Rebuild snap candidates when the selection changes (excluding self).
-  // Candidates are also rebuilt at drag-start (covering entity-set changes); gating
-  // on selectedId avoids re-collecting on every render. ----
+  // Rebuild snap candidates (excluding the selected entity) when the selection changes.
   useEffect(() => {
-    const doc = useStore.getState().document;
-    snapCandidatesRef.current = collectSnapCandidates3D(doc, selectedId);
+    snapCandidatesRef.current = collectSnapCandidates3D(useStore.getState().document, selectedId);
   }, [selectedId]);
 
-  function syncTargetFromEntity(): void {
-    if (!entity) return;
-    const t = targetRef.current;
-    if (!t) return;
-    const rp = toRenderPosition(entity.position, renderOrigin);
-    t.position.set(rp[0], rp[1], rp[2]);
-    t.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
-    t.scale.set(1, 1, 1);
-    t.updateMatrixWorld(true);
-  }
+  // Sync the target group from the entity (new selection, or the store update after a dispatch).
+  useEffect(() => {
+    const target = targetRef.current;
+    if (!entity || !target) return;
+    target.position.set(...toRenderPosition(entity.position, renderOrigin));
+    target.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
+    target.scale.set(1, 1, 1);
+    target.updateMatrixWorld(true);
+  }, [entity, renderOrigin]);
 
-  useEffect(syncTargetFromEntity, [entity, renderOrigin]);
-
-  // NOTE: this useFrame runs ONLY when a drag is in progress (isDraggingRef.current).
-  // When idle it returns immediately after the first branch — no setState, no
-  // invalidate() calls → the demand frameloop quiesces.
+  // Per-frame snap poll. Does nothing (no setState, no invalidate) unless a snapping translate
+  // drag is in progress, so the demand frameloop quiesces when idle.
   useFrame(() => {
     if (!isDraggingRef.current || mode !== 'translate' || !snap3dEnabled) {
-      // Ensure indicator is cleared when not snapping.
-      if (prevIndicatorTypeRef.current !== 'none') {
-        prevIndicatorTypeRef.current = 'none';
-        setIndicatorType('none');
+      if (indicatorRef.current.type !== 'none') {
+        showIndicator({ ...indicatorRef.current, type: 'none' });
       }
       return;
     }
 
-    const t = targetRef.current;
-    if (!t) return;
-    // t.position is in RENDER space (relative to floating-origin group).
-    // Convert to world space for snap computation.
-    const worldX = t.position.x + renderOrigin[0];
-    const worldY = t.position.y + renderOrigin[1];
-    const worldZ = t.position.z + renderOrigin[2];
-
+    const target = targetRef.current;
+    if (!target) return;
+    // target.position is in RENDER space (relative to the floating-origin group); snapping works in world space.
     const result = snap3d(
-      worldX,
-      worldY,
-      worldZ,
+      target.position.x + renderOrigin[0],
+      target.position.y + renderOrigin[1],
+      target.position.z + renderOrigin[2],
       snapCandidatesRef.current,
       SNAP3D_TOLERANCE,
       SNAP3D_GRID_STEP,
@@ -213,28 +187,14 @@ export function TransformGizmo({
       ? { x: result.x, y: result.y, z: result.z, type: result.type }
       : null;
 
-    // Update indicator — only call setState when the value actually changed to
-    // avoid triggering unnecessary React re-renders on every frame.
-    const renderSnapX = result.x - renderOrigin[0];
-    const renderSnapY = result.y - renderOrigin[1];
-    const renderSnapZ = result.z - renderOrigin[2];
-    const newPos: readonly [number, number, number] = [renderSnapX, renderSnapY, renderSnapZ];
-    const newType: Snap3DType = result.snapped ? result.type : 'none';
-
-    const posChanged =
-      newPos[0] !== prevIndicatorPosRef.current[0] ||
-      newPos[1] !== prevIndicatorPosRef.current[1] ||
-      newPos[2] !== prevIndicatorPosRef.current[2];
-    const typeChanged = newType !== prevIndicatorTypeRef.current;
-
-    if (posChanged) {
-      prevIndicatorPosRef.current = newPos;
-      setIndicatorPos(newPos);
-    }
-    if (typeChanged) {
-      prevIndicatorTypeRef.current = newType;
-      setIndicatorType(newType);
-    }
+    showIndicator({
+      position: [
+        result.x - renderOrigin[0],
+        result.y - renderOrigin[1],
+        result.z - renderOrigin[2],
+      ],
+      type: result.snapped ? result.type : 'none',
+    });
   });
 
   const handleDraggingChanged = useCallback(
@@ -242,89 +202,70 @@ export function TransformGizmo({
       const dragging = event.value;
       onDraggingChanged(dragging);
       isDraggingRef.current = dragging;
+      const target = targetRef.current;
 
       if (dragging) {
-        // Snapshot pre-drag baseline and rebuild candidates.
-        const t = targetRef.current;
-        if (!t) return;
-        preDragPos.current.copy(t.position);
-        preDragRot.current.copy(t.rotation);
-        preDragScale.current.copy(t.scale);
-        // Rebuild snap candidates at drag start (latest entity state).
-        const doc = useStore.getState().document;
-        snapCandidatesRef.current = collectSnapCandidates3D(doc, selectedId);
+        if (!target) return;
+        // Snapshot the pre-drag baseline and rebuild the candidates from the latest entity state.
+        preDragPos.current.copy(target.position);
+        preDragRot.current.copy(target.rotation);
+        preDragScale.current.copy(target.scale);
+        snapCandidatesRef.current = collectSnapCandidates3D(
+          useStore.getState().document,
+          selectedId,
+        );
         activeSnapRef.current = null;
         return;
       }
 
-      // Drag ended — clear indicator.
-      prevIndicatorTypeRef.current = 'none';
-      setIndicatorType('none');
+      showIndicator({ ...indicatorRef.current, type: 'none' });
 
-      if (!selectedId) return;
-      const t = targetRef.current;
-      if (!t) return;
+      if (!selectedId || !target) return;
 
       if (mode === 'translate') {
-        // Apply snapped position to the gizmo target before computing delta.
+        // Apply the snapped position to the gizmo target before computing the delta.
         const snap = activeSnapRef.current;
         if (snap && snap3dEnabled) {
-          const renderX = snap.x - renderOrigin[0];
-          const renderY = snap.y - renderOrigin[1];
-          const renderZ = snap.z - renderOrigin[2];
-          t.position.set(renderX, renderY, renderZ);
+          target.position.set(...toRenderPosition([snap.x, snap.y, snap.z], renderOrigin));
         }
-
-        const delta = computeTranslateDelta(preDragPos.current, t.position);
-        const mag = Math.sqrt(delta[0] ** 2 + delta[1] ** 2 + delta[2] ** 2);
-        if (mag < 1e-6) return;
-        dispatch('move_entity', { id: selectedId, delta });
+        const delta = computeTranslateDelta(preDragPos.current, target.position);
+        if (!isNegligible(delta)) dispatch('move_entity', { id: selectedId, delta });
       } else if (mode === 'rotate') {
-        const delta = computeRotateDelta(preDragRot.current, t.rotation);
-        const mag = Math.sqrt(delta[0] ** 2 + delta[1] ** 2 + delta[2] ** 2);
-        if (mag < 1e-6) return;
-        dispatch('rotate_entity', { id: selectedId, delta });
+        const delta = computeRotateDelta(preDragRot.current, target.rotation);
+        if (!isNegligible(delta)) dispatch('rotate_entity', { id: selectedId, delta });
       } else {
-        // scale — derive uniform factor relative to the pre-drag scale baseline.
+        // scale — derive the uniform factor relative to the pre-drag scale baseline.
         const prevAvg =
           (preDragScale.current.x + preDragScale.current.y + preDragScale.current.z) / 3;
-        const nextFactor = computeScaleFactor(t.scale);
+        const nextFactor = computeScaleFactor(target.scale);
         const factor = prevAvg > 0 ? nextFactor / prevAvg : nextFactor;
         if (Math.abs(factor - 1) < 1e-6 || factor <= 0) return;
         dispatch('scale_entity', { id: selectedId, factor });
         // Reset gizmo scale to neutral; geometry dimensions live in the entity.
-        t.scale.set(1, 1, 1);
+        target.scale.set(1, 1, 1);
       }
     },
-    [selectedId, mode, dispatch, onDraggingChanged, snap3dEnabled, renderOrigin],
+    [selectedId, mode, dispatch, onDraggingChanged, snap3dEnabled, renderOrigin, showIndicator],
   );
 
   useEffect(() => {
-    const ctrl = controlsRef.current as (DraggingDispatcher & TransformControlsImpl) | null;
-    if (!ctrl) return;
-    ctrl.addEventListener('dragging-changed', handleDraggingChanged);
-    return () => ctrl.removeEventListener('dragging-changed', handleDraggingChanged);
+    const controls = controlsRef.current as (DraggingDispatcher & TransformControlsImpl) | null;
+    if (!controls) return;
+    controls.addEventListener('dragging-changed', handleDraggingChanged);
+    return () => controls.removeEventListener('dragging-changed', handleDraggingChanged);
   }, [handleDraggingChanged]);
 
   // Generated building geometry is edited through its element (Building panel), not the gizmo.
   if (!entity || !selectedId || entity.tags?.includes('bim') === true) return null;
 
-  // Compute the render-space position for initial group placement.
-  const rp = toRenderPosition(entity.position, renderOrigin);
+  const [x, y, z] = toRenderPosition(entity.position, renderOrigin);
 
   return (
     <>
-      {/*
-        Sibling pattern: render a real scene-graph <group> and pass its ref
-        to TransformControls as the `object` prop. drei calls:
-          controls.attach(object instanceof THREE.Object3D ? object : object.current)
-        Because targetRef.current is a proper scene node (parent != null),
-        the "attached object must be part of the scene graph" error never fires
-        and the demand frameloop quiesces when idle.
-      */}
+      {/* Sibling pattern: a real scene-graph <group> is the controls' target (see header). */}
       <group
         ref={targetRef}
-        position={[rp[0], rp[1], rp[2]]}
+        position={[x, y, z]}
         rotation={[entity.rotation[0], entity.rotation[1], entity.rotation[2]]}
       />
       <TransformControls
@@ -333,8 +274,8 @@ export function TransformGizmo({
         mode={mode}
         size={0.8}
       />
-      {snap3dEnabled && mode === 'translate' && indicatorType !== 'none' && (
-        <SnapIndicator3D position={indicatorPos} snapType={indicatorType} />
+      {snap3dEnabled && mode === 'translate' && indicator.type !== 'none' && (
+        <SnapIndicator3D position={indicator.position} snapType={indicator.type} />
       )}
     </>
   );

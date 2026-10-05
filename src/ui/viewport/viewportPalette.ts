@@ -9,6 +9,9 @@
 import { useThemeStore } from '@ui/store';
 import type { Theme } from '@ui/store';
 
+/** Tint of a selected 2D shape or text entity. */
+export const SELECTION_COLOR = '#5b8dee';
+
 interface ViewportPalette {
   /** WebGL clear color behind the scene. */
   background: string;

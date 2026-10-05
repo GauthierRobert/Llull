@@ -1,31 +1,20 @@
 /**
  * @layer ui/viewport/3d
  *
- * Maps `document.order` → a render branch per entity `kind`.
- * Every kind has exactly one branch (OCP / architecture L7).
- * Hidden layers are not rendered; selection state is passed to each branch.
- * Hidden-entity override (render-only, UI store) is also respected here.
+ * Maps `document.order` → a render branch per entity `kind` (architecture L7: every kind has one).
+ * Layer-hidden and render-only hidden entities (UI store) are skipped; selection state is passed
+ * to each branch. 2D kinds belong to the 2D viewport and render nothing here.
  *
- * Click wiring: plain click → select([id]); Shift/Ctrl/Meta click → toggleSelection(id).
- * The `onSelect` callback is threaded from the store down to each mesh via EntityRenderer.
+ * Click: plain click → select([id]); Shift/Ctrl/Meta click → toggleSelection(id). A click also
+ * toggles the `trigger:'click'` animations that target the entity (directly or through a group).
  *
- * ## Instanced rendering
- * Entities whose kind is batchable (box / cylinder / sphere) are grouped by
- * `groupEntitiesForInstancing` and rendered as InstancedMesh batches via
- * `<InstancedRenderer>`. This collapses N identical-geometry entities into 1
- * draw call per geometry+color group.
- *
- * Non-batchable entities (extrusion, mesh, cone, torus, wedge, pyramid, and all
- * 2D kinds) continue to use per-entity mesh branches (EntityRenderer).
- *
- * Expected draw-call delta: 100 identical boxes → 100 draw calls (before) vs
- * 1 draw call (after). Mixed scenes with N distinct groups → N draw calls.
+ * Batchable kinds (box / cylinder / sphere, see grouping.ts) are drawn by InstancedRenderer as one
+ * InstancedMesh per geometry+color group; every other kind uses a per-entity mesh branch.
  */
 
 import { useCallback, useMemo } from 'react';
-import type { CadDocument, Entity, EntityId, InstanceEntity, Material } from '@core/model/types';
-import { useStore } from '@ui/store';
-import { useViewportStore } from '@ui/store';
+import type { CadDocument, Entity, EntityId, InstanceEntity } from '@core/model/types';
+import { useStore, useViewportStore } from '@ui/store';
 import { findClickAnimationsForEntity } from './animationClickHelpers';
 import { BoxMesh } from './entities/BoxMesh';
 import { CylinderMesh } from './entities/CylinderMesh';
@@ -41,6 +30,7 @@ import { TextMesh } from './entities/TextMesh';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 import { expandInstance } from '@core/commands/assemblies';
+import type { PbrMaterial } from './useMaterialProps';
 
 interface EntitiesProps {
   document: CadDocument;
@@ -103,13 +93,6 @@ function InstanceEntityRenderer({
   );
 }
 
-/** PBR material override passed to entity mesh components. */
-interface PbrMaterial {
-  color: string;
-  metalness: number;
-  roughness: number;
-}
-
 /**
  * Render a single entity; one pure branch per `kind`.
  * Used only for NON-batchable kinds — batchable kinds (box/cylinder/sphere)
@@ -129,10 +112,10 @@ function EntityRenderer({
   entity: Entity;
   selected: boolean;
   onSelect: (id: EntityId, additive: boolean) => void;
-  pbrMaterial?: PbrMaterial;
+  pbrMaterial?: PbrMaterial | undefined;
   document?: CadDocument;
 }): React.ReactElement | null {
-  const shared = { selected, onSelect, ...(pbrMaterial ? { pbrMaterial } : {}) };
+  const shared = { selected, onSelect, pbrMaterial };
   switch (entity.kind) {
     case 'box':
       return <BoxMesh entity={entity} {...shared} />;
@@ -187,27 +170,16 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const toggleClickAnimation = useViewportStore((s) => s.toggleClickAnimation);
 
-  /**
-   * Called by each mesh on click.
-   * Plain click → single-select; Shift/Ctrl/Meta click → toggle (multi-select).
-   * Also toggles any `trigger:'click'` animations that target this entity (directly
-   * or via a group whose memberIds include it) — without removing select behaviour.
-   */
+  // Called by each mesh on click: plain click → single-select; Shift/Ctrl/Meta → toggle. Also
+  // toggles the `trigger:'click'` animations targeting this entity (directly or via a group).
   const handleSelect = useCallback(
     (id: EntityId, additive: boolean): void => {
-      // 1. Normal selection behaviour.
-      if (additive) {
-        toggleSelection(id);
-      } else {
-        select([id]);
-      }
+      if (additive) toggleSelection(id);
+      else select([id]);
 
-      // 2. Toggle any click-triggered animations for this entity.
-      const animations = useStore.getState().document.animations;
-      const groups = useStore.getState().document.groups;
-      const clickAnimIds = findClickAnimationsForEntity(id, animations, groups);
-      for (const animId of clickAnimIds) {
-        toggleClickAnimation(animId);
+      const { animations, groups } = useStore.getState().document;
+      for (const animationId of findClickAnimationsForEntity(id, animations, groups)) {
+        toggleClickAnimation(animationId);
       }
     },
     [select, toggleSelection, toggleClickAnimation],
@@ -226,17 +198,14 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
       });
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
 
-  const batchableEntities = useMemo(() => visibleEntities.filter(isBatchable), [visibleEntities]);
-
-  const nonBatchableEntities = useMemo(
-    () => visibleEntities.filter((e) => !isBatchable(e)),
-    [visibleEntities],
-  );
-
   // Pass the materials map so batches can carry per-batch PBR overrides.
   const batches = useMemo(
-    () => groupEntitiesForInstancing(batchableEntities, materials),
-    [batchableEntities, materials],
+    () => groupEntitiesForInstancing(visibleEntities, materials),
+    [visibleEntities, materials],
+  );
+  const nonBatchableEntities = useMemo(
+    () => visibleEntities.filter((entity) => !isBatchable(entity)),
+    [visibleEntities],
   );
 
   return (
@@ -246,14 +215,7 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
 
       {/* Per-entity rendering: non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid, instance) */}
       {nonBatchableEntities.map((entity) => {
-        const mat: Material | undefined = entity.materialId
-          ? materials[entity.materialId]
-          : undefined;
-        const pbrProp = mat
-          ? {
-              pbrMaterial: { color: mat.color, metalness: mat.metalness, roughness: mat.roughness },
-            }
-          : {};
+        const material = entity.materialId ? materials[entity.materialId] : undefined;
         return (
           <EntityRenderer
             key={entity.id}
@@ -261,7 +223,7 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
             selected={selectionSet.has(entity.id)}
             onSelect={handleSelect}
             document={document}
-            {...pbrProp}
+            pbrMaterial={material}
           />
         );
       })}

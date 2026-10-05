@@ -1,40 +1,18 @@
 /**
  * @layer ui/viewport/3d
  *
- * Renders batches of identical-geometry entities as THREE.InstancedMesh —
- * one draw call per batch instead of one draw call per entity.
+ * Renders batches of identical-geometry entities (box / cylinder / sphere, see grouping.ts) as
+ * one THREE.InstancedMesh per batch — one draw call instead of one per entity. Everything else
+ * stays on the per-entity mesh path in Entities.tsx.
  *
- * ## Architecture
- * - Receives pre-computed `InstanceBatch` objects from `groupEntitiesForInstancing`.
- * - Each `<InstanceBatchMesh>` owns one InstancedMesh for its batch.
- * - Per-instance transforms (position + rotation) are applied via `setMatrixAt`.
- * - Per-instance color is applied via `setColorAt` when any entity in the batch
- *   is selected (highlight tint) or has a distinct base color from the batch key.
- * - Selection raycast: `InstancedMesh.raycast` yields `intersection.instanceId`;
- *   the component maps that back to an entity id via the batch's sorted id array
- *   and calls `onSelect(entityId, additive)`.
- *
- * ## Supported geometry kinds (v1)
- * - box:      THREE.BoxGeometry
- * - cylinder/sphere: shared +Z-up builders from entities/primitiveGeometry (same as single meshes)
- *
- * Non-batchable kinds (extrusion, mesh, cone, torus, wedge, pyramid) are NOT
- * rendered here — they remain in the per-entity mesh path in Entities.tsx.
- *
- * ## Performance contract (R9)
- * - Geometry and material are created ONCE per batch via useMemo and disposed on unmount.
- * - Instance matrices and colors are written in a useEffect keyed on the batch entity
- *   list — NOT inside useFrame. After update, `instanceMatrix.needsUpdate = true` and
- *   `instanceColor.needsUpdate = true` are set; r3f's StoreInvalidator calls invalidate()
- *   so the demand-mode canvas re-renders once.
- * - No per-frame allocations.
- *
- * ## Draw-call delta (100 identical boxes)
- * BEFORE: 100 BoxMesh components → 100 draw calls.
- * AFTER:  1 InstanceBatchMesh (1 InstancedMesh) → 1 draw call.
+ * - Geometry and material are created once per batch and disposed on unmount (R9).
+ * - Instance matrices and colors are written in an effect keyed on the batch contents (not in
+ *   useFrame) and flagged `needsUpdate`; per-instance color carries the selection tint.
+ * - Click: `InstancedMesh.raycast` yields `instanceId`, mapped back to an entity id through the
+ *   batch's id-sorted entity array.
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { EntityId } from '@core/model/types';
@@ -43,6 +21,7 @@ import type { DisplayMode } from '@ui/store';
 import type { InstanceBatch } from './grouping';
 import { entityIdFromInstanceId } from './grouping';
 import { buildCylinderGeometry, buildSphereGeometry } from './entities/primitiveGeometry';
+import { useDisposable } from '../useDisposable';
 
 /**
  * Creates the THREE geometry for a given batchable kind + representative entity.
@@ -86,39 +65,37 @@ const SELECTED_EMISSIVE_INTENSITY = 0.35;
 /** White — used as a per-instance color multiplier when we want the base color unchanged. */
 const WHITE = new THREE.Color(1, 1, 1);
 
+/** Scratch objects reused by every batch's matrix/color writes (single-threaded, synchronous). */
+const DUMMY = new THREE.Object3D();
+const SCRATCH_COLOR = new THREE.Color();
+
+const SHADED_MATERIAL_ARGS: THREE.MeshStandardMaterialParameters = {
+  roughness: 0.45,
+  metalness: 0.08,
+  envMapIntensity: 0.8,
+  wireframe: false,
+  transparent: false,
+  opacity: 1,
+  depthWrite: true,
+  side: THREE.FrontSide,
+};
+
 /**
- * Returns MeshStandardMaterial constructor args matching the display mode.
- * Mirrors the logic in useMaterialProps.ts for consistency.
- *
- * `batchMaterial` carries optional PBR overrides from an assigned document material.
- * The overrides are applied in shaded mode only — wireframe and x-ray ignore them.
+ * MeshStandardMaterial constructor args for the display mode (mirrors useMaterialProps.ts).
+ * `batchMaterial` carries optional PBR overrides from an assigned document material; they apply
+ * in shaded mode only — wireframe and x-ray ignore them.
  */
 export function makeMaterialArgs(
   displayMode: DisplayMode,
   batchMaterial?: { roughness: number; metalness: number } | undefined,
 ): THREE.MeshStandardMaterialParameters {
-  // In shaded mode, use batch-level PBR values when available.
-  const roughness = displayMode === 'shaded' && batchMaterial ? batchMaterial.roughness : 0.45;
-  const metalness = displayMode === 'shaded' && batchMaterial ? batchMaterial.metalness : 0.08;
-
   switch (displayMode) {
     case 'wireframe':
-      return {
-        roughness: 0.45,
-        metalness: 0.08,
-        envMapIntensity: 0.8,
-        wireframe: true,
-        transparent: false,
-        opacity: 1,
-        depthWrite: true,
-        side: THREE.FrontSide,
-      };
+      return { ...SHADED_MATERIAL_ARGS, wireframe: true };
     case 'xray':
       return {
-        roughness: 0.45,
-        metalness: 0.08,
+        ...SHADED_MATERIAL_ARGS,
         envMapIntensity: 0,
-        wireframe: false,
         transparent: true,
         opacity: 0.18,
         depthWrite: false,
@@ -127,14 +104,11 @@ export function makeMaterialArgs(
     case 'shaded':
     default:
       return {
-        roughness,
-        metalness,
-        envMapIntensity: 0.8,
-        wireframe: false,
-        transparent: false,
-        opacity: 1,
-        depthWrite: true,
-        side: THREE.FrontSide,
+        ...SHADED_MATERIAL_ARGS,
+        ...(batchMaterial && {
+          roughness: batchMaterial.roughness,
+          metalness: batchMaterial.metalness,
+        }),
       };
   }
 }
@@ -147,16 +121,9 @@ interface InstanceBatchMeshProps {
 }
 
 /**
- * Renders one THREE.InstancedMesh for a single `InstanceBatch`.
- *
- * - Geometry: created once via useMemo; disposed on unmount.
- * - Material: created once via useMemo; disposed on unmount.
- *   Per-instance colors come from `instanceColor` (setColorAt); `vertexColors` stays
- *   off — primitive geometries carry no color attribute, so enabling it renders black.
- * - Instance matrices + colors: written in a useEffect keyed on entity ids +
- *   selection set. NOT in useFrame.
- * - Click/raycast: InstancedMesh fires onClick with `intersection.instanceId`;
- *   we map that to an entity id via `entityIdFromInstanceId` and call onSelect.
+ * Renders one THREE.InstancedMesh for a single `InstanceBatch`. Per-instance colors come from
+ * `instanceColor` (setColorAt); `vertexColors` stays off — primitive geometries carry no color
+ * attribute, so enabling it renders black.
  */
 function InstanceBatchMesh({
   batch,
@@ -167,41 +134,14 @@ function InstanceBatchMesh({
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = batch.entities.length;
 
-  // batch objects are rebuilt every grouping pass; batch.key is the content identity.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const geometry = useMemo(() => makeGeometry(batch), [batch.key]);
-
-  // Dispose geometry on unmount or key change.
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  // Batch objects are rebuilt every grouping pass; batch.key is the content identity.
+  const geometry = useDisposable(() => makeGeometry(batch), [batch.key]);
 
   // Uses batch.pbrMaterial for roughness/metalness in shaded mode.
-  const material = useMemo(
+  const material = useDisposable(
     () => new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, batch.pbrMaterial)),
     [displayMode, batch.pbrMaterial],
   );
-
-  // Dispose material on unmount or displayMode change.
-  useEffect(() => () => material.dispose(), [material]);
-
-  // Keyed on a stable string that includes all entity ids + selection state.
-  // This ensures we rewrite matrices/colors when:
-  //   - entities are added/removed from the batch (position/rotation changes)
-  //   - selection changes (color highlight)
-  //   - display mode changes (handled above via material recreation)
-  const entitySignature = useMemo(() => {
-    const ids = batch.entities.map((e) => e.id).join(',');
-    const selBits = batch.entities.map((e) => (selectionSet.has(e.id) ? '1' : '0')).join('');
-    // Include transforms in signature so matrix update fires when entities move.
-    const transforms = batch.entities
-      .map((e) => `${e.position.join(',')}/${e.rotation.join(',')}`)
-      .join(';');
-    // Include batch material color so instance colors update when material changes.
-    const matColor = batch.pbrMaterial?.color ?? '';
-    return `${ids}|${selBits}|${transforms}|${matColor}`;
-  }, [batch.entities, selectionSet, batch.pbrMaterial]);
-
-  const _dummy = useMemo(() => new THREE.Object3D(), []);
-  const _color = useMemo(() => new THREE.Color(), []);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -213,31 +153,27 @@ function InstanceBatchMesh({
       mesh.setColorAt(0, WHITE);
     }
 
-    for (let i = 0; i < batch.entities.length; i++) {
-      const entity = batch.entities[i];
-      if (!entity) continue;
-
+    batch.entities.forEach((entity, i) => {
       // Write world-space transform.
-      _dummy.position.set(entity.position[0], entity.position[1], entity.position[2]);
-      _dummy.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
-      _dummy.updateMatrix();
-      mesh.setMatrixAt(i, _dummy.matrix);
+      DUMMY.position.set(entity.position[0], entity.position[1], entity.position[2]);
+      DUMMY.rotation.set(entity.rotation[0], entity.rotation[1], entity.rotation[2]);
+      DUMMY.updateMatrix();
+      mesh.setMatrixAt(i, DUMMY.matrix);
 
       // Write per-instance color.
       // In shaded mode with an assigned material, use the material's diffuse color.
       // Otherwise fall back to the entity's own color.
       // Selection highlight blends on top of whichever base color is active.
-      const baseColor = batch.pbrMaterial ? batch.pbrMaterial.color : entity.color;
-      _color.set(baseColor);
-      if (selectionSet.has(entity.id)) _color.lerp(SELECTED_EMISSIVE, SELECTED_EMISSIVE_INTENSITY);
-      mesh.setColorAt(i, _color);
-    }
+      SCRATCH_COLOR.set(batch.pbrMaterial ? batch.pbrMaterial.color : entity.color);
+      if (selectionSet.has(entity.id)) {
+        SCRATCH_COLOR.lerp(SELECTED_EMISSIVE, SELECTED_EMISSIVE_INTENSITY);
+      }
+      mesh.setColorAt(i, SCRATCH_COLOR);
+    });
 
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) {
-      mesh.instanceColor.needsUpdate = true;
-    }
-  }, [entitySignature, batch.entities, batch.pbrMaterial, selectionSet, _dummy, _color]);
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [batch.entities, batch.pbrMaterial, selectionSet]);
 
   // For xray, selected instances get a slightly higher opacity. Since THREE
   // InstancedMesh does not support per-instance opacity, we use the uniform

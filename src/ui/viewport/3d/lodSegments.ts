@@ -1,31 +1,18 @@
 /**
  * @layer ui/viewport/3d
  *
- * LOD segment-count helper for curved THREE geometries (sphere, cylinder, cone, torus).
+ * Segment count for curved THREE geometries (sphere, cylinder, cone, torus), picked once when the
+ * geometry is memoized from the entity's size: small objects need far fewer segments, and a
+ * static count avoids full three.js LOD objects (extra geometries + per-frame distance checks).
  *
- * Rationale: a sphere at radius=0.5 world unit needs far fewer radial segments
- * than one at radius=50 world units for the same visual quality. Rather than
- * building full three.js LOD objects (which require separate geometry instances
- * and camera distance tracking every frame), we pick a static segment count at
- * geometry memo time from the entity's bounding-box diagonal. This is cheaper,
- * sufficient for our entity counts, and avoids per-frame LOD evaluation cost.
+ *   segments = clamp(8 + floor(log2(diag) * 4), 8, 64)    e.g. diag 4 → 16, 16 → 24, 64 → 32
  *
- * Formula:  segments = clamp(8 + floor(log2(diag) * 4), 8, 64)
- *   diag ≤ 1  → 8   segments (tiny object, save triangles)
- *   diag = 4  → 16  segments
- *   diag = 16 → 24  segments
- *   diag = 64 → 32  segments
- *   diag ≥ huge → capped at 64
- *
- * @pure — no side effects, only arithmetic.
+ * @pure
  */
 
 /**
- * Compute radial segment count for curved geometry based on bounding-box diagonal.
- *
- * @param diag - The longest diagonal of the entity's axis-aligned bounding box (world units).
- *               Must be positive; clamps to a minimum of 1e-6 internally.
- * @returns Integer segment count in [8, 64].
+ * Radial segment count for a bounding-box diagonal `diag` (world units; clamped to ≥ 1e-6).
+ * @returns integer in [8, 64]
  */
 export function radialSegmentsForDiag(diag: number): number {
   const safeDiag = Math.max(diag, 1e-6);
@@ -34,9 +21,8 @@ export function radialSegmentsForDiag(diag: number): number {
 }
 
 /**
- * Diagonal of a sphere's bounding box = 2 * radius * sqrt(3).
- * Simplified to 2 * radius * 1.732 ≈ diameter * 1.732.
- * For segment purposes we can use `2 * radius` (diameter) — good enough heuristic.
+ * Size heuristic for a sphere's segment count: its diameter (the true bounding-box diagonal
+ * would be diameter × √3).
  *
  * @pure
  */
@@ -56,10 +42,7 @@ export function cylinderDiag(radius: number, height: number): number {
 }
 
 /**
- * Diagonal of a torus bounding box.
- * Outer diameter = 2*(ringRadius + tubeRadius) in both X and Y.
- * Height in Z = 2*tubeRadius.
- * sqrt(outerDiam^2 + outerDiam^2 + (2*tubeRadius)^2) — use outer diameter as heuristic.
+ * Size heuristic for a torus's segment count: its outer diameter, 2 * (ringRadius + tubeRadius).
  *
  * @pure
  */
