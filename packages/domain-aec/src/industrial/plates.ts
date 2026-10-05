@@ -9,7 +9,6 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
 import { boltSize } from './evaluate';
@@ -53,9 +52,9 @@ export const addBasePlates = defineCommand({
     boltDiameter: z.number().optional().describe('Bolt diameter. Default 24 mm (M24).'),
   }),
   run: (doc, params): CommandResult => {
-    const positive = (value: number | undefined): boolean =>
-      value === undefined || (isFiniteNumber(value) && value > 0);
-    if (!positive(params.margin) || !positive(params.thickness) || !positive(params.boltDiameter)) {
+    const { margin, thickness, boltDiameter } = params;
+    const positive = (value: number | undefined): boolean => value === undefined || value > 0;
+    if (!positive(margin) || !positive(thickness) || !positive(boltDiameter)) {
       return noop(doc, 'add_base_plates failed: margin, thickness and boltDiameter must be > 0.');
     }
     const boltCount = params.boltCount ?? 4;
@@ -72,16 +71,16 @@ export const addBasePlates = defineCommand({
     const columns = columnsWithoutPlates(
       building,
       levelId,
-      Array.isArray(params.memberIds) ? new Set(params.memberIds) : null,
+      params.memberIds ? new Set(params.memberIds) : null,
     );
     if (columns.length === 0) {
       return noop(doc, 'add_base_plates failed: no steel column without a base plate found.');
     }
     const added = appendBasePlates(doc, building, columns, {
-      ...(params.margin !== undefined ? { margin: params.margin } : {}),
-      ...(params.thickness !== undefined ? { thickness: params.thickness } : {}),
+      margin,
+      thickness,
       boltCount,
-      ...(params.boltDiameter !== undefined ? { boltDiameter: params.boltDiameter } : {}),
+      boltDiameter,
     });
     const document = regenerateBuilding(doc, added.building);
     const plates = added.ids.map((id) => added.building.elements[id] as BasePlateElement);

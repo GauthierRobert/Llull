@@ -17,7 +17,6 @@ import {
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
 
@@ -47,14 +46,9 @@ export const addCableTray = defineCommand({
   run: (doc, { points, width, height, system, levelId }): CommandResult => {
     const path = parseRoute(points);
     if (!path) return noop(doc, 'add_cable_tray failed: points must be ≥ 2 [x, y, z] points.');
-    const repeated = hasRepeatedPoint(path);
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedHeight = height ?? fromMm(doc, 60);
-    if (
-      repeated ||
-      !(isFiniteNumber(resolvedWidth) && resolvedWidth > 0) ||
-      !(isFiniteNumber(resolvedHeight) && resolvedHeight > 0)
-    ) {
+    if (hasRepeatedPoint(path) || !(resolvedWidth > 0) || !(resolvedHeight > 0)) {
       return noop(
         doc,
         'add_cable_tray failed: consecutive points must differ, width and height be > 0.',
@@ -71,7 +65,7 @@ export const addCableTray = defineCommand({
       points: path,
       width: resolvedWidth,
       height: resolvedHeight,
-      system: typeof system === 'string' && system.trim() !== '' ? system.trim() : 'power',
+      system: system?.trim() || 'power',
     };
     const document = regenerateBuilding(doc, withElement(resolution.building, tray));
     return {

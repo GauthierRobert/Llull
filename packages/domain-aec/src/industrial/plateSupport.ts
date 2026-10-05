@@ -10,12 +10,12 @@ import { fromMm, nextElementId, nextMark, withElement, withoutElements } from '.
 import { findProfile } from '../steel/profiles';
 
 interface PlateSize {
-  readonly margin?: number;
-  readonly thickness?: number;
-  readonly boltCount?: number;
-  readonly boltDiameter?: number;
+  readonly margin?: number | undefined;
+  readonly thickness?: number | undefined;
+  readonly boltCount?: number | undefined;
+  readonly boltDiameter?: number | undefined;
   /** Stored on the plate only when 'fixed' (absent = pinned). */
-  readonly fixity?: 'pinned' | 'fixed';
+  readonly fixity?: 'pinned' | 'fixed' | undefined;
 }
 
 /** Adds one base plate per column (sized from its profile + margin); no regeneration. */

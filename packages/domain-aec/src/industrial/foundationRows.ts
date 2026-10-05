@@ -5,16 +5,15 @@
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '../model';
-import type { BaseReaction } from './frameModelSolve';
 import {
   BACKFILL_UNIT_WEIGHT,
   CONCRETE_UNIT_WEIGHT,
-  type ClayLayer,
   type Combination,
   DIFFERENTIAL_RATIO,
   FRICTION,
-  type Factors,
+  type FootingCheckContext,
   type FoundationRow,
+  type PadSettlement,
   GAMMA_R_H,
   MAX_UTILISATION,
   MIN_EFFECTIVE_RATIO,
@@ -60,17 +59,12 @@ export const rowOf =
 
 /** Footing check rows (bearing, uplift, overturning, sliding, settlement) of one column's pad. */
 export function footingRows(
-  doc: CadDocument,
-  reaction: BaseReaction,
-  columnMark: string,
+  context: FootingCheckContext,
   footing: FootingElement,
-  soilBearing: number,
-  wind: boolean,
-  slidingHorizontal: (factors: Factors) => number,
-  slabShare: number,
-  soilModulus: number,
-  clayLayer?: ClayLayer,
+  columnMark: string,
 ): FoundationRow[] {
+  const { doc, reaction, soilBearing, wind, slidingHorizontal, slabShare, soilModulus, clayLayer } =
+    context;
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
   const [widthX, lengthY, thickness] = [footing.width, footing.length, footing.thickness].map(
     (value) => toMetres(doc, value),
@@ -191,22 +185,13 @@ export function footingRows(
 
 export function differentialRows(
   doc: CadDocument,
-  settlements: ReadonlyArray<{
-    frame: string;
-    x: number;
-    column: string;
-    footing: FootingElement;
-    settlement: number;
-  }>,
+  settlements: ReadonlyArray<PadSettlement>,
 ): FoundationRow[] {
   let best: FoundationRow | null = null;
   for (const frame of new Set(settlements.map((item) => item.frame))) {
     const ordered = settlements.filter((item) => item.frame === frame).sort((a, b) => a.x - b.x);
     for (let index = 1; index < ordered.length; index++) {
-      const [a, b] = [ordered[index - 1], ordered[index]] as [
-        (typeof ordered)[number],
-        (typeof ordered)[number],
-      ];
+      const [a, b] = [ordered[index - 1], ordered[index]] as [PadSettlement, PadSettlement];
       const spanMm = toMetres(doc, b.x - a.x) * 1000;
       if (spanMm <= 0) continue;
       const limit = spanMm / DIFFERENTIAL_RATIO;

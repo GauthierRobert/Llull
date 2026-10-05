@@ -9,8 +9,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, getBuilding, toMetres } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { dot3, sub3 } from '@lib/vec3';
+import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from './evaluate';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
 
@@ -75,7 +74,7 @@ function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number 
     const ab = sub3(b, a);
     const ap = sub3(point, a);
     const t = Math.max(0, Math.min(1, dot3(ap, ab) / (dot3(ab, ab) || 1)));
-    best = Math.min(best, Math.hypot(ap[0] - ab[0] * t, ap[1] - ab[1] * t, ap[2] - ab[2] * t));
+    best = Math.min(best, Math.hypot(...sub3(ap, scale3(ab, t))));
   }
   return best;
 }
@@ -204,7 +203,7 @@ export const checkClashes = defineCommand({
     if (levelId !== undefined && !building.levels[levelId])
       return noop(doc, `check_clashes failed: no level '${levelId}'.`);
     const resolvedTolerance = tolerance ?? fromMm(doc, 5);
-    if (!(isFiniteNumber(resolvedTolerance) && resolvedTolerance >= 0)) {
+    if (!(resolvedTolerance >= 0)) {
       return noop(doc, 'check_clashes failed: tolerance must be >= 0.');
     }
     const clashes = findClashes(

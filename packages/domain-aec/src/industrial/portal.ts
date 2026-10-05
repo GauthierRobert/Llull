@@ -19,10 +19,10 @@ import {
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
+import { sub3 } from '@lib/vec3';
 import { findProfile, type SteelProfile } from '../steel/profiles';
-import { appendMembers } from './memberSupport';
+import { appendMembers, type MemberSpec } from './memberSupport';
 import {
   appendFootings,
   appendPanel,
@@ -31,7 +31,7 @@ import {
   withoutFootings,
 } from './footingPanelSupport';
 import { portalInputs } from './portalInputs';
-import { buildHallGeometry, type MemberSpec } from './portalGeometry';
+import { buildHallGeometry } from './portalGeometry';
 import { portalFrameParams } from './portalParams';
 import { hallMemberSpecs } from './portalMembers';
 import { claddingPanels, facing } from './portalCladding';
@@ -45,11 +45,7 @@ function steelMass(doc: CadDocument, building: BuildingModel, ids: ReadonlyArray
     const element = building.elements[id];
     if (element?.category !== 'member') return sum;
     const profile = findProfile(element.profile);
-    const length = Math.hypot(
-      element.end[0] - element.start[0],
-      element.end[1] - element.start[1],
-      element.end[2] - element.start[2],
-    );
+    const length = Math.hypot(...sub3(element.end, element.start));
     return sum + (profile ? toMetres(doc, length) * profile.massPerMetre : 0);
   }, 0);
 }
@@ -82,11 +78,7 @@ export const addCraneRunway = defineCommand({
     }
     const length = Math.hypot(params.end[0] - params.start[0], params.end[1] - params.start[1]);
     const spacing = params.supportSpacing ?? fromMm(doc, 6000);
-    if (
-      !(length > 0) ||
-      !(isFiniteNumber(params.railHeight) && params.railHeight > 0) ||
-      !(isFiniteNumber(spacing) && spacing > 0)
-    ) {
+    if (!(length > 0) || !(params.railHeight > 0) || !(spacing > 0)) {
       return noop(
         doc,
         'add_crane_runway failed: distinct points, railHeight > 0 and supportSpacing > 0 required.',
@@ -365,7 +357,7 @@ interface RunwaySpec {
 }
 
 /** Runway beam segments between supports + brackets to the nearest steel column at each support. */
-export function runwayMembers(
+function runwayMembers(
   doc: CadDocument,
   building: BuildingModel,
   levelId: string,

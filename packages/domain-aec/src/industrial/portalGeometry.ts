@@ -4,10 +4,6 @@
  */
 
 import type { SteelProfile } from '../steel/profiles';
-import type { appendMembers } from './memberSupport';
-
-type MemberSpecs = Parameters<typeof appendMembers>[2];
-export type MemberSpec = MemberSpecs[number];
 
 /** Resolved steel sections of a portal hall. */
 export interface PortalProfiles {
@@ -20,7 +16,7 @@ export interface PortalProfiles {
 }
 
 /** One roof slope of a span: from its low end at a column line up to its high end. */
-export interface Slope {
+interface Slope {
   readonly side: -1 | 1;
   readonly lowX: number;
   readonly lowZ: number;

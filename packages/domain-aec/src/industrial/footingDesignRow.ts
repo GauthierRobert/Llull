@@ -5,11 +5,9 @@
  */
 
 import type { BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
-import type { CadDocument } from '@core/model/types';
 import { fromMm, toMetres } from '../model';
 import { round } from '../numeric';
 import { findProfile } from '../steel/profiles';
-import type { BaseReaction } from './frameModelSolve';
 import { findPlate, hasCase, ultimateCombinations } from './foundationCombinations';
 import {
   COVER_MM,
@@ -50,23 +48,15 @@ const emptyRow = {
   combination: '-',
 } as const;
 
-interface FootingDesignInputs {
-  readonly doc: CadDocument;
+interface FootingDesignInputs extends Omit<SizingContext, 'face' | 'crane'> {
   readonly building: BuildingModel;
-  readonly footing: FootingElement;
   readonly column: SteelMemberElement;
-  readonly reaction: BaseReaction;
-  readonly wind: boolean;
   readonly allowShrink: boolean;
-  readonly soilBearing: number;
-  readonly soilModulus: number;
-  readonly clayLayer: SizingContext['clayLayer'];
-  readonly slidingHorizontal: SizingContext['slidingHorizontal'];
-  readonly slabShare: number;
 }
 
 export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutcome {
-  const { doc, building, footing, column, reaction, wind, allowShrink } = inputs;
+  const { building, column, allowShrink, ...sizing } = inputs;
+  const { doc, footing, reaction, wind } = sizing;
   const toMm = (value: number): number => toMetres(doc, value) * 1000;
   const plate = findPlate(building, column.id);
   const profile = findProfile(column.profile);
@@ -93,19 +83,7 @@ export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutc
       },
     };
   }
-  const context: SizingContext = {
-    doc,
-    footing,
-    face,
-    reaction,
-    wind,
-    crane,
-    soilBearing: inputs.soilBearing,
-    soilModulus: inputs.soilModulus,
-    clayLayer: inputs.clayLayer,
-    slidingHorizontal: inputs.slidingHorizontal,
-    slabShare: inputs.slabShare,
-  };
+  const context: SizingContext = { ...sizing, face, crane };
   const currentVerdict = evaluatePad(context, current);
   let size = current;
   let verdict = currentVerdict;

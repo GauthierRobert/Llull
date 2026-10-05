@@ -12,7 +12,7 @@ import type {
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import { fromMm } from '../model';
 import { sweepFrame } from '../mesh';
-import { distanceSq3, dot3, sub3 } from '@lib/vec3';
+import { add3, distanceSq3, dot3, scale3, sub3 } from '@lib/vec3';
 import type { SteelProfile } from '../steel/profiles';
 import { atLevel } from './evaluate';
 import { connectionSolids } from './evaluateConnections';
@@ -68,11 +68,7 @@ export function round2(value: number): number {
 /** Rafter end cut: the end plate is vertical, so the cut equals the roof pitch. */
 function pitchCut(member: SteelMemberElement): number {
   if (member.role !== 'rafter') return 0;
-  const [dx, dy, dz] = [
-    member.end[0] - member.start[0],
-    member.end[1] - member.start[1],
-    member.end[2] - member.start[2],
-  ];
+  const [dx, dy, dz] = sub3(member.end, member.start);
   const horizontal = Math.hypot(dx, dy);
   if (horizontal <= 0.2 * Math.hypot(dx, dy, dz)) return 0;
   return round2((Math.atan2(Math.abs(dz), horizontal) * 180) / Math.PI);
@@ -100,7 +96,7 @@ function endPlateCutback(
     );
     for (const solid of plates ?? []) {
       const atStart = distanceSq3(solid.origin, start) <= distanceSq3(solid.origin, end);
-      const into: Vec3 = atStart ? direction : [-direction[0], -direction[1], -direction[2]];
+      const into = atStart ? direction : scale3(direction, -1);
       const joint = atStart ? start : end;
       const slope = dot3(into, solid.along);
       if (slope <= 1e-6) continue;
@@ -144,11 +140,7 @@ function memberHoles(
     for (const solid of solids) {
       if (!solid.part.startsWith('bolt-')) continue;
       const [cx, cy] = outlineMean(solid.outline);
-      const centre: Vec3 = [
-        solid.origin[0] + solid.x[0] * cx + solid.y[0] * cy,
-        solid.origin[1] + solid.x[1] * cx + solid.y[1] * cy,
-        solid.origin[2] + solid.x[2] * cx + solid.y[2] * cy,
-      ];
+      const centre = add3(add3(solid.origin, scale3(solid.x, cx)), scale3(solid.y, cy));
       const offset = sub3(centre, start);
       const throughFlange =
         Math.abs(dot3(solid.along, frame.v)) >= Math.abs(dot3(solid.along, frame.u));

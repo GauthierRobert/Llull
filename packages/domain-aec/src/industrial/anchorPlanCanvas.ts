@@ -4,6 +4,7 @@
 
 import type { Vec2 } from '@core/model/types';
 import { escapeXml } from '@lib/escapeXml';
+import { distance } from '@lib/polygon';
 import type { Viewport } from '../sheet';
 import { ROW_HEIGHT, n } from './anchorPlanLayout';
 
@@ -44,7 +45,7 @@ export class PlanCanvas {
   /** Aligned dimension between two model points, drawn `side` paper-mm off the measured line. */
   dimension(a: Vec2, b: Vec2, side: number, label: string): void {
     const [pa, pb] = [this.map(a), this.map(b)];
-    const length = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
+    const length = distance(pa, pb);
     if (length === 0) return;
     const normal: Vec2 = [(pb[1] - pa[1]) / length, -(pb[0] - pa[0]) / length];
     const shift = (p: Vec2, d: number): Vec2 => [p[0] + normal[0] * d, p[1] + normal[1] * d];

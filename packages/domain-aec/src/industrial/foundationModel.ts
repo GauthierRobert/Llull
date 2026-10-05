@@ -1,3 +1,6 @@
+import type { FootingElement } from '@core/model/building';
+import type { CadDocument } from '@core/model/types';
+import type { BaseReaction } from './frameModelSolve';
 import type { LoadCase } from './frameModelTypes';
 
 export interface FoundationRow {
@@ -32,6 +35,15 @@ export interface ClayLayer {
   readonly preconsolidationPressure?: number | undefined;
 }
 
+/** Settlement (mm) of the pad under one frame column, `x` along the frame in document units. */
+export interface PadSettlement {
+  readonly frame: string;
+  readonly x: number;
+  readonly column: string;
+  readonly footing: FootingElement;
+  readonly settlement: number;
+}
+
 export type Factors = Partial<Record<LoadCase, number>>;
 
 export interface Combination {
@@ -39,40 +51,33 @@ export interface Combination {
   readonly factors: Factors;
 }
 
-export const CONCRETE_UNIT_WEIGHT = 25;
+/** Loads and soil parameters shared by every footing check row of one column. */
+export interface FootingCheckContext {
+  readonly doc: CadDocument;
+  readonly reaction: BaseReaction;
+  readonly wind: boolean;
+  readonly soilBearing: number;
+  readonly soilModulus: number;
+  readonly clayLayer: ClayLayer | undefined;
+  readonly slidingHorizontal: (factors: Factors) => number;
+  readonly slabShare: number;
+}
 
-// kN/m³
-export const BACKFILL_UNIT_WEIGHT = 18;
-
-// kN/m³
+export const CONCRETE_UNIT_WEIGHT = 25; // kN/m³
+export const BACKFILL_UNIT_WEIGHT = 18; // kN/m³
+export const WATER_UNIT_WEIGHT = 9.81; // kN/m³
+export const DEFAULT_CLAY_UNIT_WEIGHT = 19; // kN/m³
 export const FRICTION = 0.45;
-
 /** EN 1997-1 DA2 partial factor on sliding resistance. */
 export const GAMMA_R_H = 1.1;
-
 export const MAX_UTILISATION = 99;
-
 export const MIN_EFFECTIVE_RATIO = 0.01;
-
 export const TOLERANCE_METRES = 0.1;
-
 /** 2 × H16 B500 bars: 2 × 201 mm² × 435 N/mm², kN. */
 export const DEFAULT_TIE_CAPACITY = 175;
-
-// MPa
 export const POISSON_RATIO = 0.3;
-
 /** Influence factor of a rigid square footing (elastic half-space; flexible centre = 1.12). */
 export const SETTLEMENT_INFLUENCE = 0.88;
-
 export const SETTLEMENT_LIMIT_MM = 25;
-
 export const DIFFERENTIAL_RATIO = 500;
-
-export const WATER_UNIT_WEIGHT = 9.81;
-
-// kN/m³
-export const DEFAULT_CLAY_UNIT_WEIGHT = 19;
-
-// kN/m³
 export const CONSOLIDATION_SUBLAYERS = 5;

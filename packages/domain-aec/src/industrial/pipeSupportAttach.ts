@@ -11,7 +11,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { fromMm } from '../model';
 import { collectSteelBars, modelUnits, type SteelBar } from './steelMemberBars';
 import { nearestOnRoute, RISER_SLOPE } from './routeSupport';
-import { pipeRunOf } from './pipeSupportLayout';
+import { absolutePointMm, pipeRunOf } from './pipeSupportLayout';
 import {
   bearingOf,
   findBearingMember,
@@ -25,7 +25,7 @@ export const REACH: Readonly<Record<'below' | 'above', number>> = { below: 500, 
 export const PLAN_TOLERANCE = 100;
 
 /** Drops unit-conversion noise (1e-9 of a document unit). */
-const clean = (value: number): number => Math.round(value * 1e9) / 1e9;
+export const clean = (value: number): number => Math.round(value * 1e9) / 1e9;
 
 /** The steel a support bears on, in mm. */
 export interface Bearing {
@@ -91,7 +91,7 @@ export function attachmentFields(
   };
 }
 
-export interface SupportChange {
+interface SupportChange {
   readonly id: string;
   readonly mark: string;
   /** Mark of the member before / after (null = unattached). */
@@ -170,12 +170,7 @@ export function reconcilePipeSupports(
     const pipe = next.elements[support.pipeId];
     if (pipe?.category !== 'pipe') continue;
     const run = pipeRunOf(units, pipe);
-    const base = units.elevationMm(support.levelId);
-    const point: Vec3 = [
-      units.toMm(support.position[0]),
-      units.toMm(support.position[1]),
-      base + units.toMm(support.position[2]),
-    ];
+    const point = absolutePointMm(units, support.levelId, support.position);
     const riser = isRiserPoint(run.points, point);
     const current =
       (riser ? (support.standoff ?? 0) : support.rodLength + support.pedestalHeight) / unit;

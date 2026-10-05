@@ -6,12 +6,12 @@
  */
 
 import { anchorBoltResistance } from './steelDesign';
+import { FCD } from './footingModel';
+import { MAX_UTILISATION } from './foundationModel';
 
-const FCD = 25 / 1.5; // C25/30, N/mm²
 const CONCENTRATION_FACTOR = 1.5;
 /** Concrete bearing strength fjd = 2/3 × 1.5 × fcd (C25/30), N/mm². */
 export const BEARING_STRENGTH = (2 / 3) * FCD * CONCENTRATION_FACTOR;
-const MAX_UTILISATION = 99;
 const BISECTION_STEPS = 60;
 const MIN_TENSION_LEVER = 20;
 

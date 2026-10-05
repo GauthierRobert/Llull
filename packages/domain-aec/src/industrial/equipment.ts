@@ -19,7 +19,6 @@ import {
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { toVec3 } from './memberSupport';
 import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from './pipeSizes';
@@ -62,13 +61,7 @@ export const addEquipment = defineCommand({
       return noop(doc, 'add_equipment failed: size must be [length, width, height], all > 0.');
     }
     const resolvedClearance = clearance ?? fromMm(doc, 800);
-    if (
-      !isFiniteNumber(angle) ||
-      !isFiniteNumber(resolvedClearance) ||
-      resolvedClearance < 0 ||
-      !isFiniteNumber(weight) ||
-      weight < 0
-    ) {
+    if (resolvedClearance < 0 || weight < 0) {
       return noop(doc, 'add_equipment failed: angle finite, clearance >= 0 and weight >= 0.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
@@ -164,9 +157,8 @@ export const addPipeRun = defineCommand({
         `add_pipe_run failed: DN${dn} is not in the pipe size table (${known}); give an explicit diameter.`,
       );
     }
-    const repeated = hasRepeatedPoint(path);
     const resolvedDiameter = diameter ?? fromMm(doc, tabulated ?? 114.3);
-    if (repeated || !isFiniteNumber(resolvedDiameter) || resolvedDiameter <= 0) {
+    if (hasRepeatedPoint(path) || resolvedDiameter <= 0) {
       return noop(doc, 'add_pipe_run failed: consecutive points must differ and diameter be > 0.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);

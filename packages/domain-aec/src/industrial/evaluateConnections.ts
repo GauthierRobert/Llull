@@ -16,10 +16,11 @@ import { fromMm } from '../model';
 import { base, colorForMaterial, meshEntity, orientedBox } from '../entities';
 import { prismMesh, sweepFrame } from '../mesh';
 import { findProfile } from '../steel/profiles';
+import { add3, scale3, sub3 } from '@lib/vec3';
 import { atLevel, boltSize } from './evaluate';
 
-/** World placement of a base plate and its anchor bolts (null when the column is missing). */
-interface PlateLayout {
+/** World placement of a base plate and its anchor bolts. */
+export interface PlateLayout {
   /** Plate centre (world). */
   readonly center: Vec3;
   /** Plan angle of the plate length axis (the column depth direction). */
@@ -171,12 +172,7 @@ export function connectionSolids(
   const columnProfile = other ? findProfile(other.profile) : undefined;
   const offset =
     connection.kind === 'eaves' && columnProfile ? mm(columnProfile.h) / 2 / plate.slope : 0;
-  const at = (s: number): Vec3 => [
-    joint[0] + frame.d[0] * s,
-    joint[1] + frame.d[1] * s,
-    joint[2] + frame.d[2] * s,
-  ];
-  const face = at(offset);
+  const face = add3(joint, scale3(frame.d, offset));
   const rectangle = (x0: number, x1: number, y0: number, y1: number): Vec2[] => [
     [x0, y0],
     [x1, y0],
@@ -195,8 +191,7 @@ export function connectionSolids(
     },
   ];
   if (connection.kind === 'apex' && other) {
-    const distanceTo = (point: Vec3): number =>
-      Math.hypot(point[0] - joint[0], point[1] - joint[1], point[2] - joint[2]);
+    const distanceTo = (point: Vec3): number => Math.hypot(...sub3(point, joint));
     const nearerEnd =
       distanceTo(atLevel(level, other.start)) <= distanceTo(atLevel(level, other.end))
         ? 'start'
@@ -217,7 +212,6 @@ export function connectionSolids(
   if (haunchDepth > 0) {
     // The haunch is cut vertically where it meets the (vertical) end plate.
     const tanSlope = plate.slope < 1 ? frame.d[2] / plate.slope : 0;
-    const minusV: Vec3 = [-frame.v[0], -frame.v[1], -frame.v[2]];
     solids.push({
       part: 'haunch',
       outline: [
@@ -225,13 +219,9 @@ export function connectionSolids(
         [connection.haunchLength, h / 2],
         [-(h / 2 + haunchDepth) * tanSlope, h / 2 + haunchDepth],
       ],
-      origin: [
-        face[0] - (frame.u[0] * b) / 2,
-        face[1] - (frame.u[1] * b) / 2,
-        face[2] - (frame.u[2] * b) / 2,
-      ],
+      origin: sub3(face, scale3(frame.u, b / 2)),
       x: frame.d,
-      y: minusV,
+      y: scale3(frame.v, -1),
       along: frame.u,
       depth: b,
     });
@@ -245,11 +235,7 @@ export function connectionSolids(
   });
   const rows = Math.max(1, connection.boltRows);
   // Through the end plate and the column flange / the other end plate.
-  const boltStart: Vec3 = [
-    face[0] - plate.along[0] * (t + connection.boltDiameter),
-    face[1] - plate.along[1] * (t + connection.boltDiameter),
-    face[2] - plate.along[2] * (t + connection.boltDiameter),
-  ];
+  const boltStart = sub3(face, scale3(plate.along, t + connection.boltDiameter));
   for (let row = 0; row < rows; row++) {
     const y = rows === 1 ? 0 : top - edge - ((top - bottom - 2 * edge) * row) / (rows - 1);
     for (const x of [-gauge, gauge]) {

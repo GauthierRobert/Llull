@@ -11,9 +11,12 @@ import type {
 } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { fromMm, nextElementId, nextMark, withElement, withoutElements } from '../model';
+import { sub3 } from '@lib/vec3';
 import { findProfile } from '../steel/profiles';
 
-const distance = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const distance = (a: Vec3, b: Vec3): number => Math.hypot(...sub3(a, b));
+
+type MomentJoint = Pick<MomentConnectionElement, 'kind' | 'rafterId' | 'end' | 'otherId'>;
 
 /** Unconnected rafter joints of `members`: rafter end on a column top (eaves) or a rafter end (apex). */
 export function findMomentJoints(
@@ -21,7 +24,7 @@ export function findMomentJoints(
   levelId: string,
   rafterIds: ReadonlySet<string> | null,
   tolerance: number,
-): Array<Pick<MomentConnectionElement, 'kind' | 'rafterId' | 'end' | 'otherId'>> {
+): MomentJoint[] {
   const members = Object.values(building.elements).filter(
     (element): element is SteelMemberElement =>
       element.category === 'member' && element.levelId === levelId,
@@ -36,7 +39,7 @@ export function findMomentJoints(
       .filter((element) => element.kind === 'apex')
       .map((element) => pairKey(element.rafterId, element.otherId)),
   );
-  const joints: Array<Pick<MomentConnectionElement, 'kind' | 'rafterId' | 'end' | 'otherId'>> = [];
+  const joints: MomentJoint[] = [];
   for (const rafter of members) {
     if (rafter.role !== 'rafter' || (rafterIds && !rafterIds.has(rafter.id))) continue;
     for (const end of ['start', 'end'] as const) {
@@ -68,9 +71,9 @@ export function findMomentJoints(
 }
 
 interface ConnectionSize {
-  readonly plateThickness?: number;
-  readonly boltDiameter?: number;
-  readonly haunchLength?: number;
+  readonly plateThickness?: number | undefined;
+  readonly boltDiameter?: number | undefined;
+  readonly haunchLength?: number | undefined;
 }
 
 /** Adds a moment connection per joint (no regeneration). */
@@ -78,7 +81,7 @@ export function appendConnections(
   doc: Pick<CadDocument, 'units'>,
   building: BuildingModel,
   levelId: string,
-  joints: ReadonlyArray<Pick<MomentConnectionElement, 'kind' | 'rafterId' | 'end' | 'otherId'>>,
+  joints: ReadonlyArray<MomentJoint>,
   size: ConnectionSize,
 ): { building: BuildingModel; ids: string[] } {
   let next = building;

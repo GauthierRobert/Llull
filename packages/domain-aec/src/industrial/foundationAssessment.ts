@@ -4,13 +4,16 @@
  * @pure
  */
 
-import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { getBuilding } from '../model';
 import type { FrameLoads } from './frameModelTypes';
 import { baseReactions } from './frameModelSolve';
-import { type ClayLayer, type FoundationRow, MAX_UTILISATION } from './foundationModel';
-import { DEFAULT_SOIL_MODULUS } from './soilParams';
+import {
+  type ClayLayer,
+  type FoundationRow,
+  MAX_UTILISATION,
+  type PadSettlement,
+} from './foundationModel';
 import { differentialRows, footingRows } from './foundationRows';
 import { plateRows } from './foundationPlateRows';
 import { groundSlabWeight, slidingHorizontalOf } from './foundationThrust';
@@ -35,7 +38,7 @@ export function checkFoundations(
   soilBearing: number,
   thrustTie: boolean,
   tieCapacity: number,
-  soilModulus: number = DEFAULT_SOIL_MODULUS,
+  soilModulus: number,
   clayLayer?: ClayLayer,
 ): { rows: FoundationRow[]; footings: number; plates: number; unchecked: number } {
   const building = getBuilding(doc);
@@ -47,13 +50,7 @@ export function checkFoundations(
   const checkedFootings = new Set<string>();
   const tieDone = new Set<string>();
   const slabWeight = thrustTie ? groundSlabWeight(doc, building, levelId) : 0;
-  const settlements: Array<{
-    frame: string;
-    x: number;
-    column: string;
-    footing: FootingElement;
-    settlement: number;
-  }> = [];
+  const settlements: PadSettlement[] = [];
   const slabShare = reactions.length > 0 ? slabWeight / reactions.length : 0;
   for (const reaction of reactions) {
     const column = building.elements[reaction.columnId];
@@ -95,16 +92,18 @@ export function checkFoundations(
       checkedFootings.add(footing.id);
       rows.push(
         ...footingRows(
-          doc,
-          reaction,
-          column.mark,
+          {
+            doc,
+            reaction,
+            wind,
+            soilBearing,
+            soilModulus,
+            clayLayer,
+            slidingHorizontal,
+            slabShare,
+          },
           footing,
-          soilBearing,
-          wind,
-          slidingHorizontal,
-          slabShare,
-          soilModulus,
-          clayLayer,
+          column.mark,
         ),
       );
       settlements.push({

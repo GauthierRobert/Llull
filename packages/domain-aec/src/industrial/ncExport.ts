@@ -16,7 +16,12 @@ import { fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { sweepFrame } from '../mesh';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
-import { connectionSolids, plateLayout } from './evaluateConnections';
+import {
+  connectionSolids,
+  plateLayout,
+  type ConnectionSolid,
+  type PlateLayout,
+} from './evaluateConnections';
 import { buildFiles, type NcFile } from './ncFiles';
 import {
   ANCHOR_HOLE_CLEARANCE_MM,
@@ -77,9 +82,6 @@ function platePiece(
   };
 }
 
-type PlateLayout = NonNullable<ReturnType<typeof plateLayout>>;
-type ConnectionSolids = NonNullable<ReturnType<typeof connectionSolids>>;
-
 function basePlatePiece(doc: CadDocument, plate: BasePlateElement, layout: PlateLayout): NcPiece {
   const [cos, sin] = [Math.cos(layout.angle), Math.sin(layout.angle)];
   const mm = (value: number): number => value / fromMm(doc, 1);
@@ -107,7 +109,7 @@ function basePlatePiece(doc: CadDocument, plate: BasePlateElement, layout: Plate
 function endPlatePieces(
   doc: CadDocument,
   connection: MomentConnectionElement,
-  solids: ConnectionSolids,
+  solids: ReadonlyArray<ConnectionSolid>,
 ): NcPiece[] {
   const mm = (value: number): number => value / fromMm(doc, 1);
   const outline = solids.find((solid) => solid.part === 'plate')?.outline;

@@ -5,7 +5,6 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 import { DEFAULT_TIE_CAPACITY } from './foundationModel';
 import { SOIL_SHAPE, soilInputs } from './soilParams';
@@ -70,7 +69,7 @@ export const foundationCheck = defineCommand({
     if ('reason' in resolved) return noop(doc, `check_foundations failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     const tieCapacity = params.tieCapacity ?? DEFAULT_TIE_CAPACITY;
-    if (!isFiniteNumber(tieCapacity) || tieCapacity <= 0) {
+    if (tieCapacity <= 0) {
       return noop(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
     }
     const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);

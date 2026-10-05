@@ -9,7 +9,6 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
 import { boltSize } from './evaluate';
@@ -63,13 +62,9 @@ export const addMomentConnections = defineCommand({
       .describe('Eaves haunch length along the rafter. Default 1/5 of its plan length.'),
   }),
   run: (doc, params): CommandResult => {
-    const positive = (value: number | undefined): boolean =>
-      value === undefined || (isFiniteNumber(value) && value > 0);
-    if (
-      !positive(params.plateThickness) ||
-      !positive(params.boltDiameter) ||
-      !positive(params.haunchLength)
-    ) {
+    const { plateThickness, boltDiameter, haunchLength } = params;
+    const positive = (value: number | undefined): boolean => value === undefined || value > 0;
+    if (!positive(plateThickness) || !positive(boltDiameter) || !positive(haunchLength)) {
       return noop(
         doc,
         'add_moment_connections failed: plateThickness, boltDiameter and haunchLength must be > 0.',
@@ -83,7 +78,7 @@ export const addMomentConnections = defineCommand({
     const joints = findMomentJoints(
       building,
       levelId,
-      Array.isArray(params.rafterIds) ? new Set(params.rafterIds) : null,
+      params.rafterIds ? new Set(params.rafterIds) : null,
       fromMm(doc, 10),
     );
     if (joints.length === 0) {
@@ -93,9 +88,9 @@ export const addMomentConnections = defineCommand({
       );
     }
     const added = appendConnections(doc, building, levelId, joints, {
-      ...(params.plateThickness !== undefined ? { plateThickness: params.plateThickness } : {}),
-      ...(params.boltDiameter !== undefined ? { boltDiameter: params.boltDiameter } : {}),
-      ...(params.haunchLength !== undefined ? { haunchLength: params.haunchLength } : {}),
+      plateThickness,
+      boltDiameter,
+      haunchLength,
     });
     const document = regenerateBuilding(doc, added.building);
     const connections = added.ids.map(
