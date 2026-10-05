@@ -11,32 +11,40 @@ export type Vec3 = readonly [number, number, number];
 /** 2D coordinate in a local work plane. */
 export type Vec2 = readonly [number, number];
 
-export type DocumentUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
+export const DOCUMENT_UNITS = ['mm', 'cm', 'm', 'in', 'ft'] as const;
 
-export type SolidKind =
-  | 'box'
-  | 'cylinder'
-  | 'sphere'
-  | 'extrusion'
-  | 'mesh'
-  | 'cone'
-  | 'torus'
-  | 'wedge'
-  | 'pyramid'
-  | 'revolution';
+export type DocumentUnit = (typeof DOCUMENT_UNITS)[number];
+
+export const SOLID_KINDS = [
+  'box',
+  'cylinder',
+  'sphere',
+  'extrusion',
+  'mesh',
+  'cone',
+  'torus',
+  'wedge',
+  'pyramid',
+  'revolution',
+] as const;
+
+export type SolidKind = (typeof SOLID_KINDS)[number];
 
 /** 2D drafting kinds. Geometry is LOCAL to the work plane; BaseEntity.position places that plane in 3D. */
-export type Shape2DKind =
-  | 'line'
-  | 'polyline'
-  | 'arc'
-  | 'circle'
-  | 'rectangle'
-  | 'point'
-  | 'ellipse'
-  | 'spline'
-  | 'text'
-  | 'dimension';
+export const SHAPE2D_KINDS = [
+  'line',
+  'polyline',
+  'arc',
+  'circle',
+  'rectangle',
+  'point',
+  'ellipse',
+  'spline',
+  'text',
+  'dimension',
+] as const;
+
+export type Shape2DKind = (typeof SHAPE2D_KINDS)[number];
 
 export type EntityKind = SolidKind | Shape2DKind | 'instance';
 
@@ -256,25 +264,14 @@ export type Entity =
   | DimensionEntity
   | InstanceEntity;
 
-const SHAPE2D_KINDS: ReadonlySet<string> = new Set<Shape2DKind>([
-  'line',
-  'polyline',
-  'arc',
-  'circle',
-  'rectangle',
-  'point',
-  'ellipse',
-  'spline',
-  'text',
-  'dimension',
-]);
+const SHAPE2D_KIND_SET: ReadonlySet<string> = new Set(SHAPE2D_KINDS);
 
 export function is2D(e: Entity): boolean {
-  return SHAPE2D_KINDS.has(e.kind);
+  return SHAPE2D_KIND_SET.has(e.kind);
 }
 
 export function is3D(e: Entity): boolean {
-  return !SHAPE2D_KINDS.has(e.kind);
+  return !SHAPE2D_KIND_SET.has(e.kind);
 }
 
 export interface Layer {
@@ -397,13 +394,16 @@ export type EntityRef =
   | { readonly entityId: string }
   | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
 
-export type ConstraintKind =
-  | 'coincident'
-  | 'parallel'
-  | 'perpendicular'
-  | 'tangent'
-  | 'distance'
-  | 'angle';
+export const CONSTRAINT_KINDS = [
+  'coincident',
+  'parallel',
+  'perpendicular',
+  'tangent',
+  'distance',
+  'angle',
+] as const;
+
+export type ConstraintKind = (typeof CONSTRAINT_KINDS)[number];
 
 interface ConstraintBase<K extends ConstraintKind> {
   readonly id: string;

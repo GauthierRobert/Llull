@@ -20,27 +20,25 @@ type BatchIds =
  * Validate and split the `ids` of a batch command (`delete_entities`, `move_entities`).
  *
  * @pure
- * @param emptyDetail summary text (after `<command>: `) used when `ids` is empty or malformed
- * @failure empty/malformed, > MAX_BATCH_IDS, or no listed entity exists -> `{ ok: false, result }` no-op
+ * @param emptyDetail summary text (after `<command>: `) used when `ids` is empty
+ * @failure empty, > MAX_BATCH_IDS, or no listed entity exists -> `{ ok: false, result }` no-op
  * @invariant `existing` and `missing` are de-duplicated, in first-seen order
  */
 function resolveBatchIds(
   doc: CadDocument,
   command: string,
-  ids: readonly unknown[],
+  ids: readonly string[],
   emptyDetail: string,
 ): BatchIds {
   const fail = (summary: string): BatchIds => ({
     ok: false,
     result: noop(doc, `${command}: ${summary}`),
   });
-  if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== 'string')) {
-    return fail(emptyDetail);
-  }
+  if (ids.length === 0) return fail(emptyDetail);
   if (ids.length > MAX_BATCH_IDS) {
     return fail(`${ids.length} ids exceeds MAX_BATCH_IDS (${MAX_BATCH_IDS}).`);
   }
-  const unique = [...new Set(ids as string[])];
+  const unique = [...new Set(ids)];
   const existing = unique.filter((id) => Object.hasOwn(doc.entities, id));
   const missing = unique.filter((id) => !Object.hasOwn(doc.entities, id));
   if (existing.length === 0) {
@@ -56,7 +54,7 @@ function resolveBatchIds(
  * @affects removes every existing listed entity from entities/order/selection; prunes them from
  *          all group memberIds; dissolves any group left with fewer than 2 members
  * @invariant all remaining group memberIds exist in entities; missing/duplicate ids are skipped
- * @failure ids not a non-empty string array, > MAX_BATCH_IDS ids, or none exist -> no-op, affected:[]
+ * @failure empty ids, > MAX_BATCH_IDS ids, or none exist -> no-op, affected:[]
  */
 export const deleteEntities = defineCommand({
   name: 'delete_entities',

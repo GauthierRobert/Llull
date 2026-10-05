@@ -11,6 +11,7 @@ import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { kernelRefusal } from './kernelRefusal';
 import { replayHistory } from './replay';
+import { unresolvedExpressionsNote } from './replayStep';
 import { noop } from './noop';
 
 /** Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities". */
@@ -59,7 +60,7 @@ function editStep(
  * @invariant featureHistory is preserved unchanged; entities are re-evaluated
  * @failure empty history -> returns doc unchanged, affected:[]
  */
-const replayHistory_cmd = defineCommand({
+const replayHistoryCommand = defineCommand({
   name: 'replay_history',
   description:
     'Recompute the document from scratch by replaying all non-suppressed steps in ' +
@@ -78,13 +79,9 @@ const replayHistory_cmd = defineCommand({
     }
     const regenerated = replayHistory(doc, doc.featureHistory, currentContext().registry, warnings);
     const count = Object.keys(regenerated.entities).length;
-    const warnSuffix =
-      warnings.length > 0
-        ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`
-        : '';
     return {
       document: regenerated,
-      summary: `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${warnSuffix}`,
+      summary: `replay_history: replayed ${doc.featureHistory.length} step(s); ${count} ${count === 1 ? 'entity' : 'entities'} in document.${unresolvedExpressionsNote(warnings)}`,
       affected: regenerated.order,
     };
   },
@@ -113,12 +110,11 @@ const setStepSuppressed = defineCommand({
     suppressed: z.boolean().describe('true to suppress (skip during replay), false to restore.'),
   }),
   annotations: { metaHistory: true, idempotent: true },
-  run: (doc, { stepId, suppressed }): CommandResult => {
-    return editStep(doc, 'set_step_suppressed', stepId, (idx, step) => ({
+  run: (doc, { stepId, suppressed }): CommandResult =>
+    editStep(doc, 'set_step_suppressed', stepId, (idx, step) => ({
       history: doc.featureHistory.map((s, i) => (i === idx ? { ...step, suppressed } : s)),
       done: (n) => `step '${stepId}' suppressed=${String(suppressed)}; regenerated ${n}.`,
-    }));
-  },
+    })),
 });
 
 /**
@@ -149,12 +145,11 @@ const editStepParams = defineCommand({
       ),
   }),
   annotations: { metaHistory: true, idempotent: true },
-  run: (doc, { stepId, params: newParams }): CommandResult => {
-    return editStep(doc, 'edit_step_params', stepId, (idx, step) => ({
+  run: (doc, { stepId, params: newParams }): CommandResult =>
+    editStep(doc, 'edit_step_params', stepId, (idx, step) => ({
       history: doc.featureHistory.map((s, i) => (i === idx ? { ...step, params: newParams } : s)),
       done: (n) => `step '${stepId}' params updated; regenerated ${n}.`,
-    }));
-  },
+    })),
 });
 
 /**
@@ -211,12 +206,11 @@ const deleteStep = defineCommand({
     stepId: z.string().describe('Id of the FeatureStep to delete (from doc.featureHistory[*].id).'),
   }),
   annotations: { metaHistory: true, destructive: true },
-  run: (doc, { stepId }): CommandResult => {
-    return editStep(doc, 'delete_step', stepId, () => ({
+  run: (doc, { stepId }): CommandResult =>
+    editStep(doc, 'delete_step', stepId, () => ({
       history: doc.featureHistory.filter((s) => s.id !== stepId),
       done: (n) => `step '${stepId}' deleted; regenerated ${n}.`,
-    }));
-  },
+    })),
 });
 
 /**
@@ -291,7 +285,7 @@ const insertStep = defineCommand({
 });
 
 export const historyCommands: ReadonlyArray<CommandDefinition<unknown>> = [
-  replayHistory_cmd,
+  replayHistoryCommand,
   setStepSuppressed,
   editStepParams,
   reorderStep,

@@ -45,42 +45,34 @@ export interface ExecutionContext {
 
 let activeContext: ExecutionContext | null = null;
 
+/** The value stored for `key`, created on first use. */
+function getOrCreate<K extends object, V>(store: WeakMap<K, V>, key: K, create: () => V): V {
+  let value = store.get(key);
+  if (value === undefined) {
+    value = create();
+    store.set(key, value);
+  }
+  return value;
+}
+
 /** One memoized wrapper per installed kernel, so the cache survives across executes. */
 const memoizedKernels = new WeakMap<GeometryKernel, GeometryKernel>();
-
-function memoized(kernel: GeometryKernel | null): GeometryKernel | null {
-  if (kernel === null) return null;
-  let wrapper = memoizedKernels.get(kernel);
-  if (wrapper === undefined) {
-    wrapper = memoizeKernel(kernel);
-    memoizedKernels.set(kernel, wrapper);
-  }
-  return wrapper;
-}
 
 const replayCaches = new WeakMap<object, ReplayCache>();
 const NO_KERNEL = {};
 
-function replayCacheFor(kernel: GeometryKernel | null): ReplayCache {
-  const key: object = kernel ?? NO_KERNEL;
-  let cache = replayCaches.get(key);
-  if (cache === undefined) {
-    cache = createReplayCache();
-    replayCaches.set(key, cache);
-  }
-  return cache;
-}
-
 /** Context built from the process defaults: installed kernel (memoized), counter ids, registry. */
 export function defaultContext(): ExecutionContext {
-  const kernel = memoized(getGeometryKernel());
+  const installed = getGeometryKernel();
+  const kernel =
+    installed && getOrCreate(memoizedKernels, installed, () => memoizeKernel(installed));
   return {
     kernel,
     ids: counterIdSource,
     registry: getCommand,
     projectDepth: 0,
     recipeDepth: 0,
-    replayCache: replayCacheFor(kernel),
+    replayCache: getOrCreate(replayCaches, kernel ?? NO_KERNEL, createReplayCache),
   };
 }
 

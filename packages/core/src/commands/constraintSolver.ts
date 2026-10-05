@@ -9,28 +9,22 @@ function resolvePoint(doc: CadDocument, ref: EntityRef): Point | null {
   if (!entity) return null;
 
   const [px, py] = entity.position;
+  const subKind = 'kind' in ref ? ref.kind : undefined;
 
-  // Distinguish named sub-points for line/arc entities.
-  if ('kind' in ref) {
-    const k = entity.kind;
-    const subKind = ref.kind;
-
-    if (k === 'line') {
-      const line = entity as { start: readonly [number, number]; end: readonly [number, number] };
-      if (subKind === 'start') return [line.start[0] + px, line.start[1] + py];
-      if (subKind === 'end') return [line.end[0] + px, line.end[1] + py];
-      if (subKind === 'center' || subKind === 'mid') {
-        return [(line.start[0] + line.end[0]) / 2 + px, (line.start[1] + line.end[1]) / 2 + py];
-      }
-    }
-
-    if (k === 'arc' || k === 'circle') {
-      const circ = entity as { center: readonly [number, number] };
-      if (subKind === 'center') return [circ.center[0] + px, circ.center[1] + py];
+  // Named sub-points of line/arc/circle entities; anything else falls back to the entity position.
+  if (entity.kind === 'line') {
+    const { start, end } = entity;
+    if (subKind === 'start') return [start[0] + px, start[1] + py];
+    if (subKind === 'end') return [end[0] + px, end[1] + py];
+    if (subKind === 'center' || subKind === 'mid') {
+      return [(start[0] + end[0]) / 2 + px, (start[1] + end[1]) / 2 + py];
     }
   }
 
-  // Default: use entity position projected to XY.
+  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center') {
+    return [entity.center[0] + px, entity.center[1] + py];
+  }
+
   return [px, py];
 }
 
@@ -40,11 +34,9 @@ function resolvePoint(doc: CadDocument, ref: EntityRef): Point | null {
  */
 function resolveDirection(doc: CadDocument, ref: EntityRef): [number, number] | null {
   const entity = doc.entities[ref.entityId];
-  if (!entity) return null;
-  if (entity.kind !== 'line') return null;
-  const line = entity as { start: readonly [number, number]; end: readonly [number, number] };
-  const dx = line.end[0] - line.start[0];
-  const dy = line.end[1] - line.start[1];
+  if (entity?.kind !== 'line') return null;
+  const dx = entity.end[0] - entity.start[0];
+  const dy = entity.end[1] - entity.start[1];
   const len = Math.sqrt(dx * dx + dy * dy);
   if (len < 1e-12) return [1, 0];
   return [dx / len, dy / len];
@@ -53,11 +45,7 @@ function resolveDirection(doc: CadDocument, ref: EntityRef): [number, number] | 
 /** Get the radius of a circle or arc entity; null for other kinds. */
 function resolveRadius(doc: CadDocument, ref: EntityRef): number | null {
   const entity = doc.entities[ref.entityId];
-  if (!entity) return null;
-  if (entity.kind === 'circle' || entity.kind === 'arc') {
-    return (entity as { radius: number }).radius;
-  }
-  return null;
+  return entity?.kind === 'circle' || entity?.kind === 'arc' ? entity.radius : null;
 }
 
 /** Per-entity 2D position deltas accumulated in one solver iteration. */

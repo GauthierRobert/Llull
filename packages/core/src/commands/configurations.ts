@@ -5,13 +5,14 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Configuration, Parameter } from '../model/types';
+import type { CadDocument, Configuration } from '../model/types';
 import { kernelRefusal } from './kernelRefusal';
 import { currentContext } from './context';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { reEvaluateAll } from './parameters';
+import { reEvaluateAll, withParameterExpression } from './parameters';
 import { replayHistory } from './replay';
+import { unresolvedExpressionsNote } from './replayStep';
 import { noop } from './noop';
 
 /**
@@ -130,15 +131,11 @@ export const activateConfiguration = defineCommand({
     const changedParams = Object.entries(config.parameterValues).map(
       ([paramName, expression]) => `${paramName}="${expression}"`,
     );
-    const updatedParameters: Record<string, Parameter> = { ...doc.parameters };
-    for (const [paramName, expression] of Object.entries(config.parameterValues)) {
-      // The seed value is kept when evaluation fails (reEvaluateAll retains the last good value).
-      updatedParameters[paramName] = {
-        name: paramName,
-        expression,
-        value: doc.parameters[paramName]?.value ?? 0,
-      };
-    }
+    // The seed value is kept when evaluation fails (reEvaluateAll retains the last good value).
+    const updatedParameters = Object.entries(config.parameterValues).reduce(
+      (table, [paramName, expression]) => withParameterExpression(table, paramName, expression),
+      doc.parameters,
+    );
     const baseDoc: CadDocument = { ...doc, parameters: reEvaluateAll(updatedParameters) };
 
     const warnings: string[] = [];
@@ -155,22 +152,18 @@ export const activateConfiguration = defineCommand({
 
     const entityCount = Object.keys(regenerated.entities).length;
 
-    const parts: string[] = [
-      `activate_configuration '${name}': applied ${changedParams.length} parameter${changedParams.length === 1 ? '' : 's'} (${changedParams.join(', ')})`,
-      `regenerated ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}.`,
-    ];
-    if (unknownParams.length > 0) {
-      parts.push(
-        `Warning: created ${unknownParams.length} new parameter(s) not previously in the document: ${unknownParams.join(', ')}.`,
-      );
-    }
-    if (warnings.length > 0) {
-      parts.push(`Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`);
-    }
+    const createdNote =
+      unknownParams.length > 0
+        ? ` Warning: created ${unknownParams.length} new parameter(s) not previously in the document: ${unknownParams.join(', ')}.`
+        : '';
 
     return {
       document: regenerated,
-      summary: parts.join(' '),
+      summary:
+        `activate_configuration '${name}': applied ${changedParams.length} parameter${changedParams.length === 1 ? '' : 's'} (${changedParams.join(', ')}) ` +
+        `regenerated ${entityCount} ${entityCount === 1 ? 'entity' : 'entities'}.` +
+        createdNote +
+        unresolvedExpressionsNote(warnings),
       affected: regenerated.order,
     };
   },

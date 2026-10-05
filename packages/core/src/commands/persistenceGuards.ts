@@ -1,4 +1,5 @@
-import type { DocumentUnit, EntityKind, Layer, CameraState, Vec3 } from '../model/types';
+import type { Layer, CameraState, Vec3 } from '../model/types';
+import { SHAPE2D_KINDS, SOLID_KINDS } from '../model/types';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
 import { isHexColor } from '../lib/isHexColor';
@@ -28,40 +29,10 @@ function isFiniteVec3(v: unknown): v is Vec3 {
   return Array.isArray(v) && v.length === 3 && v.every(isFiniteNumber);
 }
 
-/** All legal entity kinds (must stay in sync with EntityKind union in types.ts). */
-const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set<EntityKind>([
-  // 3D solids
-  'box',
-  'cylinder',
-  'sphere',
-  'extrusion',
-  'mesh',
-  'cone',
-  'torus',
-  'wedge',
-  'pyramid',
-  'revolution',
-  // 2D shapes
-  'line',
-  'polyline',
-  'arc',
-  'circle',
-  'rectangle',
-  'point',
-  'ellipse',
-  'spline',
-  'text',
-  'dimension',
-  // Assembly
+const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([
+  ...SOLID_KINDS,
+  ...SHAPE2D_KINDS,
   'instance',
-]);
-
-export const VALID_UNITS: ReadonlySet<string> = new Set<DocumentUnit>([
-  'mm',
-  'cm',
-  'm',
-  'in',
-  'ft',
 ]);
 
 export function validateCamera(v: unknown): v is CameraState {

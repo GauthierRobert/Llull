@@ -1,6 +1,7 @@
 import type { CadDocument } from '../model/types';
 import type { CommandResult } from './types';
-import { evaluateExpression, extractReferences } from './expression';
+import type { EvalResult } from './expression';
+import { evaluateExpression, extractReferences, parameterValues } from './expression';
 import { MAX_PROJECT_STEPS } from './limits';
 import { mapStringLeaves } from './regenerate';
 import { isRecord } from '../lib/isRecord';
@@ -51,23 +52,19 @@ export function findUndefinedRef(value: unknown, defined: ReadonlySet<string>): 
 }
 
 export function isPlanAction(value: unknown): value is PlanAction {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { command?: unknown }).command === 'string'
-  );
+  return isRecord(value) && typeof value['command'] === 'string';
 }
 
 /** `{ [key]: {...}, step: { command: string } }` — shared shape of repeat / for_each steps. */
 function isControlStep(value: unknown, key: 'repeat' | 'for_each'): boolean {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const control = value[key];
+  const step = value['step'];
   return (
-    typeof v[key] === 'object' &&
-    v[key] !== null &&
-    typeof v['step'] === 'object' &&
-    v['step'] !== null &&
-    typeof (v['step'] as Record<string, unknown>)['command'] === 'string'
+    typeof control === 'object' &&
+    control !== null &&
+    isRecord(step) &&
+    typeof step['command'] === 'string'
   );
 }
 
@@ -97,12 +94,12 @@ export function rejectPlan(
 
 /** Expression env: every parameter value plus the loop variables (`$i`, `$<as>`). */
 export function buildEnv(doc: CadDocument, extras: Record<string, number>): Record<string, number> {
-  return {
-    ...Object.fromEntries(
-      Object.entries(doc.parameters).map(([name, param]) => [name, param.value]),
-    ),
-    ...extras,
-  };
+  return { ...parameterValues(doc.parameters), ...extras };
+}
+
+/** Evaluate a plan expression (leading `=` optional) over the document parameters. */
+function evaluateOverParameters(raw: string, doc: CadDocument): EvalResult {
+  return evaluateExpression(raw.startsWith('=') ? raw.slice(1) : raw, buildEnv(doc, {}));
 }
 
 /** A `repeat` count: number literal, or expression string (leading `=` optional) over the parameters. */
@@ -113,9 +110,7 @@ export function resolveCount(
   if (typeof raw === 'number') {
     return { count: raw, error: null };
   }
-  const expr = raw.startsWith('=') ? raw.slice(1) : raw;
-  const env = buildEnv(doc, {});
-  const result = evaluateExpression(expr, env);
+  const result = evaluateOverParameters(raw, doc);
   if (!result.ok) return { count: 0, error: `repeat count expression error: ${result.error}` };
   return { count: result.value, error: null };
 }
@@ -129,9 +124,7 @@ export function resolveForEachValues(
   doc: CadDocument,
 ): { values: unknown[]; error: string | null } {
   if (Array.isArray(raw)) return { values: raw, error: null };
-  const expr = raw.startsWith('=') ? raw.slice(1) : raw;
-  const env = buildEnv(doc, {});
-  const result = evaluateExpression(expr, env);
+  const result = evaluateOverParameters(raw, doc);
   if (!result.ok) return { values: [], error: `for_each values expression error: ${result.error}` };
   return { values: [result.value], error: null };
 }

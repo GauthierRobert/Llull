@@ -14,11 +14,12 @@ import { currentContext } from './context';
 import { kernelRefusal } from './kernelRefusal';
 
 /** Parameter names referenced by `=expr` strings anywhere in `params`. */
-export function parametersReadBy(params: unknown, into = new Set<string>()): Set<string> {
+export function parametersReadBy(params: unknown): Set<string> {
+  const names = new Set<string>();
   for (const text of stringLeaves(params)) {
-    if (text.startsWith('=')) for (const name of extractReferences(text.slice(1))) into.add(name);
+    if (text.startsWith('=')) for (const name of extractReferences(text.slice(1))) names.add(name);
   }
-  return into;
+  return names;
 }
 
 /** Names whose evaluated value (or existence) differs between two parameter tables. */
@@ -37,12 +38,10 @@ export function changedParameters(
 const CONSTRAINT_COMMANDS: ReadonlySet<string> = new Set(['add_constraint', 'update_constraint']);
 
 /** Identifiers in every string of `params`, `=` or not (conservative: an id may read as a name). */
-function bareExpressionRefs(params: unknown, into: Set<string>): void {
-  for (const text of stringLeaves(params)) {
-    for (const name of extractReferences(text.startsWith('=') ? text.slice(1) : text)) {
-      into.add(name);
-    }
-  }
+function bareExpressionRefs(params: unknown): string[] {
+  return stringLeaves(params).flatMap((text) => [
+    ...extractReferences(text.startsWith('=') ? text.slice(1) : text),
+  ]);
 }
 
 /**
@@ -55,7 +54,9 @@ function parametersReadByStep(
   depth = 0,
 ): Set<string> {
   const names = parametersReadBy(step.params);
-  if (CONSTRAINT_COMMANDS.has(step.name)) bareExpressionRefs(step.params, names);
+  if (CONSTRAINT_COMMANDS.has(step.name)) {
+    for (const name of bareExpressionRefs(step.params)) names.add(name);
+  }
   if (step.name === 'instantiate_recipe' && depth < 8) {
     const recipeName = (step.params as { name?: unknown } | null)?.name;
     const recipe = typeof recipeName === 'string' ? doc.recipes[recipeName] : undefined;

@@ -35,6 +35,13 @@ export function resolveStepForReplay(
   return remapIds(resolved, idMap);
 }
 
+/** Summary suffix listing the `warnings` collected by `resolveStepForReplay`; empty when none. */
+export function unresolvedExpressionsNote(warnings: readonly string[]): string {
+  return warnings.length > 0
+    ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`
+    : '';
+}
+
 /**
  * Run `cmd` for a replayed `step`; a throw yields `null` (step skipped). On success the id map
  * is extended by zipping the step's recorded `affected` with the result's.

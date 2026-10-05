@@ -28,12 +28,15 @@ function paramString(step: FeatureStep, key: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-type OrderedTable = 'constraints' | 'joints' | 'driveRelations';
-const ORDER_KEY = {
-  constraints: 'constraintOrder',
-  joints: 'jointOrder',
-  driveRelations: 'driveRelationOrder',
-} as const;
+/** The records of an ordered table that no history step produced, with their order. */
+function orphanRecords<T>(
+  table: Readonly<Record<string, T>>,
+  order: readonly string[],
+  affected: ReadonlySet<string>,
+): { records: Record<string, T>; order: string[] } {
+  const ids = order.filter((id) => !affected.has(id) && id in table);
+  return { records: Object.fromEntries(ids.map((id) => [id, table[id] as T])), order: ids };
+}
 
 /** @pure returns the regenerated-table seed (orphans only) to merge into a fresh document. */
 export function orphanState(
@@ -79,22 +82,18 @@ export function orphanState(
           Object.entries(base.components).filter(([key]) => !componentClaims.has(key)),
         );
 
-  const seed = {
-    constraints: {} as CadDocument['constraints'],
-    constraintOrder: [] as string[],
-    joints: {} as CadDocument['joints'],
-    jointOrder: [] as string[],
-    driveRelations: {} as CadDocument['driveRelations'],
-    driveRelationOrder: [] as string[],
-  };
-  for (const table of ['constraints', 'joints', 'driveRelations'] as OrderedTable[]) {
-    const orderKey = ORDER_KEY[table];
-    const orphanIds = base[orderKey].filter((id) => !affected.has(id) && id in base[table]);
-    (seed[table] as Record<string, unknown>) = Object.fromEntries(
-      orphanIds.map((id) => [id, base[table][id]]),
-    );
-    seed[orderKey] = orphanIds;
-  }
+  const constraints = orphanRecords(base.constraints, base.constraintOrder, affected);
+  const joints = orphanRecords(base.joints, base.jointOrder, affected);
+  const driveRelations = orphanRecords(base.driveRelations, base.driveRelationOrder, affected);
 
-  return { materials, components, ...seed };
+  return {
+    materials,
+    components,
+    constraints: constraints.records,
+    constraintOrder: constraints.order,
+    joints: joints.records,
+    jointOrder: joints.order,
+    driveRelations: driveRelations.records,
+    driveRelationOrder: driveRelations.order,
+  };
 }
