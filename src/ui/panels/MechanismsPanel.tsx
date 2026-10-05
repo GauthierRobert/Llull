@@ -215,8 +215,9 @@ function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactEleme
 }
 
 interface MechanismSectionProps {
-  /** Plural section title; lower-cased it names the count, the empty state and the test id. */
+  /** Plural section title; lower-cased it names the count and the empty state. */
   title: string;
+  testId: string;
   listLabel: string;
   listRole: 'list' | 'listbox';
   rows: ReadonlyArray<React.ReactElement>;
@@ -224,6 +225,7 @@ interface MechanismSectionProps {
 
 function MechanismSection({
   title,
+  testId,
   listLabel,
   listRole,
   rows,
@@ -235,7 +237,7 @@ function MechanismSection({
       title={title}
       count={rows.length}
       countLabel={`${rows.length} ${noun}`}
-      testId={`mechanisms-section-${noun}`}
+      testId={testId}
     >
       {rows.length === 0 ? (
         <PanelEmpty compact icon="mechanism" message={`No ${noun} defined.`} />
@@ -275,6 +277,7 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
       <PanelHeader title="Mechanisms" />
       <MechanismSection
         title="Constraints"
+        testId="mechanisms-section-constraints"
         listLabel="Constraint list"
         listRole="listbox"
         rows={orderedValues(constraintOrder, constraints).map((constraint) => (
@@ -288,6 +291,7 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
       />
       <MechanismSection
         title="Joints"
+        testId="mechanisms-section-joints"
         listLabel="Joint list"
         listRole="listbox"
         rows={orderedValues(jointOrder, joints).map((joint) => (
@@ -301,6 +305,7 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
       />
       <MechanismSection
         title="Drive Relations"
+        testId="mechanisms-section-drive relations"
         listLabel="Drive relation list"
         listRole="list"
         rows={orderedValues(driveRelationOrder, driveRelations).map((relation) => (

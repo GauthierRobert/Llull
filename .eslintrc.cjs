@@ -8,7 +8,7 @@ module.exports = {
   plugins: ['@typescript-eslint', 'react-hooks'],
   rules: {
     'react-hooks/rules-of-hooks': 'error',
-    'react-hooks/exhaustive-deps': 'warn',
+    'react-hooks/exhaustive-deps': ['warn', { additionalHooks: '(useDisposable)' }],
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/explicit-function-return-type': ['warn', { allowExpressions: true }],
     'no-console': ['warn', { allow: ['warn', 'error'] }],

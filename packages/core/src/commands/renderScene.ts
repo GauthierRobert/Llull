@@ -1,15 +1,9 @@
 import type { CadDocument, Vec3 } from '../model/types';
 import { ORIGIN, add3 } from '../lib/vec3';
 import { computeSceneSnapshot } from './scene';
-import { boundsCenter } from './sceneBounds';
+import { boundsCenter, boundsRadius } from './sceneBounds';
 import type { RenderViewData, Polygon3D } from './renderTypes';
-import {
-  type ViewName,
-  boundsRadius,
-  cameraForView,
-  cameraBasis,
-  projectPoint,
-} from './renderCamera';
+import { type ViewName, cameraForView, cameraBasis, projectPoint } from './renderCamera';
 import { tessellateEntity } from './renderTessellation';
 import { MAX_POLYGONS, buildSvg } from './renderSvg';
 

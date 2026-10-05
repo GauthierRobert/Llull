@@ -11,7 +11,8 @@ import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import type { CostLine } from '@aec/index';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { OptionSelect, capitalize } from '@ui/panels/OptionSelect';
+import { OptionSelect } from '@ui/panels/OptionSelect';
+import { capitalize } from '@ui/panels/capitalize';
 import { downloadText } from '@ui/download';
 
 const UNIT_LABEL: Readonly<Record<string, string>> = {

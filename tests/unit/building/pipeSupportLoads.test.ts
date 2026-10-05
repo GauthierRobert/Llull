@@ -24,16 +24,18 @@ const lineOf = (doc: CadDocument): LineRow =>
 
 describe('tributaryLengths', () => {
   it('gives half the spans to supports, the whole overhang to a free end', () => {
-    expect(tributaryLengths([1000, 3000], 6000, false, false)).toEqual([2000, 4000]);
+    expect(tributaryLengths([1000, 3000], 6000)).toEqual([2000, 4000]);
   });
 
   it('gives only half the span to an end carried by a nozzle or a header', () => {
-    expect(tributaryLengths([1000, 3000], 6000, true, true)).toEqual([1500, 2500]);
+    expect(tributaryLengths([1000, 3000], 6000, { carriedStart: true, carriedEnd: true })).toEqual([
+      1500, 2500,
+    ]);
   });
 
   it('shares the tributary of supports closer than 100 mm and handles none', () => {
-    expect(tributaryLengths([1000, 1050], 6000, false, false)).toEqual([3000, 3000]);
-    expect(tributaryLengths([], 6000, false, false)).toEqual([]);
+    expect(tributaryLengths([1000, 1050], 6000)).toEqual([3000, 3000]);
+    expect(tributaryLengths([], 6000)).toEqual([]);
   });
 });
 

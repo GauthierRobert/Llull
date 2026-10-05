@@ -10,7 +10,7 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import type { CadDocument, Vec2 } from '@core/model/types';
-import { getBuilding } from '../model';
+import { elementsOf, getBuilding } from '../model';
 import { plateLayout } from './evaluateConnections';
 
 export const TITLE = 'Anchor bolt setting-out plan';
@@ -48,8 +48,6 @@ export function gridRef(axis: GridAxis | null, offsetMm: number): string {
   if (Math.abs(offsetMm) <= OFFSET_TOLERANCE_MM) return axis.mark;
   return `${axis.mark}${offsetMm > 0 ? '+' : '-'}${Math.round(Math.abs(offsetMm))}`;
 }
-
-export const n = (value: number): string => String(Math.round(value * 100) / 100);
 
 /** One base plate placed in plan, all lengths in millimetres. */
 interface PlacedPlate {
@@ -138,9 +136,8 @@ export function placePlates(
       element.category === 'footing' && element.levelId === level.id,
   );
   const placed: PlacedPlate[] = [];
-  for (const id of building.elementOrder) {
-    const plate = building.elements[id];
-    if (plate?.category !== 'plate' || plate.levelId !== level.id) continue;
+  for (const plate of elementsOf(building, 'plate')) {
+    if (plate.levelId !== level.id) continue;
     const member = building.elements[plate.memberId];
     if (member?.category !== 'member' || (member as SteelMemberElement).role !== 'column') continue;
     const layout = plateLayout(doc, plate, member, level);

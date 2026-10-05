@@ -8,7 +8,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Vec2, Vec3 } from '@core/model/types';
-import { ShapeLine } from './PlacedLineObject';
+import { ShapeLine } from './ShapeLine';
 
 const CURVE_SEGMENTS = 64;
 

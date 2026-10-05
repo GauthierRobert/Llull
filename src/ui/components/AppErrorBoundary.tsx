@@ -7,6 +7,7 @@
 
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
+import { errorMessage } from '@lib/errorMessage';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -20,7 +21,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   state: AppErrorBoundaryState = { message: null };
 
   static getDerivedStateFromError(error: unknown): AppErrorBoundaryState {
-    return { message: error instanceof Error ? error.message : String(error) };
+    return { message: errorMessage(error) };
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo): void {

@@ -4,7 +4,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { resolveNumeric } from './expression';
 import { instanceFrameRef } from './instanceFrameRef';
-import { isValidAxis } from './jointsKinematics';
+import { isValidAxis } from '../lib/axis';
 import { noop } from './noop';
 /**
  * @command add_joint

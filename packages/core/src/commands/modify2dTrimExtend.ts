@@ -40,16 +40,13 @@ function resolveLinePair(
 
 /**
  * `id` with its endpoint nearer to the intersection with `boundaryId` (infinite lines) moved onto it;
- * `withinSegments` additionally requires the intersection to lie on both segments.
- * @param done summary lead-in, completed with ` at [x, y].`
+ * `trim` additionally requires the intersection to lie on both segments, `extend` does not.
  */
 function moveEndpointToBoundary(
   doc: CadDocument,
-  command: string,
+  command: 'trim' | 'extend',
   id: string,
   boundaryId: string,
-  withinSegments: boolean,
-  done: string,
 ): CommandResult {
   const pair = resolveLinePair(doc, command, id, boundaryId);
   if ('summary' in pair) return pair;
@@ -58,13 +55,20 @@ function moveEndpointToBoundary(
   if (hit === null) {
     return noop(doc, `${command}: lines ${id} and ${boundaryId} are parallel — no intersection.`);
   }
-  if (withinSegments && (hit.t < -1e-9 || hit.t > 1 + 1e-9 || hit.u < -1e-9 || hit.u > 1 + 1e-9)) {
+  if (
+    command === 'trim' &&
+    (hit.t < -1e-9 || hit.t > 1 + 1e-9 || hit.u < -1e-9 || hit.u > 1 + 1e-9)
+  ) {
     return noop(
       doc,
       `${command}: intersection of ${id} and ${boundaryId} is outside segment bounds.`,
     );
   }
   const point = evalLine(line.start, line.end, hit.t);
+  const done =
+    command === 'trim'
+      ? `Trimmed line ${id} to intersection with ${boundaryId}`
+      : `Extended line ${id} to meet ${boundaryId}`;
   return {
     document: replaceEntity(doc, withNearerEndpointAt(line, point)),
     summary: `${done} at [${point[0].toFixed(3)}, ${point[1].toFixed(3)}].`,
@@ -93,14 +97,7 @@ export const trim = defineCommand({
     boundaryId: z.string().describe('Id of the line entity that acts as the trim boundary.'),
   }),
   run: (doc, { id, boundaryId }): CommandResult =>
-    moveEndpointToBoundary(
-      doc,
-      'trim',
-      id,
-      boundaryId,
-      true,
-      `Trimmed line ${id} to intersection with ${boundaryId}`,
-    ),
+    moveEndpointToBoundary(doc, 'trim', id, boundaryId),
 });
 
 /**
@@ -124,12 +121,5 @@ export const extend = defineCommand({
     boundaryId: z.string().describe('Id of the line entity that acts as the extend boundary.'),
   }),
   run: (doc, { id, boundaryId }): CommandResult =>
-    moveEndpointToBoundary(
-      doc,
-      'extend',
-      id,
-      boundaryId,
-      false,
-      `Extended line ${id} to meet ${boundaryId}`,
-    ),
+    moveEndpointToBoundary(doc, 'extend', id, boundaryId),
 });

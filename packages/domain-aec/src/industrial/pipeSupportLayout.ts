@@ -7,6 +7,7 @@
 
 import type { PipeElement, PipeSupportElement } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
+import { elementsOf } from '../model';
 import type { ModelUnits } from './steelMemberBars';
 import { RISER_SLOPE, arcLengths, nearestOnRoute, spanCoordinate } from './routeSupport';
 import { pipeSpanLimit } from './pipeSpans';
@@ -62,20 +63,12 @@ export function pipeRunOf(units: ModelUnits, element: PipeElement): PipeRun {
 
 /** Every pipe of the building, in model order. */
 export function pipeRunsOf(units: ModelUnits): PipeRun[] {
-  const { building } = units;
-  return building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    return element?.category === 'pipe' ? [pipeRunOf(units, element)] : [];
-  });
+  return elementsOf(units.building, 'pipe').map((pipe) => pipeRunOf(units, pipe));
 }
 
 /** Supports of pipe `pipeId`, in model order. */
 export function supportsOfPipe(units: ModelUnits, pipeId: string): PipeSupportElement[] {
-  const { building } = units;
-  return building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    return element?.category === 'pipeSupport' && element.pipeId === pipeId ? [element] : [];
-  });
+  return elementsOf(units.building, 'pipeSupport').filter((support) => support.pipeId === pipeId);
 }
 
 /** Support stations of a pipe sorted by arc length; unattached supports are listed with `attached` false. */

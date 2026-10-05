@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import type { PolylineEntity } from '@core/model/types';
 import { flattenPoints } from '../../lineGeometry';
-import { ShapeLine } from './PlacedLineObject';
+import { ShapeLine } from './ShapeLine';
 
 export function PolylineRenderer({
   entity: { points, closed, position, color },

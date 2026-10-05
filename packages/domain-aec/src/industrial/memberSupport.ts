@@ -28,7 +28,15 @@ const ROLE_MARK: Readonly<Record<MemberRole, string>> = {
   crane: 'CB',
 };
 
-export const MEMBER_ROLES = Object.keys(ROLE_MARK) as MemberRole[];
+export const MEMBER_ROLES: ReadonlyArray<MemberRole> = [
+  'column',
+  'rafter',
+  'beam',
+  'brace',
+  'purlin',
+  'rail',
+  'crane',
+];
 
 /** Next mark for a member role, e.g. "SC4", "PU12". */
 export function nextMemberMark(building: BuildingModel, role: MemberRole): string {

@@ -7,14 +7,14 @@
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@core/model/building';
-import { fromMm, getBuilding } from '../model';
+import { elementsOf, fromMm, getBuilding } from '../model';
 import { findProfile, sectionProperties, type SteelProfile } from '../steel/profiles';
 import { yieldStrength } from './steelDesign';
 
 /** m/s², converts kg to kN. */
 export const GRAVITY = 9.80665;
 
-type BarKind = 'column' | 'beam' | 'brace' | 'skipped';
+export type BarKind = 'column' | 'beam' | 'brace' | 'skipped';
 
 export interface SteelBar {
   readonly id: string;
@@ -115,9 +115,7 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
     if (element.category === 'plate')
       plateFixities.set(element.memberId, element.fixity ?? 'pinned');
   }
-  for (const id of building.elementOrder) {
-    const element = building.elements[id];
-    if (element?.category !== 'member') continue;
+  for (const element of elementsOf(building, 'member')) {
     const base = elevationMm(element.levelId);
     const point = (value: readonly number[]): Vec3 => [
       toMm(value[0] ?? 0),

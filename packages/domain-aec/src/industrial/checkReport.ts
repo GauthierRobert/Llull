@@ -1,19 +1,7 @@
 import type { BuildingModel } from '@core/model/building';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
-
-/** The first item of highest utilisation; undefined when there is none. */
-export const highestUtilisation = <Item extends { utilisation: number }>(
-  items: readonly Item[],
-): Item | undefined =>
-  items.reduce<Item | undefined>(
-    (best, item) => (best === undefined || item.utilisation > best.utilisation ? item : best),
-    undefined,
-  );
-
-/** The labels of the first 8 items, joined; ", …" follows when there are more. */
-export const briefList = <Item>(items: readonly Item[], label: (item: Item) => string): string =>
-  `${items.slice(0, 8).map(label).join(', ')}${items.length > 8 ? ', …' : ''}`;
+import { briefList, highestUtilisation } from './utilisation';
 
 /** Summary tail of an engineering check: `allOkText`, or up to 8 failing rows (utilisation > 1). */
 export const failureSummary = <Row extends { utilisation: number }>(
@@ -38,6 +26,38 @@ export const checkTable = <Row extends { utilisation: number }>(
   failures: rows.filter((row) => row.utilisation > 1),
   worst: highestUtilisation(rows),
 });
+
+/** Trailing columns of a value-vs-limit check table (purlins, foundations); pair with `limitCells`. */
+export const LIMIT_COLUMNS = [
+  'Check',
+  'Value',
+  'Limit',
+  'Unit',
+  'Utilisation',
+  'Status',
+  'Combination',
+] as const;
+
+/** Cells of `LIMIT_COLUMNS` for one row. */
+export const limitCells = (
+  row: {
+    check: string;
+    value: number;
+    limit: number;
+    unit: string;
+    utilisation: number;
+    combination: string;
+  },
+  status: 'FAIL' | 'OK',
+): (string | number)[] => [
+  row.check,
+  round(row.value),
+  round(row.limit),
+  row.unit,
+  round(row.utilisation),
+  status,
+  row.combination,
+];
 
 /** Level a read-only check runs on: `requested`, else the active / first level; undefined when it does not exist. */
 export const existingLevelId = (

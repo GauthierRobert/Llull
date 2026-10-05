@@ -22,6 +22,7 @@ import {
   nextElementId,
   nextMark,
   resolveLevel,
+  toMm,
   toVec2,
   withElement,
   elementAffected,
@@ -430,7 +431,7 @@ export const addStair = defineCommand({
       material: material?.trim() || 'concrete',
     };
     const document = regenerateBuilding(doc, withElement(resolution.building, stair));
-    const blondelMm = (2 * riserHeight + resolvedTread) / fromMm(doc, 1);
+    const blondelMm = toMm(doc, 2 * riserHeight + resolvedTread);
     return {
       document,
       summary:

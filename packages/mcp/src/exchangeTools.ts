@@ -18,6 +18,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import type { McpToolDefinition } from './tools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
@@ -323,6 +324,6 @@ export async function applyExchangeToolCall(
   try {
     return await handler(deps, deps.port, isRecord(rawArgs) ? rawArgs : {});
   } catch (error) {
-    return failure(`${toolName} failed: ${error instanceof Error ? error.message : String(error)}`);
+    return failure(`${toolName} failed: ${errorMessage(error)}`);
   }
 }

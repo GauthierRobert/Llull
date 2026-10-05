@@ -6,7 +6,7 @@
  */
 
 import type { BuildingModel } from '@core/model/building';
-import { nextElementId, nextMark, withElement } from '../model';
+import { elementsOf, nextElementId, nextMark, withElement } from '../model';
 
 /** Copies the supports of every pipe in `copiedIds` (source id → copy id) onto `levelId`. */
 export function copyPipeSupports(
@@ -17,10 +17,9 @@ export function copyPipeSupports(
 ): { building: BuildingModel; ids: string[] } {
   let building = target;
   const ids: string[] = [];
-  for (const id of source.elementOrder) {
-    const support = source.elements[id];
-    const pipeId = support?.category === 'pipeSupport' ? copiedIds.get(support.pipeId) : undefined;
-    if (support?.category !== 'pipeSupport' || pipeId === undefined) continue;
+  for (const support of elementsOf(source, 'pipeSupport')) {
+    const pipeId = copiedIds.get(support.pipeId);
+    if (pipeId === undefined) continue;
     const memberId = support.memberId === null ? undefined : copiedIds.get(support.memberId);
     const copyId = nextElementId(building, 'pipeSupport');
     building = withElement(building, {

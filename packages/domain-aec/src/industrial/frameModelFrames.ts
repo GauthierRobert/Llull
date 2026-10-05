@@ -5,7 +5,7 @@
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';
-import { fromMm } from '../model';
+import { toMm } from '../model';
 import { findProfile, sectionProperties } from '../steel/profiles';
 import { E_STEEL } from './steelDesign';
 
@@ -34,7 +34,7 @@ export function framesOf(
   levelId: string,
   loads: FrameLoads,
 ): { frames: FrameModel[]; skipped: string[] } {
-  const mm = (value: number): number => value / fromMm(doc, 1);
+  const mm = (value: number): number => toMm(doc, value);
   const tolerance = 10;
   const members = Object.values(building.elements).filter(
     (element): element is SteelMemberElement =>

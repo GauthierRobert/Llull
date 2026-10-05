@@ -7,7 +7,7 @@
 import { useMemo } from 'react';
 import type { RectangleEntity } from '@core/model/types';
 import { flattenPoints } from '../../lineGeometry';
-import { ShapeLine } from './PlacedLineObject';
+import { ShapeLine } from './ShapeLine';
 
 export function RectangleRenderer({
   entity: { width, height, position, color },

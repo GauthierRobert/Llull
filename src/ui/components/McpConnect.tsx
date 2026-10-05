@@ -141,7 +141,7 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
   // Focus the first focusable element when the modal opens.
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (dialog) focusableElements(dialog)[0]?.focus();
+    if (dialog) focusableElements(dialog, { links: true })[0]?.focus();
   }, []);
 
   return (
@@ -163,7 +163,7 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
             e.preventDefault();
             onClose();
           } else if (e.key === 'Tab' && dialogRef.current) {
-            trapTab(e, dialogRef.current);
+            trapTab(e, dialogRef.current, { links: true });
           }
         }}
       >

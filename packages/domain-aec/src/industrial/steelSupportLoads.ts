@@ -35,21 +35,32 @@ export interface SupportedPipeLoad {
   readonly columnNodes: Array<readonly [string, ColumnNode]>;
 }
 
+export interface TributaryRules {
+  /** Supports closer than this share one station, mm. Default: the pipe-support placement spacing. */
+  readonly groupDistance?: number;
+  /** The run start rests on equipment or a header (half span instead of the overhang). Default false. */
+  readonly carriedStart?: boolean;
+  /** The run end rests on equipment or a header. Default false. */
+  readonly carriedEnd?: boolean;
+}
+
 /**
- * Tributary length (mm) of each support of a run, grouping supports closer than SAME_SUPPORT_DISTANCE.
+ * Tributary length (mm) of each support of a run, grouping supports closer than `groupDistance`.
  * @param arcs support positions along the run, ascending, mm
- * @param carriedStart the run start rests on equipment or a header (half span instead of the overhang)
  */
 export function tributaryLengths(
   arcs: ReadonlyArray<number>,
   length: number,
-  carriedStart: boolean,
-  carriedEnd: boolean,
+  {
+    groupDistance = SAME_SUPPORT_DISTANCE,
+    carriedStart = false,
+    carriedEnd = false,
+  }: TributaryRules = {},
 ): number[] {
   const groups: number[][] = [];
   arcs.forEach((arc, index) => {
     const last = groups.at(-1);
-    if (last && arc - (arcs[last.at(-1) as number] as number) < SAME_SUPPORT_DISTANCE) {
+    if (last && arc - (arcs[last.at(-1) as number] as number) < groupDistance) {
       last.push(index);
     } else groups.push([index]);
   });
@@ -97,8 +108,7 @@ export function applySupportedPipe(
   const tributaries = tributaryLengths(
     attached.map((station) => station.arc),
     run.lengthMm,
-    startCarrier !== null,
-    endCarrier !== null,
+    { carriedStart: startCarrier !== null, carriedEnd: endCarrier !== null },
   );
   let carried = 0;
   attached.forEach((station: SupportStation, index) => {

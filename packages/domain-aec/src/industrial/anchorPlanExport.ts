@@ -6,7 +6,7 @@ import type { GridElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, toMetres } from '../model';
+import { elementsOf, fileSlug, getBuilding, toMetres } from '../model';
 import { noop } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
 import {
@@ -15,6 +15,7 @@ import {
   composeSheetSvg,
   TITLE_HEIGHT,
   fitScale,
+  n,
   sheetDrawingArea,
   type PaperSize,
   type Viewport,
@@ -37,7 +38,6 @@ import {
   gridRef,
   gridSpans,
   metres,
-  n,
   nearest,
   packBands,
   placePlates,
@@ -177,9 +177,8 @@ export const exportAnchorPlan = defineCommand({
     }
 
     // Footings (dashed), plates, bolts.
-    for (const id of building.elementOrder) {
-      const footing = building.elements[id];
-      if (footing?.category !== 'footing' || footing.levelId !== level.id) continue;
+    for (const footing of elementsOf(building, 'footing')) {
+      if (footing.levelId !== level.id) continue;
       const [cx, cy] = [mm(footing.location[0]), mm(footing.location[1])];
       const [hx, hy] = [mm(footing.width) / 2, mm(footing.length) / 2];
       canvas.polygon(

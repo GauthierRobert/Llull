@@ -12,6 +12,7 @@ import { DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
+import { errorMessage } from '../lib/errorMessage';
 import { isRecord } from '../lib/isRecord';
 import { derivedEntityIds } from '../model/partition';
 import { documentExtensions } from '../plugins/host';
@@ -192,8 +193,7 @@ export const loadDocument = defineCommand({
     try {
       parsed = deserializeDocument(json);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return noop(doc, message);
+      return noop(doc, errorMessage(err));
     }
 
     const entityCount = Object.keys(parsed.entities).length;

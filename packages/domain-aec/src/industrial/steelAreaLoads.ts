@@ -8,6 +8,7 @@
  */
 
 import { pointInPolygon, polygonArea, projectOntoSegment, type Point2 } from '@lib/polygon';
+import { elementsOf } from '../model';
 import { round } from '../numeric';
 import { GRAVITY, type ModelUnits } from './steelMemberBars';
 import { depositArea, type BeamLoads } from './steelBeamLoads';
@@ -134,9 +135,8 @@ function rasterCells(surface: Surface): { centres: Point2[]; area: number } {
 function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>): Surface[] {
   const { building, toMm, elevationMm } = units;
   const surfaces: Surface[] = [];
-  for (const id of building.elementOrder) {
-    const slab = building.elements[id];
-    if (slab?.category !== 'slab' || slab.role !== 'floor') continue;
+  for (const slab of elementsOf(building, 'slab')) {
+    if (slab.role !== 'floor') continue;
     const top = elevationMm(slab.levelId) + toMm(slab.offset);
     surfaces.push({
       slabId: slab.id,
@@ -156,11 +156,9 @@ function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>): Surface
 function footprintsOf(units: ModelUnits): Array<{ id: string; footprint: Footprint }> {
   const { building, toMm, elevationMm } = units;
   const footprints: Array<{ id: string; footprint: Footprint }> = [];
-  for (const id of building.elementOrder) {
-    const equipment = building.elements[id];
-    if (equipment?.category !== 'equipment') continue;
+  for (const equipment of elementsOf(building, 'equipment')) {
     footprints.push({
-      id,
+      id: equipment.id,
       footprint: {
         center: toPoint2(equipment.location, toMm),
         size: [toMm(equipment.size[0]), toMm(equipment.size[1])],

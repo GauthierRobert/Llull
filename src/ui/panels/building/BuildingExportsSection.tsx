@@ -10,7 +10,8 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { OptionSelect, capitalize } from '@ui/panels/OptionSelect';
+import { OptionSelect } from '@ui/panels/OptionSelect';
+import { capitalize } from '@ui/panels/capitalize';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { downloadText } from '@ui/download';
 

@@ -1,6 +1,7 @@
 import type { Vec3 } from '../model/types';
 import { sub3, dot3, cross3, normalize3 } from '../lib/vec3';
 import type { Bounds } from './sceneTypes';
+import { boundsRadius } from './sceneBounds';
 
 export type ViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso';
 
@@ -78,17 +79,6 @@ export function makeProjector(
     const [u, v] = projectPoint(p, cam, basis);
     return [width / 2 + u * scale, height / 2 - v * scale];
   };
-}
-
-/** Largest side of an AABB. */
-export function boundsExtent({ min, max }: Bounds): number {
-  return Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
-}
-
-/** Radius of the sphere framing `bounds`: half the largest extent, 1 for a (near-)point scene. */
-export function boundsRadius(bounds: Bounds): number {
-  const radius = boundsExtent(bounds) / 2 + 1e-3;
-  return radius < 0.1 ? 1 : radius;
 }
 
 /** Half-width of the orthographic frustum (world units) the SVG overlays project with. */

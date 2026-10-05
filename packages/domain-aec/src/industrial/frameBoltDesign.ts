@@ -7,7 +7,7 @@
 
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { fromMm, withElement } from '../model';
+import { fromMm, toMm, withElement } from '../model';
 import { buildingConnectionSolids } from './evaluateConnections';
 import { connectionCheck, type CheckRow } from './frameCheckSolve';
 
@@ -100,7 +100,7 @@ function rowSpacingOk(
   if (connection.boltRows < 2) return true;
   const solids = buildingConnectionSolids(doc, building, connection);
   if (!solids) return false;
-  const diameter = connection.boltDiameter / fromMm(doc, 1);
+  const diameter = toMm(doc, connection.boltDiameter);
   const hole = fromMm(doc, diameter + (diameter <= 24 ? 2 : 3));
   const ys = [
     ...new Set(

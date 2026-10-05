@@ -2,7 +2,7 @@
 
 import type { PointEntity } from '@core/model/types';
 import { flattenPoints } from '../../lineGeometry';
-import { ShapeLine } from './PlacedLineObject';
+import { ShapeLine } from './ShapeLine';
 
 const CROSS_SIZE = 0.1;
 /** Horizontal arm, then vertical arm — two independent segments. */

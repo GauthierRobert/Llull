@@ -7,6 +7,7 @@
  */
 
 import type { CableTrayElement, PipeElement } from '@core/model/building';
+import { orderedElements } from '../model';
 import { round } from '../numeric';
 import { type ModelUnits, type SteelBar } from './steelMemberBars';
 import { addPointLoad, type BeamLoads } from './steelBeamLoads';
@@ -70,6 +71,8 @@ interface Support {
 const SUPPORT_TOLERANCE = 10;
 /** A crossing this far beyond the beam end still counts, mm. */
 const END_TOLERANCE = 50;
+/** Resting supports closer than this share one tributary station, mm. */
+const GROUP_DISTANCE = 100;
 const NEARLY_HORIZONTAL = 0.1;
 
 function runOf(
@@ -109,13 +112,11 @@ function runOf(
 }
 
 function runsOf(units: ModelUnits, params: LineLoadParams): Run[] {
-  const { building } = units;
-  return building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    return element?.category === 'pipe' || element?.category === 'tray'
+  return orderedElements(units.building).flatMap((element) =>
+    element.category === 'pipe' || element.category === 'tray'
       ? [runOf(units, element, params)]
-      : [];
-  });
+      : [],
+  );
 }
 
 /** Arc lengths (mm) at which `pipe` rests on top of `beams` (the rule for pipes without supports). */
@@ -215,7 +216,7 @@ export function applyLineLoads(
     const nozzles = supports.length === 0 && pipeRun !== null && carriedByEnds(units, pipeRun);
     let carried = 0;
     const arcs = supports.map(({ s }) => s);
-    const tributaries = tributaryLengths(arcs, length, false, false);
+    const tributaries = tributaryLengths(arcs, length, { groupDistance: GROUP_DISTANCE });
     supports.forEach((support, index) => {
       const weight = (run.weightPerMetre * (tributaries[index] as number)) / 1000;
       addPointLoad(support.beam, support.at, weight, 0, true);

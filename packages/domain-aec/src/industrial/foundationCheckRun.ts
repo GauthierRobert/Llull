@@ -11,7 +11,7 @@ import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { checkFoundations } from './foundationAssessment';
 import { defaultThrustTie } from './foundationThrust';
 import { round } from '../numeric';
-import { checkTable, failureSummary } from './checkReport';
+import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from './checkReport';
 
 const foundationCheckParams = z.object({
   ...FRAME_LOAD_SHAPE,
@@ -87,31 +87,11 @@ export const foundationCheck = defineCommand({
       csv,
       failures,
       worst: worstRow,
-    } = checkTable(
-      rows,
-      [
-        'Column',
-        'Footing',
-        'Check',
-        'Value',
-        'Limit',
-        'Unit',
-        'Utilisation',
-        'Status',
-        'Combination',
-      ],
-      (row, status) => [
-        row.column,
-        row.footing,
-        row.check,
-        round(row.value),
-        round(row.limit),
-        row.unit,
-        round(row.utilisation),
-        status,
-        row.combination,
-      ],
-    );
+    } = checkTable(rows, ['Column', 'Footing', ...LIMIT_COLUMNS], (row, status) => [
+      row.column,
+      row.footing,
+      ...limitCells(row, status),
+    ]);
     if (!worstRow) {
       return noop(
         doc,

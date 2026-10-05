@@ -14,7 +14,9 @@
  */
 
 import type { CadDocument } from '@core/model/types';
+import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { execute, getCommand } from '@core/commands/registry';
+import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 
 /** Maximum undo/redo depth — mirrors MAX_UNDO_DEPTH in the UI store. */
@@ -29,12 +31,6 @@ const history: Record<HistoryDirection, CadDocument[]> = { undo: [], redo: [] };
 
 const pushCapped = (stack: CadDocument[], doc: CadDocument): CadDocument[] =>
   [...stack, doc].slice(-MAX_UNDO_DEPTH);
-
-/** Restored history documents keep the newest step counter so undone ids are never re-minted. */
-function withMonotonicStepCounter(restored: CadDocument, current: CadDocument): CadDocument {
-  const nextStepNumber = Math.max(current.nextStepNumber ?? 1, restored.nextStepNumber ?? 1);
-  return restored.nextStepNumber === nextStepNumber ? restored : { ...restored, nextStepNumber };
-}
 
 /**
  * The value returned by `applyCommand`, `undo`, and `redo`.
@@ -94,7 +90,7 @@ function runCommand(name: string, params: unknown): CommandBusResult {
   } catch (err) {
     // A throwing command must surface as an error result, never a transport failure.
     return withHistoryFlags({
-      summary: `Command ${name} failed: ${err instanceof Error ? err.message : String(err)}`,
+      summary: `Command ${name} failed: ${errorMessage(err)}`,
       affected: [],
       isError: true,
     });

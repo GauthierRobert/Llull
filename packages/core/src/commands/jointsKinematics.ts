@@ -6,15 +6,9 @@ import type {
   Vec3,
 } from '../model/types';
 import { resolveNumeric } from './expression';
+import { axisVector } from '../lib/axis';
 import { topologicalSort } from '../lib/topologicalSort';
 import { add3, scale3, sub3 } from '../lib/vec3';
-/** Normalize a string axis shorthand ('x'|'y'|'z') to a Vec3 unit vector. */
-export function normalizeAxis(axis: 'x' | 'y' | 'z' | Vec3): Vec3 {
-  if (axis === 'x') return [1, 0, 0];
-  if (axis === 'y') return [0, 1, 0];
-  if (axis === 'z') return [0, 0, 1];
-  return axis;
-}
 
 /**
  * Rotate a Vec3 about an axis by an angle (Rodrigues' rotation formula).
@@ -34,13 +28,6 @@ function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
     v[1] * cos + crossY * sin + uy * dot * (1 - cos),
     v[2] * cos + crossZ * sin + uz * dot * (1 - cos),
   ];
-}
-
-/** Validate that a string is a valid named axis shorthand or that the value is a Vec3. */
-export function isValidAxis(v: unknown): v is 'x' | 'y' | 'z' | Vec3 {
-  if (v === 'x' || v === 'y' || v === 'z') return true;
-  if (!Array.isArray(v) || v.length !== 3) return false;
-  return (v as unknown[]).every((c) => typeof c === 'number' && Number.isFinite(c));
 }
 
 /** Resolve a JointMateRef to the InstanceEntity, returning null on missing/wrong kind. */
@@ -167,7 +154,7 @@ export function evaluateMotionInternal(
     if (!instanceA || !instanceB) continue;
 
     const value = resolvedJoints[joint.id] ?? 0;
-    const axisVec = normalizeAxis(joint.axis);
+    const axisVec = axisVector(joint.axis);
 
     const bId = joint.b.instanceId;
     const bRot: Vec3 = instanceRotations[bId] ?? instanceB.rotation;

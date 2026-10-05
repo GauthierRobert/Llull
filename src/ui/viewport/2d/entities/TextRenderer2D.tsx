@@ -5,12 +5,14 @@
  * drei's <Text> SDF renderer (it manages its own geometry and disposal).
  * - Anchored at entity.position; only rotation[2] applies (2D entities rotate within the work plane).
  * - fontSize = entity.height (cap-height in model units); anchorX from entity.anchor (default
- *   'left'); anchorY always 'middle'.
+ *   'left'); anchorY always 'middle'. Uses the self-hosted font (`TEXT_FONT_URL`): troika would fetch
+ *   a CDN font otherwise, which hangs offline.
  * - Must be rendered inside the -renderOrigin group in Viewport2D.tsx (U4 convention).
  */
 
 import { Text } from '@react-three/drei';
 import type { TextEntity } from '@core/model/types';
+import { TEXT_FONT_URL, toAnchorX } from '@ui/viewport/textFont';
 import { SELECTION_COLOR } from '../../viewportPalette';
 
 export function TextRenderer2D({
@@ -22,11 +24,12 @@ export function TextRenderer2D({
 }): React.ReactElement {
   return (
     <Text
+      font={TEXT_FONT_URL}
       position={[position[0], position[1], position[2]]}
       rotation={[0, 0, rotation[2] ?? 0]}
       fontSize={height}
       color={selected ? SELECTION_COLOR : color}
-      anchorX={anchor ?? 'left'}
+      anchorX={toAnchorX(anchor)}
       anchorY="middle"
     >
       {content}

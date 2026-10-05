@@ -31,6 +31,7 @@ import {
   toolsetOf,
 } from '@mcp/index';
 import type { ToolsetName } from '@mcp/index';
+import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc } from '../liveDocument';
 import { applyCommand } from '../commandBus';
 import type { ExchangeOptions } from '../pythonExchange';
@@ -113,8 +114,7 @@ export function buildMcpServer(
     try {
       return await handleToolCall(req);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return makeErrorResult(`Tool ${req.params.name} failed: ${message}`);
+      return makeErrorResult(`Tool ${req.params.name} failed: ${errorMessage(err)}`);
     }
   });
 

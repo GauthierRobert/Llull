@@ -16,58 +16,78 @@
  * - Base transforms are read from `document.entities` every frame so the player
  *   is stable even if another system (e.g. TransformGizmo) has mutated the document.
  * - When multiple animations target the same object they are composed in document
- *   order by `composeAnimatedPose` (animationMath).
+ *   order by `composeAnimatedPoseInto` (animationMath).
+ * - Per-frame work reuses pooled vectors / contributions (rule R9: no per-frame allocation).
  * - If the target object is not found in the scene (scene.getObjectByName) the
  *   animation is silently skipped that frame.
  *
  * @pure   N/A — imperative three.js mutation; by design (render-time overlay).
  */
 
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useStore, useViewportStore } from '@ui/store';
 import type { Animation, CadDocument, Vec3 } from '@core/model/types';
-import { ORIGIN, add3 } from '@lib/vec3';
+import { ORIGIN } from '@lib/vec3';
 import {
-  composeAnimatedPose,
+  composeAnimatedPoseInto,
+  createPoseScratch,
   evaluateAnimationScalar,
+  type AnimatedPose,
   type AnimationContribution,
 } from './animationMath';
 
-/** Normalise a Vec3 direction. Falls back to the Z axis (Z-up) for a near-zero vector. */
-function normalise(v: Vec3): THREE.Vector3 {
-  const vec = new THREE.Vector3(v[0], v[1], v[2]);
-  const len = vec.length();
-  if (len < 1e-9) return new THREE.Vector3(0, 0, 1);
-  return vec.divideScalar(len);
+/** Write the unit direction of `v` into `target`; falls back to the Z axis (Z-up) for a near-zero vector. */
+function writeUnitAxis(target: THREE.Vector3, v: Vec3): void {
+  target.set(v[0], v[1], v[2]);
+  const len = target.length();
+  if (len < 1e-9) target.set(0, 0, 1);
+  else target.divideScalar(len);
 }
 
-/** Centroid of a list of document positions (the origin for an empty list). */
-function centroid(positions: Vec3[]): Vec3 {
-  const count = Math.max(positions.length, 1);
-  const [x, y, z] = positions.reduce((total, p) => add3(total, p), ORIGIN);
-  return [x / count, y / count, z / count];
-}
-
-/** Rotation pivot: the animation's own, else the target's position (a group's: member centroid). */
-function pivotOf(
+/** Write the rotation pivot into `target`: the animation's own, else the target's position (a group's: member centroid). */
+function writePivot(
+  target: THREE.Vector3,
   anim: Animation,
   memberIds: string[],
   entities: CadDocument['entities'],
-): THREE.Vector3 {
-  const pivot =
-    anim.pivot ??
-    (anim.targetKind === 'entity'
-      ? entities[anim.targetId]?.position
-      : centroid(
-          memberIds.map((id) => entities[id]?.position).filter((p): p is Vec3 => p !== undefined),
-        ));
-  return new THREE.Vector3(...(pivot ?? ORIGIN));
+): void {
+  if (anim.pivot) {
+    target.set(anim.pivot[0], anim.pivot[1], anim.pivot[2]);
+  } else if (anim.targetKind === 'entity') {
+    const [x, y, z] = entities[anim.targetId]?.position ?? ORIGIN;
+    target.set(x, y, z);
+  } else {
+    target.set(0, 0, 0);
+    let count = 0;
+    for (const id of memberIds) {
+      const position = entities[id]?.position;
+      if (position === undefined) continue;
+      target.x += position[0];
+      target.y += position[1];
+      target.z += position[2];
+      count += 1;
+    }
+    const divisor = Math.max(count, 1);
+    target.set(target.x / divisor, target.y / divisor, target.z / divisor);
+  }
 }
 
-/** Pivot placeholder for position-channel contributions (unused by them). */
-const NO_PIVOT = new THREE.Vector3();
+/** Per-frame scratch state of the player: pooled contributions, pose and math temporaries. */
+function createFrameBuffers(): {
+  pose: AnimatedPose;
+  scratch: ReturnType<typeof createPoseScratch>;
+  contributionsByEntity: Map<string, AnimationContribution[]>;
+  pool: AnimationContribution[];
+} {
+  return {
+    pose: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() },
+    scratch: createPoseScratch(),
+    contributionsByEntity: new Map(),
+    pool: [],
+  };
+}
 
 /** Mounted inside the Canvas; renders null. Drives transforms per-frame via useFrame. */
 export function AnimationPlayer(): null {
@@ -76,6 +96,8 @@ export function AnimationPlayer(): null {
 
   // Track the last known reset nonce so we can detect a bump.
   const lastResetNonce = useRef<number>(useViewportStore.getState().animationResetNonce);
+
+  const buffers = useMemo(createFrameBuffers, []);
 
   useFrame(({ scene, invalidate }, delta) => {
     const viewport = useViewportStore.getState();
@@ -96,7 +118,12 @@ export function AnimationPlayer(): null {
     if (animationPlaying || activeClickAnimationIds.size > 0) invalidate();
 
     // Every animation targeting an entity contributes to its pose; contributions compose in order.
-    const contributions = new Map<string, AnimationContribution[]>();
+    const { pose, scratch, contributionsByEntity, pool } = buffers;
+    for (const [entityId, parts] of contributionsByEntity) {
+      if (parts.length === 0) contributionsByEntity.delete(entityId);
+      else parts.length = 0;
+    }
+    let pooled = 0;
 
     for (const anim of animList) {
       const running =
@@ -110,26 +137,32 @@ export function AnimationPlayer(): null {
         anim.targetKind === 'entity' ? [anim.targetId] : (groups[anim.targetId]?.memberIds ?? []);
       if (memberIds.length === 0) continue;
 
-      const contribution: AnimationContribution = {
+      const contribution = (pool[pooled] ??= {
         channel: anim.channel,
-        axis: normalise(anim.axis),
-        scalar: evaluateAnimationScalar(anim, phase),
-        pivot: anim.channel === 'rotation' ? pivotOf(anim, memberIds, entities) : NO_PIVOT,
-      };
+        axis: new THREE.Vector3(),
+        scalar: 0,
+        pivot: new THREE.Vector3(),
+      });
+      pooled += 1;
+      contribution.channel = anim.channel;
+      contribution.scalar = evaluateAnimationScalar(anim, phase);
+      writeUnitAxis(contribution.axis, anim.axis);
+      if (anim.channel === 'rotation') writePivot(contribution.pivot, anim, memberIds, entities);
       for (const memberId of memberIds) {
-        if (entities[memberId]) {
-          contributions.set(memberId, [...(contributions.get(memberId) ?? []), contribution]);
-        }
+        if (!entities[memberId]) continue;
+        const parts = contributionsByEntity.get(memberId);
+        if (parts) parts.push(contribution);
+        else contributionsByEntity.set(memberId, [contribution]);
       }
     }
 
-    for (const [entityId, parts] of contributions) {
+    for (const [entityId, parts] of contributionsByEntity) {
       const entity = entities[entityId];
       const object = scene.getObjectByName(entityId);
-      if (!entity || !object) continue;
-      const pose = composeAnimatedPose(entity.position, entity.rotation, parts);
-      object.position.set(...pose.position);
-      object.quaternion.set(...pose.quaternion);
+      if (!entity || !object || parts.length === 0) continue;
+      composeAnimatedPoseInto(pose, entity.position, entity.rotation, parts, scratch);
+      object.position.copy(pose.position);
+      object.quaternion.copy(pose.quaternion);
     }
   });
 

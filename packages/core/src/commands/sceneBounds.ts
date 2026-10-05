@@ -221,6 +221,17 @@ export function boundsCenter({ min, max }: Bounds): Vec3 {
   return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
 }
 
+/** Largest side of an AABB. */
+export function boundsExtent({ min, max }: Bounds): number {
+  return Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+}
+
+/** Radius of the sphere framing `bounds`: half the largest extent, 1 for a (near-)point scene. */
+export function boundsRadius(bounds: Bounds): number {
+  const radius = boundsExtent(bounds) / 2 + 1e-3;
+  return radius < 0.1 ? 1 : radius;
+}
+
 export function mergeBounds(a: Bounds, b: Bounds): Bounds {
   return {
     min: [Math.min(a.min[0], b.min[0]), Math.min(a.min[1], b.min[1]), Math.min(a.min[2], b.min[2])],

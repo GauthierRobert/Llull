@@ -6,12 +6,12 @@
 
 import type { CadDocument, Vec3 } from '../model/types';
 import { escapeXml } from '../lib/escapeXml';
-import { type ViewName, boundsExtent, makeProjector, computeOrthoHalf } from './renderCamera';
+import { type ViewName, makeProjector, computeOrthoHalf } from './renderCamera';
 import { renderDocument } from './renderScene';
 import type { RenderViewData } from './renderTypes';
 import { extractSvgInner, r2, svgDocument } from './renderSvg';
 import { computeSceneSnapshot } from './scene';
-import { boundsCenter } from './sceneBounds';
+import { boundsCenter, boundsExtent } from './sceneBounds';
 import { ORIGIN } from '../lib/vec3';
 
 /** Render only the entities of `doc` whose id satisfies `keep` (document order preserved). */

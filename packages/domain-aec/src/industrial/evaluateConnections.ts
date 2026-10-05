@@ -14,7 +14,7 @@ import type {
 } from '@core/model/building';
 import { fromMm } from '../model';
 import { base, colorForMaterial, meshEntity, orientedBox } from '../entities';
-import { prismMesh, sweepFrame } from '../mesh';
+import { prismMesh, sweepFrame, type SweepFrame } from '../mesh';
 import { findProfile } from '../steel/profiles';
 import { add3, scale3, sub3 } from '@lib/vec3';
 import { atLevel, boltSize } from './evaluate';
@@ -137,7 +137,7 @@ export function connectionSolids(
     end: 'start' | 'end',
   ): {
     joint: Vec3;
-    frame: NonNullable<ReturnType<typeof sweepFrame>>;
+    frame: SweepFrame;
     plate: { x: Vec3; y: Vec3; along: Vec3; slope: number };
   } | null => {
     const [start, finish] = [atLevel(level, member.start), atLevel(level, member.end)];

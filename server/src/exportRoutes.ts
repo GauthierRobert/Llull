@@ -7,6 +7,7 @@
 import { Router, type Response } from 'express';
 import { exportStepFile } from '@mcp/index';
 import type { ExportStlData } from '@core/commands/export';
+import { errorMessage } from '@lib/errorMessage';
 import { applyCommand } from './commandBus';
 import { getLiveDoc } from './liveDocument';
 import type { ExchangeOptions } from './pythonExchange';
@@ -89,9 +90,7 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
         sendDownload(res, file.fileName, 'model/step', Buffer.from(file.stepBase64, 'base64'));
       })
       .catch((error: unknown) => {
-        res.status(500).json({
-          error: `export_step failed: ${error instanceof Error ? error.message : String(error)}`,
-        });
+        res.status(500).json({ error: `export_step failed: ${errorMessage(error)}` });
       });
   });
 

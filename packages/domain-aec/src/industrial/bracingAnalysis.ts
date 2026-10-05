@@ -5,7 +5,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import { fromMm, getBuilding } from '../model';
+import { elementsOf, getBuilding, toMm } from '../model';
 import { findProfile } from '../steel/profiles';
 import { round } from '../numeric';
 import { sectionResistance, yieldStrength } from './steelDesign';
@@ -40,24 +40,21 @@ interface BracingInputs {
 
 /** Steel members of `levelId` with endpoints in mm. */
 export function locateMembers(doc: CadDocument, levelId: string): Located[] {
-  const building = getBuilding(doc);
-  const unit = fromMm(doc, 1);
+  const toPointMm = (point: readonly number[]): Point => [
+    toMm(doc, point[0] ?? 0),
+    toMm(doc, point[1] ?? 0),
+    toMm(doc, point[2] ?? 0),
+  ];
   const members: Located[] = [];
-  for (const id of building.elementOrder) {
-    const element = building.elements[id];
-    if (element?.category !== 'member' || element.levelId !== levelId) continue;
+  for (const element of elementsOf(getBuilding(doc), 'member')) {
+    if (element.levelId !== levelId) continue;
     const profile = findProfile(element.profile);
     if (!profile) continue;
-    const toMm = (point: readonly number[]): Point => [
-      (point[0] ?? 0) / unit,
-      (point[1] ?? 0) / unit,
-      (point[2] ?? 0) / unit,
-    ];
     members.push({
       member: element,
       profile,
-      start: toMm(element.start),
-      end: toMm(element.end),
+      start: toPointMm(element.start),
+      end: toPointMm(element.end),
     });
   }
   return members;

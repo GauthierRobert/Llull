@@ -7,6 +7,7 @@
 
 import type { CadDocument, EntityId } from '@core/model/types';
 import { extendIdMap, remapIds } from '@core/commands/regenerate';
+import { errorMessage } from '@lib/errorMessage';
 import { fetchLiveSnapshot, postCommand } from './serverCommands';
 import type { CadStoreState, StoreGet, StoreSet } from './storeTypes';
 
@@ -128,7 +129,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
       syncInFlight = false;
       set({
         syncState: 'failed',
-        lastSummary: `Could not sync offline edits (will retry): ${err instanceof Error ? err.message : String(err)}`,
+        lastSummary: `Could not sync offline edits (will retry): ${errorMessage(err)}`,
       });
       if (get().liveStatus === 'disconnected') return;
       const delay = Math.min(SYNC_RETRY_BASE_MS * 2 ** syncAttempt, SYNC_RETRY_MAX_MS);

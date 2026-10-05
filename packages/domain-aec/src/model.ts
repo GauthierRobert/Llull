@@ -27,6 +27,11 @@ export function fromMm(doc: Pick<CadDocument, 'units'>, millimetres: number): nu
   return (millimetres * 0.001) / METRES_PER_UNIT[doc.units];
 }
 
+/** Converts a length in document units into millimetres (inverse of `fromMm`). */
+export function toMm(doc: Pick<CadDocument, 'units'>, value: number): number {
+  return value / fromMm(doc, 1);
+}
+
 /** Converts a length in document units to metres. */
 export function toMetres(doc: Pick<CadDocument, 'units'>, value: number): number {
   return value * METRES_PER_UNIT[doc.units];

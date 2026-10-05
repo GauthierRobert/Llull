@@ -17,7 +17,7 @@
 import type { ThreeEvent } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import type { TextEntity } from '@core/model/types';
-import { TEXT_FONT_URL } from '@ui/viewport/textFont';
+import { TEXT_FONT_URL, toAnchorX } from '@ui/viewport/textFont';
 import { SELECTION_COLOR } from '@ui/viewport/viewportPalette';
 
 interface TextMeshProps {
@@ -47,7 +47,7 @@ export function TextMesh({ entity, selected, onSelect }: TextMeshProps): React.R
       rotation={[rotation[0], rotation[1], rotation[2]]}
       fontSize={height}
       color={selected ? SELECTION_COLOR : color}
-      anchorX={anchor ?? 'left'}
+      anchorX={toAnchorX(anchor)}
       anchorY="middle"
       onClick={handleClick}
     >

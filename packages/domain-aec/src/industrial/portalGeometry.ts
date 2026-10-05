@@ -16,7 +16,7 @@ export interface PortalProfiles {
 }
 
 /** One roof slope of a span: from its low end at a column line up to its high end. */
-interface Slope {
+export interface Slope {
   readonly side: -1 | 1;
   readonly lowX: number;
   readonly lowZ: number;

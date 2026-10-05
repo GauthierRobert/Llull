@@ -43,7 +43,7 @@ export function prismMesh(
   return { positions, indices };
 }
 
-interface SweepFrame {
+export interface SweepFrame {
   /** Local x axis (section width). */
   readonly u: Vec3;
   /** Local y axis (section depth). */

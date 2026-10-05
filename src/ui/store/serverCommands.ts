@@ -15,6 +15,7 @@
  */
 
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
+import { errorMessage } from '@lib/errorMessage';
 import type { LiveSnapshotEvent } from '@mcp/liveSync';
 
 /**
@@ -59,9 +60,7 @@ async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
           },
     );
   } catch (cause) {
-    throw new ServerCommandError(
-      `Network error: ${cause instanceof Error ? cause.message : String(cause)}`,
-    );
+    throw new ServerCommandError(`Network error: ${errorMessage(cause)}`);
   }
   if (!response.ok) {
     throw new ServerCommandError(

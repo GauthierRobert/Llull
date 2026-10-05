@@ -8,7 +8,7 @@
 import type { MemberRole } from '@core/model/building';
 import type { SteelProfile } from '../steel/profiles';
 import { round } from '../numeric';
-import { highestUtilisation } from './checkReport';
+import { highestUtilisation } from './utilisation';
 import { sectionResistance } from './steelDesign';
 import { compressionClass, isBeamShape, type SteelBar } from './steelMemberBars';
 

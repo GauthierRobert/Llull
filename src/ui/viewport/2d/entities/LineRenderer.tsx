@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { LineEntity } from '@core/model/types';
-import { ShapeLine } from './PlacedLineObject';
+import { ShapeLine } from './ShapeLine';
 
 export function LineRenderer({
   entity: { start, end, position, color },

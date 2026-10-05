@@ -20,7 +20,7 @@ import {
   type SteelBar,
 } from './steelMemberBars';
 
-interface SystemMember {
+export interface SystemMember {
   readonly geometry: Omit<FrameMember, 'load'>;
   readonly barId: string;
   readonly kind: 'column' | 'beam';
@@ -29,7 +29,7 @@ interface SystemMember {
   readonly imposed: number;
 }
 
-interface SystemLevel {
+export interface SystemLevel {
   readonly z: number;
   /** Column nodes at this level (the horizontal force of the level is shared by them). */
   readonly nodes: number[];

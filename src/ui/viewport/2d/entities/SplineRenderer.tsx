@@ -6,7 +6,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { SplineEntity } from '@core/model/types';
-import { ShapeLine } from './PlacedLineObject';
+import { ShapeLine } from './ShapeLine';
 
 const SPLINE_SEGMENTS_PER_POINT = 16;
 

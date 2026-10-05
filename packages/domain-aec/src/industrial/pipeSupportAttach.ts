@@ -8,7 +8,7 @@
 
 import type { BuildingModel, PipeSupportElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { fromMm } from '../model';
+import { elementsOf, fromMm } from '../model';
 import { collectSteelBars, modelUnits, type SteelBar } from './steelMemberBars';
 import { nearestOnRoute, RISER_SLOPE } from './routeSupport';
 import { absolutePointMm, pipeRunOf } from './pipeSupportLayout';
@@ -91,7 +91,7 @@ export function attachmentFields(
   };
 }
 
-interface SupportChange {
+export interface SupportChange {
   readonly id: string;
   readonly mark: string;
   /** Mark of the member before / after (null = unattached). */
@@ -149,15 +149,13 @@ export function reconcilePipeSupports(
     kept: [],
   };
   if (!previous) return unchanged;
-  const candidates = next.elementOrder.flatMap((id) => {
-    const support = next.elements[id];
-    if (support?.category !== 'pipeSupport') return [];
-    const before = previous.elements[id];
+  const candidates = elementsOf(next, 'pipeSupport').filter((support) => {
+    const before = previous.elements[support.id];
     const dangling = support.memberId !== null && memberMark(next, support.memberId) === null;
     const changed =
       before?.category === 'pipeSupport' &&
       attachmentSignature(previous, before) !== attachmentSignature(next, support);
-    return dangling || changed || alsoIds.includes(id) ? [support] : [];
+    return dangling || changed || alsoIds.includes(support.id);
   });
   if (candidates.length === 0) return unchanged;
   const nextDoc: CadDocument = { ...doc, building: next };

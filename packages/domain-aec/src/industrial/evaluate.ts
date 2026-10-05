@@ -16,7 +16,7 @@ import type {
   PipeElement,
   SteelMemberElement,
 } from '@core/model/building';
-import { fromMm } from '../model';
+import { fromMm, toMm } from '../model';
 import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../entities';
 import { prismMesh, sweepMesh } from '../mesh';
 import { findProfile, profileOutline } from '../steel/profiles';
@@ -227,5 +227,5 @@ export function evaluateTray(
 
 /** Anchor bolt size label, e.g. "M24" (diameter in document units). */
 export function boltSize(doc: Pick<CadDocument, 'units'>, diameter: number): string {
-  return `M${Math.round(diameter / fromMm(doc, 1))}`;
+  return `M${Math.round(toMm(doc, diameter))}`;
 }

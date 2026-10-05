@@ -72,7 +72,7 @@ const ANCHORED_OUTLINES: Partial<
   },
 };
 
-export /** Chain tools preview a straight-segment rubber band; the others an outline from the one placed point. */
+/** Chain tools preview a straight-segment rubber band; the others an outline from the one placed point. */
 function previewOf(tool: DrawToolKind, points: ReadonlyArray<Vec2>, cursor: Vec2): Preview | null {
   if (CHAIN_DRAW_TOOLS.has(tool)) {
     if (points.length > 0) return { vertices: chainSegments([...points, cursor]), hint: false };

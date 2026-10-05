@@ -6,7 +6,14 @@
 
 import type { BasePlateElement, BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { fromMm, nextElementId, nextMark, withElement, withoutElements } from '../model';
+import {
+  elementsOf,
+  fromMm,
+  nextElementId,
+  nextMark,
+  withElement,
+  withoutElements,
+} from '../model';
 import { findProfile } from '../steel/profiles';
 
 interface PlateSize {
@@ -96,10 +103,10 @@ export function columnsWithoutPlates(
       element.category === 'plate' ? [element.memberId] : [],
     ),
   );
-  return building.elementOrder.flatMap((id) => {
-    const element = building.elements[id];
-    if (element?.category !== 'member' || element.role !== 'column' || plated.has(id)) return [];
-    if (memberIds ? !memberIds.has(id) : element.levelId !== levelId) return [];
-    return [element];
-  });
+  return elementsOf(building, 'member').filter(
+    (element) =>
+      element.role === 'column' &&
+      !plated.has(element.id) &&
+      (memberIds ? memberIds.has(element.id) : element.levelId === levelId),
+  );
 }

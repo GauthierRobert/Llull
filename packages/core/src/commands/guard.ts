@@ -9,6 +9,7 @@ import { formatIssues } from './schema';
 import { derivationViolation } from './derivation';
 import { pluginGuards } from '../plugins/host';
 import { noop } from './noop';
+import { errorMessage } from '../lib/errorMessage';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
   if (typeof value === 'number') return !Number.isFinite(value);
@@ -69,7 +70,7 @@ function warnAndDescribe(message: string, error: unknown): string {
     `[llull] ${message}`,
     error instanceof Error ? (error.stack ?? error.message) : error,
   );
-  return error instanceof Error ? error.message : String(error);
+  return errorMessage(error);
 }
 
 function corruptionReason(entity: unknown): string | null {

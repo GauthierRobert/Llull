@@ -12,7 +12,7 @@ import type {
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fromMm, getBuilding } from '../model';
+import { getBuilding, orderedElements, toMm } from '../model';
 import { noop } from '@core/commands/noop';
 import { sweepFrame } from '../mesh';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
@@ -50,11 +50,10 @@ function platePiece(
     sourceId: string;
   },
 ): NcPiece {
-  const mm = (value: number): number => value / fromMm(doc, 1);
   const [length, width, thickness] = [
-    round2(mm(parts.length)),
-    round2(mm(parts.width)),
-    round2(mm(parts.thickness)),
+    round2(toMm(doc, parts.length)),
+    round2(toMm(doc, parts.width)),
+    round2(toMm(doc, parts.thickness)),
   ];
   return {
     kind: 'plate',
@@ -84,7 +83,7 @@ function platePiece(
 
 function basePlatePiece(doc: CadDocument, plate: BasePlateElement, layout: PlateLayout): NcPiece {
   const [cos, sin] = [Math.cos(layout.angle), Math.sin(layout.angle)];
-  const mm = (value: number): number => value / fromMm(doc, 1);
+  const mm = (value: number): number => toMm(doc, value);
   const foot = layout.center;
   return platePiece(doc, {
     mark: plate.mark,
@@ -111,7 +110,7 @@ function endPlatePieces(
   connection: MomentConnectionElement,
   solids: ReadonlyArray<ConnectionSolid>,
 ): NcPiece[] {
-  const mm = (value: number): number => value / fromMm(doc, 1);
+  const mm = (value: number): number => toMm(doc, value);
   const outline = solids.find((solid) => solid.part === 'plate')?.outline;
   if (!outline) return [];
   const xs = outline.map((point) => point[0]);
@@ -185,10 +184,7 @@ export const exportNcFiles = defineCommand({
     if (levelId !== undefined && !building.levels[levelId]) {
       return noop(doc, `export_nc_files failed: no level '${String(levelId)}'.`);
     }
-    const elements = building.elementOrder.flatMap((id) => {
-      const element = building.elements[id];
-      return element ? [element] : [];
-    });
+    const elements = orderedElements(building);
     const allMembers: Record<string, SteelMemberElement | undefined> = {};
     const allConnections: MomentConnectionElement[] = [];
     for (const element of elements) {

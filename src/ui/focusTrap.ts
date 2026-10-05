@@ -2,19 +2,31 @@
 
 import type React from 'react';
 
-const FOCUSABLE_SELECTOR =
-  'a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+const CONTROL_SELECTOR = 'button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
 
-/** Every focusable element inside `container`, in DOM order. */
-export function focusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (element) => !element.hasAttribute('hidden'),
+interface FocusTrapOptions {
+  /** Also treat `a[href]` links as focusable (MCP connect dialog); the palette has none. */
+  readonly links?: boolean;
+}
+
+/** Focusable elements inside `container`, in DOM order; disabled and hidden ones are skipped. */
+export function focusableElements(
+  container: HTMLElement,
+  { links = false }: FocusTrapOptions = {},
+): HTMLElement[] {
+  const selector = links ? `a[href],${CONTROL_SELECTOR}` : CONTROL_SELECTOR;
+  return Array.from(container.querySelectorAll<HTMLElement>(selector)).filter(
+    (element) => !element.hasAttribute('disabled') && !element.hasAttribute('hidden'),
   );
 }
 
 /** Keep Tab / Shift+Tab cycling inside `container`. */
-export function trapTab(event: React.KeyboardEvent<HTMLElement>, container: HTMLElement): void {
-  const focusable = focusableElements(container);
+export function trapTab(
+  event: React.KeyboardEvent<HTMLElement>,
+  container: HTMLElement,
+  options: FocusTrapOptions = {},
+): void {
+  const focusable = focusableElements(container, options);
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
   if (first === undefined || last === undefined) return;

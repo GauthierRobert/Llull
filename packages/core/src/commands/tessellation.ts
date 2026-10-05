@@ -1,6 +1,6 @@
 /**
  * Tessellation constants and low-level pure geometry helpers shared by the SVG renderer
- * (`renderTessellation3D.ts`) and the triangle exporters (`exportTriangulate.ts`), so both
+ * (`renderTessellation.ts`) and the triangle exporters (`exportTriangulate.ts`), so both
  * segment and wind every primitive the same way.
  *
  * @layer core/commands

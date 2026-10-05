@@ -13,7 +13,7 @@ import { fromMm } from '../model';
 import { hangerRodDiameter, pipeSpanLimit } from './pipeSpans';
 import { RISER_SLOPE, nearestOnRoute } from './routeSupport';
 
-type SupportPart =
+export type SupportPart =
   | {
       readonly kind: 'box';
       readonly name: string;

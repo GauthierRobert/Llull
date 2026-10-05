@@ -7,7 +7,7 @@ import type { BuildingModel, MomentConnectionElement } from '@core/model/buildin
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding } from '../model';
+import { elementAffected, fromMm, getBuilding, toMm } from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
@@ -165,7 +165,7 @@ export function connectionWelds(
   const flanges = 2 * (2 * profile.b - profile.tw);
   const web = 2 * (profile.h - 2 * profile.tf);
   const plates = connection.kind === 'apex' ? 2 : 1;
-  const haunch = connection.haunchLength / fromMm(doc, 1);
+  const haunch = toMm(doc, connection.haunchLength);
   // Haunch: web to rafter flange both sides, haunch flange + web to the end plate.
   const haunchWeb = haunch > 0 ? 2 * haunch + 2 * profile.h : 0;
   const haunchFlange = haunch > 0 ? 2 * profile.b : 0;

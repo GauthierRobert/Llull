@@ -11,7 +11,7 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
-import { briefList } from './checkReport';
+import { briefList } from './utilisation';
 import { collectSteelBars, modelUnits, type ModelUnits } from './steelMemberBars';
 import { spanCoordinate } from './routeSupport';
 import { createBeamLoads, type BeamLoads } from './steelBeamLoads';

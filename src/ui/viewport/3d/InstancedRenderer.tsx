@@ -135,6 +135,7 @@ function InstanceBatchMesh({
   const count = batch.entities.length;
 
   // Batch objects are rebuilt every grouping pass; batch.key is the content identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const geometry = useDisposable(() => makeGeometry(batch), [batch.key]);
 
   // Uses batch.pbrMaterial for roughness/metalness in shaded mode.

@@ -10,7 +10,7 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
-import { briefList, highestUtilisation } from './checkReport';
+import { briefList, highestUtilisation } from './utilisation';
 import { analyseSteelStructure } from './steelStructureAnalysis';
 
 const ASSUMPTIONS: ReadonlyArray<string> = [

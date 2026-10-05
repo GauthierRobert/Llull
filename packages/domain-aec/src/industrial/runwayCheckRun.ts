@@ -5,7 +5,7 @@
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fromMm, getBuilding } from '../model';
+import { getBuilding, toMm } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { craneCapacityOf, type CraneModel } from './frameModelTypes';
@@ -161,7 +161,7 @@ export const runwayCheck = defineCommand({
     if (levelId === undefined) {
       return noop(doc, `check_crane_runways failed: no level '${params.levelId ?? ''}'.`);
     }
-    const mm = (value: number): number => value / fromMm(doc, 1);
+    const mm = (value: number): number => toMm(doc, value);
     const rows: RunwayCheckRow[] = [];
     const runways = Object.values(building.elements).filter(
       (element): element is SteelMemberElement =>
