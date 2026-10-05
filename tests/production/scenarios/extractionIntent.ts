@@ -128,6 +128,32 @@ function supportSteel(): IntentMember[] {
       purpose,
     });
   }
+  // Riser guide posts: L-103 into the extractor, L-104 out of the desolventizer (the second post
+  // stands on a short IPE200 at Floor +12, 100 mm under the floor beams like the hanger beams).
+  members.push({
+    role: 'column',
+    profile: 'HEA100',
+    start: [17900, 4500, 0],
+    end: [17900, 4500, 3600],
+    level: 0,
+    purpose,
+  });
+  members.push({
+    role: 'beam',
+    profile: 'IPE200',
+    start: [0, 11750, 11770],
+    end: [6000, 11750, 11770],
+    level: 2,
+    purpose,
+  });
+  members.push({
+    role: 'column',
+    profile: 'HEA100',
+    start: [3000, 11750, 11870],
+    end: [3000, 11750, 16500],
+    level: 2,
+    purpose,
+  });
   return members;
 }
 
@@ -155,6 +181,8 @@ const SUPPORTS: IntentSupport[] = [
     ],
   },
   { line: 'L-104', type: 'hanger', at: [[0, 11250, 16000]] },
+  { line: 'L-103', type: 'guide', at: [[17500, 4500, 3000]] },
+  { line: 'L-104', type: 'guide', at: [[3000, 11250, 14000]] },
 ];
 
 const PIPES: IntentPipe[] = [

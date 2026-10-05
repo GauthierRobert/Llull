@@ -8,7 +8,7 @@
 import type { PipeElement, PipeSupportElement } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
 import type { ModelUnits } from './steelMemberBars';
-import { arcLengths, nearestOnRoute, spanCoordinate } from './routeSupport';
+import { RISER_SLOPE, arcLengths, nearestOnRoute, spanCoordinate } from './routeSupport';
 import { pipeSpanLimit } from './pipeSpans';
 
 export interface PipeRun {
@@ -33,6 +33,8 @@ export interface SupportStation {
   readonly memberId: string | null;
   /** Bears on an existing steel member. */
   readonly attached: boolean;
+  /** Sits on a riser (steep segment): a clamp with a bracket, not a support under a horizontal run. */
+  readonly onRiser: boolean;
 }
 
 /** Supports closer than this along a pipe are one support, mm. */
@@ -97,10 +99,26 @@ export function supportStations(
           point: snap.point,
           memberId: support.memberId,
           attached: member?.category === 'member',
+          onRiser: Math.abs(snap.direction[2]) > RISER_SLOPE,
         },
       ];
     })
     .sort((a, b) => a.arc - b.arc);
+}
+
+/** A guide on a riser restrains it laterally only: it carries none of the pipe weight. */
+export const isLateralOnly = (station: Pick<SupportStation, 'onRiser' | 'type'>): boolean =>
+  station.onRiser && station.type === 'guide';
+
+/** Supports of `run` that carry pipe weight: all but the guides on risers. */
+export function weightSupportsOf(units: ModelUnits, run: PipeRun): PipeSupportElement[] {
+  const supports = supportsOfPipe(units, run.element.id);
+  const lateral = new Set(
+    supportStations(units, run, supports)
+      .filter(isLateralOnly)
+      .map((station) => station.id),
+  );
+  return supports.filter((support) => !lateral.has(support.id));
 }
 
 /** True when `point` (absolute mm) lies inside the equipment footprint box (1 mm margin). */

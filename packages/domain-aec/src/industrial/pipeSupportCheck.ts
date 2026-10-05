@@ -12,7 +12,7 @@ import { getBuilding } from '../model';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
 import { collectSteelBars, modelUnits, type ModelUnits } from './steelMemberBars';
-import { riserLengthAtEnd, spanCoordinate } from './routeSupport';
+import { spanCoordinate } from './routeSupport';
 import { createBeamLoads, type BeamLoads } from './steelBeamLoads';
 import { restingArcs } from './steelLineLoads';
 import { pipeSpanLimit } from './pipeSpans';
@@ -21,9 +21,12 @@ import {
   pipeRunsOf,
   supportStations,
   supportsOfPipe,
+  isLateralOnly,
+  weightSupportsOf,
   type EndCarrier,
   type PipeRun,
 } from './pipeSupportLayout';
+import { riserRows, type RiserRow } from './pipeSupportRiser';
 
 export interface PipeSupportRow {
   readonly id: string;
@@ -44,18 +47,18 @@ export interface PipeSupportRow {
   readonly unattached: number;
   readonly basis: 'supports' | 'resting' | 'nozzles' | 'none';
   readonly endCarriers: readonly [EndCarrier | null, EndCarrier | null];
+  /** One verdict per riser (steep run of at least 0.5 m); `ok` includes them. */
+  readonly risers: RiserRow[];
   readonly ok: boolean;
   readonly issues: string[];
   readonly notes: string[];
 }
 
-/** A riser longer than this next to a carried end gets a note, mm. */
-const LONG_RISER = 3000;
-
 const ASSUMPTIONS: ReadonlyArray<string> = [
   'Span limits: MSS SP-69 Table 3 / ASME B31.1 Table 121.5 suggested spacing of horizontal, water-filled, standard-wall steel pipe by nominal size (DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, DN250 6.7 m, DN300 7.0 m, DN400 8.2 m, DN600 9.8 m …), multiplied by spanFactor. A pipe without `dn` takes the size of its outside diameter (an untabulated diameter the next smaller size).',
-  'Spans are measured along the centreline between consecutive attached supports; vertical risers (slope > 0.7) are not counted — a vertical pipe does not sag, its weight goes to the supports at its ends. A pipe end inside equipment (nozzle) or on another pipe (branch) is carried: it is a support for the span (a riser longer than 3 m at a carried end is noted: guide it). A free end must have a support within overhangRatio × allowed span (default 0.5: the cantilever moment stays below the simple-span moment).',
+  'Spans are measured along the centreline between consecutive attached supports; vertical risers (slope > 0.7) are not counted — a vertical pipe does not sag, its weight goes to the supports at its ends. A pipe end inside equipment (nozzle) or on another pipe (branch) is carried: it is a support for the span. A free end must have a support within overhangRatio × allowed span (default 0.5: the cantilever moment stays below the simple-span moment).',
   'Supports count when they bear on a steel member (add_pipe_support memberId set); unattached supports carry nothing and fail the pipe. A pipe without supports counts the beams it rests on (underside at top of steel ±10 mm, as check_steel_members) and is marked basis "resting"; a pipe with supports is carried by them only.',
+  'Risers (runs of at least 0.5 m steeper than 44° from horizontal, |dz| / length > 0.7) are checked by a design-aid rule, not a quoted code clause: lateral restraints — attached guides and anchors on the riser (add_pipe_support type guide / anchor at a point on it), an end carried by equipment or a header — at most the table span of the DN × spanFactor apart (the MSS SP-69 spacing applied to the vertical length); a free end (elbow) at most overhangRatio × that span from the nearest restraint (a riser between two elbows with no guide may be that long at most); the riser weight (water-filled, standard wall) carried by an end in equipment / on a header (nozzle), a shoe or anchor clamp on the riser, or an attached support of the pipe within overhangRatio × that span along the pipe of one of its elbows (the riser hangs on the elbow like a free end). A guide on a riser carries no weight on the horizontal spans; a shoe or anchor clamp counts as a support at its elbow.',
   'Not covered: pipes with concentrated loads (valves, flanged instruments), insulation, non-water content, sloped lines (use a smaller spanFactor), thermal loops and seismic restraint.',
 ];
 
@@ -68,21 +71,22 @@ function rowOf(
   overhangRatio: number,
 ): PipeSupportRow {
   const { element } = run;
-  const supports = supportsOfPipe(units, element.id);
-  const stations = supportStations(units, run, supports);
+  const stations = supportStations(units, run, supportsOfPipe(units, element.id));
   const unattached = stations.filter((station) => !station.attached);
-  const explicitArcs = stations.filter((station) => station.attached).map((station) => station.arc);
-  const resting = supports.length > 0 ? [] : restingArcs(units, element, beams);
-  const arcs = (supports.length > 0 ? explicitArcs : resting).sort((a, b) => a - b);
+  const weightBearing = weightSupportsOf(units, run).length > 0;
+  const explicitArcs = stations
+    .filter((station) => station.attached && !isLateralOnly(station))
+    .map((station) => station.arc);
+  const resting = weightBearing ? [] : restingArcs(units, element, beams);
+  const arcs = (weightBearing ? explicitArcs : resting).sort((a, b) => a - b);
   const carriers = endCarriers(units, run, runs);
-  const basis: PipeSupportRow['basis'] =
-    supports.length > 0
-      ? 'supports'
-      : resting.length > 0
-        ? 'resting'
-        : carriers[0] !== null && carriers[1] !== null
-          ? 'nozzles'
-          : 'none';
+  const basis: PipeSupportRow['basis'] = weightBearing
+    ? 'supports'
+    : resting.length > 0
+      ? 'resting'
+      : carriers[0] !== null && carriers[1] !== null
+        ? 'nozzles'
+        : 'none';
   const limit = pipeSpanLimit(element.dn, run.diameterMm);
   const allowed = limit.spanM * spanFactor;
   const metres = (millimetres: number): number => round(millimetres / 1000, 2);
@@ -131,17 +135,8 @@ function rowOf(
   if (run.lengthMm - length > 1) {
     notes.push(`risers (${shown(run.lengthMm - length)} m) are not counted in the spans`);
   }
-  for (const [end, carrier] of [
-    ['start', carriers[0]],
-    ['end', carriers[1]],
-  ] as const) {
-    const riser = carrier === null ? 0 : riserLengthAtEnd(run.points, end);
-    if (riser > LONG_RISER) {
-      notes.push(
-        `${shown(riser)} m riser at the ${end} end (carried by ${carrier}): guide it — not checked`,
-      );
-    }
-  }
+  const risers = riserRows(run, stations, carriers, allowed * 1000, overhangRatio);
+  issues.push(...risers.flatMap((riser) => riser.issues));
   if (basis === 'resting') notes.push('no supports: the beams the pipe rests on are used');
   return {
     id: element.id,
@@ -160,6 +155,7 @@ function rowOf(
     unattached: unattached.length,
     basis,
     endCarriers: carriers,
+    risers,
     ok: issues.length === 0,
     issues,
     notes,
@@ -183,8 +179,13 @@ export const checkPipeSupports = defineCommand({
     '(only those bearing on steel count), else the beams it rests on. Ends inside equipment (nozzle) or on another pipe ' +
     'are carried; a free end needs a support within overhangRatio × allowed span. Returns data.pipes: one row per pipe ' +
     '{ id, mark, line, dn, lengthM, maxSpanM (table), allowedSpanM (table × spanFactor), largestSpanM (actual), ' +
-    'overhangM, supports, unattached, basis ("supports" | "resting" | "nozzles" | "none"), ok, issues, notes }; data.ok is true ' +
-    'only when every pipe passes. Fix a failing pipe with add_pipe_support (spacing or at points).',
+    'overhangM, supports, unattached, basis ("supports" | "resting" | "nozzles" | "none"), risers, ok, issues, notes }; data.ok is true ' +
+    'only when every pipe passes. RISERS (runs ≥ 0.5 m steeper than 44° from horizontal) are checked too: ' +
+    'risers[] = { fromZM, toZM, lengthM, guides, maxGuideSpacingM, allowedSpacingM, weightKn, weightBy ("carried end" | ' +
+    '"clamp" | "elbow support" | null), ok, issues }; they need lateral guides (add_pipe_support type "guide" at a point on the ' +
+    'riser, bracketed to steel beside it) at most the span table value apart and at most overhangRatio × span from a free ' +
+    'elbow, and their weight carried by an end in equipment, a shoe / anchor clamp on the riser or a support within overhangRatio × span of an ' +
+    'elbow; the pipe ok includes its risers. Fix a failing pipe with add_pipe_support (spacing or at points).',
   params: z.object({
     spanFactor: z
       .number()

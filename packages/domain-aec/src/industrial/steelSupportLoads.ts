@@ -15,6 +15,7 @@ import {
   pipeRunsOf,
   supportsOfPipe,
   supportStations,
+  isLateralOnly,
   SAME_SUPPORT_DISTANCE,
   type PipeRun,
   type SupportStation,
@@ -76,7 +77,7 @@ export function applySupportedPipe(
   const warnings: string[] = [];
   const columnNodes: Array<readonly [string, ColumnNode]> = [];
   const stations = supportStations(units, run, supportsOfPipe(units, run.element.id));
-  const attached = stations.filter((station) => station.attached);
+  const attached = stations.filter((station) => station.attached && !isLateralOnly(station));
   for (const station of stations.filter((candidate) => !candidate.attached)) {
     warnings.push(
       `support ${station.mark} (${station.type} on ${label}) is attached to no steel member: it carries nothing`,

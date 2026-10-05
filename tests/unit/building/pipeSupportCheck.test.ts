@@ -7,7 +7,6 @@ import {
   arcLengths,
   nearestOnRoute,
   pointAtArc,
-  riserLengthAtEnd,
   spanCoordinate,
 } from '@aec/industrial/routeSupport';
 import { beam, step, twoLevels } from './steelFixtures';
@@ -275,7 +274,7 @@ describe('span verdicts', () => {
 });
 
 describe('risers', () => {
-  it('does not count vertical pipe in the span and notes a long riser at a carried end', () => {
+  it('does not count vertical pipe in the span and checks the riser at a carried end', () => {
     let doc = step(twoLevels(), 'add_pipe_run', {
       levelId: 'level-1',
       dn: 100,
@@ -294,11 +293,18 @@ describe('risers', () => {
     const row = rowOf(run(doc), 'PL1');
     expect(row.lengthM).toBe(7);
     expect(row.overhangM).toEqual({ start: null, end: 3 });
-    expect(row.notes).toEqual([
-      'risers (4.00 m) are not counted in the spans',
-      '4.00 m riser at the start end (carried by equipment): guide it — not checked',
+    expect(row.notes).toEqual(['risers (4.00 m) are not counted in the spans']);
+    expect(row.issues).toEqual([
+      'end overhang 3.00 m exceeds 2.15 m (0.5 × allowed span)',
+      'riser z 0.50 → 4.50 m (4.00 m): end elbow is 4.00 m from the nearest lateral guide (max 2.15 m = 0.5 × allowed spacing)',
     ]);
-    expect(row.issues).toEqual(['end overhang 3.00 m exceeds 2.15 m (0.5 × allowed span)']);
+    expect(row.risers).toHaveLength(1);
+    expect(row.risers[0]).toMatchObject({
+      lengthM: 4,
+      guides: 0,
+      weightBy: 'carried end',
+      ok: false,
+    });
   });
 
   it('measures spans on the horizontal run only', () => {
@@ -325,7 +331,8 @@ describe('risers', () => {
     }
     const row = rowOf(run(doc), 'PL1');
     expect(row.largestSpanM).toBe(6);
-    expect(row.issues).toEqual(['span 6.00 m exceeds 4.30 m allowed for DN100 (table 4.3 m)']);
+    expect(row.issues[0]).toBe('span 6.00 m exceeds 4.30 m allowed for DN100 (table 4.3 m)');
+    expect(row.issues).toHaveLength(3);
     expect(row.notes).toEqual(['risers (4.00 m) are not counted in the spans']);
   });
 });
@@ -371,8 +378,6 @@ describe('route helpers', () => {
     expect(spanCoordinate(route, 1000)).toBe(1000);
     expect(spanCoordinate(route, 5000)).toBe(3000);
     expect(spanCoordinate(route, 7000)).toBe(3000);
-    expect(riserLengthAtEnd(route, 'end')).toBe(4000);
-    expect(riserLengthAtEnd(route, 'start')).toBe(0);
   });
 });
 

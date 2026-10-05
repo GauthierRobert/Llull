@@ -19,6 +19,7 @@ import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, type SteelProfile } from '../steel/profiles';
 import { refitPlates } from './plateSupport';
 import { dropStaleConnections } from './connectionSupport';
+import { reconcilePipeSupports, reconciliationNote } from './pipeSupportAttach';
 import {
   MEMBER_ROLES,
   appendMembers,
@@ -151,7 +152,9 @@ export const updateSteelMember = defineCommand({
   name: 'update_steel_member',
   description:
     'Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, ' +
-    'beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed).',
+    'beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports ' +
+    'bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or ' +
+    'unattached (the summary says which).',
   params: z.object({
     memberId: z.string().describe('Member element id, e.g. "member-3".'),
     profile: z.string().optional().describe('New catalogue section.'),
@@ -220,7 +223,8 @@ export const updateSteelMember = defineCommand({
     };
     const refit = refitPlates(doc, withElement(building, updated), updated, member.profile);
     const stale = dropStaleConnections(refit.building, memberId, fromMm(doc, 10));
-    const document = regenerateBuilding(doc, stale.building);
+    const supports = reconcilePipeSupports(doc, stale.building);
+    const document = regenerateBuilding(doc, supports.building);
     const plateNote =
       refit.resized.length > 0
         ? ` Base plate(s) ${refit.resized.join(', ')} re-sized.`
@@ -231,8 +235,12 @@ export const updateSteelMember = defineCommand({
       document,
       summary:
         `Updated ${updated.role} ${updated.mark} (${memberId}): ${profileSummary(section)}.${plateNote}` +
-        `${stale.removed.length > 0 ? ` Moment connection(s) ${stale.removed.join(', ')} removed (joint no longer exists).` : ''}`,
-      affected: elementAffected(document, [memberId, ...refit.resized]),
+        `${stale.removed.length > 0 ? ` Moment connection(s) ${stale.removed.join(', ')} removed (joint no longer exists).` : ''}${reconciliationNote(supports)}`,
+      affected: elementAffected(document, [
+        memberId,
+        ...refit.resized,
+        ...[...supports.reattached, ...supports.detached].map((change) => change.id),
+      ]),
     };
   },
 });

@@ -11,7 +11,7 @@ import { type ModelUnits, type SteelBar } from './steelMemberBars';
 import { addPointLoad, type BeamLoads } from './steelBeamLoads';
 import type { ColumnNode } from './steelFraming';
 import { pipeWeightPerMetre } from './pipeWeight';
-import { carriedByEnds, pipeRunOf, supportsOfPipe } from './pipeSupportLayout';
+import { carriedByEnds, pipeRunOf, weightSupportsOf } from './pipeSupportLayout';
 import { applySupportedPipe } from './steelSupportLoads';
 
 export interface LineLoadParams {
@@ -214,8 +214,8 @@ export function applyLineLoads(
   const warnings: string[] = [];
   const columnNodes: Array<readonly [string, ColumnNode]> = [];
   for (const run of runsOf(units, params)) {
-    if (run.pipe && supportsOfPipe(units, run.id).length > 0) {
-      const pipeRun = pipeRunOf(units, run.pipe);
+    const pipeRun = run.pipe ? pipeRunOf(units, run.pipe) : null;
+    if (pipeRun && weightSupportsOf(units, pipeRun).length > 0) {
       const supported = applySupportedPipe(units, pipeRun, run.weightPerMetre, beams, bars);
       warnings.push(...supported.warnings);
       columnNodes.push(...supported.columnNodes);
@@ -233,10 +233,7 @@ export function applyLineLoads(
       continue;
     }
     const { supports, length } = supportsOf(run, beams);
-    const nozzles =
-      supports.length === 0 &&
-      run.pipe !== undefined &&
-      carriedByEnds(units, pipeRunOf(units, run.pipe));
+    const nozzles = supports.length === 0 && pipeRun !== null && carriedByEnds(units, pipeRun);
     let carried = 0;
     for (const { support, tributary } of tributaries(supports, length)) {
       const weight = (run.weightPerMetre * tributary) / 1000;

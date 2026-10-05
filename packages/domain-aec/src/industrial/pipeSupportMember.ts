@@ -111,6 +111,84 @@ export function bearingOf(
   };
 }
 
+/** Steel a riser support (clamp with a bracket) bears on: its bracket length and direction. */
+export interface RiserHit extends BearingHit {
+  /** Horizontal gap pipe surface → member face, mm (the bracket length). */
+  readonly standoff: number;
+  /** Plan direction from the pipe toward the member axis, radians. */
+  readonly angle: number;
+}
+
+/**
+ * Whether `bar` can take a clamp at the riser point `point` (absolute mm, pipe outside diameter
+ * `diameter`) through a horizontal bracket: a column or a horizontal member whose section reaches the
+ * clamp elevation (± `planTolerance`) and whose face is within `maxReach` of the pipe surface.
+ * The bracket length and direction when it can, else the reason.
+ */
+export function riserBearingOf(
+  bar: SteelBar,
+  point: Vec3,
+  diameter: number,
+  limits: BearingLimits,
+): RiserHit | string {
+  const label = `member ${bar.mark} (${bar.profileName})`;
+  const [width, depth] = [bar.profile?.b ?? 0, bar.profile?.h ?? 0];
+  const slope = bar.length > 0 ? Math.abs(bar.end[2] - bar.start[2]) / bar.length : 0;
+  const failure = (reason: string): string => `${label} ${reason}`;
+  const column = slope >= VERTICAL_RATIO;
+  if (!column && slope > HORIZONTAL_RATIO) {
+    return failure('is inclined: only columns and horizontal members take riser brackets');
+  }
+  const projection = column ? null : planProjection(bar, point);
+  const nearest: [number, number] =
+    projection === null
+      ? [bar.start[0], bar.start[1]]
+      : [
+          bar.start[0] + (bar.end[0] - bar.start[0]) * projection.t,
+          bar.start[1] + (bar.end[1] - bar.start[1]) * projection.t,
+        ];
+  const planDistance = Math.hypot(point[0] - nearest[0], point[1] - nearest[1]);
+  const [low, high] = column
+    ? [Math.min(bar.start[2], bar.end[2]), Math.max(bar.start[2], bar.end[2])]
+    : [(projection?.axisZ ?? 0) - depth / 2, (projection?.axisZ ?? 0) + depth / 2];
+  if (point[2] < low - limits.planTolerance || point[2] > high + limits.planTolerance) {
+    return failure(
+      `spans z ${Math.round(low)}…${Math.round(high)} mm, not the riser elevation ${Math.round(point[2])} mm`,
+    );
+  }
+  const clearance = planDistance - (column ? Math.max(width, depth) : width) / 2 - diameter / 2;
+  if (clearance < -PENETRATION) return failure('would pass through the riser');
+  if (clearance > limits.maxReach) {
+    return failure(
+      `is ${Math.round(clearance)} mm from the pipe surface (reach ${limits.maxReach} mm)`,
+    );
+  }
+  return {
+    memberId: bar.id,
+    gap: 0,
+    planDistance,
+    standoff: Math.max(0, clearance),
+    angle: Math.atan2(nearest[1] - point[1], nearest[0] - point[0]),
+  };
+}
+
+/** The member with the shortest bracket (then the nearest in plan) a riser clamp at `point` can use, or null. */
+export function findRiserBearingMember(
+  bars: ReadonlyArray<SteelBar>,
+  point: Vec3,
+  diameter: number,
+  limits: BearingLimits,
+): RiserHit | null {
+  let best: RiserHit | null = null;
+  for (const bar of bars) {
+    if (bar.profile === null) continue;
+    const hit = riserBearingOf(bar, point, diameter, limits);
+    if (typeof hit === 'string') continue;
+    if (best === null || hit.standoff < best.standoff - 1e-6) best = hit;
+  }
+  return best;
+}
+
 /** The nearest bearing member (smallest vertical gap, then plan distance) among `bars`, or null. */
 export function findBearingMember(
   bars: ReadonlyArray<SteelBar>,

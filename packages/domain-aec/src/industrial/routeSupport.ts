@@ -152,16 +152,46 @@ export function spanCoordinate(route: ReadonlyArray<Vec3>, arc: number): number 
   return span;
 }
 
-/** Length of the run of riser segments that starts at the first (`start`) or last (`end`) point of `route`. */
-export function riserLengthAtEnd(route: ReadonlyArray<Vec3>, end: 'start' | 'end'): number {
-  const ordered = end === 'start' ? route : [...route].reverse();
-  let length = 0;
-  for (let index = 0; index + 1 < ordered.length; index++) {
-    const [a, b] = [ordered[index] as Vec3, ordered[index + 1] as Vec3];
-    const segment = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-    if (segment === 0) continue;
-    if (Math.abs(b[2] - a[2]) / segment <= RISER_SLOPE) break;
-    length += segment;
+/** A run of consecutive riser segments: from `startArc` to `endArc` along the route, mm. */
+export interface RiserRun {
+  readonly startArc: number;
+  readonly endArc: number;
+  /** Axis length of the run, mm. */
+  readonly length: number;
+  /** First and last point of the run. */
+  readonly from: Vec3;
+  readonly to: Vec3;
+}
+
+/** Risers shorter than this are fittings (offsets, drops to a nozzle), not checked as risers, mm. */
+export const MIN_RISER_LENGTH = 500;
+
+/** Maximal runs of consecutive riser segments (|dz| / length > RISER_SLOPE) of at least MIN_RISER_LENGTH. */
+export function riserRuns(route: ReadonlyArray<Vec3>): RiserRun[] {
+  const arcs = arcLengths(route);
+  const runs: RiserRun[] = [];
+  let open: number | null = null;
+  const close = (toIndex: number): void => {
+    if (open === null) return;
+    const fromIndex = open;
+    open = null;
+    const [startArc, endArc] = [arcs[fromIndex] as number, arcs[toIndex] as number];
+    if (endArc - startArc < MIN_RISER_LENGTH) return;
+    runs.push({
+      startArc,
+      endArc,
+      length: endArc - startArc,
+      from: route[fromIndex] as Vec3,
+      to: route[toIndex] as Vec3,
+    });
+  };
+  for (let index = 0; index + 1 < route.length; index++) {
+    const [a, b] = [route[index] as Vec3, route[index + 1] as Vec3];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    const steep = length > 0 && Math.abs(b[2] - a[2]) / length > RISER_SLOPE;
+    if (steep && open === null) open = index;
+    if (!steep && length > 0) close(index);
   }
-  return length;
+  close(route.length - 1);
+  return runs;
 }

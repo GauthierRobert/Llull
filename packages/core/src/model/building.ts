@@ -252,7 +252,8 @@ export type PipeSupportType = 'shoe' | 'hanger' | 'guide' | 'anchor';
 
 /**
  * A support on a pipe: shoe / guide / anchor rest on steel below, a hanger hangs by a rod from
- * steel above. Hosted by its pipe (moves, copies and is deleted with it).
+ * steel above; on a riser (steep segment) a shoe / guide / anchor is a clamp with a bracket to the
+ * steel beside the pipe (`standoff`). Hosted by its pipe (moves, copies and is deleted with it).
  */
 export interface PipeSupportElement extends LevelElementBase {
   readonly category: 'pipeSupport';
@@ -267,6 +268,10 @@ export interface PipeSupportElement extends LevelElementBase {
   rodLength: number;
   /** Shoe / guide / anchor block height, pipe underside down to the member top (0 for hangers). */
   pedestalHeight: number;
+  /** Riser supports only: horizontal gap from the pipe surface to the member face (bracket length). */
+  standoff?: number;
+  /** Riser supports only: plan direction from the pipe toward the member, radians. */
+  standoffAngle?: number;
 }
 
 /** A cable tray run through 3D points (z = tray centre, relative to the level). */

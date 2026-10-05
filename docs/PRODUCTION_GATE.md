@@ -99,10 +99,11 @@ the project reopens and replays identically; a revision keeps every id, mark and
 | 8   | No pipe supports: line weight never reached the steel, spans unchecked                   | `pipe-supports`       | `add_pipe_support` (shoe / hanger / guide / anchor on steel) and `check_pipe_supports` (MSS SP-69 spans)         |
 | 9   | Only braced frames: a pipe rack's bents had no verifiable transverse stability           | `lateral-stability`   | rigid joints / base fixity on steel members; `check_steel_members` solves moment frames (N+M, sway, αcr)         |
 | 10  | Design: 6 m rack bents exceed the support span of 7 of 9 lines                           | `pipe-supports`       | the rack design was corrected: stringers and mid-bay tier beams, a shoe every 3 m                                |
+| 11  | Risers were not checked; supports kept a dangling member after edits; no plan symbol     | `pipe-supports`       | riser rule (guide spacing, weight carried), supports re-attach on delete / move / copy, P-SUPP plan symbols      |
 
 `check_steel_members` warnings left are informational: equipment standing on grade (carried by
-foundations, not by the steel). `check_pipe_supports` notes the two long risers (into the extractor,
-out of the desolventizer) as "guide it — not checked".
+foundations, not by the steel). The two long risers (into the extractor, out of the desolventizer)
+are guided from HEA100 posts and pass the riser rule.
 
 The UI driver does every call through the Building panel forms: no command-palette fallback and no
 `uiGaps`. Placement is explicit (each form has a Level selector), equipment is revised in the

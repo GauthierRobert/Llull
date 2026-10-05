@@ -1,7 +1,8 @@
 /**
  * Solid parts of a pipe support in the pipe's frame: a steel block (shoe, guide, anchor) between the
  * pipe underside and the steel below, with side stops (guide, anchor) and a cap (anchor); a hanger is
- * a clamp on the pipe top and a rod up to the steel above.
+ * a clamp on the pipe top and a rod up to the steel above. On a riser every type is a clamp collar
+ * with a horizontal bracket to the steel beside the pipe.
  * @layer domain-aec
  * @pure
  */
@@ -10,7 +11,7 @@ import type { CadDocument } from '@core/model/types';
 import type { PipeElement, PipeSupportElement } from '@core/model/building';
 import { fromMm } from '../model';
 import { hangerRodDiameter, pipeSpanLimit } from './pipeSpans';
-import { nearestOnRoute } from './routeSupport';
+import { RISER_SLOPE, nearestOnRoute } from './routeSupport';
 
 export type SupportPart =
   | {
@@ -40,10 +41,43 @@ export interface SupportShape {
 }
 
 /** Plan direction of the pipe at `position` (level-relative); 0 for a vertical segment. */
-function pipeAngle(pipe: PipeElement, position: PipeSupportElement['position']): number {
+export function pipeAngle(pipe: PipeElement, position: PipeSupportElement['position']): number {
   const snap = nearestOnRoute(pipe.points, position);
   const [dx, dy] = [snap?.direction[0] ?? 1, snap?.direction[1] ?? 0];
   return Math.hypot(dx, dy) < 1e-6 ? 0 : Math.atan2(dy, dx);
+}
+
+/** Clamp collar and bracket of a support on a riser; the frame is turned so `across` points to the steel. */
+function riserShape(
+  support: PipeSupportElement,
+  diameter: number,
+  mm: (value: number) => number,
+): SupportShape {
+  const label = `Pipe support ${support.mark} ${support.type}`;
+  const [z, collar] = [support.position[2], diameter + mm(40)];
+  const arm =
+    support.memberId !== null && support.standoff !== undefined ? support.standoff - mm(20) : 0;
+  const parts: SupportPart[] = [
+    {
+      kind: 'box',
+      name: 'clamp',
+      label: `${label} clamp`,
+      across: 0,
+      z,
+      size: [collar, collar, mm(80)],
+    },
+  ];
+  if (arm > mm(5)) {
+    parts.push({
+      kind: 'box',
+      name: 'bracket',
+      label: `${label} bracket`,
+      across: collar / 2 + arm / 2,
+      z,
+      size: [mm(60), arm, mm(40)],
+    });
+  }
+  return { angle: (support.standoffAngle ?? Math.PI / 2) - Math.PI / 2, parts };
 }
 
 /** Parts of `support` on `pipe`; z values are relative to the support's level. */
@@ -63,6 +97,8 @@ export function supportShape(
     z: number,
     size: readonly [number, number, number],
   ): SupportPart => ({ kind: 'box', name, label: `${label} ${text}`, across, z, size });
+  const snap = nearestOnRoute(pipe.points, support.position);
+  if (snap && Math.abs(snap.direction[2]) > RISER_SLOPE) return riserShape(support, diameter, mm);
   const angle = pipeAngle(pipe, support.position);
   if (support.type === 'hanger') {
     const parts: SupportPart[] = [box('clamp', 'clamp', 0, top + mm(5), [mm(40), mm(60), mm(10)])];

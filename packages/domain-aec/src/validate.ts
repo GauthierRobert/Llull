@@ -152,11 +152,15 @@ function pipeSupportErrors(key: string, element: Elements, elements: Elements): 
   if (memberId !== null && typeof memberId !== 'string') {
     errors.push(`building element ${key}: memberId must be a steel member id or null`);
   }
-  for (const field of ['rodLength', 'pedestalHeight']) {
+  for (const field of ['rodLength', 'pedestalHeight', 'standoff']) {
     const value = element[field];
     if (typeof value === 'number' && value < 0) {
       errors.push(`building element ${key}: ${field} must be >= 0`);
     }
+  }
+  const angle = element['standoffAngle'];
+  if (angle !== undefined && !(typeof angle === 'number' && Number.isFinite(angle))) {
+    errors.push(`building element ${key}: standoffAngle must be a finite number`);
   }
   return errors;
 }

@@ -1179,7 +1179,7 @@
     "name": "add_pipe_run"
   },
   {
-    "description": "Place supports on an existing pipe (add_pipe_run) so its weight reaches the steel (check_steel_members) and its spans can be verified (check_pipe_supports). Select the pipe with `pipeId` (element id) or `line` (line number, every pipe carrying it) and give EITHER `at` (list of absolute [x, y, z] points, each snapped to the nearest point of the pipe centreline within `snapDistance`) OR `spacing` (auto-placed along the pipe at no more than that spacing, plus one support min(300 mm, spacing/4) from each free end and one near each bend; ends inside equipment or on another pipe are carried and get none; never on risers). `type`: \"shoe\" (pipe rests on steel below), \"hanger\" (rod from steel above), \"guide\" (shoe with side stops), \"anchor\" (shoe fixed to the steel); all four carry the pipe weight. The steel it bears on is `memberId` or the nearest steel member in the right direction (below for shoe / guide / anchor, above for a hanger) within `maxReach` vertically and within half its width + `planTolerance` in plan. A position with no steel in reach is still created but UNATTACHED (memberId null): it carries nothing and the summary warns. Supports follow their pipe (moved, copied, deleted with it). Marks PS1, PS2… data.supports lists { id, mark, pipeId, type, position (level-relative), memberId, rodLength }.",
+    "description": "Place supports on an existing pipe (add_pipe_run) so its weight reaches the steel (check_steel_members) and its spans can be verified (check_pipe_supports). Select the pipe with `pipeId` (element id) or `line` (line number, every pipe carrying it) and give EITHER `at` (list of absolute [x, y, z] points, each snapped to the nearest point of the pipe centreline within `snapDistance`) OR `spacing` (auto-placed along the pipe at no more than that spacing, plus one support min(300 mm, spacing/4) from each free end and one near each bend; ends inside equipment or on another pipe are carried and get none; never on risers). `type`: \"shoe\" (pipe rests on steel below), \"hanger\" (rod from steel above), \"guide\" (shoe with side stops), \"anchor\" (shoe fixed to the steel); all four carry the pipe weight on a horizontal run. ON A RISER (a segment steeper than 44° from horizontal, |dz|/length > 0.7; give an `at` point on it, `spacing` never places there) only guide / shoe / anchor are allowed and they are clamps with a horizontal bracket to steel BESIDE the pipe: a guide restrains it laterally (checked by check_pipe_supports riser rule: lateral restraint spacing and a support carrying the riser weight), a shoe or anchor also carries the riser weight (an anchor is a guide and a weight support). The steel it bears on is `memberId` or the nearest steel member in the right direction (below for shoe / guide / anchor, above for a hanger) within `maxReach` vertically and within half its width + `planTolerance` in plan (riser: a column, or a horizontal member whose section reaches the clamp elevation ± planTolerance, with its face within `maxReach` horizontally of the pipe surface). A position with no steel in reach is still created but UNATTACHED (memberId null): it carries nothing and the summary warns. Supports follow their pipe (moved, copied, deleted with it) and follow edits of their steel: deleting or moving a member or moving the pipe re-attaches them to the nearest steel in reach, or leaves them unattached (the edit command's summary lists which). Marks PS1, PS2… data.supports lists { id, mark, pipeId, type, position (level-relative), memberId, rodLength, standoff (riser bracket length) }.",
     "input_schema": {
       "properties": {
         "at": {
@@ -1197,7 +1197,7 @@
           "type": "string"
         },
         "maxReach": {
-          "description": "Largest vertical gap between the pipe and its steel, document units, > 0: pedestal height for shoe / guide / anchor (default 500 mm), rod length for a hanger (default 3000 mm).",
+          "description": "Largest vertical gap between the pipe and its steel, document units, > 0: pedestal height for shoe / guide / anchor (default 500 mm), rod length for a hanger (default 3000 mm); on a riser the largest horizontal gap from the pipe surface to the member face (default 500 mm).",
           "type": "number"
         },
         "memberId": {
@@ -1221,7 +1221,7 @@
           "type": "number"
         },
         "type": {
-          "description": "\"shoe\" (rests on steel below, default), \"hanger\" (rod from steel above), \"guide\" (shoe with side stops) or \"anchor\" (fixed shoe).",
+          "description": "\"shoe\" (rests on steel below, default), \"hanger\" (rod from steel above), \"guide\" (shoe with side stops; on a riser a lateral guide clamp) or \"anchor\" (fixed shoe; on a riser a clamp that guides and carries the weight).",
           "enum": [
             "shoe",
             "hanger",
@@ -2796,7 +2796,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Read-only support-spacing check of every pipe (add_pipe_run) against the standard maximum span of water-filled standard-wall steel pipe by DN (MSS SP-69 Table 3 / ASME B31.1 Table 121.5: DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, DN250 6.7 m, DN300 7.0 m …). Uses the pipe's add_pipe_support supports (only those bearing on steel count), else the beams it rests on. Ends inside equipment (nozzle) or on another pipe are carried; a free end needs a support within overhangRatio × allowed span. Returns data.pipes: one row per pipe { id, mark, line, dn, lengthM, maxSpanM (table), allowedSpanM (table × spanFactor), largestSpanM (actual), overhangM, supports, unattached, basis (\"supports\" | \"resting\" | \"nozzles\" | \"none\"), ok, issues, notes }; data.ok is true only when every pipe passes. Fix a failing pipe with add_pipe_support (spacing or at points).",
+    "description": "Read-only support-spacing check of every pipe (add_pipe_run) against the standard maximum span of water-filled standard-wall steel pipe by DN (MSS SP-69 Table 3 / ASME B31.1 Table 121.5: DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, DN250 6.7 m, DN300 7.0 m …). Uses the pipe's add_pipe_support supports (only those bearing on steel count), else the beams it rests on. Ends inside equipment (nozzle) or on another pipe are carried; a free end needs a support within overhangRatio × allowed span. Returns data.pipes: one row per pipe { id, mark, line, dn, lengthM, maxSpanM (table), allowedSpanM (table × spanFactor), largestSpanM (actual), overhangM, supports, unattached, basis (\"supports\" | \"resting\" | \"nozzles\" | \"none\"), risers, ok, issues, notes }; data.ok is true only when every pipe passes. RISERS (runs ≥ 0.5 m steeper than 44° from horizontal) are checked too: risers[] = { fromZM, toZM, lengthM, guides, maxGuideSpacingM, allowedSpacingM, weightKn, weightBy (\"carried end\" | \"clamp\" | \"elbow support\" | null), ok, issues }; they need lateral guides (add_pipe_support type \"guide\" at a point on the riser, bracketed to steel beside it) at most the span table value apart and at most overhangRatio × span from a free elbow, and their weight carried by an end in equipment, a shoe / anchor clamp on the riser or a support within overhangRatio × span of an elbow; the pipe ok includes its risers. Fix a failing pipe with add_pipe_support (spacing or at points).",
     "input_schema": {
       "properties": {
         "levelId": {
@@ -2975,7 +2975,7 @@
     "name": "clear_document"
   },
   {
-    "description": "Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the source level onto each target level (typical floors of a multi-storey building). Optionally restrict to some categories.",
+    "description": "Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the source level onto each target level (typical floors of a multi-storey building). Optionally restrict to some categories. Copied pipes bring their pipe supports, re-attached to the steel found at their new position (unattached when none is in reach).",
     "input_schema": {
       "properties": {
         "categories": {
@@ -3116,7 +3116,7 @@
     "annotations": {
       "destructiveHint": true
     },
-    "description": "Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed.",
+    "description": "Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed. Deleting a steel member re-attaches the pipe supports bearing on it to the nearest steel in reach, or leaves them unattached (the summary says which).",
     "input_schema": {
       "properties": {
         "elementIds": {
@@ -5350,7 +5350,7 @@
     "name": "motion_study"
   },
   {
-    "description": "Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide an opening along its wall use update_opening). Corner joins are recomputed.",
+    "description": "Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide an opening along its wall use update_opening). Corner joins are recomputed. A moved pipe takes its pipe supports along and a moved steel member makes its supports re-check their reach: they re-attach to the steel at the new position or become unattached (the summary says which).",
     "input_schema": {
       "properties": {
         "delta": {
@@ -6399,7 +6399,7 @@
     "name": "update_opening"
   },
   {
-    "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed).",
+    "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or unattached (the summary says which).",
     "input_schema": {
       "properties": {
         "baseFixity": {

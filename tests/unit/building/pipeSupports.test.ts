@@ -333,7 +333,7 @@ describe('line selector and failures', () => {
     expect(result.summary).toContain(text);
   });
 
-  it('refuses a point on a riser and a second support at the same place', () => {
+  it('refuses a hanger on a riser and a second support at the same place', () => {
     const doc = step(twoLevels(), 'add_pipe_run', {
       levelId: 'level-1',
       dn: 100,
@@ -342,9 +342,14 @@ describe('line selector and failures', () => {
         [0, 0, 3000],
       ],
     });
-    const riser = execute(doc, 'add_pipe_support', { pipeId: 'pipe-1', at: [[0, 0, 1500]] });
+    const riser = execute(doc, 'add_pipe_support', {
+      pipeId: 'pipe-1',
+      type: 'hanger',
+      at: [[0, 0, 1500]],
+    });
     expect(riser.document).toBe(doc);
     expect(riser.summary).toContain('is on a riser');
+    expect(riser.summary).toContain('a hanger cannot hang there');
     const placed = execute(shoeDoc(), 'add_pipe_support', SHOE_AT);
     const duplicate = execute(placed.document, 'add_pipe_support', {
       pipeId: 'pipe-1',
