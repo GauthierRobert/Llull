@@ -27,6 +27,7 @@ import { listSteelProfiles } from './industrial/memberSupport';
 import { addSteelMember, updateSteelMember } from './industrial/memberSteelCommands';
 import { addFooting, addPanel } from './industrial/memberFootingPanelCommands';
 import { addEquipment, addPipeRun } from './industrial/equipment';
+import { updateEquipment } from './industrial/equipmentUpdate';
 import { addCraneRunway, addPortalFrameBuilding } from './industrial/portal';
 import { checkClashes } from './industrial/clash';
 import { addCableTray } from './industrial/trays';
@@ -44,6 +45,7 @@ import { checkPurlins } from './industrial/purlinCheckRun';
 import { designPurlins } from './industrial/purlinDesign';
 import { exportAnchorPlan } from './industrial/anchorPlanExport';
 import { runwayCheck } from './industrial/runwayCheckRun';
+import { checkSteelMembers } from './industrial/steelMembersCheck';
 import { quantityTakeoff, buildingSchedule, setCostRates, estimateCost } from './takeoff';
 
 /** AEC / BIM commands (levels, walls, openings, slabs, sheets, IFC, takeoff). */
@@ -93,6 +95,7 @@ export const industrialCommands = [
   addFooting,
   addPanel,
   addEquipment,
+  updateEquipment,
   addPipeRun,
   addCableTray,
   addBasePlates,
@@ -107,6 +110,7 @@ export const industrialCommands = [
   designPurlins,
   exportAnchorPlan,
   runwayCheck,
+  checkSteelMembers,
   addCraneRunway,
   addPortalFrameBuilding,
   checkClashes,

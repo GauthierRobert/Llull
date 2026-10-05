@@ -2,7 +2,7 @@
  * @layer ui/panels/building
  *
  * BuildingPanel — the construction (AEC/BIM) workspace: starter templates, project info,
- * levels, element tools, the active level's elements, clash check, quantities & cost, deliverables.
+ * levels, element tools, the active level's elements, equipment editor, clash check, quantities & cost, deliverables.
  * Every change goes through dispatch (PRIME DIRECTIVE); exports run read-only commands.
  */
 
@@ -13,6 +13,7 @@ import { ProjectSection } from './ProjectSection';
 import { LevelsSection } from './LevelsSection';
 import { ElementToolsSection } from './ElementToolsSection';
 import { ElementListSection } from './ElementListSection';
+import { EquipmentSection } from './EquipmentSection';
 import { QuantitiesSection } from './QuantitiesSection';
 import { BuildingExportsSection } from './BuildingExportsSection';
 import { ClashSection } from './ClashSection';
@@ -80,6 +81,7 @@ export function BuildingPanel({ className }: { className?: string }): React.Reac
       <LevelsSection />
       <ElementToolsSection />
       <ElementListSection />
+      <EquipmentSection />
       <ClashSection />
       <StructuralSection />
       <QuantitiesSection />

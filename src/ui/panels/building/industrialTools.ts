@@ -6,11 +6,15 @@
  */
 
 import { STEEL_PROFILES } from '@aec/steel/profiles';
+import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/pipeSizes';
 import {
   FieldReader,
+  levelField,
   num,
   onLevel,
+  placement,
   result,
+  txt,
   type ElementTool,
   type ToolField,
 } from './elementToolForm';
@@ -35,6 +39,14 @@ function profileField(key: string, label: string, defaultValue: string, iOnly = 
     options: iOnly ? I_PROFILES : ALL_PROFILES,
   };
 }
+
+const DN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
+  ['', 'Custom Ø (enter below)'],
+  ...Object.entries(PIPE_OUTSIDE_DIAMETER_MM).map(([dn, diameter]): readonly [string, string] => [
+    dn,
+    `DN${dn} · Ø${diameter}`,
+  ]),
+];
 
 const degrees = (value: number): number => (value * Math.PI) / 180;
 
@@ -139,6 +151,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('y2', 'End Y', '0'),
       num('z2', 'End Z', '4000'),
       num('roll', 'Roll (°)', '0'),
+      levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
@@ -148,7 +161,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         start: [reader.number('x1'), reader.number('y1'), reader.number('z1')],
         end: [reader.number('x2'), reader.number('y2'), reader.number('z2')],
         roll: degrees(reader.number('roll')),
-        ...onLevel(context),
+        ...placement(reader, context),
       });
     },
   },
@@ -165,11 +178,11 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      const placement = reader.flag('underColumns')
+      const position = reader.flag('underColumns')
         ? { underColumns: true }
         : { location: [reader.number('x'), reader.number('y')] };
       return result(reader, 'add_footing', {
-        ...placement,
+        ...position,
         width: reader.number('width'),
         thickness: reader.number('thickness'),
         ...onLevel(context),
@@ -239,6 +252,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     label: 'Machine / equipment',
     group: GROUP,
     fields: [
+      txt('mark', 'Tag (E-301…)', '', true),
       { key: 'name', label: 'Name', kind: 'text', defaultValue: 'Machine' },
       num('x', 'Centre X', '6000'),
       num('y', 'Centre Y', '6000'),
@@ -248,18 +262,20 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('angle', 'Rotation (°)', '0'),
       num('clearance', 'Clearance', '800'),
       num('weight', 'Weight (kg)', '', true),
+      levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
       if (reader.text('name') === '') return { ok: false, reason: 'Equipment needs a name.' };
       return result(reader, 'add_equipment', {
+        mark: reader.text('mark') || undefined,
         name: reader.text('name'),
         location: [reader.number('x'), reader.number('y')],
         size: [reader.number('length'), reader.number('width'), reader.number('height')],
         angle: degrees(reader.number('angle')),
         clearance: reader.number('clearance'),
         weight: reader.optionalNumber('weight'),
-        ...onLevel(context),
+        ...placement(reader, context),
       });
     },
   },
@@ -274,16 +290,36 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         kind: 'text',
         defaultValue: '2000,3000,4000; 20000,3000,4000',
       },
-      num('diameter', 'Outside Ø', '114.3'),
+      txt('line', 'Line number (L-101…)', '', true),
+      {
+        key: 'dn',
+        label: 'Nominal size',
+        kind: 'select',
+        defaultValue: '100',
+        options: DN_OPTIONS,
+      },
+      num('diameter', 'Outside Ø (overrides DN)', '', true),
+      txt('from', 'From (tag / tie-in)', '', true),
+      txt('to', 'To (tag / tie-in)', '', true),
       { key: 'service', label: 'Service', kind: 'text', defaultValue: 'compressed air' },
+      levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
+      const dn = reader.text('dn');
+      const diameter = reader.optionalNumber('diameter');
+      if (dn === '' && diameter === undefined) {
+        return { ok: false, reason: 'Pick a nominal size or give the outside Ø.' };
+      }
       return result(reader, 'add_pipe_run', {
         points: reader.pointList('points', 2),
-        diameter: reader.number('diameter'),
+        line: reader.text('line') || undefined,
+        dn: dn === '' ? undefined : Number(dn),
+        diameter,
+        from: reader.text('from') || undefined,
+        to: reader.text('to') || undefined,
         service: reader.text('service') || undefined,
-        ...onLevel(context),
+        ...placement(reader, context),
       });
     },
   },
@@ -301,6 +337,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('width', 'Width', '300'),
       num('height', 'Side height', '60'),
       { key: 'system', label: 'System', kind: 'text', defaultValue: 'power' },
+      levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
@@ -309,7 +346,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         width: reader.number('width'),
         height: reader.number('height'),
         system: reader.text('system') || undefined,
-        ...onLevel(context),
+        ...placement(reader, context),
       });
     },
   },

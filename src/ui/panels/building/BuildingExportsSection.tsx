@@ -24,6 +24,15 @@ export function BuildingExportsSection(): React.ReactElement {
   const [direction, setDirection] = useState<(typeof DIRECTIONS)[number]>('south');
   const [cutAt, setCutAt] = useState('');
   const [hideCladding, setHideCladding] = useState(false);
+  const [levelChoice, setLevelChoice] = useState('');
+  const levels = document.building?.levelOrder.flatMap((id) => {
+    const level = document.building?.levels[id];
+    return level ? [level] : [];
+  });
+  const levelParams =
+    levelChoice !== '' && levels?.some((level) => level.id === levelChoice)
+      ? { levelId: levelChoice }
+      : {};
   const scaleParams = scale === 'auto' ? {} : { scale: Number(scale) };
 
   const run = (
@@ -73,11 +82,29 @@ export function BuildingExportsSection(): React.ReactElement {
             </option>
           ))}
         </select>
+        <select
+          value={levelParams.levelId ?? ''}
+          onChange={(event) => setLevelChoice(event.target.value)}
+          aria-label="Export level"
+          title="Level printed by the plan sheet, anchor plan and DXF"
+        >
+          <option value="">Active level</option>
+          {levels?.map((level) => (
+            <option key={level.id} value={level.id}>
+              {level.name}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           className="btn btn--primary btn--sm"
           onClick={() =>
-            run('export_plan_sheet', { paper, ...scaleParams }, 'svg', 'image/svg+xml')
+            run(
+              'export_plan_sheet',
+              { paper, ...scaleParams, ...levelParams },
+              'svg',
+              'image/svg+xml',
+            )
           }
         >
           Plan sheet
@@ -86,7 +113,12 @@ export function BuildingExportsSection(): React.ReactElement {
           type="button"
           className="btn btn--ghost btn--sm"
           onClick={() =>
-            run('export_anchor_plan', { paper, ...scaleParams }, 'svg', 'image/svg+xml')
+            run(
+              'export_anchor_plan',
+              { paper, ...scaleParams, ...levelParams },
+              'svg',
+              'image/svg+xml',
+            )
           }
         >
           Anchor plan
@@ -147,7 +179,7 @@ export function BuildingExportsSection(): React.ReactElement {
         <button
           type="button"
           className="btn btn--ghost btn--sm"
-          onClick={() => run('export_dxf', {}, 'dxf', 'application/dxf')}
+          onClick={() => run('export_dxf', { ...levelParams }, 'dxf', 'application/dxf')}
         >
           DXF (AutoCAD)
         </button>

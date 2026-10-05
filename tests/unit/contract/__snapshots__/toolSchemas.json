@@ -1125,15 +1125,27 @@
     "name": "add_panel"
   },
   {
-    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with an outside diameter and a service / fluid name (compressed air, cooling water, steam, gas…). Bends are placed at every interior point. Pipe lengths feed the takeoff; clashes are reported by check_clashes.",
+    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes.",
     "input_schema": {
       "properties": {
         "diameter": {
-          "description": "Outside diameter. Default 114.3 mm (DN100).",
+          "description": "Outside diameter in document units. Default: from `dn` when given, else 114.3 mm (DN100).",
           "type": "number"
+        },
+        "dn": {
+          "description": "Nominal size DN as an integer, e.g. 100. Tabulated: 15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150, 200, 250, 300, 350, 400. Sets the outside diameter when `diameter` is omitted (an untabulated DN then needs an explicit `diameter`). Printed \"DN100\" in the line list.",
+          "type": "number"
+        },
+        "from": {
+          "description": "Line origin: equipment tag (e.g. \"EQ1\") or battery-limit / tie-in id (e.g. \"BL-1\").",
+          "type": "string"
         },
         "levelId": {
           "description": "Level id. Default: the active level.",
+          "type": "string"
+        },
+        "line": {
+          "description": "Line number for the line list, e.g. \"L-101\".",
           "type": "string"
         },
         "material": {
@@ -1152,6 +1164,10 @@
         },
         "service": {
           "description": "Fluid / service. Default \"process\".",
+          "type": "string"
+        },
+        "to": {
+          "description": "Line destination: equipment tag or battery-limit / tie-in id.",
           "type": "string"
         }
       },
@@ -2781,6 +2797,48 @@
       "type": "object"
     },
     "name": "check_purlins"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "General EN 1993-1-1 member verification of a steel structure built from add_steel_member (multi-storey process structures, pipe racks, platforms, halls), with the loads derived from the model: self weight, floor slabs (add_slab role floor) with dead + imposed load, equipment operating weight (add_equipment weight, kg), pipes (add_pipe_run, steel + contents) and cable trays resting on beams. ULS 1.35 G + 1.5 Q, SLS G + Q. Beams (role beam, horizontal) are simply supported between end nodes, with floor load shared by the 45° tributary rule and equipment by footprint area per bay; checked for bending (+ lateral-torsional buckling when nothing restrains the top flange), shear and deflection ≤ span/250. Columns are checked per storey segment between beam levels for Npl,Rd and flexural buckling Nb,Rd (Lcr = segment length). Braces (role brace, in an X or Y vertical plane) carry the EN 1993-1-1 §5.3.2 equivalent horizontal forces (notionalFactor × factored vertical load per level), tension-only in X-bracing, with slenderness ≤ 300; the horizontal members of a braced bay are checked as struts. Returns data.members: one row per steel member { id, mark, role, profile, check (governing check), utilisation (1.0 = at resistance), ok, governing (combination), detail, checks, forces } — members that cannot be analysed (profile not in the catalogue, class 4, roles rafter / purlin / rail / crane, inclined columns) appear with check \"not analysed\", ok false and the reason; data.ok is true only when every member is analysed and passes. data.warnings lists model gaps (equipment on grade, pipes resting on nothing, directions without bracing, beam ends bearing on nothing). Beam-column connections are assumed pinned; a preliminary check, not a substitute for the engineer of record. See data.loads.assumptions for every load-path rule.",
+    "input_schema": {
+      "properties": {
+        "cableTrayWeight": {
+          "description": "Weight of a cable tray including its cables, kg per metre of run. Default 75.",
+          "type": "number"
+        },
+        "deflectionRatio": {
+          "description": "Beam deflection limit as span / n under G + Q. Default 250 (L/250).",
+          "type": "number"
+        },
+        "floorDeadLoad": {
+          "description": "Permanent load of floor gratings / finishes, kN/m², on every floor slab (add_slab role floor). Default 0.5.",
+          "type": "number"
+        },
+        "imposedLoad": {
+          "description": "Imposed load on floors, kN/m² (process-plant floors, EN 1991-1-1 category E-like), applied on the floor area not occupied by equipment. Default 5.0.",
+          "type": "number"
+        },
+        "levelId": {
+          "description": "Only report the members of this level id. The whole model is always analysed (column loads come from beams on other levels). Default: every level.",
+          "type": "string"
+        },
+        "notionalFactor": {
+          "description": "Equivalent horizontal force as a fraction of the factored vertical load at each floor level (EN 1993-1-1 §5.3.2 φ0 = 1/200 = 0.005, no αh / αm reduction). Default 0.005.",
+          "type": "number"
+        },
+        "pipeContentDensity": {
+          "description": "Density of the pipe contents, kg/m³: 1000 = water-filled (default, operating / hydrotest), 0 = empty pipes.",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "check_steel_members"
   },
   {
     "annotations": {
@@ -6090,6 +6148,62 @@
       "type": "object"
     },
     "name": "update_constraint"
+  },
+  {
+    "description": "Edit an existing equipment in place (revision): name, tag (mark), plan centre, size, plan rotation, maintenance clearance, operating weight or level. Identify it by `elementId` (e.g. \"equipment-2\") or by its current tag `currentMark` (e.g. \"EQ3\"). The element id is kept, so schedules, plan tags and IFC GlobalIds stay stable across the revision. Fields you omit are unchanged.",
+    "input_schema": {
+      "properties": {
+        "angle": {
+          "description": "New plan rotation in radians.",
+          "type": "number"
+        },
+        "clearance": {
+          "description": "New maintenance clearance (>= 0).",
+          "type": "number"
+        },
+        "currentMark": {
+          "description": "Current equipment tag, e.g. \"EQ3\"; used when `elementId` is omitted.",
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Equipment element id, e.g. \"equipment-2\".",
+          "type": "string"
+        },
+        "levelId": {
+          "description": "Move the equipment to this level id.",
+          "type": "string"
+        },
+        "location": {
+          "description": "New footprint centre [x, y].",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "mark": {
+          "description": "New equipment tag (must not clash with another tag).",
+          "type": "string"
+        },
+        "name": {
+          "description": "New equipment name.",
+          "type": "string"
+        },
+        "size": {
+          "description": "New [length, width, height], all > 0.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "weight": {
+          "description": "New operating weight in kg (>= 0).",
+          "type": "number"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "update_equipment"
   },
   {
     "description": "Rename a level or change its elevation / floor-to-floor height. All walls, slabs, columns, beams, stairs, doors, windows and rooms on the level move and regenerate accordingly; walls and columns at full storey height and stairs climbing the storey follow a new height.",

@@ -179,6 +179,16 @@ export function exportIndustrial(
       const ref = writer.add(
         `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [extrusion(context, profile, mm(height))])},${ifcString(element.id)},.ELEMENT.)`,
       );
+      const properties = [
+        `IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(${ifcReal(element.weight)}),$)`,
+        `IFCPROPERTYSINGLEVALUE('MaintenanceClearance','Free space around the footprint, mm',IFCLENGTHMEASURE(${ifcReal(mm(element.clearance))}),$)`,
+      ].map((property) => writer.add(property));
+      const propertySet = writer.add(
+        `IFCPROPERTYSET('${context.guid(`${element.id}:pset`)}',$,'Pset_llullEquipment',$,(${properties.join(',')}))`,
+      );
+      writer.add(
+        `IFCRELDEFINESBYPROPERTIES('${context.guid(`${element.id}:rel-pset`)}',$,$,$,(${ref}),${propertySet})`,
+      );
       return { ref, material: null };
     }
     case 'pipe': {
@@ -186,8 +196,9 @@ export function exportIndustrial(
       const circle = circleProfile(context, mm(element.diameter) / 2);
       const solids = sweptSolids(context, circle, element.points.map(mm3));
       if (solids.length === 0) return null;
+      const description = [element.line, element.service].filter(Boolean).join(' ');
       const ref = writer.add(
-        `IFCPIPESEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(element.service)},$,${local},${shape(context, solids)},${ifcString(element.id)},.RIGIDSEGMENT.)`,
+        `IFCPIPESEGMENT('${guid}',$,${ifcString(element.mark)},${ifcString(description)},$,${local},${shape(context, solids)},${ifcString(element.id)},.RIGIDSEGMENT.)`,
       );
       return { ref, material: element.material };
     }

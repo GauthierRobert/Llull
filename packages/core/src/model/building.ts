@@ -226,6 +226,14 @@ export interface PipeElement extends LevelElementBase {
   /** Fluid / service, e.g. "compressed air", "cooling water". */
   service: string;
   material: string;
+  /** Line number, e.g. "L-101" (line list). */
+  line?: string;
+  /** Nominal size (DN, integer), e.g. 100. */
+  dn?: number;
+  /** Origin: equipment tag or battery-limit / tie-in id. */
+  from?: string;
+  /** Destination: equipment tag or battery-limit / tie-in id. */
+  to?: string;
 }
 
 /** A cable tray run through 3D points (z = tray centre, relative to the level). */

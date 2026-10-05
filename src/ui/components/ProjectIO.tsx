@@ -16,6 +16,7 @@ import React, { useRef } from 'react';
 import { useStore } from '@ui/store';
 import { serializeDocument } from '@core/commands/persistence';
 import { Icon } from '@ui/components/Icon';
+import { downloadBlob } from '@ui/download';
 
 function timestamp(): string {
   const d = new Date();
@@ -33,13 +34,7 @@ export function ProjectIO(): React.ReactElement {
 
   const handleSave = (): void => {
     const json = serializeDocument(document);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement('a');
-    a.href = url;
-    a.download = `llull-${timestamp()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(new Blob([json], { type: 'application/json' }), `llull-${timestamp()}.json`);
   };
 
   const handleOpenClick = (): void => {

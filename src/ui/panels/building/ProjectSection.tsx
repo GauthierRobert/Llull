@@ -1,12 +1,13 @@
 /**
  * @layer ui/panels/building
  *
- * ProjectSection — title-block / IFC project metadata form → `set_project_info`.
+ * ProjectSection — title-block / IFC project metadata form → `set_project_info` (also on an
+ * empty document: the command creates the building model).
  */
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
-import type { ProjectInfo } from '@core/model/building';
+import { createEmptyBuilding, type ProjectInfo } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
 
 const FIELDS: ReadonlyArray<readonly [keyof ProjectInfo, string]> = [
@@ -18,6 +19,9 @@ const FIELDS: ReadonlyArray<readonly [keyof ProjectInfo, string]> = [
   ['revision', 'Revision'],
   ['date', 'Date'],
 ];
+
+/** Shown (and submitted as a diff) while the document has no building model yet. */
+const NEW_PROJECT: ProjectInfo = createEmptyBuilding().project;
 
 interface ProjectFormProps {
   project: ProjectInfo;
@@ -63,8 +67,7 @@ function ProjectForm({ project }: ProjectFormProps): React.ReactElement {
 }
 
 export function ProjectSection(): React.ReactElement {
-  const project = useStore((s) => s.document.building?.project);
-  if (!project) return <></>;
+  const project = useStore((s) => s.document.building?.project) ?? NEW_PROJECT;
   // Remount the form when the stored project changes (load / undo / MCP edit).
   return (
     <PanelSection title="Project" collapsible testId="building-project">

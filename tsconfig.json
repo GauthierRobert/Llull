@@ -36,6 +36,6 @@
     }
   },
   "include": ["src", "packages", "tests"],
-  /* Node-side quality gates have their own config (tests/quality/tsconfig.json). */
-  "exclude": ["tests/quality"]
+  /* Node-side quality and production gates have their own tsconfig.json. */
+  "exclude": ["tests/quality", "tests/production"]
 }

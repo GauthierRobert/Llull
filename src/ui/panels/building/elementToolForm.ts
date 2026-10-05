@@ -8,7 +8,7 @@
 type FieldKind = 'number' | 'text' | 'select' | 'checkbox';
 
 /** Live element lists a select field can offer. */
-export type ElementListKind = 'walls' | 'hosts' | 'stairs' | 'slabs';
+export type ElementListKind = 'walls' | 'hosts' | 'stairs' | 'slabs' | 'levels';
 
 export interface ToolField {
   readonly key: string;
@@ -41,6 +41,15 @@ export interface ElementTool {
 
 export function num(key: string, label: string, defaultValue = '', optional = false): ToolField {
   return { key, label, kind: 'number', defaultValue, optional };
+}
+
+export function txt(key: string, label: string, defaultValue = '', optional = false): ToolField {
+  return { key, label, kind: 'text', defaultValue, optional };
+}
+
+/** Level selector: blank = the active level, else a level id (relative z / placement is on it). */
+export function levelField(): ToolField {
+  return { key: 'levelId', label: 'Level', kind: 'select', defaultValue: '', options: 'levels' };
 }
 
 export class FieldReader {
@@ -111,6 +120,12 @@ export function result(
 
 export function onLevel(context: ToolContext): Record<string, unknown> {
   return context.levelId === null ? {} : { levelId: context.levelId };
+}
+
+/** `levelId` of the form's Level selector, else the active level. */
+export function placement(reader: FieldReader, context: ToolContext): Record<string, unknown> {
+  const chosen = reader.text('levelId');
+  return chosen === '' ? onLevel(context) : { levelId: chosen };
 }
 
 export function defaultValues(tool: ElementTool): Record<string, string> {

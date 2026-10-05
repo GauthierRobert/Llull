@@ -249,6 +249,17 @@ function elementErrors(
       errors.push(`building element ${key}: ${field} must be a string`);
     }
   }
+  if (category === 'pipe') {
+    for (const field of ['line', 'from', 'to']) {
+      if (element[field] !== undefined && typeof element[field] !== 'string') {
+        errors.push(`building element ${key}: ${field} must be a string`);
+      }
+    }
+    const dn = element['dn'];
+    if (dn !== undefined && !(typeof dn === 'number' && Number.isInteger(dn) && dn > 0)) {
+      errors.push(`building element ${key}: dn must be a positive integer`);
+    }
+  }
   for (const [field, minimum] of [
     ['corners', 3],
     ['points', 2],

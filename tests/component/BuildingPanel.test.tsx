@@ -161,7 +161,7 @@ describe('BuildingPanel', () => {
         [2000, 3000, 4000],
         [20000, 3000, 4000],
       ],
-      diameter: 114.3,
+      dn: 100,
       service: 'steam',
     });
   });
