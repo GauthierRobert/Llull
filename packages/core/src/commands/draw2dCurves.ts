@@ -2,12 +2,17 @@ import type { Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { newEntity } from './newEntity';
 import { compactNumber } from '../lib/compactNumber';
-import { defineCommand, z, colorField, looseVec2 as vec2 } from './schema';
+import { defineCommand, z, colorField, nameField, looseVec2 as vec2 } from './schema';
 import { nextId } from '../lib/id';
 import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
 import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from './limits';
 import { sampleInvolute } from './gears';
-import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlanePositionField } from './draw2dShared';
+import {
+  DEFAULT_DRAW_COLOR,
+  drawPointSeries,
+  workPlanePositionField,
+  workPlaneRotationField,
+} from './draw2dShared';
 import { commitEntity } from './commitEntity';
 import { pointsExtent } from './sceneBounds';
 import { noop } from './noop';
@@ -157,20 +162,9 @@ export const drawInvolute = defineCommand({
       )
       .optional(),
     position: workPlanePositionField(),
-    rotation: z
-      .array(z.number())
-      .describe(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].',
-      )
-      .optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#4a90d9". Defaults to "#4a90d9".')
-      .optional(),
-    name: z
-      .string()
-      .describe('Optional display name for the entity (shown in the scene tree).')
-      .optional(),
+    rotation: workPlaneRotationField(),
+    color: colorField(DEFAULT_DRAW_COLOR),
+    name: nameField(),
   }),
   run: (
     doc,

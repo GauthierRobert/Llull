@@ -1612,7 +1612,7 @@
           "type": "number"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#7a9cbb\". Defaults to \"#7a9cbb\".",
+          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#7a9cbb\".",
           "type": "string"
         },
         "faceWidth": {
@@ -3739,7 +3739,7 @@
           "type": "number"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#4a90d9\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "name": {
@@ -3761,7 +3761,7 @@
           "type": "array"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in radians [rx, ry, rz] for the work plane. Defaults to [0,0,0].",
+          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].",
           "items": {
             "type": "number"
           },
@@ -3859,7 +3859,7 @@
           "type": "number"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#4a90d9\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "endAngle": {

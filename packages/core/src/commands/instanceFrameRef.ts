@@ -1,3 +1,4 @@
+import type { CadDocument } from '../model/types';
 import { z } from './schema';
 
 type InstanceFrameRefSchema = z.ZodObject<{
@@ -25,4 +26,25 @@ export function instanceFrameRef(
         .describe('Frame selector: origin (default), axis-x, axis-y, or axis-z.'),
     })
     .describe(description);
+}
+
+/**
+ * First problem with the `a` / `b` instance refs of `command`, or null when both name an existing
+ * InstanceEntity.
+ */
+export function instanceRefsProblem(
+  doc: CadDocument,
+  command: string,
+  refs: Readonly<Record<'a' | 'b', { readonly instanceId: string }>>,
+): string | null {
+  for (const side of ['a', 'b'] as const) {
+    const { instanceId } = refs[side];
+    if (instanceId.length === 0) {
+      return `${command}: ${side} must be an object with a non-empty instanceId string.`;
+    }
+    if (doc.entities[instanceId]?.kind !== 'instance') {
+      return `${command}: ${side}.instanceId '${instanceId}' does not exist or is not an InstanceEntity.`;
+    }
+  }
+  return null;
 }

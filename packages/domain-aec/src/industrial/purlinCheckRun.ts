@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import type { PurlinRow } from './purlinModel';
 import { analysePurlins, locatePurlinMembers } from './purlinAnalysis';
 import { round } from '../numeric';
@@ -74,8 +74,11 @@ export const checkPurlins = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, snowLoad = 0.8, roofDeadLoad = 0.3 } = params;
-    const nonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
-    if (!nonNegative(windPressure) || !nonNegative(snowLoad) || !nonNegative(roofDeadLoad)) {
+    if (
+      !isNonNegativeNumber(windPressure) ||
+      !isNonNegativeNumber(snowLoad) ||
+      !isNonNegativeNumber(roofDeadLoad)
+    ) {
       return noop(
         doc,
         'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.',

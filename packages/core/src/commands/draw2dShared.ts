@@ -1,7 +1,6 @@
 import type { CadDocument, Vec2, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
-import type { z } from './schema';
-import { looseVec3 } from './schema';
+import { looseVec3, z } from './schema';
 import { nextId } from '../lib/id';
 import { commitEntity } from './commitEntity';
 import { noop } from './noop';
@@ -15,6 +14,16 @@ export function workPlanePositionField(): z.ZodOptional<z.ZodType<Vec3>> {
   return looseVec3(
     'World-space position [x, y, z] of the work-plane origin. Defaults to [0,0,0].',
   ).optional();
+}
+
+/** Optional `rotation` param: extrinsic XYZ Euler angles of the 2D work plane. */
+export function workPlaneRotationField(): z.ZodOptional<z.ZodArray<z.ZodNumber>> {
+  return z
+    .array(z.number())
+    .describe(
+      'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].',
+    )
+    .optional();
 }
 
 const POINT_SERIES_ID_PREFIX = { polyline: 'poly', spline: 'spline' } as const;

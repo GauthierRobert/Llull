@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding } from './model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { priceTakeoff } from './costing';
 import { computeTakeoff } from './takeoffCompute';
 import { SCHEDULE_KINDS, buildSchedule, toCsv } from './scheduleBuild';
@@ -85,7 +85,7 @@ export const buildingSchedule = defineCommand({
 });
 
 function validRates(rates: Record<string, unknown>): rates is Record<string, number> {
-  return Object.values(rates).every((rate) => isFiniteNumber(rate) && rate >= 0);
+  return Object.values(rates).every(isNonNegativeNumber);
 }
 
 /**

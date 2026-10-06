@@ -249,3 +249,11 @@ export function colorField(defaultColor: string): z.ZodOptional<z.ZodString> {
     .describe(`Hex color string, e.g. "#c8553d". Defaults to "${defaultColor}".`)
     .optional();
 }
+
+/** Optional display-name param of a created entity. */
+export function nameField(): z.ZodOptional<z.ZodString> {
+  return z
+    .string()
+    .describe('Optional display name for the entity (shown in the scene tree).')
+    .optional();
+}

@@ -4,7 +4,6 @@
 
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
-import { toMetres } from '../model';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import type { BaseReaction } from './frameModelSolve';
 import { combine } from './foundationCombinations';
@@ -13,6 +12,7 @@ import {
   CONCRETE_UNIT_WEIGHT,
   CONSOLIDATION_SUBLAYERS,
   type ClayLayer,
+  footingMetres,
   DEFAULT_CLAY_UNIT_WEIGHT,
   POISSON_RATIO,
   SETTLEMENT_INFLUENCE,
@@ -24,18 +24,15 @@ function footingNetPressure(
   reaction: BaseReaction,
   footing: FootingElement,
 ): { pressure: number; breadth: number; length: number; foundingDepth: number } {
-  const [widthX, lengthY, thickness] = [footing.width, footing.length, footing.thickness].map(
-    (value) => toMetres(doc, value),
-  ) as [number, number, number];
-  const backfill = Math.max(0, -toMetres(doc, footing.topOffset));
-  const area = widthX * lengthY;
+  const { breadth, length, thickness, backfill } = footingMetres(doc, footing);
+  const area = breadth * length;
   const { v } = combine(reaction, { G: 1, S: 1 });
   const gross =
     (v + (CONCRETE_UNIT_WEIGHT * thickness + BACKFILL_UNIT_WEIGHT * backfill) * area) / area;
   return {
     pressure: Math.max(0, gross - BACKFILL_UNIT_WEIGHT * (thickness + backfill)),
-    breadth: Math.min(widthX, lengthY),
-    length: Math.max(widthX, lengthY),
+    breadth,
+    length,
     foundingDepth: thickness + backfill,
   };
 }

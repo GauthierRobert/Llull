@@ -4,7 +4,7 @@
  * @pure
  */
 
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isFiniteNumber, isPositiveNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { MEMBER_LAYER } from './entities';
 import { arcThrough } from './curvedWallGeometry';
@@ -212,7 +212,7 @@ function elementErrors(
       isRecord(reinforcement) &&
       ['barDiameter', 'spacing', 'cover'].every((field) => {
         const value = reinforcement[field];
-        return isFiniteNumber(value) && value > 0;
+        return isPositiveNumber(value);
       });
     if (!valid) {
       errors.push(

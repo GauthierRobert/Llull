@@ -2,7 +2,7 @@
  * Unit tests for TransformGizmo pure helpers and gizmo target resolution.
  *
  * These tests run in jsdom — they do NOT mount r3f. They validate:
- *   1. The pure math helpers (computeTranslateDelta, computeRotateDelta,
+ *   1. The pure math helpers (computeDelta,
  *      computeScaleFactor) return correct values.
  *   2. The "children" attach pattern: a group in the scene tree has a non-null
  *      parent — so TransformControls.attach() would succeed (no "must be part
@@ -18,20 +18,16 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import {
-  computeTranslateDelta,
-  computeRotateDelta,
-  computeScaleFactor,
-} from '@ui/viewport/3d/TransformGizmo';
+import { computeDelta, computeScaleFactor } from '@ui/viewport/3d/TransformGizmo';
 
 describe('TransformGizmo pure delta helpers', () => {
-  it('computeTranslateDelta returns the signed component difference (next - prev)', () => {
-    const delta = computeTranslateDelta(new THREE.Vector3(1, 2, 3), new THREE.Vector3(4, 0, -1));
+  it('computeDelta returns the signed component difference (next - prev)', () => {
+    const delta = computeDelta(new THREE.Vector3(1, 2, 3), new THREE.Vector3(4, 0, -1));
     expect(delta).toEqual([3, -2, -4]);
   });
 
-  it('computeRotateDelta returns the signed Euler difference in radians', () => {
-    const delta = computeRotateDelta(new THREE.Euler(0, 0.5, 1), new THREE.Euler(0.25, 0.5, 0));
+  it('computeDelta returns the signed Euler difference in radians', () => {
+    const delta = computeDelta(new THREE.Euler(0, 0.5, 1), new THREE.Euler(0.25, 0.5, 0));
     expect(delta[0]).toBeCloseTo(0.25);
     expect(delta[1]).toBeCloseTo(0);
     expect(delta[2]).toBeCloseTo(-1);
@@ -95,9 +91,9 @@ describe('TransformGizmo scene-graph attachment invariant (regression)', () => {
     expect(worldPos.z).toBeCloseTo(300);
   });
 
-  it('computeTranslateDelta is zero for a no-op drag', () => {
+  it('computeDelta is zero for a no-op drag', () => {
     const pos = new THREE.Vector3(5, 3, -2);
-    const delta = computeTranslateDelta(pos, pos.clone());
+    const delta = computeDelta(pos, pos.clone());
     expect(delta[0]).toBeCloseTo(0);
     expect(delta[1]).toBeCloseTo(0);
     expect(delta[2]).toBeCloseTo(0);

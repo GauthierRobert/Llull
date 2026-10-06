@@ -8,8 +8,8 @@
 
 import { useEffect } from 'react';
 import * as THREE from 'three';
-import type { ThreeEvent } from '@react-three/fiber';
 import type { BaseEntity } from '@core/model/types';
+import { selectOnClick } from '@ui/viewport/selectClick';
 import { useMaterialProps, type PbrMaterial } from '../useMaterialProps';
 
 export interface SolidSurface {
@@ -70,19 +70,13 @@ export function SolidMeshShell({
 
   const matProps = useMaterialProps({ color, selected, ...surface, pbrOverride: pbrMaterial });
 
-  function handleClick(e: ThreeEvent<MouseEvent>): void {
-    e.stopPropagation();
-    const additive = e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
-    onSelect(entity.id, additive);
-  }
-
   return (
     <mesh
       name={entity.id}
       geometry={geometry}
       position={[position[0], position[1], position[2]]}
       rotation={[rotation[0], rotation[1], rotation[2]]}
-      onClick={handleClick}
+      onClick={selectOnClick(entity.id, onSelect)}
       castShadow
       receiveShadow
     >

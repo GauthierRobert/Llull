@@ -7,7 +7,7 @@
 import type { CadDocument } from '@core/model/types';
 import { z } from '@core/commands/schema';
 import { getBuilding } from '../model';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import type { CraneModel, FrameLoads } from './frameModelTypes';
 import { existingLevelId } from './checkReport';
 
@@ -73,26 +73,24 @@ export function resolveFrameLoads(
   params: FrameLoadParams,
 ): { loads: FrameLoads; levelId: string } | { reason: string } {
   const { deadLoad = 0.5, snowLoad = 0.8, windPressure = 0, craneCapacity } = params;
-  const nonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
   if (
-    !nonNegative(deadLoad) ||
-    !nonNegative(snowLoad) ||
-    !nonNegative(windPressure) ||
-    (craneCapacity !== undefined && !nonNegative(craneCapacity))
+    !isNonNegativeNumber(deadLoad) ||
+    !isNonNegativeNumber(snowLoad) ||
+    !isNonNegativeNumber(windPressure) ||
+    (craneCapacity !== undefined && !isNonNegativeNumber(craneCapacity))
   ) {
     return { reason: 'deadLoad, snowLoad, windPressure and craneCapacity must be >= 0' };
   }
   const { hoistingClass, hoistingSpeed, craneSelfWeight, minHookApproach, wheelBase } = params;
   if (
-    (hoistingSpeed !== undefined && !nonNegative(hoistingSpeed)) ||
-    (minHookApproach !== undefined && !nonNegative(minHookApproach))
+    (hoistingSpeed !== undefined && !isNonNegativeNumber(hoistingSpeed)) ||
+    (minHookApproach !== undefined && !isNonNegativeNumber(minHookApproach))
   ) {
     return { reason: 'hoistingSpeed and minHookApproach must be >= 0' };
   }
-  const positive = (value: unknown): boolean => isFiniteNumber(value) && value > 0;
   if (
-    (craneSelfWeight !== undefined && !positive(craneSelfWeight)) ||
-    (wheelBase !== undefined && !positive(wheelBase))
+    (craneSelfWeight !== undefined && !isPositiveNumber(craneSelfWeight)) ||
+    (wheelBase !== undefined && !isPositiveNumber(wheelBase))
   ) {
     return { reason: 'craneSelfWeight and wheelBase must be > 0' };
   }

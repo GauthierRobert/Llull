@@ -8,7 +8,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, getBuilding, withElement } from './model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isPositiveNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from './evaluateElements';
 
 const WALL_LAYER_FUNCTIONS = [
@@ -31,7 +31,7 @@ export function parseWallLayers(value: unknown): WallLayer[] | string {
     if (
       typeof layer.material !== 'string' ||
       layer.material.trim() === '' ||
-      !(isFiniteNumber(layer.thickness) && layer.thickness > 0) ||
+      !isPositiveNumber(layer.thickness) ||
       !WALL_LAYER_FUNCTIONS.includes(fn as WallLayerFunction)
     ) {
       return `each layer needs a material, a thickness > 0 and a function (${WALL_LAYER_FUNCTIONS.join(', ')})`;

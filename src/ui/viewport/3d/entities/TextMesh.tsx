@@ -14,10 +14,10 @@
  *   for the text itself (drei documentation; verified: no WebGL warnings in dev mode).
  */
 
-import type { ThreeEvent } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import type { TextEntity } from '@core/model/types';
 import { TEXT_FONT_URL, toAnchorX } from '@ui/viewport/textFont';
+import { selectOnClick } from '@ui/viewport/selectClick';
 import { SELECTION_COLOR } from '@ui/viewport/viewportPalette';
 
 interface TextMeshProps {
@@ -28,12 +28,6 @@ interface TextMeshProps {
 
 export function TextMesh({ entity, selected, onSelect }: TextMeshProps): React.ReactElement {
   const { content, height, position, rotation, color, anchor } = entity;
-
-  function handleClick(e: ThreeEvent<MouseEvent>): void {
-    e.stopPropagation();
-    const additive = e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
-    onSelect(entity.id, additive);
-  }
 
   // Perf limit: drei <Text> uses troika-three-text which compiles an SDF atlas
   // per font on first render — this is a one-time cost but the atlas upload can spike
@@ -49,7 +43,7 @@ export function TextMesh({ entity, selected, onSelect }: TextMeshProps): React.R
       color={selected ? SELECTION_COLOR : color}
       anchorX={toAnchorX(anchor)}
       anchorY="middle"
-      onClick={handleClick}
+      onClick={selectOnClick(entity.id, onSelect)}
     >
       {content}
     </Text>

@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { resolveNumeric } from './expression';
-import { instanceFrameRef } from './instanceFrameRef';
+import { instanceFrameRef, instanceRefsProblem } from './instanceFrameRef';
 import { isValidAxis } from '../lib/axis';
 import { noop } from './noop';
 /**
@@ -60,34 +60,14 @@ export const addJoint = defineCommand({
       ),
   }),
   run: (doc, { kind, a, b, axis, id }): CommandResult => {
-    for (const [side, ref] of [
-      ['a', a],
-      ['b', b],
-    ] as const) {
-      if (ref.instanceId.length === 0) {
-        return noop(
-          doc,
-          `add_joint: "${side}" must be an object with a non-empty instanceId string.`,
-        );
-      }
-    }
     if (!isValidAxis(axis)) {
       return noop(
         doc,
         `add_joint: invalid axis '${JSON.stringify(axis)}'. Use "x", "y", "z", or a [x,y,z] number array.`,
       );
     }
-    for (const [side, ref] of [
-      ['a', a],
-      ['b', b],
-    ] as const) {
-      if (doc.entities[ref.instanceId]?.kind !== 'instance') {
-        return noop(
-          doc,
-          `add_joint: ${side}.instanceId '${ref.instanceId}' does not exist or is not an InstanceEntity.`,
-        );
-      }
-    }
+    const refProblem = instanceRefsProblem(doc, 'add_joint', { a, b });
+    if (refProblem !== null) return noop(doc, refProblem);
 
     const jointId = id !== undefined && id.length > 0 ? id : nextId('joint');
     if (jointId in doc.joints) {

@@ -22,6 +22,7 @@ import type { InstanceBatch } from './grouping';
 import { entityIdFromInstanceId } from './grouping';
 import { buildCylinderGeometry, buildSphereGeometry } from './entities/primitiveGeometry';
 import { useDisposable } from '../useDisposable';
+import { isAdditiveSelect } from '../selectClick';
 
 /**
  * Creates the THREE geometry for a given batchable kind + representative entity.
@@ -198,8 +199,7 @@ function InstanceBatchMesh({
     const entityId = entityIdFromInstanceId(batch, instanceId);
     if (!entityId) return;
 
-    const additive = e.nativeEvent.shiftKey || e.nativeEvent.ctrlKey || e.nativeEvent.metaKey;
-    onSelect(entityId, additive);
+    onSelect(entityId, isAdditiveSelect(e.nativeEvent));
   }
 
   return (

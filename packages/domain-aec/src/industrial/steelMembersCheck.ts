@@ -6,7 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isFiniteNumber, isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
@@ -119,7 +119,7 @@ export const checkSteelMembers = defineCommand({
       swayRatio = 300,
     } = params;
     const nonNegative = [floorDeadLoad, imposedLoad, pipeContentDensity, cableTrayWeight].every(
-      (value) => isFiniteNumber(value) && value >= 0,
+      isNonNegativeNumber,
     );
     if (!nonNegative) {
       return noop(
@@ -130,14 +130,14 @@ export const checkSteelMembers = defineCommand({
     if (!(isFiniteNumber(notionalFactor) && notionalFactor >= 0 && notionalFactor <= 0.1)) {
       return noop(doc, 'check_steel_members failed: notionalFactor must be a number in [0, 0.1].');
     }
-    if (!(isFiniteNumber(deflectionRatio) && deflectionRatio > 0)) {
+    if (!isPositiveNumber(deflectionRatio)) {
       return noop(doc, 'check_steel_members failed: deflectionRatio must be a number > 0.');
     }
     const building = getBuilding(doc);
     if (params.levelId !== undefined && !building.levels[params.levelId]) {
       return noop(doc, `check_steel_members failed: no level '${params.levelId}'.`);
     }
-    if (!(isFiniteNumber(swayRatio) && swayRatio > 0)) {
+    if (!isPositiveNumber(swayRatio)) {
       return noop(doc, 'check_steel_members failed: swayRatio must be a number > 0.');
     }
     const analysis = analyseSteelStructure(doc, {

@@ -11,6 +11,7 @@ import {
   type Combination,
   DIFFERENTIAL_RATIO,
   FRICTION,
+  footingMetres,
   type FootingCheckContext,
   type FoundationRow,
   type PadSettlement,
@@ -66,12 +67,8 @@ export function footingRows(
   const { doc, reaction, soilBearing, wind, slidingHorizontal, slabShare, soilModulus, clayLayer } =
     context;
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
-  const [widthX, lengthY, thickness] = [footing.width, footing.length, footing.thickness].map(
-    (value) => toMetres(doc, value),
-  ) as [number, number, number];
-  const backfill = Math.max(0, -toMetres(doc, footing.topOffset));
   // Bending dimension = the smaller plan side (frame plane direction unknown: conservative).
-  const [breadth, depthLength] = [Math.min(widthX, lengthY), Math.max(widthX, lengthY)];
+  const { breadth, length: depthLength, thickness, backfill } = footingMetres(doc, footing);
   const area = breadth * depthLength;
   const selfWeight = CONCRETE_UNIT_WEIGHT * area * thickness;
   const soilWeight = BACKFILL_UNIT_WEIGHT * area * backfill;

@@ -1,14 +1,12 @@
 import type { Layer, CameraState, Vec3 } from '../model/types';
 import { SHAPE2D_KINDS, SOLID_KINDS } from '../model/types';
 import { isRecord } from '../lib/isRecord';
-import { isFiniteNumber } from '../lib/isFiniteNumber';
+import { isFiniteNumber, isPositiveNumber } from '../lib/isFiniteNumber';
 import { isHexColor } from '../lib/isHexColor';
 
 export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
-
-const isPositiveNumber = (v: unknown): v is number => isFiniteNumber(v) && v > 0;
 
 /** Fields that must be finite and > 0, per entity kind. */
 const POSITIVE_FIELDS: Readonly<Record<string, readonly string[]>> = {

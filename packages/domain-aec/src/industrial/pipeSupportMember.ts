@@ -53,6 +53,21 @@ function planProjection(
   };
 }
 
+/** Section width/depth (mm), axis slope (|dz| / length) and a reason formatter naming `bar`. */
+function barTraits(bar: SteelBar): {
+  width: number;
+  depth: number;
+  slope: number;
+  failure: (reason: string) => string;
+} {
+  return {
+    width: bar.profile?.b ?? 0,
+    depth: bar.profile?.h ?? 0,
+    slope: bar.length > 0 ? Math.abs(bar.end[2] - bar.start[2]) / bar.length : 0,
+    failure: (reason) => `member ${bar.mark} (${bar.profileName}) ${reason}`,
+  };
+}
+
 /**
  * Whether `bar` can carry a support of `type` at the pipe centreline point `point` (absolute mm,
  * pipe outside diameter `diameter`); the gap and plan distance when it can, else the reason.
@@ -64,12 +79,9 @@ export function bearingOf(
   diameter: number,
   limits: BearingLimits,
 ): BearingHit | string {
-  const label = `member ${bar.mark} (${bar.profileName})`;
-  const [width, depth] = [bar.profile?.b ?? 0, bar.profile?.h ?? 0];
-  const slope = bar.length > 0 ? Math.abs(bar.end[2] - bar.start[2]) / bar.length : 0;
+  const { width, depth, slope, failure } = barTraits(bar);
   const underside = point[2] - diameter / 2;
   const top = point[2] + diameter / 2;
-  const failure = (reason: string): string => `${label} ${reason}`;
   if (slope >= VERTICAL_RATIO) {
     if (!isBelow(type)) return failure('is a column: a hanger needs steel above the pipe');
     const planDistance = Math.hypot(point[0] - bar.start[0], point[1] - bar.start[1]);
@@ -131,10 +143,7 @@ export function riserBearingOf(
   diameter: number,
   limits: BearingLimits,
 ): RiserHit | string {
-  const label = `member ${bar.mark} (${bar.profileName})`;
-  const [width, depth] = [bar.profile?.b ?? 0, bar.profile?.h ?? 0];
-  const slope = bar.length > 0 ? Math.abs(bar.end[2] - bar.start[2]) / bar.length : 0;
-  const failure = (reason: string): string => `${label} ${reason}`;
+  const { width, depth, slope, failure } = barTraits(bar);
   const column = slope >= VERTICAL_RATIO;
   if (!column && slope > HORIZONTAL_RATIO) {
     return failure('is inclined: only columns and horizontal members take riser brackets');

@@ -5,7 +5,7 @@
  */
 
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec3 as vec3 } from './schema';
+import { defineCommand, z, colorField, nameField, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { compactNumber as fmt } from '../lib/compactNumber';
 import { rotatePoint2 } from '../lib/polygon';
@@ -16,6 +16,8 @@ import { commitEntity } from './commitEntity';
 import { newEntity } from './newEntity';
 import { boundsText } from './geometryShared';
 import { noop } from './noop';
+
+const DEFAULT_GEAR_COLOR = '#7a9cbb';
 
 type Point = readonly [number, number];
 
@@ -181,14 +183,8 @@ export const addSpurGear = defineCommand({
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
       )
       .optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#7a9cbb". Defaults to "#7a9cbb".')
-      .optional(),
-    name: z
-      .string()
-      .describe('Optional display name for the entity (shown in the scene tree).')
-      .optional(),
+    color: colorField(DEFAULT_GEAR_COLOR),
+    name: nameField(),
   }),
   run: (
     doc,
@@ -200,7 +196,7 @@ export const addSpurGear = defineCommand({
       bore = 0,
       position = [0, 0, 0] as const,
       rotation,
-      color = '#7a9cbb',
+      color = DEFAULT_GEAR_COLOR,
       name,
     },
   ): CommandResult => {

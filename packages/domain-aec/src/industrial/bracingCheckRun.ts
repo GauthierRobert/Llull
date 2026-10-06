@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_TRAVEL_SPEED } from './runwayCheckModel';
 import { round } from '../numeric';
 import { checkTable, existingLevelId, failureSummary } from './checkReport';
@@ -91,8 +91,11 @@ export const checkBracing = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, deadLoad = 0.5, snowLoad = 0.8 } = params;
-    const nonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
-    if (!nonNegative(windPressure) || !nonNegative(deadLoad) || !nonNegative(snowLoad)) {
+    if (
+      !isNonNegativeNumber(windPressure) ||
+      !isNonNegativeNumber(deadLoad) ||
+      !isNonNegativeNumber(snowLoad)
+    ) {
       return noop(doc, 'check_bracing failed: windPressure, deadLoad, snowLoad must be >= 0.');
     }
     const { travelSpeed = DEFAULT_TRAVEL_SPEED, bufferStiffness = DEFAULT_BUFFER_STIFFNESS } =
@@ -103,7 +106,7 @@ export const checkBracing = defineCommand({
       ['travelSpeed', travelSpeed],
       ['bufferStiffness', bufferStiffness],
     ] as const) {
-      if (value !== undefined && !(isFiniteNumber(value) && value > 0)) {
+      if (value !== undefined && !isPositiveNumber(value)) {
         return noop(doc, `check_bracing failed: ${name} must be a number > 0.`);
       }
     }
