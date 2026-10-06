@@ -7,7 +7,7 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
 import { toCsv } from '../scheduleBuild';
@@ -208,10 +208,10 @@ export const checkPipeSupports = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { spanFactor = 1, overhangRatio = 0.5 } = params;
-    if (!(isFiniteNumber(spanFactor) && spanFactor > 0)) {
+    if (!isPositiveNumber(spanFactor)) {
       return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
     }
-    if (!(isFiniteNumber(overhangRatio) && overhangRatio >= 0)) {
+    if (!isNonNegativeNumber(overhangRatio)) {
       return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
     }
     const building = getBuilding(doc);

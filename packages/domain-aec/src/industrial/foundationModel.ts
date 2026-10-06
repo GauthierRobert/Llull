@@ -2,6 +2,7 @@ import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { BaseReaction } from './frameModelSolve';
 import type { LoadCase } from './frameModelTypes';
+import { toMetres } from '../model';
 
 export interface FoundationRow {
   /** Column mark. */
@@ -81,3 +82,17 @@ export const SETTLEMENT_INFLUENCE = 0.88;
 export const SETTLEMENT_LIMIT_MM = 25;
 export const DIFFERENTIAL_RATIO = 500;
 export const CONSOLIDATION_SUBLAYERS = 5;
+
+/** Pad plan sides (`breadth` = smaller, `length` = larger), thickness and backfill over it, in m. */
+export function footingMetres(
+  doc: CadDocument,
+  footing: FootingElement,
+): { breadth: number; length: number; thickness: number; backfill: number } {
+  const [widthX, lengthY] = [toMetres(doc, footing.width), toMetres(doc, footing.length)];
+  return {
+    breadth: Math.min(widthX, lengthY),
+    length: Math.max(widthX, lengthY),
+    thickness: toMetres(doc, footing.thickness),
+    backfill: Math.max(0, -toMetres(doc, footing.topOffset)),
+  };
+}

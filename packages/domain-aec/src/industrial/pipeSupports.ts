@@ -8,7 +8,7 @@ import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { fromMm, nextElementId, nextMark, elementAffected, withElement } from '../model';
 import { regenerateBuilding } from '../evaluateElements';
 import { toVec3 } from './memberSupport';
@@ -145,10 +145,7 @@ export const addPipeSupport = defineCommand({
     };
     const snapDistance = (params.snapDistance ?? fromMm(doc, SNAP_DISTANCE)) / unit;
     const positive = [spacing ?? 1, limits.maxReach, snapDistance];
-    if (
-      !positive.every((value) => isFiniteNumber(value) && value > 0) ||
-      !(isFiniteNumber(limits.planTolerance) && limits.planTolerance >= 0)
-    ) {
+    if (!positive.every(isPositiveNumber) || !isNonNegativeNumber(limits.planTolerance)) {
       return fail('spacing, maxReach and snapDistance must be > 0 and planTolerance >= 0.');
     }
     const units = modelUnits(doc);

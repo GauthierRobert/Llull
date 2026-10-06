@@ -7,7 +7,6 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
   evaluateAnimationScalar,
-  rotatePointAboutPivot,
   composeAnimatedPose,
 } from '../../src/ui/viewport/3d/animationMath';
 
@@ -43,54 +42,6 @@ describe('evaluateAnimationScalar', () => {
     expect(evaluateAnimationScalar({ ...base, mode: 'oscillate' }, threeQtrPeriod)).toBeCloseTo(
       -base.amplitude,
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// rotatePointAboutPivot
-// ---------------------------------------------------------------------------
-
-describe('rotatePointAboutPivot', () => {
-  it('rotates [1,0,0] by π about Y around origin → [−1,0,0]', () => {
-    const point = new THREE.Vector3(1, 0, 0);
-    const axis = new THREE.Vector3(0, 1, 0);
-    const pivot = new THREE.Vector3(0, 0, 0);
-    const result = rotatePointAboutPivot(point, axis, Math.PI, pivot);
-    expect(result.x).toBeCloseTo(-1);
-    expect(result.y).toBeCloseTo(0);
-    expect(result.z).toBeCloseTo(0);
-  });
-
-  it('rotates [2,0,0] by π about Y around [1,0,0] (pivot) → [0,0,0]', () => {
-    // Relative to pivot: [1,0,0]. Rotate by π about Y → [−1,0,0]. Add pivot → [0,0,0].
-    const point = new THREE.Vector3(2, 0, 0);
-    const axis = new THREE.Vector3(0, 1, 0);
-    const pivot = new THREE.Vector3(1, 0, 0);
-    const result = rotatePointAboutPivot(point, axis, Math.PI, pivot);
-    expect(result.x).toBeCloseTo(0);
-    expect(result.y).toBeCloseTo(0);
-    expect(result.z).toBeCloseTo(0);
-  });
-
-  it('does not mutate input point', () => {
-    const point = new THREE.Vector3(1, 0, 0);
-    const axis = new THREE.Vector3(0, 1, 0);
-    const pivot = new THREE.Vector3(0, 0, 0);
-    rotatePointAboutPivot(point, axis, Math.PI / 2, pivot);
-    expect(point.x).toBeCloseTo(1); // unchanged
-  });
-
-  it('zero angle leaves point unchanged', () => {
-    const point = new THREE.Vector3(3, 4, 5);
-    const result = rotatePointAboutPivot(
-      point,
-      new THREE.Vector3(0, 1, 0),
-      0,
-      new THREE.Vector3(1, 1, 1),
-    );
-    expect(result.x).toBeCloseTo(3);
-    expect(result.y).toBeCloseTo(4);
-    expect(result.z).toBeCloseTo(5);
   });
 });
 

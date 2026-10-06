@@ -2,7 +2,7 @@
  * @layer domain-aec
  */
 
-import type { Vec3 } from '@core/model/types';
+import type { CadDocument, Vec3 } from '@core/model/types';
 import type {
   BaseFixity,
   BuildingModel,
@@ -12,7 +12,7 @@ import type {
 } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, tolerant, z } from '@core/commands/schema';
-import { highestIndex, nextElementId, withElement } from '../model';
+import { elementsOf, getBuilding, highestIndex, nextElementId, toMm, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { sub3 } from '@lib/vec3';
@@ -48,6 +48,31 @@ export function nextMemberMark(building: BuildingModel, role: MemberRole): strin
 }
 
 /** Accepts [x, y, z] or [x, y] (z = 0); null when malformed. */
+/** A steel member of a level with its catalogue profile (if known) and endpoints in mm. */
+export interface MemberInMm {
+  readonly member: SteelMemberElement;
+  readonly profile: SteelProfile | undefined;
+  readonly start: readonly [number, number, number];
+  readonly end: readonly [number, number, number];
+}
+
+/** Steel members of `levelId` with endpoints converted to mm. */
+export function levelMembersInMm(doc: CadDocument, levelId: string): MemberInMm[] {
+  const toPointMm = (point: readonly number[]): readonly [number, number, number] => [
+    toMm(doc, point[0] ?? 0),
+    toMm(doc, point[1] ?? 0),
+    toMm(doc, point[2] ?? 0),
+  ];
+  return elementsOf(getBuilding(doc), 'member')
+    .filter((member) => member.levelId === levelId)
+    .map((member) => ({
+      member,
+      profile: findProfile(member.profile),
+      start: toPointMm(member.start),
+      end: toPointMm(member.end),
+    }));
+}
+
 export function toVec3(value: unknown): Vec3 | null {
   if (!Array.isArray(value) || (value.length !== 2 && value.length !== 3)) return null;
   if (!value.every((n) => isFiniteNumber(n))) return null;

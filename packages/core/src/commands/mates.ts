@@ -9,7 +9,7 @@ import type { Constraint } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
-import { instanceFrameRef } from './instanceFrameRef';
+import { instanceFrameRef, instanceRefsProblem } from './instanceFrameRef';
 import { noop } from './noop';
 
 /**
@@ -75,20 +75,8 @@ export const addMate = defineCommand({
       ),
   }),
   run: (doc, { kind, a, b, value, id }): CommandResult => {
-    for (const [side, ref] of [
-      ['a', a],
-      ['b', b],
-    ] as const) {
-      if (ref.instanceId.length === 0) {
-        return noop(doc, `add_mate: ${side} must be an object with a non-empty instanceId string.`);
-      }
-      if (doc.entities[ref.instanceId]?.kind !== 'instance') {
-        return noop(
-          doc,
-          `add_mate: ${side}.instanceId '${ref.instanceId}' does not exist or is not an InstanceEntity.`,
-        );
-      }
-    }
+    const refProblem = instanceRefsProblem(doc, 'add_mate', { a, b });
+    if (refProblem !== null) return noop(doc, refProblem);
     if (kind === 'distance' && value === undefined) {
       return noop(
         doc,

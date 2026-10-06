@@ -5,8 +5,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
-import { elementsOf, getBuilding, toMm } from '../model';
-import { findProfile } from '../steel/profiles';
+import { levelMembersInMm } from './memberSupport';
 import { round } from '../numeric';
 import { sectionResistance, yieldStrength } from './steelDesign';
 import { craneCapacityOf, GAMMA_G, GAMMA_Q } from './frameModelTypes';
@@ -40,24 +39,9 @@ interface BracingInputs {
 
 /** Steel members of `levelId` with endpoints in mm. */
 export function locateMembers(doc: CadDocument, levelId: string): Located[] {
-  const toPointMm = (point: readonly number[]): Point => [
-    toMm(doc, point[0] ?? 0),
-    toMm(doc, point[1] ?? 0),
-    toMm(doc, point[2] ?? 0),
-  ];
-  const members: Located[] = [];
-  for (const element of elementsOf(getBuilding(doc), 'member')) {
-    if (element.levelId !== levelId) continue;
-    const profile = findProfile(element.profile);
-    if (!profile) continue;
-    members.push({
-      member: element,
-      profile,
-      start: toPointMm(element.start),
-      end: toPointMm(element.end),
-    });
-  }
-  return members;
+  return levelMembersInMm(doc, levelId).flatMap(({ profile, ...located }) =>
+    profile ? [{ ...located, profile }] : [],
+  );
 }
 
 const axisLength = ({ start, end }: Located): number =>

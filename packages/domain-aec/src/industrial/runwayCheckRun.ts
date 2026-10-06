@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding, toMm } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
+import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { craneCapacityOf, type CraneModel } from './frameModelTypes';
 import {
   DEFAULT_BUFFER_STIFFNESS,
@@ -134,16 +134,16 @@ export const runwayCheck = defineCommand({
       railSize = 'A55',
       girder = 'rolled',
     } = params;
-    if (craneCapacity !== undefined && !(isFiniteNumber(craneCapacity) && craneCapacity > 0)) {
+    if (craneCapacity !== undefined && !isPositiveNumber(craneCapacity)) {
       return noop(doc, 'check_crane_runways failed: craneCapacity must be a number > 0 (t).');
     }
-    if (!(isFiniteNumber(wheelBase) && wheelBase > 0)) {
+    if (!isPositiveNumber(wheelBase)) {
       return noop(doc, 'check_crane_runways failed: wheelBase must be a number > 0 (mm).');
     }
-    if (!(isFiniteNumber(hoistingSpeed) && hoistingSpeed >= 0)) {
+    if (!isNonNegativeNumber(hoistingSpeed)) {
       return noop(doc, 'check_crane_runways failed: hoistingSpeed must be a number >= 0 (m/s).');
     }
-    if (!(isFiniteNumber(minHookApproach) && minHookApproach >= 0)) {
+    if (!isNonNegativeNumber(minHookApproach)) {
       return noop(doc, 'check_crane_runways failed: minHookApproach must be a number >= 0 (m).');
     }
     for (const [name, value] of [
@@ -152,7 +152,7 @@ export const runwayCheck = defineCommand({
       ['travelSpeed', travelSpeed],
       ['bufferStiffness', bufferStiffness],
     ] as const) {
-      if (value !== undefined && !(isFiniteNumber(value) && value > 0)) {
+      if (value !== undefined && !isPositiveNumber(value)) {
         return noop(doc, `check_crane_runways failed: ${name} must be a number > 0.`);
       }
     }

@@ -52,16 +52,10 @@ const SNAP3D_TOLERANCE = 0.8;
 /** Grid step in world units (matches the viewport Grid cellSize = 1). */
 const SNAP3D_GRID_STEP = 1;
 
-/** Compute the translation delta between two world positions. */
-export function computeTranslateDelta(
-  prev: THREE.Vector3,
-  next: THREE.Vector3,
-): [number, number, number] {
-  return [next.x - prev.x, next.y - prev.y, next.z - prev.z];
-}
+type XYZ = Pick<THREE.Vector3, 'x' | 'y' | 'z'>;
 
-/** Compute the rotation delta between two Euler angles (radians). */
-export function computeRotateDelta(prev: THREE.Euler, next: THREE.Euler): [number, number, number] {
+/** Component-wise `next - prev`: a translation delta (Vector3) or rotation delta (Euler, radians). */
+export function computeDelta(prev: XYZ, next: XYZ): [number, number, number] {
   return [next.x - prev.x, next.y - prev.y, next.z - prev.z];
 }
 
@@ -228,10 +222,10 @@ export function TransformGizmo({
         if (snap && snap3dEnabled) {
           target.position.set(...toRenderPosition([snap.x, snap.y, snap.z], renderOrigin));
         }
-        const delta = computeTranslateDelta(preDragPos.current, target.position);
+        const delta = computeDelta(preDragPos.current, target.position);
         if (!isNegligible(delta)) dispatch('move_entity', { id: selectedId, delta });
       } else if (mode === 'rotate') {
-        const delta = computeRotateDelta(preDragRot.current, target.rotation);
+        const delta = computeDelta(preDragRot.current, target.rotation);
         if (!isNegligible(delta)) dispatch('rotate_entity', { id: selectedId, delta });
       } else {
         // scale — derive the uniform factor relative to the pre-drag scale baseline.

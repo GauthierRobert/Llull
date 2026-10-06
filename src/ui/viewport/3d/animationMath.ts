@@ -43,23 +43,6 @@ function rotateAboutPivotInPlace(
   return point.sub(pivot).applyQuaternion(rotation).add(pivot);
 }
 
-/**
- * Rotate `point` by `angle` radians about `axis` around `pivot`.
- *
- * Returns a new THREE.Vector3; inputs are not mutated.
- *
- * @pure
- */
-export function rotatePointAboutPivot(
-  point: THREE.Vector3,
-  axis: THREE.Vector3,
-  angle: number,
-  pivot: THREE.Vector3,
-): THREE.Vector3 {
-  const rotation = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-  return rotateAboutPivotInPlace(point.clone(), rotation, pivot);
-}
-
 /** A quaternion expressed as [x, y, z, w]. */
 type QuaternionTuple = [number, number, number, number];
 

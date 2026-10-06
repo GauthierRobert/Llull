@@ -13,6 +13,7 @@ import type { Entity } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { pickEntityId } from './modifyHelpers';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
+import { isAdditiveSelect } from '../selectClick';
 
 /** Pick radius in screen pixels. */
 const PICK_RADIUS_PX = 10;
@@ -41,7 +42,7 @@ export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): Rea
           !hiddenLayerIds.has(entity.layerId) &&
           !hiddenEntityIds.has(entity.id);
         const id = pickEntityId(state.document, toDocumentPoint(e.point), tolerance, isVisible);
-        const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+        const additive = isAdditiveSelect(e);
         if (id === null) {
           if (!additive) state.clearSelection();
         } else if (additive) {
