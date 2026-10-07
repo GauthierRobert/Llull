@@ -5238,7 +5238,7 @@
           "type": "number"
         },
         "polar": {
-          "description": "Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level). Omit to keep the current polar angle.",
+          "description": "Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level); clamped to (0.01, π−0.01). Omit to keep the current polar angle.",
           "type": "number"
         },
         "target": {
@@ -5954,7 +5954,7 @@
           "type": "number"
         },
         "polar": {
-          "description": "Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. Clamped to (0.01, π−0.01) to avoid gimbal lock. Omit to keep current value.",
+          "description": "Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. Clamped to [0.01, π−0.01] to avoid gimbal lock. Omit to keep current value.",
           "type": "number"
         },
         "target": {

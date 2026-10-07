@@ -28,6 +28,12 @@ const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
   iso: { azimuth: (3 * Math.PI) / 4, polar: Math.PI / 4 },
 };
 
+const MIN_POLAR = 0.01;
+const MAX_POLAR = Math.PI - 0.01;
+
+/** `polar` limited to [0.01, π−0.01] so the eye never reaches a pole. */
+const clampPolar = (polar: number): number => Math.min(MAX_POLAR, Math.max(MIN_POLAR, polar));
+
 /**
  * @command set_camera
  * @pure
@@ -62,7 +68,7 @@ export const setCamera = defineCommand({
       .optional()
       .describe(
         'Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. ' +
-          'Clamped to (0.01, π−0.01) to avoid gimbal lock. Omit to keep current value.',
+          'Clamped to [0.01, π−0.01] to avoid gimbal lock. Omit to keep current value.',
       ),
     distance: z
       .number()
@@ -80,7 +86,7 @@ export const setCamera = defineCommand({
     const next: CameraState = {
       target: p.target ?? prev.target,
       azimuth: p.azimuth ?? prev.azimuth,
-      polar: p.polar ?? prev.polar,
+      polar: p.polar === undefined ? prev.polar : clampPolar(p.polar),
       distance: p.distance ?? prev.distance,
     };
     const changed = (['target', 'azimuth', 'polar', 'distance'] as const).filter(
@@ -129,7 +135,7 @@ export const lookAt = defineCommand({
       .number()
       .optional()
       .describe(
-        'Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level). ' +
+        'Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level); clamped to (0.01, π−0.01). ' +
           'Omit to keep the current polar angle.',
       ),
   }),
@@ -138,7 +144,7 @@ export const lookAt = defineCommand({
     const next: CameraState = {
       target: p.target,
       azimuth: p.azimuth ?? prev.azimuth,
-      polar: p.polar ?? prev.polar,
+      polar: p.polar === undefined ? prev.polar : clampPolar(p.polar),
       distance: prev.distance,
     };
 
