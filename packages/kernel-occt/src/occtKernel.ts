@@ -272,13 +272,53 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   return solid;
 }
 
-/** Box entities only (centered on `position`); every other kind -> null. */
+/** llull placement M = Rx·Ry·Rz (Rz applied first, radians) followed by the translation. */
+function placementTransform(api: OccApi, rotation: Vec3, position: Vec3): OccHandle {
+  const total = new api.gp_Trsf_1();
+  const offset: OccHandle = new api.gp_Vec_4(position[0], position[1], position[2]);
+  total.SetTranslation_1(offset);
+  release(offset);
+  const axes: ReadonlyArray<readonly [number, readonly [number, number, number]]> = [
+    [rotation[0], [1, 0, 0]],
+    [rotation[1], [0, 1, 0]],
+    [rotation[2], [0, 0, 1]],
+  ];
+  for (const [angle, [x, y, z]] of axes) {
+    const origin: OccHandle = new api.gp_Pnt_3(0, 0, 0);
+    const direction: OccHandle = new api.gp_Dir_4(x, y, z);
+    const axis: OccHandle = new api.gp_Ax1_2(origin, direction);
+    const turn = new api.gp_Trsf_1();
+    turn.SetRotation_1(axis, angle);
+    total.Multiply(turn);
+    [turn, axis, direction, origin].forEach(release);
+  }
+  return total;
+}
+
+/** Copy of `shape` moved by `placement`; the input shape is released. */
+function placed(api: OccApi, shape: OccShape, placement: OccHandle): OccShape {
+  const transformer = new api.BRepBuilderAPI_Transform_2(shape, placement, true) as {
+    Shape(): OccShape;
+    delete(): void;
+  };
+  const moved = transformer.Shape();
+  transformer.delete();
+  release(placement);
+  release(shape);
+  return moved;
+}
+
+/** Box entities only (honouring `rotation` and `position`); every other kind -> null. */
 function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind !== 'box') return null;
   const [sx, sy, sz] = entity.size;
   if (sx <= 0 || sy <= 0 || sz <= 0) return null;
   const [px, py, pz] = entity.position;
-  const origin: OccHandle = new api.gp_Pnt_3(px - sx / 2, py - sy / 2, pz - sz / 2);
+  const rotated = entity.rotation.some((angle) => angle !== 0);
+  const [ox, oy, oz] = rotated
+    ? [-sx / 2, -sy / 2, -sz / 2]
+    : [px - sx / 2, py - sy / 2, pz - sz / 2];
+  const origin: OccHandle = new api.gp_Pnt_3(ox, oy, oz);
   const maker = new api.BRepPrimAPI_MakeBox_2(origin, sx, sy, sz) as {
     Shape(): OccShape;
     delete(): void;
@@ -286,7 +326,9 @@ function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   const shape = maker.Shape();
   origin.delete();
   maker.delete();
-  return shape;
+  return rotated
+    ? placed(api, shape, placementTransform(api, entity.rotation, entity.position))
+    : shape;
 }
 
 const BOOLEAN_BUILDERS: Readonly<Record<BooleanOp, string>> = {
