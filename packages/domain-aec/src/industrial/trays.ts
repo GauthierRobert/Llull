@@ -17,6 +17,7 @@ import {
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, samePath } from '../duplicates';
 import { regenerateBuilding } from '../evaluateElements';
 import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
 import { levelIdParam } from '../levelParams';
@@ -57,6 +58,18 @@ export const addCableTray = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_cable_tray failed: ${resolution.reason}.`);
+    const trayTwin = findTwin(
+      resolution.building,
+      'tray',
+      resolution.level.id,
+      (element) =>
+        element.width === resolvedWidth &&
+        element.height === resolvedHeight &&
+        samePath(element.points, path),
+    );
+    if (trayTwin) {
+      return noop(doc, duplicateSummary('add_cable_tray', trayTwin, 'a cable tray on this route'));
+    }
     const tray: CableTrayElement = {
       id: nextElementId(resolution.building, 'tray'),
       category: 'tray',

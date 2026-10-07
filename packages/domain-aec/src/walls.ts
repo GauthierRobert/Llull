@@ -19,6 +19,7 @@ import {
   elementAffected,
 } from './model';
 import { distance } from '@lib/polygon';
+import { findTwin, sameSegment } from './duplicates';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
 import { builtExtent, openingsOf, wallFrame, type WallExtent } from './wallGeometry';
@@ -80,9 +81,6 @@ const WALL_OPTION_SHAPE = {
     ),
 };
 
-const sameVec2 = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): boolean =>
-  a[0] === b[0] && a[1] === b[1];
-
 type WallOptions = z.output<z.ZodObject<typeof WALL_OPTION_SHAPE>>;
 
 type WallBuild =
@@ -114,13 +112,12 @@ function buildWalls(
         reason: `segment [${start.join(', ')}]→[${end.join(', ')}] has zero length`,
       };
     }
-    const twin = Object.values(building.elements).find(
+    const twin = findTwin(
+      building,
+      'wall',
+      resolution.level.id,
       (element) =>
-        element.category === 'wall' &&
-        element.levelId === resolution.level.id &&
-        element.baseOffset === baseOffset &&
-        ((sameVec2(element.start, start) && sameVec2(element.end, end)) ||
-          (sameVec2(element.start, end) && sameVec2(element.end, start))),
+        element.baseOffset === baseOffset && sameSegment(element.start, element.end, start, end),
     );
     if (twin) {
       return {

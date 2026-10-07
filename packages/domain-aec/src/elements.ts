@@ -24,6 +24,7 @@ import {
   withoutElements,
 } from './model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, sameRing } from './duplicates';
 import { regenerateBuilding } from './evaluateElements';
 import { resolveOutline } from './structure';
 import { openingFitIssues } from './walls';
@@ -80,6 +81,11 @@ export const addRoom = defineCommand({
     const roomsOnLevel = Object.values(resolution.building.elements).filter(
       (element) => element.category === 'room' && element.levelId === resolution.level.id,
     ).length;
+    const roomTwin = findTwin(resolution.building, 'room', resolution.level.id, (element) =>
+      sameRing(element.boundary, outline),
+    );
+    if (roomTwin)
+      return noop(doc, duplicateSummary('add_room', roomTwin, 'a room with this outline'));
     const room: RoomElement = {
       id: nextElementId(resolution.building, 'room'),
       category: 'room',

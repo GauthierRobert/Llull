@@ -17,6 +17,7 @@ import {
   withElement,
 } from './model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, samePoint, sameSegment } from './duplicates';
 import { regenerateBuilding } from './evaluateElements';
 import { curvedWallArc, curvedWallBand, curvedWallLength } from './curvedWallGeometry';
 import { levelIdParam } from './levelParams';
@@ -72,6 +73,18 @@ export const addCurvedWall = defineCommand({
     }
     if (!curvedWallBand(wall)) {
       return noop(doc, 'add_curved_wall failed: thickness must be smaller than the diameter.');
+    }
+    const twin = findTwin(
+      resolution.building,
+      'curvedWall',
+      resolution.level.id,
+      (element) =>
+        element.baseOffset === wall.baseOffset &&
+        samePoint(element.through, wall.through) &&
+        sameSegment(element.start, element.end, wall.start, wall.end),
+    );
+    if (twin) {
+      return noop(doc, duplicateSummary('add_curved_wall', twin, 'a curved wall on this arc'));
     }
     const document = regenerateBuilding(doc, withElement(resolution.building, wall));
     return {

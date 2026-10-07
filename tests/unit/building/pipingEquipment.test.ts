@@ -111,7 +111,7 @@ describe('add_pipe_run line-list data', () => {
       from: 'EQ1',
       to: 'EQ2',
     });
-    doc = run(doc, 'add_pipe_run', { points: ROUTE, from: 'EQ3' });
+    doc = run(doc, 'add_pipe_run', { points: ROUTE, from: 'EQ3', diameter: 50 });
     const table = execute(doc, 'building_schedule', { kind: 'pipe' }).data as ScheduleTable;
     const header = table.columns;
     expect(header[0]).toBe('Mark');

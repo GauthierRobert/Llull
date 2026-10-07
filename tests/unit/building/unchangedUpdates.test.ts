@@ -120,10 +120,64 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     ]) {
       const again = execute(doc, 'add_beam', { start, end });
       expect(again.document).toBe(doc);
-      expect(again.summary).toMatch(/beam beam-1 already spans/);
+      expect(again.summary).toMatch(/a beam over this span already exists as beam-1/);
     }
     const lower = execute(doc, 'add_beam', { start: [0, 0], end: [5000, 0], topOffset: -500 });
     expect(lower.affected.length).toBeGreaterThan(0);
+  });
+
+  it('add_slab / add_room / add_stair / add_curved_wall refuse an exact twin', () => {
+    const square = [
+      [0, 0],
+      [4000, 0],
+      [4000, 3000],
+      [0, 3000],
+    ];
+    const rotated = [square[2], square[3], square[0], square[1]];
+    const reversed = [...square].reverse();
+    let doc = createEmptyDocument();
+    const twinOf = (name: string, params: Record<string, unknown>, twinParams = params): void => {
+      doc = execute(doc, name, params).document;
+      const again = execute(doc, name, twinParams);
+      expect(again.document, name).toBe(doc);
+      expect(again.affected).toEqual([]);
+      expect(again.summary).toMatch(/already exists as .* nothing added/);
+    };
+    twinOf('add_slab', { boundary: square }, { boundary: rotated });
+    twinOf('add_room', { name: 'Hall', boundary: square }, { name: 'Hall 2', boundary: reversed });
+    twinOf('add_stair', { start: [0, 0], angle: 0 });
+    const arc = { start: [-5000, 0], through: [0, 5000], end: [5000, 0], thickness: 300 };
+    twinOf('add_curved_wall', arc, { ...arc, start: [5000, 0], end: [-5000, 0] });
+    const other = execute(doc, 'add_slab', { boundary: square, role: 'roof' });
+    expect(other.affected.length).toBeGreaterThan(0);
+  });
+
+  it('add_steel_member / add_pipe_run / add_cable_tray refuse an exact twin', () => {
+    let doc = createEmptyDocument();
+    const twinOf = (name: string, params: Record<string, unknown>, twinParams = params): void => {
+      doc = execute(doc, name, params).document;
+      const again = execute(doc, name, twinParams);
+      expect(again.document, name).toBe(doc);
+      expect(again.summary).toMatch(/already exists as .* nothing added/);
+    };
+    const route = [
+      [0, 0, 3000],
+      [6000, 0, 3000],
+    ];
+    twinOf(
+      'add_steel_member',
+      { profile: 'IPE300', role: 'beam', start: [0, 0, 3000], end: [4000, 0, 3000] },
+      { profile: 'IPE300', role: 'beam', start: [4000, 0, 3000], end: [0, 0, 3000] },
+    );
+    twinOf('add_pipe_run', { points: route }, { points: [...route].reverse() });
+    twinOf('add_cable_tray', { points: route });
+    const other = execute(doc, 'add_steel_member', {
+      profile: 'IPE400',
+      role: 'beam',
+      start: [0, 0, 3000],
+      end: [4000, 0, 3000],
+    });
+    expect(other.affected.length).toBeGreaterThan(0);
   });
 
   it('set_project_info', () => {

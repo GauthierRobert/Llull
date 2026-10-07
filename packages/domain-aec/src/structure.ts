@@ -29,6 +29,7 @@ import {
   elementAffected,
 } from './model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, samePoint, sameRing, sameSegment } from './duplicates';
 import { regenerateBuilding } from './evaluateElements';
 
 const levelIdParam = (): z.ZodOptional<z.ZodString> =>
@@ -195,6 +196,15 @@ export const addSlab = defineCommand({
     }
     const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
     if (!resolution.ok) return noop(doc, `add_slab failed: ${resolution.reason}.`);
+    const slabTwin = findTwin(
+      resolution.building,
+      'slab',
+      resolution.level.id,
+      (element) =>
+        element.offset === offset && element.role === role && sameRing(element.boundary, outline),
+    );
+    if (slabTwin)
+      return noop(doc, duplicateSummary('add_slab', slabTwin, 'a slab with this outline'));
     const slab: SlabElement = {
       id: nextElementId(resolution.building, 'slab'),
       category: 'slab',
@@ -386,26 +396,14 @@ export const addBeam = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_beam failed: ${resolution.reason}.`);
-    const twin = Object.values(resolution.building.elements).find(
+    const twin = findTwin(
+      resolution.building,
+      'beam',
+      resolution.level.id,
       (element) =>
-        element.category === 'beam' &&
-        element.levelId === resolution.level.id &&
-        element.topOffset === topOffset &&
-        ((element.start[0] === start[0] &&
-          element.start[1] === start[1] &&
-          element.end[0] === end[0] &&
-          element.end[1] === end[1]) ||
-          (element.start[0] === end[0] &&
-            element.start[1] === end[1] &&
-            element.end[0] === start[0] &&
-            element.end[1] === start[1])),
+        element.topOffset === topOffset && sameSegment(element.start, element.end, start, end),
     );
-    if (twin) {
-      return noop(
-        doc,
-        `add_beam failed: beam ${twin.id} already spans [${start.join(', ')}]→[${end.join(', ')}] on ${resolution.level.id} at this topOffset; nothing added.`,
-      );
-    }
+    if (twin) return noop(doc, duplicateSummary('add_beam', twin, 'a beam over this span'));
     const beam: BeamElement = {
       id: nextElementId(resolution.building, 'beam'),
       category: 'beam',
@@ -475,6 +473,18 @@ export const addStair = defineCommand({
       );
     }
     const riserHeight = levelHeight / count;
+    const stairTwin = findTwin(
+      resolution.building,
+      'stair',
+      resolution.level.id,
+      (element) => element.angle === angle && samePoint(element.start, start),
+    );
+    if (stairTwin) {
+      return noop(
+        doc,
+        duplicateSummary('add_stair', stairTwin, 'a stair from this start and angle'),
+      );
+    }
     const stair: StairElement = {
       id: nextElementId(resolution.building, 'stair'),
       category: 'stair',

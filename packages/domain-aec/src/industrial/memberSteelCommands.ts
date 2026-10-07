@@ -15,6 +15,7 @@ import {
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, sameSegment } from '../duplicates';
 import { regenerateBuilding } from '../evaluateElements';
 import { distance3 } from '@lib/vec3';
 import { findProfile, type SteelProfile } from '../steel/profiles';
@@ -112,6 +113,26 @@ export const addSteelMember = defineCommand({
     if (problem) return noop(doc, `add_steel_member failed: ${problem}.`);
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_steel_member failed: ${resolution.reason}.`);
+    const memberTwin = findTwin(
+      resolution.building,
+      'member',
+      resolution.level.id,
+      (element) =>
+        element.profile === (findProfile(profile)?.name ?? profile) &&
+        element.role === role &&
+        element.roll === roll &&
+        sameSegment(element.start, element.end, from, to),
+    );
+    if (memberTwin) {
+      return noop(
+        doc,
+        duplicateSummary(
+          'add_steel_member',
+          memberTwin,
+          `a ${role} ${profile} between these points`,
+        ),
+      );
+    }
     const added = appendMembers(resolution.building, resolution.level.id, [
       {
         role,

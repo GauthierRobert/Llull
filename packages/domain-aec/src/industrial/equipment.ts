@@ -19,6 +19,7 @@ import {
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
+import { duplicateSummary, findTwin, samePath } from '../duplicates';
 import { regenerateBuilding } from '../evaluateElements';
 import {
   SHAPE_PARAM_TEXT,
@@ -193,6 +194,14 @@ export const addPipeRun = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_pipe_run failed: ${resolution.reason}.`);
+    const pipeTwin = findTwin(
+      resolution.building,
+      'pipe',
+      resolution.level.id,
+      (element) => element.diameter === resolvedDiameter && samePath(element.points, path),
+    );
+    if (pipeTwin)
+      return noop(doc, duplicateSummary('add_pipe_run', pipeTwin, 'a pipe on this route'));
     const text = (value: string | undefined): string | undefined => value?.trim() || undefined;
     const [lineNumber, origin, destination] = [text(line), text(from), text(to)];
     const pipe: PipeElement = {
