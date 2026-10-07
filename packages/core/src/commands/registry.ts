@@ -40,7 +40,7 @@ import { checkModel } from './check';
 import { renderView } from './render';
 import { makeTubeBetween } from './composite';
 import { addText, addDimension } from './annotate';
-import { filletEdge, chamferEdge } from './modify3d';
+import { filletEdge, chamferEdge, shellSolid } from './modify3d';
 import { instantiateTemplate } from './templates';
 import { historyCommands } from './history';
 import { createConfiguration, activateConfiguration } from './configurations';
@@ -150,6 +150,7 @@ const rawDefinitions = [
   addDimension,
   filletEdge,
   chamferEdge,
+  shellSolid,
   instantiateTemplate,
   ...historyCommands,
   createConfiguration,

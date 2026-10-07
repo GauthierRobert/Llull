@@ -6292,6 +6292,27 @@
     "name": "set_wall_layers"
   },
   {
+    "description": "Hollow out a closed 3D solid, leaving walls of the given thickness (grown inward), and replace it with a new mesh entity. The source entity is consumed. Requires a geometry kernel that supports shellSolid; a kernel without it (or a solid that is too thin for the thickness) makes this a graceful no-op that leaves the document unchanged. Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution or mesh).",
+    "input_schema": {
+      "properties": {
+        "id": {
+          "description": "Id of the closed 3D solid entity to hollow. Must exist and be a 3D solid.",
+          "type": "string"
+        },
+        "thickness": {
+          "description": "Wall thickness in document units. Must be > 0 and smaller than half the solid's thinnest dimension.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "thickness"
+      ],
+      "type": "object"
+    },
+    "name": "shell_solid"
+  },
+  {
     "description": "Run the constraint solver and update entity positions so that all declared constraints are satisfied. The solver works on the 2D XY plane (position Z is unchanged): point constraints (coincident, distance, tangent) move entity positions; angle, parallel and perpendicular turn line b about its midpoint (line a is the reference). It iterates up to 64 steps, stopping early when the total constraint residual is below 1e-8. Returns convergence info in data: { residual: number, iterations: number, converged: boolean }. Non-convergent results are returned with the best-effort positions and converged:false. No parameters required.",
     "input_schema": {
       "properties": {},
