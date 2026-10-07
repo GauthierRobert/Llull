@@ -43,7 +43,13 @@ async function makeFakeKernel(): Promise<Fake> {
     get: () => ({
       NbNodes: (): number => 3,
       NbTriangles: (): number => 1,
-      Node: (i: number) => handle({ X: (): number => i, Y: (): number => 0, Z: (): number => 0 }),
+      Node: (i: number) =>
+        handle({
+          X: (): number => i,
+          Y: (): number => 0,
+          Z: (): number => 0,
+          Transform: (): void => undefined,
+        }),
       Triangle: () => handle({ Value: (j: number): number => j }),
     }),
     delete: (): void => undefined,
@@ -66,7 +72,7 @@ async function makeFakeKernel(): Promise<Fake> {
     BRepPrimAPI_MakeBox_2: construct({ Shape: () => handle({}) }),
     BRepMesh_IncrementalMesh_2: construct({ Perform: (): void => undefined }),
     TopExp_Explorer_2: oneShotExplorer,
-    TopLoc_Location_1: construct(),
+    TopLoc_Location_1: construct({ Transformation: () => handle({}) }),
     TopoDS: {
       Face_1: () => handle({ Orientation_1: () => ({ value: 0 }) }),
       Shell_1: () => handle({}),

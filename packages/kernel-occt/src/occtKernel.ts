@@ -10,6 +10,7 @@
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
 import type { Entity, Vec3 } from '@core/model/types';
 import { cross3, dot3, sub3 } from '@lib/vec3';
+import { isValidPolygon, toCounterClockwise } from '@lib/polygon';
 import { clearTangentContact } from './tangentGuard';
 
 /** Minimal typings for the subset of the OCC WASM API this kernel uses. */
@@ -27,7 +28,12 @@ interface OccTriangulation extends OccHandle {
   get(): {
     NbTriangles(): number;
     NbNodes(): number;
-    Node(i: number): OccHandle & { X(): number; Y(): number; Z(): number };
+    Node(i: number): OccHandle & {
+      X(): number;
+      Y(): number;
+      Z(): number;
+      Transform(placement: OccHandle): void;
+    };
     Triangle(i: number): OccHandle & { Value(j: number): number };
   };
 }
@@ -152,7 +158,7 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   while (exp.More()) {
     const current = exp.Current();
     const face = (api.TopoDS as OccTopoDS).Face_1(current);
-    const loc: OccHandle = new api.TopLoc_Location_1();
+    const loc = new api.TopLoc_Location_1() as OccHandle & { Transformation(): OccHandle };
     const triangulation = api.BRep_Tool.Triangulation(face, loc) as OccTriangulation;
 
     if (!triangulation.IsNull()) {
@@ -160,11 +166,16 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
       const nNodes = tri.NbNodes();
       const nTris = tri.NbTriangles();
 
+      // Nodes are stored in the face's own frame; `loc` carries the shape's placement (a prism's
+      // top face, a transformed shape's faces), so bring them into world space.
+      const placement = loc.Transformation();
       for (let i = 1; i <= nNodes; i++) {
         const node = tri.Node(i);
+        node.Transform(placement);
         positions.push(node.X(), node.Y(), node.Z());
         release(node);
       }
+      release(placement);
 
       // A REVERSED face's stored triangles wind against the solid's outward normal: flip them.
       const reversed = face.Orientation_1().value === api.TopAbs_Orientation.TopAbs_REVERSED.value;
@@ -196,8 +207,8 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   return { positions, indices };
 }
 
-/** Planar OCC face of one triangle (closed polygon wire), or null when OCC rejects it. */
-function triangleFace(api: OccApi, corners: [Vec3, Vec3, Vec3]): OccShape | null {
+/** Planar OCC face of a closed polygon wire through `corners`, or null when OCC rejects it. */
+function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
   const points: OccHandle[] = corners.map(([x, y, z]) => new api.gp_Pnt_3(x, y, z));
   const poly = new api.BRepBuilderAPI_MakePolygon_1() as OccMakePolygon;
   for (const point of points) poly.Add_1(point);
@@ -239,7 +250,7 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
     ];
     const normal = cross3(sub3(corners[1], corners[0]), sub3(corners[2], corners[0]));
     if (dot3(normal, normal) < 1e-24) continue;
-    const face = triangleFace(api, corners);
+    const face = polygonFace(api, corners);
     if (face) {
       sewing.Add(face);
       release(face);
@@ -350,8 +361,41 @@ function revolvedPrimitive(api: OccApi, entity: Entity): OccShape | null {
   return placed(api, shape, placementTransform(api, entity.rotation, entity.position, anchorShift));
 }
 
-/** Box, cylinder, sphere and cone entities (honouring `rotation` and `position`); others -> null. */
+/**
+ * Prism of an XY polygon from z=0 to z=depth. The outline is made counter-clockwise first (a
+ * clockwise face would extrude inside-out); degenerate or non-finite profiles -> null.
+ */
+function extrudedProfile(api: OccApi, entity: Entity): OccShape | null {
+  if (entity.kind !== 'extrusion' || !isValidPolygon(entity.profile) || !(entity.depth > 0)) {
+    return null;
+  }
+  const outline = toCounterClockwise(entity.profile).map(([x, y]): Vec3 => [x, y, 0]);
+  const face = polygonFace(api, outline);
+  if (face === null) return null;
+  const direction: OccHandle = new api.gp_Vec_4(0, 0, entity.depth);
+  const maker = new api.BRepPrimAPI_MakePrism_1(face, direction, false, true) as {
+    Shape(): OccShape;
+    delete(): void;
+  };
+  const shape = maker.Shape();
+  [maker, direction, face].forEach(release);
+  return placed(api, shape, placementTransform(api, entity.rotation, entity.position));
+}
+
+/** Closed triangle-mesh solid (world space) rebuilt as a sewn OCC solid; open meshes -> null. */
+function meshSolid(api: OccApi, entity: Entity): OccShape | null {
+  if (entity.kind !== 'mesh') return null;
+  const shape = meshDataToTopoDSShape(api, entity.mesh);
+  const moved = [...entity.rotation, ...entity.position].some((value) => value !== 0);
+  return shape !== null && moved
+    ? placed(api, shape, placementTransform(api, entity.rotation, entity.position))
+    : shape;
+}
+
+/** Box, cylinder, sphere, cone, extrusion and mesh entities (rotation + position honoured). */
 function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
+  if (entity.kind === 'extrusion') return extrudedProfile(api, entity);
+  if (entity.kind === 'mesh') return meshSolid(api, entity);
   if (entity.kind !== 'box') return revolvedPrimitive(api, entity);
   const [sx, sy, sz] = entity.size;
   if (sx <= 0 || sy <= 0 || sz <= 0) return null;
