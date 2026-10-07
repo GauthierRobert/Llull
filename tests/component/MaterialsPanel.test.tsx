@@ -275,12 +275,47 @@ describe('MaterialsPanel — create form', () => {
         name: 'aluminium',
         density: 0.0027,
       }),
+      expect.anything(),
     );
   });
 
+  it('keeps the typed values when the create is rejected', () => {
+    patchDispatch(
+      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: any) => void }) =>
+        options?.onResult?.({ summary: 'duplicate', changed: false }),
+      ),
+    );
+
+    render(<MaterialsPanel />);
+    const form = screen.getByTestId('material-create-form');
+    const nameInput = within(form).getByRole('textbox', {
+      name: /new material name/i,
+    }) as HTMLInputElement;
+    const densityInput = within(form).getByRole('spinbutton', {
+      name: /material density/i,
+    }) as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'steel' } });
+    fireEvent.change(densityInput, { target: { value: '0.00785' } });
+    fireEvent.submit(form);
+
+    expect(nameInput.value).toBe('steel');
+    expect(densityInput.value).toBe('0.00785');
+  });
+
+  it('shows large densities without exponent notation', () => {
+    setMaterials({
+      steel: { name: 'steel', density: 7850, color: '#b0b0b0', metalness: 0.9, roughness: 0.2 },
+    });
+    render(<MaterialsPanel />);
+    expect(within(screen.getByTestId('material-row-steel')).getByText('7850')).toBeDefined();
+  });
+
   it('clears name and density after successful submit', () => {
-    const dispatchSpy = vi.fn();
-    patchDispatch(dispatchSpy);
+    patchDispatch(
+      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: any) => void }) =>
+        options?.onResult?.({ summary: 'ok', changed: true }),
+      ),
+    );
 
     render(<MaterialsPanel />);
     const form = screen.getByTestId('material-create-form');
