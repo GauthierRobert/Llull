@@ -8,6 +8,11 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import { is2D } from '@core/model/types';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {
+  curveCurveIntersections,
+  segmentCurveIntersections,
+  type CircularCurve,
+} from './curveIntersections';
+import {
   entityToSegments,
   isAngleOnArc,
   mid,
@@ -56,6 +61,7 @@ export function collectSnapCandidates(
 
   // Collect all line segments first (needed for intersection computation).
   const allSegments: Segment[] = [];
+  const allCurves: CircularCurve[] = [];
 
   /** Perpendicular / extension / nearest snaps for each segment, then register it for intersections. */
   const addSegmentSnaps = (segments: ReadonlyArray<Segment>): void => {
@@ -84,6 +90,7 @@ export function collectSnapCandidates(
     endAngle: number,
     full: boolean,
   ): void => {
+    allCurves.push({ cx, cy, r, startAngle, endAngle, full });
     if (doTangents) {
       for (const snap of snapTangentToCircle(from, cx, cy, r)) {
         if (full || isAngleOnArc(Math.atan2(snap.y - cy, snap.x - cx), startAngle, endAngle)) {
@@ -239,6 +246,14 @@ export function collectSnapCandidates(
         const b = allSegments[j];
         const pt = a && b ? segmentIntersection(...a, ...b) : null;
         if (pt) add('intersection', ...pt);
+      }
+    }
+    for (const [i, curve] of allCurves.entries()) {
+      for (const segment of allSegments) {
+        for (const pt of segmentCurveIntersections(segment, curve)) add('intersection', ...pt);
+      }
+      for (const other of allCurves.slice(i + 1)) {
+        for (const pt of curveCurveIntersections(curve, other)) add('intersection', ...pt);
       }
     }
   }
