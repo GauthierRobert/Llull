@@ -197,6 +197,17 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(again.summary).toMatch(/failed at step/);
   });
 
+  it('add_stair refuses an absurd riser count, explicit or derived from a huge level', () => {
+    const doc = execute(createEmptyDocument(), 'add_level', { height: 1e9 }).document;
+    for (const params of [{ start: [0, 0] }, { start: [0, 0], riserCount: 201 }]) {
+      const result = execute(doc, 'add_stair', params);
+      expect(result.document).toBe(doc);
+      expect(result.summary).toMatch(/exceed the limit of 200/);
+    }
+    const ok = execute(doc, 'add_stair', { start: [0, 0], riserCount: 200 });
+    expect(ok.affected.length).toBeGreaterThan(0);
+  });
+
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
     expectNoOp(doc, 'set_project_info', { name: 'Hall' });

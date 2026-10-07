@@ -427,6 +427,8 @@ export const addBeam = defineCommand({
   },
 });
 
+const MAX_RISERS = 200;
+
 /**
  * @command add_stair
  * @pure
@@ -448,7 +450,12 @@ export const addStair = defineCommand({
         'Run direction in radians, counter-clockwise from +X. Default 0 (climbs toward +X).',
       ),
     width: z.number().optional().describe('Stair width, in document units. Default 1000 mm.'),
-    riserCount: z.number().optional().describe('Number of risers (integer ≥ 2).'),
+    riserCount: z
+      .number()
+      .optional()
+      .describe(
+        'Number of risers (integer, 2 to 200). Default: level height ÷ 175 mm, rounded up.',
+      ),
     treadDepth: z
       .number()
       .optional()
@@ -470,6 +477,12 @@ export const addStair = defineCommand({
       return noop(
         doc,
         'add_stair failed: riserCount must be an integer ≥ 2, width and treadDepth > 0.',
+      );
+    }
+    if (count > MAX_RISERS) {
+      return noop(
+        doc,
+        `add_stair failed: ${count} risers exceed the limit of ${MAX_RISERS}; the level is ${levelHeight} ${doc.units} high — pass a smaller riserCount for a partial flight or stack stairs.`,
       );
     }
     const riserHeight = levelHeight / count;

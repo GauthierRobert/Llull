@@ -1865,7 +1865,7 @@
           "type": "string"
         },
         "riserCount": {
-          "description": "Number of risers (integer ≥ 2).",
+          "description": "Number of risers (integer, 2 to 200). Default: level height ÷ 175 mm, rounded up.",
           "type": "number"
         },
         "start": {
