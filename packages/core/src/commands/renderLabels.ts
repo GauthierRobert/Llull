@@ -88,6 +88,8 @@ function entityKeyPoints(e: Entity): Vec3[] {
       ];
     case 'rectangle':
       return [lift(0, 0), lift(e.width, 0), lift(e.width, e.height), lift(0, e.height)];
+    case 'instance':
+      return [pos]; // its component's extent needs the document; anchor the label at its origin
     default:
       return boundsCorners(entityBounds(e));
   }

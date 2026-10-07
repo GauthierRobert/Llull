@@ -2,17 +2,12 @@ import type { CadDocument, Entity, Vec3 } from '../model/types';
 import { cross3, dot3 } from '../lib/vec3';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import { entityBounds, instanceBoundsFromDoc, mergeBounds } from './sceneBounds';
+import { entityBounds, entityBoundsInDoc, mergeBounds } from './sceneBounds';
 import { expandInstance } from './assemblies';
 import type { Bounds } from './sceneTypes';
 import { formatLength } from './units';
 import { polygonArea, polygonCentroid } from '../lib/polygon';
 import { noop } from './noop';
-
-/** World AABB of `e`; instances are measured through their component (entityBounds has no document). */
-function boundsInDoc(doc: CadDocument, e: Entity): Bounds {
-  return e.kind === 'instance' ? instanceBoundsFromDoc(e, doc) : entityBounds(e);
-}
 
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -61,14 +56,14 @@ export const measureBoundingBox = defineCommand({
       if (!e) {
         return noop(doc, `measure_bounding_box: entity '${entityId}' not found.`);
       }
-      bounds = boundsInDoc(doc, e);
+      bounds = entityBoundsInDoc(doc, e);
     } else {
       const ids = useSelection && doc.selection.length > 0 ? doc.selection : doc.order;
 
       for (const id of ids) {
         const e = doc.entities[id];
         if (!e) continue;
-        const b = boundsInDoc(doc, e);
+        const b = entityBoundsInDoc(doc, e);
         bounds = bounds ? mergeBounds(bounds, b) : b;
       }
 

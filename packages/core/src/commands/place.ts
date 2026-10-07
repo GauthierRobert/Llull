@@ -19,7 +19,7 @@ import type { Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
-import { entityBounds } from './sceneBounds';
+import { entityBoundsInDoc } from './sceneBounds';
 import { replaceEntity } from './entityOps';
 
 type AxisIndex = 0 | 1 | 2;
@@ -88,7 +88,7 @@ export const align = defineCommand({
     const edgeType = edgeMatch[1] as 'min' | 'max' | 'center';
     const axisIndex = axisIndexOf(edgeMatch[2] as 'x' | 'y' | 'z');
     const edgeValue = (e: Entity): number => {
-      const { min, max } = entityBounds(e);
+      const { min, max } = entityBoundsInDoc(doc, e);
       return edgeType === 'min'
         ? min[axisIndex]
         : edgeType === 'max'
@@ -169,7 +169,7 @@ export const distribute = defineCommand({
     const items = targetIds
       .map((id) => {
         const e = doc.entities[id] as Entity;
-        const { min, max } = entityBounds(e);
+        const { min, max } = entityBoundsInDoc(doc, e);
         return {
           e,
           center: (min[axisIndex] + max[axisIndex]) / 2,
@@ -257,7 +257,8 @@ export const stackOn = defineCommand({
     }
     const axisIndex = axisIndexOf(axis);
     const delta =
-      entityBounds(baseEntity).max[axisIndex] - entityBounds(movingEntity).min[axisIndex];
+      entityBoundsInDoc(doc, baseEntity).max[axisIndex] -
+      entityBoundsInDoc(doc, movingEntity).min[axisIndex];
 
     if (Math.abs(delta) < 1e-10) {
       return noop(doc, `stack_on: "${movingId}" is already stacked on "${baseId}" along ${axis}.`);

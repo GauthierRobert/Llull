@@ -4897,7 +4897,7 @@
           "type": "array"
         },
         "kind": {
-          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\". Omit to match all kinds.",
+          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
           "enum": [
             "box",
             "cylinder",
@@ -4908,6 +4908,7 @@
             "torus",
             "wedge",
             "pyramid",
+            "revolution",
             "line",
             "polyline",
             "arc",
@@ -4915,7 +4916,10 @@
             "rectangle",
             "point",
             "ellipse",
-            "spline"
+            "spline",
+            "text",
+            "dimension",
+            "instance"
           ],
           "type": "string"
         },

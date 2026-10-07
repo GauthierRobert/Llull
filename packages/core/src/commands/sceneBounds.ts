@@ -194,7 +194,7 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
   for (const cid of component.order) {
     const child = component.entities[cid];
     if (!child) continue;
-    for (const c of boundsCorners(entityBounds(child))) {
+    for (const c of boundsCorners(entityBoundsInDoc(doc, child))) {
       const scaled: Vec3 = [c[0] * scale[0], c[1] * scale[1], c[2] * scale[2]];
       // Rotate around the component origin, then translate.
       const rotated = hasRotation ? applyEulerXYZ(scaled, ORIGIN, rotation) : scaled;
@@ -202,6 +202,15 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
     }
   }
   return worldPoints.length > 0 ? boundsOfPoints(worldPoints) : bounds(position, position);
+}
+
+/**
+ * World AABB of `e`. Unlike `entityBounds` it resolves instances through their component in `doc`
+ * (a bare `entityBounds` call on an instance yields a zero-size box at the origin).
+ * @pure
+ */
+export function entityBoundsInDoc(doc: CadDocument, e: Entity): Bounds {
+  return e.kind === 'instance' ? instanceBoundsFromDoc(e, doc) : entityBounds(e);
 }
 
 /** True when two AABBs overlap (touching counts) on every axis. */
