@@ -539,4 +539,19 @@ describe('transform commands', () => {
       expect(JSON.stringify(doc)).toBe(snapshot);
     });
   });
+
+  describe('malformed vector params', () => {
+    it.each([
+      ['rotate_entity', { delta: [0.5] }],
+      ['array_linear', { count: 3, offset: [1, 2] }],
+      ['array_polar', { count: 3, center: [0] }],
+    ])('%s rejects %j without producing NaN geometry', (name, extra) => {
+      const created = docWithBox();
+      const id = created.affected[0]!;
+      const result = execute(created.document, name, { id, ...extra });
+      expect(result.affected).toEqual([]);
+      expect(result.document).toBe(created.document);
+      expect(result.summary).toMatch(/finite/);
+    });
+  });
 });
