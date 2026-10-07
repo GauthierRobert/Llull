@@ -6534,7 +6534,7 @@
           "type": "string"
         },
         "name": {
-          "description": "New name.",
+          "description": "New level name; blank keeps the current name.",
           "type": "string"
         }
       },

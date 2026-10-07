@@ -61,6 +61,14 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
     ).toEqual([]);
   });
 
+  it('update_level with unchanged values is a no-op that records nothing', () => {
+    const doc = run(createEmptyDocument(), 'add_level', { name: 'Ground' });
+    const result = execute(doc, 'update_level', { levelId: 'level-1', name: ' ' });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+    expect(result.summary).toMatch(/already has these values/);
+  });
+
   it('delete_level refuses when occupied unless deleteElements, then removes hosted openings', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
     doc = run(doc, 'add_wall', { start: [0, 0], end: [5000, 0] });

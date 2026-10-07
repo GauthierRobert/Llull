@@ -91,7 +91,7 @@ export const updateLevel = defineCommand({
     'columns at full storey height and stairs climbing the storey follow a new height.',
   params: z.object({
     levelId: z.string().describe('Level id, e.g. "level-2".'),
-    name: z.string().optional().describe('New name.'),
+    name: z.string().optional().describe('New level name; blank keeps the current name.'),
     elevation: z.number().optional().describe('New finished-floor elevation (document units).'),
     height: z.number().optional().describe('New floor-to-floor height (> 0, document units).'),
   }),
@@ -108,6 +108,13 @@ export const updateLevel = defineCommand({
       elevation: elevation ?? level.elevation,
       height: height ?? level.height,
     };
+    if (
+      updated.name === level.name &&
+      updated.elevation === level.elevation &&
+      updated.height === level.height
+    ) {
+      return noop(doc, `update_level: level ${levelId} "${level.name}" already has these values.`);
+    }
     const levels = { ...building.levels, [levelId]: updated };
     const elements = Object.fromEntries(
       Object.entries(building.elements).map(([id, element]) => [
