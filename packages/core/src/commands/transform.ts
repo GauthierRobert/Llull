@@ -60,7 +60,7 @@ export const rotateEntity = defineCommand({
 });
 
 /** Scaled copy of `e` about its local origin plus the summary fragment describing the result. */
-function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
+export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: string } {
   switch (e.kind) {
     case 'box':
     case 'wedge': {

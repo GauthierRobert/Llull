@@ -17,6 +17,7 @@ import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { noop } from './noop';
 import { EXTRUSION_COLOR } from './geometryShared';
 import { ORIGIN, add3 } from '../lib/vec3';
+import { scaleGeometry } from './transform';
 
 const UNIT_SCALE: Vec3 = [1, 1, 1];
 
@@ -38,6 +39,21 @@ export function instanceEntity(
     layerId: DEFAULT_LAYER_ID,
     color: EXTRUSION_COLOR,
   };
+}
+
+/**
+ * `entity` with its geometry scaled by the instance's per-axis `scale` (magnitudes; a negative
+ * component only mirrors the position). box/wedge scale per axis; other kinds use the uniform
+ * factor, or the geometric mean of the three when the scale is non-uniform.
+ */
+function scaledChild(entity: Entity, scale: Vec3): Entity {
+  const [ax, ay, az] = [Math.abs(scale[0]), Math.abs(scale[1]), Math.abs(scale[2])];
+  if (ax === 1 && ay === 1 && az === 1) return entity;
+  if ((entity.kind === 'box' || entity.kind === 'wedge') && ax > 0 && ay > 0 && az > 0) {
+    return { ...entity, size: [entity.size[0] * ax, entity.size[1] * ay, entity.size[2] * az] };
+  }
+  const factor = ax === ay && ay === az ? ax : Math.cbrt(ax * ay * az);
+  return factor > 0 ? scaleGeometry(entity, factor).scaled : entity;
 }
 
 function expandedId(instanceId: string, sourceEntityId: string): string {
@@ -67,7 +83,7 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
       const rotatedPos: Vec3 = hasRotation ? applyEulerXYZ(localPos, [0, 0, 0], rot) : localPos;
 
       return {
-        ...childEntity,
+        ...scaledChild(childEntity, [sx, sy, sz]),
         id: expandedId(instance.id, childEntity.id),
         position: add3(rotatedPos, pos),
         rotation: add3(childEntity.rotation, rot),
