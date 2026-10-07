@@ -354,6 +354,27 @@ describe('DXF layer names', () => {
   });
 });
 
+describe('export_ifc counts', () => {
+  it('reports elements and IFC products separately and truthfully', () => {
+    const hall = execute(createEmptyDocument(), 'add_portal_frame_building', {
+      span: 12000,
+      length: 12000,
+      baySpacing: 6000,
+    }).document;
+    const result = execute(hall, 'export_ifc', {});
+    const data = result.data as IfcExport;
+    const modelled = Object.keys(hall.building?.elements ?? {}).length;
+    expect(data.elementCount).toBeGreaterThan(0);
+    expect(data.elementCount).toBeLessThanOrEqual(modelled);
+    expect(data.productCount).toBeGreaterThanOrEqual(data.elementCount);
+    expect(result.summary).toContain(
+      `${data.elementCount} building element(s) as ${data.productCount} IFC product(s)`,
+    );
+    const plain = execute(house(), 'export_ifc', {}).data as IfcExport;
+    expect(plain.elementCount).toBeLessThanOrEqual(plain.productCount);
+  });
+});
+
 describe('export_ifc header timestamp', () => {
   it('uses an ISO project date, and falls back (saying so) for a free-text date', () => {
     const iso = execute(house(), 'export_ifc', {});
