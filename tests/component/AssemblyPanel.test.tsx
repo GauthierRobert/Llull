@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
@@ -162,11 +162,7 @@ describe('AssemblyPanel — instances section', () => {
 
     render(<AssemblyPanel />);
 
-    const explodeBtn = screen
-      .getByTestId(`assembly-instance-${instanceId}`)
-      .querySelector('button');
-    expect(explodeBtn).toBeDefined();
-    fireEvent.click(explodeBtn!);
+    fireEvent.click(screen.getByRole('button', { name: `Explode instance ${instanceId}` }));
 
     expect(dispatchSpy).toHaveBeenCalledWith('explode_instance', { id: instanceId });
 
@@ -193,5 +189,21 @@ describe('AssemblyPanel — instances section', () => {
 
     const row = screen.getByTestId(`assembly-instance-${instanceId}`);
     expect(row.className).toContain('assembly-instance-row--selected');
+  });
+
+  it('exposes each instance as a keyboard-operable button reflecting selection', () => {
+    const boxResult = localDispatch('add_box', { size: [1, 1, 1] });
+    localDispatch('create_component', { name: 'Bolt', entityIds: [boxResult.affected[0]!] });
+    const compId = Object.keys(useStore.getState().document.components)[0]!;
+    const instanceId = localDispatch('insert_instance', { componentId: compId }).affected[0]!;
+
+    render(<AssemblyPanel />);
+
+    const row = screen.getByTestId(`assembly-instance-${instanceId}`);
+    const pick = within(row).getByRole('button', { name: 'Select instance of Bolt' });
+    expect(pick).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(pick);
+    expect(useStore.getState().document.selection).toEqual([instanceId]);
+    expect(pick).toHaveAttribute('aria-pressed', 'true');
   });
 });
