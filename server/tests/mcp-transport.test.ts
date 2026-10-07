@@ -473,6 +473,15 @@ describe('MCP tools/call — unknown tool name', () => {
     expect(result.content[0]!.text).toMatch(/unknown command/i);
   });
 
+  it('puts a one-letter typo of a real tool first', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    const result = await mcpCallTool(sessionId, 'add_boxx', {});
+
+    expect(result.content[0]!.text).toMatch(/Closest tools: add_box[,.]/);
+  });
+
   it('suggests the closest real tools and points at search_tools', async () => {
     const sessionId = await mcpInitialize();
     await mcpNotifyInitialized(sessionId);

@@ -27,6 +27,7 @@ import {
   applyExchangeToolCall,
   applyDiscoveryToolCall,
   isPromptEnabled,
+  closestToolNames,
   isToolEnabled,
   searchTools,
   toolsetOf,
@@ -48,7 +49,11 @@ function unknownToolResult(
   name: string,
   enabledToolsets: ReadonlySet<ToolsetName>,
 ): CallToolResult {
-  const suggestions = searchTools(name.replace(/_/g, ' '), 5, enabledToolsets).map((r) => r.name);
+  const typoMatches = closestToolNames(name, 5);
+  const suggestions =
+    typoMatches.length > 0
+      ? typoMatches
+      : searchTools(name.replace(/_/g, ' '), 5, enabledToolsets).map((r) => r.name);
   const hint = suggestions.length > 0 ? ` Closest tools: ${suggestions.join(', ')}.` : '';
   return makeErrorResult(
     `Unknown command: ${name}.${hint} Use search_tools to find tools by keyword.`,

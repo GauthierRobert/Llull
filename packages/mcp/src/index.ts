@@ -24,6 +24,7 @@ export {
   buildDiscoveryToolDefinitions,
   applyDiscoveryToolCall,
   searchTools,
+  closestToolNames,
 } from './discovery';
 
 export type { ToolsetName } from './toolsets';

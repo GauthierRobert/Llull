@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyDiscoveryToolCall,
   buildDiscoveryToolDefinitions,
+  closestToolNames,
   parseToolsets,
   searchTools,
   toolsetOf,
@@ -79,6 +80,22 @@ describe('search_tools', () => {
     for (const args of [{}, { query: '  ' }, { query: 5 }, null]) {
       expect(applyDiscoveryToolCall('search_tools', args, coreOnly())?.result.isError).toBe(true);
     }
+  });
+});
+
+describe('closestToolNames', () => {
+  it('finds the intended tool for a typo, closest first', () => {
+    expect(closestToolNames('add_boxx', 3)[0]).toBe('add_box');
+    expect(closestToolNames('Boolean_Subtrct', 3)).toContain('boolean_subtract');
+    expect(closestToolNames('add_box', 3)[0]).toBe('add_box');
+  });
+
+  it('returns nothing when no tool name is close', () => {
+    expect(closestToolNames('make_me_a_sandwich_please', 5)).toEqual([]);
+  });
+
+  it('respects the limit', () => {
+    expect(closestToolNames('add_boxx', 1)).toHaveLength(1);
   });
 });
 

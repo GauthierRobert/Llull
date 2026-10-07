@@ -138,6 +138,34 @@ export function searchTools(
     }));
 }
 
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const substitution = (previous[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1);
+      current.push(Math.min(substitution, (previous[j] ?? 0) + 1, (current[j - 1] ?? 0) + 1));
+    }
+    previous = current;
+  }
+  return previous[b.length] ?? 0;
+}
+
+/**
+ * Tool names within a typo's edit distance of `name` (closest first, ties by name); empty when
+ * nothing is close. For "Unknown command" hints; keyword search is the fallback.
+ */
+export function closestToolNames(name: string, limit: number): string[] {
+  const wanted = name.toLowerCase();
+  const maxDistance = Math.max(2, Math.floor(wanted.length / 3));
+  return buildAllMcpTools()
+    .map((tool) => ({ name: tool.name, distance: editDistance(wanted, tool.name) }))
+    .filter(({ distance }) => distance <= maxDistance)
+    .sort((a, b) => a.distance - b.distance || a.name.localeCompare(b.name))
+    .slice(0, limit)
+    .map(({ name: toolName }) => toolName);
+}
+
 function outcome(
   summary: string,
   isError: boolean,
