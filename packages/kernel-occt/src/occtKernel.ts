@@ -9,6 +9,8 @@
 
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
 import type { Entity, Vec3 } from '@core/model/types';
+import { createEmptyDocument } from '@core/model/types';
+import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { isValidPolygon, toCounterClockwise } from '@lib/polygon';
 import { clearTangentContact } from './tangentGuard';
@@ -392,8 +394,55 @@ function meshSolid(api: OccApi, entity: Entity): OccShape | null {
     : shape;
 }
 
-/** Box, cylinder, sphere, cone, extrusion and mesh entities (rotation + position honoured). */
+/** Kinds with no exact OCC maker here: their world-space triangles are sewn into a solid. */
+const TRIANGULATED_KINDS: ReadonlySet<Entity['kind']> = new Set([
+  'torus',
+  'wedge',
+  'pyramid',
+  'revolution',
+]);
+
+/** Primitive tessellation never reads components; instances are not boolean operands. */
+const NO_COMPONENTS = createEmptyDocument();
+
+/** Signed volume of a triangle soup (9 numbers per triangle); negative when wound inward. */
+function soupVolume(positions: readonly number[]): number {
+  let sum = 0;
+  for (let i = 0; i + 8 < positions.length; i += 9) {
+    const [a, b, c] = [
+      positions.slice(i, i + 3),
+      positions.slice(i + 3, i + 6),
+      positions.slice(i + 6, i + 9),
+    ];
+    sum += dot3(a as unknown as Vec3, cross3(b as unknown as Vec3, c as unknown as Vec3));
+  }
+  return sum / 6;
+}
+
+/** Sewn solid from the entity's own (already world-space, outward-wound) triangles. */
+function tessellatedSolid(api: OccApi, entity: Entity): OccShape | null {
+  const positions: number[] = [];
+  for (const triangle of entityToTriangles(entity, NO_COMPONENTS)) {
+    for (const [x, y, z] of triangle) positions.push(x, y, z);
+  }
+  if (positions.length === 0) return null;
+  if (soupVolume(positions) < 0) {
+    for (let i = 0; i + 8 < positions.length; i += 9) {
+      positions.splice(
+        i + 3,
+        6,
+        ...positions.slice(i + 6, i + 9),
+        ...positions.slice(i + 3, i + 6),
+      );
+    }
+  }
+  const indices = Array.from({ length: positions.length / 3 }, (_, corner) => corner);
+  return meshDataToTopoDSShape(api, { positions, indices });
+}
+
+/** Every solid kind a boolean can take (rotation + position honoured); 2D shapes -> null. */
 function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
+  if (TRIANGULATED_KINDS.has(entity.kind)) return tessellatedSolid(api, entity);
   if (entity.kind === 'extrusion') return extrudedProfile(api, entity);
   if (entity.kind === 'mesh') return meshSolid(api, entity);
   if (entity.kind !== 'box') return revolvedPrimitive(api, entity);
