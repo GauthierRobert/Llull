@@ -123,22 +123,28 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
   return snap(adjustedCursor, candidates, gridSize, tolerance);
 }
 
+/** Stable identity so useSnap's memo is not rebuilt every render. */
+const ORTHO_ONLY: OrthoPolarOpts = { ortho: true, polar: false };
+
 /** Snap aperture in screen pixels — kept constant across zoom (CAD convention). */
 const SNAP_TOLERANCE_PX = 12;
 
 /**
  * `useSnap` for the ortho 2D view at camera `zoom`: the snap grid tracks the visible adaptive mesh
  * (selectable grid points at every zoom) and the aperture is pixel-constant, so geometric snaps
- * stay grabbable from very zoomed out to very zoomed in.
+ * stay grabbable from very zoomed out to very zoomed in. `ortho` constrains the cursor to the
+ * horizontal/vertical from `drawOrigin` (held Shift while drawing).
  */
 export function useZoomSnap(
   cursor: Vec2 | null,
   zoom: number,
   drawOrigin: Vec2 | null = null,
+  ortho = false,
 ): SnapResult | null {
   return useSnap(cursor, {
     gridSize: adaptiveGridStep(zoom),
     tolerance: pixelsToWorld(SNAP_TOLERANCE_PX, zoom),
     drawOrigin,
+    ...(ortho ? { orthoPolar: ORTHO_ONLY } : {}),
   });
 }

@@ -9,7 +9,7 @@
  *   3. CollectedPointMarkers (dots at already-placed vertices).
  *
  * Snapping is applied via useSnap before forwarding to useDrawTool.handleClick.
- * Double-click finishes a polyline, spline or wall chain.
+ * Double-click finishes a polyline, spline or wall chain. Holding Shift constrains to ortho.
  *
  * Presentation only — no document mutations (R1).
  */
@@ -39,9 +39,11 @@ export function DrawInteraction({
   zoom,
 }: DrawInteractionProps): React.ReactElement | null {
   const [rawCursor, setRawCursor] = useState<Vec2 | null>(null);
+  // Holding Shift constrains the next point to the horizontal/vertical from the last one.
+  const [orthoHeld, setOrthoHeld] = useState(false);
 
   // The last placed point is the reference for perpendicular/tangent snaps.
-  const snapResult = useZoomSnap(rawCursor, zoom, collectedPoints.at(-1) ?? null);
+  const snapResult = useZoomSnap(rawCursor, zoom, collectedPoints.at(-1) ?? null, orthoHeld);
   const snappedCursor: Vec2 | null = snapResult && [snapResult.x, snapResult.y];
 
   // If no draw tool is active, don't intercept events.
@@ -52,6 +54,7 @@ export function DrawInteraction({
       <GroundPlane
         onPointerMove={(e) => {
           e.stopPropagation();
+          setOrthoHeld(e.shiftKey);
           setRawCursor(toDocumentPoint(e.point));
         }}
         onPointerLeave={() => setRawCursor(null)}
