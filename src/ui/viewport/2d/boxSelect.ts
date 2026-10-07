@@ -8,8 +8,8 @@
  */
 
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
-import { is2D } from '@core/model/types';
 import { dimensionLabelBox, TEXT_PICK_EM_WIDTH } from './modifyHelpers';
+import { solidOutline } from './solidOutline';
 
 export type BoxSelectMode = 'window' | 'crossing';
 
@@ -160,8 +160,14 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
         ],
       };
     }
-    default:
-      return null;
+    default: {
+      // 3D solids: their top-view outline rings (derived 'bim' geometry is drawn elsewhere).
+      if (entity.tags?.includes('bim') === true) return null;
+      const rings = solidOutline(document, entity);
+      return rings === null
+        ? null
+        : { polylines: rings.map((ring) => [...ring, ...ring.slice(0, 1)]), boxes: [] };
+    }
   }
 }
 
@@ -202,7 +208,7 @@ export function entitiesInBox(
   const mode = boxSelectMode(start, end);
   return document.order.filter((id) => {
     const entity = document.entities[id];
-    if (!entity || !is2D(entity) || !isSelectable(entity)) return false;
+    if (!entity || !isSelectable(entity)) return false;
     const geometry = sampleEntity(document, entity);
     return geometry !== null && matches(geometry, box, mode);
   });

@@ -15,7 +15,7 @@ import type { CadDocument, DimensionEntity, Entity, EntityId, Vec2 } from '@core
 import { is3D } from '@core/model/types';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
-import { footprintOutlineDistSq, solidFootprint } from './solidFootprint';
+import { ringsDistSq, solidOutline } from './solidOutline';
 
 /** Pick radius in screen pixels (selection and modify-tool picks). */
 export const PICK_RADIUS_PX = 10;
@@ -261,8 +261,8 @@ export function dimensionLabelDistSq(
  */
 function solidOutlineDistSq(document: CadDocument, solid: Entity, worldPick: Vec2): number {
   if (solid.tags?.includes('bim') === true) return Infinity;
-  const rect = solidFootprint(document, solid);
-  return rect === null ? Infinity : footprintOutlineDistSq(rect, worldPick);
+  const rings = solidOutline(document, solid);
+  return rings === null ? Infinity : ringsDistSq(rings, worldPick);
 }
 
 /**
