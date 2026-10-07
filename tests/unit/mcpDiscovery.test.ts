@@ -28,6 +28,35 @@ describe('discovery tool definitions', () => {
   });
 });
 
+describe('search_tools on natural phrasing', () => {
+  const top = (query: string, count = 3): string[] =>
+    searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);
+
+  it.each([
+    ['cut a hole', 'boolean_subtract'],
+    ['make a hole in a plate', 'boolean_subtract'],
+    ['round the edges', 'fillet_edge'],
+    ['bevel the edges', 'chamfer_edge'],
+    ['how heavy is it', 'mass_properties'],
+    ['take a picture', 'render_view'],
+    ['copy an entity many times in a row', 'duplicate_entity'],
+    ['export to STEP', 'export_step'],
+    ['measure distance between two points', 'measure_distance'],
+  ])('"%s" finds %s in the top results', (query, expected) => {
+    expect(top(query, 4)).toContain(expected);
+  });
+
+  it('ignores stopwords and one-letter words, so filler cannot match tools', () => {
+    expect(top('a the of to')).toEqual([]);
+    expect(top('a')).toEqual([]);
+  });
+
+  it('is plural-insensitive', () => {
+    expect(top('fillets')).toEqual(top('fillet'));
+    expect(top('edges')[0]).toBe(top('edge')[0]);
+  });
+});
+
 describe('search_tools', () => {
   it('ranks name matches first and reports toolset + enabled', () => {
     const results = searchTools('wall', 5, coreOnly());
