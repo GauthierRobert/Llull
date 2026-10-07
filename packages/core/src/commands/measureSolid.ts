@@ -244,7 +244,7 @@ export const massProperties = defineCommand({
   description:
     'Compute the mass of a 3D solid from its volume and density. ' +
     "Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', " +
-    "'cone', 'torus', 'wedge', 'pyramid'. " +
+    "'cone', 'torus', 'wedge', 'pyramid', 'revolution'. " +
     'Density resolution: if the entity has a material assigned (via assign_material) and that ' +
     "material exists in doc.materials, the material's density is used automatically — the density " +
     'param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). ' +
@@ -256,7 +256,7 @@ export const massProperties = defineCommand({
       .string()
       .describe(
         "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', " +
-          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
+          "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
       ),
     density: z
       .number()
