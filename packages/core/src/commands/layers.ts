@@ -12,6 +12,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { noop } from './noop';
+import { isHexColor } from '../lib/isHexColor';
 import { replaceEntity } from './entityOps';
 
 const withLayer = (doc: CadDocument, layer: Layer): CadDocument => ({
@@ -42,7 +43,7 @@ function setLayerFlag(
  * @layer core/commands
  * @affects creates 1 new Layer; affected = [newLayerId]
  * @invariant new layer is visible, unlocked, appended to layerOrder
- * @failure empty name -> no-op, affected:[]
+ * @failure empty name or non-#rrggbb color -> no-op, affected:[]
  */
 export const addLayer = defineCommand({
   name: 'add_layer',
@@ -57,7 +58,7 @@ export const addLayer = defineCommand({
       .string()
       .optional()
       .describe(
-        'Optional hex color string for the layer, e.g. "#ff0000". ' +
+        'Optional hex color string #rrggbb for the layer, e.g. "#ff0000"; any other format is rejected. ' +
           'Used by the UI to tint layer contents. Omit to leave unset.',
       ),
   }),
@@ -65,6 +66,10 @@ export const addLayer = defineCommand({
     const trimmed = name.trim();
     if (!trimmed) {
       return noop(doc, 'add_layer requires a non-empty name.');
+    }
+
+    if (color !== undefined && !isHexColor(color)) {
+      return noop(doc, `add_layer: color must be a #rrggbb hex string (got "${color}").`);
     }
 
     const id = nextId('layer');

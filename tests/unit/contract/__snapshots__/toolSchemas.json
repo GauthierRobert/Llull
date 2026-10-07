@@ -1120,7 +1120,7 @@
     "input_schema": {
       "properties": {
         "color": {
-          "description": "Optional hex color string for the layer, e.g. \"#ff0000\". Used by the UI to tint layer contents. Omit to leave unset.",
+          "description": "Optional hex color string #rrggbb for the layer, e.g. \"#ff0000\"; any other format is rejected. Used by the UI to tint layer contents. Omit to leave unset.",
           "type": "string"
         },
         "name": {
