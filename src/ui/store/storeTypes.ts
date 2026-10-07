@@ -5,7 +5,7 @@ import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import type { OutboxCommand } from './outbox';
 
 /** The structured result of the most recently dispatched read-only/query command. */
-interface LastMeasure {
+export interface LastMeasure {
   /** The command name, e.g. 'measure_distance'. */
   command: string;
   /** The structured data returned by the command (typed per command, but stored as unknown here). */
@@ -28,6 +28,8 @@ export interface DispatchOptions {
   selectAffected?: boolean;
   /** Called once with THIS dispatch's outcome (also on a failed POST), never with another's. */
   onResult?: (result: DispatchResult) => void;
+  /** Leave the status-bar summary untouched (automatic UI-initiated commands such as framing). */
+  quiet?: boolean;
 }
 
 export interface CadStoreState {

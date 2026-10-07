@@ -7,6 +7,7 @@
 
 import type { CadDocument, EntityId } from '@core/model/types';
 import { postCommand, postRedo, postUndo, ServerCommandError } from './serverCommands';
+import { measureAfter, statusSummaryFor } from './feedback';
 import { newCommandId } from './outbox';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
@@ -80,11 +81,10 @@ export function postDispatch(
     .then((response) => {
       set((state) => ({
         document: selectAffectedIn(state.document, selectionAtDispatch, response.affected, options),
-        lastSummary: response.summary,
+        lastSummary: statusSummaryFor(name, response.summary, options) ?? state.lastSummary,
         canUndo: response.canUndo,
         canRedo: response.canRedo,
-        lastMeasure:
-          response.data !== undefined ? { command: name, data: response.data } : state.lastMeasure,
+        lastMeasure: measureAfter(name, response.data, state.lastMeasure),
       }));
       options?.onResult?.({ summary: response.summary, changed: response.affected.length > 0 });
     })

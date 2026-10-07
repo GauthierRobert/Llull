@@ -29,6 +29,8 @@ import { RevolutionMesh } from './entities/RevolutionMesh';
 import { TextMesh } from './entities/TextMesh';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
+import { GridAnnotations3D } from './GridAnnotations3D';
+import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/commands/assemblies';
 import type { PbrMaterial } from './useMaterialProps';
 
@@ -204,12 +206,18 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
     [visibleEntities, materials],
   );
   const nonBatchableEntities = useMemo(
-    () => visibleEntities.filter((entity) => !isBatchable(entity)),
-    [visibleEntities],
+    () =>
+      visibleEntities.filter(
+        (entity) => !isBatchable(entity) && layers[entity.layerId]?.name !== GRID_LAYER_NAME,
+      ),
+    [visibleEntities, layers],
   );
 
   return (
     <group name="entities">
+      {/* Structural grid (S-GRID): screen-space lines + camera-facing labelled bubbles */}
+      <GridAnnotations3D document={document} />
+
       {/* Instanced rendering: box / cylinder / sphere — one draw call per batch */}
       <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
 

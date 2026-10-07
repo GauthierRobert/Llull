@@ -13,12 +13,14 @@
  * displayPrecision. Must be rendered inside the -renderOrigin group in Viewport2D.tsx.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import type * as THREE from 'three';
 import { Text } from '@react-three/drei';
 import type { CadDocument, DimensionEntity } from '@core/model/types';
 import { ORIGIN } from '@lib/vec3';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 import { SELECTION_COLOR } from '@ui/viewport/viewportPalette';
+import { useMinScreenSize } from '../useMinScreenSize';
 import { PlacedLineObject } from './PlacedLineObject';
 import { DEFAULT_OFFSET, dimensionDrawing } from './dimensionGeometry';
 
@@ -38,6 +40,8 @@ export function DimensionRenderer2D({
 }: DimensionRenderer2DProps): React.ReactElement | null {
   const { dimensionKind, entityIds, offset: rawOffset, precision, label, color, position } = entity;
   const offset = rawOffset ?? DEFAULT_OFFSET;
+  const textRef = useRef<THREE.Group>(null);
+  useMinScreenSize(textRef, TEXT_HEIGHT);
   const dimColor = selected ? SELECTION_COLOR : color || DIM_LINE_COLOR;
 
   const drawing = useMemo(
@@ -61,16 +65,17 @@ export function DimensionRenderer2D({
   return (
     <group position={[position[0], position[1], position[2]]}>
       {drawing.lines && <PlacedLineObject object={drawing.lines} position={ORIGIN} />}
-      <Text
-        font={TEXT_FONT_URL}
-        position={[drawing.textX, drawing.textY, 0.01]}
-        fontSize={TEXT_HEIGHT}
-        color={dimColor}
-        anchorX="center"
-        anchorY="middle"
-      >
-        {displayText}
-      </Text>
+      <group ref={textRef} position={[drawing.textX, drawing.textY, 0.01]}>
+        <Text
+          font={TEXT_FONT_URL}
+          fontSize={TEXT_HEIGHT}
+          color={dimColor}
+          anchorX="center"
+          anchorY="middle"
+        >
+          {displayText}
+        </Text>
+      </group>
     </group>
   );
 }

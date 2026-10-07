@@ -7,6 +7,7 @@
 import { execute } from '@core/commands/registry';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import type { EntityId } from '@core/model/types';
+import { measureAfter, statusSummaryFor } from './feedback';
 import { moveLastOutboxEntry, newCommandId } from './outbox';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
@@ -47,10 +48,10 @@ export function runLocally(
   const state = get();
   const result = execute(state.document, name, params);
   const summary = `${result.summary}${LOCAL_SUFFIX}`;
-  const lastMeasure =
-    result.data !== undefined ? { command: name, data: result.data } : state.lastMeasure;
+  const lastMeasure = measureAfter(name, result.data, state.lastMeasure);
+  const shown = statusSummaryFor(name, summary, options) ?? state.lastSummary;
   if (result.document === state.document) {
-    set({ lastSummary: summary, lastMeasure });
+    set({ lastSummary: shown, lastMeasure });
     options?.onResult?.({ summary, changed: false });
     return;
   }
@@ -59,7 +60,7 @@ export function runLocally(
       ...result.document,
       selection: selectionAfter(result.document.selection, result.affected, options),
     },
-    lastSummary: summary,
+    lastSummary: shown,
     lastMeasure,
     localUndoStack: [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT),
     localRedoStack: [],

@@ -6,8 +6,12 @@
  * Cross-session persistence is the server-side autosave in `server/src/liveDocument.ts`.
  */
 
-import React, { useRef } from 'react';
-import { useStore } from '@ui/store';
+import React, { useRef, useState } from 'react';
+import { useStore, useToolStore } from '@ui/store';
+import { useSessionStore } from '@ui/store/sessionStore';
+import { clearAutosave } from '@ui/store/autosave';
+import { ConfirmDialog } from '@ui/components/ConfirmDialog';
+import { projectFileStem } from '@ui/components/projectName';
 import { serializeDocument } from '@core/commands/persistence';
 import { Icon } from '@ui/components/Icon';
 import { downloadBlob } from '@ui/download';
@@ -25,9 +29,42 @@ export function ProjectIO(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [confirmingNew, setConfirmingNew] = useState(false);
+
   const handleSave = (): void => {
-    const json = serializeDocument(useStore.getState().document);
-    downloadBlob(new Blob([json], { type: 'application/json' }), `llull-${timestamp()}.json`);
+    const document = useStore.getState().document;
+    const json = serializeDocument(document);
+    const stem = projectFileStem(document, `llull-${timestamp()}`);
+    downloadBlob(new Blob([json], { type: 'application/json' }), `${stem}.json`);
+    useSessionStore.getState().markSaved();
+  };
+
+  const startNewProject = (): void => {
+    dispatch('clear_document', {});
+    useStore.getState().clearSelection();
+    useStore.getState().clearLastMeasure();
+    useToolStore.getState().setDrawTool('none');
+    useToolStore.getState().setModifyTool('none');
+    try {
+      clearAutosave(window.localStorage);
+    } catch {
+      // storage unavailable: nothing to clear
+    }
+    useSessionStore.getState().setRestoredAt(null);
+    useSessionStore.getState().markSaved();
+    setConfirmingNew(false);
+  };
+
+  const handleNewClick = (): void => {
+    if (useStore.getState().document.order.length === 0) startNewProject();
+    else setConfirmingNew(true);
+  };
+
+  const afterOpen = ({ changed }: { changed: boolean }): void => {
+    if (!changed) return;
+    useSessionStore.getState().markSaved();
+    useSessionStore.getState().setRestoredAt(null);
+    dispatch('fit_view', { direction: 'iso' }, { quiet: true });
   };
 
   const handleOpenClick = (): void => {
@@ -39,12 +76,22 @@ export function ProjectIO(): React.ReactElement {
     e.target.value = '';
     if (!file) return;
     void file.text().then((json) => {
-      dispatch('load_document', { json });
+      dispatch('load_document', { json }, { onResult: afterOpen });
     });
   };
 
   return (
     <span className="project-io" role="group" aria-label="Project file">
+      <button
+        type="button"
+        className="project-io__btn"
+        onClick={handleNewClick}
+        aria-label="New project"
+        title="New project"
+      >
+        <Icon name="plus" size={14} />
+        <span>New</span>
+      </button>
       <button
         type="button"
         className="project-io__btn"
@@ -73,6 +120,15 @@ export function ProjectIO(): React.ReactElement {
         style={{ display: 'none' }}
         aria-hidden="true"
       />
+      {confirmingNew && (
+        <ConfirmDialog
+          title="Start a new project?"
+          message="This clears the current model. You can undo it right after."
+          confirmLabel="Clear and start new"
+          onConfirm={startNewProject}
+          onCancel={() => setConfirmingNew(false)}
+        />
+      )}
     </span>
   );
 }
