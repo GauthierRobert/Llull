@@ -17,8 +17,10 @@ import {
   select,
   txt,
   type ElementTool,
+  type PlanExtent,
   type ToolField,
 } from './elementToolForm';
+import { GRID_FRAMING_TOOLS } from './gridFramingTools';
 
 const MATERIALS: ReadonlyArray<readonly [string, string]> = [
   ['concrete', 'Concrete'],
@@ -73,10 +75,21 @@ const RECTANGLE_FIELDS = [
 function outline(
   reader: FieldReader,
   wallIds: ReadonlyArray<string>,
-): { wallIds: string[] } | { boundary: Array<[number, number]> } {
-  return reader.text('source') === 'walls'
-    ? { wallIds: [...wallIds] }
-    : { boundary: rectangle(reader) };
+  gridExtent: PlanExtent | null = null,
+): { wallIds: string[] } | { boundary: Array<[number, number]> } | null {
+  const source = reader.text('source');
+  if (source === 'walls') return { wallIds: [...wallIds] };
+  if (source !== 'grid') return { boundary: rectangle(reader) };
+  if (gridExtent === null) return null;
+  const [x1, y1, x2, y2] = gridExtent;
+  return {
+    boundary: [
+      [x1, y1],
+      [x2, y1],
+      [x2, y2],
+      [x1, y2],
+    ],
+  };
 }
 
 export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
@@ -95,6 +108,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       });
     },
   },
+  ...GRID_FRAMING_TOOLS,
   {
     id: 'perimeter',
     label: 'Perimeter walls',
@@ -247,6 +261,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     fields: [
       select('source', 'Outline', 'walls', [
         ['walls', 'Enclosed by level walls'],
+        ['grid', 'Grid extent (min/max of grid lines)'],
         ['rectangle', 'Rectangle'],
       ]),
       ...RECTANGLE_FIELDS,
@@ -262,8 +277,11 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
+      const shape = outline(reader, context.wallIds, context.gridExtent ?? null);
+      if (shape === null)
+        return { ok: false, reason: 'No structural grid to take the extent from.' };
       return result(reader, 'add_slab', {
-        ...outline(reader, context.wallIds),
+        ...shape,
         thickness: reader.number('thickness'),
         offset: reader.number('offset'),
         role: reader.text('role'),

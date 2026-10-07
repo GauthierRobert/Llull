@@ -5,9 +5,15 @@
  * ONE command + params (param-gathering only, react R1).
  */
 
-import { STEEL_PROFILES } from '@aec/steel/profiles';
 import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/pipeSizes';
 import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
+import {
+  ALL_PROFILES,
+  BASE_OPTIONS as BASES,
+  I_PROFILES,
+  JOINT_OPTIONS as JOINTS,
+  MEMBER_ROLE_OPTIONS,
+} from './steelProfileOptions';
 import {
   FieldReader,
   INDUSTRIAL_TOOL_GROUP as GROUP,
@@ -25,15 +31,6 @@ import {
   type ToolField,
 } from './elementToolForm';
 
-const ALL_PROFILES: ReadonlyArray<readonly [string, string]> = STEEL_PROFILES.map(
-  (profile): readonly [string, string] => [
-    profile.name,
-    `${profile.name} · ${profile.massPerMetre} kg/m`,
-  ],
-);
-
-const I_PROFILES = ALL_PROFILES.filter(([name]) => /^(IPE|HEA|HEB)/.test(name));
-
 function profileField(key: string, label: string, defaultValue: string, iOnly = false): ToolField {
   return select(key, label, defaultValue, iOnly ? I_PROFILES : ALL_PROFILES);
 }
@@ -46,14 +43,6 @@ const DN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ]),
 ];
 
-const JOINTS: ReadonlyArray<readonly [string, string]> = [
-  ['pinned', 'Pinned'],
-  ['rigid', 'Rigid (moment connection)'],
-];
-const BASES: ReadonlyArray<readonly [string, string]> = [
-  ['pinned', 'Pinned'],
-  ['fixed', 'Fixed'],
-];
 const BEAM_ONLY = { key: 'role', values: ['beam'] } as const;
 const COLUMN_ONLY = { key: 'role', values: ['column'] } as const;
 
@@ -123,15 +112,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     label: 'Steel member',
     group: GROUP,
     fields: [
-      select('role', 'Role', 'beam', [
-        ['column', 'Column'],
-        ['beam', 'Beam'],
-        ['rafter', 'Rafter'],
-        ['brace', 'Brace'],
-        ['purlin', 'Purlin'],
-        ['rail', 'Side rail'],
-        ['crane', 'Crane beam'],
-      ]),
+      select('role', 'Role', 'beam', MEMBER_ROLE_OPTIONS),
       profileField('profile', 'Profile', 'IPE300'),
       num('x1', 'Start X', '0'),
       num('y1', 'Start Y', '0'),
