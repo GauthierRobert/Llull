@@ -1,7 +1,7 @@
 /**
  * @layer ui/viewport/2d
  * 2D drafting viewport: the same three.js scene through an orthographic top-down camera
- * (MapControls pan/zoom, disabled while a draw tool is active), an adaptive grid, a ScaleBar HUD
+ * (MapControls pan/zoom; pan disabled while a tool is armed, wheel zoom stays), an adaptive grid, a ScaleBar HUD
  * and floating-origin rendering. `frameloop="demand"`; presentational only, changes go through
  * dispatch.
  */
@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import type { DrawToolKind, ModifyToolKind } from '@ui/store';
+import { cameraGestures } from './cameraControlsPolicy';
 import { ZoomExtents2D } from './ZoomExtents2D';
 import { Entities2D } from './Entities2D';
 import { BuildingPlan2D } from './BuildingPlan2D';
@@ -86,7 +87,7 @@ function SceneContents2D({
 
       <MapControls
         makeDefault
-        enabled={!isDrawing && !isModifying}
+        {...cameraGestures(isDrawing || isModifying)}
         enableRotate={false}
         screenSpacePanning={true}
         zoomSpeed={1.2}
