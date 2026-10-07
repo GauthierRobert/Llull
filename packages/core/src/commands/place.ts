@@ -71,7 +71,8 @@ export const align = defineCommand({
       .string()
       .describe('Id of the entity whose bounding-box edge is the alignment target. Not moved.'),
   }),
-  run: (doc, { targetIds, edge, referenceId }): CommandResult => {
+  run: (doc, { targetIds: requestedIds, edge, referenceId }): CommandResult => {
+    const targetIds = [...new Set(requestedIds)];
     if (targetIds.length === 0) return noop(doc, 'align: targetIds must be a non-empty array.');
     const refEntity = doc.entities[referenceId];
     if (!refEntity) return noop(doc, `align: reference entity "${referenceId}" not found.`);
@@ -147,9 +148,10 @@ export const distribute = defineCommand({
       )
       .optional(),
   }),
-  run: (doc, { targetIds, axis, mode = 'equal-spacing' }): CommandResult => {
+  run: (doc, { targetIds: requestedIds, axis, mode = 'equal-spacing' }): CommandResult => {
+    const targetIds = [...new Set(requestedIds)];
     if (targetIds.length < 2) {
-      return noop(doc, 'distribute: targetIds must contain at least 2 entity ids.');
+      return noop(doc, 'distribute: targetIds must contain at least 2 distinct entity ids.');
     }
     const missingId = targetIds.find((id) => !doc.entities[id]);
     if (missingId) return noop(doc, `distribute: entity "${missingId}" not found.`);
