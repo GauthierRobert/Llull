@@ -371,7 +371,7 @@ export const addBeam = defineCommand({
     topOffset: z
       .number()
       .optional()
-      .describe('Offset of the beam top from the top of the level. Default 0.'),
+      .describe('Offset of the beam top from the top of the level, in document units. Default 0.'),
     levelId: levelIdParam(),
     material: z.string().optional().describe('Material. Default concrete.'),
   }),
@@ -386,6 +386,26 @@ export const addBeam = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_beam failed: ${resolution.reason}.`);
+    const twin = Object.values(resolution.building.elements).find(
+      (element) =>
+        element.category === 'beam' &&
+        element.levelId === resolution.level.id &&
+        element.topOffset === topOffset &&
+        ((element.start[0] === start[0] &&
+          element.start[1] === start[1] &&
+          element.end[0] === end[0] &&
+          element.end[1] === end[1]) ||
+          (element.start[0] === end[0] &&
+            element.start[1] === end[1] &&
+            element.end[0] === start[0] &&
+            element.end[1] === start[1])),
+    );
+    if (twin) {
+      return noop(
+        doc,
+        `add_beam failed: beam ${twin.id} already spans [${start.join(', ')}]→[${end.join(', ')}] on ${resolution.level.id} at this topOffset; nothing added.`,
+      );
+    }
     const beam: BeamElement = {
       id: nextElementId(resolution.building, 'beam'),
       category: 'beam',

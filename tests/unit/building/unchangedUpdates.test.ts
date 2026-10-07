@@ -103,6 +103,29 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(again.summary).toMatch(/columns already stand at/);
   });
 
+  it('add_beam refuses a duplicate span (either direction) but allows another topOffset', () => {
+    const doc = execute(createEmptyDocument(), 'add_beam', {
+      start: [0, 0],
+      end: [5000, 0],
+    }).document;
+    for (const [start, end] of [
+      [
+        [0, 0],
+        [5000, 0],
+      ],
+      [
+        [5000, 0],
+        [0, 0],
+      ],
+    ]) {
+      const again = execute(doc, 'add_beam', { start, end });
+      expect(again.document).toBe(doc);
+      expect(again.summary).toMatch(/beam beam-1 already spans/);
+    }
+    const lower = execute(doc, 'add_beam', { start: [0, 0], end: [5000, 0], topOffset: -500 });
+    expect(lower.affected.length).toBeGreaterThan(0);
+  });
+
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
     expectNoOp(doc, 'set_project_info', { name: 'Hall' });

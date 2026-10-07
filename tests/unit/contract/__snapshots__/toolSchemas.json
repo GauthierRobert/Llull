@@ -86,7 +86,7 @@
           "type": "array"
         },
         "topOffset": {
-          "description": "Offset of the beam top from the top of the level. Default 0.",
+          "description": "Offset of the beam top from the top of the level, in document units. Default 0.",
           "type": "number"
         },
         "width": {
