@@ -18,6 +18,7 @@ interface OccHandle {
 
 interface OccShape extends OccHandle {
   ShapeType(): unknown;
+  Orientation_1(): { value: number };
 }
 
 interface OccTriangulation extends OccHandle {
@@ -164,12 +165,15 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
         release(node);
       }
 
+      // A REVERSED face's stored triangles wind against the solid's outward normal: flip them.
+      const reversed = face.Orientation_1().value === api.TopAbs_Orientation.TopAbs_REVERSED.value;
       for (let i = 1; i <= nTris; i++) {
         const t = tri.Triangle(i);
+        const [first, second, third] = [t.Value(1), t.Value(2), t.Value(3)];
         indices.push(
-          vertexOffset + t.Value(1) - 1,
-          vertexOffset + t.Value(2) - 1,
-          vertexOffset + t.Value(3) - 1,
+          vertexOffset + first - 1,
+          vertexOffset + (reversed ? third : second) - 1,
+          vertexOffset + (reversed ? second : third) - 1,
         );
         release(t);
       }
@@ -273,7 +277,12 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
 }
 
 /** llull placement M = Rx·Ry·Rz (Rz applied first, radians) followed by the translation. */
-function placementTransform(api: OccApi, rotation: Vec3, position: Vec3): OccHandle {
+function placementTransform(
+  api: OccApi,
+  rotation: Vec3,
+  position: Vec3,
+  anchorShift: Vec3 = [0, 0, 0],
+): OccHandle {
   const total = new api.gp_Trsf_1();
   const offset: OccHandle = new api.gp_Vec_4(position[0], position[1], position[2]);
   total.SetTranslation_1(offset);
@@ -292,6 +301,13 @@ function placementTransform(api: OccApi, rotation: Vec3, position: Vec3): OccHan
     total.Multiply(turn);
     [turn, axis, direction, origin].forEach(release);
   }
+  if (anchorShift.some((component) => component !== 0)) {
+    const shift: OccHandle = new api.gp_Vec_4(anchorShift[0], anchorShift[1], anchorShift[2]);
+    const local = new api.gp_Trsf_1();
+    local.SetTranslation_1(shift);
+    total.Multiply(local);
+    [local, shift].forEach(release);
+  }
   return total;
 }
 
@@ -308,9 +324,34 @@ function placed(api: OccApi, shape: OccShape, placement: OccHandle): OccShape {
   return moved;
 }
 
-/** Box entities only (honouring `rotation` and `position`); every other kind -> null. */
+/**
+ * Cylinder (centered, axis +Z), sphere (centered) and cone (base-center, apex +height) built at the
+ * origin then placed with the entity's rotation and position; non-positive sizes -> null.
+ */
+function revolvedPrimitive(api: OccApi, entity: Entity): OccShape | null {
+  let anchorShift: Vec3 = [0, 0, 0];
+  let maker: { Shape(): OccShape; delete(): void };
+  if (entity.kind === 'cylinder') {
+    if (!(entity.radius > 0 && entity.height > 0)) return null;
+    maker = new api.BRepPrimAPI_MakeCylinder_1(entity.radius, entity.height);
+    anchorShift = [0, 0, -entity.height / 2];
+  } else if (entity.kind === 'sphere') {
+    if (!(entity.radius > 0)) return null;
+    maker = new api.BRepPrimAPI_MakeSphere_1(entity.radius);
+  } else if (entity.kind === 'cone') {
+    if (!(entity.radius > 0 && entity.height > 0)) return null;
+    maker = new api.BRepPrimAPI_MakeCone_1(entity.radius, 0, entity.height);
+  } else {
+    return null;
+  }
+  const shape = maker.Shape();
+  maker.delete();
+  return placed(api, shape, placementTransform(api, entity.rotation, entity.position, anchorShift));
+}
+
+/** Box, cylinder, sphere and cone entities (honouring `rotation` and `position`); others -> null. */
 function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
-  if (entity.kind !== 'box') return null;
+  if (entity.kind !== 'box') return revolvedPrimitive(api, entity);
   const [sx, sy, sz] = entity.size;
   if (sx <= 0 || sy <= 0 || sz <= 0) return null;
   const [px, py, pz] = entity.position;

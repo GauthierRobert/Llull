@@ -36,11 +36,16 @@ describe('occt kernel (live WASM)', () => {
     const kernel = await createNodeOcctKernel();
     const cube = kernel.tessellate(box('c', [0, 0, 0]));
     expect(cube).not.toBeNull();
-    const first = kernel.filletEdges(cube!, [0], 0.2);
+    // Mesh edges include coplanar triangle diagonals, which cannot be filleted: find a sharp one.
+    const sharpEdge = Array.from({ length: 18 }, (_, edge) => edge).find(
+      (edge) => kernel.filletEdges(cube!, [edge], 0.2) !== null,
+    );
+    expect(sharpEdge).toBeDefined();
+    const first = kernel.filletEdges(cube!, [sharpEdge!], 0.2);
     expect(first).not.toBeNull();
     expect(first!.indices.length).toBeGreaterThan(cube!.indices.length);
     for (let i = 0; i < 10; i++) {
-      expect(kernel.filletEdges(cube!, [0], 0.2)?.positions).toEqual(first!.positions);
+      expect(kernel.filletEdges(cube!, [sharpEdge!], 0.2)?.positions).toEqual(first!.positions);
     }
   }, 120_000);
 });

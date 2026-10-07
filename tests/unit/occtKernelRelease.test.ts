@@ -60,6 +60,7 @@ async function makeFakeKernel(): Promise<Fake> {
     };
   const api = {
     TopAbs_ShapeEnum: { TopAbs_FACE: 'face', TopAbs_SHAPE: 'shape' },
+    TopAbs_Orientation: { TopAbs_REVERSED: { value: 1 } },
     ChFi3d_FilletShape: { ChFi3d_Rational: 0 },
     gp_Pnt_3: construct(),
     BRepPrimAPI_MakeBox_2: construct({ Shape: () => handle({}) }),
@@ -67,7 +68,7 @@ async function makeFakeKernel(): Promise<Fake> {
     TopExp_Explorer_2: oneShotExplorer,
     TopLoc_Location_1: construct(),
     TopoDS: {
-      Face_1: () => handle({}),
+      Face_1: () => handle({ Orientation_1: () => ({ value: 0 }) }),
       Shell_1: () => handle({}),
       Edge_1: () => handle({}),
     },
