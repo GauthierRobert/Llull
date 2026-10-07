@@ -43,6 +43,8 @@ function SceneKeyLight({ shadowMapSize }: { shadowMapSize: number }): React.Reac
     camera.bottom = -rig.halfExtent;
     camera.near = rig.near;
     camera.far = rig.far;
+    // Z-up document: the default Y-up shadow camera left a dark patch on an off-origin scene.
+    camera.up.set(0, 0, 1);
     camera.updateProjectionMatrix();
     light.target = target;
     target.updateMatrixWorld();
