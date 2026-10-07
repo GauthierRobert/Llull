@@ -1276,7 +1276,7 @@
     "input_schema": {
       "properties": {
         "corners": {
-          "description": "Coplanar corners [[x, y, z], …], at least 3.",
+          "description": "Coplanar corners [[x, y, z], …], 3 to 500.",
           "items": {
             "items": {
               "type": "number"

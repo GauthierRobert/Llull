@@ -83,6 +83,8 @@ export const addFooting = defineCommand({
   },
 });
 
+const MAX_PANEL_CORNERS = 500;
+
 /**
  * @command add_panel
  * @pure
@@ -96,13 +98,19 @@ export const addPanel = defineCommand({
     'The panel thickness grows along the plane normal (right-hand rule on the corner order). Use for ' +
     'pitched roofs, façades and gables.',
   params: z.object({
-    corners: z.array(z.array(z.number())).describe('Coplanar corners [[x, y, z], …], at least 3.'),
+    corners: z.array(z.array(z.number())).describe('Coplanar corners [[x, y, z], …], 3 to 500.'),
     role: z.enum(['roof', 'wall']).optional().describe('Roofing or wall cladding. Default wall.'),
     thickness: z.number().optional().describe('Panel thickness, in document units. Default 80 mm.'),
     levelId: levelIdParam,
     material: z.string().optional().describe('Default sandwich-panel (or steel-sheet, …).'),
   }),
   run: (doc, { corners, role = 'wall', thickness, levelId, material }): CommandResult => {
+    if (corners.length > MAX_PANEL_CORNERS) {
+      return noop(
+        doc,
+        `add_panel failed: at most ${MAX_PANEL_CORNERS} corners (got ${corners.length}); a panel is a planar polygon, split a complex outline.`,
+      );
+    }
     const points = corners.map(toVec3);
     if (points.length < 3 || points.some((point) => point === null)) {
       return noop(doc, 'add_panel failed: corners must be ≥ 3 [x, y, z] points.');

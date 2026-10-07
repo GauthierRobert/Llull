@@ -42,6 +42,19 @@ describe('resource limits: generators refuse bombs with a clear summary', () => 
     expect(expectRefused(doc, 'add_cable_tray', { points })).toMatch(/at most 1000 points per run/);
   });
 
+  it('add_panel caps the outline at 500 corners and still takes a 500-corner polygon', () => {
+    const circle = (count: number): number[][] =>
+      many(count, (index) => {
+        const angle = (index / count) * 2 * Math.PI;
+        return [Math.cos(angle) * 5000, Math.sin(angle) * 5000, 3000];
+      });
+    const doc = createEmptyDocument();
+    expect(expectRefused(doc, 'add_panel', { corners: circle(501) })).toMatch(
+      /at most 500 corners \(got 501\)/,
+    );
+    expect(execute(doc, 'add_panel', { corners: circle(500) }).affected.length).toBeGreaterThan(0);
+  });
+
   it('add_pipe_support refuses a spacing that would crowd a run, and too many points', () => {
     let doc = execute(createEmptyDocument(), 'add_pipe_run', {
       points: [
