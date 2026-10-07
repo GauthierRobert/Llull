@@ -44,6 +44,15 @@ describe('set_wall_layers', () => {
     expect(layerBoundaries(wall)).toEqual([-117.5, 2.5, 202.5]);
   });
 
+  it('treats a repeated wall id once (single mark in the summary)', () => {
+    const result = execute(wallDoc(), 'set_wall_layers', {
+      wallIds: ['wall-1', 'wall-1'],
+      layers: BUILD_UP,
+    });
+    expect(result.summary).toMatch(/ on W1\.$/);
+    expect(result.affected.filter((id) => id === 'wall-1')).toHaveLength(1);
+  });
+
   it('removes a build-up and is dropped when update_wall changes the thickness', () => {
     let doc = execute(wallDoc(), 'set_wall_layers', {
       wallIds: ['wall-1'],

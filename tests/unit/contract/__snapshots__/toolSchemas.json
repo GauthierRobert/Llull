@@ -6244,7 +6244,7 @@
           "items": {
             "properties": {
               "function": {
-                "description": "Default structure.",
+                "description": "Role of the layer. Default \"structure\".",
                 "enum": [
                   "structure",
                   "insulation",
@@ -6255,11 +6255,11 @@
                 "type": "string"
               },
               "material": {
-                "description": "Layer material.",
+                "description": "Layer material name, e.g. \"brick\", \"mineral wool\".",
                 "type": "string"
               },
               "thickness": {
-                "description": "Layer thickness (> 0).",
+                "description": "Layer thickness in document units (> 0).",
                 "type": "number"
               }
             },
@@ -6272,7 +6272,7 @@
           "type": "array"
         },
         "wallIds": {
-          "description": "Wall ids.",
+          "description": "Ids of existing straight walls (e.g. [\"wall-1\"]); curved walls are not accepted.",
           "items": {
             "type": "string"
           },
