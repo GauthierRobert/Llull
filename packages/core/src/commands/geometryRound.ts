@@ -37,14 +37,7 @@ export const addCylinder = defineCommand({
       .describe('Radius of the cylinder cross-section in document units. Must be > 0.'),
     height: z.number().describe('Total height of the cylinder in document units. Must be > 0.'),
     position: positionField(),
-    anchor: anchorField(
-      'Which point on the cylinder the position refers to. ' +
-        '"center" (default): geometric center. ' +
-        '"min": min-XYZ corner of the AABB. ' +
-        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-        'Unknown values fall back to "center". ' +
-        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-    ),
+    anchor: anchorField('cylinder', 'center'),
     rotation: rotationField(),
     color: colorField(DEFAULT_SOLID_COLOR),
   }),
@@ -95,14 +88,7 @@ export const addSphere = defineCommand({
   params: z.object({
     radius: z.number().describe('Radius of the sphere in document units. Must be > 0.'),
     position: positionField(),
-    anchor: anchorField(
-      'Which point on the sphere the position refers to. ' +
-        '"center" (default): geometric center. ' +
-        '"min": min-XYZ corner of the AABB. ' +
-        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-        'Unknown values fall back to "center". ' +
-        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-    ),
+    anchor: anchorField('sphere', 'center'),
     rotation: rotationField('Stored for uniformity; geometrically moot for a sphere.'),
     color: colorField(DEFAULT_SOLID_COLOR),
   }),
@@ -159,14 +145,10 @@ export const addCone = defineCommand({
         'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
       ),
     position: positionField(),
-    anchor: anchorField(
-      'Which point on the cone the position refers to. ' +
-        '"base-center" (default): center of the circular base; apex at position+[0,0,height]. ' +
-        '"center": geometric center of the AABB (mid X/Y/Z). ' +
-        '"min": min-XYZ corner of the AABB. ' +
-        'Unknown values fall back to "base-center". ' +
-        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-    ),
+    anchor: anchorField('cone', 'base-center', {
+      'base-center': 'center of the circular base; apex at position+[0,0,height]',
+      center: 'geometric center of the AABB (mid X/Y/Z)',
+    }),
     rotation: rotationField(),
     color: colorField(DEFAULT_SOLID_COLOR),
   }),
@@ -232,14 +214,7 @@ export const addTorus = defineCommand({
           'Should be less than ringRadius for a non-self-intersecting torus.',
       ),
     position: positionField('The ring lies in the XY plane. '),
-    anchor: anchorField(
-      'Which point on the torus the position refers to. ' +
-        '"center" (default): geometric center. ' +
-        '"min": min-XYZ corner of the AABB. ' +
-        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-        'Unknown values fall back to "center". ' +
-        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-    ),
+    anchor: anchorField('torus', 'center'),
     rotation: rotationField(),
     color: colorField(DEFAULT_SOLID_COLOR),
   }),
