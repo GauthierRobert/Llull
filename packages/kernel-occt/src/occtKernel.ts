@@ -11,6 +11,7 @@ import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel'
 import type { Entity, Vec3 } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
+import { errorMessage } from '@lib/errorMessage';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { isValidPolygon, toCounterClockwise } from '@lib/polygon';
 import { clearTangentContact } from './tangentGuard';
@@ -55,6 +56,12 @@ interface OccTopoDS {
 /** Boolean operation or fillet builder: `Build` then `Shape`. */
 interface OccBuilder extends OccHandle {
   Build(): void;
+  IsDone(): boolean;
+  Shape(): OccShape;
+}
+
+interface OccOffsetMaker extends OccHandle {
+  PerformByJoin(...args: readonly unknown[]): void;
   IsDone(): boolean;
   Shape(): OccShape;
 }
@@ -482,11 +489,59 @@ function withHandles(
       owned.push(handle);
       return handle;
     });
-  } catch {
+  } catch (error) {
+    // A number is a native C++ exception pointer (OCC rejecting the input: expected, silent); an
+    // Error is a binding or programming fault worth surfacing.
+    if (error instanceof Error)
+      console.warn(`[occtKernel] OCC operation failed: ${errorMessage(error)}`);
     return null;
   } finally {
     owned.forEach(release);
   }
+}
+
+/**
+ * Fillet or chamfer the selected edges of a closed mesh solid (both builders share `Add_2(size,
+ * edge)`): rebuild a sewn solid, add the edges, build, mesh the result.
+ * @failure size <= 0, empty or non-closed mesh, builder not done -> null
+ */
+function roundEdges(
+  api: OccApi,
+  label: string,
+  mesh: MeshData,
+  edgeIndices: number[],
+  size: number,
+  makeBuilder: (solid: OccShape) => OccFilletMaker,
+): MeshData | null {
+  if (!(size > 0) || mesh.positions.length === 0) return null;
+  return withHandles((own) => {
+    const solid = own(meshDataToTopoDSShape(api, mesh));
+    if (!solid) {
+      console.warn(
+        `[occtKernel] ${label}: could not reconstruct a manifold solid from MeshData ` +
+          '(non-manifold mesh, open shell, or degenerate triangles). Returning null.',
+      );
+      return null;
+    }
+    const maker = own(makeBuilder(solid));
+    const edgeExp = explorer(api, solid, 'TopAbs_EDGE');
+    const edgeSet = edgeIndices.length > 0 ? new Set(edgeIndices) : null;
+    for (let edgeIdx = 0; edgeExp.More(); edgeIdx++, edgeExp.Next()) {
+      if (edgeSet && !edgeSet.has(edgeIdx)) continue;
+      const current = edgeExp.Current();
+      const edge = (api.TopoDS as OccTopoDS).Edge_1(current);
+      try {
+        maker.Add_2(size, edge);
+      } catch {
+        // Degenerate or seam edge: skip.
+      }
+      release(edge);
+      release(current);
+    }
+    edgeExp.delete();
+    maker.Build();
+    return maker.IsDone() ? extractMeshData(api, own(maker.Shape())) : null;
+  });
 }
 
 /**
@@ -511,45 +566,42 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
 
     /** @param edgeIndices 0-based edge indices to fillet; empty = all edges */
     filletEdges(shape: MeshData, edgeIndices: number[], radius: number): MeshData | null {
-      if (radius <= 0 || shape.positions.length === 0) return null;
-      return withHandles((own) => {
-        const occShape = own(meshDataToTopoDSShape(api, shape));
-        if (!occShape) {
-          console.warn(
-            '[occtKernel] filletEdges: could not reconstruct a manifold solid from MeshData ' +
-              '(non-manifold mesh, open shell, or degenerate triangles). Returning null.',
-          );
-          return null;
-        }
-        const filletMaker = own(
-          new api.BRepFilletAPI_MakeFillet(
-            occShape,
-            api.ChFi3d_FilletShape.ChFi3d_Rational,
-          ) as OccFilletMaker,
-        );
-        const edgeExp = explorer(api, occShape, 'TopAbs_EDGE');
-        const edgeSet = edgeIndices.length > 0 ? new Set(edgeIndices) : null;
-        for (let edgeIdx = 0; edgeExp.More(); edgeIdx++, edgeExp.Next()) {
-          if (edgeSet && !edgeSet.has(edgeIdx)) continue;
-          const current = edgeExp.Current();
-          const edge = (api.TopoDS as OccTopoDS).Edge_1(current);
-          try {
-            filletMaker.Add_2(radius, edge);
-          } catch {
-            // Degenerate or seam edge: skip.
-          }
-          release(edge);
-          release(current);
-        }
-        edgeExp.delete();
-        filletMaker.Build();
-        return filletMaker.IsDone() ? extractMeshData(api, own(filletMaker.Shape())) : null;
+      return roundEdges(api, 'filletEdges', shape, edgeIndices, radius, (solid) => {
+        return new api.BRepFilletAPI_MakeFillet(solid, api.ChFi3d_FilletShape.ChFi3d_Rational);
       });
     },
 
-    chamferEdges: () => null,
+    /** @param edgeIndices 0-based edge indices to chamfer; empty = all edges */
+    chamferEdges(shape: MeshData, edgeIndices: number[], distance: number): MeshData | null {
+      return roundEdges(api, 'chamferEdges', shape, edgeIndices, distance, (solid) => {
+        return new api.BRepFilletAPI_MakeChamfer(solid);
+      });
+    },
 
-    shellSolid: () => null,
+    /** Closed hollow: the solid minus its inward offset by `thickness` (a sealed internal cavity). */
+    shellSolid(shape: MeshData, thickness: number): MeshData | null {
+      if (!(thickness > 0) || shape.positions.length === 0) return null;
+      return withHandles((own) => {
+        const solid = own(meshDataToTopoDSShape(api, shape));
+        if (!solid) return null;
+        const offset = own(new api.BRepOffsetAPI_MakeOffsetShape_1() as OccOffsetMaker);
+        offset.PerformByJoin(
+          solid,
+          -thickness,
+          1e-4,
+          api.BRepOffset_Mode.BRepOffset_Skin,
+          false,
+          false,
+          api.GeomAbs_JoinType.GeomAbs_Arc,
+          false,
+        );
+        if (!offset.IsDone()) return null;
+        const cavity = own(offset.Shape());
+        const cut = own(new api.BRepAlgoAPI_Cut_3(solid, cavity) as OccBuilder);
+        cut.Build();
+        return cut.IsDone() ? extractMeshData(api, own(cut.Shape())) : null;
+      });
+    },
 
     tessellate(entity: Entity): MeshData | null {
       return withHandles((own) => {
