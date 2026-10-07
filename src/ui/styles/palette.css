@@ -140,6 +140,10 @@
   color: var(--fg-subtle);
 }
 
+.palette-item--active .palette-item__hint {
+  color: var(--fg-muted);
+}
+
 .palette-item__group {
   flex-shrink: 0;
   font-size: var(--text-2xs);

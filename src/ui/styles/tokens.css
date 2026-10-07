@@ -28,11 +28,11 @@
   --fg: oklch(0.955 0.004 260);
   --fg-muted: oklch(0.78 0.006 260);
   --fg-subtle: oklch(0.63 0.008 260);
-  --fg-faint: oklch(0.5 0.008 260);
+  --fg-faint: oklch(0.62 0.008 260);
 
   /* ---- Accent (selection / primary action) ---- */
-  --accent: oklch(0.68 0.165 258);
-  --accent-hover: oklch(0.73 0.15 258);
+  --accent: oklch(0.56 0.19 258);
+  --accent-hover: oklch(0.62 0.18 258);
   --accent-fg: oklch(0.99 0 0); /* text on a solid accent fill */
   --accent-soft: oklch(0.68 0.165 258 / 0.16);
   --accent-softer: oklch(0.68 0.165 258 / 0.09);
