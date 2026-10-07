@@ -254,7 +254,7 @@ export function McpConnectButton(): React.ReactElement {
         type="button"
         className="mcp-connect-trigger"
         onClick={() => setOpen(true)}
-        aria-label="Connect an MCP agent"
+        aria-label="Connect agent"
         title="Connect an MCP agent"
       >
         <Icon name="plug" size={14} />

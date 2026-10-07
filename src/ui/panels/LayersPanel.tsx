@@ -63,6 +63,7 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
       </button>
 
       <span
+        role="img"
         className={`layer-lock${layer.locked ? ' layer-lock--locked' : ''}`}
         aria-label={
           layer.locked ? `Layer ${layer.name} is locked` : `Layer ${layer.name} is unlocked`

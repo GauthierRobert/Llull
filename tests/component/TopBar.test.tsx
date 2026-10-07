@@ -99,7 +99,7 @@ describe('TopBar — search trigger', () => {
 
   it('opens the command palette and advertises the shortcut', () => {
     render(<TopBar />);
-    const trigger = screen.getByRole('button', { name: 'Search commands' });
+    const trigger = screen.getByRole('button', { name: /^Search or run a command/ });
     expect(trigger.getAttribute('aria-keyshortcuts')).toContain('Control+K');
     fireEvent.click(trigger);
     expect(usePaletteStore.getState().open).toBe(true);
@@ -160,6 +160,6 @@ describe('TopBar — dock toggles and actions', () => {
     render(<TopBar />);
     expect(screen.getByRole('button', { name: /open project/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /save project/i })).toBeDefined();
-    expect(screen.getByRole('button', { name: /connect an mcp agent/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /^connect agent/i })).toBeDefined();
   });
 });

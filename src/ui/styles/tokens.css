@@ -131,7 +131,7 @@
   --fg: oklch(0.2 0.01 260);
   --fg-muted: oklch(0.38 0.01 260);
   --fg-subtle: oklch(0.52 0.01 260);
-  --fg-faint: oklch(0.64 0.008 260);
+  --fg-faint: oklch(0.54 0.008 260);
 
   --accent: oklch(0.56 0.19 258);
   --accent-hover: oklch(0.5 0.19 258);
@@ -143,8 +143,8 @@
 
   --success: oklch(0.56 0.15 155);
   --success-soft: oklch(0.56 0.15 155 / 0.12);
-  --warning: oklch(0.62 0.15 70);
-  --warning-soft: oklch(0.62 0.15 70 / 0.12);
+  --warning: oklch(0.5 0.13 70);
+  --warning-soft: oklch(0.5 0.13 70 / 0.12);
   --danger: oklch(0.56 0.2 25);
   --danger-soft: oklch(0.56 0.2 25 / 0.1);
   --agent: oklch(0.6 0.15 45);

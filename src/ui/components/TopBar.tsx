@@ -85,7 +85,7 @@ function SearchTrigger(): React.ReactElement {
       type="button"
       className="search-trigger"
       onClick={() => setOpen(true)}
-      aria-label="Search commands"
+      aria-label={`Search or run a command… ${shortcut}`}
       aria-keyshortcuts="Control+K Meta+K"
       title={`Search every action and command (${shortcut})`}
     >
@@ -118,7 +118,7 @@ export function TopBar(): React.ReactElement {
               />
             </svg>
           </div>
-          <span className="brand-wordmark">Llull</span>
+          <h1 className="brand-wordmark">Llull</h1>
         </div>
 
         <span className="topbar__sep" aria-hidden="true" />
