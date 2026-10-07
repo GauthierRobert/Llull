@@ -25,6 +25,11 @@ export function formatDegrees(term: Term, piName: string): string {
   return Math.abs(degrees) < 1e-12 ? '0' : String(Number(degrees.toPrecision(15)));
 }
 
+/** `# ── TITLE ───…` comment rule, padded to 66 columns. */
+export function sectionBanner(title: string): string {
+  return `# ── ${title} `.padEnd(66, '─');
+}
+
 export function isZero(terms: readonly Term[]): boolean {
   return terms.every((t) => t.expression === undefined && t.value === 0);
 }

@@ -14,6 +14,7 @@ import {
   parameterLines,
   provenance,
   quote,
+  sectionBanner,
 } from './format';
 import { placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
@@ -66,7 +67,7 @@ export function emitPython(program: FeatureProgram, backend: PythonBackend): str
   lines.push(`LLULL_UNITS = ${quote(program.units)}`, '');
   lines.push(`# ── llull runtime (${LIBRARY[backend]}) · keep unchanged ${'─'.repeat(30)}`);
   lines.push(pythonRuntime(backend));
-  lines.push(`# ── PARAMETERS ${'─'.repeat(50)}`);
+  lines.push(sectionBanner('PARAMETERS'));
   lines.push(
     ...parameterLines(
       program,
@@ -74,7 +75,7 @@ export function emitPython(program: FeatureProgram, backend: PythonBackend): str
       (p) => `${p.identifier} = param(${quote(p.name)}, ${p.expression ?? formatNumber(p.value)})`,
     ),
   );
-  lines.push('', `# ── MODEL ${'─'.repeat(55)}`);
+  lines.push('', sectionBanner('MODEL'));
   lines.push(...featureLinesWithHeadings(program, '#', featureLine));
   lines.push(
     '',
