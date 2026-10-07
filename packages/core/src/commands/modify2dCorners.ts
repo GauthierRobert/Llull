@@ -54,6 +54,9 @@ function resolveCorner(
       `${command}: polyline ${poly.id} needs at least 3 points to ${verb} a corner (got ${n}).`,
     );
   }
+  if (!Number.isInteger(vertexIndex)) {
+    return noop(doc, `${command}: vertexIndex must be an integer (got ${vertexIndex}).`);
+  }
   const isValidIndex = poly.closed
     ? vertexIndex >= 0 && vertexIndex < n
     : vertexIndex >= 1 && vertexIndex <= n - 2;
