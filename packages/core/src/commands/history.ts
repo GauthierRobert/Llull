@@ -14,13 +14,6 @@ import { replayHistory } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
 import { noop } from './noop';
 
-/** True when replaying a step left every document field (except featureHistory) untouched. */
-function changedNothing(before: CadDocument, after: CadDocument): boolean {
-  return (Object.keys(after) as Array<keyof CadDocument>).every(
-    (key) => key === 'featureHistory' || after[key] === before[key],
-  );
-}
-
 /**
  * Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities".
  * @param mustApplyStepId a user-edited step that must change the document when replayed (a known
@@ -40,10 +33,12 @@ function regenerateWith(
   if (refused !== null) return noop(doc, `${command}: ${refused}`);
   let inertStep: FeatureStep | undefined;
   const warnings: string[] = [];
+  const brokenDependents: FeatureStep[] = [];
   const replayed = replayHistory(doc, newHistory, context.registry, warnings, (event) => {
-    if (event.step.id === mustApplyStepId && changedNothing(event.before, event.after)) {
-      inertStep = event.step;
-    }
+    if (!event.inert) return;
+    if (event.step.id === mustApplyStepId) inertStep = event.step;
+    // A step that used to affect entities but now changes nothing lost an input it depended on.
+    else if ((event.step.affected?.length ?? 0) > 0) brokenDependents.push(event.step);
   });
   // Unresolved =expr params are legitimate (the parameter may be defined later); replay_history reports them.
   if (inertStep !== undefined && warnings.length === 0) {
@@ -54,9 +49,13 @@ function regenerateWith(
   }
   const regenerated = nextStepNumber === undefined ? replayed : { ...replayed, nextStepNumber };
   const count = Object.keys(regenerated.entities).length;
+  const brokenNote =
+    brokenDependents.length > 0
+      ? ` Warning: ${brokenDependents.length} step(s) no longer change the document (a referenced entity or input is gone): ${brokenDependents.map((step) => `${step.id} (${step.name})`).join(', ')}.`
+      : '';
   return {
     document: regenerated,
-    summary: `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}`,
+    summary: `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`,
     affected: regenerated.order,
   };
 }
