@@ -14,7 +14,6 @@ import {
   appendMembers,
   baseFixitySchema,
   jointFixitySchema,
-  levelIdSchema,
   profileSummary,
   type MemberSpec,
 } from './memberSupport';
@@ -26,6 +25,7 @@ import {
   samePlanPoint,
   unknownLabels,
 } from './gridFraming';
+import { levelIdParam } from '../levelParams';
 
 const tonnes = (kg: number): string => (kg / 1000).toFixed(1);
 
@@ -106,7 +106,7 @@ export const addGridColumns = defineCommand({
     'hold a column on that level are skipped. Mark SC, role column; follow with add_grid_beams / add_grid_bracing.',
   params: z.object({
     profile: z.string().describe('Catalogue section name, e.g. "HEB300" (list_steel_profiles).'),
-    levelId: levelIdSchema.describe(
+    levelId: levelIdParam.describe(
       'Base level id: columns start at its finished floor level. Default: the active level.',
     ),
     topLevelId: z
@@ -246,7 +246,7 @@ export const addGridBeams = defineCommand({
     'hold a beam with the same end points are skipped. Mark SB, role beam.',
   params: z.object({
     profile: z.string().describe('Catalogue section name, e.g. "IPE400" (list_steel_profiles).'),
-    levelId: levelIdSchema.describe(
+    levelId: levelIdParam.describe(
       'Level id: the beams sit at its finished floor level. Default: the active level.',
     ),
     axes: z
@@ -360,7 +360,7 @@ export const addGridBracing = defineCommand({
       .describe(
         'Label of the grid line crossing axis that bounds the bay at the other side, e.g. "2".',
       ),
-    levelId: levelIdSchema.describe(
+    levelId: levelIdParam.describe(
       'Storey base level id: bracing starts at its FFL and rises one level height. Default: the active level.',
     ),
     pattern: z
