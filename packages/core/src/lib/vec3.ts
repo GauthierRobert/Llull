@@ -33,6 +33,11 @@ export function len3(a: Vec3): number {
   return Math.sqrt(dot3(a, a));
 }
 
+/** @pure Euclidean distance */
+export function distance3(a: Vec3, b: Vec3): number {
+  return Math.sqrt(distanceSq3(a, b));
+}
+
 /** @pure squared Euclidean distance (no sqrt — for threshold comparisons) */
 export function distanceSq3(a: Vec3, b: Vec3): number {
   const delta = sub3(a, b);

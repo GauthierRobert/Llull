@@ -3,7 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { formatLength } from './units';
 import { boundsCenter, entityBounds } from './sceneBounds';
-import { distanceSq3, dot3, sub3 } from '../lib/vec3';
+import { dot3, sub3, len3, distance3 } from '../lib/vec3';
 import { noop } from './noop';
 interface MeasureDistanceData {
   distance: number;
@@ -79,7 +79,7 @@ export const measureDistance = defineCommand({
       );
     }
 
-    const distance = Math.sqrt(distanceSq3(locA, locB));
+    const distance = distance3(locA, locB);
     const data: MeasureDistanceData = { distance, unit: doc.units };
     return {
       document: doc,
@@ -166,8 +166,8 @@ export const measureAngle = defineCommand({
       );
     }
 
-    const lenA = Math.sqrt(dot3(vA, vA));
-    const lenB = Math.sqrt(dot3(vB, vB));
+    const lenA = len3(vA);
+    const lenB = len3(vB);
     if (lenA < 1e-12 || lenB < 1e-12) {
       return noop(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
     }
