@@ -56,6 +56,19 @@ describe('ProjectIO', () => {
   beforeEach(resetStores);
   afterEach(() => vi.restoreAllMocks());
 
+  it('Save marks the browser autosave as identical to the saved file', () => {
+    vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+    window.localStorage.removeItem('llull-autosave');
+    act(() => dispatch('add_box', { size: [1, 1, 1] }));
+    render(<ProjectIO />);
+    fireEvent.click(screen.getByRole('button', { name: /save project/i }));
+    const record = JSON.parse(window.localStorage.getItem('llull-autosave') ?? 'null') as {
+      clean?: boolean;
+    } | null;
+    expect(record?.clean).toBe(true);
+    window.localStorage.removeItem('llull-autosave');
+  });
+
   it('Save names the file after the project and clears the unsaved marker', () => {
     const save = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
     act(() => dispatch('set_project_info', { name: 'My Hall' }));

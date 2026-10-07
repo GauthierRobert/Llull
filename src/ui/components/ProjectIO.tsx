@@ -11,7 +11,7 @@ import React, { useRef, useState } from 'react';
 import { useStore, useToolStore } from '@ui/store';
 import { isLocalMode } from '@ui/store/localMode';
 import { useSessionStore } from '@ui/store/sessionStore';
-import { browserStorage, clearAutosave } from '@ui/store/autosave';
+import { browserStorage, clearAutosave, writeAutosave } from '@ui/store/autosave';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { projectFileStem } from '@ui/components/projectName';
 import { serializeDocument } from '@core/commands/persistence';
@@ -40,6 +40,11 @@ export function ProjectIO(): React.ReactElement {
     const stem = projectFileStem(document, `llull-${timestamp()}`);
     downloadBlob(new Blob([json], { type: 'application/json' }), `${stem}.json`);
     useSessionStore.getState().markSaved();
+    // Mark the browser autosave as identical to the saved file (offline only, like autosave).
+    const storage = browserStorage();
+    if (storage !== null && useStore.getState().liveStatus !== 'connected') {
+      writeAutosave(storage, { savedAt: Date.now(), json, clean: true });
+    }
   };
 
   const startNewProject = (): void => {

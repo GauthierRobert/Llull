@@ -153,6 +153,26 @@ describe('useAutosave', () => {
     expect(useStore.getState().document.order.length).toBe(1);
   });
 
+  it('restores a clean autosave (equal to the saved file) silently and not dirty', () => {
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: Date.now(), json: savedBoxJson(), clean: true });
+    expect(readAutosave(storage)?.clean).toBe(true);
+    render(<Harness storage={storage} />);
+    expect(useStore.getState().document.order.length).toBe(1);
+    expect(screen.queryByText(/restored your unsaved work/i)).toBeNull();
+    expect(useSessionStore.getState().dirty).toBe(false);
+  });
+
+  it('does not flag an autosave written while the document was unsaved as clean', () => {
+    const storage = fakeStorage();
+    render(<Harness storage={storage} />);
+    act(() => useStore.getState().dispatch('add_box', { size: [1, 1, 1] }));
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 10);
+    });
+    expect(readAutosave(storage)?.clean).toBeUndefined();
+  });
+
   it('discards an autosave that cannot be loaded', () => {
     const storage = fakeStorage();
     writeAutosave(storage, { savedAt: 1, json: 'not a document' });
