@@ -8,6 +8,7 @@ import { z } from '@core/commands/schema';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { withElement } from '../model';
+import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
 
 /** Iteration cap of the design loops of design_portal_frames and design_purlins. */
 export const MAX_ITERATIONS = 15;
@@ -103,4 +104,25 @@ export function upsizeProfileGroups(
     changedIds.push(...resized.changedIds);
   }
   return { building: next, progressed, limited, changes, changedIds };
+}
+
+/**
+ * Next heavier profile of the same family; at the top of the family, the lightest I-section
+ * (IPE / HEA / HEB) with a larger plastic modulus. Null when nothing larger exists.
+ */
+export function nextProfile(name: string): string | null {
+  const profile = findProfile(name);
+  if (!profile) return null;
+  const sameFamily = lightestProfile(
+    (candidate) =>
+      candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre,
+  );
+  if (sameFamily) return sameFamily.name;
+  if (profile.shape !== 'I') return null;
+  const modulus = sectionProperties(profile).plasticModulus;
+  const stronger = lightestProfile(
+    (candidate) =>
+      candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
+  );
+  return stronger?.name ?? null;
 }

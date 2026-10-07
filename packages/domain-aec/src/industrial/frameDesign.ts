@@ -10,11 +10,12 @@ import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
 import { refitPlates } from './plateSupport';
 import { designFixedPlates } from './plateDesign';
-import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
+import { findProfile } from '../steel/profiles';
 import {
   addProfileGroup,
   isValidTargetUtilisation,
   MAX_ITERATIONS,
+  nextProfile,
   resizeProfileGroup,
   targetUtilisationParam,
   upsizeProfileGroups,
@@ -28,27 +29,6 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
 import { finalUtilisationText, noChangeResult, utilisationStats } from './designReport';
 import { sweepFrame } from '../mesh';
-
-/**
- * Next heavier profile of the same family; at the top of the family, the lightest I-section
- * (IPE / HEA / HEB) with a larger plastic modulus. Null when nothing larger exists.
- */
-export function nextProfile(name: string): string | null {
-  const profile = findProfile(name);
-  if (!profile) return null;
-  const sameFamily = lightestProfile(
-    (candidate) =>
-      candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre,
-  );
-  if (sameFamily) return sameFamily.name;
-  if (profile.shape !== 'I') return null;
-  const modulus = sectionProperties(profile).plasticModulus;
-  const stronger = lightestProfile(
-    (candidate) =>
-      candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
-  );
-  return stronger?.name ?? null;
-}
 
 /**
  * @command design_portal_frames

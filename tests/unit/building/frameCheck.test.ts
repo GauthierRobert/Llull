@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { CheckRow } from '@aec/industrial/frameCheckSolve';
-import { nextProfile } from '@aec/industrial/frameDesign';
+import { nextProfile } from '@aec/industrial/profileGroups';
 import { boltResistance, yieldStrength } from '@aec/industrial/steelDesign';
 import { connectionWelds } from '@aec/industrial/connections';
 import type { MomentConnectionElement, SteelMemberElement } from '@core/model/building';

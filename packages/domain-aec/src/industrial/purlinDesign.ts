@@ -16,11 +16,12 @@ import { regenerateBuilding } from '../evaluateElements';
 import { finalUtilisationText, noChangeResult, utilisationStats } from './designReport';
 import { sweepFrame } from '../mesh';
 import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
-import { nextProfile } from './frameDesign';
+
 import {
   addProfileGroup,
   isValidTargetUtilisation,
   MAX_ITERATIONS,
+  nextProfile,
   resizeProfileGroup,
   targetUtilisationParam,
   upsizeProfileGroups,

@@ -12,7 +12,11 @@ interface McpTextContent {
   text: string;
 }
 
-/** MCP CallToolResult minus the document. `structuredContent` only for record-typed `data`. */
+/**
+ * MCP CallToolResult minus the document. `structuredContent` only for record-typed `data`.
+ * @invariant a type alias, not an interface: only an alias is assignable to the SDK's
+ *            index-signatured CallToolResult (server/src/mcp/server.ts relies on it, no casts).
+ */
 export type McpShapedResult = {
   content: McpTextContent[];
   isError: boolean;
