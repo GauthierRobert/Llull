@@ -7,7 +7,7 @@ import type { BuildingModel, MomentConnectionElement } from '@core/model/buildin
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding, toMm } from '../model';
+import { elementAffected, existingLevelId, fromMm, getBuilding, toMm } from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
@@ -15,6 +15,7 @@ import { boltSize } from './evaluate';
 import { buildingConnectionSolids } from './evaluateConnections';
 import { appendConnections, findMomentJoints } from './connectionSupport';
 import { polygonArea } from '@lib/polygon';
+import { existingLevelIdParam } from '../levelParams';
 
 /** Steel mass of a connection in kg: its modelled end plate(s) + haunch (half the rafter section per metre). */
 export function connectionMass(
@@ -53,7 +54,7 @@ export const addMomentConnections = defineCommand({
       .array(z.string())
       .optional()
       .describe('Rafter member ids. Default: every rafter of the level.'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: existingLevelIdParam,
     plateThickness: z.number().optional().describe('End plate thickness. Default 20 / 25 mm.'),
     boltDiameter: z.number().optional().describe('Bolt diameter. Default 20 mm (M20).'),
     haunchLength: z
@@ -74,7 +75,7 @@ export const addMomentConnections = defineCommand({
     if (params.levelId !== undefined && !building.levels[params.levelId]) {
       return noop(doc, `add_moment_connections failed: no level '${params.levelId}'.`);
     }
-    const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0] ?? '';
+    const levelId = existingLevelId(building, params.levelId) ?? '';
     const joints = findMomentJoints(
       building,
       levelId,

@@ -65,6 +65,10 @@ describe('steel profile catalogue', () => {
     expect(
       (execute(doc, 'list_steel_profiles', {}).data as { profiles: unknown[] }).profiles,
     ).toHaveLength(STEEL_PROFILES.length);
+    const unknown = execute(doc, 'list_steel_profiles', { family: 'XYZ' });
+    expect(unknown.document).toBe(doc);
+    expect(unknown.data).toBeUndefined();
+    expect(unknown.summary).toMatch(/unknown family 'XYZ' \(valid families: IPE, HEA, HEB/);
   });
 });
 
@@ -161,7 +165,7 @@ describe('add_footing / add_panel', () => {
 
   it('rejects bad footings', () => {
     const doc = createEmptyDocument();
-    expect(execute(doc, 'add_footing', {}).summary).toMatch(/location must be/);
+    expect(execute(doc, 'add_footing', {}).summary).toMatch(/give location/);
     expect(execute(doc, 'add_footing', { underColumns: true }).summary).toMatch(/no columns/);
     expect(execute(doc, 'add_footing', { location: [0, 0], width: 0 }).affected).toEqual([]);
     expect(execute(doc, 'add_footing', { location: [0, 0], topOffset: NaN }).affected).toEqual([]);
@@ -331,7 +335,6 @@ describe('add_portal_frame_building', () => {
     const doc = createEmptyDocument();
     for (const params of [
       { span: 0 },
-      { origin: [0] },
       { roofPitch: 50 },
       { columnProfile: 'NOPE' },
       { crane: { railHeight: 9000 } },
@@ -342,6 +345,9 @@ describe('add_portal_frame_building', () => {
       expect(result.affected, JSON.stringify(params)).toEqual([]);
       expect(result.summary).toMatch(/add_portal_frame_building failed/);
     }
+    const shortOrigin = execute(doc, 'add_portal_frame_building', { origin: [0] });
+    expect(shortOrigin.affected).toEqual([]);
+    expect(shortOrigin.summary).toMatch(/rejected: invalid params/);
   });
 });
 
@@ -1082,6 +1088,8 @@ describe('phase 2 review regressions', () => {
     expect(rafter.summary).toMatch(/plate-1 removed \(no longer a column\)/);
     expect(rafter.document.building?.elements['plate-1']).toBeUndefined();
     expect(rafter.document.entities['plate-1:body']).toBeUndefined();
+    expect(rafter.affected).toContain('plate-1');
+    expect(rafter.affected).toContain('plate-1:body');
     // Unrelated edits leave the plate alone.
     const noted = execute(doc, 'update_steel_member', { memberId: 'member-1', note: 'x' });
     expect(noted.summary).not.toMatch(/plate/i);

@@ -16,7 +16,7 @@ import { fromMm } from '../model';
 import { base, colorForMaterial, meshEntity, orientedBox } from '../entities';
 import { prismMesh, sweepFrame, type SweepFrame } from '../mesh';
 import { findProfile } from '../steel/profiles';
-import { add3, scale3, sub3 } from '@lib/vec3';
+import { add3, distance3, scale3, sub3 } from '@lib/vec3';
 import { atLevel, boltSize } from './evaluate';
 
 /** World placement of a base plate and its anchor bolts. */
@@ -191,7 +191,7 @@ export function connectionSolids(
     },
   ];
   if (connection.kind === 'apex' && other) {
-    const distanceTo = (point: Vec3): number => Math.hypot(...sub3(point, joint));
+    const distanceTo = (point: Vec3): number => distance3(point, joint);
     const nearerEnd =
       distanceTo(atLevel(level, other.start)) <= distanceTo(atLevel(level, other.end))
         ? 'start'

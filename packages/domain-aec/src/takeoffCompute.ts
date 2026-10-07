@@ -5,7 +5,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { BuildingElement } from '@core/model/building';
 import { distance, polygonArea } from '@lib/polygon';
-import { sub3 } from '@lib/vec3';
+import { distance3 } from '@lib/vec3';
 import { elementsOf, getBuilding, toMetres } from './model';
 import { findProfile } from './steel/profiles';
 import { polygonNormal, boltSize } from './industrial/evaluate';
@@ -22,6 +22,7 @@ import {
   stairVolume,
   wallQuantities,
 } from './takeoffBasics';
+import { routeLength } from './industrial/routeSupport';
 
 /** Bill of quantities grouped by category × material × unit. */
 export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
@@ -135,7 +136,9 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   }
   for (const pipe of elementsOf(building, 'pipe')) {
     const size = `${pipe.service} Ø${pipe.diameter}`;
-    takeoff.add('pipe', size, `Pipe ${size}`, [['m', 'length', scale.length(pipeLength(pipe))]]);
+    takeoff.add('pipe', size, `Pipe ${size}`, [
+      ['m', 'length', scale.length(routeLength(pipe.points))],
+    ]);
   }
   for (const tray of elementsOf(building, 'tray')) {
     const size = `${tray.system} ${tray.width}×${tray.height}`;
@@ -192,7 +195,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
 }
 
 export function memberLength(member: Extract<BuildingElement, { category: 'member' }>): number {
-  return Math.hypot(...sub3(member.end, member.start));
+  return distance3(member.end, member.start);
 }
 
 /** Steel mass of a member in kg. */
@@ -202,13 +205,6 @@ export function memberMass(
 ): number {
   const profile = findProfile(member.profile);
   return profile ? toMetres(doc, memberLength(member)) * profile.massPerMetre : 0;
-}
-
-export function pipeLength(pipe: Extract<BuildingElement, { category: 'pipe' }>): number {
-  return pipe.points.reduce((sum, point, index) => {
-    const previous = pipe.points[index - 1];
-    return previous ? sum + Math.hypot(...sub3(point, previous)) : sum;
-  }, 0);
 }
 
 /** True area of a planar 3D panel (half the Newell normal length). */

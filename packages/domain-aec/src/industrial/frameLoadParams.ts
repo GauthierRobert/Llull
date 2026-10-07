@@ -6,10 +6,10 @@
 
 import type { CadDocument } from '@core/model/types';
 import { z } from '@core/commands/schema';
-import { getBuilding } from '../model';
+import { existingLevelId, getBuilding } from '../model';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import type { CraneModel, FrameLoads } from './frameModelTypes';
-import { existingLevelId } from './checkReport';
+import { existingLevelIdParam } from '../levelParams';
 
 /** Load parameters shared by check_portal_frames and design_portal_frames. */
 export const FRAME_LOAD_SHAPE = {
@@ -62,7 +62,7 @@ export const FRAME_LOAD_SHAPE = {
     .describe(
       'Wheel base a of a crane rail wheel group in mm (> 0), used for the transverse drive force HT = φ5 ξ M / a. Default 3000.',
     ),
-  levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  levelId: existingLevelIdParam,
 };
 
 type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>>;

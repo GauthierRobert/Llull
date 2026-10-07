@@ -113,7 +113,7 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
  * Replaces all previously evaluated building entities with a fresh evaluation of `edited` (after
  * re-attaching the pipe supports whose pipe or steel it changed).
  * @pure
- * @returns the new document and, per element id, the generated entity ids
+ * @returns the new document; each element's `entityIds` lists the entities generated for it
  */
 export function regenerateBuilding(doc: CadDocument, edited: BuildingModel): CadDocument {
   const previous = doc.building;

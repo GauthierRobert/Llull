@@ -138,7 +138,7 @@ test.describe('construction workflow', () => {
     await page.getByRole('button', { name: 'Activate level Ground floor' }).click();
     await applyTool(page, 'stair', { x: '1000', y: '6500' });
     await applyTool(page, 'slabOpening', { source: 'stair', stairId: 'stair-1' });
-    await expect(status(page)).toContainText('Cut opening #1');
+    await expect(status(page)).toContainText('Cut opening index 0');
     await expect(status(page)).toContainText('in slab SL1');
   });
 

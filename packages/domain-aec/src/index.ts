@@ -23,7 +23,7 @@ import { exportElevationSheet } from './elevation';
 import { exportIfc } from './ifcBuild';
 import { addBuildingTemplate } from './templates';
 import { addSlabOpening, deleteSlabOpening } from './slabOpenings';
-import { listSteelProfiles } from './industrial/memberSupport';
+import { listSteelProfiles } from './industrial/steelProfileList';
 import { addSteelMember, updateSteelMember } from './industrial/memberSteelCommands';
 import { addFooting, addPanel } from './industrial/memberFootingPanelCommands';
 import { addEquipment, addPipeRun } from './industrial/equipment';

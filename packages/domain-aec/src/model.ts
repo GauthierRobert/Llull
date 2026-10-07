@@ -200,6 +200,15 @@ export function resolveLevel(
   return { ok: true, level, building: { ...withLevel(building, level), activeLevelId: level.id } };
 }
 
+/** Level a read-only check or export runs on: `requested`, else the active / first level; undefined when it does not exist. */
+export const existingLevelId = (
+  building: BuildingModel,
+  requested: string | undefined,
+): string | undefined => {
+  const levelId = requested ?? building.activeLevelId ?? building.levelOrder[0];
+  return levelId !== undefined && building.levels[levelId] ? levelId : undefined;
+};
+
 /** Returns a building with `element` inserted (or replaced) by id. */
 export function withElement(building: BuildingModel, element: BuildingElement): BuildingModel {
   const exists = building.elements[element.id] !== undefined;

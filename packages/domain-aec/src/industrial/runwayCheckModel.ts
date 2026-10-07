@@ -1,3 +1,4 @@
+import { GRAVITY } from '../numeric';
 import { E_STEEL } from './steelDesign';
 
 export type CraneClass = 'S2' | 'S3' | 'S4';
@@ -96,7 +97,7 @@ export function bufferForce(
   travelSpeed: number,
   stiffnessKnPerM: number,
 ): number {
-  const mass = craneSelfWeightNewton / 9.81;
+  const mass = craneSelfWeightNewton / GRAVITY;
   return PHI7 * BUFFER_SPEED_RATIO * travelSpeed * Math.sqrt(mass * stiffnessKnPerM * 1000);
 }
 

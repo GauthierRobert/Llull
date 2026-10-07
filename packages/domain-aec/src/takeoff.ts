@@ -10,7 +10,8 @@ import { noop } from '@core/commands/noop';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { priceTakeoff } from './costing';
 import { computeTakeoff } from './takeoffCompute';
-import { SCHEDULE_KINDS, buildSchedule, toCsv } from './scheduleBuild';
+import { SCHEDULE_KINDS, buildSchedule } from './scheduleBuild';
+import { toCsv } from './csv';
 
 const TAKEOFF_COLUMNS = ['Key', 'Description', 'Quantity', 'Unit'];
 const UNIT_LABEL = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' } as const;

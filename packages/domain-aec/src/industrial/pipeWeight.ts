@@ -5,7 +5,7 @@
  * @pure
  */
 
-import { GRAVITY } from './steelMemberBars';
+import { GRAVITY } from '../numeric';
 import { OUTSIDE_DIAMETER_TOLERANCE_MM, PIPE_SIZES } from './pipeSizes';
 
 const STEEL_DENSITY = 7850; // kg/m³

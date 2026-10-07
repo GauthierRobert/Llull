@@ -6,6 +6,7 @@ import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { FrameNode } from '@lib/frame2d';
 import { toMm } from '../model';
+import { GRAVITY } from '../numeric';
 import { findProfile, sectionProperties } from '../steel/profiles';
 import { E_STEEL } from './steelDesign';
 
@@ -63,7 +64,7 @@ export function framesOf(
       )
       .map((member) => mm(member.start[0]));
   const selfWeight = (profileName: string): number =>
-    ((findProfile(profileName)?.massPerMetre ?? 0) * 9.81) / 1000;
+    ((findProfile(profileName)?.massPerMetre ?? 0) * GRAVITY) / 1000;
   const area = (kNPerSquareMetre: number): number => kNPerSquareMetre * 1e-3;
   const skipped: string[] = [];
   const frames = candidates.flatMap((candidate): FrameModel[] => {

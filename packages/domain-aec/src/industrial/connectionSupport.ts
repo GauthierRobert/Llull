@@ -9,12 +9,10 @@ import type {
   MomentConnectionElement,
   SteelMemberElement,
 } from '@core/model/building';
-import type { CadDocument, Vec3 } from '@core/model/types';
+import type { CadDocument } from '@core/model/types';
 import { fromMm, nextElementId, nextMark, withElement, withoutElements } from '../model';
-import { sub3 } from '@lib/vec3';
+import { distance3 } from '@lib/vec3';
 import { findProfile } from '../steel/profiles';
-
-const distance = (a: Vec3, b: Vec3): number => Math.hypot(...sub3(a, b));
 
 type MomentJoint = Pick<MomentConnectionElement, 'kind' | 'rafterId' | 'end' | 'otherId'>;
 
@@ -48,7 +46,7 @@ export function findMomentJoints(
       const column = members.find(
         (member) =>
           member.role === 'column' &&
-          distance(member.start[2] >= member.end[2] ? member.start : member.end, point) <=
+          distance3(member.start[2] >= member.end[2] ? member.start : member.end, point) <=
             tolerance,
       );
       if (column) {
@@ -59,7 +57,8 @@ export function findMomentJoints(
         (member) =>
           member.role === 'rafter' &&
           member.id !== rafter.id &&
-          (distance(member.start, point) <= tolerance || distance(member.end, point) <= tolerance),
+          (distance3(member.start, point) <= tolerance ||
+            distance3(member.end, point) <= tolerance),
       );
       if (partner && !apexPairs.has(pairKey(rafter.id, partner.id))) {
         apexPairs.add(pairKey(rafter.id, partner.id));
@@ -132,11 +131,11 @@ export function dropStaleConnections(
       const point = rafter[element.end];
       if (element.kind === 'eaves') {
         const top = other.start[2] >= other.end[2] ? other.start : other.end;
-        return other.role !== 'column' || distance(top, point) > tolerance;
+        return other.role !== 'column' || distance3(top, point) > tolerance;
       }
       return (
         other.role !== 'rafter' ||
-        Math.min(distance(other.start, point), distance(other.end, point)) > tolerance
+        Math.min(distance3(other.start, point), distance3(other.end, point)) > tolerance
       );
     },
   );

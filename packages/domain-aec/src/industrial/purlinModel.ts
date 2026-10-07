@@ -47,8 +47,6 @@ export const DEFAULT_TRIBUTARY = 1800;
 
 export const TOLERANCE = 1;
 
-export const GRAVITY = 9.81;
-
 export type WallZone = keyof typeof CPE_WALL;
 
 /** One verification of a member. */

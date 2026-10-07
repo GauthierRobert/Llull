@@ -11,7 +11,7 @@ import { eulerForce, memberBuckling, sectionResistance } from './steelDesign';
 import type { FrameDirection } from './steelFrameDetect';
 import { sectionOf } from './steelMemberBars';
 
-export type BendingAxis = 'strong' | 'weak';
+type BendingAxis = 'strong' | 'weak';
 
 const ALIGNMENT = (5 * Math.PI) / 180;
 

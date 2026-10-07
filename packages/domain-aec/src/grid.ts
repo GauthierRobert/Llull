@@ -11,6 +11,7 @@ import { fromMm, getBuilding, nextElementId, withElement, elementAffected } from
 import { distance } from '@lib/polygon';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
+import { wallFrame } from './wallGeometry';
 
 export function gridLabels(building: BuildingModel): Set<string> {
   return new Set(
@@ -98,7 +99,7 @@ export const addGridLine = defineCommand({
  * @command add_grid_system
  * @pure
  * @affects creates (xSpacings.length + 1) numbered axes and (ySpacings.length + 1) lettered axes
- * @failure empty spacing lists or spacing <= 0 -> no-op
+ * @failure empty spacing lists, spacing <= 0 or a zero-length axis -> no-op
  */
 export const addGridSystem = defineCommand({
   name: 'add_grid_system',
@@ -143,6 +144,12 @@ export const addGridSystem = defineCommand({
     for (const spacing of ySpacings) ys.push((ys[ys.length - 1] as number) + spacing);
     const [minX, maxX] = [xs[0] as number, xs[xs.length - 1] as number];
     const [minY, maxY] = [ys[0] as number, ys[ys.length - 1] as number];
+    if (maxY - minY + 2 * overrun <= 0 || maxX - minX + 2 * overrun <= 0) {
+      return noop(
+        doc,
+        'add_grid_system failed: axes would have zero length (empty spacing list with extension 0).',
+      );
+    }
     let building = getBuilding(doc);
     const used = new Set(gridLabels(building));
     const created: string[] = [];
@@ -168,3 +175,12 @@ export const addGridSystem = defineCommand({
     };
   },
 });
+
+/** Bubble centres of a grid axis: one `radius` beyond each end, along the axis. */
+export function gridBubbleCenters(grid: GridElement, radius: number): [start: Vec2, end: Vec2] {
+  const { direction } = wallFrame(grid);
+  return [
+    [grid.start[0] - direction[0] * radius, grid.start[1] - direction[1] * radius],
+    [grid.end[0] + direction[0] * radius, grid.end[1] + direction[1] * radius],
+  ];
+}

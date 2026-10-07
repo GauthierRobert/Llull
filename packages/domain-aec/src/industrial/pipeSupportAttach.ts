@@ -91,7 +91,7 @@ export function attachmentFields(
   };
 }
 
-export interface SupportChange {
+interface SupportChange {
   readonly id: string;
   readonly mark: string;
   /** Mark of the member before / after (null = unattached). */
@@ -99,7 +99,7 @@ export interface SupportChange {
   readonly to: string | null;
 }
 
-export interface SupportReconciliation {
+interface SupportReconciliation {
   readonly building: BuildingModel;
   /** Supports now bearing on another member than before (or on one after being unattached). */
   readonly reattached: SupportChange[];

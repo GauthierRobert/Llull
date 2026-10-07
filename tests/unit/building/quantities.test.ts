@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { type TakeoffLine } from '@aec/takeoffBasics';
-import { toCsv } from '@aec/scheduleBuild';
+import { toCsv } from '@aec/csv';
 import { rateFor, type CostLine } from '@aec/costing';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {

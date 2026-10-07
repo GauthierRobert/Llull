@@ -12,7 +12,7 @@ import { clayLayerError } from './foundationSettlement';
 const DEFAULT_SOIL_BEARING = 150;
 
 /** Soil elastic modulus Es, MPa. */
-export const DEFAULT_SOIL_MODULUS = 20;
+const DEFAULT_SOIL_MODULUS = 20;
 
 export const SOIL_SHAPE = {
   soilBearing: z

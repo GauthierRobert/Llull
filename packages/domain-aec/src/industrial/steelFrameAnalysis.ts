@@ -20,7 +20,7 @@ import type { BeamResult, ColumnNode } from './steelFraming';
 import type { SteelBar } from './steelMemberBars';
 import { skippedRow, type MemberRow } from './steelMemberRows';
 
-export interface FrameParams {
+interface FrameParams {
   readonly notionalFactor: number;
   readonly deflectionRatio: number;
   /** Storey drift limit as h / n. */
@@ -44,7 +44,7 @@ export interface FrameReport {
   readonly jointMoments: Record<string, number>;
 }
 
-export interface FrameAnalysis {
+interface FrameAnalysis {
   readonly rows: Map<string, MemberRow>;
   readonly reports: FrameReport[];
   readonly coverage: FrameCoverage[];

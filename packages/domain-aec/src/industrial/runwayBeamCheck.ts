@@ -33,7 +33,7 @@ import {
   wheelMoment,
   wheelShear,
 } from './runwayCheckModel';
-import { round } from '../numeric';
+import { GRAVITY, round } from '../numeric';
 
 export function checkBeam(
   beam: SteelMemberElement,
@@ -84,7 +84,7 @@ export function checkBeam(
   });
 
   const rail = RAILS[railSize];
-  const distributed = (((profile.massPerMetre + rail.mass) * 9.81) / 1000) * GAMMA_ULS;
+  const distributed = (((profile.massPerMetre + rail.mass) * GRAVITY) / 1000) * GAMMA_ULS;
   const momentY = GAMMA_ULS * wheelMoment(wheel, wheelBase, span) + (distributed * span ** 2) / 8;
   const shear = GAMMA_ULS * wheelShear(wheel, wheelBase, span) + (distributed * span) / 2;
   const momentZ = GAMMA_ULS * wheelMoment(lateralWheel, wheelBase, span);
@@ -128,14 +128,14 @@ export function checkBeam(
     bufferPerRail / resistance.axial + (bufferPerRail * eccentricity) / resistance.moment;
 
   // Group 8 (§2.10): Qtest = max(φ6 · 1.1 Qh, 1.25 Qh), φ6 = 0.5 (1 + φ2), γ = 1.1.
-  const hoistLoad = capacity * 9810;
+  const hoistLoad = actions.hoist;
   const phi6 = 0.5 * (1 + actions.phi2);
   const testFactor = Math.max(phi6 * DYNAMIC_TEST_FACTOR, STATIC_TEST_FACTOR);
-  const approach = Math.min(Math.max(0, (model.minHookApproach ?? 1) * 1000), craneSpan);
   const testRail =
     0.4 * actions.selfWeight +
-    (0.2 * actions.selfWeight + testFactor * hoistLoad) * ((craneSpan - approach) / craneSpan);
-  const testDistributed = (((profile.massPerMetre + rail.mass) * 9.81) / 1000) * GAMMA_TEST;
+    (0.2 * actions.selfWeight + testFactor * hoistLoad) *
+      ((craneSpan - actions.approach) / craneSpan);
+  const testDistributed = (((profile.massPerMetre + rail.mass) * GRAVITY) / 1000) * GAMMA_TEST;
   const testMoment =
     GAMMA_TEST * wheelMoment(testRail / 2, wheelBase, span) + (testDistributed * span ** 2) / 8;
 

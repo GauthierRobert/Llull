@@ -11,6 +11,7 @@ import type {
 } from '@core/model/building';
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
 import { toMm } from '../model';
+import { round } from '../numeric';
 import { sweepFrame, type SweepFrame } from '../mesh';
 import { add3, distanceSq3, dot3, scale3, sub3 } from '@lib/vec3';
 import type { SteelProfile } from '../steel/profiles';
@@ -60,18 +61,13 @@ const CODE_BY_SHAPE: Readonly<Record<SteelProfile['shape'], string>> = {
   L: 'L',
 };
 
-export function round2(value: number): number {
-  const rounded = Math.round(value * 100) / 100;
-  return rounded === 0 ? 0 : rounded;
-}
-
 /** Rafter end cut: the end plate is vertical, so the cut equals the roof pitch. */
 function pitchCut(member: SteelMemberElement): number {
   if (member.role !== 'rafter') return 0;
   const [dx, dy, dz] = sub3(member.end, member.start);
   const horizontal = Math.hypot(dx, dy);
   if (horizontal <= 0.2 * Math.hypot(dx, dy, dz)) return 0;
-  return round2((Math.atan2(Math.abs(dz), horizontal) * 180) / Math.PI);
+  return round((Math.atan2(Math.abs(dz), horizontal) * 180) / Math.PI);
 }
 
 /** Length (document units) removed from a member by the end plates welded to its ends. */
@@ -144,20 +140,20 @@ function memberHoles(
       const offset = sub3(centre, start);
       const throughFlange =
         Math.abs(dot3(solid.along, frame.v)) >= Math.abs(dot3(solid.along, frame.u));
-      const diameter = round2(mm(connection.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM);
-      const x = round2(mm(dot3(offset, frame.d)));
+      const diameter = round(mm(connection.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM);
+      const x = round(mm(dot3(offset, frame.d)));
       holes.push(
         throughFlange
           ? {
               face: dot3(solid.along, frame.v) > 0 ? 'o' : 'u',
               x,
-              y: round2(mm(dot3(offset, frame.u)) + profile.b / 2),
+              y: round(mm(dot3(offset, frame.u)) + profile.b / 2),
               diameter,
             }
           : {
               face: 'v',
               x,
-              y: round2(mm(dot3(offset, frame.v)) + profile.h / 2),
+              y: round(mm(dot3(offset, frame.v)) + profile.h / 2),
               diameter,
             },
       );
@@ -183,13 +179,13 @@ export function memberPiece(
     grade: element.material,
     profileName: profile.name,
     code: CODE_BY_SHAPE[profile.shape],
-    length: round2(toMm(doc, frame.length - cutback)),
+    length: round(toMm(doc, frame.length - cutback)),
     height: profile.h,
     flangeWidth: profile.b,
     flangeThickness: profile.tf,
     webThickness: profile.tw,
     massPerMetre: profile.massPerMetre,
-    paintPerMetre: round2(profile.perimeter / 1000),
+    paintPerMetre: round(profile.perimeter / 1000),
     cuts: [cut, cut, 0, 0],
     holes: memberHoles(doc, element, profile, connections, members, levels),
     contour: [],

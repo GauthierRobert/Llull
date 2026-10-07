@@ -5,13 +5,14 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { getBuilding } from '../model';
+import { existingLevelId, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_TRAVEL_SPEED } from './runwayCheckModel';
 import { round } from '../numeric';
-import { checkTable, existingLevelId, failureSummary } from './checkReport';
+import { checkTable, failureSummary } from './checkReport';
 import { analyseBracing, locateMembers } from './bracingAnalysis';
+import { existingLevelIdParam } from '../levelParams';
 
 /**
  * @command check_bracing
@@ -87,7 +88,7 @@ export const checkBracing = defineCommand({
       .number()
       .optional()
       .describe('Buffer spring constant SB in kN/m (> 0). Default 1000.'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: existingLevelIdParam,
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, deadLoad = 0.5, snowLoad = 0.8 } = params;

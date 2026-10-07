@@ -7,7 +7,7 @@
 
 import { OUTSIDE_DIAMETER_TOLERANCE_MM, PIPE_SIZES } from './pipeSizes';
 
-export interface PipeSpanLimit {
+interface PipeSpanLimit {
   /** Nominal size the span was taken for. */
   readonly dn: number;
   /** Maximum support spacing, m. */

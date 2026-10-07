@@ -19,6 +19,7 @@ import {
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from './evaluateElements';
 import { curvedWallArc, curvedWallBand, curvedWallLength } from './curvedWallGeometry';
+import { levelIdParam } from './levelParams';
 
 /**
  * @command add_curved_wall
@@ -41,7 +42,7 @@ export const addCurvedWall = defineCommand({
     height: z.number().optional().describe('Wall height. Default: the level height.'),
     baseOffset: z.number().optional().describe('Base above the level. Default 0.'),
     material: z.string().optional().describe('Default concrete.'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: levelIdParam,
   }),
   run: (doc, params): CommandResult => {
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);

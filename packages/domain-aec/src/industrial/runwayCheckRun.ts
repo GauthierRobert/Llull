@@ -5,7 +5,7 @@
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { getBuilding, toMm } from '../model';
+import { existingLevelId, getBuilding, toMm } from '../model';
 import { noop } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { craneCapacityOf, type CraneModel } from './frameModelTypes';
@@ -17,7 +17,8 @@ import {
 } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
 import { round } from '../numeric';
-import { checkTable, existingLevelId, failureSummary } from './checkReport';
+import { checkTable, failureSummary } from './checkReport';
+import { existingLevelIdParam } from '../levelParams';
 
 /**
  * @command check_crane_runways
@@ -117,7 +118,7 @@ export const runwayCheck = defineCommand({
       .describe(
         'Runway girder type for local web fatigue (EN 1993-1-9 Tab. 8.10): rolled section = detail category 160; welded-full = welded plate girder with full-penetration web-to-flange welds = 71; welded-fillet = fillet or partial-penetration welds = 36. Default rolled.',
       ),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: existingLevelIdParam,
   }),
   run: (doc, params): CommandResult => {
     const {

@@ -10,10 +10,11 @@
 import { pointInPolygon, polygonArea, projectOntoSegment, type Point2 } from '@lib/polygon';
 import { elementsOf } from '../model';
 import { round } from '../numeric';
-import { GRAVITY, type ModelUnits } from './steelMemberBars';
+import { GRAVITY } from '../numeric';
+import type { ModelUnits } from './steelMemberBars';
 import { depositArea, type BeamLoads } from './steelBeamLoads';
 
-export interface AreaLoadParams {
+interface AreaLoadParams {
   /** kN/m² on every floor slab (permanent). */
   readonly floorDeadLoad: number;
   /** kN/m² on the floor area not occupied by equipment (imposed). */
@@ -42,7 +43,7 @@ export interface EquipmentLoadReport {
   readonly support: 'floor' | 'beams' | 'mixed' | 'grade';
 }
 
-export interface AreaLoadResult {
+interface AreaLoadResult {
   readonly floors: FloorLoadReport[];
   readonly equipment: EquipmentLoadReport[];
   readonly warnings: string[];

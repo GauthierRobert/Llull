@@ -5,22 +5,19 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BuildingModel, SlabElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, vec2, z } from '@core/commands/schema';
 import {
   elementAffected,
   fromMm,
   getBuilding,
-  isVec2,
   nextElementId,
   nextMark,
   resolveLevel,
   toMetres,
-  toVec2,
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
-import { sub3 } from '@lib/vec3';
 import { findProfile, type SteelProfile } from '../steel/profiles';
 import { appendMembers, type MemberSpec } from './memberSupport';
 import {
@@ -37,16 +34,15 @@ import { hallMemberSpecs } from './portalMembers';
 import { claddingPanels, facing } from './portalCladding';
 import { appendBasePlates, columnsWithoutPlates } from './plateSupport';
 import { appendConnections, findMomentJoints } from './connectionSupport';
+import { memberMass } from '../takeoffCompute';
 import { addGrid, gridLabels, nextFreeLabel } from '../grid';
+import { levelIdParam } from '../levelParams';
 
 /** Steel mass of members created by a generator, kg. */
 function steelMass(doc: CadDocument, building: BuildingModel, ids: ReadonlyArray<string>): number {
   return ids.reduce((sum, id) => {
     const element = building.elements[id];
-    if (element?.category !== 'member') return sum;
-    const profile = findProfile(element.profile);
-    const length = Math.hypot(...sub3(element.end, element.start));
-    return sum + (profile ? toMetres(doc, length) * profile.massPerMetre : 0);
+    return element?.category === 'member' ? sum + memberMass(doc, element) : sum;
   }, 0);
 }
 
@@ -63,19 +59,16 @@ export const addCraneRunway = defineCommand({
     'supports every supportSpacing, each support carried by a bracket cantilevered from the nearest steel ' +
     'column (within 2 m). Capacity (t) is noted on the members for schedules.',
   params: z.object({
-    start: z.array(z.number()).describe('Runway start [x, y].'),
-    end: z.array(z.number()).describe('Runway end [x, y].'),
+    start: vec2('Runway start [x, y].'),
+    end: vec2('Runway end [x, y].'),
     railHeight: z.number().describe('Top of the runway beam above the level (> 0).'),
     profile: z.string().optional().describe('Runway beam section. Default HEB300.'),
     capacity: z.number().optional().describe('Crane capacity in tonnes (for notes). Default 10.'),
     supportSpacing: z.number().optional().describe('Distance between supports. Default 6000 mm.'),
     bracketProfile: z.string().optional().describe('Bracket section. Default HEB200.'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: levelIdParam,
   }),
   run: (doc, params): CommandResult => {
-    if (!isVec2(params.start) || !isVec2(params.end)) {
-      return noop(doc, 'add_crane_runway failed: start and end must be [x, y].');
-    }
     const length = Math.hypot(params.end[0] - params.start[0], params.end[1] - params.start[1]);
     const spacing = params.supportSpacing ?? fromMm(doc, 6000);
     if (!(length > 0) || !(params.railHeight > 0) || !(spacing > 0)) {
@@ -105,8 +98,8 @@ export const addCraneRunway = defineCommand({
     for (let distance = spacing; distance < length; distance += spacing) supports.push(distance);
     const capacity = params.capacity ?? 10;
     const specs = runwayMembers(doc, resolution.building, resolution.level.id, {
-      start: toVec2(params.start),
-      end: toVec2(params.end),
+      start: params.start,
+      end: params.end,
       railHeight: params.railHeight,
       profile,
       supports,

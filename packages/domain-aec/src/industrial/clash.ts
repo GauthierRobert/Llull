@@ -7,7 +7,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BimCategory, BuildingElement, BuildingModel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fromMm, getBuilding, toMetres } from '../model';
+import { fromMm, getBuilding, toMm } from '../model';
 import { noop } from '@core/commands/noop';
 import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from './evaluate';
@@ -213,7 +213,7 @@ export const checkClashes = defineCommand({
     );
     const describe = (clash: Clash): string => {
       const [a, b] = [building.elements[clash.a], building.elements[clash.b]];
-      return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${Math.round(toMetres(doc, clash.depth) * 1000)} mm)`;
+      return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${Math.round(toMm(doc, clash.depth))} mm)`;
     };
     const hard = clashes.filter((clash) => clash.kind === 'hard').length;
     return {

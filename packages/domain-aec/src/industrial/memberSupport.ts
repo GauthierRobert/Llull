@@ -10,13 +10,11 @@ import type {
   MemberRole,
   SteelMemberElement,
 } from '@core/model/building';
-import type { CommandResult } from '@core/commands/types';
-import { defineCommand, tolerant, z } from '@core/commands/schema';
+import { z } from '@core/commands/schema';
 import { elementsOf, getBuilding, highestIndex, nextElementId, toMm, withElement } from '../model';
-import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
-import { sub3 } from '@lib/vec3';
-import { findProfile, STEEL_PROFILES, type SteelProfile } from '../steel/profiles';
+import { distance3 } from '@lib/vec3';
+import { findProfile, type SteelProfile } from '../steel/profiles';
 
 const ROLE_MARK: Readonly<Record<MemberRole, string>> = {
   column: 'SC',
@@ -47,9 +45,8 @@ export function nextMemberMark(building: BuildingModel, role: MemberRole): strin
   return `${prefix}${highestIndex(marks, prefix) + 1}`;
 }
 
-/** Accepts [x, y, z] or [x, y] (z = 0); null when malformed. */
 /** A steel member of a level with its catalogue profile (if known) and endpoints in mm. */
-export interface MemberInMm {
+interface MemberInMm {
   readonly member: SteelMemberElement;
   readonly profile: SteelProfile | undefined;
   readonly start: readonly [number, number, number];
@@ -73,6 +70,7 @@ export function levelMembersInMm(doc: CadDocument, levelId: string): MemberInMm[
     }));
 }
 
+/** Accepts [x, y, z] or [x, y] (z = 0); null when malformed. */
 export function toVec3(value: unknown): Vec3 | null {
   if (!Array.isArray(value) || (value.length !== 2 && value.length !== 3)) return null;
   if (!value.every((n) => isFiniteNumber(n))) return null;
@@ -131,7 +129,7 @@ export function appendMembers(
     const profile = findProfile(spec.profile);
     if (!profile)
       return { reason: `unknown steel profile '${spec.profile}' (see list_steel_profiles)` };
-    const length = Math.hypot(...sub3(spec.end, spec.start));
+    const length = distance3(spec.end, spec.start);
     if (!(length > 0)) return { reason: 'start and end must differ' };
     const member: SteelMemberElement = {
       id: nextElementId(next, 'member'),
@@ -155,47 +153,3 @@ export function appendMembers(
   }
   return { building: next, ids };
 }
-
-/**
- * @command list_steel_profiles
- * @pure read-only
- * @affects none; data = { profiles: SteelProfile[] }
- */
-export const listSteelProfiles = defineCommand({
-  name: 'list_steel_profiles',
-  annotations: { readOnly: true, idempotent: true },
-  description:
-    'Read-only steel section catalogue: IPE, HEA, HEB, UPN, cold-formed C purlins, SHS, RHS, CHS and ' +
-    'equal angles L, with depth h, width b, web / flange thickness (mm), mass (kg/m), area (mm²) and paint ' +
-    'perimeter (mm). Optionally filter by family.',
-  params: z.object({
-    // tolerant: lower-case / padded family names are normalised in run.
-    family: tolerant(
-      z
-        .enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L'])
-        .optional()
-        .describe('Only this family.'),
-    ),
-  }),
-  run: (doc, { family }): CommandResult => {
-    const raw: unknown = family;
-    if (raw !== undefined && typeof raw !== 'string') {
-      return noop(doc, 'list_steel_profiles: family must be a string such as "HEA".');
-    }
-    const wanted = raw?.trim().toUpperCase();
-    const profiles = STEEL_PROFILES.filter(
-      (profile) => wanted === undefined || profile.family === wanted,
-    );
-    return {
-      document: doc,
-      summary: `${profiles.length} steel profile(s): ${profiles.map((profile) => profile.name).join(', ')}.`,
-      affected: [],
-      data: { profiles },
-    };
-  },
-});
-
-export const levelIdSchema = z
-  .string()
-  .optional()
-  .describe('Level id. Default: the active level (a "Level 0" is created if none).');

@@ -18,7 +18,7 @@ import { analyseFraming, type BeamResult } from './steelFraming';
 import { collectSteelBars, modelUnits } from './steelMemberBars';
 import { skippedRow, type MemberRow } from './steelMemberRows';
 
-export interface SteelCheckParams {
+interface SteelCheckParams {
   /** kN/m² permanent on floor slabs. */
   readonly floorDeadLoad: number;
   /** kN/m² imposed on floor slabs outside equipment footprints. */
@@ -35,7 +35,7 @@ export interface SteelCheckParams {
   readonly swayRatio: number;
 }
 
-export interface SteelStructureAnalysis {
+interface SteelStructureAnalysis {
   /** One row per steel member, in model order. */
   readonly rows: MemberRow[];
   readonly floors: FloorLoadReport[];

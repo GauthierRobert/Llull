@@ -291,6 +291,27 @@ describe('rooms and element edits', () => {
       execute(doc, 'copy_level_elements', { sourceLevelId: 'level-1', targetLevelIds: ['level-2'] })
         .summary,
     ).toMatch(/nothing to copy/);
+    const onlySource = execute(doc, 'copy_level_elements', {
+      sourceLevelId: 'level-1',
+      targetLevelIds: ['level-1', 'level-1'],
+    });
+    expect(onlySource.affected).toEqual([]);
+    expect(onlySource.summary).toMatch(/every target level is the source level level-1/);
+  });
+
+  it('copy_level_elements copies once to a level listed twice', () => {
+    let doc = run(createEmptyDocument(), 'add_level', { name: 'L0' });
+    doc = run(doc, 'draw_walls', { points: SQUARE, closed: true });
+    doc = run(doc, 'add_level', { name: 'L1' });
+    const result = execute(doc, 'copy_level_elements', {
+      sourceLevelId: 'level-1',
+      targetLevelIds: ['level-2', 'level-2'],
+    });
+    const walls = Object.values(result.document.building!.elements).filter(
+      (element) => element.category === 'wall',
+    );
+    expect(walls).toHaveLength(8);
+    expect(result.summary).toMatch(/to level-2:/);
   });
 });
 

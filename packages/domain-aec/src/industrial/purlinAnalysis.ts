@@ -14,7 +14,6 @@ import {
   CPI_PRESSURE,
   CPI_SUCTION,
   DEFAULT_TRIBUTARY,
-  GRAVITY,
   type Located,
   PURLIN_DEFLECTION_RATIO,
   type PurlinRow,
@@ -25,7 +24,8 @@ import {
   type ZoneSummary,
 } from './purlinModel';
 import { beamVerdicts, freeFlangeReduction, governing } from './purlinSection';
-import { round } from '../numeric';
+import { GRAVITY, round } from '../numeric';
+import { distance3 } from '@lib/vec3';
 
 interface PurlinLoads {
   readonly windPressure: number;
@@ -41,7 +41,7 @@ export function locatePurlinMembers(
   const members: Located[] = [];
   const skipped: string[] = [];
   for (const { member, profile, start, end } of levelMembersInMm(doc, levelId)) {
-    const length = Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
+    const length = distance3(end, start);
     if (!profile || length < TOLERANCE) {
       if (member.role === 'purlin' || member.role === 'rail') skipped.push(member.mark);
       continue;
@@ -108,9 +108,7 @@ export function analysePurlins(
     rafterHighEnds.every(
       (point, index) =>
         !rafterHighEnds.some(
-          (other, otherIndex) =>
-            otherIndex !== index &&
-            Math.hypot(point[0] - other[0], point[1] - other[1], point[2] - other[2]) <= 10,
+          (other, otherIndex) => otherIndex !== index && distance3(point, other) <= 10,
         ),
     );
   const width = x1 - x0;
