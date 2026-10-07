@@ -3542,7 +3542,7 @@
           "type": "string"
         },
         "roofDeadLoad": {
-          "description": "Roof build-up dead load per m² of roof carried by the purlins, kN/m², >= 0. Default 0.3.",
+          "description": "Roof build-up dead load carried by the purlins (sheeting, insulation, services) per m² of roof, kN/m², >= 0. Purlin self-weight is added automatically. Default 0.3.",
           "type": "number"
         },
         "snowLoad": {
@@ -3554,7 +3554,7 @@
           "type": "number"
         },
         "windPressure": {
-          "description": "Peak velocity pressure qp, kN/m² (EN 1991-1-4), >= 0. Default 0.6.",
+          "description": "Peak velocity pressure qp, kN/m² (EN 1991-1-4, e.g. 0.6-1.0), >= 0. Default 0.6. 0 = no wind.",
           "type": "number"
         }
       },

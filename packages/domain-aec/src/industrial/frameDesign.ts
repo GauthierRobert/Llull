@@ -26,6 +26,7 @@ import { checkFrames } from './frameCheckFrames';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
+import { finalUtilisationText, noChangeResult, utilisationStats } from './designReport';
 import { sweepFrame } from '../mesh';
 
 /**
@@ -145,17 +146,7 @@ export const designPortalFrames = defineCommand({
     if (plates.unresolved > 0) limited = true;
     if (changed.size === 0) {
       const final = checkFrames(doc, levelId, loads);
-      const worst = Math.max(0, ...final.rows.map((row) => row.utilisation));
-      return {
-        document: doc,
-        summary: `Designed ${final.frames} frame(s): no change needed (max utilisation ${worst.toFixed(2)}${limited ? '; largest available size reached for some elements' : ''}).`,
-        affected: [],
-        data: {
-          changes: [],
-          maxUtilisation: worst,
-          failures: final.rows.filter((row) => row.utilisation > 1).length,
-        },
-      };
+      return noChangeResult(doc, `${final.frames} frame(s)`, final.rows, limited);
     }
     const document = regenerateBuilding(doc, building);
     const final = checkFrames(document, levelId, loads);
@@ -166,19 +157,17 @@ export const designPortalFrames = defineCommand({
         element.role === 'column' &&
         !analysed.has(element.id),
     );
-    const worst = Math.max(0, ...final.rows.map((row) => row.utilisation));
-    const failures = final.rows.filter((row) => row.utilisation > 1).length;
+    const stats = utilisationStats(final.rows);
     return {
       document,
       summary:
         `Designed ${final.frames} frame(s) for ${final.combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
         `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ` +
-        `Max utilisation now ${worst.toFixed(2)}${failures > 0 ? `, ${failures} element(s) still failing` : ''}` +
-        `${limited ? ' (largest available size reached for some elements)' : ''}. ` +
+        `${finalUtilisationText(stats, 'element(s)', limited)} ` +
         `Frames only (verify bracing, foundations and runways with their checks)` +
         `${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
       affected: elementAffected(document, [...changed]),
-      data: { changes, maxUtilisation: worst, failures },
+      data: { changes, ...stats },
     };
   },
 });
