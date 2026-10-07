@@ -31,4 +31,16 @@ describe('occt kernel (live WASM)', () => {
       expect(kernel.tessellate(box('c', [0, 0, 0]))?.indices).toHaveLength(36);
     }
   }, 120_000);
+
+  it('fillets the same mesh repeatedly with identical results (no use-after-release)', async () => {
+    const kernel = await createNodeOcctKernel();
+    const cube = kernel.tessellate(box('c', [0, 0, 0]));
+    expect(cube).not.toBeNull();
+    const first = kernel.filletEdges(cube!, [0], 0.2);
+    expect(first).not.toBeNull();
+    expect(first!.indices.length).toBeGreaterThan(cube!.indices.length);
+    for (let i = 0; i < 10; i++) {
+      expect(kernel.filletEdges(cube!, [0], 0.2)?.positions).toEqual(first!.positions);
+    }
+  }, 120_000);
 });
