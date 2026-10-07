@@ -9,6 +9,7 @@ import { is2D } from '@core/model/types';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {
   entityToSegments,
+  isAngleOnArc,
   mid,
   nearestOnArc,
   nearestOnSegment,
@@ -83,7 +84,13 @@ export function collectSnapCandidates(
     endAngle: number,
     full: boolean,
   ): void => {
-    if (doTangents) candidates.push(...snapTangentToCircle(from, cx, cy, r));
+    if (doTangents) {
+      for (const snap of snapTangentToCircle(from, cx, cy, r)) {
+        if (full || isAngleOnArc(Math.atan2(snap.y - cy, snap.x - cx), startAngle, endAngle)) {
+          candidates.push(snap);
+        }
+      }
+    }
     if (doNearest && cursor !== null) {
       add('nearest', ...nearestOnArc(cursor[0], cursor[1], cx, cy, r, startAngle, endAngle, full));
     }
