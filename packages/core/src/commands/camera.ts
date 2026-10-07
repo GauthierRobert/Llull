@@ -14,8 +14,8 @@ import { defineCommand, vec3, z } from './schema';
 import { computeSceneSnapshot } from './scene';
 import { noop } from './noop';
 
-/** Half of the viewport PerspectiveCamera's 60° field of view. */
-const HALF_FOV_RAD = (60 / 2) * (Math.PI / 180);
+/** Half of the 3D viewport PerspectiveCamera's vertical field of view (`fov={45}` in Viewport3D). */
+const HALF_FOV_RAD = (45 / 2) * (Math.PI / 180);
 
 /** Direction presets (eye position → view); top/bottom stop short of the poles to avoid gimbal lock. */
 const DIRECTION_PRESETS: Record<string, { azimuth: number; polar: number }> = {
