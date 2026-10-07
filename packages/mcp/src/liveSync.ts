@@ -39,11 +39,71 @@ type LiveApplyResult =
 
 const hashByDocument = new WeakMap<CadDocument, string>();
 
-/** Hash of everything clients must agree on (selection excluded); memoized per (immutable) document. */
+/** Two 32-bit lanes of `hashText`, so documents fold parts without building strings. */
+interface PartHash {
+  readonly high: number;
+  readonly low: number;
+}
+
+/** Per-object hashes: commands share unchanged entities / steps between documents (L3 purity). */
+const hashByPart = new WeakMap<object, PartHash>();
+
+function partHash(part: object, key: string): PartHash {
+  const known = hashByPart.get(part);
+  if (known !== undefined) return known;
+  const hex = hashText(JSON.stringify([key, part]));
+  const hash = {
+    high: Number.parseInt(hex.slice(0, 8), 16),
+    low: Number.parseInt(hex.slice(8), 16),
+  };
+  hashByPart.set(part, hash);
+  return hash;
+}
+
+/** Order-sensitive running 64-bit fold of part hashes. */
+class PartFold {
+  high: number;
+  low: number;
+
+  constructor(seedHex: string) {
+    this.high = Number.parseInt(seedHex.slice(0, 8), 16);
+    this.low = Number.parseInt(seedHex.slice(8), 16);
+  }
+
+  add(part: PartHash): void {
+    this.high = Math.imul(this.high ^ part.high, 0x01000193);
+    this.low = Math.imul(this.low ^ part.low, 0x5bd1e995) ^ (this.low >>> 15);
+  }
+
+  hex(): string {
+    return (
+      (this.high >>> 0).toString(16).padStart(8, '0') +
+      (this.low >>> 0).toString(16).padStart(8, '0')
+    );
+  }
+}
+
+/**
+ * Hash of everything clients must agree on (selection excluded); memoized per (immutable) document.
+ * Entities and feature steps are hashed once per object and combined, so a command costs the size
+ * of what it changed plus a pass over the id lists, not a serialization of the whole document.
+ */
 export function documentHash(doc: CadDocument): string {
   const known = hashByDocument.get(doc);
   if (known !== undefined) return known;
-  const hash = hashText(serializeDocument({ ...doc, selection: [] }, { includeDerived: true }));
+  const rest = hashText(
+    serializeDocument(
+      { ...doc, selection: [], entities: {}, featureHistory: [] },
+      { includeDerived: true },
+    ),
+  );
+  const fold = new PartFold(rest);
+  for (const id in doc.entities) {
+    const entity = doc.entities[id];
+    if (entity !== undefined) fold.add(partHash(entity, id));
+  }
+  for (const step of doc.featureHistory) fold.add(partHash(step, 'step'));
+  const hash = fold.hex();
   hashByDocument.set(doc, hash);
   return hash;
 }
