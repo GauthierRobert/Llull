@@ -9,28 +9,60 @@ import { Environment, Lightformer, ContactShadows, SoftShadows } from '@react-th
 import type * as THREE from 'three';
 import { useStore } from '@ui/store';
 import { mergedEntityBounds } from './fitBounds';
+import { computeContactShadowPlane } from './contactShadowPlane';
 import { computeKeyLightRig } from './keyLightRig';
 import type { RenderQualitySettings } from './useRenderQuality';
 
 /** drei ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
 export const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
 
-/** Shadow-casting key light that follows the scene's extent (see keyLightRig.ts). */
-function SceneKeyLight({ shadowMapSize }: { shadowMapSize: number }): React.ReactElement {
+/** World AABB of the whole scene (null when empty); recomputed only when the content changes. */
+function useSceneBounds(): ReturnType<typeof mergedEntityBounds> {
   const entities = useStore((s) => s.document.entities);
   const components = useStore((s) => s.document.components);
   const order = useStore((s) => s.document.order);
+  return useMemo(
+    () => mergedEntityBounds(useStore.getState().document, order),
+    // entities/components are the content identity; order alone misses in-place edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entities, components, order],
+  );
+}
+
+/** Ground contact-shadow patch sized to the scene footprint (see contactShadowPlane.ts). */
+function SceneContactShadows({ opacity }: { opacity: number }): React.ReactElement {
+  const bounds = useSceneBounds();
+  const renderOrigin = useStore((s) => s.renderOrigin);
+  const plane = useMemo(
+    () => computeContactShadowPlane(bounds, renderOrigin),
+    [bounds, renderOrigin],
+  );
+  // frames={1} bakes once: remount (re-bake) when the footprint changes.
+  const bakeKey = `${plane.position.join(',')}|${plane.scale}|${plane.far}`;
+  return (
+    <ContactShadows
+      key={bakeKey}
+      position={plane.position}
+      rotation={GROUND_PLANE_ROTATION}
+      opacity={opacity}
+      scale={plane.scale}
+      blur={2.5}
+      far={plane.far}
+      frames={1}
+      color="#1a1e2a"
+    />
+  );
+}
+
+/** Shadow-casting key light that follows the scene's extent (see keyLightRig.ts). */
+function SceneKeyLight({ shadowMapSize }: { shadowMapSize: number }): React.ReactElement {
+  const bounds = useSceneBounds();
   const renderOrigin = useStore((s) => s.renderOrigin);
   const invalidate = useThree((s) => s.invalidate);
   const lightRef = useRef<THREE.DirectionalLight>(null);
   const targetRef = useRef<THREE.Object3D>(null);
 
-  const rig = useMemo(() => {
-    const bounds = mergedEntityBounds(useStore.getState().document, order);
-    return computeKeyLightRig(bounds, renderOrigin);
-    // entities/components are the content identity; order alone misses in-place edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entities, components, order, renderOrigin]);
+  const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin), [bounds, renderOrigin]);
 
   useLayoutEffect(() => {
     const light = lightRef.current;
@@ -109,18 +141,7 @@ export function SceneLighting({
 
       {/* ---- Contact shadows: rendered once (frames=1) — safe under demand frameloop.
            Disabled in Low tier to avoid the extra render pass. ---- */}
-      {quality.contactShadowsEnabled && (
-        <ContactShadows
-          position={[0, 0, -0.001]}
-          rotation={GROUND_PLANE_ROTATION}
-          opacity={contactShadowOpacity}
-          scale={40}
-          blur={2.5}
-          far={20}
-          frames={1}
-          color="#1a1e2a"
-        />
-      )}
+      {quality.contactShadowsEnabled && <SceneContactShadows opacity={contactShadowOpacity} />}
     </>
   );
 }
