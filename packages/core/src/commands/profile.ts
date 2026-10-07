@@ -114,6 +114,9 @@ export const extrudeSketch = defineCommand({
       );
     }
 
+    const flatProfile = rejectZeroAreaProfile(doc, 'extrude_sketch', profile);
+    if (flatProfile) return flatProfile;
+
     const extId = nextId('ext');
     const extrusion = newEntity(
       'extrusion',

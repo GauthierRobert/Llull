@@ -40,6 +40,13 @@ function runBoolean(
       `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`,
     );
   }
+  const instanced = ids.find((_, i) => (operands[i] as Entity).kind === 'instance');
+  if (instanced !== undefined) {
+    return noop(
+      doc,
+      `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`,
+    );
+  }
   const [entA, entB] = operands as [Entity, Entity];
 
   const k = (ctx ?? currentContext()).kernel;
@@ -50,6 +57,13 @@ function runBoolean(
     return noop(
       doc,
       `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`,
+    );
+  }
+
+  if (meshData.indices.length === 0) {
+    return noop(
+      doc,
+      `${opName}: the result of '${a}' and '${b}' is empty (no volume remains, e.g. disjoint solids for an intersection); operands kept.`,
     );
   }
 
