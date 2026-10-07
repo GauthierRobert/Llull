@@ -10,6 +10,7 @@ import { fitScale, type PlanSheet } from '@aec/sheet';
 import { type IfcExport } from '@aec/ifcBuild';
 import { ifcGuid, ifcReal, ifcString } from '@aec/ifcStep';
 import { fileSlug } from '@aec/model';
+import { isIllegalXmlCharacter } from '@aec/xmlText';
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -351,6 +352,38 @@ describe('DXF layer names', () => {
     expect(layerOfEntity('POLYLINE')).toEqual(['A_B_3']);
     expect(writer.layers.get('S-GRID')).toBe(1);
     expect(new DxfWriter().layers.size).toBe(0);
+  });
+});
+
+describe('SVG sheets stay well-formed XML for hostile names', () => {
+  it('escapes markup and drops control characters in plan and elevation sheets', () => {
+    const nasty = `<A&B> "q" 'x' \u0001\u000b é`;
+    let doc = run(createEmptyDocument(), 'set_project_info', { name: nasty, author: nasty });
+    doc = run(doc, 'add_level', { name: nasty });
+    doc = run(doc, 'draw_walls', {
+      points: [
+        [0, 0],
+        [6000, 0],
+        [6000, 5000],
+        [0, 5000],
+      ],
+      closed: true,
+    });
+    doc = run(doc, 'add_room', { name: nasty, wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] });
+    for (const name of ['export_plan_sheet', 'export_elevation_sheet']) {
+      const svg = (execute(doc, name, {}).data as { svg: string }).svg;
+      expect([...svg].filter(isIllegalXmlCharacter), name).toEqual([]);
+      expect(svg, name).not.toMatch(/&(?!amp;|lt;|gt;|quot;|#)/);
+      expect(svg, name).toContain('&lt;A&amp;B&gt;');
+    }
+  });
+});
+
+describe('xmlText', () => {
+  it('keeps tab, newline and astral characters; drops C0 controls and U+FFFE/U+FFFF', async () => {
+    const { escapeXml: safe } = await import('@aec/xmlText');
+    expect(safe('a\tb\nc\r🏠é')).toBe('a\tb\nc\r🏠é');
+    expect(safe('a\u0000b\u001fc￾d￿e')).toBe('abcde');
   });
 });
 

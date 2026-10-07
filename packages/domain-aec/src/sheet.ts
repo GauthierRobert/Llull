@@ -11,7 +11,7 @@ import { fileSlug, getBuilding, toMm } from './model';
 import { noop } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
-import { escapeXml } from '@lib/escapeXml';
+import { escapeXml } from './xmlText';
 import { round } from './numeric';
 
 export const PAPER_SIZES = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;

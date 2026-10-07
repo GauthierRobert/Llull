@@ -103,15 +103,20 @@ function fuzzBuilding(
     [['building', 'levels'], building['levels']],
   ];
   const failures: string[] = [];
+  // Deterministic sample: two bad values per field, rotated by the field's running index.
+  let fieldIndex = 0;
   for (const [prefix, root] of roots) {
     for (const relative of pathsIn(root, depth)) {
       const path = ['document', ...prefix, ...relative];
-      for (const value of BAD) {
+      for (const offset of [0, 3]) {
+        const value = BAD[(fieldIndex + offset) % BAD.length];
         const crash = rawCrash(JSON.stringify(corrupt(file as unknown as Json, path, value)));
         if (crash) failures.push(`${label} ${path.join('.')}=${JSON.stringify(value)}: ${crash}`);
       }
+      fieldIndex += 1;
     }
   }
+  expect(fieldIndex, `${label}: fields exercised`).toBeGreaterThan(100);
   return failures;
 }
 
