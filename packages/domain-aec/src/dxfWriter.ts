@@ -57,6 +57,7 @@ export const fmt = (value: number): string => {
 export class DxfWriter {
   readonly lines: string[] = [];
   readonly layers = new Map<string, number>();
+  private readonly layerNames = new Map<string, string>();
   entityCount = 0;
   private minX = Infinity;
   private minY = Infinity;
@@ -72,10 +73,24 @@ export class DxfWriter {
     this.lines.push(String(code), typeof value === 'number' ? fmt(value) : value);
   }
 
+  /**
+   * R12 name of a source layer. Sources whose sanitised names collide ("A B" / "A_B") keep distinct
+   * layers: later ones get `_2`, `_3`, … in first-seen order.
+   */
+  private layerName(layer: string): string {
+    const known = this.layerNames.get(layer);
+    if (known !== undefined) return known;
+    const base = dxfLayerName(layer);
+    const taken = new Set(this.layerNames.values());
+    let name = base;
+    for (let suffix = 2; taken.has(name); suffix++) name = `${base}_${suffix}`;
+    this.layerNames.set(layer, name);
+    this.layers.set(name, LAYER_COLOR[base] ?? (base.endsWith('-PATT') ? 8 : 7));
+    return name;
+  }
+
   private start(type: string, layer: string): void {
-    const name = dxfLayerName(layer);
-    if (!this.layers.has(name))
-      this.layers.set(name, LAYER_COLOR[name] ?? (name.endsWith('-PATT') ? 8 : 7));
+    const name = this.layerName(layer);
     this.pair(0, type);
     this.pair(8, name);
     this.entityCount += 1;
@@ -135,7 +150,7 @@ export class DxfWriter {
     this.pair(66, 1);
     this.pair(70, closed ? 1 : 0);
     this.point(10, [0, 0]);
-    const name = dxfLayerName(layer);
+    const name = this.layerName(layer);
     for (const point of points) {
       this.pair(0, 'VERTEX');
       this.pair(8, name);

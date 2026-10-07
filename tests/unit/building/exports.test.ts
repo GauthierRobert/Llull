@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 import { boundsOf, dimensionLabel } from '@aec/planArchitectural';
 import { buildPlanDrawing } from '@aec/planDrawing';
 import { type DxfExport } from '@aec/dxfExport';
-import { dxfLayerName, dxfText } from '@aec/dxfWriter';
+import { DxfWriter, dxfLayerName, dxfText } from '@aec/dxfWriter';
 import { escapeXml } from '@lib/escapeXml';
 import { fitScale, type PlanSheet } from '@aec/sheet';
 import { type IfcExport } from '@aec/ifcBuild';
@@ -323,6 +323,34 @@ describe('DXF drafting text and extents', () => {
     const dxf = (execute(doc, 'export_dxf', {}).data as DxfExport).dxf;
     expect(dxf).toMatch(/Far note\n50\n90\n72\n2\n11\n50000/);
     expect(dxf).toMatch(/\$EXTMAX\n10\n50000\n20\n20000/);
+  });
+});
+
+describe('DXF layer names', () => {
+  it('keeps layers that differ only by punctuation distinct, in first-seen order', () => {
+    const writer = new DxfWriter();
+    writer.line('A B', [0, 0], [1, 0]);
+    writer.line('A_B', [0, 0], [1, 1]);
+    writer.line('A B', [0, 0], [0, 1]);
+    writer.polyline(
+      'A/B',
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+      ],
+      false,
+    );
+    writer.line('S-GRID', [0, 0], [1, 0]);
+    expect([...writer.layers.keys()]).toEqual(['A_B', 'A_B_2', 'A_B_3', 'S-GRID']);
+    const layerOfEntity = (type: string): string[] =>
+      writer.lines.flatMap((line, index) =>
+        line === type && writer.lines[index - 1] === '0' ? [writer.lines[index + 2] as string] : [],
+      );
+    expect(layerOfEntity('LINE')).toEqual(['A_B', 'A_B_2', 'A_B', 'S-GRID']);
+    expect(layerOfEntity('POLYLINE')).toEqual(['A_B_3']);
+    expect(writer.layers.get('S-GRID')).toBe(1);
+    expect(new DxfWriter().layers.size).toBe(0);
   });
 });
 
