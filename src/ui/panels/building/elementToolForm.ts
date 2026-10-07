@@ -17,15 +17,22 @@ export interface ToolField {
   readonly defaultValue: string;
   /** For 'select': [value, label] pairs, or a live list (active level's walls / stairs, all slabs). */
   readonly options?: ReadonlyArray<readonly [string, string]> | ElementListKind;
+  /** For live-list selects: text of the blank first option (default depends on the list). */
+  readonly blankLabel?: string;
   /** Optional numeric fields may be left blank → the command default applies. */
   readonly optional?: boolean;
   /** Shown only while the form field `key` holds one of `values` (e.g. joints for beams). */
   readonly showWhen?: { readonly key: string; readonly values: ReadonlyArray<string> };
 }
 
+/** Plan bounds [x1, y1, x2, y2] of the building's grid lines. */
+export type PlanExtent = readonly [number, number, number, number];
+
 interface ToolContext {
   readonly levelId: string | null;
   readonly wallIds: ReadonlyArray<string>;
+  /** Extent of the structural grid, null when there is none. */
+  readonly gridExtent?: PlanExtent | null;
 }
 
 type ToolCommand =
@@ -163,6 +170,16 @@ export function result(
     Object.entries(params).filter(([, value]) => value !== undefined),
   );
   return { ok: true, command, params: cleaned };
+}
+
+/** Comma / semicolon separated text → trimmed non-empty items; blank → undefined. */
+export function textList(reader: FieldReader, key: string): string[] | undefined {
+  const items = reader
+    .text(key)
+    .split(/[,;]+/)
+    .map((item) => item.trim())
+    .filter((item) => item !== '');
+  return items.length === 0 ? undefined : items;
 }
 
 export function onLevel(context: ToolContext): Record<string, unknown> {

@@ -5,7 +5,7 @@
  * parameters, dispatch the single command it maps to (see elementTools.ts).
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingModel } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
@@ -20,6 +20,7 @@ import {
 import { BuildingForm } from './BuildingForm';
 import { useFormValues } from './useFormValues';
 import { INDUSTRIAL_TOOLS } from './industrialTools';
+import { gridExtent } from './gridExtent';
 
 const ALL_TOOLS: ReadonlyArray<ElementTool> = [...ELEMENT_TOOLS, ...INDUSTRIAL_TOOLS];
 const TOOL_GROUPS: ReadonlyArray<string> = [
@@ -101,11 +102,14 @@ interface FieldInputProps {
   field: ToolField;
   value: string;
   lists: ElementOptions;
+  units: string;
   onChange: (key: string, value: string) => void;
 }
 
-function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.ReactElement {
+function FieldInput({ field, value, lists, units, onChange }: FieldInputProps): React.ReactElement {
+  const fieldLabel = field.label.replace('{unit}', units);
   const testId = `tool-field-${field.key}`;
+  const inputId = useId();
   if (field.kind === 'checkbox') {
     return (
       <label className="field">
@@ -115,7 +119,7 @@ function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.R
           onChange={(event) => onChange(field.key, String(event.target.checked))}
           data-testid={testId}
         />
-        <span>{field.label}</span>
+        <span>{fieldLabel}</span>
       </label>
     );
   }
@@ -126,15 +130,20 @@ function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.R
         ? lists[field.options].map((option): readonly [string, string] => [option.id, option.label])
         : (field.options ?? []);
     return (
-      <label className="field">
-        <span className="field__label">{field.label}</span>
+      <div className="field">
+        <label className="field__label" htmlFor={inputId}>
+          {fieldLabel}
+        </label>
         <select
+          id={inputId}
           value={value}
           onChange={(event) => onChange(field.key, event.target.value)}
           data-testid={testId}
         >
           {listKind !== null && (
-            <option value="">{blankOptionLabel(listKind, lists[listKind].length)}</option>
+            <option value="">
+              {field.blankLabel ?? blankOptionLabel(listKind, lists[listKind].length)}
+            </option>
           )}
           {options.map(([optionValue, label]) => (
             <option key={optionValue} value={optionValue}>
@@ -142,20 +151,23 @@ function FieldInput({ field, value, lists, onChange }: FieldInputProps): React.R
             </option>
           ))}
         </select>
-      </label>
+      </div>
     );
   }
   return (
-    <label className="field">
-      <span className="field__label">{field.label}</span>
+    <div className="field">
+      <label className="field__label" htmlFor={inputId}>
+        {fieldLabel}
+      </label>
       <input
+        id={inputId}
         type={field.kind === 'number' ? 'number' : 'text'}
         value={value}
         placeholder={field.optional === true ? 'auto' : undefined}
         onChange={(event) => onChange(field.key, event.target.value)}
         data-testid={testId}
       />
-    </label>
+    </div>
   );
 }
 
@@ -166,6 +178,7 @@ interface ToolFormProps {
 function ToolForm({ tool }: ToolFormProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const building = useStore((s) => s.document.building);
+  const units = useStore((s) => s.document.units);
   const { values, error, setError, change } = useFormValues(() => defaultValues(tool));
   const lists = useMemo(() => elementOptions(building), [building]);
 
@@ -173,6 +186,7 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
     const outcome = tool.build(values, {
       levelId: building?.activeLevelId ?? null,
       wallIds: lists.walls.map((wall) => wall.id),
+      gridExtent: gridExtent(building),
     });
     if (!outcome.ok) {
       setError(outcome.reason);
@@ -197,6 +211,7 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
             field={field}
             value={values[field.key] ?? ''}
             lists={lists}
+            units={units}
             onChange={change}
           />
         ))}

@@ -2,7 +2,7 @@
  * @layer ui/panels/building
  *
  * LevelsSection — storey list (activate / delete) + add-level form.
- * Dispatches: add_level, set_active_level, delete_level.
+ * Dispatches: add_level, set_active_level, delete_level, update_level, copy_level_elements.
  */
 
 import React, { useState } from 'react';
@@ -10,6 +10,7 @@ import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
 import { PanelSection, IconButton } from '@ui/panels/PanelParts';
 import { orderedValues } from '@ui/panels/orderedValues';
+import { CopyLevelForm, LevelEditForm } from './LevelEditors';
 
 const EMPTY_LEVELS: ReadonlyArray<BuildingLevel> = [];
 
@@ -17,38 +18,77 @@ interface LevelRowProps {
   level: BuildingLevel;
   active: boolean;
   units: string;
+  levels: ReadonlyArray<BuildingLevel>;
 }
 
-function LevelRow({ level, active, units }: LevelRowProps): React.ReactElement {
+type RowMode = 'edit' | 'copy' | null;
+
+function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const [mode, setMode] = useState<RowMode>(null);
+  const toggle = (next: Exclude<RowMode, null>): void => setMode(mode === next ? null : next);
   return (
-    <li
-      className={`panel__row${active ? ' panel__row--selected' : ''}`}
-      data-testid={`level-row-${level.id}`}
-      aria-current={active ? 'true' : undefined}
-    >
-      <button
-        type="button"
-        className="building-row-btn"
-        onClick={() => dispatch('set_active_level', { levelId: level.id })}
-        aria-label={`Activate level ${level.name}`}
+    <>
+      <li
+        className={`panel__row${active ? ' panel__row--selected' : ''}`}
+        data-testid={`level-row-${level.id}`}
+        aria-current={active ? 'true' : undefined}
       >
-        <span className="panel__row-main">{level.name}</span>
-        <span className="panel__row-meta">
-          +{level.elevation} {units} · h {level.height}
+        <button
+          type="button"
+          className="building-row-btn"
+          onClick={() => dispatch('set_active_level', { levelId: level.id })}
+          aria-label={`Activate level ${level.name}`}
+        >
+          <span className="panel__row-main">{level.name}</span>
+          <span className="panel__row-meta">
+            +{level.elevation} {units} · h {level.height}
+          </span>
+        </button>
+        <span className="panel__row-actions">
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            aria-label={`Edit level ${level.name}`}
+            aria-pressed={mode === 'edit'}
+            onClick={() => toggle('edit')}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            aria-label={`Copy level ${level.name} to levels`}
+            aria-pressed={mode === 'copy'}
+            onClick={() => toggle('copy')}
+          >
+            Copy to…
+          </button>
+          <IconButton
+            icon="close"
+            danger
+            size={12}
+            label={`Delete level ${level.name}`}
+            title="Delete level (and its elements)"
+            onClick={() => dispatch('delete_level', { levelId: level.id, deleteElements: true })}
+          />
         </span>
-      </button>
-      <span className="panel__row-actions">
-        <IconButton
-          icon="close"
-          danger
-          size={12}
-          label={`Delete level ${level.name}`}
-          title="Delete level (and its elements)"
-          onClick={() => dispatch('delete_level', { levelId: level.id, deleteElements: true })}
-        />
-      </span>
-    </li>
+      </li>
+      {mode === 'edit' && (
+        <li>
+          <LevelEditForm level={level} units={units} onDone={() => setMode(null)} />
+        </li>
+      )}
+      {mode === 'copy' && (
+        <li>
+          <CopyLevelForm
+            source={level}
+            targets={levels.filter((candidate) => candidate.id !== level.id)}
+            onDone={() => setMode(null)}
+          />
+        </li>
+      )}
+    </>
   );
 }
 
@@ -108,6 +148,7 @@ export function LevelsSection(): React.ReactElement {
             level={level}
             active={level.id === building?.activeLevelId}
             units={units}
+            levels={levels}
           />
         ))}
       </ul>
