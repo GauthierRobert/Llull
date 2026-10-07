@@ -3,6 +3,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
+import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { existingLevelId, getBuilding } from '../model';
@@ -12,7 +13,6 @@ import type { PurlinRow } from './purlinModel';
 import { analysePurlins, locatePurlinMembers } from './purlinAnalysis';
 import { round } from '../numeric';
 import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from './checkReport';
-import { existingLevelIdParam } from '../levelParams';
 
 /**
  * @command check_purlins
@@ -52,20 +52,7 @@ export const checkPurlins = defineCommand({
     'checked. Returns one row per member with its governing check; values > 1 fail. Preliminary - ' +
     'not a substitute for the engineer of record.',
   params: z.object({
-    windPressure: z
-      .number()
-      .optional()
-      .describe(
-        'Peak velocity pressure qp, kN/m² (EN 1991-1-4, e.g. 0.6-1.0), >= 0. Default 0.6. 0 = no wind.',
-      ),
-    snowLoad: z.number().optional().describe('Roof snow load on plan, kN/m², >= 0. Default 0.8.'),
-    roofDeadLoad: z
-      .number()
-      .optional()
-      .describe(
-        'Roof build-up dead load carried by the purlins (sheeting, insulation, services) per m² of roof, kN/m², >= 0. Purlin self-weight is added automatically. Default 0.3.',
-      ),
-    levelId: existingLevelIdParam,
+    ...PURLIN_LOAD_SHAPE,
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, snowLoad = 0.8, roofDeadLoad = 0.3 } = params;

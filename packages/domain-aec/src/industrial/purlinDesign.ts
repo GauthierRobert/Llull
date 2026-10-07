@@ -6,12 +6,14 @@
 
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
+import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, fromMm, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../evaluateElements';
+import { finalUtilisationText, noChangeResult, utilisationStats } from './designReport';
 import { sweepFrame } from '../mesh';
 import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
 import { nextProfile } from './frameDesign';
@@ -26,7 +28,6 @@ import {
 } from './profileGroups';
 import { type PurlinRow } from './purlinModel';
 import { checkPurlins } from './purlinCheckRun';
-import { existingLevelIdParam } from '../levelParams';
 
 /**
  * Next heavier secondary-steel profile: the next cold-formed C by mass, then the lightest IPE with a
@@ -69,18 +70,7 @@ export const designPurlins = defineCommand({
     'change and the final maximum utilisation; no change returns the document untouched. ' +
     'Bracing eaves struts are not sized (see check_bracing).',
   params: z.object({
-    windPressure: z
-      .number()
-      .optional()
-      .describe('Peak velocity pressure qp, kN/m² (EN 1991-1-4), >= 0. Default 0.6.'),
-    snowLoad: z.number().optional().describe('Roof snow load on plan, kN/m², >= 0. Default 0.8.'),
-    roofDeadLoad: z
-      .number()
-      .optional()
-      .describe(
-        'Roof build-up dead load per m² of roof carried by the purlins, kN/m², >= 0. Default 0.3.',
-      ),
-    levelId: existingLevelIdParam,
+    ...PURLIN_LOAD_SHAPE,
     targetUtilisation: targetUtilisationParam,
   }),
   run: (doc, params): CommandResult => {
@@ -138,33 +128,19 @@ export const designPurlins = defineCommand({
       if (iteration === MAX_ITERATIONS - 1) limited = true;
     }
     if (changed.size === 0) {
-      const worst = Math.max(0, ...first.rows.map((row) => row.utilisation));
-      return {
-        document: doc,
-        summary:
-          `Designed ${first.rows.length} purlin / rail row(s): no change needed (max utilisation ${worst.toFixed(2)}` +
-          `${limited ? '; largest available size reached for some elements' : ''}).`,
-        affected: [],
-        data: {
-          changes: [],
-          maxUtilisation: worst,
-          failures: first.rows.filter((row) => row.utilisation > 1).length,
-        },
-      };
+      return noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited);
     }
     const document = regenerateBuilding(doc, getBuilding(current));
     const final = analyse(document).rows;
-    const worst = Math.max(0, ...final.map((row) => row.utilisation));
-    const failures = final.filter((row) => row.utilisation > 1).length;
+    const stats = utilisationStats(final);
     return {
       document,
       summary:
         `Designed ${final.length} purlin / rail row(s): ${changes.join('; ')}. ` +
-        `Max utilisation now ${worst.toFixed(2)}${failures > 0 ? `, ${failures} row(s) still failing` : ''}` +
-        `${limited ? ' (largest available size reached for some elements)' : ''}. ` +
+        `${finalUtilisationText(stats, 'row(s)', limited)} ` +
         `Re-seated on rafters / columns; verify bracing eaves struts with check_bracing.`,
       affected: elementAffected(document, [...changed]),
-      data: { changes, maxUtilisation: worst, failures },
+      data: { changes, ...stats },
     };
   },
 });
