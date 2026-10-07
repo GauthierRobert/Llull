@@ -65,6 +65,11 @@ export function CommitInput({
   onCommit: (text: string) => void;
 }): React.ReactElement {
   const [draft, setDraft] = useState(value);
+  const [seenValue, setSeenValue] = useState(value);
+  if (value !== seenValue) {
+    setSeenValue(value);
+    setDraft(value);
+  }
   return (
     <input
       className={className}
@@ -75,7 +80,11 @@ export function CommitInput({
       spellCheck={false}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
-        if (draft !== value) onCommit(draft);
+        if (draft === value) return;
+        onCommit(draft);
+        // A rejected edit (unparseable number) leaves the stored value as is: show it again.
+        // An accepted one changes `value`, which the prop sync above turns into the new draft.
+        setDraft(value);
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
