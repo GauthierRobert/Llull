@@ -14,7 +14,18 @@ import { replayHistory } from './replay';
 import { unresolvedExpressionsNote } from './replayStep';
 import { noop } from './noop';
 
-/** Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities". */
+/** True when replaying a step left every document field (except featureHistory) untouched. */
+function changedNothing(before: CadDocument, after: CadDocument): boolean {
+  return (Object.keys(after) as Array<keyof CadDocument>).every(
+    (key) => key === 'featureHistory' || after[key] === before[key],
+  );
+}
+
+/**
+ * Refuse (kernel) or replay `newHistory`; `done` receives "<n> entity|entities".
+ * @param mustApplyStepId a user-edited step that must change the document when replayed (a known
+ *   command that no-ops or throws means its params are invalid) — otherwise the edit is refused
+ */
 function regenerateWith(
   doc: CadDocument,
   command: string,
@@ -22,11 +33,25 @@ function regenerateWith(
   done: (entityCount: string) => string,
   ctx: ExecutionContext | undefined,
   nextStepNumber?: number,
+  mustApplyStepId?: string,
 ): CommandResult {
   const context = ctx ?? currentContext();
   const refused = kernelRefusal(doc, newHistory, context);
   if (refused !== null) return noop(doc, `${command}: ${refused}`);
-  const replayed = replayHistory(doc, newHistory, context.registry);
+  let inertStep: FeatureStep | undefined;
+  const warnings: string[] = [];
+  const replayed = replayHistory(doc, newHistory, context.registry, warnings, (event) => {
+    if (event.step.id === mustApplyStepId && changedNothing(event.before, event.after)) {
+      inertStep = event.step;
+    }
+  });
+  // Unresolved =expr params are legitimate (the parameter may be defined later); replay_history reports them.
+  if (inertStep !== undefined && warnings.length === 0) {
+    return noop(
+      doc,
+      `${command}: step '${(inertStep as FeatureStep).id}' (${(inertStep as FeatureStep).name}) changed nothing when replayed — its params are invalid for that command; history unchanged.`,
+    );
+  }
   const regenerated = nextStepNumber === undefined ? replayed : { ...replayed, nextStepNumber };
   const count = Object.keys(regenerated.entities).length;
   return {
@@ -44,7 +69,13 @@ function editStep(
   edit: (
     idx: number,
     step: FeatureStep,
-  ) => string | { history: FeatureStep[]; done: (entityCount: string) => string },
+  ) =>
+    | string
+    | {
+        history: FeatureStep[];
+        done: (entityCount: string) => string;
+        mustApplyStepId?: string | undefined;
+      },
   ctx?: ExecutionContext,
 ): CommandResult {
   const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
@@ -52,7 +83,15 @@ function editStep(
   if (!step) return noop(doc, `${command}: step '${stepId}' not found in featureHistory.`);
   const edited = edit(idx, step);
   if (typeof edited === 'string') return noop(doc, `${command}: ${edited}`);
-  return regenerateWith(doc, command, edited.history, edited.done, ctx);
+  return regenerateWith(
+    doc,
+    command,
+    edited.history,
+    edited.done,
+    ctx,
+    undefined,
+    edited.mustApplyStepId,
+  );
 }
 
 /**
@@ -163,6 +202,7 @@ const editStepParams = defineCommand({
       (idx, step) => ({
         history: doc.featureHistory.map((s, i) => (i === idx ? { ...step, params: newParams } : s)),
         done: (n) => `step '${stepId}' params updated; regenerated ${n}.`,
+        mustApplyStepId: step.suppressed ? undefined : stepId,
       }),
       ctx,
     ),
@@ -310,6 +350,7 @@ const insertStep = defineCommand({
       (n) => `step '${newStep.id}' (${cmdName}) inserted; regenerated ${n}.`,
       ctx,
       stepNumber + 1,
+      newStep.id,
     );
   },
 });
