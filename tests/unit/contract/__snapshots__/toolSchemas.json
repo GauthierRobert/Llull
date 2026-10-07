@@ -5769,7 +5769,7 @@
     "input_schema": {
       "properties": {
         "newIndex": {
-          "description": "Zero-based target index in featureHistory. Clamped to [0, history.length-1]. Moving to the same index is a no-op.",
+          "description": "Zero-based target index in featureHistory. Rounded to an integer, then clamped to [0, history.length-1]. Moving to the same index is a no-op.",
           "type": "number"
         },
         "stepId": {
