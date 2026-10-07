@@ -163,6 +163,7 @@ interface JointRowProps {
 function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
+  const documentUnits = useStore((s) => s.document.units);
   const currentValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
   const [inputValue, setInputValue] = useState<string>(String(currentValue));
 
@@ -174,7 +175,7 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
 
   const chipTone = JOINT_CHIP_TONE[joint.kind] ?? 'accent';
   const axisLabel = Array.isArray(joint.axis) ? `[${joint.axis.join(',')}]` : joint.axis;
-  const unit = joint.kind === 'revolute' ? 'rad' : 'mm';
+  const unit = joint.kind === 'revolute' ? 'rad' : documentUnits;
 
   return (
     <MechanismRow

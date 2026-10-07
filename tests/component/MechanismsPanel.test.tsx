@@ -213,6 +213,14 @@ describe('MechanismsPanel — joints section', () => {
     expect(row.textContent).toContain('revolute');
   });
 
+  it('labels a prismatic joint value with the document unit, not a fixed mm', () => {
+    const { jointId } = buildFullDoc();
+    localDispatch('set_units', { units: 'm' });
+    const { drivenJointId } = buildDriveRelation(jointId);
+    render(<MechanismsPanel />);
+    expect(screen.getByLabelText(`Joint value for ${drivenJointId} (m)`)).toBeDefined();
+  });
+
   it('joint row input shows current angle value', () => {
     const { jointId } = buildFullDoc();
     render(<MechanismsPanel />);
