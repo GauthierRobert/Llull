@@ -6,7 +6,7 @@ import { flattenPoints } from '../../lineGeometry';
 import { ShapeLine } from './ShapeLine';
 
 export function PolylineRenderer({
-  entity: { points, closed, position, color },
+  entity: { points, closed, position, rotation, color },
   selected,
 }: {
   entity: PolylineEntity;
@@ -21,5 +21,13 @@ export function PolylineRenderer({
   }, [points, closed]);
 
   if (!positions) return null;
-  return <ShapeLine positions={positions} position={position} color={color} selected={selected} />;
+  return (
+    <ShapeLine
+      positions={positions}
+      position={position}
+      rotation={rotation}
+      color={color}
+      selected={selected}
+    />
+  );
 }

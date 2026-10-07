@@ -61,17 +61,27 @@ export function segmentIntersection(
   return null;
 }
 
+/** Entity-local 2D point -> world XY: rotated about the entity origin by rotation[2], then offset by position. */
+export function localToWorld2D(entity: Entity, lx: number, ly: number): [number, number] {
+  const rz = entity.rotation[2] ?? 0;
+  const cos = Math.cos(rz);
+  const sin = Math.sin(rz);
+  return [entity.position[0] + lx * cos - ly * sin, entity.position[1] + lx * sin + ly * cos];
+}
+
 /**
- * Extract line segments as [x1,y1,x2,y2] pairs from a 2D entity,
- * offset by the entity's world position.
+ * Extract line segments as [x1,y1,x2,y2] pairs from a 2D entity in world space
+ * (entity rotation about Z and position applied).
  */
 export function entityToSegments(entity: Entity): Segment[] {
-  const ox = entity.position[0];
-  const oy = entity.position[1];
+  const segmentBetween = (a: Vec2, b: Vec2): Segment => [
+    ...localToWorld2D(entity, a[0], a[1]),
+    ...localToWorld2D(entity, b[0], b[1]),
+  ];
 
   switch (entity.kind) {
     case 'line': {
-      return [[entity.start[0] + ox, entity.start[1] + oy, entity.end[0] + ox, entity.end[1] + oy]];
+      return [segmentBetween(entity.start, entity.end)];
     }
     case 'polyline': {
       const segs: Segment[] = [];
@@ -79,25 +89,22 @@ export function entityToSegments(entity: Entity): Segment[] {
       for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i];
         const b = pts[i + 1];
-        if (a && b) segs.push([a[0] + ox, a[1] + oy, b[0] + ox, b[1] + oy]);
+        if (a && b) segs.push(segmentBetween(a, b));
       }
       const first = pts[0];
       const last = pts[pts.length - 1];
       if (entity.closed && first && last && pts.length >= 2) {
-        segs.push([last[0] + ox, last[1] + oy, first[0] + ox, first[1] + oy]);
+        segs.push(segmentBetween(last, first));
       }
       return segs;
     }
     case 'rectangle': {
-      const x0 = ox;
-      const y0 = oy;
-      const x1 = ox + entity.width;
-      const y1 = oy + entity.height;
+      const { width, height } = entity;
       return [
-        [x0, y0, x1, y0],
-        [x1, y0, x1, y1],
-        [x1, y1, x0, y1],
-        [x0, y1, x0, y0],
+        segmentBetween([0, 0], [width, 0]),
+        segmentBetween([width, 0], [width, height]),
+        segmentBetween([width, height], [0, height]),
+        segmentBetween([0, height], [0, 0]),
       ];
     }
     default:

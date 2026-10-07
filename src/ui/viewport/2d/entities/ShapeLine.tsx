@@ -17,6 +17,8 @@ interface ShapeLineProps {
   segments?: boolean;
   linewidth?: number;
   position: Vec3;
+  /** Entity rotation; only the Z component applies in the top-down 2D view. */
+  rotation?: Vec3;
   color: string;
   selected: boolean;
 }
@@ -26,6 +28,7 @@ export function ShapeLine({
   segments = false,
   linewidth = 1,
   position,
+  rotation,
   color,
   selected,
 }: ShapeLineProps): React.ReactElement {
@@ -44,5 +47,5 @@ export function ShapeLine({
     [geometry, material, segments],
   );
 
-  return <primitive object={object} position={position} />;
+  return <primitive object={object} position={position} rotation={[0, 0, rotation?.[2] ?? 0]} />;
 }
