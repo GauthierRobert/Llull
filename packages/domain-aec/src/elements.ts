@@ -100,6 +100,9 @@ export const addRoom = defineCommand({
   },
 });
 
+const ignoredNote = (ids: ReadonlyArray<string>): string =>
+  ids.length > 0 ? ` Ignored unknown id(s): ${[...new Set(ids)].join(', ')}.` : '';
+
 /**
  * @command delete_building_element
  * @pure
@@ -123,12 +126,13 @@ export const deleteBuildingElement = defineCommand({
     if (known.length === 0) {
       return noop(doc, 'delete_building_element: none of the given ids is a building element.');
     }
+    const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const doomed = withDependents(building, known);
     const removedEntityIds = [...doomed].flatMap((id) => building.elements[id]?.entityIds ?? []);
     const supports = reconcilePipeSupports(doc, withoutElements(building, doomed));
     return {
       document: regenerateBuilding(doc, supports.building),
-      summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.${reconciliationNote(supports)}`,
+      summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.${ignoredNote(ignored)}${reconciliationNote(supports)}`,
       affected: [
         ...doomed,
         ...removedEntityIds,
@@ -206,10 +210,14 @@ export const moveBuildingElement = defineCommand({
   }),
   run: (doc, { elementIds, delta }): CommandResult => {
     const building = getBuilding(doc);
-    const known = elementIds.filter((id) => building.elements[id] !== undefined);
+    const known = [...new Set(elementIds)].filter((id) => building.elements[id] !== undefined);
     if (known.length === 0) {
       return noop(doc, 'move_building_element: none of the given ids is a building element.');
     }
+    if (delta[0] === 0 && delta[1] === 0) {
+      return noop(doc, 'move_building_element: delta is [0, 0]; nothing to move.');
+    }
+    const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const strayOpenings = known.filter((id) => {
       const element = building.elements[id];
       const host = element ? hostOf(element) : null;
@@ -262,7 +270,7 @@ export const moveBuildingElement = defineCommand({
     const moved = withDependents(building, known);
     return {
       document,
-      summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${reconciliationNote(supports)}`,
+      summary: `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${ignoredNote(ignored)}${reconciliationNote(supports)}`,
       affected: elementAffected(document, [
         ...moved,
         ...[...supports.reattached, ...supports.detached].map((change) => change.id),

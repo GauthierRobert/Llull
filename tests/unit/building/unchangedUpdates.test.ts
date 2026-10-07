@@ -6,7 +6,7 @@ const expectNoOp = (doc: CadDocument, name: string, params: Record<string, unkno
   const result = execute(doc, name, params);
   expect(result.document).toBe(doc);
   expect(result.affected).toEqual([]);
-  expect(result.summary).toMatch(/already|nothing changed/);
+  expect(result.summary).toMatch(/already|nothing/);
 };
 
 describe('update_* / set_* commands with unchanged values are no-ops', () => {
@@ -36,6 +36,27 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
       profile: 'IPE400',
     });
     expect(changed.affected.length).toBeGreaterThan(0);
+  });
+
+  it('move_building_element: zero delta no-op, duplicates counted once, unknown ids reported', () => {
+    const doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+    }).document;
+    expectNoOp(doc, 'move_building_element', { elementIds: ['wall-1'], delta: [0, 0] });
+    const moved = execute(doc, 'move_building_element', {
+      elementIds: ['wall-1', 'wall-1', 'nope'],
+      delta: [0, 500],
+    });
+    expect(moved.summary).toMatch(
+      /Moved 1 element\(s\) by \[0, 500\]: wall-1\. Ignored unknown id\(s\): nope\./,
+    );
+    const deleted = execute(moved.document, 'delete_building_element', {
+      elementIds: ['wall-1', 'nope'],
+    });
+    expect(deleted.summary).toMatch(
+      /Deleted 1 building element\(s\): wall-1\. Ignored unknown id\(s\): nope\./,
+    );
   });
 
   it('set_project_info', () => {
