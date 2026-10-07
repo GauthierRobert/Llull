@@ -4,6 +4,7 @@ import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from 
 import { axisVector, isValidAxis } from '../lib/axis';
 import { ORIGIN, finiteVec3OrZero, len3 } from '../lib/vec3';
 import { noop } from './noop';
+import { MAX_PROFILE_POINTS, MAX_REVOLVE_SEGMENTS } from './limits';
 import { newEntity } from './newEntity';
 import { nextId } from '../lib/id';
 import { compactNumber } from '../lib/compactNumber';
@@ -233,6 +234,18 @@ export const revolveProfile = defineCommand({
       return noop(
         doc,
         `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${profile.length}); no-op.`,
+      );
+    }
+    if (profile.length > MAX_PROFILE_POINTS) {
+      return noop(
+        doc,
+        `revolve_profile: profile has ${profile.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}); no-op.`,
+      );
+    }
+    if (rawSegments !== undefined && rawSegments > MAX_REVOLVE_SEGMENTS) {
+      return noop(
+        doc,
+        `revolve_profile: segments ${rawSegments} exceeds MAX_REVOLVE_SEGMENTS (${MAX_REVOLVE_SEGMENTS}); no-op.`,
       );
     }
     const badProfile = rejectBadProfile(doc, 'revolve_profile', profile);

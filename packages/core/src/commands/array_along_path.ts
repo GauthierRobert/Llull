@@ -8,7 +8,7 @@
 import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
-import { MAX_COPIES_PER_COMMAND } from './limits';
+import { MAX_COPIES_PER_COMMAND, MAX_PROFILE_POINTS } from './limits';
 import { addCopies } from './transform';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3, distance3 } from '../lib/vec3';
 import { noop } from './noop';
@@ -77,6 +77,12 @@ export const arrayAlongPath = defineCommand({
       return noop(
         doc,
         `array_along_path: path must contain at least 2 points (got ${path.length}).`,
+      );
+    }
+    if (path.length > MAX_PROFILE_POINTS) {
+      return noop(
+        doc,
+        `array_along_path: path has ${path.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}).`,
       );
     }
     if (count < 1 || count > MAX_COPIES_PER_COMMAND) {

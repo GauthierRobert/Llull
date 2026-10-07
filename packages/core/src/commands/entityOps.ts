@@ -13,6 +13,18 @@ export function withEntity(doc: CadDocument, entity: Entity): CadDocument {
 }
 
 /**
+ * `doc` with every entity of `created` stored and appended to `order` (same result as folding
+ * `withEntity`, but one pass instead of re-spreading the entity bag per entity).
+ * @pure
+ */
+export function withEntities(doc: CadDocument, created: ReadonlyArray<Entity>): CadDocument {
+  if (created.length === 0) return doc;
+  const entities: CadDocument['entities'] = { ...doc.entities };
+  for (const entity of created) entities[entity.id] = entity;
+  return { ...doc, entities, order: [...doc.order, ...created.map((entity) => entity.id)] };
+}
+
+/**
  * `doc` with `entity` stored under its id (order unchanged).
  * @pure
  */

@@ -14,7 +14,7 @@ import { MAX_COPIES_PER_COMMAND } from './limits';
 import { add3, scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
 import { rotatePoint2 } from '../lib/polygon';
-import { replaceEntity, withEntity } from './entityOps';
+import { replaceEntity } from './entityOps';
 import { rotateEulerAboutWorldZ } from '../lib/eulerRotation';
 
 /** True for exactly three finite numbers (looseVec3 params are unchecked at the schema level). */
@@ -261,14 +261,17 @@ export function addCopies(
   placements: ReadonlyArray<{ position: Vec3; rotation?: Vec3 }>,
   idPrefix: string = source.kind,
 ): { document: CadDocument; newIds: string[] } {
-  let document = doc;
+  // One pass over fresh containers: re-spreading the entity bag per copy would be O(copies²).
+  const entities: CadDocument['entities'] = { ...doc.entities };
+  const order = [...doc.order];
   const newIds: string[] = [];
   for (const { position, rotation = source.rotation } of placements) {
     const id = nextId(idPrefix);
-    document = withEntity(document, { ...source, id, position, rotation });
+    entities[id] = { ...source, id, position, rotation } as Entity;
+    order.push(id);
     newIds.push(id);
   }
-  return { document, newIds };
+  return { document: newIds.length === 0 ? doc : { ...doc, entities, order }, newIds };
 }
 
 /**
