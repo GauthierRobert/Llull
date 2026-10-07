@@ -6,7 +6,6 @@ import { offsetSegment, miterJoin, resolvePolyline } from './modify2dGeometry';
 import { commitEntity } from './commitEntity';
 import { withEntity, withoutEntities } from './entityOps';
 import { newEntity } from './newEntity';
-import { applyEulerXYZ } from '../lib/eulerRotation';
 import { noop } from './noop';
 import { elementAt } from '../lib/elementAt';
 
@@ -160,12 +159,7 @@ export const offset2D = defineCommand({
             `offset_2d: resulting rectangle ${width}×${height} is degenerate — no-op.`,
           );
         }
-        // The local origin shifts by [-distance, -distance, 0]; rotate that into world space.
-        const [shiftX, shiftY, shiftZ] = applyEulerXYZ(
-          [-distance, -distance, 0],
-          [0, 0, 0],
-          entity.rotation,
-        );
+        // The origin shifts by -distance on X and Y so the rectangle grows/shrinks on every side.
         const [x, y, z] = entity.position;
         offsetEntity = {
           ...base,
@@ -173,7 +167,7 @@ export const offset2D = defineCommand({
           kind: 'rectangle',
           width,
           height,
-          position: [x + shiftX, y + shiftY, z + shiftZ],
+          position: [x - distance, y - distance, z],
         };
         summary = `Offset rectangle ${id} by ${distance} → new rectangle ${newId} ${width}×${height}.`;
         break;

@@ -14,7 +14,6 @@ import {
   commitSolid,
   rejectBadProfile,
 } from './geometryShared';
-import { composeEulerXYZ } from '../lib/eulerRotation';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { circlePoints } from './tessellation';
 
@@ -26,8 +25,7 @@ const CIRCLE_SEGMENTS = 32;
  * @pure
  * @layer core/commands
  * @affects creates 1 extrusion entity at the source position; source entity kept
- * @invariant depth > 0; resulting rotation = given rotation applied in the world frame AFTER the
- *            source sketch rotation (source rotation alone when `rotation` is omitted)
+ * @invariant depth > 0; resulting rotation = `rotation` param only (source rotation not inherited)
  * @failure missing id / unsupported or open source / depth <= 0 -> no-op, affected:[]
  *
  * Derives a polygon profile from the given closed 2D shape entity and builds a
@@ -43,9 +41,9 @@ export const extrudeSketch = defineCommand({
   name: 'extrude_sketch',
   description:
     'Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. ' +
-    'Right-handed world frame, +Z up. The solid is placed at the source entity position, inherits the ' +
-    'source entity rotation (so a sketch on a tilted work plane extrudes along its own normal) and extends depth ' +
-    'units along the sketch local +Z. Keeps the source entity in the document. depth must be > 0.',
+    'Right-handed world frame, +Z up. The solid is placed at the source entity position and extends depth ' +
+    'units along +Z (before the optional rotation); the source entity rotation is not inherited. ' +
+    'Keeps the source entity in the document. depth must be > 0.',
   params: z.object({
     id: z
       .string()
@@ -60,9 +58,9 @@ export const extrudeSketch = defineCommand({
     rotation: z
       .array(z.number())
       .describe(
-        `${ROTATION_CONVENTION}, an EXTRA world-frame rotation applied after the source entity's own rotation. ` +
-          'Matches rotate_entity convention. Defaults to [0, 0, 0] (the solid keeps the source rotation). ' +
-          'If non-finite or not length-3 the rotation is ignored.',
+        `${ROTATION_CONVENTION} for the resulting extrusion solid. ` +
+          'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
+          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
       )
       .optional(),
   }),
@@ -122,7 +120,7 @@ export const extrudeSketch = defineCommand({
       source.position,
       EXTRUSION_COLOR,
       {
-        rotation: composeEulerXYZ(finiteVec3OrZero(rotation), source.rotation),
+        rotation: finiteVec3OrZero(rotation),
       },
     );
 

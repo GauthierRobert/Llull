@@ -5,15 +5,17 @@
 
 import type { EquipmentElement, PipeElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, vec2, vec3, z } from '@core/commands/schema';
+import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import {
   elementAffected,
   fromMm,
   getBuilding,
+  isVec2,
   nextElementId,
   nextMark,
   resolveLevel,
   toMetres,
+  toVec2,
   withElement,
 } from '../model';
 import { noop } from '@core/commands/noop';
@@ -36,7 +38,7 @@ export const addEquipment = defineCommand({
     'operating weight in kg (for floor loads). Shown as a block in 3D and with its clearance zone in plan.',
   params: z.object({
     name: z.string().describe('Equipment name, e.g. "CNC lathe", "Compressor".'),
-    location: vec2('Footprint centre [x, y].'),
+    location: looseVec2('Footprint centre [x, y] (a trailing z is ignored).'),
     size: vec3('[length (local x), width (local y), height], all > 0.'),
     angle: z.number().optional().describe('Plan rotation in radians. Default 0.'),
     clearance: z
@@ -52,6 +54,9 @@ export const addEquipment = defineCommand({
     { name, location, size, angle = 0, clearance, weight = 0, levelId, mark },
   ): CommandResult => {
     if (name.trim() === '') return noop(doc, 'add_equipment failed: name is required.');
+    if (!isVec2(location)) {
+      return noop(doc, 'add_equipment failed: location must be [x, y] with finite numbers.');
+    }
     if (size.some((value) => !(value > 0))) {
       return noop(doc, 'add_equipment failed: size must be [length, width, height], all > 0.');
     }
@@ -68,7 +73,7 @@ export const addEquipment = defineCommand({
       entityIds: [],
       levelId: resolution.level.id,
       name: name.trim(),
-      location,
+      location: toVec2(location),
       angle,
       size,
       clearance: resolvedClearance,

@@ -335,6 +335,28 @@ describe('applyCommand — idempotent commandId', () => {
   });
 });
 
+describe('applyCommand — changed flag', () => {
+  it('is true for set_parameter even though affected is empty', () => {
+    const result = applyCommand('set_parameter', { name: 'width', expression: '10' });
+    expect(result.affected).toEqual([]);
+    expect(result.changed).toBe(true);
+    expect(result.isError).toBe(false);
+  });
+
+  it('is carried by a cached idempotent replay', () => {
+    applyCommand('set_parameter', { name: 'width', expression: '10' }, 'param-1');
+    const repeat = applyCommand('set_parameter', { name: 'width', expression: '10' }, 'param-1');
+    expect(repeat.changed).toBe(true);
+  });
+
+  it('is false for a query and for an empty undo, true for a real undo', () => {
+    expect(applyCommand('measure_volume', { id: 'none' }).changed).toBe(false);
+    expect(undo().changed).toBe(false);
+    applyCommand('add_box', { size: [1, 1, 1] });
+    expect(undo().changed).toBe(true);
+  });
+});
+
 describe('undo/redo — monotonic step counter', () => {
   it('add_box, undo, add_box mints a different id than the undone one', () => {
     const undone = applyCommand('add_box', { size: [1, 1, 1] }).affected[0];

@@ -76,11 +76,12 @@ function eulerToMatrix([rx, ry, rz]: Vec3): Matrix3 {
 
 /** three.js `Euler.setFromRotationMatrix(m, 'XYZ')`. */
 function matrixToEuler(m: Matrix3): [number, number, number] {
-  const y = Math.asin(Math.max(-1, Math.min(1, m[0][2])));
+  // `+ 0` normalizes -0 (atan2(-0, 1)) to 0.
+  const y = Math.asin(Math.max(-1, Math.min(1, m[0][2]))) + 0;
   if (Math.abs(m[0][2]) < 0.9999999) {
-    return [Math.atan2(-m[1][2], m[2][2]), y, Math.atan2(-m[0][1], m[0][0])];
+    return [Math.atan2(-m[1][2], m[2][2]) + 0, y, Math.atan2(-m[0][1], m[0][0]) + 0];
   }
-  return [Math.atan2(m[2][1], m[1][1]), y, 0];
+  return [Math.atan2(m[2][1], m[1][1]) + 0, y, 0];
 }
 
 /** Rotation of `inner` followed by a WORLD-frame rotation `outer`, as intrinsic XYZ Euler angles. */

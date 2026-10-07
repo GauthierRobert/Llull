@@ -700,7 +700,7 @@
           "type": "string"
         },
         "location": {
-          "description": "Footprint centre [x, y].",
+          "description": "Footprint centre [x, y] (a trailing z is ignored).",
           "items": {
             "type": "number"
           },
@@ -4595,7 +4595,7 @@
     "name": "extrude_profile"
   },
   {
-    "description": "Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. Right-handed world frame, +Z up. The solid is placed at the source entity position, inherits the source entity rotation (so a sketch on a tilted work plane extrudes along its own normal) and extends depth units along the sketch local +Z. Keeps the source entity in the document. depth must be > 0.",
+    "description": "Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. Right-handed world frame, +Z up. The solid is placed at the source entity position and extends depth units along +Z (before the optional rotation); the source entity rotation is not inherited. Keeps the source entity in the document. depth must be > 0.",
     "input_schema": {
       "properties": {
         "depth": {
@@ -4607,7 +4607,7 @@
           "type": "string"
         },
         "rotation": {
-          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X), an EXTRA world-frame rotation applied after the source entity's own rotation. Matches rotate_entity convention. Defaults to [0, 0, 0] (the solid keeps the source rotation). If non-finite or not length-3 the rotation is ignored.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X) for the resulting extrusion solid. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -6288,7 +6288,7 @@
           "type": "string"
         },
         "location": {
-          "description": "New footprint centre [x, y].",
+          "description": "New footprint centre [x, y] (a trailing z is ignored).",
           "items": {
             "type": "number"
           },

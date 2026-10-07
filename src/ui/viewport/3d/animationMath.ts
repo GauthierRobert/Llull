@@ -43,8 +43,6 @@ function rotateAboutPivotInPlace(
   return point.sub(pivot).applyQuaternion(rotation).add(pivot);
 }
 
-/** A quaternion expressed as [x, y, z, w]. */
-
 /** Pose written by `composeAnimatedPoseInto`. */
 export interface AnimatedPose {
   position: THREE.Vector3;

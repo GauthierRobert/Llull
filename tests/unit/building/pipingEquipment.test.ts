@@ -290,7 +290,7 @@ describe('update_equipment', () => {
       [{ currentMark: 'NOPE' }, /no equipment tagged 'NOPE'/],
       [{ elementId: 'equipment-1', size: [1, 0, 1] }, /size must be/],
       [{ elementId: 'equipment-1', size: [1, 1] }, /rejected: invalid params/],
-      [{ elementId: 'equipment-1', location: [1] }, /rejected: invalid params/],
+      [{ elementId: 'equipment-1', location: [1] }, /location must be \[x, y\]/],
       [{ elementId: 'equipment-1', clearance: -1 }, /clearance >= 0/],
       [{ elementId: 'equipment-1', weight: -1 }, /weight >= 0/],
       [{ elementId: 'equipment-1', name: '  ' }, /cannot be empty/],
@@ -306,6 +306,40 @@ describe('update_equipment', () => {
     }
     const ambiguous = execute(twin, 'update_equipment', { currentMark: 'DUP' });
     expect(ambiguous.summary).toMatch(/ambiguous/);
+  });
+});
+
+describe('equipment location accepts [x, y, z]', () => {
+  it('add_equipment and update_equipment truncate a 3-component location to [x, y]', () => {
+    const added = execute(createEmptyDocument(), 'add_equipment', {
+      name: 'Tank',
+      location: [1, 2, 0],
+      size: [1000, 1000, 2000],
+    });
+    expect(added.affected.length, added.summary).toBeGreaterThan(0);
+    expect(element(added.document, 'equipment-1')).toMatchObject({ location: [1, 2] });
+    const moved = run(added.document, 'update_equipment', {
+      elementId: 'equipment-1',
+      location: [5, 6, 7],
+    });
+    expect(element(moved, 'equipment-1')).toMatchObject({ location: [5, 6] });
+  });
+
+  it('refuses a location with fewer than 2 finite numbers', () => {
+    const base = createEmptyDocument();
+    const added = execute(base, 'add_equipment', {
+      name: 'Tank',
+      location: [1],
+      size: [1000, 1000, 2000],
+    });
+    expect(added.affected).toEqual([]);
+    expect(added.document).toBe(base);
+    expect(added.summary).toMatch(/location must be \[x, y\]/);
+    const doc = plant();
+    const updated = execute(doc, 'update_equipment', { elementId: 'equipment-1', location: [1] });
+    expect(updated.affected).toEqual([]);
+    expect(updated.document).toBe(doc);
+    expect(updated.summary).toMatch(/location must be \[x, y\]/);
   });
 });
 

@@ -4,8 +4,8 @@
 
 import type { EquipmentElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, vec2, vec3, z } from '@core/commands/schema';
-import { elementAffected, getBuilding, resolveLevel, withElement } from '../model';
+import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
+import { elementAffected, getBuilding, isVec2, resolveLevel, toVec2, withElement } from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
 
@@ -31,7 +31,7 @@ export const updateEquipment = defineCommand({
       .describe('Current equipment tag, e.g. "EQ3"; used when `elementId` is omitted.'),
     name: z.string().optional().describe('New equipment name.'),
     mark: z.string().optional().describe('New equipment tag (must not clash with another tag).'),
-    location: vec2('New footprint centre [x, y].').optional(),
+    location: looseVec2('New footprint centre [x, y] (a trailing z is ignored).').optional(),
     size: vec3('New [length, width, height], all > 0.').optional(),
     angle: z.number().optional().describe('New plan rotation in radians.'),
     clearance: z.number().optional().describe('New maintenance clearance (>= 0).'),
@@ -74,6 +74,9 @@ export const updateEquipment = defineCommand({
       return noop(doc, 'update_equipment failed: give elementId or currentMark.');
     }
     const equipment = target;
+    if (location !== undefined && !isVec2(location)) {
+      return noop(doc, 'update_equipment failed: location must be [x, y] with finite numbers.');
+    }
     const dimensions = size ?? equipment.size;
     if (dimensions.some((v) => !(v > 0))) {
       return noop(doc, 'update_equipment failed: size must be [length, width, height], all > 0.');
@@ -101,7 +104,7 @@ export const updateEquipment = defineCommand({
       ...equipment,
       name: newName,
       mark: newMark,
-      location: location ?? equipment.location,
+      location: location !== undefined ? toVec2(location) : equipment.location,
       size: dimensions,
       ...next,
       levelId: resolution.level.id,

@@ -3,7 +3,8 @@
  *
  * useMcpLiveDocument — subscribes to the server-side SSE command log.
  *
- * Opens `GET <SERVER_BASE>/live` as an EventSource (SERVER_BASE from @ui/serverConfig).
+ * Opens `GET <SERVER_BASE>/live` as an EventSource (URL + optional `?access_token=` from
+ * `liveStreamUrl()` in @ui/serverConfig).
  *
  * Protocol (named SSE events, types in `@mcp/liveSync`; `epoch` = server process id, seq is per epoch):
  *   - `snapshot` `{ seq, stateHash, document }`: on connect and after undo/redo → hydrateLiveDocument.
@@ -18,10 +19,9 @@
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
-import { SERVER_BASE } from '@ui/serverConfig';
+import { liveStreamUrl } from '@ui/serverConfig';
 import { fetchLiveSnapshot } from '@ui/store/serverCommands';
 
-const LIVE_URL = `${SERVER_BASE}/live`;
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30000;
 
@@ -73,7 +73,7 @@ export function useMcpLiveDocument(): void {
 
     const connect = (): void => {
       setLiveStatus('connecting');
-      const es = new EventSource(LIVE_URL);
+      const es = new EventSource(liveStreamUrl());
       source = es;
 
       es.onopen = () => {

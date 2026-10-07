@@ -51,11 +51,14 @@ const pushCapped = (stack: CadDocument[], doc: CadDocument): CadDocument[] =>
  * - `isError`  — true when `execute` rejected the call (unknown command, invalid params,
  *   kernel unavailable, derivation guard) or the command threw.
  * - `data`     — present only when the command returned data (queries, `build_project` reports).
+ * - `changed`  — the live document was replaced (true even when `affected` is empty, e.g.
+ *   `set_parameter`); a cached idempotent replay reports the original `changed`.
  */
 interface CommandBusResult {
   summary: string;
   affected: string[];
   isError: boolean;
+  changed: boolean;
   data?: unknown;
   canUndo: boolean;
   canRedo: boolean;
@@ -80,7 +83,7 @@ function withHistoryFlags(result: Omit<CommandBusResult, 'canUndo' | 'canRedo'>)
  *   a different name/params is an error result. Bounded LRU of MAX_IDEMPOTENCY_ENTRIES.
  */
 export function applyCommand(name: string, params: unknown, commandId?: string): CommandBusResult {
-  if (commandId === undefined) return runCommand(name, params).result;
+  if (commandId === undefined) return runCommand(name, params);
   const requestHash = requestHashOf(name, params);
   const cached = _resultsByCommandId.get(commandId);
   if (cached !== undefined) {
@@ -89,14 +92,15 @@ export function applyCommand(name: string, params: unknown, commandId?: string):
         summary: `commandId ${commandId} was already used for a different command; use a fresh commandId.`,
         affected: [],
         isError: true,
+        changed: false,
       });
     }
     _resultsByCommandId.delete(commandId);
     _resultsByCommandId.set(commandId, cached); // refresh LRU position
     return withHistoryFlags(cached.result);
   }
-  const { result, changed } = runCommand(name, params);
-  if (!changed || getCommand(name)?.annotations?.readOnly === true) return result;
+  const result = runCommand(name, params);
+  if (!result.changed || getCommand(name)?.annotations?.readOnly === true) return result;
   _resultsByCommandId.set(commandId, { requestHash, result });
   if (_resultsByCommandId.size > MAX_IDEMPOTENCY_ENTRIES) {
     const oldest = _resultsByCommandId.keys().next();
@@ -106,21 +110,19 @@ export function applyCommand(name: string, params: unknown, commandId?: string):
 }
 
 /** `changed` = the live document was replaced by this call. */
-function runCommand(name: string, params: unknown): { result: CommandBusResult; changed: boolean } {
+function runCommand(name: string, params: unknown): CommandBusResult {
   const prior = getLiveDoc();
   let result: ReturnType<typeof execute>;
   try {
     result = execute(prior, name, params);
   } catch (err) {
     // A throwing command must surface as an error result, never a transport failure.
-    return {
-      result: withHistoryFlags({
-        summary: `Command ${name} failed: ${errorMessage(err)}`,
-        affected: [],
-        isError: true,
-      }),
+    return withHistoryFlags({
+      summary: `Command ${name} failed: ${errorMessage(err)}`,
+      affected: [],
+      isError: true,
       changed: false,
-    };
+    });
   }
 
   const changed = result.document !== prior;
@@ -130,13 +132,13 @@ function runCommand(name: string, params: unknown): { result: CommandBusResult; 
     setLiveDoc(result.document, { name, params });
   }
 
-  const busResult = withHistoryFlags({
+  return withHistoryFlags({
     summary: result.summary,
     affected: result.affected,
     isError: result.rejected === true,
+    changed,
     ...(result.data !== undefined ? { data: result.data } : {}),
   });
-  return { result: busResult, changed };
 }
 
 /**
@@ -151,13 +153,18 @@ function travelHistory(
 ): CommandBusResult {
   const target = history[from].at(-1);
   if (target === undefined) {
-    return withHistoryFlags({ summary: emptySummary, affected: [], isError: false });
+    return withHistoryFlags({
+      summary: emptySummary,
+      affected: [],
+      isError: false,
+      changed: false,
+    });
   }
   const current = getLiveDoc();
   history[from] = history[from].slice(0, -1);
   history[to] = pushCapped(history[to], current);
   setLiveDoc(withMonotonicStepCounter(target, current));
-  return withHistoryFlags({ summary, affected: [], isError: false });
+  return withHistoryFlags({ summary, affected: [], isError: false, changed: true });
 }
 
 /** Undo the last mutating command. */

@@ -64,6 +64,45 @@ describe('dispatch onResult', () => {
     expect(onResult).toHaveBeenCalledWith({ summary: 'Added box box-9.', changed: true });
   });
 
+  it('uses the server changed flag when affected is empty (set_parameter)', async () => {
+    useStore.setState({ liveStatus: 'connected' });
+    vi.stubGlobal(
+      'fetch',
+      serverResponse({
+        summary: 'Set parameter width = 10.',
+        affected: [],
+        isError: false,
+        changed: true,
+        canUndo: true,
+        canRedo: false,
+      }),
+    );
+    const onResult = vi.fn();
+    useStore
+      .getState()
+      .dispatch('set_parameter', { name: 'width', expression: '10' }, { onResult });
+    await flushPromises();
+    expect(onResult).toHaveBeenCalledWith({ summary: 'Set parameter width = 10.', changed: true });
+  });
+
+  it('falls back to affected ids when an older server omits changed', async () => {
+    useStore.setState({ liveStatus: 'connected' });
+    vi.stubGlobal(
+      'fetch',
+      serverResponse({
+        summary: 'rejected',
+        affected: ['box-1'],
+        isError: true,
+        canUndo: false,
+        canRedo: false,
+      }),
+    );
+    const onResult = vi.fn();
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { onResult });
+    await flushPromises();
+    expect(onResult).toHaveBeenCalledWith({ summary: 'rejected', changed: false });
+  });
+
   it('reports a failed POST as unchanged', async () => {
     useStore.setState({ liveStatus: 'connected', sseEverConnected: true });
     vi.stubGlobal('fetch', serverResponse({ error: 'boom' }, false));
