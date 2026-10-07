@@ -69,7 +69,8 @@ export const exportObj = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const { entityIds, units } = params;
-    const unitLabel = units ?? doc.units;
+    // One comment line only: a newline in the label would inject arbitrary OBJ records.
+    const unitLabel = (units ?? doc.units).replace(/[\r\n\u2028\u2029]+/g, ' ').trim() || doc.units;
 
     const collected = collectExportTriangles(doc, entityIds);
     const triangleCount = collected.tris.length;
