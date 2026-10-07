@@ -185,8 +185,9 @@ const reorderStep = defineCommand({
     stepId: z.string().describe('Id of the FeatureStep to move (from doc.featureHistory[*].id).'),
     newIndex: z
       .number()
+      .int()
       .describe(
-        'Zero-based target index in featureHistory. Rounded to an integer, then clamped to [0, history.length-1]. ' +
+        'Zero-based target index in featureHistory. Must be an integer; clamped to [0, history.length-1]. ' +
           'Moving to the same index is a no-op.',
       ),
   }),
@@ -197,7 +198,7 @@ const reorderStep = defineCommand({
       'reorder_step',
       stepId,
       (idx, step) => {
-        const clamped = Math.max(0, Math.min(Math.round(newIndex), doc.featureHistory.length - 1));
+        const clamped = Math.max(0, Math.min(newIndex, doc.featureHistory.length - 1));
         if (clamped === idx) return `step '${stepId}' is already at index ${idx}.`;
         const without = doc.featureHistory.filter((_, i) => i !== idx);
         return {

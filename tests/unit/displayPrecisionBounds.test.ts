@@ -20,7 +20,7 @@ describe('display precision bounds', () => {
     const b = execute(a.document, 'draw_line', { start: [0, 5], end: [10, 5] });
     const entityIds = [a.affected[0]!, b.affected[0]!];
 
-    it.each([-1, 1.5, 101])('rejects precision %s', (precision) => {
+    it.each([-1, 101])('rejects precision %s', (precision) => {
       const result = execute(b.document, 'add_dimension', {
         dimensionKind: 'linear',
         entityIds,
@@ -29,6 +29,16 @@ describe('display precision bounds', () => {
       expect(result.affected).toEqual([]);
       expect(result.document).toBe(b.document);
       expect(result.summary).toContain('precision must be an integer');
+    });
+
+    it('rejects fractional precision at the schema level', () => {
+      const result = execute(b.document, 'add_dimension', {
+        dimensionKind: 'linear',
+        entityIds,
+        precision: 1.5,
+      });
+      expect(result.affected).toEqual([]);
+      expect(result.summary).toContain('invalid params');
     });
 
     it('accepts precision 3', () => {

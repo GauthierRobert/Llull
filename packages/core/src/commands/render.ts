@@ -65,6 +65,7 @@ export const renderView = defineCommand({
       .object({
         frames: z
           .number()
+          .int()
           .describe(
             'Number of frames (1..12). Each frame is a separate rotated view stitched into one wide strip.',
           ),
@@ -131,7 +132,7 @@ export const renderView = defineCommand({
     const base = renderDocument(doc, view, width, height);
 
     if (params.turntable) {
-      const frames = Math.max(1, Math.min(12, Math.round(params.turntable.frames)));
+      const frames = Math.max(1, Math.min(12, params.turntable.frames));
       const strip = buildTurntableSvg(doc, frames, view, width, height);
       return {
         document: doc,

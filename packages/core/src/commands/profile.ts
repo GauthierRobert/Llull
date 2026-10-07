@@ -191,8 +191,9 @@ export const revolveProfile = defineCommand({
       .optional(),
     segments: z
       .number()
+      .int()
       .describe(
-        'Number of radial subdivisions for tessellation. Higher = smoother surface. Default: 32. Minimum: 3.',
+        'Number of radial subdivisions for tessellation. Integer; higher = smoother surface. Default: 32. Minimum: 3 (smaller values are raised to 3).',
       )
       .optional(),
     position: looseVec3(
@@ -264,7 +265,7 @@ export const revolveProfile = defineCommand({
       );
     }
 
-    const segments = Math.max(3, Math.round(rawSegments ?? 32));
+    const segments = Math.max(3, rawSegments ?? 32);
 
     const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('rev');
     const entity = newEntity(

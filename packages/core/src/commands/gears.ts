@@ -148,6 +148,7 @@ export const addSpurGear = defineCommand({
       ),
     teeth: z
       .number()
+      .int()
       .describe(
         'Number of teeth. Must be an integer >= 3. ' +
           'Below ~17 teeth undercut occurs; the profile is approximated by clamping the involute to the root circle.',
@@ -204,7 +205,7 @@ export const addSpurGear = defineCommand({
       return noop(doc, `add_spur_gear failed: module must be finite and > 0, got ${String(mod)}.`);
     }
 
-    const teethInt = Math.round(teeth);
+    const teethInt = teeth;
     if (teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
       return noop(
         doc,

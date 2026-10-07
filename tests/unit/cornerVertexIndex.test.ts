@@ -21,7 +21,7 @@ describe('fillet_2d / chamfer_2d vertexIndex', () => {
     const result = execute(drawn.document, name, { id, vertexIndex: 1.5, ...extra });
     expect(result.affected).toEqual([]);
     expect(result.document).toBe(drawn.document);
-    expect(result.summary).toContain('vertexIndex must be an integer');
+    expect(result.summary).toContain('invalid params');
   });
 
   it('still fillets an integer vertex', () => {

@@ -89,7 +89,10 @@ export const distributeAlongPath = defineCommand({
     componentId: z
       .string()
       .describe('Id of an existing Component in doc.components. Obtain one via create_component.'),
-    count: z.number().describe('Number of instances to create. Must be a positive integer (>= 1).'),
+    count: z
+      .number()
+      .int()
+      .describe('Number of instances to create. Must be a positive integer (>= 1).'),
     tangentAlign: z
       .boolean()
       .describe(
@@ -153,7 +156,7 @@ export const distributeAlongPath = defineCommand({
       );
     }
 
-    if (count < 1 || !Number.isInteger(count) || count > MAX_COPIES_PER_COMMAND) {
+    if (count < 1 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,

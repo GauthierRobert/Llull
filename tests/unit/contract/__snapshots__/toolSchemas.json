@@ -2364,7 +2364,7 @@
     "input_schema": {
       "properties": {
         "count": {
-          "description": "Number of copies to place. Must be >= 1.",
+          "description": "Number of copies to place. Must be an integer >= 1.",
           "type": "number"
         },
         "mode": {
@@ -3834,7 +3834,7 @@
           "type": "array"
         },
         "count": {
-          "description": "Number of copies to place. Must be >= 1.",
+          "description": "Number of copies to place. Must be an integer >= 1.",
           "type": "number"
         },
         "endAngle": {
@@ -5517,7 +5517,7 @@
           "type": "number"
         },
         "steps": {
-          "description": "Number of samples across the range (default 24, minimum 2, maximum 360). Non-integers are rounded. Step k = start + (end - start) * k / (steps - 1).",
+          "description": "Number of samples across the range (default 24, minimum 2, maximum 360). Must be an integer. Step k = start + (end - start) * k / (steps - 1).",
           "type": "number"
         },
         "target": {
@@ -5769,7 +5769,7 @@
     "input_schema": {
       "properties": {
         "newIndex": {
-          "description": "Zero-based target index in featureHistory. Rounded to an integer, then clamped to [0, history.length-1]. Moving to the same index is a no-op.",
+          "description": "Zero-based target index in featureHistory. Must be an integer; clamped to [0, history.length-1]. Moving to the same index is a no-op.",
           "type": "number"
         },
         "stepId": {
@@ -5840,7 +5840,7 @@
           "type": "array"
         },
         "segments": {
-          "description": "Number of radial subdivisions for tessellation. Higher = smoother surface. Default: 32. Minimum: 3.",
+          "description": "Number of radial subdivisions for tessellation. Integer; higher = smoother surface. Default: 32. Minimum: 3 (smaller values are raised to 3).",
           "type": "number"
         }
       },

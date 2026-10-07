@@ -60,7 +60,7 @@ export const arrayAlongPath = defineCommand({
         'Polyline path as an array of [x,y,z] points. Minimum 2 points. ' +
           'Copies are placed at evenly-spaced arc-length positions from the first to the last point.',
       ),
-    count: z.number().describe('Number of copies to place. Must be >= 1.'),
+    count: z.number().int().describe('Number of copies to place. Must be an integer >= 1.'),
     mode: z
       .string()
       .optional()
@@ -101,7 +101,7 @@ export const arrayAlongPath = defineCommand({
       validatedPath.push([pt[0] as number, pt[1] as number, pt[2] as number]);
     }
 
-    const intCount = Math.max(1, Math.round(count));
+    const intCount = count;
     const totalLen = polylineLength(validatedPath);
 
     const step = intCount === 1 ? 0 : totalLen / (intCount - 1);
@@ -151,7 +151,7 @@ export const distributeOnArc = defineCommand({
         "Start angle of the arc sweep in radians (measured from the plane's local +X axis).",
       ),
     endAngle: z.number().describe('End angle of the arc sweep in radians.'),
-    count: z.number().describe('Number of copies to place. Must be >= 1.'),
+    count: z.number().int().describe('Number of copies to place. Must be an integer >= 1.'),
   }),
   run: (doc, { sourceId, center, normal, radius, startAngle, endAngle, count }): CommandResult => {
     const source = doc.entities[sourceId];
@@ -185,7 +185,7 @@ export const distributeOnArc = defineCommand({
     const u = buildPerpendicularInPlane(n);
     const v = cross3(n, u);
 
-    const intCount = Math.max(1, Math.round(count));
+    const intCount = count;
     const angleRange = endAngle - startAngle;
     // Full circle: step = range/count (first and last copies must not coincide).
     const isFullCircle = Math.abs(Math.abs(angleRange) - Math.PI * 2) < 1e-9;

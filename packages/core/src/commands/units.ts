@@ -31,6 +31,7 @@ export const setUnits = defineCommand({
       ),
     displayPrecision: z
       .number()
+      .int()
       .optional()
       .describe(
         'Number of decimal places to show when formatting length values (e.g. 2 → "12.50 mm"). ' +
@@ -40,9 +41,7 @@ export const setUnits = defineCommand({
   run: (doc, { units, displayPrecision }): CommandResult => {
     if (
       displayPrecision !== undefined &&
-      (displayPrecision < 0 ||
-        displayPrecision > MAX_DISPLAY_PRECISION ||
-        !Number.isInteger(displayPrecision))
+      (displayPrecision < 0 || displayPrecision > MAX_DISPLAY_PRECISION)
     ) {
       return noop(
         doc,

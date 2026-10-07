@@ -288,6 +288,7 @@ export const arrayLinear = defineCommand({
     id: z.string().describe('Id of the entity to array.'),
     count: z
       .number()
+      .int()
       .describe('Total number of instances including the original. Must be an integer >= 2.'),
     offset: looseVec3(
       'World-space translation vector [dx, dy, dz] between consecutive instances. ' +
@@ -299,7 +300,7 @@ export const arrayLinear = defineCommand({
     if (!target) {
       return noop(doc, `array_linear: No entity ${id}.`);
     }
-    if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
+    if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
@@ -348,6 +349,7 @@ export const arrayPolar = defineCommand({
     id: z.string().describe('Id of the entity to array.'),
     count: z
       .number()
+      .int()
       .describe('Total number of instances including the original. Must be an integer >= 2.'),
     center: looseVec3(
       'World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). ' +
@@ -366,7 +368,7 @@ export const arrayPolar = defineCommand({
     if (!target) {
       return noop(doc, `array_polar: No entity ${id}.`);
     }
-    if (!Number.isInteger(count) || count < 2 || count > MAX_COPIES_PER_COMMAND) {
+    if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
