@@ -40,6 +40,7 @@ export function TextRenderer2D({
         fontSize={height}
         color={selected ? SELECTION_COLOR : color}
         anchorX={toAnchorX(anchor)}
+        textAlign={toAnchorX(anchor)}
         anchorY="middle"
       >
         {content}

@@ -8,7 +8,7 @@
  */
 
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
-import { dimensionLabelBox, TEXT_PICK_EM_WIDTH } from './modifyHelpers';
+import { dimensionLabelBox, textLocalBox } from './modifyHelpers';
 import { solidOutline } from './solidOutline';
 
 export type BoxSelectMode = 'window' | 'crossing';
@@ -136,12 +136,11 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
     case 'point':
       return lines([[0, 0]]);
     case 'text': {
-      const width = entity.content.length * entity.height * TEXT_PICK_EM_WIDTH;
-      const left = entity.anchor === 'center' ? -width / 2 : entity.anchor === 'right' ? -width : 0;
-      const [x0, y0] = world([left, -entity.height / 2]);
+      const { left, width, height } = textLocalBox(entity);
+      const [x0, y0] = world([left, -height / 2]);
       return {
         polylines: [],
-        boxes: [{ minX: x0, minY: y0, maxX: x0 + width, maxY: y0 + entity.height }],
+        boxes: [{ minX: x0, minY: y0, maxX: x0 + width, maxY: y0 + height }],
       };
     }
     case 'dimension': {

@@ -11,7 +11,14 @@
 
 import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import type * as THREE from 'three';
-import type { CadDocument, DimensionEntity, Entity, EntityId, Vec2 } from '@core/model/types';
+import type {
+  CadDocument,
+  DimensionEntity,
+  Entity,
+  EntityId,
+  TextEntity,
+  Vec2,
+} from '@core/model/types';
 import { is3D } from '@core/model/types';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
@@ -157,11 +164,9 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
     case 'point':
       return distance(pick, [0, 0]) ** 2;
     case 'text': {
-      // Estimated text box (no font metrics here): ~0.6 em per character, one line tall.
-      const width = entity.content.length * entity.height * TEXT_PICK_EM_WIDTH;
-      const left = entity.anchor === 'center' ? -width / 2 : entity.anchor === 'right' ? -width : 0;
+      const { left, width, height } = textLocalBox(entity);
       const dx = Math.max(left - pick[0], 0, pick[0] - (left + width));
-      const dy = Math.max(Math.abs(pick[1]) - entity.height / 2, 0);
+      const dy = Math.max(Math.abs(pick[1]) - height / 2, 0);
       return dx * dx + dy * dy;
     }
     case 'ellipse': {
@@ -179,6 +184,22 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
 
 /** Average glyph advance as a fraction of the text height, used to estimate a text pick box. */
 export const TEXT_PICK_EM_WIDTH = 0.6;
+
+/** Line pitch as a multiple of the text height (troika's default line height is about 1.2 em). */
+const TEXT_LINE_PITCH = 1.2;
+
+/**
+ * Estimated entity-local box of a text entity (no font metrics here): the longest line at about
+ * 0.6 em per character, lines stacked at 1.2 em, block centred vertically on the entity origin
+ * (anchorY 'middle') and placed horizontally by the anchor.
+ * @pure
+ */
+export function textLocalBox(entity: TextEntity): { left: number; width: number; height: number } {
+  const lines = entity.content.split('\n');
+  const width = Math.max(...lines.map((line) => line.length)) * entity.height * TEXT_PICK_EM_WIDTH;
+  const left = entity.anchor === 'center' ? -width / 2 : entity.anchor === 'right' ? -width : 0;
+  return { left, width, height: entity.height * (1 + (lines.length - 1) * TEXT_LINE_PITCH) };
+}
 
 /** Segments used to approximate an ellipse outline for picking. */
 const ELLIPSE_PICK_SAMPLES = 48;
