@@ -27,7 +27,7 @@
           "type": "number"
         },
         "boltDiameter": {
-          "description": "Bolt diameter. Default 24 mm (M24).",
+          "description": "Bolt diameter, in document units. Default 24 mm (M24).",
           "type": "number"
         },
         "levelId": {
@@ -46,7 +46,7 @@
           "type": "array"
         },
         "thickness": {
-          "description": "Plate thickness. Default 25 mm (20 mm for profiles < 300 deep).",
+          "description": "Plate thickness, in document units. Default 25 mm (20 mm for profiles < 300 deep).",
           "type": "number"
         }
       },
@@ -1243,7 +1243,7 @@
     "input_schema": {
       "properties": {
         "boltDiameter": {
-          "description": "Bolt diameter. Default 20 mm (M20).",
+          "description": "Bolt diameter, in document units. Default 20 mm (M20).",
           "type": "number"
         },
         "haunchLength": {
@@ -1255,7 +1255,7 @@
           "type": "string"
         },
         "plateThickness": {
-          "description": "End plate thickness. Default 20 / 25 mm.",
+          "description": "End plate thickness, in document units. Default 20 / 25 mm.",
           "type": "number"
         },
         "rafterIds": {

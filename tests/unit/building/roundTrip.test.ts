@@ -119,6 +119,33 @@ describe('derivation guard on every generated entity kind', () => {
   });
 });
 
+describe('feature history replay reproduces the building', () => {
+  it('replay_history gives identical entities, order and building model', () => {
+    const doc = build();
+    const replayed = execute(doc, 'replay_history', {});
+    expect(replayed.summary, replayed.summary).not.toMatch(/failed|refused|skipped/i);
+    expect(replayed.document.entities).toEqual(doc.entities);
+    expect(replayed.document.order).toEqual(doc.order);
+    expect(replayed.document.building).toEqual(doc.building);
+  });
+
+  it('editing a step re-evaluates the building: a thicker wall changes only what depends on it', () => {
+    const doc = build();
+    const wallStep = doc.featureHistory.find((step) => step.name === 'draw_walls');
+    expect(wallStep).toBeDefined();
+    const edited = execute(doc, 'edit_step_params', {
+      stepId: wallStep?.id,
+      params: { points: SQUARE, closed: true, thickness: 300 },
+    });
+    expect(edited.summary, edited.summary).not.toMatch(/rejected|failed|refused/i);
+    const wall = edited.document.building?.elements['wall-1'];
+    expect(wall?.category === 'wall' && wall.thickness).toBe(300);
+    expect(Object.keys(edited.document.building?.elements ?? {})).toEqual(
+      Object.keys(doc.building?.elements ?? {}),
+    );
+  });
+});
+
 describe('save -> load round trip of derived building geometry', () => {
   it('restores every derived entity of a mixed model exactly', () => {
     const doc = build();

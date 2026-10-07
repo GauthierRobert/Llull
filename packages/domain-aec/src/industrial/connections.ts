@@ -55,8 +55,14 @@ export const addMomentConnections = defineCommand({
       .optional()
       .describe('Rafter member ids. Default: every rafter of the level.'),
     levelId: existingLevelIdParam,
-    plateThickness: z.number().optional().describe('End plate thickness. Default 20 / 25 mm.'),
-    boltDiameter: z.number().optional().describe('Bolt diameter. Default 20 mm (M20).'),
+    plateThickness: z
+      .number()
+      .optional()
+      .describe('End plate thickness, in document units. Default 20 / 25 mm.'),
+    boltDiameter: z
+      .number()
+      .optional()
+      .describe('Bolt diameter, in document units. Default 20 mm (M20).'),
     haunchLength: z
       .number()
       .optional()
