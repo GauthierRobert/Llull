@@ -24,6 +24,8 @@ export interface OutboxCommand {
   readonly affected: readonly string[];
   /** Part of the previous entry's undo step (a `coalesce` dispatch): undo / redo move them together. */
   readonly coalesced?: boolean;
+  /** Never sent to the server (autosave restore and its follow-ups): the server document stays the truth. */
+  readonly localOnly?: boolean;
 }
 
 /** Guards against concurrent pushes. */
@@ -97,6 +99,12 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
     for (;;) {
       const next = get().localOutbox[0];
       if (next === undefined) break;
+      if (next.localOnly === true) {
+        set((state) => ({
+          localOutbox: state.localOutbox.filter((entry) => entry.commandId !== next.commandId),
+        }));
+        continue;
+      }
       const response = await postCommand(
         next.name,
         remapIds(next.params, flushIdMap),

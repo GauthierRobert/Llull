@@ -35,6 +35,11 @@ export interface DispatchOptions {
    * follow-ups such as framing new content), so one Undo reverts both.
    */
   coalesce?: boolean;
+  /**
+   * Local mode: never replay this command to the server when the outbox flushes (autosave restore:
+   * a stale browser copy must not replace the shared live document). A coalesced follow-up inherits it.
+   */
+  localOnly?: boolean;
 }
 
 export interface CadStoreState {

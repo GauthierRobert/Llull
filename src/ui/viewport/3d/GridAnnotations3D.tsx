@@ -38,6 +38,12 @@ export function GridAnnotations3D({ document }: { document: CadDocument }): Reac
       });
     return collectGridAnnotations(gridEntities);
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
+  // One outline per bubble radius (R9: no geometry rebuilt every render).
+  const outlines = useMemo(
+    () =>
+      new Map(annotations.bubbles.map((bubble) => [bubble.radius, circlePoints(bubble.radius)])),
+    [annotations],
+  );
 
   return (
     <group name="grid-annotations-3d">
@@ -58,7 +64,7 @@ export function GridAnnotations3D({ document }: { document: CadDocument }): Reac
           position={[bubble.center[0], bubble.center[1], bubble.center[2] + bubble.radius]}
         >
           <Line
-            points={circlePoints(bubble.radius)}
+            points={outlines.get(bubble.radius) ?? circlePoints(bubble.radius)}
             color={bubble.color}
             lineWidth={2}
             depthTest={false}

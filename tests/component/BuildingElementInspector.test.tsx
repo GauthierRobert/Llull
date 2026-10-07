@@ -68,11 +68,30 @@ describe('building element inspector', () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
     const [name, params] = dispatch.mock.calls[0] as [string, Record<string, unknown>];
     expect(name).toBe('update_steel_member');
-    expect(params).toEqual({
-      memberId: expect.any(String),
-      profile: 'HEB320',
+    expect(params).toEqual({ memberId: expect.any(String), profile: 'HEB320' });
+  });
+
+  it('keeps the top of steel of a beam on a section change unless unticked', () => {
+    const { affected } = localDispatch('add_steel_member', {
+      role: 'beam',
+      profile: 'IPE300',
+      start: [0, 0, 4000],
+      end: [6000, 0, 4000],
+    });
+    useStore.getState().select([affected.find((id) => id.endsWith(':body')) ?? affected[0]!]);
+    const dispatch = spyDispatch();
+    render(<PropertiesPanel />);
+    expect(screen.queryByTestId('member-keep-top')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Profile'), { target: { value: 'IPE400' } });
+    expect(screen.getByTestId('member-keep-top')).toBeChecked();
+    fireEvent.click(screen.getByTestId('member-save'));
+    expect(dispatch.mock.calls.at(-1)?.[1]).toMatchObject({
+      profile: 'IPE400',
       keepTopOfSteel: true,
     });
+    fireEvent.click(screen.getByTestId('member-keep-top'));
+    fireEvent.click(screen.getByTestId('member-save'));
+    expect(dispatch.mock.calls.at(-1)?.[1]).not.toHaveProperty('keepTopOfSteel');
   });
 
   it('does not dispatch when nothing changed', () => {

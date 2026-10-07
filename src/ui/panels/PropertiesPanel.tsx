@@ -140,8 +140,11 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
 }
 
 function PropertiesBody(): React.ReactElement {
-  const document = useStore((s) => s.document);
-  const { selection, entities } = document;
+  // Narrow slices (react R3): camera / orbit changes must not re-render the inspector.
+  const selection = useStore((s) => s.document.selection);
+  const entities = useStore((s) => s.document.entities);
+  const building = useStore((s) => s.document.building);
+  const document = building === undefined ? { entities } : { entities, building };
   const [selectedId] = selection;
   const entity =
     selection.length === 1 && selectedId !== undefined ? entities[selectedId] : undefined;

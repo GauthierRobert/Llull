@@ -6,8 +6,9 @@
  *
  * - Saves 1.5 s after the last change and on `pagehide` / `visibilitychange` (hidden).
  * - Restore happens once, when the live-server connection attempt fails (offline / local mode) and
- *   the document is empty: `dispatch('load_document')` (PRIME DIRECTIVE). When a live server is
- *   connected the server document is the truth: nothing is restored and nothing is saved.
+ *   the document is empty: `dispatch('load_document')` (PRIME DIRECTIVE), `localOnly` so a later
+ *   outbox flush never replaces the shared server document with it. When a live server is
+ *   connected the server document is the truth: nothing is restored, saved or marked unsaved.
  */
 
 import { useEffect } from 'react';
@@ -15,17 +16,9 @@ import { serializeDocument } from '@core/commands/persistence';
 import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import type { KeyValueStorage } from '@ui/store/autosave';
-import { clearAutosave, readAutosave, writeAutosave } from '@ui/store/autosave';
+import { browserStorage, clearAutosave, readAutosave, writeAutosave } from '@ui/store/autosave';
 
 export const AUTOSAVE_DELAY_MS = 1500;
-
-function browserStorage(): KeyValueStorage | null {
-  try {
-    return typeof window === 'undefined' ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-}
 
 export function useAutosave(storage: KeyValueStorage | null = browserStorage()): void {
   useEffect(() => {
@@ -57,6 +50,7 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
         { json: record.json },
         {
           quiet: true,
+          localOnly: true,
           onResult: ({ changed }) => {
             if (!changed) {
               console.warn('llull: autosave could not be restored; discarding it');
@@ -78,7 +72,7 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
         state.document.entities !== previous.document.entities ||
         state.document.building !== previous.document.building ||
         state.document.featureHistory !== previous.document.featureHistory;
-      if (!changed) return;
+      if (!changed || state.liveStatus === 'connected') return;
       useSessionStore.getState().markDirty();
       pending = true;
       if (timer !== null) clearTimeout(timer);

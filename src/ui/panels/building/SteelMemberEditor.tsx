@@ -8,6 +8,7 @@ import { useStore } from '@ui/store';
 import type { SteelMemberElement } from '@core/model/building';
 import {
   buildSteelMemberUpdate,
+  isHorizontalMember,
   steelMemberValues,
   type SteelMemberEditKey,
   type SteelMemberEditValues,
@@ -67,6 +68,8 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
   const dispatch = useStore((s) => s.dispatch);
   const initial = steelMemberValues(member);
   const [values, setValues] = useState<SteelMemberEditValues>(initial);
+  const horizontal = isHorizontalMember(member);
+  const [keepTopOfSteel, setKeepTopOfSteel] = useState(true);
   const set =
     (key: SteelMemberEditKey) =>
     (value: string): void =>
@@ -74,7 +77,7 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
-    const params = buildSteelMemberUpdate(member.id, initial, values);
+    const params = buildSteelMemberUpdate(member.id, initial, values, horizontal && keepTopOfSteel);
     if (params !== null) dispatch('update_steel_member', params);
   };
 
@@ -91,6 +94,17 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
         options={ALL_PROFILES}
         onChange={set('profile')}
       />
+      {horizontal && values.profile !== initial.profile && (
+        <label className="field">
+          <input
+            type="checkbox"
+            checked={keepTopOfSteel}
+            onChange={(event) => setKeepTopOfSteel(event.target.checked)}
+            data-testid="member-keep-top"
+          />
+          <span className="field__label">Keep top of steel (move the axis)</span>
+        </label>
+      )}
       <TextField label="Grade" value={values.material} onChange={set('material')} />
       <SelectField
         label="Role"

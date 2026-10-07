@@ -67,3 +67,12 @@ export function readAutosave(storage: KeyValueStorage): AutosaveRecord | null {
   clearAutosave(storage);
   return null;
 }
+
+/** The browser's localStorage, or null when unavailable (private mode, SSR, blocked storage). */
+export function browserStorage(): KeyValueStorage | null {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}

@@ -59,6 +59,9 @@ export function runLocally(
   }
   const coalesce =
     options?.coalesce === true && state.localUndoStack.length > 0 && state.localOutbox.length > 0;
+  const localOnly =
+    options?.localOnly === true ||
+    (coalesce && state.localOutbox[state.localOutbox.length - 1]?.localOnly === true);
   set({
     document: {
       ...result.document,
@@ -78,6 +81,7 @@ export function runLocally(
         params,
         affected: result.affected,
         ...(coalesce ? { coalesced: true } : {}),
+        ...(localOnly ? { localOnly: true } : {}),
       },
     ],
     localRedoOutbox: [],

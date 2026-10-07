@@ -8,7 +8,7 @@
 import React, { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
-import { clearAutosave } from '@ui/store/autosave';
+import { browserStorage, clearAutosave } from '@ui/store/autosave';
 import { Icon } from '@ui/components/Icon';
 
 /** The notice hides itself after this long; the restored work stays. */
@@ -29,11 +29,8 @@ export function RestoredBanner(): React.ReactElement | null {
 
   const startFresh = (): void => {
     dispatch('clear_document', {});
-    try {
-      clearAutosave(window.localStorage);
-    } catch {
-      // storage unavailable: nothing to clear
-    }
+    const storage = browserStorage();
+    if (storage !== null) clearAutosave(storage);
     useSessionStore.getState().markSaved();
     setRestoredAt(null);
   };

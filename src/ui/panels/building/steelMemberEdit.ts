@@ -27,6 +27,11 @@ const EDIT_KEYS: ReadonlyArray<SteelMemberEditKey> = [
   'note',
 ];
 
+/** Horizontal axis: a section change can keep its top of steel. */
+export function isHorizontalMember(member: SteelMemberElement): boolean {
+  return Math.abs(member.end[2] - member.start[2]) < 1e-9;
+}
+
 export function steelMemberValues(member: SteelMemberElement): SteelMemberEditValues {
   return {
     profile: member.profile,
@@ -44,6 +49,8 @@ export function buildSteelMemberUpdate(
   memberId: string,
   initial: SteelMemberEditValues,
   values: SteelMemberEditValues,
+  /** A new section keeps the top of steel (horizontal members; the command ignores it otherwise). */
+  keepTopOfSteel = false,
 ): Record<string, unknown> | null {
   const changes: Record<string, unknown> = {};
   for (const key of EDIT_KEYS) {
@@ -54,6 +61,9 @@ export function buildSteelMemberUpdate(
     changes[key] = key === 'note' ? values[key] : text;
   }
   if (Object.keys(changes).length === 0) return null;
-  // A new section keeps the top of steel of a horizontal member (the command ignores it otherwise).
-  return { memberId, ...changes, ...('profile' in changes ? { keepTopOfSteel: true } : {}) };
+  return {
+    memberId,
+    ...changes,
+    ...(keepTopOfSteel && 'profile' in changes ? { keepTopOfSteel: true } : {}),
+  };
 }

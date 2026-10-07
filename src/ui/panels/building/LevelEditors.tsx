@@ -8,23 +8,28 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import type { BuildingLevel } from '@core/model/building';
+import { COPYABLE } from '@aec/elements';
 
-/** Mirrors the copyable categories of copy_level_elements. */
-export const COPYABLE_CATEGORIES: ReadonlyArray<readonly [string, string]> = [
-  ['wall', 'Walls'],
-  ['curvedWall', 'Curved walls'],
-  ['slab', 'Slabs'],
-  ['column', 'Columns'],
-  ['beam', 'Beams'],
-  ['stair', 'Stairs'],
-  ['room', 'Rooms'],
-  ['member', 'Steel members'],
-  ['footing', 'Footings'],
-  ['panel', 'Panels'],
-  ['equipment', 'Equipment'],
-  ['pipe', 'Pipes'],
-  ['tray', 'Cable trays'],
-];
+const CATEGORY_LABELS: Record<(typeof COPYABLE)[number], string> = {
+  wall: 'Walls',
+  curvedWall: 'Curved walls',
+  slab: 'Slabs',
+  column: 'Columns',
+  beam: 'Beams',
+  stair: 'Stairs',
+  room: 'Rooms',
+  member: 'Steel members',
+  footing: 'Footings',
+  panel: 'Panels',
+  equipment: 'Equipment',
+  pipe: 'Pipes',
+  tray: 'Cable trays',
+};
+
+/** Copyable categories of copy_level_elements (read from the AEC command). */
+export const COPYABLE_CATEGORIES: ReadonlyArray<readonly [string, string]> = COPYABLE.map(
+  (category) => [category, CATEGORY_LABELS[category]] as const,
+);
 
 interface LevelEditFormProps {
   level: BuildingLevel;

@@ -473,6 +473,30 @@ describe('CadStore — offline fallback', () => {
     expect(getState().hasUnsyncedLocalEdits).toBe(false);
   });
 
+  it('never replays a local-only restore (and its coalesced framing) to the server', async () => {
+    useStore.setState({ liveStatus: 'disconnected' });
+    const restored = serializeDocument(
+      execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document,
+    );
+    getState().dispatch('load_document', { json: restored }, { localOnly: true });
+    getState().dispatch('fit_view', { direction: 'iso' }, { coalesce: true });
+    getState().dispatch('add_sphere', { radius: 2 });
+    expect(getState().localOutbox.map((c) => [c.name, c.localOnly === true])).toEqual([
+      ['load_document', true],
+      ['fit_view', true],
+      ['add_sphere', false],
+    ]);
+    const server = simulatedServer();
+    vi.stubGlobal('fetch', server.fetch);
+    useStore.setState({ liveStatus: 'connected' });
+
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument()));
+    await vi.waitFor(() => expect(getState().syncState).toBe('idle'));
+
+    expect(server.commands()).toEqual(['add_sphere']);
+    expect(getState().localOutbox).toEqual([]);
+  });
+
   it('an offline undo drops its command from the outbox; redo re-queues it', () => {
     useStore.setState({ liveStatus: 'disconnected' });
     getState().dispatch('add_box', { size: [1, 1, 1] });

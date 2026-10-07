@@ -3,13 +3,15 @@
  *
  * ProjectIO — Save downloads the in-store document as JSON; Open reads a chosen file and
  * dispatches `load_document` (PRIME DIRECTIVE: never mutate the document outside a command).
- * Cross-session persistence is the server-side autosave in `server/src/liveDocument.ts`.
+ * New clears it (`clear_document`) and the browser autosave. Cross-session persistence: the browser
+ * autosave (`useAutosave`) offline, the server-side autosave (`server/src/liveDocument.ts`) online.
  */
 
 import React, { useRef, useState } from 'react';
 import { useStore, useToolStore } from '@ui/store';
+import { isLocalMode } from '@ui/store/localMode';
 import { useSessionStore } from '@ui/store/sessionStore';
-import { clearAutosave } from '@ui/store/autosave';
+import { browserStorage, clearAutosave } from '@ui/store/autosave';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { projectFileStem } from '@ui/components/projectName';
 import { serializeDocument } from '@core/commands/persistence';
@@ -27,6 +29,7 @@ function timestamp(): string {
 
 export function ProjectIO(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const liveStatus = useStore((s) => s.liveStatus);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [confirmingNew, setConfirmingNew] = useState(false);
@@ -45,11 +48,8 @@ export function ProjectIO(): React.ReactElement {
     useStore.getState().clearLastMeasure();
     useToolStore.getState().setDrawTool('none');
     useToolStore.getState().setModifyTool('none');
-    try {
-      clearAutosave(window.localStorage);
-    } catch {
-      // storage unavailable: nothing to clear
-    }
+    const storage = browserStorage();
+    if (storage !== null) clearAutosave(storage);
     useSessionStore.getState().setRestoredAt(null);
     useSessionStore.getState().markSaved();
     setConfirmingNew(false);
@@ -60,12 +60,17 @@ export function ProjectIO(): React.ReactElement {
     else setConfirmingNew(true);
   };
 
-  const afterOpen = ({ changed }: { changed: boolean }): void => {
-    if (!changed) return;
-    useSessionStore.getState().markSaved();
-    useSessionStore.getState().setRestoredAt(null);
-    dispatch('fit_view', { direction: 'iso' }, { quiet: true, coalesce: true });
-  };
+  /** After Open: framing an empty → loaded document is useAutoFrame's job; frame a replaced one here. */
+  const afterOpen =
+    (replacedContent: boolean) =>
+    ({ changed }: { changed: boolean }): void => {
+      if (!changed) return;
+      useSessionStore.getState().markSaved();
+      useSessionStore.getState().setRestoredAt(null);
+      if (replacedContent && isLocalMode(useStore.getState())) {
+        dispatch('fit_view', { direction: 'iso' }, { quiet: true, coalesce: true });
+      }
+    };
 
   const handleOpenClick = (): void => {
     fileInputRef.current?.click();
@@ -76,7 +81,8 @@ export function ProjectIO(): React.ReactElement {
     e.target.value = '';
     if (!file) return;
     void file.text().then((json) => {
-      dispatch('load_document', { json }, { onResult: afterOpen });
+      const replacedContent = useStore.getState().document.order.length > 0;
+      dispatch('load_document', { json }, { onResult: afterOpen(replacedContent) });
     });
   };
 
@@ -123,7 +129,11 @@ export function ProjectIO(): React.ReactElement {
       {confirmingNew && (
         <ConfirmDialog
           title="Start a new project?"
-          message="This clears the current model. You can undo it right after."
+          message={
+            liveStatus === 'connected'
+              ? 'This clears the SHARED live model on the server, for every connected user and agent. You can undo it right after.'
+              : 'This clears the current model. You can undo it right after.'
+          }
           confirmLabel="Clear and start new"
           onConfirm={startNewProject}
           onCancel={() => setConfirmingNew(false)}
