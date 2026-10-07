@@ -43,6 +43,8 @@ import {
 } from './ifcStep';
 import type { Exported } from './ifcElementExport';
 import { dot3 } from '@lib/vec3';
+import { vesselSolid } from './ifcVesselExport';
+import { shapeOf } from './industrial/equipmentShape';
 
 /** IFC parametric profile definition of a catalogue section (dimensions in mm). */
 function steelProfileDef(context: Context, profile: SteelProfile): string {
@@ -168,20 +170,24 @@ export function exportIndustrial(
     }
     case 'equipment': {
       const [length, width, height] = element.size;
+      const equipmentShape = shapeOf(element);
       const local = placement(
         context,
         storeyPlacement,
         mm(element.location[0]),
         mm(element.location[1]),
-        0,
+        equipmentShape === 'horizontal_vessel' ? mm(width) / 2 : 0,
         element.angle,
       );
-      const profile = rectangleProfile(context, [0, 0], mm(length), mm(width));
+      const solid =
+        vesselSolid(context, element) ??
+        extrusion(context, rectangleProfile(context, [0, 0], mm(length), mm(width)), mm(height));
       const ref = writer.add(
-        `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [extrusion(context, profile, mm(height))])},${ifcString(element.id)},.ELEMENT.)`,
+        `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [solid])},${ifcString(element.id)},.ELEMENT.)`,
       );
       addPropertySet(context, { id: element.id, ref }, 'Pset_llullEquipment', [
         `IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(${ifcReal(element.weight)}),$)`,
+        `IFCPROPERTYSINGLEVALUE('Shape','box, vertical_vessel or horizontal_vessel',IFCLABEL(${ifcString(equipmentShape)}),$)`,
         `IFCPROPERTYSINGLEVALUE('MaintenanceClearance','Free space around the footprint, mm',IFCLENGTHMEASURE(${ifcReal(mm(element.clearance))}),$)`,
       ]);
       return { ref, material: null };

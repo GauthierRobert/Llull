@@ -10,6 +10,7 @@ import { MEMBER_LAYER } from './entities';
 import { arcThrough } from './curvedWallGeometry';
 import { parseWallLayers } from './wallLayers';
 import { isVec2 } from './model';
+import { EQUIPMENT_SHAPES } from './industrial/equipmentShape';
 
 /** Numeric fields each category must carry (finite numbers). */
 const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -262,6 +263,14 @@ function elementErrors(
     !(isPoint3(element['size']) && (element['size'] as number[]).every((n) => n > 0))
   ) {
     errors.push(`building element ${key}: size must be [length, width, height], all > 0`);
+  }
+  const shapeValue = element['shape'];
+  if (
+    category === 'equipment' &&
+    shapeValue !== undefined &&
+    !(typeof shapeValue === 'string' && EQUIPMENT_SHAPES.includes(shapeValue))
+  ) {
+    errors.push(`building element ${key}: shape must be one of ${EQUIPMENT_SHAPES.join(', ')}`);
   }
   const role = element['role'];
   if (

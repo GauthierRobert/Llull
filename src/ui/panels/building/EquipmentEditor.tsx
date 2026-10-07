@@ -56,6 +56,18 @@ export function EquipmentEditor({ element, levels }: EquipmentEditorProps): Reac
         </label>
       ))}
       <label className="field">
+        <span className="field__label">Shape</span>
+        <select
+          value={values.shape}
+          onChange={(event) => change('shape', event.target.value)}
+          data-testid="equipment-edit-shape"
+        >
+          <option value="box">Box / machine</option>
+          <option value="vertical_vessel">Vertical vessel</option>
+          <option value="horizontal_vessel">Horizontal vessel</option>
+        </select>
+      </label>
+      <label className="field">
         <span className="field__label">Level</span>
         <select
           value={values.levelId}

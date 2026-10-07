@@ -684,7 +684,7 @@
     "name": "add_drive_relation"
   },
   {
-    "description": "Place a machine / process equipment on a level: name, plan centre, size [length, width, height], plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and operating weight in kg (for floor loads). Shown as a block in 3D and with its clearance zone in plan.",
+    "description": "Place a machine / process equipment on a level: name, plan centre, size [length, width, height], plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -714,8 +714,17 @@
           "description": "Equipment name, e.g. \"CNC lathe\", \"Compressor\".",
           "type": "string"
         },
+        "shape": {
+          "description": "Shape: \"box\" (default), \"vertical_vessel\" (cylinder, axis along Z: size = [diameter, ignored, height]; the width is set equal to the diameter) or \"horizontal_vessel\" (cylinder, axis along its local x: size = [length, diameter, ignored]; the height is set equal to the diameter and the bottom rests on the level). Plans draw a vertical vessel as a circle.",
+          "enum": [
+            "box",
+            "vertical_vessel",
+            "horizontal_vessel"
+          ],
+          "type": "string"
+        },
         "size": {
-          "description": "[length (local x), width (local y), height], all > 0.",
+          "description": "Three numbers. box: [length (local x), width (local y), height], all > 0. vertical_vessel: [diameter, ignored, height]. horizontal_vessel: [length along local x, diameter, ignored].",
           "items": {
             "type": "number"
           },
@@ -6424,7 +6433,7 @@
     "name": "update_constraint"
   },
   {
-    "description": "Edit an existing equipment in place (revision): name, tag (mark), plan centre, size, plan rotation, maintenance clearance, operating weight or level. Identify it by `elementId` (e.g. \"equipment-2\") or by its current tag `currentMark` (e.g. \"EQ3\"). The element id is kept, so schedules, plan tags and IFC GlobalIds stay stable across the revision. Fields you omit are unchanged.",
+    "description": "Edit an existing equipment in place (revision): name, tag (mark), plan centre, size, plan rotation, maintenance clearance, operating weight, shape (box / vertical_vessel / horizontal_vessel) or level. Identify it by `elementId` (e.g. \"equipment-2\") or by its current tag `currentMark` (e.g. \"EQ3\"). The element id is kept, so schedules, plan tags and IFC GlobalIds stay stable across the revision. Fields you omit are unchanged.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -6462,8 +6471,17 @@
           "description": "New equipment name.",
           "type": "string"
         },
+        "shape": {
+          "description": "New shape. Shape: \"box\" (default), \"vertical_vessel\" (cylinder, axis along Z: size = [diameter, ignored, height]; the width is set equal to the diameter) or \"horizontal_vessel\" (cylinder, axis along its local x: size = [length, diameter, ignored]; the height is set equal to the diameter and the bottom rests on the level). Plans draw a vertical vessel as a circle.",
+          "enum": [
+            "box",
+            "vertical_vessel",
+            "horizontal_vessel"
+          ],
+          "type": "string"
+        },
         "size": {
-          "description": "New [length, width, height], all > 0.",
+          "description": "New size, three numbers. box: [length, width, height], all > 0. vertical_vessel: [diameter, ignored, height]. horizontal_vessel: [length along local x, diameter, ignored]. Vessel sizes are normalised to their bounding box.",
           "items": {
             "type": "number"
           },

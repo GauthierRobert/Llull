@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { shapeOf } from './industrial/equipmentShape';
 import type { Vec2 } from '@core/model/types';
 import type { BuildingElement, BuildingLevel } from '@core/model/building';
 import { distance } from '@lib/polygon';
@@ -139,18 +140,40 @@ export function industrialPrimitives(
       const rectangle = (hx: number, hy: number): Vec2[] =>
         rectangleAt(element.location, hx, hy, element.angle);
       const layer = layerName('equipment');
+      const round = shapeOf(element) === 'vertical_vessel';
+      const [cx, cy] = [element.location[0] as number, element.location[1] as number];
+      const arm = length / 2;
+      const outline: PlanPrimitive[] = round
+        ? [
+            { type: 'circle', layer, style: 'thin', center: [cx, cy], radius: arm },
+            thinLine(layer, [cx - arm / 2, cy], [cx + arm / 2, cy]),
+            thinLine(layer, [cx, cy - arm / 2], [cx, cy + arm / 2]),
+          ]
+        : [{ type: 'polygon', layer, style: 'thin', points: rectangle(length / 2, width / 2) }];
+      const zone: PlanPrimitive[] =
+        element.clearance <= 0
+          ? []
+          : round
+            ? [
+                {
+                  type: 'circle',
+                  layer,
+                  style: 'hidden',
+                  center: [cx, cy],
+                  radius: arm + element.clearance,
+                },
+              ]
+            : [
+                {
+                  type: 'polygon',
+                  layer,
+                  style: 'hidden',
+                  points: rectangle(length / 2 + element.clearance, width / 2 + element.clearance),
+                },
+              ];
       return [
-        { type: 'polygon', layer, style: 'thin', points: rectangle(length / 2, width / 2) },
-        ...(element.clearance > 0
-          ? [
-              {
-                type: 'polygon',
-                layer,
-                style: 'hidden',
-                points: rectangle(length / 2 + element.clearance, width / 2 + element.clearance),
-              } as PlanPrimitive,
-            ]
-          : []),
+        ...outline,
+        ...zone,
         annotationText(
           layer,
           element.location,

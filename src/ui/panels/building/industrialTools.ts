@@ -43,6 +43,11 @@ const DN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ]),
 ];
 
+const EQUIPMENT_SHAPE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
+  ['box', 'Box / machine'],
+  ['vertical_vessel', 'Vertical vessel (tank, DT)'],
+  ['horizontal_vessel', 'Horizontal vessel'],
+];
 const BEAM_ONLY = { key: 'role', values: ['beam'] } as const;
 const COLUMN_ONLY = { key: 'role', values: ['column'] } as const;
 
@@ -228,10 +233,11 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     fields: [
       txt('mark', 'Tag (E-301…)', '', true),
       txt('name', 'Name', 'Machine'),
+      select('shape', 'Shape', 'box', EQUIPMENT_SHAPE_OPTIONS),
       num('x', 'Centre X', '6000'),
       num('y', 'Centre Y', '6000'),
-      num('length', 'Length', '3000'),
-      num('width', 'Width', '2000'),
+      num('length', 'Length (vertical vessel: Ø)', '3000'),
+      num('width', 'Width (horizontal vessel: Ø)', '2000'),
       num('height', 'Height', '2000'),
       num('angle', 'Rotation (°)', '0'),
       num('clearance', 'Clearance', '800'),
@@ -246,6 +252,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         name: reader.text('name'),
         location: reader.point('x', 'y'),
         size: [reader.number('length'), reader.number('width'), reader.number('height')],
+        shape: reader.text('shape') === 'box' ? undefined : reader.text('shape'),
         angle: radians(reader.number('angle')),
         clearance: reader.number('clearance'),
         weight: reader.optionalNumber('weight'),

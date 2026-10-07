@@ -20,7 +20,8 @@ export type EquipmentEditKey =
   | 'angle'
   | 'clearance'
   | 'weight'
-  | 'levelId';
+  | 'levelId'
+  | 'shape';
 
 export type EquipmentEditValues = Readonly<Record<EquipmentEditKey, string>>;
 
@@ -58,6 +59,7 @@ export function equipmentValues(element: EquipmentElement): EquipmentEditValues 
     clearance: String(element.clearance),
     weight: String(element.weight),
     levelId: element.levelId,
+    shape: element.shape ?? 'box',
   };
 }
 
@@ -85,6 +87,7 @@ export function buildEquipmentUpdate(
   if (changed('clearance')) changes['clearance'] = reader.number('clearance');
   if (changed('weight')) changes['weight'] = reader.number('weight');
   if (changed('levelId')) changes['levelId'] = reader.text('levelId');
+  if (changed('shape')) changes['shape'] = reader.text('shape');
   if (Object.keys(changes).length === 0) return { ok: false, reason: 'Nothing changed.' };
   const outcome = result(reader, 'update_equipment', { elementId, ...changes });
   return outcome.ok ? { ok: true, params: outcome.params } : outcome;

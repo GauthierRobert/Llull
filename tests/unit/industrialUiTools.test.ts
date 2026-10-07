@@ -103,6 +103,20 @@ describe('industrial tools', () => {
     expect(hall.ok && 'crane' in hall.params).toBe(false);
     const equipment = tool('equipment').build(defaultValues(tool('equipment')), context);
     expect(equipment.ok && 'weight' in equipment.params).toBe(false);
+    expect(equipment.ok && 'shape' in equipment.params).toBe(false);
+  });
+
+  it('places a vertical vessel from the equipment form', () => {
+    const doc = apply(createEmptyDocument(), 'equipment', {
+      name: 'Desolventizer-toaster',
+      shape: 'vertical_vessel',
+      length: '4000',
+      height: '12000',
+    });
+    const vessel = Object.values(doc.building?.elements ?? {}).find(
+      (element) => element.category === 'equipment',
+    );
+    expect(vessel).toMatchObject({ shape: 'vertical_vessel', size: [4000, 4000, 12000] });
   });
 
   it('reports malformed point lists and a missing equipment name', () => {

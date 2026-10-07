@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import { shapeOf } from './industrial/equipmentShape';
 import type { CadDocument } from '@core/model/types';
 import type {
   CurvedWallElement,
@@ -319,6 +320,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
           `Size (${unit})`,
           `Clearance (${unit})`,
           'Weight (kg)',
+          'Shape',
         ],
         rows: elementsOf(building, 'equipment').map((equipment) => [
           equipment.mark,
@@ -329,6 +331,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
           equipment.size.join('×'),
           equipment.clearance,
           equipment.weight,
+          shapeOf(equipment),
         ]),
       };
     case 'pipe':
