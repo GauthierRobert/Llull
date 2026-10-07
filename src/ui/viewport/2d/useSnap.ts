@@ -47,6 +47,7 @@ interface UseSnapOpts {
 function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
   const entities = useStore((s) => s.document.entities);
   const order = useStore((s) => s.document.order);
+  const components = useStore((s) => s.document.components);
   const layers = useStore((s) => s.document.layers);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
@@ -80,12 +81,12 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
   const staticCandidates = useMemo(
     () =>
       collectSnapCandidates(
-        { entities, order },
+        { entities, order, components },
         { ...collectOpts, extensions: false, nearest: false, isVisible },
         drawOrigin ?? null,
         null,
       ),
-    [entities, order, collectOpts, drawOrigin, isVisible],
+    [entities, order, components, collectOpts, drawOrigin, isVisible],
   );
 
   // Cursor-DEPENDENT candidates: extension + nearest only. These do follow the

@@ -9,11 +9,12 @@
  * hull of its projected bounding box / vertices (mesh, revolution, wedge, pyramid, box, instance).
  */
 
-import { instanceBoundsFromDoc, localBounds } from '@core/commands/sceneBounds';
+import { localBounds } from '@core/commands/sceneBounds';
 import { applyEulerXYZ } from '@core/lib/eulerRotation';
-import type { CadDocument, Entity, Vec2, Vec3 } from '@core/model/types';
+import type { CadDocument, Entity, InstanceEntity, Vec2, Vec3 } from '@core/model/types';
 import { is3D } from '@core/model/types';
 import { projectOntoSegment } from '@lib/polygon';
+import type { SnapPoint } from './snapping/types';
 
 export type OutlineRing = ReadonlyArray<Vec2>;
 
@@ -85,6 +86,29 @@ function torusSurface(ringRadius: number, tubeRadius: number): Vec3[] {
   return points;
 }
 
+type ComponentsDoc = Pick<CadDocument, 'components'>;
+
+const MAX_INSTANCE_DEPTH = 4;
+
+/** Union of the component's child outlines, mapped through the instance's scale/rotation/position. */
+function instanceRings(document: ComponentsDoc, e: InstanceEntity, depth: number): OutlineRing[] {
+  const component = document.components[e.componentId];
+  if (!component || depth >= MAX_INSTANCE_DEPTH) return [];
+  const [sx, sy] = e.scale ?? [1, 1, 1];
+  const rings = component.order.flatMap((childId) => {
+    const child = component.entities[childId];
+    return child ? outlineRings(document, child, depth + 1) : [];
+  });
+  const placed = rings.map((ring) =>
+    ring.map(([x, y]): Vec2 => {
+      const rotated = applyEulerXYZ([x * sx, y * sy, 0], ORIGIN, e.rotation);
+      return [rotated[0] + e.position[0], rotated[1] + e.position[1]];
+    }),
+  );
+  // A tilted instance is no longer a flat union: use the hull of everything.
+  return isUpright(e) || placed.length === 0 ? placed : [convexHull(placed.flat())];
+}
+
 /** Hull of the entity's projected local points; the common fallback. */
 const hullRing = (e: Entity, local: ReadonlyArray<Vec3>): OutlineRing[] => [
   convexHull(toWorldXY(e, local)),
@@ -94,13 +118,13 @@ const hullRing = (e: Entity, local: ReadonlyArray<Vec3>): OutlineRing[] => [
  * Closed top-view rings of a 3D solid, or null for 2D shapes / empty geometry.
  * @pure
  */
-export function solidOutline(document: CadDocument, e: Entity): OutlineRing[] | null {
+export function solidOutline(document: ComponentsDoc, e: Entity): OutlineRing[] | null {
   if (!is3D(e)) return null;
-  const rings = outlineRings(document, e);
+  const rings = outlineRings(document, e, 0);
   return rings.length > 0 && rings.every((ring) => ring.length >= 2) ? rings : null;
 }
 
-function outlineRings(document: CadDocument, e: Entity): OutlineRing[] {
+function outlineRings(document: ComponentsDoc, e: Entity, depth: number): OutlineRing[] {
   switch (e.kind) {
     case 'cylinder': {
       const { min, max } = localBounds(e);
@@ -141,25 +165,66 @@ function outlineRings(document: CadDocument, e: Entity): OutlineRing[] {
       }
       return [convexHull(points)];
     }
-    case 'instance': {
-      const { min, max } = instanceBoundsFromDoc(e, document);
-      return [
-        [
-          [min[0], min[1]],
-          [max[0], min[1]],
-          [max[0], max[1]],
-          [min[0], max[1]],
-        ],
-      ];
+    case 'instance':
+      return instanceRings(document, e, depth);
+    case 'revolution': {
+      const upright = isUpright(e) && Math.abs(e.axis[2]) > 0.999 && e.angle >= 2 * Math.PI - 1e-9;
+      if (!upright) return hullRing(e, boundsCorners(e));
+      const radii = e.profile.map(([radial]) => Math.abs(radial));
+      const outer = Math.max(...radii);
+      const inner = Math.min(...radii);
+      const center = toWorldXY(e, [ORIGIN])[0] as Vec2;
+      // A profile that stays off the axis leaves a hole: draw its inner ring too.
+      return inner > 1e-9
+        ? [circleAround(center, outer), circleAround(center, inner)]
+        : [circleAround(center, outer)];
     }
     default:
-      // box, wedge, pyramid, revolution: hull of the projected local bounding box.
+      // box, wedge, pyramid: hull of the projected local bounding box.
       return hullRing(e, boundsCorners(e));
   }
 }
 
 function circleAround(center: Vec2, radius: number): Vec2[] {
   return circlePoints(radius, 0).map(([x, y]): Vec2 => [center[0] + x, center[1] + y]);
+}
+
+/** Rings with at least this many points are treated as curves (no per-vertex snaps). */
+const CURVE_RING_MIN_POINTS = 32;
+
+/**
+ * Snap points of a solid's top-view outline: polygon rings give vertices (endpoint) and edge
+ * midpoints; curved rings give a centre plus the four extreme points (quadrants).
+ * @pure
+ */
+export function solidSnapPoints(
+  document: Partial<ComponentsDoc>,
+  e: Entity,
+): ReadonlyArray<SnapPoint> {
+  const rings = solidOutline({ components: document.components ?? {} }, e);
+  if (rings === null) return [];
+  const snaps: SnapPoint[] = [];
+  for (const ring of rings) {
+    if (ring.length >= CURVE_RING_MIN_POINTS) {
+      const cx = ring.reduce((sum, p) => sum + p[0], 0) / ring.length;
+      const cy = ring.reduce((sum, p) => sum + p[1], 0) / ring.length;
+      snaps.push({ x: cx, y: cy, type: 'center' });
+      const extremes = [
+        ring.reduce((best, p) => (p[0] > best[0] ? p : best)),
+        ring.reduce((best, p) => (p[0] < best[0] ? p : best)),
+        ring.reduce((best, p) => (p[1] > best[1] ? p : best)),
+        ring.reduce((best, p) => (p[1] < best[1] ? p : best)),
+      ];
+      for (const [x, y] of extremes) snaps.push({ x, y, type: 'endpoint' });
+    } else {
+      ring.forEach(([x, y], i) => {
+        const [nx, ny] = ring[(i + 1) % ring.length] as Vec2;
+        snaps.push({ x, y, type: 'endpoint' });
+        snaps.push({ x: (x + nx) / 2, y: (y + ny) / 2, type: 'midpoint' });
+      });
+    }
+  }
+  return snaps;
 }
 
 /** Squared distance from `point` to the nearest ring segment (rings are closed). @pure */

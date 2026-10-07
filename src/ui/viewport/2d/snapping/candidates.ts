@@ -5,7 +5,8 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import { is2D } from '@core/model/types';
+import { is3D } from '@core/model/types';
+import { solidSnapPoints } from '../solidOutline';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
 import {
   curveCurveIntersections,
@@ -37,7 +38,7 @@ import {
  * @pure deterministic, no side effects
  */
 export function collectSnapCandidates(
-  document: Pick<CadDocument, 'entities' | 'order'>,
+  document: Pick<CadDocument, 'entities' | 'order'> & Partial<Pick<CadDocument, 'components'>>,
   opts: CollectOpts = {},
   fromPoint?: Vec2 | null,
   cursorPoint?: Vec2 | null,
@@ -106,7 +107,7 @@ export function collectSnapCandidates(
 
   for (const id of document.order) {
     const entity = document.entities[id];
-    if (!entity || !is2D(entity) || !isVisible(entity)) continue;
+    if (!entity || !isVisible(entity)) continue;
 
     // Entity-local -> world XY (rotation about Z, then position).
     const world = (lx: number, ly: number): [number, number] => localToWorld2D(entity, lx, ly);
@@ -227,8 +228,19 @@ export function collectSnapCandidates(
         break;
       }
 
-      // 3D solids have no 2D snap geometry — already filtered by is2D above.
+      // Text and dimensions have no snap geometry; 3D solids snap to their top-view outline.
       default:
+        if (is3D(entity) && entity.tags?.includes('bim') !== true) {
+          for (const snap of solidSnapPoints(document, entity)) {
+            const wanted =
+              snap.type === 'endpoint'
+                ? doEndpoints
+                : snap.type === 'midpoint'
+                  ? doMidpoints
+                  : doCenters;
+            if (wanted) candidates.push(snap);
+          }
+        }
         break;
     }
   }
