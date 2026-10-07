@@ -10,7 +10,9 @@
  */
 
 import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
-import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
+import type * as THREE from 'three';
+import type { CadDocument, DimensionEntity, Entity, EntityId, Vec2 } from '@core/model/types';
+import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
 
 /** Pick radius in screen pixels (selection and modify-tool picks). */
@@ -195,6 +197,45 @@ function chainDistSq(pick: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): 
   return best;
 }
 
+/** Dimension label height (world units) used for picking — matches DimensionRenderer2D. */
+const DIMENSION_LABEL_HEIGHT = 0.5;
+
+/**
+ * Squared distance from `worldPick` to a dimension's label box (estimated from the label text).
+ * Dimensions are associative, so the label position comes from the referenced entities.
+ * @failure dangling or wrong-kind references -> Infinity (not pickable)
+ */
+export function dimensionLabelDistSq(
+  document: CadDocument,
+  dimension: DimensionEntity,
+  worldPick: Vec2,
+): number {
+  const drawing = dimensionDrawing(
+    dimension.dimensionKind,
+    dimension.entityIds.map((id) => document.entities[id]),
+    dimension.offset ?? DEFAULT_OFFSET,
+    dimension.color,
+  );
+  if (drawing === null) return Infinity;
+  drawing.lines?.geometry.dispose();
+  (drawing.lines?.material as THREE.Material | undefined)?.dispose();
+  const text =
+    dimension.label ||
+    (dimension.dimensionKind === 'angular'
+      ? `${drawing.value.toFixed(1)}°`
+      : drawing.value.toFixed(dimension.precision ?? document.displayPrecision));
+  const halfWidth = (text.length * DIMENSION_LABEL_HEIGHT * TEXT_PICK_EM_WIDTH) / 2;
+  const dx = Math.max(
+    Math.abs(worldPick[0] - dimension.position[0] - drawing.textX) - halfWidth,
+    0,
+  );
+  const dy = Math.max(
+    Math.abs(worldPick[1] - dimension.position[1] - drawing.textY) - DIMENSION_LABEL_HEIGHT / 2,
+    0,
+  );
+  return dx * dx + dy * dy;
+}
+
 /**
  * Id of the entity nearest to `worldPick` within `tolerance` world units, or null.
  * Entities rejected by `isPickable` (e.g. hidden ones) are ignored.
@@ -212,7 +253,10 @@ export function nearestEntityId(
   for (const id of document.order) {
     const entity = document.entities[id];
     if (!entity || !isPickable(entity)) continue;
-    const dSq = entityDistSq(entity, worldPick);
+    const dSq =
+      entity.kind === 'dimension'
+        ? dimensionLabelDistSq(document, entity, worldPick)
+        : entityDistSq(entity, worldPick);
     if (dSq < toleranceSq && dSq < bestDist) {
       bestDist = dSq;
       bestId = id;
