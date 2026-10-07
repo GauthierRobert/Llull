@@ -61,6 +61,18 @@ describe('add_level / update_level / delete_level / set_active_level', () => {
     ).toEqual([]);
   });
 
+  it('falls back to the first level when the stored active level no longer exists', () => {
+    const base = run(createEmptyDocument(), 'add_level', {});
+    const doc: CadDocument = {
+      ...base,
+      building: { ...base.building!, activeLevelId: 'level-99' },
+    };
+    const result = execute(doc, 'add_wall', { start: [0, 0], end: [3000, 0] });
+    expect(Object.keys(result.document.building!.levels)).toEqual(['level-1']);
+    expect(result.document.building!.elements['wall-1']).toMatchObject({ levelId: 'level-1' });
+    expect(execute(doc, 'check_clashes', {}).summary).toBe('No clashes found.');
+  });
+
   it('update_level with unchanged values is a no-op that records nothing', () => {
     const doc = run(createEmptyDocument(), 'add_level', { name: 'Ground' });
     const result = execute(doc, 'update_level', { levelId: 'level-1', name: ' ' });
