@@ -3,6 +3,7 @@ import { compactNumber } from '../lib/compactNumber';
 import { defineCommand, z, colorField, nameField } from './schema';
 import { nextId } from '../lib/id';
 import { sampleArc } from '../lib/arc';
+import { len2 } from '../lib/vec2';
 import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
 import { MAX_CURVE_SAMPLES } from './limits';
 import { DEFAULT_DRAW_COLOR, workPlanePositionField, workPlaneRotationField } from './draw2dShared';
@@ -30,7 +31,7 @@ function externalTangentPoints(p1: PulleySpec, p2: PulleySpec): readonly [Point,
   const [c2x, c2y] = p2.center;
   const dx = c2x - c1x;
   const dy = c2y - c1y;
-  const d = Math.sqrt(dx * dx + dy * dy);
+  const d = len2([dx, dy]);
   const alpha = Math.asin((p1.radius - p2.radius) / d);
   const angle = Math.atan2(dy, dx) + Math.PI / 2 + alpha;
   return [
@@ -142,7 +143,7 @@ export const drawBeltAround = defineCommand({
       const p2 = elementAt(pulleys, ni);
       const dx = p2.center[0] - p1.center[0];
       const dy = p2.center[1] - p1.center[1];
-      const d = Math.sqrt(dx * dx + dy * dy);
+      const d = len2([dx, dy]);
       if (d === 0) {
         return noop(
           doc,
@@ -171,7 +172,7 @@ export const drawBeltAround = defineCommand({
 
       const tdx = inTP[0] - outTP[0];
       const tdy = inTP[1] - outTP[1];
-      totalLength += Math.sqrt(tdx * tdx + tdy * tdy);
+      totalLength += len2([tdx, tdy]);
 
       // Wrap arc on pulleys[ni] from its incoming tangent point to its outgoing one.
       const pni = elementAt(pulleys, ni);
