@@ -13,12 +13,12 @@ import {
   mergeBounds,
 } from '@core/commands/sceneBounds';
 
-/** Half the default three.js PerspectiveCamera FOV (75 degrees). */
-const HALF_FOV_TAN = Math.tan((75 / 2) * (Math.PI / 180));
+/** Vertical field of view of the 3D viewport camera, in degrees (single source: Viewport3D). */
+export const CAMERA_FOV_DEGREES = 45;
 /** Margin applied on top of the exact fit distance. */
-const FIT_MARGIN = 1.35;
-/** Smallest framed sphere radius, so a point-like selection does not zoom to nothing. */
-const MIN_SPHERE_RADIUS = 1;
+const FIT_MARGIN = 1.15;
+/** Framed radius for a zero-extent selection (a lone point), so it does not zoom to nothing. */
+const DEGENERATE_SPHERE_RADIUS = 1;
 
 export interface FitFraming {
   readonly center: Vec3;
@@ -54,22 +54,31 @@ export function mergedEntityBounds(
 
 /**
  * @pure
+ * @param aspect viewport width / height (default square)
  * @failure no ids, or none that exist -> null
  */
 export function computeFitFraming(
   document: CadDocument,
   ids: readonly string[],
+  aspect = 1,
 ): FitFraming | null {
   const merged = mergedEntityBounds(document, ids);
   if (!merged) return null;
 
-  const sphereRadius = Math.max(
+  const extentRadius =
     Math.hypot(
       merged.max[0] - merged.min[0],
       merged.max[1] - merged.min[1],
       merged.max[2] - merged.min[2],
-    ) / 2,
-    MIN_SPHERE_RADIUS,
-  );
-  return { center: boundsCenter(merged), distance: (sphereRadius / HALF_FOV_TAN) * FIT_MARGIN };
+    ) / 2;
+  // Real size wins, however small (a 0.02 mm part must fill the view); only a point gets a default.
+  const sphereRadius = extentRadius > 0 ? extentRadius : DEGENERATE_SPHERE_RADIUS;
+  // The bounding sphere must fit the narrower of the vertical / horizontal half-angles.
+  const halfVertical = (CAMERA_FOV_DEGREES / 2) * (Math.PI / 180);
+  const halfHorizontal = Math.atan(Math.tan(halfVertical) * Math.max(aspect, 1e-3));
+  const halfAngle = Math.min(halfVertical, halfHorizontal);
+  return {
+    center: boundsCenter(merged),
+    distance: (sphereRadius / Math.sin(halfAngle)) * FIT_MARGIN,
+  };
 }

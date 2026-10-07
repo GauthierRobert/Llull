@@ -13,6 +13,7 @@ const fake = vi.hoisted(() => ({
   camera: null as unknown,
   controls: null as unknown,
   invalidate: (): void => undefined,
+  get: () => ({ size: { width: 800, height: 600 } }),
 }));
 
 vi.mock('@react-three/fiber', () => ({

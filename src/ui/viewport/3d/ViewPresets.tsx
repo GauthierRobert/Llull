@@ -35,11 +35,14 @@ type ApplyPreset = (direction: PresetDirection, target: THREE.Vector3, distance:
 // Module-level bridge between the inner (Canvas) and outer (DOM) layers: r3f has no portals or
 // context across the Canvas boundary. Holds ONLY the camera driver registered by
 // ViewPresetsInner; it never touches the document.
-const bridge: { applyPreset: ApplyPreset | null } = { applyPreset: null };
+const bridge: { applyPreset: ApplyPreset | null; getAspect: (() => number) | null } = {
+  applyPreset: null,
+  getAspect: null,
+};
 
 /** Mounted INSIDE the r3f Canvas (useThree); registers the camera driver for the overlay. */
 export function ViewPresetsInner(): null {
-  const { camera, controls, invalidate } = useThree();
+  const { camera, controls, invalidate, get } = useThree();
 
   useEffect(() => {
     bridge.applyPreset = (direction, target, distance) => {
@@ -61,11 +64,16 @@ export function ViewPresetsInner(): null {
       orbit.update();
       invalidate();
     };
+    bridge.getAspect = () => {
+      const { width, height } = get().size;
+      return height > 0 ? width / height : 1;
+    };
     // Unregister on unmount so a stale closure over a disposed camera cannot fire after teardown.
     return () => {
       bridge.applyPreset = null;
+      bridge.getAspect = null;
     };
-  }, [camera, controls, invalidate]);
+  }, [camera, controls, invalidate, get]);
 
   return null;
 }
@@ -77,7 +85,7 @@ export function ViewPresetsOverlay(): React.ReactElement {
 
   /** View `ids` from `direction`, framed to fit; nothing to frame -> origin from distance 10. */
   const frame = (direction: PresetDirection, ids: string[]): void => {
-    const framing = computeFitFraming(useStore.getState().document, ids);
+    const framing = computeFitFraming(useStore.getState().document, ids, bridge.getAspect?.() ?? 1);
     if (!framing) {
       bridge.applyPreset?.(direction, new THREE.Vector3(), 10);
       return;
