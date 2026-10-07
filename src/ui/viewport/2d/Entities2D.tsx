@@ -10,10 +10,10 @@
 
 import { useMemo } from 'react';
 import type { Entity, EntityId, LineEntity } from '@core/model/types';
-import { is2D } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { isEntityVisible } from '../entityVisibility';
 import { BatchedLines2D } from './BatchedLines2D';
+import { SolidFootprintRenderer } from './entities/SolidFootprintRenderer';
 import { LineRenderer } from './entities/LineRenderer';
 import { PolylineRenderer } from './entities/PolylineRenderer';
 import { CircleRenderer } from './entities/CircleRenderer';
@@ -54,9 +54,9 @@ function Entity2DRenderer({
       return <TextRenderer2D entity={entity} selected={selected} />;
     case 'dimension':
       return <DimensionRenderer2D entity={entity} selected={selected} />;
-    // 3D solid kinds are intentionally not rendered here.
+    // 3D solids appear in the top view as their XY footprint outline.
     default:
-      return null;
+      return <SolidFootprintRenderer entity={entity} selected={selected} />;
   }
 }
 
@@ -78,7 +78,7 @@ export function Entities2D(): React.ReactElement {
     const rest: Array<{ entity: Entity; selected: boolean }> = [];
     for (const id of order) {
       const entity = entities[id];
-      if (!entity || !is2D(entity)) continue;
+      if (!entity) continue;
       // Building annotations are drawn per level by BuildingPlan2D.
       if (entity.tags?.includes('bim') === true) continue;
       if (!isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds)) continue;

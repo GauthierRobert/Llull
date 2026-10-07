@@ -12,8 +12,10 @@
 import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import type * as THREE from 'three';
 import type { CadDocument, DimensionEntity, Entity, EntityId, Vec2 } from '@core/model/types';
+import { is3D } from '@core/model/types';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
+import { footprintOutlineDistSq, solidFootprint } from './solidFootprint';
 
 /** Pick radius in screen pixels (selection and modify-tool picks). */
 export const PICK_RADIUS_PX = 10;
@@ -254,6 +256,16 @@ export function dimensionLabelDistSq(
 }
 
 /**
+ * Squared distance to a 3D solid's top-view footprint outline; derived building geometry
+ * (`bim` tag, drawn per level elsewhere) is not pickable here.
+ */
+function solidOutlineDistSq(document: CadDocument, solid: Entity, worldPick: Vec2): number {
+  if (solid.tags?.includes('bim') === true) return Infinity;
+  const rect = solidFootprint(document, solid);
+  return rect === null ? Infinity : footprintOutlineDistSq(rect, worldPick);
+}
+
+/**
  * Id of the entity nearest to `worldPick` within `tolerance` world units, or null.
  * Entities rejected by `isPickable` (e.g. hidden ones) are ignored.
  * @pure
@@ -273,7 +285,9 @@ export function nearestEntityId(
     const dSq =
       entity.kind === 'dimension'
         ? dimensionLabelDistSq(document, entity, worldPick)
-        : entityDistSq(entity, worldPick);
+        : is3D(entity)
+          ? solidOutlineDistSq(document, entity, worldPick)
+          : entityDistSq(entity, worldPick);
     if (dSq < toleranceSq && dSq < bestDist) {
       bestDist = dSq;
       bestId = id;
