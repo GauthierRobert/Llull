@@ -26,6 +26,7 @@ import {
   CHAIN_DRAW_TOOLS,
   rectParamsFromCorners,
   circleRadiusFromPoints,
+  dropRepeatedPoints,
   ellipseParamsFromCenterCorner,
 } from './drawHelpers';
 
@@ -108,9 +109,15 @@ export function useDrawTool(): UseDrawToolResult {
   const finishChain = useCallback(() => {
     if (collectedPoints.length >= 2) {
       if (activeTool === 'wall') dispatch('draw_walls', wallChainParams(collectedPoints, false));
-      else if (activeTool === 'spline')
-        dispatch('draw_spline', { points: collectedPoints, closed: false });
-      else dispatch('draw_polyline', { points: collectedPoints, closed: false });
+      else {
+        const points = dropRepeatedPoints(collectedPoints);
+        if (points.length >= 2) {
+          dispatch(activeTool === 'spline' ? 'draw_spline' : 'draw_polyline', {
+            points,
+            closed: false,
+          });
+        }
+      }
     }
     setCollectedPoints([]);
   }, [activeTool, collectedPoints, dispatch, setCollectedPoints]);
