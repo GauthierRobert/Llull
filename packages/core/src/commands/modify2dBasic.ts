@@ -4,9 +4,11 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { offsetSegment, miterJoin, resolvePolyline } from './modify2dGeometry';
 import { commitEntity } from './commitEntity';
-import { withEntity, withoutEntity } from './entityOps';
+import { withEntity, withoutEntities } from './entityOps';
 import { newEntity } from './newEntity';
+import { applyEulerXYZ } from '../lib/eulerRotation';
 import { noop } from './noop';
+import { elementAt } from '../lib/elementAt';
 
 /**
  * @command explode_polyline
@@ -35,11 +37,13 @@ export const explodePolyline = defineCommand({
       );
     }
 
-    const ring = polyline.closed ? [...polyline.points, polyline.points[0]!] : polyline.points;
-    const segments = ring.slice(1).map((end, i): [Vec2, Vec2] => [ring[i]!, end]);
+    const ring = polyline.closed
+      ? [...polyline.points, elementAt(polyline.points, 0)]
+      : polyline.points;
+    const segments = ring.slice(1).map((end, i): [Vec2, Vec2] => [elementAt(ring, i), end]);
 
     // Remove the polyline, add one line per segment
-    let newDoc = withoutEntity(doc, id);
+    let newDoc = withoutEntities(doc, new Set([id])).document;
     const createdIds: string[] = [];
     for (const [start, end] of segments) {
       const lineId = nextId('line');
@@ -122,15 +126,18 @@ export const offset2D = defineCommand({
         if (pts.length < 2) {
           return noop(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
         }
-        const segs = pts.slice(0, -1).map((p, i) => offsetSegment(p, pts[i + 1]!, distance));
-        if (entity.closed) segs.push(offsetSegment(pts[pts.length - 1]!, pts[0]!, distance));
+        const segs = pts
+          .slice(0, -1)
+          .map((p, i) => offsetSegment(p, elementAt(pts, i + 1), distance));
+        if (entity.closed)
+          segs.push(offsetSegment(elementAt(pts, pts.length - 1), elementAt(pts, 0), distance));
         const joins = (entity.closed ? segs : segs.slice(1)).map((seg, i) => {
-          const prev = segs[entity.closed ? (i - 1 + segs.length) % segs.length : i]!;
+          const prev = elementAt(segs, entity.closed ? (i - 1 + segs.length) % segs.length : i);
           return miterJoin(prev[0], prev[1], seg[0], seg[1]);
         });
         const points: Vec2[] = entity.closed
           ? joins
-          : [segs[0]![0], ...joins, segs[segs.length - 1]![1]];
+          : [elementAt(segs, 0)[0], ...joins, elementAt(segs, segs.length - 1)[1]];
         offsetEntity = { ...base, id: newId, kind: 'polyline', points, closed: entity.closed };
         summary = `Offset polyline ${id} by ${distance} → new polyline ${newId} (${points.length} points).`;
         break;
@@ -153,7 +160,12 @@ export const offset2D = defineCommand({
             `offset_2d: resulting rectangle ${width}×${height} is degenerate — no-op.`,
           );
         }
-        // The origin shifts by -distance on X and Y so the rectangle grows/shrinks on every side.
+        // The local origin shifts by [-distance, -distance, 0]; rotate that into world space.
+        const [shiftX, shiftY, shiftZ] = applyEulerXYZ(
+          [-distance, -distance, 0],
+          [0, 0, 0],
+          entity.rotation,
+        );
         const [x, y, z] = entity.position;
         offsetEntity = {
           ...base,
@@ -161,7 +173,7 @@ export const offset2D = defineCommand({
           kind: 'rectangle',
           width,
           height,
-          position: [x - distance, y - distance, z],
+          position: [x + shiftX, y + shiftY, z + shiftZ],
         };
         summary = `Offset rectangle ${id} by ${distance} → new rectangle ${newId} ${width}×${height}.`;
         break;

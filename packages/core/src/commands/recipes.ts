@@ -1,7 +1,7 @@
 import type { CadDocument, FeatureStep, Recipe } from '../model/types';
 import { kernelRefusal } from './kernelRefusal';
-import { currentContext, runInContext } from './context';
-import type { CommandDefinition, CommandResult } from './types';
+import { currentContext, runInContext, type ExecutionContext } from './context';
+import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from './limits';
@@ -17,7 +17,7 @@ import { resolveStepForReplay, runReplayStep, unresolvedExpressionsNote } from '
 function replayRecipeAdditive(
   base: CadDocument,
   steps: readonly FeatureStep[],
-  getCommandFn: (name: string) => CommandDefinition<unknown> | undefined,
+  ctx: ExecutionContext,
   resolveWarnings?: string[],
 ): { doc: CadDocument; allAffected: string[] } {
   let doc = base;
@@ -28,11 +28,11 @@ function replayRecipeAdditive(
 
   for (const step of steps) {
     if (step.suppressed) continue;
-    const cmd = getCommandFn(step.name);
+    const cmd = ctx.registry(step.name);
     if (!cmd) continue;
 
     const params = resolveStepForReplay(step, doc, idMap, resolveWarnings, 'recipe step');
-    const result = runReplayStep(cmd, step, doc, params, idMap, currentContext(), false);
+    const result = runReplayStep(cmd, step, doc, params, idMap, ctx, false);
     if (!result) continue;
     doc = result.document;
     for (const id of result.affected) {
@@ -136,13 +136,16 @@ export const instantiateRecipe = defineCommand({
         `instantiate_recipe failed: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,
       );
     }
-    return runInContext({ ...context, recipeDepth: context.recipeDepth + 1 }, () =>
-      instantiateRecipeOnce(doc, params.name),
-    );
+    const nested = { ...context, recipeDepth: context.recipeDepth + 1 };
+    return runInContext(nested, () => instantiateRecipeOnce(doc, params.name, nested));
   },
 });
 
-function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
+function instantiateRecipeOnce(
+  doc: CadDocument,
+  name: string,
+  ctx: ExecutionContext,
+): CommandResult {
   if (name.trim() === '') {
     return noop(doc, 'instantiate_recipe failed: name must be a non-empty string.');
   }
@@ -157,7 +160,7 @@ function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
     return noop(doc, `instantiate_recipe failed: recipe '${name}' not found.${hint}`);
   }
 
-  const refused = kernelRefusal(doc, recipe.steps);
+  const refused = kernelRefusal(doc, recipe.steps, ctx);
   if (refused !== null) {
     return noop(doc, `instantiate_recipe: ${refused}`);
   }
@@ -170,12 +173,7 @@ function instantiateRecipeOnce(doc: CadDocument, name: string): CommandResult {
   }
 
   const warnings: string[] = [];
-  const { doc: newDoc, allAffected } = replayRecipeAdditive(
-    doc,
-    recipe.steps,
-    currentContext().registry,
-    warnings,
-  );
+  const { doc: newDoc, allAffected } = replayRecipeAdditive(doc, recipe.steps, ctx, warnings);
 
   return {
     document: newDoc,

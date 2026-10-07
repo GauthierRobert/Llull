@@ -40,3 +40,17 @@ export function normalize2(a: Vec2, fallback: Vec2 = [0, 0]): Vec2 {
 export function perp2(a: Vec2): Vec2 {
   return [-a[1], a[0]];
 }
+
+/** @pure true for an exact-length-2 array of finite numbers */
+export function isVec2(value: unknown): value is Vec2 {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    value.every((c) => typeof c === 'number' && Number.isFinite(c))
+  );
+}
+
+/** @pure true for an array whose every element satisfies `isVec2` */
+export function isVec2List(value: unknown): value is Vec2[] {
+  return Array.isArray(value) && value.every(isVec2);
+}

@@ -48,7 +48,8 @@ const pushCapped = (stack: CadDocument[], doc: CadDocument): CadDocument[] =>
 /**
  * The value returned by `applyCommand`, `undo`, and `redo`.
  * - `affected` — ids created/changed (empty for queries, undo/redo, and no-ops).
- * - `isError`  — true when the command name is unknown or the command threw.
+ * - `isError`  — true when `execute` rejected the call (unknown command, invalid params,
+ *   kernel unavailable, derivation guard) or the command threw.
  * - `data`     — present only when the command returned data (queries, `build_project` reports).
  */
 interface CommandBusResult {
@@ -106,7 +107,6 @@ export function applyCommand(name: string, params: unknown, commandId?: string):
 
 /** `changed` = the live document was replaced by this call. */
 function runCommand(name: string, params: unknown): { result: CommandBusResult; changed: boolean } {
-  const isError = getCommand(name) === undefined;
   const prior = getLiveDoc();
   let result: ReturnType<typeof execute>;
   try {
@@ -133,7 +133,7 @@ function runCommand(name: string, params: unknown): { result: CommandBusResult; 
   const busResult = withHistoryFlags({
     summary: result.summary,
     affected: result.affected,
-    isError,
+    isError: result.rejected === true,
     ...(result.data !== undefined ? { data: result.data } : {}),
   });
   return { result: busResult, changed };

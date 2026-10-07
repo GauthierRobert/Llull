@@ -7,3 +7,9 @@ export const noop = (doc: CadDocument, summary: string): CommandResult => ({
   summary,
   affected: [],
 });
+
+/** `noop` flagged as refused by the registry choke point (`CommandResult.rejected`). */
+export const rejection = (doc: CadDocument, summary: string): CommandResult => ({
+  ...noop(doc, summary),
+  rejected: true,
+});

@@ -13,6 +13,7 @@ import { buildFeatureProgram } from '../codegen/featureProgram';
 import { emitPython } from '../codegen/python';
 import { emitOpenScad } from '../codegen/openscad';
 import { emitFreeCad } from '../codegen/freecad';
+import { safeFileName } from '../lib/safeFileName';
 
 type CodeLanguage = 'cadquery' | 'build123d' | 'openscad' | 'freecad';
 
@@ -58,11 +59,7 @@ export const exportCode = defineCommand({
         : language === 'freecad'
           ? emitFreeCad(program)
           : emitPython(program, language);
-    const base =
-      (name ?? 'model')
-        .replace(/[^A-Za-z0-9._-]/g, '_')
-        .replace(/^[._]+/, '')
-        .slice(0, 64) || 'model';
+    const base = safeFileName(name, 'model');
     const fileName = `${base}.${FILE_EXTENSIONS[language]}`;
     const notes = program.notes.length > 0 ? ` Notes: ${program.notes.join(' ')}` : '';
     return {

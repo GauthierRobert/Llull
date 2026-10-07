@@ -13,6 +13,7 @@ import { nextId } from '../lib/id';
 import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { commitEntity } from './commitEntity';
 import { noop } from './noop';
+import { DEFAULT_SOLID_COLOR } from './geometryShared';
 
 /**
  * Unit axis + angle (Rodrigues rotation matrix R) as the Euler XYZ triple [rx, ry, rz] of the
@@ -83,10 +84,10 @@ export const makeTubeBetween = defineCommand({
     radius: z.number().describe('Cross-section radius of the tube. Must be greater than 0.'),
     color: z
       .string()
-      .describe('Hex color string, e.g. "#c8553d". Defaults to "#6b8f9c".')
+      .describe(`Hex color string, e.g. "#c8553d". Defaults to "${DEFAULT_SOLID_COLOR}".`)
       .optional(),
   }),
-  run: (doc, { p1, p2, radius, color = '#6b8f9c' }): CommandResult => {
+  run: (doc, { p1, p2, radius, color = DEFAULT_SOLID_COLOR }): CommandResult => {
     for (const [label, point] of [
       ['p1', p1],
       ['p2', p2],

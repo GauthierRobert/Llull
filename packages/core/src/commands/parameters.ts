@@ -21,7 +21,7 @@ function topoSort(parameters: Readonly<Record<string, Parameter>>): {
   const names = Object.keys(parameters);
   const edges = names.flatMap((name) =>
     [...extractReferences((parameters[name] as Parameter).expression)]
-      .filter((ref) => ref in parameters)
+      .filter((ref) => Object.hasOwn(parameters, ref))
       .map((ref): [string, string] => [ref, name]),
   );
   const { sorted, cyclic } = topologicalSort(names, edges);
@@ -41,7 +41,8 @@ export function reEvaluateAll(
   const env: Record<string, number> = {};
 
   for (const name of sorted) {
-    const param = parameters[name]!;
+    const param = parameters[name];
+    if (!param) continue;
     const evalResult = evaluateExpression(param.expression, env);
     if (evalResult.ok) {
       result[name] = { name, expression: param.expression, value: evalResult.value };
@@ -105,8 +106,8 @@ export const setParameter = defineCommand({
           'Supports +, -, *, /, parentheses, unary minus, and decimal numbers.',
       ),
   }),
-  run: (doc, { name, expression }): CommandResult => {
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+  run: (doc, { name, expression }, ctx): CommandResult => {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) || name === '__proto__') {
       return noop(
         doc,
         `set_parameter failed: name '${name}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
@@ -117,7 +118,8 @@ export const setParameter = defineCommand({
     }
 
     const evaluated = reEvaluateAll(withParameterExpression(doc.parameters, name, expression));
-    const param = evaluated[name]!;
+    const param = evaluated[name];
+    if (!param) return noop(doc, `set_parameter failed: could not store parameter '${name}'.`);
 
     const newDoc: CadDocument = { ...doc, parameters: evaluated };
 
@@ -132,7 +134,7 @@ export const setParameter = defineCommand({
     const dependentCount = Object.values(evaluated).filter(
       (p) => p.name !== name && extractReferences(p.expression).has(name),
     ).length;
-    const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc);
+    const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc, ctx);
     if (refusal !== undefined) {
       return noop(doc, `set_parameter '${name}': ${refusal}`);
     }
@@ -175,7 +177,7 @@ export const deleteParameter = defineCommand({
       ),
   }),
   run: (doc, { name }): CommandResult => {
-    if (!(name in doc.parameters)) {
+    if (!Object.hasOwn(doc.parameters, name)) {
       return noop(doc, `delete_parameter: parameter '${name}' does not exist — no change made.`);
     }
 

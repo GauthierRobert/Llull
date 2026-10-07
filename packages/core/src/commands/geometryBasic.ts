@@ -1,14 +1,16 @@
 import type { CommandResult } from './types';
 import { newEntity } from './newEntity';
-import { defineCommand, z, looseVec3, colorField, untypedArray } from './schema';
+import { defineCommand, z, looseVec3, vec3, colorField, untypedArray } from './schema';
 import { nextId } from '../lib/id';
-import { replaceEntity, withoutEntities } from './entityOps';
+import { referenceSuffix, replaceEntity, withoutEntities } from './entityOps';
 import {
   DEFAULT_SOLID_COLOR,
+  EXTRUSION_COLOR,
   anchorField,
   commitSolid,
   placeSolid,
   positionField,
+  rejectBadProfile,
   rejectBadSize,
   rotationField,
   translated,
@@ -75,10 +77,10 @@ export const addBox = defineCommand({
  * @pure
  * @layer core/commands
  * @affects creates 1 extrusion entity; profile is extruded along +Z from position
- * @invariant depth > 0; profile must be a non-empty array of [x,y] points
+ * @invariant depth > 0; profile has >= 3 points, each a finite [x,y] pair
+ * @failure profile < 3 points or any point not a finite [x,y] pair -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
  */
-
 export const extrude = defineCommand({
   name: 'extrude_profile',
   description:
@@ -98,15 +100,20 @@ export const extrude = defineCommand({
         'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
     ).optional(),
     rotation: rotationField(),
-    color: colorField('#c8553d'),
+    color: colorField(EXTRUSION_COLOR),
   }),
-  run: (doc, { profile, depth, position = ORIGIN, rotation, color = '#c8553d' }): CommandResult => {
+  run: (
+    doc,
+    { profile, depth, position = ORIGIN, rotation, color = EXTRUSION_COLOR },
+  ): CommandResult => {
     if (profile.length < 3) {
       return noop(
         doc,
         `extrude_profile: profile must be an array of at least 3 [x,y] points; no-op.`,
       );
     }
+    const badProfile = rejectBadProfile(doc, 'extrude_profile', profile);
+    if (badProfile) return badProfile;
     if (depth <= 0) {
       return noop(
         doc,
@@ -121,12 +128,26 @@ export const extrude = defineCommand({
   },
 });
 
+/**
+ * @command move_entity
+ * @pure
+ * @layer core/commands
+ * @affects translates 1 entity: position += delta; affected = [id]
+ * @invariant only position changes; delta is in document units
+ * @failure missing id -> no-op, affected:[]
+ */
 export const move = defineCommand({
   name: 'move_entity',
-  description: 'Translate an entity by a delta vector.',
+  description:
+    'Translate one entity by a relative [dx, dy, dz] vector in document units (see set_units); ' +
+    'its position becomes position + delta and its rotation/geometry are unchanged. ' +
+    'Right-handed frame, +Z up; works on 2D shapes and 3D solids alike. ' +
+    'If the id does not exist the document is left unchanged and nothing is affected.',
   params: z.object({
     id: z.string().describe('Target entity id'),
-    delta: looseVec3('Translation [dx,dy,dz]'),
+    delta: vec3(
+      'Relative translation [dx, dy, dz] in document units, e.g. [10, 0, 0] moves +X by 10.',
+    ),
   }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
@@ -164,7 +185,7 @@ export const deleteEntity = defineCommand({
       return noop(doc, `No entity ${id} to delete.`);
     }
 
-    const { document, dissolvedGroups } = withoutEntities(doc, new Set([id]));
+    const { document, dissolvedGroups, prunedReferences } = withoutEntities(doc, new Set([id]));
 
     const dissolveSuffix =
       dissolvedGroups.length > 0
@@ -173,7 +194,7 @@ export const deleteEntity = defineCommand({
 
     return {
       document,
-      summary: `Deleted ${id}.${dissolveSuffix}`,
+      summary: `Deleted ${id}.${dissolveSuffix}${referenceSuffix(prunedReferences)}`,
       affected: [id],
     };
   },

@@ -10,7 +10,7 @@ import type { CadDocument, FeatureStep, Parameter } from '../model/types';
 import { extractReferences } from './expression';
 import { stringLeaves } from './regenerate';
 import { replayHistory } from './replay';
-import { currentContext } from './context';
+import { currentContext, type ExecutionContext } from './context';
 import { kernelRefusal } from './kernelRefusal';
 
 /** Parameter names referenced by `=expr` strings anywhere in `params`. */
@@ -91,6 +91,7 @@ export function stepsReading(
 export function regenerateParameterDependents(
   before: CadDocument,
   after: CadDocument,
+  ctx: ExecutionContext = currentContext(),
 ): { document: CadDocument; dependentSteps: number; refusal?: string } {
   const dependents = stepsReading(
     after.featureHistory,
@@ -98,8 +99,8 @@ export function regenerateParameterDependents(
     after,
   );
   if (dependents.length === 0) return { document: after, dependentSteps: 0 };
-  const refusal = kernelRefusal(after, after.featureHistory);
+  const refusal = kernelRefusal(after, after.featureHistory, ctx);
   if (refusal !== null) return { document: after, dependentSteps: dependents.length, refusal };
-  const regenerated = replayHistory(after, after.featureHistory, currentContext().registry);
+  const regenerated = replayHistory(after, after.featureHistory, ctx.registry);
   return { document: regenerated, dependentSteps: dependents.length };
 }

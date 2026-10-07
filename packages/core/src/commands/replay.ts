@@ -46,7 +46,7 @@ export function replayHistory(
   onStep?: (event: ReplayStepEvent) => void,
 ): CadDocument {
   const context = currentContext();
-  const refusal = kernelRefusal(base, history, getCommandFn);
+  const refusal = kernelRefusal(base, history, { ...context, registry: getCommandFn });
   if (refusal !== null) {
     resolveWarnings?.push(`replay refused: ${refusal}`);
     return base;

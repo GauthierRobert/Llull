@@ -10,7 +10,7 @@ import type { ExecutionContext } from './context';
 import { currentContext, runInContext } from './context';
 import { guardCommand } from './guard';
 import { kernelUnavailable } from './kernelRefusal';
-import { noop } from './noop';
+import { rejection } from './noop';
 import { stepIdSource } from '../lib/id';
 import { addWedge, addPyramid } from './geometryPrismatic';
 import { addCylinder, addSphere, addCone, addTorus } from './geometryRound';
@@ -231,7 +231,7 @@ export function getCommand(name: string): CommandDefinition<unknown> | undefined
  * @invariant a mutating command (not `readOnly` / `metaHistory`) that changes the document appends
  * FeatureStep `step-<n>` (n = doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay
  * re-mints identical ids; an execute nested inside a running step joins it (no extra step)
- * @failure unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[]
+ * @failure unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
  */
 export function execute(
   doc: CadDocument,
@@ -241,11 +241,11 @@ export function execute(
 ): CommandResult {
   const def = byName.get(commandName);
   if (!def) {
-    return noop(doc, `Unknown command: ${commandName}`);
+    return rejection(doc, `Unknown command: ${commandName}`);
   }
   const annotations = def.annotations;
   if (annotations?.requiresKernel === true && ctx.kernel === null) {
-    return noop(doc, kernelUnavailable(commandName));
+    return rejection(doc, kernelUnavailable(commandName));
   }
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true;
   if (!recordsStep || ctx.stepKey !== undefined) {

@@ -6,6 +6,7 @@
  */
 
 import type { Vec3 } from '../model/types';
+import { elementAt } from '../lib/elementAt';
 
 type RevolutionProfile = ReadonlyArray<readonly [number, number]>;
 
@@ -48,16 +49,21 @@ export function revolutionPolygons(
 
   const polygons: Vec3[][] = [];
   for (let s = 0; s < segments; s++) {
-    const ringA = rings[s]!;
-    const ringB = rings[(s + 1) % ringCount]!;
+    const ringA = elementAt(rings, s);
+    const ringB = elementAt(rings, (s + 1) % ringCount);
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
-      polygons.push([ringA[i]!, ringA[j]!, ringB[j]!, ringB[i]!]);
+      polygons.push([
+        elementAt(ringA, i),
+        elementAt(ringA, j),
+        elementAt(ringB, j),
+        elementAt(ringB, i),
+      ]);
     }
   }
   if (!isFull) {
-    polygons.push([...rings[0]!].reverse());
-    polygons.push([...rings[segments]!]);
+    polygons.push([...elementAt(rings, 0)].reverse());
+    polygons.push([...elementAt(rings, segments)]);
   }
   return polygons;
 }
@@ -77,7 +83,7 @@ export function revolutionTriangles(
   const triangles: Array<readonly [Vec3, Vec3, Vec3]> = [];
   for (const polygon of revolutionPolygons(profile, axis, angle, segments, origin)) {
     for (let i = 1; i + 1 < polygon.length; i++) {
-      triangles.push([polygon[0]!, polygon[i]!, polygon[i + 1]!]);
+      triangles.push([elementAt(polygon, 0), elementAt(polygon, i), elementAt(polygon, i + 1)]);
     }
   }
   return triangles;

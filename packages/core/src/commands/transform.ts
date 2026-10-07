@@ -7,7 +7,7 @@
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec3 as vec3 } from './schema';
+import { defineCommand, z, looseVec3 } from './schema';
 import { noop } from './noop';
 import { nextId } from '../lib/id';
 import { MAX_COPIES_PER_COMMAND } from './limits';
@@ -15,6 +15,7 @@ import { add3, scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
 import { rotatePoint2 } from '../lib/polygon';
 import { replaceEntity, withEntity } from './entityOps';
+import { rotateEulerAboutWorldZ } from '../lib/eulerRotation';
 
 /**
  * @command rotate_entity
@@ -29,7 +30,7 @@ export const rotateEntity = defineCommand({
     'Add Euler-angle deltas (radians) to an entity rotation. Modifies only the rotation field; position and geometry are unchanged.',
   params: z.object({
     id: z.string().describe('Id of the entity to rotate.'),
-    delta: vec3(
+    delta: looseVec3(
       'Euler-angle increments [dRx, dRy, dRz] in radians to add to the current rotation.',
     ),
   }),
@@ -277,7 +278,7 @@ export const arrayLinear = defineCommand({
     count: z
       .number()
       .describe('Total number of instances including the original. Must be an integer >= 2.'),
-    offset: vec3(
+    offset: looseVec3(
       'World-space translation vector [dx, dy, dz] between consecutive instances. ' +
         'All components must be finite numbers.',
     ),
@@ -331,7 +332,7 @@ export const arrayPolar = defineCommand({
     count: z
       .number()
       .describe('Total number of instances including the original. Must be an integer >= 2.'),
-    center: vec3(
+    center: looseVec3(
       'World-space center point [cx, cy, cz] for the polar rotation axis (Z axis through this point). ' +
         'Only cx and cy are used for the rotation; cz is ignored.',
     ),
@@ -365,7 +366,7 @@ export const arrayPolar = defineCommand({
         const [rx, ry] = rotatePoint2([target.position[0] - cx, target.position[1] - cy], theta);
         return {
           position: [cx + rx, cy + ry, target.position[2]] as Vec3,
-          rotation: [target.rotation[0], target.rotation[1], target.rotation[2] + theta] as Vec3,
+          rotation: rotateEulerAboutWorldZ(target.rotation, theta),
         };
       }),
     );

@@ -8,7 +8,7 @@ import { currentContext } from './context';
 import { formatIssues } from './schema';
 import { derivationViolation } from './derivation';
 import { pluginGuards } from '../plugins/host';
-import { noop } from './noop';
+import { rejection } from './noop';
 import { errorMessage } from '../lib/errorMessage';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
@@ -97,7 +97,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
         typeof params === 'object' && params !== null ? params : {},
       );
       if (hasPrototypeIdKey(safeParams)) {
-        return noop(
+        return rejection(
           doc,
           `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
         );
@@ -108,10 +108,10 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
           checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
         } catch (error) {
           const reason = warnAndDescribe(`command '${def.name}' params validation threw:`, error);
-          return noop(doc, `${def.name} rejected: invalid params — ${reason}`);
+          return rejection(doc, `${def.name} rejected: invalid params — ${reason}`);
         }
         if (!checked.success) {
-          return noop(
+          return rejection(
             doc,
             `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
           );
@@ -122,17 +122,17 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
         result = def.run(doc, safeParams, ctx ?? currentContext());
       } catch (error) {
         const reason = warnAndDescribe(`command '${def.name}' threw:`, error);
-        return noop(doc, `${def.name} failed: ${reason}; document unchanged.`);
+        return rejection(doc, `${def.name} failed: ${reason}; document unchanged.`);
       }
       const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);
       if (violation !== null) {
-        return noop(doc, violation);
+        return rejection(doc, violation);
       }
       if (result.document !== doc) {
         for (const id of result.affected) {
           const reason = corruptionReason(result.document.entities[id]);
           if (reason !== null) {
-            return noop(
+            return rejection(
               doc,
               `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`,
             );

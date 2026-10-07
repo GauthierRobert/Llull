@@ -15,6 +15,7 @@ import { commitEntity } from './commitEntity';
 import { replaceEntities, withoutEntities } from './entityOps';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { noop } from './noop';
+import { EXTRUSION_COLOR } from './geometryShared';
 import { ORIGIN, add3 } from '../lib/vec3';
 
 const UNIT_SCALE: Vec3 = [1, 1, 1];
@@ -35,7 +36,7 @@ export function instanceEntity(
     rotation,
     ...(scale ? { scale } : {}),
     layerId: DEFAULT_LAYER_ID,
-    color: '#c8553d',
+    color: EXTRUSION_COLOR,
   };
 }
 

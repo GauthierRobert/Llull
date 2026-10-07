@@ -171,6 +171,15 @@ describe('applyCommand — unknown command', () => {
     expect(getLiveDoc()).toBe(docBefore);
     expect(result.canUndo).toBe(false);
   });
+
+  it('returns isError true when execute rejects schema-invalid params', () => {
+    const docBefore = getLiveDoc();
+    const result = applyCommand('add_box', { size: 'big' });
+
+    expect(result.isError).toBe(true);
+    expect(result.summary).toMatch(/rejected: invalid params/);
+    expect(getLiveDoc()).toBe(docBefore);
+  });
 });
 
 // ---------------------------------------------------------------------------

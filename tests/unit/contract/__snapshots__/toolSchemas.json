@@ -116,7 +116,7 @@
           "type": "string"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
           "type": "string"
         },
         "position": {
@@ -127,7 +127,7 @@
           "type": "array"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -184,7 +184,7 @@
           "type": "number"
         },
         "levelId": {
-          "description": "Level id. Default: the active level.",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "points": {
@@ -276,7 +276,7 @@
           "type": "string"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
           "type": "string"
         },
         "height": {
@@ -295,7 +295,7 @@
           "type": "number"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -419,7 +419,7 @@
           "type": "array"
         },
         "levelId": {
-          "description": "Level id. Default: the active level.",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "profile": {
@@ -471,7 +471,7 @@
           "type": "number"
         },
         "levelId": {
-          "description": "Level id. Default: the active level.",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "material": {
@@ -520,7 +520,7 @@
           "type": "string"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
           "type": "string"
         },
         "height": {
@@ -539,7 +539,7 @@
           "type": "number"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -696,7 +696,7 @@
           "type": "number"
         },
         "levelId": {
-          "description": "Level id. Default: the active level.",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "location": {
@@ -1141,7 +1141,7 @@
           "type": "string"
         },
         "levelId": {
-          "description": "Level id. Default: the active level.",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "line": {
@@ -1314,7 +1314,7 @@
           "type": "number"
         },
         "levelId": {
-          "description": "Level id. Default: the active level.",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "origin": {
@@ -1395,7 +1395,7 @@
           "type": "number"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
           "type": "string"
         },
         "height": {
@@ -1410,7 +1410,7 @@
           "type": "array"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -1441,7 +1441,7 @@
           "type": "array"
         },
         "levelId": {
-          "description": "Level id. Default: the active level.",
+          "description": "Level id. Default: the active level (a \"Level 0\" is created if none).",
           "type": "string"
         },
         "name": {
@@ -1574,7 +1574,7 @@
           "type": "string"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
           "type": "string"
         },
         "position": {
@@ -1589,7 +1589,7 @@
           "type": "number"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Stored for uniformity; geometrically moot for a sphere. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Stored for uniformity; geometrically moot for a sphere. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -1604,7 +1604,7 @@
     "name": "add_sphere"
   },
   {
-    "description": "Create a parametric involute spur gear solid (extrusion). Computes the full closed 2D tooth profile from module, tooth count, and pressure angle, then extrudes it by faceWidth along +Z. module (metric) sets the tooth scale: pitchDiameter = module * teeth. pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). faceWidth is the gear thickness along Z. bore is a central hole radius; if > 0 it is currently ignored (kernel hole not yet wired) and noted in the summary. position is [x, y, z] of the gear center; rotation is extrinsic XYZ Euler angles in radians. Right-handed frame, +Z up.",
+    "description": "Create a parametric involute spur gear solid (extrusion). Computes the full closed 2D tooth profile from module, tooth count, and pressure angle, then extrudes it by faceWidth along +Z. module (metric) sets the tooth scale: pitchDiameter = module * teeth. pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). faceWidth is the gear thickness along Z. bore is a central hole radius; if > 0 it is currently ignored (kernel hole not yet wired) and noted in the summary. position is [x, y, z] of the gear center; rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). Right-handed frame, +Z up.",
     "input_schema": {
       "properties": {
         "bore": {
@@ -1612,7 +1612,7 @@
           "type": "number"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#7a9cbb\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#7a9cbb\".",
           "type": "string"
         },
         "faceWidth": {
@@ -1639,7 +1639,7 @@
           "type": "number"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -1715,7 +1715,7 @@
           "type": "string"
         },
         "end": {
-          "description": "Axis end [x, y, z].",
+          "description": "Axis end [x, y, z]; [x, y] means z = 0.",
           "items": {
             "type": "number"
           },
@@ -1763,7 +1763,7 @@
           "type": "number"
         },
         "start": {
-          "description": "Axis start [x, y, z], z relative to the level.",
+          "description": "Axis start [x, y, z], z relative to the level; [x, y] means z = 0.",
           "items": {
             "type": "number"
           },
@@ -1849,7 +1849,7 @@
           "type": "string"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
           "type": "string"
         },
         "position": {
@@ -1864,7 +1864,7 @@
           "type": "number"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -1944,7 +1944,7 @@
           "type": "string"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
           "type": "string"
         },
         "position": {
@@ -1955,7 +1955,7 @@
           "type": "array"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -2778,7 +2778,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Scan the document for geometry defects, structural issues, and parameter errors. Returns a structured issue list in `data` ({ ok: boolean, issues: Issue[] }) — `ok` is true when there are no error-severity issues. Does NOT mutate the document. Useful as a lint pass before or after build_project. Issue codes: degenerate_size (zero/negative box/cylinder/sphere/extrusion/circle/arc/ellipse/cone/torus/wedge/pyramid dimension), open_profile (polyline not closed), insufficient_points (polyline/spline < 2 points), far_from_origin (entity center > farThreshold units from world origin), empty_layer (layer with no entities), orphaned_group_member (group references missing entity id), dangling_dimension_ref (dimension entity references a missing entity id), parameter_error (a named parameter has an evaluation error).",
+    "description": "Scan the document for geometry defects, structural issues, and parameter errors. Returns a structured issue list in `data` ({ ok: boolean, issues: Issue[] }) — `ok` is true when there are no error-severity issues. Does NOT mutate the document. Useful as a lint pass before or after build_project. Issue codes: degenerate_size (zero/negative box/cylinder/sphere/extrusion/circle/arc/ellipse/cone/torus/wedge/pyramid dimension), open_profile (polyline not closed), insufficient_points (polyline/spline < 2 points), far_from_origin (entity center > farThreshold units from world origin), empty_layer (layer with no entities), orphaned_group_member (group references missing entity id), dangling_dimension_ref (dimension entity references a missing entity id), dangling_reference (constraint/joint/drive relation references a missing entity or joint), parameter_error (a named parameter has an evaluation error).",
     "input_schema": {
       "properties": {
         "farThreshold": {
@@ -3697,7 +3697,7 @@
           "type": "array"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "endAngle": {
@@ -3739,7 +3739,7 @@
           "type": "number"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "name": {
@@ -3761,7 +3761,7 @@
           "type": "array"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X) for the work plane. Defaults to [0,0,0].",
           "items": {
             "type": "number"
           },
@@ -3787,7 +3787,7 @@
           "type": "array"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "position": {
@@ -3822,7 +3822,7 @@
           "type": "array"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "position": {
@@ -3851,7 +3851,7 @@
     "name": "draw_ellipse"
   },
   {
-    "description": "Draw an open 2D involute curve sampled as a polyline in the local work plane. The involute of a circle: x(t) = baseRadius*(cos t + t*sin t), y(t) = baseRadius*(sin t − t*cos t). baseRadius is the base circle radius (must be > 0). startAngle and endAngle are the involute parameter t at the curve start and end (endAngle must be > startAngle). samples is the number of points on the curve (minimum 2; default 24). At t=0 the curve originates at (baseRadius, 0); radial distance from origin at t is baseRadius*sqrt(1+t²). The curve is open (not closed) and can be fed to other commands or used standalone as a reference curve. position is [x,y,z] world-space placement of the work-plane origin (default [0,0,0]). rotation is extrinsic XYZ Euler angles in radians (default [0,0,0]).",
+    "description": "Draw an open 2D involute curve sampled as a polyline in the local work plane. The involute of a circle: x(t) = baseRadius*(cos t + t*sin t), y(t) = baseRadius*(sin t − t*cos t). baseRadius is the base circle radius (must be > 0). startAngle and endAngle are the involute parameter t at the curve start and end (endAngle must be > startAngle). samples is the number of points on the curve (minimum 2; default 24). At t=0 the curve originates at (baseRadius, 0); radial distance from origin at t is baseRadius*sqrt(1+t²). The curve is open (not closed) and can be fed to other commands or used standalone as a reference curve. position is [x,y,z] world-space placement of the work-plane origin (default [0,0,0]). rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X; default [0,0,0]).",
     "input_schema": {
       "properties": {
         "baseRadius": {
@@ -3859,7 +3859,7 @@
           "type": "number"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "endAngle": {
@@ -3878,7 +3878,7 @@
           "type": "array"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X) for the work plane. Defaults to [0,0,0].",
           "items": {
             "type": "number"
           },
@@ -3906,7 +3906,7 @@
     "input_schema": {
       "properties": {
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "end": {
@@ -3944,7 +3944,7 @@
     "input_schema": {
       "properties": {
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "position": {
@@ -3969,7 +3969,7 @@
           "type": "boolean"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "points": {
@@ -4002,7 +4002,7 @@
     "input_schema": {
       "properties": {
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "height": {
@@ -4038,7 +4038,7 @@
           "type": "boolean"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#4a90d9\".",
           "type": "string"
         },
         "points": {
@@ -4560,7 +4560,7 @@
     "input_schema": {
       "properties": {
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Defaults to \"#c8553d\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#c8553d\".",
           "type": "string"
         },
         "depth": {
@@ -4579,7 +4579,7 @@
           "type": "array"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X). Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -4595,7 +4595,7 @@
     "name": "extrude_profile"
   },
   {
-    "description": "Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. Right-handed world frame, +Z up. The solid is placed at the source entity position and extends depth units along +Z. Keeps the source entity in the document. depth must be > 0.",
+    "description": "Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. Right-handed world frame, +Z up. The solid is placed at the source entity position, inherits the source entity rotation (so a sketch on a tilted work plane extrudes along its own normal) and extends depth units along the sketch local +Z. Keeps the source entity in the document. depth must be > 0.",
     "input_schema": {
       "properties": {
         "depth": {
@@ -4607,7 +4607,7 @@
           "type": "string"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the resulting extrusion solid. Matches rotate_entity convention. Defaults to [0, 0, 0]. If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X), an EXTRA world-frame rotation applied after the source entity's own rotation. Matches rotate_entity convention. Defaults to [0, 0, 0] (the solid keeps the source rotation). If non-finite or not length-3 the rotation is ignored.",
           "items": {
             "type": "number"
           },
@@ -4906,9 +4906,6 @@
     "name": "insert_instance"
   },
   {
-    "annotations": {
-      "idempotentHint": true
-    },
     "description": "Splice a new feature history step into featureHistory immediately after the step with id afterStepId, then regenerate the document. If afterStepId is omitted the step is appended at the end. The new step is always active (suppressed=false).",
     "input_schema": {
       "properties": {
@@ -5404,11 +5401,11 @@
     "name": "move_entities"
   },
   {
-    "description": "Translate an entity by a delta vector.",
+    "description": "Translate one entity by a relative [dx, dy, dz] vector in document units (see set_units); its position becomes position + delta and its rotation/geometry are unchanged. Right-handed frame, +Z up; works on 2D shapes and 3D solids alike. If the id does not exist the document is left unchanged and nothing is affected.",
     "input_schema": {
       "properties": {
         "delta": {
-          "description": "Translation [dx,dy,dz]",
+          "description": "Relative translation [dx, dy, dz] in document units, e.g. [10, 0, 0] moves +X by 10.",
           "items": {
             "type": "number"
           },
@@ -5624,7 +5621,7 @@
           "type": "string"
         },
         "color": {
-          "description": "Hex color string, e.g. \"#c8553d\". Default: \"#6b8f9c\".",
+          "description": "Hex color string #rrggbb, e.g. \"#c8553d\". Defaults to \"#6b8f9c\".",
           "type": "string"
         },
         "id": {
@@ -5647,7 +5644,7 @@
           "type": "array"
         },
         "rotation": {
-          "description": "Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] applied after revolution. Default: [0, 0, 0]. Malformed or non-length-3 values are ignored and [0,0,0] is used.",
+          "description": "three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X) applied after revolution. Default: [0, 0, 0]. Malformed or non-length-3 values are ignored and [0,0,0] is used.",
           "items": {
             "type": "number"
           },
@@ -6411,7 +6408,7 @@
           "type": "string"
         },
         "end": {
-          "description": "New axis end [x, y, z].",
+          "description": "New axis end [x, y, z]; [x, y] means z = 0.",
           "items": {
             "type": "number"
           },
@@ -6459,7 +6456,7 @@
           "type": "number"
         },
         "start": {
-          "description": "New axis start [x, y, z].",
+          "description": "New axis start [x, y, z]; [x, y] means z = 0.",
           "items": {
             "type": "number"
           },

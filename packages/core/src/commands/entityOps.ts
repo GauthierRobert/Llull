@@ -21,14 +21,6 @@ export function replaceEntity(doc: CadDocument, entity: Entity): CadDocument {
 }
 
 /**
- * `doc` without entity `id` (also dropped from `order` and `selection`).
- * @pure
- */
-export function withoutEntity(doc: CadDocument, id: string): CadDocument {
-  return withoutEntities(doc, new Set([id]), false).document;
-}
-
-/**
  * Remove `removedIds` from every group's `memberIds`; a group left with fewer than 2 members is
  * dissolved (omitted from `nextGroups`, listed in `dissolvedGroups`).
  *
@@ -48,27 +40,72 @@ function pruneGroupMembers(
   return { nextGroups, dissolvedGroups };
 }
 
+/** Records of `record` whose key is not in `dropped`. */
+function withoutKeys<T>(
+  record: Readonly<Record<string, T>>,
+  dropped: ReadonlySet<string>,
+): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !dropped.has(key)));
+}
+
+/** Constraint, joint and drive-relation records that do not reference a removed entity. */
+function pruneReferences(
+  doc: CadDocument,
+  removed: ReadonlySet<string>,
+): { references: Partial<CadDocument>; prunedReferences: number } {
+  const droppedConstraints = new Set(
+    Object.values(doc.constraints)
+      .filter((c) => removed.has(c.a.entityId) || removed.has(c.b.entityId))
+      .map((c) => c.id),
+  );
+  const droppedJoints = new Set(
+    Object.values(doc.joints)
+      .filter((j) => removed.has(j.a.instanceId) || removed.has(j.b.instanceId))
+      .map((j) => j.id),
+  );
+  const droppedRelations = new Set(
+    Object.values(doc.driveRelations)
+      .filter((r) => droppedJoints.has(r.driver) || droppedJoints.has(r.driven))
+      .map((r) => r.id),
+  );
+  const prunedReferences = droppedConstraints.size + droppedJoints.size + droppedRelations.size;
+  if (prunedReferences === 0) return { references: {}, prunedReferences };
+  return {
+    prunedReferences,
+    references: {
+      constraints: withoutKeys(doc.constraints, droppedConstraints),
+      constraintOrder: doc.constraintOrder.filter((id) => !droppedConstraints.has(id)),
+      joints: withoutKeys(doc.joints, droppedJoints),
+      jointOrder: doc.jointOrder.filter((id) => !droppedJoints.has(id)),
+      driveRelations: withoutKeys(doc.driveRelations, droppedRelations),
+      driveRelationOrder: doc.driveRelationOrder.filter((id) => !droppedRelations.has(id)),
+    },
+  };
+}
+
 /**
- * `doc` without `removed` entities (entities/order/selection; with `pruneGroups`, also group
- * memberships — groups left with fewer than 2 members are dissolved and listed).
+ * `doc` without `removed` entities: entities/order/selection, group memberships (groups left with
+ * fewer than 2 members are dissolved and listed), and every constraint / joint / drive relation
+ * that referenced a removed entity (counted in `prunedReferences`).
  * @pure
  */
 export function withoutEntities(
   doc: CadDocument,
   removed: ReadonlySet<string>,
-  pruneGroups = true,
-): { document: CadDocument; dissolvedGroups: string[] } {
+): { document: CadDocument; dissolvedGroups: string[]; prunedReferences: number } {
   const entities = { ...doc.entities };
   for (const id of removed) delete entities[id];
-  const base: CadDocument = {
+  const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, removed);
+  const { references, prunedReferences } = pruneReferences(doc, removed);
+  const document: CadDocument = {
     ...doc,
     entities,
     order: doc.order.filter((id) => !removed.has(id)),
     selection: doc.selection.filter((id) => !removed.has(id)),
+    groups: nextGroups,
+    ...references,
   };
-  if (!pruneGroups) return { document: base, dissolvedGroups: [] };
-  const { nextGroups, dissolvedGroups } = pruneGroupMembers(doc.groups, removed);
-  return { document: { ...base, groups: nextGroups }, dissolvedGroups };
+  return { document, dissolvedGroups, prunedReferences };
 }
 
 /**
@@ -82,4 +119,11 @@ export function replaceEntities(
   result: Entity,
 ): CadDocument {
   return withEntity(withoutEntities(doc, new Set(removedIds)).document, result);
+}
+
+/** Summary fragment naming how many constraints/joints/drive relations a deletion removed. */
+export function referenceSuffix(prunedReferences: number): string {
+  return prunedReferences > 0
+    ? ` Also removed ${prunedReferences} constraint/joint/drive record(s) that referenced it.`
+    : '';
 }

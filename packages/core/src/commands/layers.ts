@@ -201,13 +201,11 @@ export const setEntityLayer = defineCommand({
 
     const sourceLayer = doc.layers[entity.layerId];
     if (sourceLayer?.locked) {
-      return {
-        document: doc,
-        summary:
-          `Entity ${entityId} is on locked layer ${entity.layerId} ("${sourceLayer.name}"). ` +
+      return noop(
+        doc,
+        `Entity ${entityId} is on locked layer ${entity.layerId} ("${sourceLayer.name}"). ` +
           `Unlock the source layer before reassigning its entities.`,
-        affected: [],
-      };
+      );
     }
 
     return {

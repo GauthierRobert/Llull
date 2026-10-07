@@ -5,17 +5,19 @@
  */
 
 import type { CommandResult } from './types';
-import { defineCommand, z, colorField, nameField, looseVec3 as vec3 } from './schema';
+import { defineCommand, z, colorField, nameField, looseVec3 } from './schema';
 import { nextId } from '../lib/id';
 import { compactNumber as fmt } from '../lib/compactNumber';
 import { rotatePoint2 } from '../lib/polygon';
+import { sampleArc } from '../lib/arc';
 import { finiteVec3OrZero } from '../lib/vec3';
 import { MAX_GEAR_TEETH } from './limits';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 import { commitEntity } from './commitEntity';
 import { newEntity } from './newEntity';
-import { boundsText } from './geometryShared';
+import { ROTATION_CONVENTION, boundsText } from './geometryShared';
 import { noop } from './noop';
+import { elementAt } from '../lib/elementAt';
 
 const DEFAULT_GEAR_COLOR = '#7a9cbb';
 
@@ -44,12 +46,8 @@ function involuteT(rb: number, r: number): number {
 }
 
 /** `segments` points on the circle of radius `r`, from just after `startAngle` through `endAngle` (CCW). */
-function sampleArc(r: number, startAngle: number, endAngle: number, segments: number): Point[] {
-  const n = Math.max(segments, 1);
-  return Array.from({ length: n }, (_, i): Point => {
-    const a = startAngle + ((endAngle - startAngle) * (i + 1)) / n;
-    return [r * Math.cos(a), r * Math.sin(a)];
-  });
+function arcPoints(r: number, startAngle: number, endAngle: number, segments: number): Point[] {
+  return [...sampleArc([0, 0], r, startAngle, endAngle - startAngle, Math.max(segments, 1))];
 }
 
 const angleOf = (p: Point): number => Math.atan2(p[1], p[0]);
@@ -95,23 +93,25 @@ export function buildSpurGearProfile(
     const leftFlank = rawFlank.map((pt) =>
       rotatePoint2([pt[0], -pt[1]], leftFlankRotation + toothCenter),
     );
-    const rightTipAngle = angleOf(rightFlank[rightFlank.length - 1]!);
-    let tipArcEnd = angleOf(leftFlank[leftFlank.length - 1]!);
+    const rightTipAngle = angleOf(elementAt(rightFlank, rightFlank.length - 1));
+    let tipArcEnd = angleOf(elementAt(leftFlank, leftFlank.length - 1));
     if (tipArcEnd < rightTipAngle) tipArcEnd += 2 * Math.PI;
 
-    const leftRootAngle = angleOf(leftFlank[0]!);
+    const leftRootAngle = angleOf(elementAt(leftFlank, 0));
     const nextToothCenter = ((t + 1) % teeth) * toothAngle;
-    let rootArcEnd = angleOf(rotatePoint2(rawFlank[0]!, rightFlankRotation + nextToothCenter));
+    let rootArcEnd = angleOf(
+      rotatePoint2(elementAt(rawFlank, 0), rightFlankRotation + nextToothCenter),
+    );
     if (rootArcEnd <= leftRootAngle) rootArcEnd += 2 * Math.PI;
 
     profile.push(
       ...rightFlank,
-      ...sampleArc(outerRadius, rightTipAngle, tipArcEnd, 2),
+      ...arcPoints(outerRadius, rightTipAngle, tipArcEnd, 2),
       ...[...leftFlank].reverse(),
-      ...sampleArc(rootRadius, leftRootAngle, rootArcEnd, rootArcSegments),
+      ...arcPoints(rootRadius, leftRootAngle, rootArcEnd, rootArcSegments),
     );
   }
-  if (profile.length > 0) profile.push(profile[0]!);
+  if (profile.length > 0) profile.push(elementAt(profile, 0));
   return profile;
 }
 
@@ -137,7 +137,7 @@ export const addSpurGear = defineCommand({
     'pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). ' +
     'faceWidth is the gear thickness along Z. ' +
     'bore is a central hole radius; if > 0 it is currently ignored (kernel hole not yet wired) and noted in the summary. ' +
-    'position is [x, y, z] of the gear center; rotation is extrinsic XYZ Euler angles in radians. ' +
+    'position is [x, y, z] of the gear center; rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). ' +
     'Right-handed frame, +Z up.',
   params: z.object({
     module: z
@@ -172,14 +172,14 @@ export const addSpurGear = defineCommand({
           'Currently ignored if > 0 (kernel hole not yet wired); a note appears in the summary.',
       )
       .optional(),
-    position: vec3(
+    position: looseVec3(
       'World-space center of the gear [x, y, z] in document units. ' +
         'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
     ).optional(),
     rotation: z
       .array(z.number())
       .describe(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. Defaults to [0, 0, 0]. ' +
+        `${ROTATION_CONVENTION}. Defaults to [0, 0, 0]. ` +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
       )
       .optional(),
