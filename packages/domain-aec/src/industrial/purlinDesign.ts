@@ -10,13 +10,20 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, fromMm, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../evaluateElements';
 import { sweepFrame } from '../mesh';
 import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
-import { MAX_ITERATIONS, nextProfile } from './frameDesign';
-import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
+import { nextProfile } from './frameDesign';
+import {
+  addProfileGroup,
+  isValidTargetUtilisation,
+  MAX_ITERATIONS,
+  resizeProfileGroup,
+  targetUtilisationParam,
+  upsizeProfileGroups,
+  type ProfileGroups,
+} from './profileGroups';
 import { type PurlinRow } from './purlinModel';
 import { checkPurlins } from './purlinCheckRun';
 import { existingLevelIdParam } from '../levelParams';
@@ -74,16 +81,11 @@ export const designPurlins = defineCommand({
         'Roof build-up dead load per m² of roof carried by the purlins, kN/m², >= 0. Default 0.3.',
       ),
     levelId: existingLevelIdParam,
-    targetUtilisation: z
-      .number()
-      .optional()
-      .describe('Maximum accepted utilisation (0.5–1). Default 0.95.'),
+    targetUtilisation: targetUtilisationParam,
   }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95, ...loadParams } = params;
-    if (
-      !(isFiniteNumber(targetUtilisation) && targetUtilisation >= 0.5 && targetUtilisation <= 1)
-    ) {
+    if (!isValidTargetUtilisation(targetUtilisation)) {
       return noop(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
     }
     const analyse = (document: CadDocument): { rows: PurlinRow[]; summary: string } => {
@@ -111,29 +113,28 @@ export const designPurlins = defineCommand({
         addProfileGroup(groups, member);
       }
       if (groups.size === 0) break;
-      let next = building;
-      let progressed = false;
-      for (const { role, profile } of groups.values()) {
-        const larger = nextSecondaryProfile(profile);
-        if (!larger) {
-          limited = true;
-          continue;
-        }
-        progressed = true;
-        changes.push(`${role}s ${profile} → ${larger}`);
-        const resizedGroup = resizeProfileGroup(
-          next,
-          { role, profile },
-          larger,
-          (element) => element.levelId === levelId,
-        );
-        next = resizedGroup.building;
-        const resizedIds = resizedGroup.resizedIds;
-        for (const id of resizedIds) changed.add(id);
-        next = reseatResized(current, next, resizedIds, profile, larger);
-      }
-      current = { ...current, building: next };
-      if (!progressed) break;
+      const step = upsizeProfileGroups(
+        building,
+        groups,
+        nextSecondaryProfile,
+        (next, group, larger) => {
+          const { building: resizedBuilding, resizedIds } = resizeProfileGroup(
+            next,
+            group,
+            larger,
+            (element) => element.levelId === levelId,
+          );
+          return {
+            building: reseatResized(current, resizedBuilding, resizedIds, group.profile, larger),
+            changedIds: resizedIds,
+          };
+        },
+      );
+      changes.push(...step.changes);
+      for (const id of step.changedIds) changed.add(id);
+      if (step.limited) limited = true;
+      current = { ...current, building: step.building };
+      if (!step.progressed) break;
       if (iteration === MAX_ITERATIONS - 1) limited = true;
     }
     if (changed.size === 0) {

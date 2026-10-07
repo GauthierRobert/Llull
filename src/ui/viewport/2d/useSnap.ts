@@ -44,7 +44,7 @@ interface UseSnapOpts {
  * Advanced snaps (perpendicular, tangent) use `drawOrigin` as the reference
  * point; extension and nearest snaps use the adjusted cursor position.
  */
-export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
+function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
   const document = useStore((s) => s.document);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);

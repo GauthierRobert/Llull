@@ -41,7 +41,7 @@ export function hasValidBearer(req: Request, token: string): boolean {
 }
 
 /** Constant-time check of the `?access_token=` query parameter (EventSource cannot set headers). */
-export function hasValidAccessToken(req: Request, token: string): boolean {
+function hasValidAccessToken(req: Request, token: string): boolean {
   const presented = req.query['access_token'];
   if (typeof presented !== 'string' || presented.length === 0) return false;
   return crypto.timingSafeEqual(sha256(presented), sha256(token));
@@ -63,7 +63,7 @@ export function isLoopbackAddress(address: string | undefined): boolean {
  * True when the TCP peer is loopback AND the request was not relayed by a proxy: behind a local
  * reverse proxy every client looks like loopback, so `X-Forwarded-For` / `Forwarded` demote it.
  */
-export function isLocalPeer(req: Request): boolean {
+function isLocalPeer(req: Request): boolean {
   if (req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined) {
     return false;
   }

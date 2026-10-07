@@ -24,7 +24,7 @@ function parsePosInt(value: string | undefined, fallback: number): number {
 }
 
 /** `MCP_MAX_SESSIONS` (default 256): a new session evicts the least recently used one when full. */
-export function maxSessions(): number {
+function maxSessions(): number {
   return parsePosInt(process.env['MCP_MAX_SESSIONS'], DEFAULT_MAX_SESSIONS);
 }
 
