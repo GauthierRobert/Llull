@@ -28,6 +28,7 @@ interface ReportRow {
 interface Report {
   readonly summary: string;
   readonly rows: ReadonlyArray<ReportRow>;
+  readonly warnings: ReadonlyArray<string>;
   readonly building: BuildingModel | undefined;
 }
 
@@ -68,6 +69,13 @@ function toPipeRows(pipes: ReadonlyArray<unknown>): ReportRow[] {
       },
     ];
   });
+}
+
+function toWarnings(data: unknown): string[] {
+  const warnings: unknown = isRecord(data) ? data.warnings : undefined;
+  return Array.isArray(warnings)
+    ? warnings.filter((warning): warning is string => typeof warning === 'string')
+    : [];
 }
 
 function toReportRows(data: unknown): ReportRow[] {
@@ -122,6 +130,7 @@ export function StructuralSection(): React.ReactElement {
       rows: toReportRows(result.data)
         .sort((a, b) => b.utilisation - a.utilisation)
         .slice(0, 12),
+      warnings: toWarnings(result.data),
       building,
     });
   };
@@ -129,27 +138,30 @@ export function StructuralSection(): React.ReactElement {
   return (
     <PanelSection title="Structural check" collapsible testId="building-structure">
       <div className="building-inline-form">
-        <input
-          type="number"
-          value={deadLoad}
-          onChange={(event) => setDeadLoad(event.target.value)}
-          aria-label="Roof dead load (kN/m²)"
-          title="Roof dead load, kN/m²"
-        />
-        <input
-          type="number"
-          value={snowLoad}
-          onChange={(event) => setSnowLoad(event.target.value)}
-          aria-label="Snow load (kN/m²)"
-          title="Snow load, kN/m²"
-        />
-        <input
-          type="number"
-          value={windPressure}
-          onChange={(event) => setWindPressure(event.target.value)}
-          aria-label="Wind pressure qp (kN/m²)"
-          title="Peak velocity pressure qp, kN/m² (0 = no wind)"
-        />
+        <label className="field" title="Roof dead load, kN/m²">
+          <span className="field__label">Roof dead load (kN/m²)</span>
+          <input
+            type="number"
+            value={deadLoad}
+            onChange={(event) => setDeadLoad(event.target.value)}
+          />
+        </label>
+        <label className="field" title="Snow load, kN/m²">
+          <span className="field__label">Snow load (kN/m²)</span>
+          <input
+            type="number"
+            value={snowLoad}
+            onChange={(event) => setSnowLoad(event.target.value)}
+          />
+        </label>
+        <label className="field" title="Peak velocity pressure qp, kN/m² (0 = no wind)">
+          <span className="field__label">Wind pressure qp (kN/m²)</span>
+          <input
+            type="number"
+            value={windPressure}
+            onChange={(event) => setWindPressure(event.target.value)}
+          />
+        </label>
         {CHECKS.map((check) => (
           <button
             key={check.command}
@@ -215,6 +227,15 @@ export function StructuralSection(): React.ReactElement {
               </li>
             ))}
           </ul>
+          {report.warnings.length > 0 && (
+            <ul className="panel__list building-warnings" aria-label="Warnings">
+              {report.warnings.map((warning) => (
+                <li key={warning} className="panel__row panel__row-meta" role="note">
+                  {warning}
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
     </PanelSection>

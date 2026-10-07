@@ -12,6 +12,7 @@ import { noop } from '@core/commands/noop';
 import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from './evaluate';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
+import { slabPenetrations } from './clashSlabs';
 
 const CLEARANCE_OBSTACLES: ReadonlySet<BimCategory> = new Set([
   'equipment',
@@ -149,6 +150,11 @@ function findClashes(
       if (depth > tolerance) record({ a: low.elementId, b: high.elementId, kind: 'hard', depth });
     }
   }
+  const inScope = (levelId: string): boolean => levelIds === null || levelIds.has(levelId);
+  for (const penetration of slabPenetrations(building, inScope, tolerance)) {
+    const [a, b] = [penetration.equipmentId, penetration.slabId].sort() as [string, string];
+    record({ a, b, kind: 'hard', depth: penetration.depth });
+  }
   for (const solid of solids) {
     const equipment = building.elements[solid.elementId];
     if (equipment?.category !== 'equipment' || equipment.clearance <= 0) continue;
@@ -187,7 +193,8 @@ export const checkClashes = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel ' +
-    'members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. ' +
+    'members, walls, concrete columns, beams and stairs, equipment passing through a floor / grating that has no ' +
+    'opening around it (add_slab_opening), plus equipment maintenance-clearance violations. ' +
     'Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe ' +
     'support touching its own pipe and the steel it bears on are not ' +
     'reported. Returns element ids, kind and penetration depth (document units; summary in mm).',

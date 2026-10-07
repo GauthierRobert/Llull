@@ -25,6 +25,9 @@ import { PaletteResultToast } from '@ui/components/commandPalette/PaletteResultT
 import { Icon } from '@ui/components/Icon';
 import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
+import { useAutoFrame } from '@ui/hooks/useAutoFrame';
+import { useAutosave } from '@ui/hooks/useAutosave';
+import { RestoredBanner } from '@ui/components/RestoredBanner';
 
 export function App(): React.ReactElement {
   const theme = useThemeStore((s) => s.theme);
@@ -35,6 +38,8 @@ export function App(): React.ReactElement {
   // Mirror the server-authoritative CadDocument into the store via SSE.
   useMcpLiveDocument();
   useKeyboardShortcuts();
+  useAutoFrame();
+  useAutosave();
 
   // Apply the theme on <html> so CSS variables cascade to portals too.
   useEffect(() => {
@@ -52,6 +57,7 @@ export function App(): React.ReactElement {
         <main className="app-viewport" aria-label="Viewport">
           <MeasurementHUD />
           <EmptyState />
+          <RestoredBanner />
 
           <div className="view-mode-toggle" role="group" aria-label="View mode">
             <button

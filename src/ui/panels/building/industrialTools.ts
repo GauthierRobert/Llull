@@ -5,9 +5,15 @@
  * ONE command + params (param-gathering only, react R1).
  */
 
-import { STEEL_PROFILES } from '@aec/steel/profiles';
 import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/pipeSizes';
 import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
+import {
+  ALL_PROFILES,
+  BASE_OPTIONS as BASES,
+  I_PROFILES,
+  JOINT_OPTIONS as JOINTS,
+  MEMBER_ROLE_OPTIONS,
+} from './steelProfileOptions';
 import {
   FieldReader,
   INDUSTRIAL_TOOL_GROUP as GROUP,
@@ -25,15 +31,6 @@ import {
   type ToolField,
 } from './elementToolForm';
 
-const ALL_PROFILES: ReadonlyArray<readonly [string, string]> = STEEL_PROFILES.map(
-  (profile): readonly [string, string] => [
-    profile.name,
-    `${profile.name} · ${profile.massPerMetre} kg/m`,
-  ],
-);
-
-const I_PROFILES = ALL_PROFILES.filter(([name]) => /^(IPE|HEA|HEB)/.test(name));
-
 function profileField(key: string, label: string, defaultValue: string, iOnly = false): ToolField {
   return select(key, label, defaultValue, iOnly ? I_PROFILES : ALL_PROFILES);
 }
@@ -46,13 +43,10 @@ const DN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ]),
 ];
 
-const JOINTS: ReadonlyArray<readonly [string, string]> = [
-  ['pinned', 'Pinned'],
-  ['rigid', 'Rigid (moment connection)'],
-];
-const BASES: ReadonlyArray<readonly [string, string]> = [
-  ['pinned', 'Pinned'],
-  ['fixed', 'Fixed'],
+const EQUIPMENT_SHAPE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
+  ['box', 'Box / machine'],
+  ['vertical_vessel', 'Vertical vessel (tank, DT)'],
+  ['horizontal_vessel', 'Horizontal vessel'],
 ];
 const BEAM_ONLY = { key: 'role', values: ['beam'] } as const;
 const COLUMN_ONLY = { key: 'role', values: ['column'] } as const;
@@ -123,15 +117,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     label: 'Steel member',
     group: GROUP,
     fields: [
-      select('role', 'Role', 'beam', [
-        ['column', 'Column'],
-        ['beam', 'Beam'],
-        ['rafter', 'Rafter'],
-        ['brace', 'Brace'],
-        ['purlin', 'Purlin'],
-        ['rail', 'Side rail'],
-        ['crane', 'Crane beam'],
-      ]),
+      select('role', 'Role', 'beam', MEMBER_ROLE_OPTIONS),
       profileField('profile', 'Profile', 'IPE300'),
       num('x1', 'Start X', '0'),
       num('y1', 'Start Y', '0'),
@@ -247,10 +233,11 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     fields: [
       txt('mark', 'Tag (E-301…)', '', true),
       txt('name', 'Name', 'Machine'),
+      select('shape', 'Shape', 'box', EQUIPMENT_SHAPE_OPTIONS),
       num('x', 'Centre X', '6000'),
       num('y', 'Centre Y', '6000'),
-      num('length', 'Length', '3000'),
-      num('width', 'Width', '2000'),
+      num('length', 'Length (vertical vessel: Ø)', '3000'),
+      num('width', 'Width (horizontal vessel: Ø)', '2000'),
       num('height', 'Height', '2000'),
       num('angle', 'Rotation (°)', '0'),
       num('clearance', 'Clearance', '800'),
@@ -265,6 +252,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         name: reader.text('name'),
         location: reader.point('x', 'y'),
         size: [reader.number('length'), reader.number('width'), reader.number('height')],
+        shape: reader.text('shape') === 'box' ? undefined : reader.text('shape'),
         angle: radians(reader.number('angle')),
         clearance: reader.number('clearance'),
         weight: reader.optionalNumber('weight'),

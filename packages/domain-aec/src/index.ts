@@ -25,6 +25,8 @@ import { addBuildingTemplate } from './templates';
 import { addSlabOpening, deleteSlabOpening } from './slabOpenings';
 import { listSteelProfiles } from './industrial/steelProfileList';
 import { addSteelMember, updateSteelMember } from './industrial/memberSteelCommands';
+import { addGridBeams, addGridBracing, addGridColumns } from './industrial/gridFramingCommands';
+import { addEquipmentOpenings } from './industrial/equipmentOpenings';
 import { addFooting, addPanel } from './industrial/memberFootingPanelCommands';
 import { addEquipment, addPipeRun } from './industrial/equipment';
 import { updateEquipment } from './industrial/equipmentUpdate';
@@ -94,10 +96,14 @@ export const industrialCommands = [
   listSteelProfiles,
   addSteelMember,
   updateSteelMember,
+  addGridColumns,
+  addGridBeams,
+  addGridBracing,
   addFooting,
   addPanel,
   addEquipment,
   updateEquipment,
+  addEquipmentOpenings,
   addPipeRun,
   addPipeSupport,
   addCableTray,

@@ -15,6 +15,8 @@ import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 import { AxisFields, CommitInput, PropRow } from './propertyFields';
 import { dimensionRows } from './entityDimensions';
+import { ElementInspector } from './building/ElementInspector';
+import { buildingElementOf } from '@aec/index';
 
 const DEGREES_PER_RADIAN = 180 / Math.PI;
 
@@ -138,11 +140,21 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
 }
 
 function PropertiesBody(): React.ReactElement {
+  // Narrow slices (react R3): camera / orbit changes must not re-render the inspector.
   const selection = useStore((s) => s.document.selection);
   const entities = useStore((s) => s.document.entities);
+  const building = useStore((s) => s.document.building);
+  const document = building === undefined ? { entities } : { entities, building };
   const [selectedId] = selection;
   const entity =
     selection.length === 1 && selectedId !== undefined ? entities[selectedId] : undefined;
+  const elementIds = new Set<string>();
+  for (const id of selection) {
+    const elementId = buildingElementOf(document, id);
+    if (elementId !== null) elementIds.add(elementId);
+  }
+  const [soleElementId] = elementIds;
+  const everyEntityBelongs = selection.every((id) => buildingElementOf(document, id) !== null);
 
   if (selection.length === 0) {
     return (
@@ -153,12 +165,19 @@ function PropertiesBody(): React.ReactElement {
       />
     );
   }
+  if (elementIds.size === 1 && everyEntityBelongs && soleElementId !== undefined) {
+    return <ElementInspector elementId={soleElementId} />;
+  }
   if (selection.length > 1) {
     return (
       <>
         <PanelEmpty
           icon="layers"
-          message={`${selection.length} entities selected`}
+          message={
+            elementIds.size > 0
+              ? `${selection.length} entities (${elementIds.size} building elements) selected`
+              : `${selection.length} entities selected`
+          }
           hint="Select a single entity to see its properties."
         />
         <SelectionActions />

@@ -684,7 +684,7 @@
     "name": "add_drive_relation"
   },
   {
-    "description": "Place a machine / process equipment on a level: name, plan centre, size [length, width, height], plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and operating weight in kg (for floor loads). Shown as a block in 3D and with its clearance zone in plan.",
+    "description": "Place a machine / process equipment on a level: name, plan centre, size [length, width, height], plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -714,8 +714,17 @@
           "description": "Equipment name, e.g. \"CNC lathe\", \"Compressor\".",
           "type": "string"
         },
+        "shape": {
+          "description": "Shape: \"box\" (default), \"vertical_vessel\" (cylinder, axis along Z: size = [diameter, ignored, height]; the width is set equal to the diameter) or \"horizontal_vessel\" (cylinder, axis along its local x: size = [length, diameter, ignored]; the height is set equal to the diameter and the bottom rests on the level). Plans draw a vertical vessel as a circle.",
+          "enum": [
+            "box",
+            "vertical_vessel",
+            "horizontal_vessel"
+          ],
+          "type": "string"
+        },
         "size": {
-          "description": "[length (local x), width (local y), height], all > 0.",
+          "description": "Three numbers. box: [length (local x), width (local y), height], all > 0. vertical_vessel: [diameter, ignored, height]. horizontal_vessel: [length along local x, diameter, ignored].",
           "items": {
             "type": "number"
           },
@@ -734,6 +743,26 @@
       "type": "object"
     },
     "name": "add_equipment"
+  },
+  {
+    "description": "Cut the floors around an equipment that passes through them (e.g. a 12 m desolventizer crossing two gratings): every slab whose top lies inside the equipment height and is solid under its footprint gets an opening = the equipment plan rectangle + margin. Clears the matching check_clashes hard clashes. A slab where the opening would not fit (outside the slab, touching another opening) is reported and left.",
+    "input_schema": {
+      "properties": {
+        "equipmentId": {
+          "description": "Equipment element id, e.g. \"equipment-2\".",
+          "type": "string"
+        },
+        "margin": {
+          "description": "Free gap around the footprint (toe plate / access), in document units; must be >= 0. Default: 300 mm converted to document units.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "equipmentId"
+      ],
+      "type": "object"
+    },
+    "name": "add_equipment_openings"
   },
   {
     "description": "Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and concrete column foot of the level. Top of footing at level + topOffset (default −300 mm); default 1500 × 1500 × 600 mm.",
@@ -779,6 +808,166 @@
       "type": "object"
     },
     "name": "add_footing"
+  },
+  {
+    "description": "Frame beams along the structural grid (add_grid_line): along every listed grid line, one beam per bay between consecutive intersections with the other lines (so it frames column to column when add_grid_columns was run first). The beam top sits at the level FFL + topOffset. Bays that already hold a beam with the same end points and a top of steel within 100 mm are skipped (any section). Mark SB, role beam.",
+    "input_schema": {
+      "properties": {
+        "axes": {
+          "description": "Grid line labels to frame along (e.g. [\"A\",\"B\"]). Default: every grid line.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "endJoint": {
+          "description": "Joint at each beam end: \"pinned\" (default) or \"rigid\".",
+          "enum": [
+            "pinned",
+            "rigid"
+          ],
+          "type": "string"
+        },
+        "levelId": {
+          "description": "Level id: the beams sit at its finished floor level. Default: the active level.",
+          "type": "string"
+        },
+        "material": {
+          "description": "Steel grade. Default S355.",
+          "type": "string"
+        },
+        "profile": {
+          "description": "Catalogue section name, e.g. \"IPE400\" (list_steel_profiles).",
+          "type": "string"
+        },
+        "startJoint": {
+          "description": "Joint at each beam start: \"pinned\" (default) or \"rigid\" (moment connection).",
+          "enum": [
+            "pinned",
+            "rigid"
+          ],
+          "type": "string"
+        },
+        "topOffset": {
+          "description": "Top of steel relative to the level FFL, in DOCUMENT UNITS (not necessarily mm). Default 0 (top of steel at FFL); negative puts it below the FFL, e.g. minus the grating thickness.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "profile"
+      ],
+      "type": "object"
+    },
+    "name": "add_grid_beams"
+  },
+  {
+    "description": "Add vertical bracing in one bay of one grid line for one storey: the bay lies in the plane of grid line axis between the crossing lines from and to. pattern \"x\" gives two crossing diagonals, \"diagonal\" one from bottom at from to top at to. Bottom nodes sit at the base level FFL + bottomOffset, top nodes at the next storey FFL (base elevation + level height) + topOffset. Mark BR, role brace.",
+    "input_schema": {
+      "properties": {
+        "axis": {
+          "description": "Label of the grid line the bracing lies in, e.g. \"A\".",
+          "type": "string"
+        },
+        "bottomOffset": {
+          "description": "Bottom node height relative to the base level FFL, in DOCUMENT UNITS (not necessarily mm). Default 0 (at the FFL).",
+          "type": "number"
+        },
+        "from": {
+          "description": "Label of the grid line crossing axis that bounds the bay at one side, e.g. \"1\".",
+          "type": "string"
+        },
+        "levelId": {
+          "description": "Storey base level id: bracing starts at its FFL and rises one level height. Default: the active level.",
+          "type": "string"
+        },
+        "material": {
+          "description": "Steel grade. Default S355.",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "\"x\" (default): two crossing diagonals; \"diagonal\": one, from bottom at from to top at to.",
+          "enum": [
+            "x",
+            "diagonal"
+          ],
+          "type": "string"
+        },
+        "profile": {
+          "description": "Catalogue section name, e.g. \"L100x10\" or \"CHS114.3x4\" (list_steel_profiles).",
+          "type": "string"
+        },
+        "to": {
+          "description": "Label of the grid line crossing axis that bounds the bay at the other side, e.g. \"2\".",
+          "type": "string"
+        },
+        "topOffset": {
+          "description": "Top node height relative to the NEXT storey FFL (base elevation + level height), in DOCUMENT UNITS (not necessarily mm). Default 0 (at the next FFL); negative puts the node under the floor beams.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "profile",
+        "axis",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "name": "add_grid_bracing"
+  },
+  {
+    "description": "Place one vertical steel column at every intersection of the structural grid (add_grid_line): the way to start framing a building. The column runs from the base level FFL up to topLevelId (a continuous column through intermediate floors) or, by default, to the top of the base level. Restrict with axes (both crossing lines must be listed) and exclude. Intersections that already hold a column on that level, or a continuous column from a lower level passing through it, are skipped. Mark SC, role column; follow with add_grid_beams / add_grid_bracing.",
+    "input_schema": {
+      "properties": {
+        "axes": {
+          "description": "Grid line labels (e.g. [\"A\",\"B\",\"1\",\"2\"]); an intersection is used only when BOTH its lines are listed. Default: all grid lines.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "baseFixity": {
+          "description": "\"pinned\" (default) or \"fixed\": the column foot restrains rotation in check_steel_members.",
+          "enum": [
+            "pinned",
+            "fixed"
+          ],
+          "type": "string"
+        },
+        "exclude": {
+          "description": "Intersections to skip, written \"A/1\" (the order of the two labels does not matter).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "levelId": {
+          "description": "Base level id: columns start at its finished floor level. Default: the active level.",
+          "type": "string"
+        },
+        "material": {
+          "description": "Steel grade. Default S355.",
+          "type": "string"
+        },
+        "profile": {
+          "description": "Catalogue section name, e.g. \"HEB300\" (list_steel_profiles).",
+          "type": "string"
+        },
+        "roll": {
+          "description": "Section rotation about the vertical axis, radians. Default 0.",
+          "type": "number"
+        },
+        "topLevelId": {
+          "description": "Level id whose FFL is the column top; must be above the base level. Default: base level elevation + base level height.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile"
+      ],
+      "type": "object"
+    },
+    "name": "add_grid_columns"
   },
   {
     "description": "Add one structural grid axis from start to end (plan [x, y]) with a labelled bubble at each end, on layer S-GRID. Label defaults to the next free number.",
@@ -2551,7 +2740,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind and penetration depth (document units; summary in mm).",
+    "description": "Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, concrete columns, beams and stairs, equipment passing through a floor / grating that has no opening around it (add_slab_opening), plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind and penetration depth (document units; summary in mm).",
     "input_schema": {
       "properties": {
         "levelId": {
@@ -6264,7 +6453,7 @@
     "name": "update_constraint"
   },
   {
-    "description": "Edit an existing equipment in place (revision): name, tag (mark), plan centre, size, plan rotation, maintenance clearance, operating weight or level. Identify it by `elementId` (e.g. \"equipment-2\") or by its current tag `currentMark` (e.g. \"EQ3\"). The element id is kept, so schedules, plan tags and IFC GlobalIds stay stable across the revision. Fields you omit are unchanged.",
+    "description": "Edit an existing equipment in place (revision): name, tag (mark), plan centre, size, plan rotation, maintenance clearance, operating weight, shape (box / vertical_vessel / horizontal_vessel) or level. Identify it by `elementId` (e.g. \"equipment-2\") or by its current tag `currentMark` (e.g. \"EQ3\"). The element id is kept, so schedules, plan tags and IFC GlobalIds stay stable across the revision. Fields you omit are unchanged.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -6302,8 +6491,17 @@
           "description": "New equipment name.",
           "type": "string"
         },
+        "shape": {
+          "description": "New shape. Shape: \"box\" (default), \"vertical_vessel\" (cylinder, axis along Z: size = [diameter, ignored, height]; the width is set equal to the diameter) or \"horizontal_vessel\" (cylinder, axis along its local x: size = [length, diameter, ignored]; the height is set equal to the diameter and the bottom rests on the level). Plans draw a vertical vessel as a circle.",
+          "enum": [
+            "box",
+            "vertical_vessel",
+            "horizontal_vessel"
+          ],
+          "type": "string"
+        },
         "size": {
-          "description": "New [length, width, height], all > 0.",
+          "description": "New size, three numbers. box: [length, width, height], all > 0. vertical_vessel: [diameter, ignored, height]. horizontal_vessel: [length along local x, diameter, ignored]. Vessel sizes are normalised to their bounding box.",
           "items": {
             "type": "number"
           },
@@ -6396,7 +6594,7 @@
     "name": "update_opening"
   },
   {
-    "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or unattached (the summary says which).",
+    "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450; a horizontal member with roll 0 or π keeps its top of steel, other rolls keep the axis height), end points, role, roll, grade, note, beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or unattached (the summary says which).",
     "input_schema": {
       "properties": {
         "baseFixity": {
@@ -6421,6 +6619,10 @@
             "rigid"
           ],
           "type": "string"
+        },
+        "keepTopOfSteel": {
+          "description": "Horizontal members with a new profile and no new start / end: shift the axis down by half the depth increase (up for a decrease) so the top of steel stays where it was, e.g. under a grating. Default false (the axis stays).",
+          "type": "boolean"
         },
         "material": {
           "description": "New steel grade.",

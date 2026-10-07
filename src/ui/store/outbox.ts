@@ -22,6 +22,10 @@ export interface OutboxCommand {
   readonly params: unknown;
   /** Ids the local run produced; zipped with the server's `affected` to remap later entries. */
   readonly affected: readonly string[];
+  /** Part of the previous entry's undo step (a `coalesce` dispatch): undo / redo move them together. */
+  readonly coalesced?: boolean;
+  /** Never sent to the server (autosave restore and its follow-ups): the server document stays the truth. */
+  readonly localOnly?: boolean;
 }
 
 /** Guards against concurrent pushes. */
@@ -62,14 +66,17 @@ export function moveLastOutboxEntry(
   direction: 'undo' | 'redo',
 ): Pick<CadStoreState, 'localOutbox' | 'localRedoOutbox'> {
   const from = direction === 'undo' ? state.localOutbox : state.localRedoOutbox;
-  const moved = from[from.length - 1];
-  if (moved === undefined) {
+  if (from.length === 0) {
     return { localOutbox: state.localOutbox, localRedoOutbox: state.localRedoOutbox };
   }
-  const rest = from.slice(0, -1);
+  // One undo step = its entry plus the coalesced entries that follow it.
+  let start = from.length - 1;
+  while (start > 0 && from[start]?.coalesced === true) start -= 1;
+  const moved = from.slice(start);
+  const rest = from.slice(0, start);
   return direction === 'undo'
-    ? { localOutbox: rest, localRedoOutbox: [...state.localRedoOutbox, moved] }
-    : { localOutbox: [...state.localOutbox, moved], localRedoOutbox: rest };
+    ? { localOutbox: rest, localRedoOutbox: [...state.localRedoOutbox, ...moved] }
+    : { localOutbox: [...state.localOutbox, ...moved], localRedoOutbox: rest };
 }
 
 /** Selection survives a document replacement, minus ids that no longer exist. */
@@ -92,6 +99,12 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
     for (;;) {
       const next = get().localOutbox[0];
       if (next === undefined) break;
+      if (next.localOnly === true) {
+        set((state) => ({
+          localOutbox: state.localOutbox.filter((entry) => entry.commandId !== next.commandId),
+        }));
+        continue;
+      }
       const response = await postCommand(
         next.name,
         remapIds(next.params, flushIdMap),

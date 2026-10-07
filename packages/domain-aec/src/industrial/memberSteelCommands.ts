@@ -2,6 +2,7 @@
  * @layer domain-aec
  */
 
+import type { CadDocument, Vec3 } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec3, z } from '@core/commands/schema';
@@ -140,6 +141,22 @@ export const addSteelMember = defineCommand({
   },
 });
 
+const shiftZ = (point: Vec3, dz: number): Vec3 => [point[0], point[1], point[2] + dz];
+
+/** Axis z change that keeps the top of a horizontal member when its section depth changes; 0 unless roll is 0 or π (mod 2π). */
+function topOfSteelShift(
+  doc: Pick<CadDocument, 'units'>,
+  member: SteelMemberElement,
+  section: SteelProfile,
+): number {
+  const old = findProfile(member.profile);
+  const horizontal = Math.abs(member.end[2] - member.start[2]) < 1e-9;
+  const turns = Math.abs(member.roll) / Math.PI;
+  const flat = Math.abs(turns - Math.round(turns)) < 1e-6;
+  if (!old || !horizontal || !flat) return 0;
+  return fromMm(doc, (old.h - section.h) / 2);
+}
+
 /**
  * @command update_steel_member
  * @pure
@@ -148,7 +165,7 @@ export const addSteelMember = defineCommand({
 export const updateSteelMember = defineCommand({
   name: 'update_steel_member',
   description:
-    'Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, ' +
+    'Edit a steel member: change its section (e.g. upsize IPE400 → IPE450; a horizontal member with roll 0 or π keeps its top of steel, other rolls keep the axis height), end points, role, roll, grade, note, ' +
     'beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports ' +
     'bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or ' +
     'unattached (the summary says which).',
@@ -173,10 +190,31 @@ export const updateSteelMember = defineCommand({
     baseFixity: baseFixitySchema
       .optional()
       .describe('Columns only: new base fixity, "pinned" or "fixed".'),
+    keepTopOfSteel: z
+      .boolean()
+      .optional()
+      .describe(
+        'Horizontal members with a new profile and no new start / end: shift the axis down by half the ' +
+          'depth increase (up for a decrease) so the top of steel stays where it was, e.g. under a grating. ' +
+          'Default false (the axis stays).',
+      ),
   }),
   run: (
     doc,
-    { memberId, profile, start, end, role, roll, material, note, startJoint, endJoint, baseFixity },
+    {
+      memberId,
+      profile,
+      start,
+      end,
+      role,
+      roll,
+      material,
+      note,
+      startJoint,
+      endJoint,
+      baseFixity,
+      keepTopOfSteel = false,
+    },
   ): CommandResult => {
     const building = getBuilding(doc);
     const member = building.elements[memberId];
@@ -185,8 +223,12 @@ export const updateSteelMember = defineCommand({
     const section = findProfile(profile ?? member.profile);
     if (!section)
       return noop(doc, `update_steel_member failed: unknown steel profile '${profile ?? ''}'.`);
-    const from = start !== undefined ? toVec3(start) : member.start;
-    const to = end !== undefined ? toVec3(end) : member.end;
+    const topShift =
+      keepTopOfSteel && start === undefined && end === undefined
+        ? topOfSteelShift(doc, member, section)
+        : 0;
+    const from = start !== undefined ? toVec3(start) : shiftZ(member.start, topShift);
+    const to = end !== undefined ? toVec3(end) : shiftZ(member.end, topShift);
     if (!from || !to) {
       return noop(
         doc,
@@ -234,7 +276,8 @@ export const updateSteelMember = defineCommand({
     return {
       document,
       summary:
-        `Updated ${updated.role} ${updated.mark} (${memberId}): ${profileSummary(section)}.${plateNote}` +
+        `Updated ${updated.role} ${updated.mark} (${memberId}): ${profileSummary(section)}` +
+        `${topShift !== 0 ? `, axis moved ${topShift > 0 ? 'up' : 'down'} ${Math.abs(topShift).toFixed(1)} ${doc.units} to keep the top of steel` : ''}.${plateNote}` +
         `${stale.removed.length > 0 ? ` Moment connection(s) ${stale.removed.join(', ')} removed (joint no longer exists).` : ''}${reconciliationNote(supports)}`,
       affected: [
         ...elementAffected(document, [

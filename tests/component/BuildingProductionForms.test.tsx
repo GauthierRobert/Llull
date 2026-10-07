@@ -213,6 +213,18 @@ describe('equipment editor', () => {
       size: [18000, 4000, 9000],
       weight: 72000,
     });
+    fireEvent.change(within(editor).getByTestId('equipment-edit-shape'), {
+      target: { value: 'vertical_vessel' },
+    });
+    fireEvent.click(screen.getByTestId('equipment-save'));
+    expect(dispatch).toHaveBeenLastCalledWith(
+      'update_equipment',
+      expect.objectContaining({ elementId: 'equipment-1', shape: 'vertical_vessel' }),
+    );
+    fireEvent.click(within(editor).getByTestId('equipment-cut-openings'));
+    expect(dispatch).toHaveBeenLastCalledWith('add_equipment_openings', {
+      equipmentId: 'equipment-1',
+    });
   });
 
   it('retags, renames, moves and rotates; refuses an empty edit and bad numbers', () => {

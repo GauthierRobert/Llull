@@ -7,7 +7,7 @@
  * the BIM entities themselves are hidden in 2D (Entities2D) so each level reads as one plan.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { Text } from '@react-three/drei';
 import type { Vec2 } from '@core/model/types';
@@ -15,6 +15,7 @@ import { buildPlanDrawing, CATEGORY_LAYER, fromMm, type PlanPrimitive } from '@a
 import { useStore } from '@ui/store';
 import { useThemeStore } from '@ui/store/themeStore';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
+import { useMinScreenSize } from './useMinScreenSize';
 
 const ARC_SEGMENTS = 32;
 const DIMENSION_COLOR = '#d6a243';
@@ -202,6 +203,25 @@ function disposeGeometry(geometry: PlanGeometry): void {
   }
 }
 
+/** Plan label; dimension values keep a minimum on-screen size when zoomed out. */
+function PlanLabelText({ label }: { label: PlanLabel }): React.ReactElement {
+  const ref = useRef<THREE.Group>(null);
+  useMinScreenSize(ref, label.key.startsWith('dimension-') ? label.height : 0);
+  return (
+    <group ref={ref} position={[label.at[0], label.at[1], 0.01]} rotation={[0, 0, label.rotation]}>
+      <Text
+        font={TEXT_FONT_URL}
+        fontSize={label.height}
+        color={label.color}
+        anchorX="center"
+        anchorY="middle"
+      >
+        {label.content}
+      </Text>
+    </group>
+  );
+}
+
 export function BuildingPlan2D(): React.ReactElement | null {
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
@@ -235,18 +255,7 @@ export function BuildingPlan2D(): React.ReactElement | null {
       <primitive object={geometry.solid} />
       <primitive object={geometry.dashed} />
       {geometry.labels.map((label) => (
-        <Text
-          key={label.key}
-          font={TEXT_FONT_URL}
-          position={[label.at[0], label.at[1], 0.01]}
-          rotation={[0, 0, label.rotation]}
-          fontSize={label.height}
-          color={label.color}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {label.content}
-        </Text>
+        <PlanLabelText key={label.key} label={label} />
       ))}
     </group>
   );

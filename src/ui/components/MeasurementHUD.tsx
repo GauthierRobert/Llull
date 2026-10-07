@@ -179,6 +179,15 @@ export function MeasurementHUD(): React.ReactElement | null {
   if (!lastMeasure) return null;
 
   const { command, data } = lastMeasure;
+  const isKnownMeasurement =
+    isDistanceData(data) ||
+    isAngleData(data) ||
+    isAreaData(data) ||
+    isPerimeterData(data) ||
+    isBoundingBoxData(data) ||
+    isVolumeData(data) ||
+    isMassPropertiesData(data);
+  if (!isKnownMeasurement) return null;
   const title = COMMAND_TITLES[command] ?? command;
 
   return (

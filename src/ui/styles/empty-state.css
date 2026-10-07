@@ -150,3 +150,7 @@
   font-size: var(--text-xs);
   color: var(--fg-subtle);
 }
+
+.empty-state__actions--structure {
+  margin-top: var(--space-2);
+}

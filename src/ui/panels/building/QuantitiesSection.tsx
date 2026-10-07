@@ -67,7 +67,7 @@ function RateForm({ lines }: { lines: ReadonlyArray<CostLine> }): React.ReactEle
       >
         {lines.map((line) => (
           <option key={line.key} value={line.key}>
-            {line.key}
+            {line.description}
           </option>
         ))}
       </select>

@@ -118,10 +118,14 @@ function buildElevationSheet(
     if (!level) continue;
     const y = toPaper([0, level.elevation])[1];
     const metres = toMetres(doc, level.elevation);
+    const datum = `${metres >= 0 ? '+' : ''}${metres.toFixed(3)}`;
+    // A level named after its elevation ("+6.00") is labelled once, by the datum.
+    const namedByElevation = Math.abs(Number(level.name) - metres) < 1e-6;
+    const label = namedByElevation ? datum : `${escapeXml(level.name)} ${datum}`;
     annotations.push(
       `<line x1="${n(left)}" y1="${n(y)}" x2="${n(right)}" y2="${n(y)}" class="hidden"/>`,
       `<polygon points="${n(right + 2)},${n(y)} ${n(right)},${n(y - 2.5)} ${n(right + 4)},${n(y - 2.5)}" class="solid"/>`,
-      `<text x="${n(right + 6)}" y="${n(y - 0.6)}" font-size="2.5" text-anchor="start">${escapeXml(level.name)} ${metres >= 0 ? '+' : ''}${metres.toFixed(3)}</text>`,
+      `<text x="${n(right + 6)}" y="${n(y - 0.6)}" font-size="2.5" text-anchor="start">${label}</text>`,
     );
   }
   const screenAxis = 1 - drawing.projection.axis;

@@ -5,7 +5,7 @@ import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import type { OutboxCommand } from './outbox';
 
 /** The structured result of the most recently dispatched read-only/query command. */
-interface LastMeasure {
+export interface LastMeasure {
   /** The command name, e.g. 'measure_distance'. */
   command: string;
   /** The structured data returned by the command (typed per command, but stored as unknown here). */
@@ -28,6 +28,18 @@ export interface DispatchOptions {
   selectAffected?: boolean;
   /** Called once with THIS dispatch's outcome (also on a failed POST), never with another's. */
   onResult?: (result: DispatchResult) => void;
+  /** Leave the status-bar summary untouched (automatic UI-initiated commands such as framing). */
+  quiet?: boolean;
+  /**
+   * Local mode: fold this change into the previous undo step instead of adding one (automatic
+   * follow-ups such as framing new content), so one Undo reverts both.
+   */
+  coalesce?: boolean;
+  /**
+   * Local mode: never replay this command to the server when the outbox flushes (autosave restore:
+   * a stale browser copy must not replace the shared live document). A coalesced follow-up inherits it.
+   */
+  localOnly?: boolean;
 }
 
 export interface CadStoreState {

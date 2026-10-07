@@ -54,7 +54,10 @@ export const buildingDerivationGuard: DerivationGuard = {
 };
 
 /** Building element that generated `entityId` (verified against the element's entity list). */
-export function buildingElementOf(document: CadDocument, entityId: string): string | null {
+export function buildingElementOf(
+  document: Pick<CadDocument, 'entities' | 'building'>,
+  entityId: string,
+): string | null {
   const element = elementTag(document.entities[entityId]);
   if (element === null) return null;
   return document.building?.elements[element]?.entityIds.includes(entityId) === true

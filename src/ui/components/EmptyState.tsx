@@ -8,7 +8,7 @@
  */
 
 import React, { useState } from 'react';
-import { useStore, useToolStore } from '@ui/store';
+import { useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
 import { Icon } from '@ui/components/Icon';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
@@ -16,6 +16,7 @@ import { createSolid } from '@ui/actions/createSolid';
 
 export function EmptyState(): React.ReactElement | null {
   const entityCount = useStore((s) => s.document.order.length);
+  const dispatch = useStore((s) => s.dispatch);
   const setDrawTool = useToolStore((s) => s.setDrawTool);
   const drawToolArmed = useToolStore((s) => s.drawTool !== 'none');
   const [dismissed, setDismissed] = useState(false);
@@ -23,6 +24,10 @@ export function EmptyState(): React.ReactElement | null {
   // Hidden while a 2D tool is armed so the card never covers the drawing area.
   if (entityCount > 0 || dismissed || drawToolArmed) return null;
 
+  const showBuildingTab = (): void => {
+    const { sidebarTab, sidebarOpen, selectSidebarTab } = useLayoutStore.getState();
+    if (sidebarTab !== 'building' || !sidebarOpen) selectSidebarTab('building');
+  };
   const boxPreset = SOLID_PRESETS[0];
 
   return (
@@ -67,6 +72,26 @@ export function EmptyState(): React.ReactElement | null {
             <Icon name="drawRectangle" size={18} />
             <span className="empty-state__action-title">Draw a 2D rectangle</span>
             <span className="empty-state__action-sub">click two corners on the grid</span>
+          </button>
+        </div>
+
+        <div className="empty-state__actions empty-state__actions--structure">
+          <button type="button" className="empty-state__action" onClick={showBuildingTab}>
+            <Icon name="building" size={18} />
+            <span className="empty-state__action-title">Start a steel structure</span>
+            <span className="empty-state__action-sub">levels, grid and templates</span>
+          </button>
+          <button
+            type="button"
+            className="empty-state__action"
+            onClick={() => {
+              showBuildingTab();
+              dispatch('add_portal_frame_building', {});
+            }}
+          >
+            <Icon name="building" size={18} />
+            <span className="empty-state__action-title">Steel hall template</span>
+            <span className="empty-state__action-sub">portal-frame hall in one click</span>
           </button>
         </div>
 
