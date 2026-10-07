@@ -40,6 +40,13 @@ describe('project name', () => {
     expect(projectFileStem(useStore.getState().document, 'x')).toBe('Plant_A_Hall_1');
   });
 
+  it('announces unsaved changes with an accessible name, independent of the visible word', () => {
+    render(<TopBar />);
+    expect(screen.queryByRole('status', { name: 'Unsaved changes' })).toBeNull();
+    act(() => useSessionStore.getState().markDirty());
+    expect(screen.getByRole('status', { name: 'Unsaved changes' })).toBeDefined();
+  });
+
   it('falls back to the timestamp stem without a project name', () => {
     expect(projectFileStem(createEmptyDocument(), 'llull-1')).toBe('llull-1');
   });

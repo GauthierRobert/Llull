@@ -130,8 +130,13 @@ export function TopBar(): React.ReactElement {
           </span>
           <span className="file-crumb file-crumb--active">{projectName ?? 'Untitled'}</span>
           {isDirty && (
-            <span className="unsaved-dot" role="status" title="Unsaved changes">
-              ● unsaved
+            <span
+              className="unsaved-dot"
+              role="status"
+              aria-label="Unsaved changes"
+              title="Unsaved changes"
+            >
+              ●<span className="unsaved-dot__label"> unsaved</span>
             </span>
           )}
         </nav>
