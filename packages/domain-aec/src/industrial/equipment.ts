@@ -28,7 +28,7 @@ import {
   normaliseEquipmentSize,
 } from './equipmentShape';
 import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from './pipeSizes';
-import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
+import { MAX_ROUTE_POINTS, hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
 import { levelIdParam } from '../levelParams';
 
 /**
@@ -141,7 +141,7 @@ export const addPipeRun = defineCommand({
   params: z.object({
     points: z
       .array(z.array(z.number()))
-      .describe('Pipe centreline [[x, y, z], …], at least 2 points.'),
+      .describe('Pipe centreline [[x, y, z], …], 2 to 1000 points.'),
     diameter: z
       .number()
       .optional()
@@ -177,6 +177,12 @@ export const addPipeRun = defineCommand({
   ): CommandResult => {
     const path = parseRoute(points);
     if (!path) return noop(doc, 'add_pipe_run failed: points must be ≥ 2 [x, y, z] points.');
+    if (path.length > MAX_ROUTE_POINTS) {
+      return noop(
+        doc,
+        `add_pipe_run failed: at most ${MAX_ROUTE_POINTS} points per run (got ${path.length}); split the line.`,
+      );
+    }
     if (dn !== undefined && !(Number.isInteger(dn) && dn > 0)) {
       return noop(doc, `add_pipe_run failed: dn must be a positive integer (got ${dn}).`);
     }

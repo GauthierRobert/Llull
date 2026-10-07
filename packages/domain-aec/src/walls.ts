@@ -186,6 +186,8 @@ export const addWall = defineCommand({
   },
 });
 
+const MAX_WALL_POINTS = 500;
+
 /**
  * @command draw_walls
  * @pure
@@ -198,7 +200,7 @@ export const drawWalls = defineCommand({
     'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing ' +
     'wall (e.g. a building perimeter). Same options as add_wall.',
   params: z.object({
-    points: z.array(z.array(z.number())).describe('Centerline vertices [[x, y], …], at least 2.'),
+    points: z.array(z.array(z.number())).describe('Centerline vertices [[x, y], …], 2 to 500.'),
     closed: z
       .boolean()
       .optional()
@@ -210,6 +212,12 @@ export const drawWalls = defineCommand({
       return noop(
         doc,
         'draw_walls failed: points must be a list of [x, y] (at least 2, or 3 when closed).',
+      );
+    }
+    if (points.length > MAX_WALL_POINTS) {
+      return noop(
+        doc,
+        `draw_walls failed: at most ${MAX_WALL_POINTS} points per call (got ${points.length}); split the outline.`,
       );
     }
     const segments: Array<readonly [Vec2, Vec2]> = [];

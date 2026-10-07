@@ -188,7 +188,7 @@
           "type": "string"
         },
         "points": {
-          "description": "Tray centreline [[x, y, z], …], at least 2 points.",
+          "description": "Tray centreline [[x, y, z], …], 2 to 1000 points.",
           "items": {
             "items": {
               "type": "number"
@@ -1016,14 +1016,14 @@
           "type": "array"
         },
         "xSpacings": {
-          "description": "Bay widths along X between consecutive numbered axes (each > 0).",
+          "description": "Bay widths along X between consecutive numbered axes (each > 0, at most 100).",
           "items": {
             "type": "number"
           },
           "type": "array"
         },
         "ySpacings": {
-          "description": "Bay widths along Y between consecutive lettered axes (each > 0).",
+          "description": "Bay widths along Y between consecutive lettered axes (each > 0, at most 100).",
           "items": {
             "type": "number"
           },
@@ -1342,7 +1342,7 @@
           "type": "string"
         },
         "points": {
-          "description": "Pipe centreline [[x, y, z], …], at least 2 points.",
+          "description": "Pipe centreline [[x, y, z], …], 2 to 1000 points.",
           "items": {
             "items": {
               "type": "number"
@@ -4280,7 +4280,7 @@
           "type": "string"
         },
         "points": {
-          "description": "Centerline vertices [[x, y], …], at least 2.",
+          "description": "Centerline vertices [[x, y], …], 2 to 500.",
           "items": {
             "items": {
               "type": "number"

@@ -95,6 +95,8 @@ export const addGridLine = defineCommand({
   },
 });
 
+const MAX_GRID_BAYS = 100;
+
 /**
  * @command add_grid_system
  * @pure
@@ -110,10 +112,10 @@ export const addGridSystem = defineCommand({
   params: z.object({
     xSpacings: z
       .array(z.number())
-      .describe('Bay widths along X between consecutive numbered axes (each > 0).'),
+      .describe('Bay widths along X between consecutive numbered axes (each > 0, at most 100).'),
     ySpacings: z
       .array(z.number())
-      .describe('Bay widths along Y between consecutive lettered axes (each > 0).'),
+      .describe('Bay widths along Y between consecutive lettered axes (each > 0, at most 100).'),
     origin: vec2('Intersection of axis 1 and axis A [x, y]. Default [0, 0].').optional(),
     extension: z
       .number()
@@ -131,6 +133,12 @@ export const addGridSystem = defineCommand({
       return noop(
         doc,
         'add_grid_system failed: xSpacings / ySpacings must be lists of numbers > 0.',
+      );
+    }
+    if (xSpacings.length > MAX_GRID_BAYS || ySpacings.length > MAX_GRID_BAYS) {
+      return noop(
+        doc,
+        `add_grid_system failed: at most ${MAX_GRID_BAYS} bays per direction (got ${xSpacings.length} x, ${ySpacings.length} y).`,
       );
     }
     const overrun = extension ?? fromMm(doc, 1500);
