@@ -221,6 +221,9 @@ function writeDimension(
 /** Pattern layer of a cut layer, e.g. A-WALL → A-WALL-PATT (AIA / NCS). */
 const patternLayer = (layer: string): string => `${layer}-PATT`;
 
+/** Hatch lines across a cut polygon's diagonal at most: coarser spacing for very large polygons. */
+const MAX_HATCH_LINES_ACROSS = 300;
+
 /** ANSI31 (45° lines) for concrete / masonry, SOLID triangles for steel. */
 function writeFill(
   writer: DxfWriter,
@@ -231,7 +234,14 @@ function writeFill(
   hatchSpacing: number,
 ): void {
   if (fill === 'hatch') {
-    for (const [a, b] of hatchSegments([outer, ...holes], Math.PI / 4, hatchSpacing)) {
+    const xs = outer.map((point) => point[0]);
+    const ys = outer.map((point) => point[1]);
+    const diagonal = Math.hypot(
+      Math.max(...xs) - Math.min(...xs),
+      Math.max(...ys) - Math.min(...ys),
+    );
+    const spacing = Math.max(hatchSpacing, diagonal / MAX_HATCH_LINES_ACROSS);
+    for (const [a, b] of hatchSegments([outer, ...holes], Math.PI / 4, spacing)) {
       writer.line(patternLayer(layer), a, b);
     }
     return;

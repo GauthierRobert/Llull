@@ -60,7 +60,12 @@ export function fitScale(widthMm: number, heightMm: number, viewport: Viewport):
     if (widthMm / scale <= viewport.width * 0.92 && heightMm / scale <= viewport.height * 0.92)
       return scale;
   }
-  return STANDARD_SCALES[STANDARD_SCALES.length - 1] as number;
+  // Beyond the standard scales: the next 1-2-5 step that fits, so the sheet never overflows.
+  const largest = STANDARD_SCALES[STANDARD_SCALES.length - 1] as number;
+  const needed = Math.max(widthMm / (viewport.width * 0.92), heightMm / (viewport.height * 0.92));
+  if (!(needed > largest) || !Number.isFinite(needed)) return largest;
+  const decade = 10 ** Math.floor(Math.log10(needed));
+  return ([1, 2, 5, 10] as const).map((step) => step * decade).find((c) => c >= needed) as number;
 }
 
 /** Shared drawing-sheet stylesheet (line weights in paper millimetres). */

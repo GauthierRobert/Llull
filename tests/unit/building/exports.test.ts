@@ -196,8 +196,8 @@ describe('export_plan_sheet', () => {
     expect(execute(createEmptyDocument(), 'export_plan_sheet', {}).data).toBeUndefined();
   });
 
-  it('fitScale falls back to the largest scale and escapeXml escapes', () => {
-    expect(fitScale(1e9, 1e9, { x: 0, y: 0, width: 100, height: 100 })).toBe(2000);
+  it('fitScale extends past the standard scales (1-2-5) and escapeXml escapes', () => {
+    expect(fitScale(1e9, 1e9, { x: 0, y: 0, width: 100, height: 100 })).toBe(20_000_000);
     expect(fitScale(1000, 1000, { x: 0, y: 0, width: 100, height: 100 })).toBe(20);
     expect(escapeXml('a&"b')).toBe('a&amp;&quot;b');
   });
@@ -376,6 +376,28 @@ describe('SVG sheets stay well-formed XML for hostile names', () => {
       expect(svg, name).not.toMatch(/&(?!amp;|lt;|gt;|quot;|#)/);
       expect(svg, name).toContain('&lt;A&amp;B&gt;');
     }
+  });
+});
+
+describe('extreme model sizes', () => {
+  const viewport = { x: 0, y: 0, width: 400, height: 250 };
+
+  it('fitScale goes beyond the standard scales so the drawing always fits', () => {
+    expect(fitScale(10, 10, viewport)).toBeLessThanOrEqual(20);
+    for (const extent of [5_000_000, 500_000_000, 123_456_789_012]) {
+      const scale = fitScale(extent, extent / 2, viewport);
+      expect(extent / scale, String(extent)).toBeLessThanOrEqual(viewport.width * 0.92);
+      expect(extent / scale, String(extent)).toBeGreaterThan(viewport.width * 0.92 * 0.19);
+      expect([1, 2, 5].includes(scale / 10 ** Math.floor(Math.log10(scale)))).toBe(true);
+    }
+    expect(fitScale(Infinity, 1, viewport)).toBe(2000);
+  });
+
+  it('DXF hatch density is capped for a 500 km wall', () => {
+    let doc = run(createEmptyDocument(), 'add_level', { name: 'L' });
+    doc = run(doc, 'add_wall', { start: [0, 0], end: [500_000_000, 0], thickness: 10_000_000 });
+    const data = execute(doc, 'export_dxf', {}).data as DxfExport;
+    expect(data.entityCount).toBeLessThan(5000);
   });
 });
 
