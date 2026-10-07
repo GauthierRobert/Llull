@@ -10,6 +10,7 @@
 import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
 import type { Entity, Vec3 } from '@core/model/types';
 import { cross3, dot3, sub3 } from '@lib/vec3';
+import { clearTangentContact } from './tangentGuard';
 
 /** Minimal typings for the subset of the OCC WASM API this kernel uses. */
 interface OccHandle {
@@ -404,9 +405,10 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
 
   return {
     booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null {
+      const [operandA, operandB] = clearTangentContact(a, b);
       return withHandles((own) => {
-        const shapeA = own(entityToOccShape(api, a));
-        const shapeB = shapeA && own(entityToOccShape(api, b));
+        const shapeA = own(entityToOccShape(api, operandA));
+        const shapeB = shapeA && own(entityToOccShape(api, operandB));
         if (!shapeA || !shapeB) return null;
         const builder = own(new api[BOOLEAN_BUILDERS[op]](shapeA, shapeB) as OccBuilder);
         builder.Build();
