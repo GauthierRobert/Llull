@@ -6461,7 +6461,7 @@
           "type": "number"
         },
         "clearance": {
-          "description": "New maintenance clearance (>= 0).",
+          "description": "New maintenance clearance in document units (>= 0).",
           "type": "number"
         },
         "currentMark": {

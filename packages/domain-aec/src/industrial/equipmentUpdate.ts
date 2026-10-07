@@ -44,7 +44,10 @@ export const updateEquipment = defineCommand({
     ).optional(),
     shape: equipmentShapeSchema.optional().describe(`New shape. ${SHAPE_PARAM_TEXT}`),
     angle: z.number().optional().describe('New plan rotation in radians.'),
-    clearance: z.number().optional().describe('New maintenance clearance (>= 0).'),
+    clearance: z
+      .number()
+      .optional()
+      .describe('New maintenance clearance in document units (>= 0).'),
     weight: z.number().optional().describe('New operating weight in kg (>= 0).'),
     levelId: z.string().optional().describe('Move the equipment to this level id.'),
   }),
@@ -138,6 +141,24 @@ export const updateEquipment = defineCommand({
       ...next,
       levelId: resolution.level.id,
     };
+    const sameNumbers = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): boolean =>
+      a.length === b.length && a.every((value, index) => value === b[index]);
+    if (
+      updated.name === equipment.name &&
+      updated.mark === equipment.mark &&
+      updated.levelId === equipment.levelId &&
+      updated.angle === equipment.angle &&
+      updated.clearance === equipment.clearance &&
+      updated.weight === equipment.weight &&
+      newShape === shapeOf(equipment) &&
+      sameNumbers(updated.location, equipment.location) &&
+      sameNumbers(updated.size, equipment.size)
+    ) {
+      return noop(
+        doc,
+        `update_equipment: ${equipment.id} already has these values; nothing changed.`,
+      );
+    }
     const document = regenerateBuilding(doc, withElement(building, updated));
     return {
       document,

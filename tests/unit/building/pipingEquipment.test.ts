@@ -266,8 +266,9 @@ describe('update_equipment', () => {
     const level = doc.building?.levelOrder[1] as string;
     doc = run(doc, 'update_equipment', { currentMark: 'P-101', mark: 'P-201', levelId: level });
     expect(element(doc, 'equipment-2')).toMatchObject({ mark: 'P-201', levelId: level });
-    const noChange = run(doc, 'update_equipment', { elementId: 'equipment-2', mark: 'P-201' });
-    expect(element(noChange, 'equipment-2').mark).toBe('P-201');
+    const noChange = execute(doc, 'update_equipment', { elementId: 'equipment-2', mark: 'P-201' });
+    expect(noChange.document).toBe(doc);
+    expect(noChange.affected).toEqual([]);
   });
 
   it('is a graceful no-op for bad targets and values', () => {

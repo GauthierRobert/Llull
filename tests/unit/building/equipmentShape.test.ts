@@ -126,6 +126,19 @@ describe('equipment shape', () => {
     expect(JSON.stringify(doc)).toBe(snapshot);
   });
 
+  it('update_equipment with values equal to the current ones is a no-op', () => {
+    const doc = add(createEmptyDocument(), { size: [3000, 2000, 5000] });
+    const same = execute(doc, 'update_equipment', {
+      elementId: 'equipment-1',
+      size: [3000, 2000, 5000],
+      shape: 'box',
+    });
+    expect(same.document).toBe(doc);
+    expect(same.affected).toEqual([]);
+    expect(same.summary).toMatch(/already has these values/);
+    expect(execute(doc, 'update_equipment', { elementId: 'equipment-1' }).document).toBe(doc);
+  });
+
   it('update_equipment changes shape, keeps id, renormalises and can return to box', () => {
     const doc = add(createEmptyDocument(), { size: [3000, 2000, 5000] });
     const vertical = execute(doc, 'update_equipment', {
