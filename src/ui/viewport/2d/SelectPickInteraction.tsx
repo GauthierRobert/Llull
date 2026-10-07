@@ -10,13 +10,11 @@
  */
 
 import type { Entity } from '@core/model/types';
+import { isEntityVisible } from '../entityVisibility';
 import { useStore, useViewportStore } from '@ui/store';
-import { pickEntityId } from './modifyHelpers';
+import { PICK_RADIUS_PX, pickEntityId } from './modifyHelpers';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
 import { isAdditiveSelect } from '../selectClick';
-
-/** Pick radius in screen pixels. */
-const PICK_RADIUS_PX = 10;
 
 /** Pointer travel (px) above which a press is a pan, not a click. */
 const CLICK_MAX_TRAVEL_PX = 4;
@@ -38,9 +36,7 @@ export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): Rea
         const { layers } = state.document;
         // Only what the 2D view draws is pickable (same filters as Entities2D).
         const isVisible = (entity: Entity): boolean =>
-          layers[entity.layerId]?.visible !== false &&
-          !hiddenLayerIds.has(entity.layerId) &&
-          !hiddenEntityIds.has(entity.id);
+          isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds);
         const id = pickEntityId(state.document, toDocumentPoint(e.point), tolerance, isVisible);
         const additive = isAdditiveSelect(e);
         if (id === null) {

@@ -15,7 +15,8 @@
 import { useCallback, useMemo } from 'react';
 import type { CadDocument, Entity, EntityId, InstanceEntity } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
-import { findClickAnimationsForEntity } from './animationClickHelpers';
+import { animatedEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
+import { isEntityVisible } from '../entityVisibility';
 import { BoxMesh } from './entities/BoxMesh';
 import { CylinderMesh } from './entities/CylinderMesh';
 import { SphereMesh } from './entities/SphereMesh';
@@ -31,10 +32,6 @@ import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 import { expandInstance } from '@core/commands/assemblies';
 import type { PbrMaterial } from './useMaterialProps';
-
-interface EntitiesProps {
-  document: CadDocument;
-}
 
 /**
  * Renders a single InstanceEntity by expanding it into world-space entities via
@@ -158,8 +155,9 @@ function EntityRenderer({
   }
 }
 
-export function Entities({ document }: EntitiesProps): React.ReactElement {
-  const { order, entities, layers, selection, materials } = document;
+export function Entities(): React.ReactElement {
+  const document = useStore((s) => s.document);
+  const { order, entities, layers, selection, materials, animations, groups } = document;
   const selectionSet = useMemo(() => new Set<EntityId>(selection), [selection]);
 
   const select = useStore((s) => s.select);
@@ -188,24 +186,26 @@ export function Entities({ document }: EntitiesProps): React.ReactElement {
   const visibleEntities = useMemo(() => {
     return order
       .map((id) => entities[id])
-      .filter((entity): entity is Entity => {
-        if (!entity) return false;
-        const layer = layers[entity.layerId];
-        if (layer && !layer.visible) return false;
-        if (hiddenLayerIds.has(entity.layerId)) return false;
-        if (hiddenEntityIds.has(entity.id)) return false;
-        return true;
-      });
+      .filter(
+        (entity): entity is Entity =>
+          entity !== undefined && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
+      );
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
 
   // Pass the materials map so batches can carry per-batch PBR overrides.
+  // Animated entities are located by scene-object name, so they take the per-entity path.
+  const animatedIds = useMemo(() => animatedEntityIds(animations, groups), [animations, groups]);
   const batches = useMemo(
-    () => groupEntitiesForInstancing(visibleEntities, materials),
-    [visibleEntities, materials],
+    () =>
+      groupEntitiesForInstancing(
+        visibleEntities.filter((entity) => !animatedIds.has(entity.id)),
+        materials,
+      ),
+    [visibleEntities, animatedIds, materials],
   );
   const nonBatchableEntities = useMemo(
-    () => visibleEntities.filter((entity) => !isBatchable(entity)),
-    [visibleEntities],
+    () => visibleEntities.filter((entity) => !isBatchable(entity) || animatedIds.has(entity.id)),
+    [visibleEntities, animatedIds],
   );
 
   return (

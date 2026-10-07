@@ -60,12 +60,24 @@ interface CopyButtonProps {
 
 function CopyButton({ text, label }: CopyButtonProps): React.ReactElement {
   const [copied, setCopied] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (resetTimer.current !== null) clearTimeout(resetTimer.current);
+    },
+    [],
+  );
 
   const handleCopy = (): void => {
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    });
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true);
+        if (resetTimer.current !== null) clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => setCopied(false), 1800);
+      },
+      () => setCopied(false),
+    );
   };
 
   return (

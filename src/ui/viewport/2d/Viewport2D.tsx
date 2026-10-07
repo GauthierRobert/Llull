@@ -69,7 +69,6 @@ function SceneContents2D({
   modifyPhase,
   onEntityPick,
 }: SceneContents2DProps): React.ReactElement {
-  const document = useStore((s) => s.document);
   const renderOrigin = useStore((s) => s.renderOrigin);
   const isDrawing = activeTool !== 'none';
   const isModifying = activeModifyTool !== 'none';
@@ -116,7 +115,7 @@ function SceneContents2D({
            space — matching the snap candidate frame (architecture L7).  ---- */}
       <group position={groupOffset}>
         <BuildingPlan2D />
-        <Entities2D document={document} />
+        <Entities2D />
 
         {/* Snap indicator + click-to-select: shown when no draw or modify tool is active */}
         {!isDrawing && !isModifying && <SnapIndicator zoom={zoom} />}
@@ -135,6 +134,7 @@ function SceneContents2D({
         <ModifyPickInteraction
           activeTool={activeModifyTool}
           phase={modifyPhase}
+          zoom={zoom}
           onEntityPick={onEntityPick}
         />
 
@@ -157,8 +157,6 @@ export function Viewport2D(): React.ReactElement {
     setPendingValue,
     commitValue,
   } = useModifyTool();
-
-  const document = useStore((s) => s.document);
 
   // Camera zoom state — updated by ZoomReader inside the canvas, displayed by
   // ScaleBar outside it. Initial value matches the OrthographicCamera zoom prop.
@@ -188,7 +186,7 @@ export function Viewport2D(): React.ReactElement {
         </Suspense>
       </Canvas>
 
-      <ScaleBar zoom={cameraZoom} document={document} />
+      <ScaleBar zoom={cameraZoom} />
 
       <div className="vp-tool-dock">
         <ModifyTools

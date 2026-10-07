@@ -12,6 +12,7 @@ import type { Clash } from '@aec/industrial/clash';
 import { toMetres } from '@aec/model';
 import type { BuildingModel } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
+import { isClashData } from '@ui/resultData';
 
 interface ClashReport {
   readonly summary: string;
@@ -30,8 +31,8 @@ export function ClashSection(): React.ReactElement {
   const runCheck = (): void => {
     const document = useStore.getState().document;
     const result = execute(document, 'check_clashes', {});
-    const data = result.data as { clashes: Clash[] } | undefined;
-    setReport({ summary: result.summary, clashes: data?.clashes ?? [], building });
+    const clashes = isClashData(result.data) ? result.data.clashes : [];
+    setReport({ summary: result.summary, clashes, building });
   };
 
   const millimetres = (depth: number): number => Math.round(toMetres({ units }, depth) * 1000);

@@ -66,19 +66,21 @@ function ConstraintRow({
       : '';
 
   return (
-    <li
-      className={mechanismRowClass(highlighted)}
-      data-testid={`constraint-row-${constraint.id}`}
-      onClick={() => onHighlight(constraint.id)}
-      aria-selected={highlighted}
-      role="option"
-    >
+    <li className={mechanismRowClass(highlighted)} data-testid={`constraint-row-${constraint.id}`}>
       <span className={`chip chip--${chipTone}`}>{constraint.kind}</span>
       <span className="panel__row-main mechanisms-row-info">
         {aRef} → {bRef}
         {value}
       </span>
       <div className="panel__row-actions">
+        <IconButton
+          icon="eye"
+          testId={`constraint-highlight-${constraint.id}`}
+          pressed={highlighted}
+          onClick={() => onHighlight(constraint.id)}
+          title="Highlight in the viewport"
+          label={`Highlight constraint ${constraint.id}`}
+        />
         <IconButton
           icon="zap"
           testId={`constraint-solve-${constraint.id}`}
@@ -111,6 +113,7 @@ interface JointRowProps {
   onHighlight: (id: string) => void;
 }
 
+/** Remounted (see `key`) whenever the document value changes, so the draft never goes stale. */
 function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
@@ -120,7 +123,7 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   const commitInput = (): void => {
     const parsed = parseFloat(inputValue);
     if (isNaN(parsed)) setInputValue(String(currentValue));
-    else dispatch('set_joint_value', { id: joint.id, value: parsed });
+    else if (parsed !== currentValue) dispatch('set_joint_value', { id: joint.id, value: parsed });
   };
 
   const chipTone = JOINT_CHIP_TONE[joint.kind] ?? 'accent';
@@ -128,13 +131,7 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   const unit = joint.kind === 'revolute' ? 'rad' : 'mm';
 
   return (
-    <li
-      className={mechanismRowClass(highlighted)}
-      data-testid={`joint-row-${joint.id}`}
-      onClick={() => onHighlight(joint.id)}
-      aria-selected={highlighted}
-      role="option"
-    >
+    <li className={mechanismRowClass(highlighted)} data-testid={`joint-row-${joint.id}`}>
       <span className={`chip chip--${chipTone}`}>{joint.kind}</span>
       <span className="panel__row-main mechanisms-row-info">
         {joint.a.instanceId.slice(-6)} → {joint.b.instanceId.slice(-6)} · axis {axisLabel}
@@ -152,10 +149,17 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
         aria-label={`Joint value for ${joint.id} (${unit})`}
         data-testid={`joint-value-${joint.id}`}
         title={`Current ${joint.kind === 'revolute' ? 'angle' : 'displacement'} in ${unit}`}
-        onClick={(e) => e.stopPropagation()}
       />
       <span className="panel__row-meta">{unit}</span>
       <div className="panel__row-actions">
+        <IconButton
+          icon="eye"
+          testId={`joint-highlight-${joint.id}`}
+          pressed={highlighted}
+          onClick={() => onHighlight(joint.id)}
+          title="Highlight in the viewport"
+          label={`Highlight joint ${joint.id}`}
+        />
         <IconButton
           icon="trash"
           danger
@@ -219,7 +223,6 @@ interface MechanismSectionProps {
   title: string;
   testId: string;
   listLabel: string;
-  listRole: 'list' | 'listbox';
   rows: ReadonlyArray<React.ReactElement>;
 }
 
@@ -227,7 +230,6 @@ function MechanismSection({
   title,
   testId,
   listLabel,
-  listRole,
   rows,
 }: MechanismSectionProps): React.ReactElement {
   const noun = title.toLowerCase();
@@ -242,7 +244,7 @@ function MechanismSection({
       {rows.length === 0 ? (
         <PanelEmpty compact icon="mechanism" message={`No ${noun} defined.`} />
       ) : (
-        <ul className="panel__list" aria-label={listLabel} role={listRole}>
+        <ul className="panel__list" aria-label={listLabel}>
           {rows}
         </ul>
       )}
@@ -279,7 +281,6 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
         title="Constraints"
         testId="mechanisms-section-constraints"
         listLabel="Constraint list"
-        listRole="listbox"
         rows={orderedValues(constraintOrder, constraints).map((constraint) => (
           <ConstraintRow
             key={constraint.id}
@@ -293,10 +294,9 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
         title="Joints"
         testId="mechanisms-section-joints"
         listLabel="Joint list"
-        listRole="listbox"
         rows={orderedValues(jointOrder, joints).map((joint) => (
           <JointRow
-            key={joint.id}
+            key={`${joint.id}:${joint.kind === 'revolute' ? joint.angle : joint.displacement}`}
             joint={joint}
             highlighted={isHighlighted('joint', joint.id)}
             onHighlight={highlight('joint')}
@@ -307,7 +307,6 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
         title="Drive Relations"
         testId="mechanisms-section-drive relations"
         listLabel="Drive relation list"
-        listRole="list"
         rows={orderedValues(driveRelationOrder, driveRelations).map((relation) => (
           <DriveRelationRow key={relation.id} relation={relation} />
         ))}

@@ -172,22 +172,36 @@ describe('collectSnapCandidates3D', () => {
     expect(vertices).toHaveLength(18);
   });
 
-  it('cylinder bottom disc centre is at entity position', () => {
-    const doc = docWithCylinder('c1', 3, 1, -2, 1, 5);
+  it('cylinder disc centres are at position -/+ height/2 along Z (Z-up, centred)', () => {
+    const doc = docWithCylinder('c1', 3, 1, -2, 1, 6);
     const candidates = collectSnapCandidates3D(doc, undefined);
-    const centre = candidates.find(
-      (c) => c.type === 'vertex' && c.x === 3 && c.y === 1 && c.z === -2,
-    );
-    expect(centre).toBeDefined();
+    expect(candidates.find((c) => c.x === 3 && c.y === 1 && c.z === -5)).toBeDefined();
+    expect(candidates.find((c) => c.x === 3 && c.y === 1 && c.z === 1)).toBeDefined();
   });
 
-  it('cylinder top disc centre is at position + height on Y', () => {
+  it('rotated cylinder axis follows rotation', () => {
     const doc = docWithCylinder('c1', 0, 0, 0, 1, 6);
+    const cylinder = doc.entities['c1'] as CylinderEntity;
+    const rotated = {
+      ...doc,
+      entities: { c1: { ...cylinder, rotation: [Math.PI / 2, 0, 0] as const } },
+    };
+    const candidates = collectSnapCandidates3D(rotated as CadDocument, undefined);
+    // Rx(90deg) maps +Z to -Y: top disc centre ends at y = -3.
+    expect(
+      candidates.find(
+        (c) => Math.abs(c.y + 3) < 1e-9 && Math.abs(c.z) < 1e-9 && Math.abs(c.x) < 1e-9,
+      ),
+    ).toBeDefined();
+  });
+
+  it('extrusion AABB spans the XY profile and +Z depth', () => {
+    const doc = docWithExtrusion('e1', 1, 1, 1);
     const candidates = collectSnapCandidates3D(doc, undefined);
-    const topCentre = candidates.find(
-      (c) => c.type === 'vertex' && c.x === 0 && c.y === 6 && c.z === 0,
-    );
-    expect(topCentre).toBeDefined();
+    const zs = candidates.map((c) => c.z);
+    expect(Math.min(...zs)).toBeCloseTo(1);
+    expect(Math.max(...zs)).toBeCloseTo(4);
+    expect(Math.max(...candidates.map((c) => c.y))).toBeCloseTo(3);
   });
 
   it('sphere produces 7 snap points: centre + 6 poles', () => {
@@ -452,12 +466,12 @@ describe('snap3d integration with collectSnapCandidates3D', () => {
   it('snaps to cylinder disc centre', () => {
     const doc = docWithCylinder('c1', 0, 0, 0, 2, 5);
     const candidates = collectSnapCandidates3D(doc, undefined);
-    // Bottom disc centre at (0, 0, 0).
-    const result = snap3d(0.1, 0.2, 0.1, candidates, 0.5, 1);
+    // Bottom disc centre at (0, 0, -2.5).
+    const result = snap3d(0.1, 0.2, -2.4, candidates, 0.5, 1);
     expect(result.type).toBe('vertex');
     expect(result.x).toBeCloseTo(0);
     expect(result.y).toBeCloseTo(0);
-    expect(result.z).toBeCloseTo(0);
+    expect(result.z).toBeCloseTo(-2.5);
   });
 
   it('snaps to sphere centre', () => {

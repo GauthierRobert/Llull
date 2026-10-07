@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
+import { isNcFilesData, stringFields } from '@ui/resultData';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
@@ -42,7 +43,7 @@ export function BuildingExportsSection(): React.ReactElement {
     mimeType: string,
   ): void => {
     const result = execute(useStore.getState().document, command, params);
-    const data = result.data as Record<string, string> | undefined;
+    const data = stringFields(result.data);
     const content = data?.[field];
     const fileName = data?.['filename'];
     if (content !== undefined && fileName !== undefined) downloadText(content, fileName, mimeType);
@@ -51,9 +52,8 @@ export function BuildingExportsSection(): React.ReactElement {
 
   const exportNcFiles = (): void => {
     const result = execute(useStore.getState().document, 'export_nc_files', {});
-    const files = (result.data as { files?: ReadonlyArray<{ name: string; content: string }> })
-      ?.files;
-    for (const file of files ?? []) downloadText(file.content, file.name, 'text/plain');
+    const files = isNcFilesData(result.data) ? result.data.files : [];
+    for (const file of files) downloadText(file.content, file.name, 'text/plain');
     setStatus(result.summary);
   };
 

@@ -76,7 +76,8 @@ export function postDispatch(
   options?: DispatchOptions,
 ): void {
   const selectionAtDispatch = get().document.selection;
-  void postCommand(name, params, newCommandId())
+  const commandId = newCommandId();
+  void postCommand(name, params, commandId)
     .then((response) => {
       set((state) => ({
         document: selectAffectedIn(state.document, selectionAtDispatch, response.affected, options),
@@ -94,7 +95,7 @@ export function postDispatch(
         get,
         err,
         `Command '${name}'`,
-        () => runLocally(set, get, name, params, options),
+        () => runLocally(set, get, name, params, options, commandId),
         (summary) => options?.onResult?.({ summary, changed: false }),
       );
     });

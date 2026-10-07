@@ -66,7 +66,7 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
       />
 
       <span className="param-value" aria-label={`Value of ${param.name}`}>
-        {hasError ? '—' : param.value.toPrecision(6).replace(/\.?0+$/, '')}
+        {hasError ? '—' : String(parseFloat(param.value.toPrecision(6)))}
       </span>
 
       <IconButton
@@ -102,9 +102,17 @@ function AddParameterRow(): React.ReactElement {
     const trimmedName = name.trim();
     const trimmedExpr = expression.trim();
     if (trimmedName === '' || trimmedExpr === '') return;
-    dispatch('set_parameter', { name: trimmedName, expression: trimmedExpr });
-    setName('');
-    setExpression('');
+    dispatch(
+      'set_parameter',
+      { name: trimmedName, expression: trimmedExpr },
+      {
+        onResult: ({ changed }) => {
+          if (!changed) return;
+          setName('');
+          setExpression('');
+        },
+      },
+    );
   };
 
   const nameValid = name.trim() === '' || /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name.trim());

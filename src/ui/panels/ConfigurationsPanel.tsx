@@ -5,7 +5,7 @@
  * activates (activate_configuration) them.
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { Configuration } from '@core/model/types';
@@ -67,6 +67,8 @@ function ConfigurationRow({ config }: ConfigurationRowProps): React.ReactElement
 }
 
 interface PvEntry {
+  /** Stable React key — rows can be removed from the middle. */
+  rowId: number;
   paramName: string;
   expression: string;
 }
@@ -123,16 +125,18 @@ function ParameterValueRow({
   );
 }
 
-const EMPTY_ROW: PvEntry = { paramName: '', expression: '' };
+const emptyRow = (rowId: number): PvEntry => ({ rowId, paramName: '', expression: '' });
 
 function CreateConfigurationForm(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [configName, setConfigName] = useState('');
-  const [pvRows, setPvRows] = useState<PvEntry[]>([EMPTY_ROW]);
+  const nextRowId = useRef(1);
+  const newRow = (): PvEntry => emptyRow(nextRowId.current++);
+  const [pvRows, setPvRows] = useState<PvEntry[]>(() => [emptyRow(0)]);
 
   const updateRow = (index: number, patch: Partial<PvEntry>): void =>
     setPvRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  const handleAddRow = (): void => setPvRows((prev) => [...prev, EMPTY_ROW]);
+  const handleAddRow = (): void => setPvRows((prev) => [...prev, newRow()]);
   const handleRemoveRow = (index: number): void =>
     setPvRows((prev) => prev.filter((_, i) => i !== index));
 
@@ -149,9 +153,17 @@ function CreateConfigurationForm(): React.ReactElement {
     if (!isSubmittable) return;
     const parameterValues: Record<string, string> = {};
     for (const row of nonEmptyRows) parameterValues[row.paramName.trim()] = row.expression.trim();
-    dispatch('create_configuration', { name: configName.trim(), parameterValues });
-    setConfigName('');
-    setPvRows([EMPTY_ROW]);
+    dispatch(
+      'create_configuration',
+      { name: configName.trim(), parameterValues },
+      {
+        onResult: ({ changed }) => {
+          if (!changed) return;
+          setConfigName('');
+          setPvRows([newRow()]);
+        },
+      },
+    );
   };
 
   return (
@@ -166,7 +178,7 @@ function CreateConfigurationForm(): React.ReactElement {
       </span>
       <div className="field">
         <label className="field__label" htmlFor="config-create-name">
-          Name
+          Configuration name
         </label>
         <input
           id="config-create-name"
@@ -175,7 +187,6 @@ function CreateConfigurationForm(): React.ReactElement {
           value={configName}
           onChange={(e) => setConfigName(e.target.value)}
           placeholder="e.g. small, production_v2"
-          aria-label="New configuration name"
           autoComplete="off"
         />
       </div>
@@ -186,7 +197,7 @@ function CreateConfigurationForm(): React.ReactElement {
         </span>
         {pvRows.map((row, index) => (
           <ParameterValueRow
-            key={index}
+            key={row.rowId}
             index={index}
             entry={row}
             onChange={updateRow}

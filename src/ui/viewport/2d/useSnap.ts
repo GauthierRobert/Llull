@@ -6,9 +6,10 @@
  * mutation, no side effects (R1, R2).
  */
 
-import { useMemo } from 'react';
-import type { Vec2 } from '@core/model/types';
-import { useStore } from '@ui/store';
+import { useCallback, useMemo } from 'react';
+import type { Entity, Vec2 } from '@core/model/types';
+import { useStore, useViewportStore } from '@ui/store';
+import { isEntityVisible } from '../entityVisibility';
 import { snap, applyOrthoPolar } from './snapping/resolveSnap';
 import { collectSnapCandidates } from './snapping/candidates';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
@@ -45,6 +46,14 @@ interface UseSnapOpts {
  */
 export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
   const document = useStore((s) => s.document);
+  const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
+  const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
+  const { layers } = document;
+  // Hidden geometry must not attract snaps.
+  const isVisible = useCallback(
+    (entity: Entity): boolean => isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
+    [layers, hiddenLayerIds, hiddenEntityIds],
+  );
 
   const { gridSize = 1, tolerance = 0.5, orthoPolar, drawOrigin, collectOpts } = opts;
 
@@ -75,12 +84,12 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
     () =>
       collectSnapCandidates(
         document,
-        { ...collectOpts, extensions: false, nearest: false },
+        { ...collectOpts, extensions: false, nearest: false, isVisible },
         drawOrigin ?? null,
         null,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [document.entities, document.order, collectOpts, drawOrigin],
+    [document.entities, document.order, collectOpts, drawOrigin, isVisible],
   );
 
   // Cursor-DEPENDENT candidates: extension + nearest only. These do follow the
@@ -102,13 +111,14 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
           tangents: false,
           extensions: wantExtensions,
           nearest: wantNearest,
+          isVisible,
         },
         null,
         adjustedCursor,
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [document.entities, document.order, wantExtensions, wantNearest, adjustedCursor],
+    [document.entities, document.order, wantExtensions, wantNearest, adjustedCursor, isVisible],
   );
 
   if (adjustedCursor === null) return null;

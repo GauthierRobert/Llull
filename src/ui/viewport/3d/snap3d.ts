@@ -6,6 +6,8 @@
 
 import type { Entity, CadDocument } from '@core/model/types';
 import { is3D } from '@core/model/types';
+import { rotatedEntityBounds } from '@core/commands/sceneRotatedBounds';
+import { applyEulerXYZ } from '@lib/eulerRotation';
 import { nearestSnap } from '../nearestSnap';
 
 export type Snap3DType = 'vertex' | 'edge' | 'face-center' | 'grid' | 'none';
@@ -45,60 +47,11 @@ interface AABB {
   readonly max: Triple;
 }
 
-function boundsOf(points: ReadonlyArray<Triple>): AABB | null {
-  if (points.length === 0) return null;
-  const min: [number, number, number] = [Infinity, Infinity, Infinity];
-  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
-  for (const point of points) {
-    for (let axis = 0; axis < 3; axis++) {
-      min[axis] = Math.min(min[axis] ?? Infinity, point[axis] ?? 0);
-      max[axis] = Math.max(max[axis] ?? -Infinity, point[axis] ?? 0);
-    }
-  }
-  return { min, max };
-}
-
-/** World AABB of a 3D solid (rotation ignored); null for kinds without one. */
+/** World AABB (rotation applied) of a 3D solid; null for non-solids. */
 function entityAABB(entity: Entity): AABB | null {
-  const [px, py, pz] = entity.position;
-  switch (entity.kind) {
-    case 'box': {
-      const [w, h, d] = entity.size;
-      return {
-        min: [px - w / 2, py - h / 2, pz - d / 2],
-        max: [px + w / 2, py + h / 2, pz + d / 2],
-      };
-    }
-    case 'cylinder': {
-      const { radius, height } = entity;
-      return { min: [px - radius, py, pz - radius], max: [px + radius, py + height, pz + radius] };
-    }
-    case 'sphere': {
-      const { radius } = entity;
-      return {
-        min: [px - radius, py - radius, pz - radius],
-        max: [px + radius, py + radius, pz + radius],
-      };
-    }
-    case 'extrusion': {
-      const bounds = boundsOf(entity.profile.map(([lx, lz]) => [lx, 0, lz]));
-      if (bounds === null) return null;
-      return {
-        min: [px + bounds.min[0], py, pz + bounds.min[2]],
-        max: [px + bounds.max[0], py + entity.depth, pz + bounds.max[2]],
-      };
-    }
-    case 'mesh': {
-      const { positions } = entity.mesh;
-      const vertices: Triple[] = [];
-      for (let i = 0; i + 2 < positions.length; i += 3) {
-        vertices.push([positions[i] ?? 0, positions[i + 1] ?? 0, positions[i + 2] ?? 0]);
-      }
-      return boundsOf(vertices);
-    }
-    default:
-      return null;
-  }
+  if (!is3D(entity)) return null;
+  const { min, max } = rotatedEntityBounds(entity);
+  return { min, max };
 }
 
 /** The 8 corners (x varies fastest), 6 face centres and 12 edge midpoints of an AABB. */
@@ -135,28 +88,43 @@ function aabbSnapPoints({ min, max }: AABB): SnapPoint3D[] {
   return [...corners, ...faces, ...edges];
 }
 
-/** Cylinder: both disc centres plus 8 rim points on each disc, all 'vertex'. */
+/** Local (Z-up, pre-rotation) offsets placed in world space about the entity position. */
+function worldPoints(entity: Entity, offsets: ReadonlyArray<Triple>): SnapPoint3D[] {
+  return offsets.map((offset) => {
+    const [x, y, z] = applyEulerXYZ(
+      [
+        entity.position[0] + offset[0],
+        entity.position[1] + offset[1],
+        entity.position[2] + offset[2],
+      ],
+      entity.position,
+      entity.rotation,
+    );
+    return { x, y, z, type: 'vertex' };
+  });
+}
+
+/** Cylinder (axis +Z, centred on position): both disc centres plus 8 rim points on each disc. */
 function cylinderSnapPoints(entity: Entity & { kind: 'cylinder' }): SnapPoint3D[] {
-  const [px, py, pz] = entity.position;
   const { radius, height } = entity;
-  const points: SnapPoint3D[] = [
-    { x: px, y: py, z: pz, type: 'vertex' },
-    { x: px, y: py + height, z: pz, type: 'vertex' },
+  const half = height / 2;
+  const offsets: Triple[] = [
+    [0, 0, -half],
+    [0, 0, half],
   ];
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * 2 * Math.PI;
-    const x = px + Math.cos(angle) * radius;
-    const z = pz + Math.sin(angle) * radius;
-    points.push({ x, y: py, z, type: 'vertex' }, { x, y: py + height, z, type: 'vertex' });
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    offsets.push([x, y, -half], [x, y, half]);
   }
-  return points;
+  return worldPoints(entity, offsets);
 }
 
 /** Sphere: centre plus 6 axis-aligned poles, all 'vertex'. */
 function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
-  const [px, py, pz] = entity.position;
-  const { radius: r } = entity;
-  return [
+  const r = entity.radius;
+  return worldPoints(entity, [
     [0, 0, 0],
     [r, 0, 0],
     [-r, 0, 0],
@@ -164,12 +132,7 @@ function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
     [0, -r, 0],
     [0, 0, r],
     [0, 0, -r],
-  ].map(([dx, dy, dz]) => ({
-    x: px + (dx ?? 0),
-    y: py + (dy ?? 0),
-    z: pz + (dz ?? 0),
-    type: 'vertex',
-  }));
+  ]);
 }
 
 /**

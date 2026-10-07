@@ -15,7 +15,9 @@
 
 import { useMemo } from 'react';
 import { Text } from '@react-three/drei';
-import type { CadDocument, DimensionEntity } from '@core/model/types';
+import { useShallow } from 'zustand/react/shallow';
+import { useStore } from '@ui/store';
+import type { DimensionEntity } from '@core/model/types';
 import { ORIGIN } from '@lib/vec3';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
 import { SELECTION_COLOR } from '@ui/viewport/viewportPalette';
@@ -27,28 +29,24 @@ const TEXT_HEIGHT = 0.5;
 
 interface DimensionRenderer2DProps {
   entity: DimensionEntity;
-  doc: CadDocument;
   selected: boolean;
 }
 
 export function DimensionRenderer2D({
   entity,
-  doc,
   selected,
 }: DimensionRenderer2DProps): React.ReactElement | null {
   const { dimensionKind, entityIds, offset: rawOffset, precision, label, color, position } = entity;
   const offset = rawOffset ?? DEFAULT_OFFSET;
   const dimColor = selected ? SELECTION_COLOR : color || DIM_LINE_COLOR;
 
+  // Only the referenced entities (shallow-compared) — unrelated document edits do not rebuild.
+  const referenced = useStore(useShallow((s) => entityIds.map((id) => s.document.entities[id])));
+  const displayPrecision = useStore((s) => s.document.displayPrecision);
+
   const drawing = useMemo(
-    () =>
-      dimensionDrawing(
-        dimensionKind,
-        entityIds.map((id) => doc.entities[id]),
-        offset,
-        dimColor,
-      ),
-    [dimensionKind, entityIds, doc.entities, offset, dimColor],
+    () => dimensionDrawing(dimensionKind, referenced, offset, dimColor),
+    [dimensionKind, referenced, offset, dimColor],
   );
   if (!drawing) return null;
 
@@ -56,7 +54,7 @@ export function DimensionRenderer2D({
     label ||
     (dimensionKind === 'angular'
       ? `${drawing.value.toFixed(1)}°`
-      : drawing.value.toFixed(precision ?? doc.displayPrecision));
+      : drawing.value.toFixed(precision ?? displayPrecision));
 
   return (
     <group position={[position[0], position[1], position[2]]}>

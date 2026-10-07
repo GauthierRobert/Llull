@@ -74,3 +74,33 @@ describe('dispatch onResult', () => {
     expect(onResult.mock.calls[0]?.[0]).toMatchObject({ changed: false });
   });
 });
+
+describe('offline fallback idempotency', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('queues the fallback outbox entry under the commandId the POST already used', async () => {
+    useStore.getState().setDocument(createEmptyDocument());
+    useStore.setState({
+      liveStatus: 'connecting',
+      sseEverConnected: false,
+      localOutbox: [],
+      localUndoStack: [],
+      localRedoStack: [],
+      hasUnsyncedLocalEdits: false,
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
+    await flushPromises();
+
+    const posted = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as { body: string }).body)) as {
+      commandId: string;
+    };
+    const { localOutbox } = useStore.getState();
+    expect(localOutbox).toHaveLength(1);
+    expect(localOutbox[0]?.commandId).toBe(posted.commandId);
+  });
+});

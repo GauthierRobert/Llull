@@ -242,14 +242,46 @@ describe('ParametersPanel — add parameter form', () => {
     fireEvent.change(exprInput, { target: { value: '15' } });
     fireEvent.submit(form);
 
-    expect(dispatchSpy).toHaveBeenCalledWith('set_parameter', {
-      name: 'newParam',
-      expression: '15',
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      'set_parameter',
+      {
+        name: 'newParam',
+        expression: '15',
+      },
+      expect.anything(),
+    );
+  });
+
+  it('keeps the form fields when the command was rejected', () => {
+    patchDispatch(
+      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: unknown) => void }) =>
+        options?.onResult?.({ summary: 'rejected', changed: false }),
+      ),
+    );
+    render(<ParametersPanel />);
+    const form = screen.getByTestId('param-add-form');
+    const nameInput = within(form).getByRole('textbox', {
+      name: /new parameter name/i,
+    }) as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'p' } });
+    fireEvent.change(within(form).getByRole('textbox', { name: /new parameter expression/i }), {
+      target: { value: '1' },
     });
+    fireEvent.submit(form);
+    expect(nameInput.value).toBe('p');
+  });
+
+  it('displays large values without stripping integer zeros', () => {
+    addParam('big', '100000');
+    render(<ParametersPanel />);
+    expect(screen.getByLabelText('Value of big').textContent).toBe('100000');
   });
 
   it('clears the form fields after successful submit', () => {
-    const dispatchSpy = vi.fn();
+    const dispatchSpy = vi.fn(
+      (_name: string, _params: unknown, options?: { onResult?: (r: unknown) => void }) =>
+        options?.onResult?.({ summary: 'ok', changed: true }),
+    );
     patchDispatch(dispatchSpy);
 
     render(<ParametersPanel />);

@@ -7,8 +7,25 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
   evaluateAnimationScalar,
-  composeAnimatedPose,
+  composeAnimatedPoseInto,
+  createPoseScratch,
+  type AnimationContribution,
 } from '../../src/ui/viewport/3d/animationMath';
+
+/** Tuple-returning wrapper over the allocation-free `composeAnimatedPoseInto`. */
+function composeAnimatedPose(
+  basePosition: [number, number, number],
+  baseRotation: [number, number, number],
+  contributions: ReadonlyArray<AnimationContribution>,
+): {
+  position: [number, number, number];
+  quaternion: [number, number, number, number];
+} {
+  const pose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
+  composeAnimatedPoseInto(pose, basePosition, baseRotation, contributions, createPoseScratch());
+  const { position: p, quaternion: q } = pose;
+  return { position: [p.x, p.y, p.z], quaternion: [q.x, q.y, q.z, q.w] };
+}
 
 // ---------------------------------------------------------------------------
 // evaluateAnimationScalar

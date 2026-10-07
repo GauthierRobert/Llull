@@ -4,6 +4,8 @@
  * Snap types and option shapes for the 2D drafting viewport.
  */
 
+import type { Entity } from '@core/model/types';
+
 export type SnapType =
   | 'endpoint'
   | 'midpoint'
@@ -46,6 +48,8 @@ export interface CollectOpts {
   tangents?: boolean;
   /** Include extension snaps (along imaginary line extension beyond endpoints). Default false. */
   extensions?: boolean;
+  /** Entities rejected here contribute no snap geometry (hidden layers / entities). Default: all. */
+  isVisible?: (entity: Entity) => boolean;
   /** Include nearest snaps (closest point on any entity geometry). Default false. */
   nearest?: boolean;
 }

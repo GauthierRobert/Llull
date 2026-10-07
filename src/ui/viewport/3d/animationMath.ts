@@ -44,7 +44,6 @@ function rotateAboutPivotInPlace(
 }
 
 /** A quaternion expressed as [x, y, z, w]. */
-type QuaternionTuple = [number, number, number, number];
 
 /** Pose written by `composeAnimatedPoseInto`. */
 export interface AnimatedPose {
@@ -53,7 +52,7 @@ export interface AnimatedPose {
 }
 
 /** Temporaries reused across `composeAnimatedPoseInto` calls so a per-frame caller allocates nothing. */
-export interface PoseScratch {
+interface PoseScratch {
   readonly euler: THREE.Euler;
   readonly step: THREE.Quaternion;
   readonly offset: THREE.Vector3;
@@ -116,29 +115,4 @@ export function composeAnimatedPoseInto(
       pose.position.add(scratch.offset.copy(contrib.axis).multiplyScalar(contrib.scalar));
     }
   }
-}
-
-/**
- * `composeAnimatedPoseInto` returning new tuples.
- *
- * @pure — no input mutation.
- */
-export function composeAnimatedPose(
-  basePosition: Vec3,
-  baseRotationEulerXYZ: Vec3,
-  contributions: ReadonlyArray<AnimationContribution>,
-): { position: [number, number, number]; quaternion: QuaternionTuple } {
-  const pose: AnimatedPose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
-  composeAnimatedPoseInto(
-    pose,
-    basePosition,
-    baseRotationEulerXYZ,
-    contributions,
-    createPoseScratch(),
-  );
-  const { position, quaternion } = pose;
-  return {
-    position: [position.x, position.y, position.z],
-    quaternion: [quaternion.x, quaternion.y, quaternion.z, quaternion.w],
-  };
 }

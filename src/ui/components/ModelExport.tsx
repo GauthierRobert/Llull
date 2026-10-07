@@ -11,6 +11,7 @@ import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 import { downloadBlob as download } from '@ui/download';
+import { isCodeExportData } from '@ui/resultData';
 
 type ExportFormat = 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step';
 
@@ -31,12 +32,12 @@ export function ModelExport(): React.ReactElement {
       language,
       name: 'model',
     });
-    const data = result.data as { text?: string; fileName?: string } | undefined;
-    if (data?.text === undefined || data.fileName === undefined) {
+    if (!isCodeExportData(result.data)) {
       setStatus(result.summary);
       return;
     }
-    download(new Blob([data.text], { type: 'text/plain;charset=utf-8' }), data.fileName);
+    const { text, fileName } = result.data;
+    download(new Blob([text], { type: 'text/plain;charset=utf-8' }), fileName);
     setStatus(result.summary);
   };
 
