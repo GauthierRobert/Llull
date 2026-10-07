@@ -262,6 +262,15 @@ export const updateSteelMember = defineCommand({
       material: material?.trim() || member.material,
       ...(note !== undefined ? { note } : {}),
     };
+    const sameFields = (Object.keys(updated) as Array<keyof SteelMemberElement>).every(
+      (key) => JSON.stringify(updated[key]) === JSON.stringify(member[key]),
+    );
+    if (sameFields && Object.keys(member).length === Object.keys(updated).length) {
+      return noop(
+        doc,
+        `update_steel_member: ${memberId} already has these values; nothing changed.`,
+      );
+    }
     const refit = refitPlates(doc, withElement(building, updated), updated, member.profile);
     const stale = dropStaleConnections(refit.building, memberId, fromMm(doc, 10));
     const supports = reconcilePipeSupports(doc, stale.building);

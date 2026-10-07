@@ -121,6 +121,15 @@ export const setCostRates = defineCommand({
     const building = getBuilding(doc);
     const costRates = replace ? { ...rates } : { ...(building.costRates ?? {}), ...rates };
     const resolvedCurrency = currency?.trim() || building.currency || 'EUR';
+    const previous = building.costRates ?? {};
+    const sameKeys = Object.keys(costRates).length === Object.keys(previous).length;
+    if (
+      sameKeys &&
+      resolvedCurrency === (building.currency ?? 'EUR') &&
+      Object.entries(costRates).every(([key, value]) => previous[key] === value)
+    ) {
+      return noop(doc, 'set_cost_rates: the stored rates and currency already match these values.');
+    }
     return {
       document: { ...doc, building: { ...building, costRates, currency: resolvedCurrency } },
       summary: `Stored ${Object.keys(costRates).length} cost rate(s) in ${resolvedCurrency}.`,

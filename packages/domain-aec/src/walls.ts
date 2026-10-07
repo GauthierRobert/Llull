@@ -262,6 +262,17 @@ export const updateWall = defineCommand({
     if (distance(updated.start, updated.end) <= 0) {
       return noop(doc, 'update_wall failed: start and end would coincide.');
     }
+    if (
+      updated.start.every((value, index) => value === wall.start[index]) &&
+      updated.end.every((value, index) => value === wall.end[index]) &&
+      updated.thickness === wall.thickness &&
+      updated.height === wall.height &&
+      updated.baseOffset === wall.baseOffset &&
+      updated.material === wall.material &&
+      updated.levelId === wall.levelId
+    ) {
+      return noop(doc, `update_wall: ${wallId} already has these values; nothing changed.`);
+    }
     const next = withElement(building, updated);
     const issues = openingFitIssues(next, new Set([wall.levelId, updated.levelId]));
     if (issues.length > 0) return noop(doc, `update_wall refused: ${issues[0]}.`);

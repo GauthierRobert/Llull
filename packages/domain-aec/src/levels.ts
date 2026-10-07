@@ -255,6 +255,13 @@ export const setProjectInfo = defineCommand({
         `set_project_info: no fields given (allowed: ${PROJECT_FIELDS.join(', ')}).`,
       );
     }
+    if (
+      Object.entries(changes).every(
+        ([field, value]) => building.project[field as keyof ProjectInfo] === value,
+      )
+    ) {
+      return noop(doc, 'set_project_info: the given fields already hold these values.');
+    }
     return {
       document: { ...doc, building: { ...building, project: { ...building.project, ...changes } } },
       summary: `Project info updated: ${changed.map((field) => `${field}="${changes[field as keyof ProjectInfo] ?? ''}"`).join(', ')}.`,
