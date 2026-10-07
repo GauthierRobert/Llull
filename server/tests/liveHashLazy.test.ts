@@ -21,6 +21,8 @@ vi.mock('@core/commands/persistence', async (importOriginal) => {
 import { subscribeLive, getLiveSnapshot, _resetLiveDoc } from '../src/liveDocument';
 import { applyCommand } from '../src/commandBus';
 import { parseSseFrame } from './sseTestHelpers';
+import { applyLiveCommand, documentHash } from '@mcp/liveSync';
+import type { CadDocument } from '@core/model/types';
 
 function makeFakeRes(): { written: string[]; write(chunk: string): boolean; end(): void } {
   return {
@@ -55,5 +57,31 @@ describe('live command hash', () => {
     const frame = parseSseFrame(res.written[0] ?? '');
     expect(frame.event).toBe('command');
     expect(frame.data['stateHash']).toBe(getLiveSnapshot().stateHash);
+  });
+
+  it('a late subscriber gets a consistent snapshot and can follow the next command', () => {
+    applyCommand('add_box', { size: [1, 1, 1] });
+    applyCommand('add_box', { size: [2, 2, 2] });
+    const res = makeFakeRes();
+    const unsubscribe = subscribeLive(res as never);
+    const snapshot = parseSseFrame(res.written[0] ?? '');
+    expect(snapshot.event).toBe('snapshot');
+    const document = snapshot.data['document'] as CadDocument;
+    expect(Object.keys(document.entities)).toHaveLength(2);
+    expect(snapshot.data['seq']).toBe(getLiveSnapshot().seq);
+    expect(snapshot.data['stateHash']).toBe(documentHash(document));
+
+    applyCommand('add_box', { size: [3, 3, 3] });
+    unsubscribe();
+    const event = parseSseFrame(res.written[1] ?? '');
+    expect(event.data['seq']).toBe((snapshot.data['seq'] as number) + 1);
+    const applied = applyLiveCommand(document, snapshot.data['seq'] as number, {
+      epoch: String(event.data['epoch']),
+      seq: event.data['seq'] as number,
+      name: String(event.data['name']),
+      params: event.data['params'],
+      stateHash: String(event.data['stateHash']),
+    });
+    expect(applied.ok).toBe(true);
   });
 });
