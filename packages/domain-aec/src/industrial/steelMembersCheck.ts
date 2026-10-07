@@ -9,7 +9,7 @@ import { noop } from '@core/commands/noop';
 import { isFiniteNumber, isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
-import { toCsv } from '../scheduleBuild';
+import { toCsv } from '../csv';
 import { briefList, highestUtilisation } from './utilisation';
 import { analyseSteelStructure } from './steelStructureAnalysis';
 

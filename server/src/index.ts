@@ -21,6 +21,7 @@ import { exchangeOptionsFromEnv } from './pythonExchange';
 import { getActiveKernelName } from './geometryKernel';
 import { buildLiveRouter } from './liveRoutes';
 import { buildExportRouter } from './exportRoutes';
+import { errorMessage } from '@lib/errorMessage';
 import { startServer } from './lifecycle';
 import {
   getAllowedOrigins,
@@ -58,7 +59,10 @@ app.use(jsonErrorHandler);
 /** Only listen when run as the entry point (tests import `app` and use supertest). */
 if (require.main === module && process.env['TEST'] !== 'true') {
   const port = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 3001;
-  startServer(app, port, process.env['HOST'] ?? '127.0.0.1');
+  startServer(app, port, process.env['HOST'] ?? '127.0.0.1').catch((err: unknown) => {
+    console.error('[llull-server] failed to start:', errorMessage(err));
+    process.exit(1);
+  });
 }
 
 export { app };

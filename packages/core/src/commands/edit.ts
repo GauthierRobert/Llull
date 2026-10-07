@@ -75,7 +75,7 @@ export const groupEntities = defineCommand({
       .optional(),
   }),
   run: (doc, { ids, name = 'Group' }): CommandResult => {
-    const validIds = ids.filter((id) => id in doc.entities);
+    const validIds = [...new Set(ids)].filter((id) => Object.hasOwn(doc.entities, id));
 
     if (validIds.length < 2) {
       return noop(
@@ -172,13 +172,14 @@ export const setEntityName = defineCommand({
       return noop(doc, `No entity ${id} — set_entity_name is a no-op.`);
     }
 
-    // Build a patched entity; only override fields that were provided.
-    // exactOptionalPropertyTypes: spread undefined to omit, or override with value.
+    const { name: currentName, tags: currentTags, ...rest } = entity;
+    const nextName = name === undefined ? currentName : name === '' ? undefined : name;
+    const nextTags = tags === undefined ? currentTags : tags.length > 0 ? tags : undefined;
     const patched: typeof entity = {
-      ...entity,
-      ...(name !== undefined ? { name: name === '' ? undefined : name } : {}),
-      ...(tags !== undefined ? { tags: tags.length > 0 ? tags : undefined } : {}),
-    } as typeof entity;
+      ...rest,
+      ...(nextName !== undefined ? { name: nextName } : {}),
+      ...(nextTags !== undefined ? { tags: nextTags } : {}),
+    };
 
     const namePart = patched.name !== undefined ? `name="${patched.name}"` : 'name=<none>';
     const tagsPart =

@@ -55,7 +55,7 @@ export interface StoreyReport {
   readonly frames: { readonly X: number; readonly Y: number };
 }
 
-export interface BracingOutcome {
+interface BracingOutcome {
   readonly rows: MemberRow[];
   /** Compression a beam takes as chord of a braced bay, kN. */
   readonly strutForces: Map<string, StrutForce>;

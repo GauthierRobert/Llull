@@ -72,7 +72,7 @@ describe('add_slab_opening / delete_slab_opening', () => {
     const snapshot = structuredClone(doc);
     const result = execute(doc, 'add_slab_opening', { stairId: 'stair-1' });
     expect(doc).toEqual(snapshot);
-    expect(result.summary).toMatch(/opening #1 .* in slab SL2 \(slab-2\)/);
+    expect(result.summary).toMatch(/opening index 0 .* in slab SL2 \(slab-2\)/);
     const body = result.document.entities['slab-2:body'];
     expect(body?.kind).toBe('mesh');
     expect(result.document.entities['slab-1:body']?.kind).toBe('extrusion');
@@ -125,7 +125,7 @@ describe('add_slab_opening / delete_slab_opening', () => {
     expect(refuse({ stairId: 'x' })).toMatch(/no stair/);
     expect(refuse({ stairId: 'stair-1', margin: -1 })).toMatch(/margin/);
     expect(refuse({})).toMatch(/boundary of ≥ 3/);
-    expect(refuse({ stairId: 'stair-1', slabId: 'slab-1' })).toMatch(/opening #2/);
+    expect(refuse({ stairId: 'stair-1', slabId: 'slab-1' })).toMatch(/opening index 1/);
 
     expect(execute(doc, 'delete_slab_opening', { slabId: 'slab-1', index: 3 }).summary).toMatch(
       /has 1 opening/,

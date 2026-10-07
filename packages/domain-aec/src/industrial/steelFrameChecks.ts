@@ -31,7 +31,7 @@ import {
   type MemberRow,
 } from './steelMemberRows';
 
-export interface FrameCheckInput {
+interface FrameCheckInput {
   readonly frame: MomentFrame;
   readonly system: FrameSystem;
   readonly solutions: FrameSolutions;

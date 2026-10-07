@@ -5,6 +5,7 @@ import { boundsOverlap, instanceBoundsFromDoc } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { evaluateMotionInternal } from './jointsKinematics';
 import { noop } from './noop';
+import { elementAt } from '../lib/elementAt';
 
 /** One sweep sample: the applied value, resolved joint values and instance transforms by id. */
 interface MotionStep {
@@ -48,13 +49,13 @@ function boundsAtStep(
 
 /** Every overlapping pair of instance AABBs. @pure */
 function detectInterferences(bounds: Record<string, Bounds>): [string, string][] {
-  const ids = Object.keys(bounds);
+  const entries = Object.entries(bounds);
   const pairs: [string, string][] = [];
-  for (let i = 0; i < ids.length; i++) {
-    for (let j = i + 1; j < ids.length; j++) {
-      const idA = ids[i]!;
-      const idB = ids[j]!;
-      if (boundsOverlap(bounds[idA]!, bounds[idB]!)) {
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const [idA, boundsA] = elementAt(entries, i);
+      const [idB, boundsB] = elementAt(entries, j);
+      if (boundsOverlap(boundsA, boundsB)) {
         pairs.push([idA, idB]);
       }
     }
@@ -166,10 +167,10 @@ export const motionStudy = defineCommand({
       }
     } else {
       // mode === 'parameter'
-      if (!(target in doc.parameters)) {
+      const param = Object.hasOwn(doc.parameters, target) ? doc.parameters[target] : undefined;
+      if (!param) {
         return noop(doc, `motion_study: parameter '${target}' does not exist in doc.parameters.`);
       }
-      const param = doc.parameters[target]!;
       if (typeof param.value !== 'number' || !Number.isFinite(param.value)) {
         return noop(
           doc,
@@ -192,7 +193,7 @@ export const motionStudy = defineCommand({
       } else {
         // Joints whose stored value equals the parameter's current value follow the sweep;
         // the rest keep their stored value (drive relations propagate in evaluateMotionInternal).
-        const currentParamValue = doc.parameters[target]!.value;
+        const currentParamValue = doc.parameters[target]?.value ?? 0;
         baseValues = {};
         for (const [jid, joint] of Object.entries(doc.joints)) {
           const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;

@@ -5,6 +5,7 @@
 import type { SteelMemberElement } from '@core/model/building';
 import type { FrameMember, FrameNode } from '@lib/frame2d';
 import type { CoefficientSet } from './windCoefficients';
+import { GRAVITY } from '../numeric';
 
 /**
  * G dead, S snow, WL / WR wind from the left (+x) / right with internal pressure cpi = +0.2,
@@ -208,6 +209,10 @@ interface CraneActions {
   readonly phi2: number;
   /** Crane self-weight Gc, N. */
   readonly selfWeight: number;
+  /** Hoist load Q = capacity × g, N. */
+  readonly hoist: number;
+  /** Minimum hook approach e to the rail, clamped to [0, span], mm. */
+  readonly approach: number;
   /** Static (characteristic, no dynamic factor) rail reactions, N per rail. */
   readonly staticMax: number;
   readonly staticMin: number;
@@ -248,7 +253,7 @@ export function craneActions(
   const { phi1, phi4, phi5, friction, rails, skewAngle } = CRANE_FACTORS;
   const { beta2, phi2Min } = HOISTING_CLASSES[model.hoistingClass ?? 'HC2'];
   const phi2 = phi2Min + beta2 * (model.hoistingSpeed ?? 0.1);
-  const hoist = capacityTonnes * 9810;
+  const hoist = capacityTonnes * GRAVITY * 1000;
   const self =
     model.craneSelfWeight !== undefined ? model.craneSelfWeight * 1000 : 0.5 * hoist + 20000;
   const approach = Math.min(Math.max(0, (model.minHookApproach ?? 1) * 1000), span);
@@ -269,6 +274,8 @@ export function craneActions(
   return {
     phi2,
     selfWeight: self,
+    hoist,
+    approach,
     staticMax,
     staticMin,
     group1: {

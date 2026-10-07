@@ -12,11 +12,12 @@ import { MAX_COPIES_PER_COMMAND } from './limits';
 import { addCopies } from './transform';
 import { add3, cross3, distanceSq3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { noop } from './noop';
+import { elementAt } from '../lib/elementAt';
 
 function polylineLength(path: Vec3[]): number {
   let total = 0;
   for (let i = 1; i < path.length; i++) {
-    total += Math.sqrt(distanceSq3(path[i]!, path[i - 1]!));
+    total += Math.sqrt(distanceSq3(elementAt(path, i), elementAt(path, i - 1)));
   }
   return total;
 }
@@ -25,14 +26,14 @@ function polylineLength(path: Vec3[]): number {
 function pointAtArcLength(path: Vec3[], t: number): Vec3 {
   let remaining = t;
   for (let i = 1; i < path.length; i++) {
-    const seg = sub3(path[i]!, path[i - 1]!);
-    const segLen = Math.sqrt(distanceSq3(path[i]!, path[i - 1]!));
+    const seg = sub3(elementAt(path, i), elementAt(path, i - 1));
+    const segLen = Math.sqrt(distanceSq3(elementAt(path, i), elementAt(path, i - 1)));
     if (remaining <= segLen + 1e-10) {
-      return add3(path[i - 1]!, scale3(normalize3(seg), remaining));
+      return add3(elementAt(path, i - 1), scale3(normalize3(seg), remaining));
     }
     remaining -= segLen;
   }
-  return path[path.length - 1]!;
+  return elementAt(path, path.length - 1);
 }
 
 /**

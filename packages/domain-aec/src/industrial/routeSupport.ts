@@ -5,7 +5,7 @@
  */
 
 import type { Vec3 } from '@core/model/types';
-import { add3, dot3, scale3, sub3 } from '@lib/vec3';
+import { add3, distance3, dot3, scale3, sub3 } from '@lib/vec3';
 import { toVec3 } from './memberSupport';
 
 /** Route as Vec3 points; null unless there are at least 2 well-formed [x, y, z] points. */
@@ -51,7 +51,7 @@ function segmentsOf(route: ReadonlyArray<Vec3>): Segment[] {
 }
 
 /** Nearest point of a polyline route to `point`. */
-export interface RouteSnap {
+interface RouteSnap {
   readonly point: Vec3;
   /** Distance from `point` to the route. */
   readonly distance: number;
@@ -74,7 +74,7 @@ export function nearestOnRoute(route: ReadonlyArray<Vec3>, point: Vec3): RouteSn
     if (length > 0) {
       const t = Math.max(0, Math.min(1, dot3(sub3(point, a), delta) / (length * length)));
       const snapped = add3(a, scale3(delta, t));
-      const distance = Math.hypot(...sub3(point, snapped));
+      const distance = distance3(point, snapped);
       if (best === null || distance < best.distance - 1e-9) {
         best = { point: snapped, distance, arc: travelled + t * length, segment: index, direction };
       }
@@ -106,7 +106,7 @@ export function arcLengths(route: ReadonlyArray<Vec3>): number[] {
   let travelled = 0;
   return route.map((point, index) => {
     const previous = route[index - 1];
-    if (previous) travelled += Math.hypot(...sub3(point, previous));
+    if (previous) travelled += distance3(point, previous);
     return travelled;
   });
 }
@@ -131,7 +131,7 @@ export function spanCoordinate(route: ReadonlyArray<Vec3>, arc: number): number 
 }
 
 /** A run of consecutive riser segments: from `startArc` to `endArc` along the route, mm. */
-export interface RiserRun {
+interface RiserRun {
   readonly startArc: number;
   readonly endArc: number;
   /** Axis length of the run, mm. */

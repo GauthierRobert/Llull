@@ -8,9 +8,10 @@
  * Uses entity `id` as React key (R8).
  */
 
-import type { CadDocument, Entity, EntityId } from '@core/model/types';
+import type { Entity, EntityId } from '@core/model/types';
 import { is2D } from '@core/model/types';
-import { useViewportStore } from '@ui/store';
+import { useStore, useViewportStore } from '@ui/store';
+import { isEntityVisible } from '../entityVisibility';
 import { LineRenderer } from './entities/LineRenderer';
 import { PolylineRenderer } from './entities/PolylineRenderer';
 import { CircleRenderer } from './entities/CircleRenderer';
@@ -22,19 +23,13 @@ import { SplineRenderer } from './entities/SplineRenderer';
 import { TextRenderer2D } from './entities/TextRenderer2D';
 import { DimensionRenderer2D } from './entities/DimensionRenderer2D';
 
-interface Entities2DProps {
-  document: CadDocument;
-}
-
 /** Pure render branch for a single 2D entity; one case per Shape2DKind. */
 function Entity2DRenderer({
   entity,
   selected,
-  document,
 }: {
   entity: Entity;
   selected: boolean;
-  document: CadDocument;
 }): React.ReactElement | null {
   switch (entity.kind) {
     case 'line':
@@ -56,19 +51,23 @@ function Entity2DRenderer({
     case 'text':
       return <TextRenderer2D entity={entity} selected={selected} />;
     case 'dimension':
-      return <DimensionRenderer2D entity={entity} doc={document} selected={selected} />;
+      return <DimensionRenderer2D entity={entity} selected={selected} />;
     // 3D solid kinds are intentionally not rendered here.
     default:
       return null;
   }
 }
 
-export function Entities2D({ document }: Entities2DProps): React.ReactElement {
-  const { order, entities, layers, selection } = document;
+export function Entities2D(): React.ReactElement {
+  const order = useStore((s) => s.document.order);
+  const entities = useStore((s) => s.document.entities);
+  const layers = useStore((s) => s.document.layers);
+  const selection = useStore((s) => s.document.selection);
   const selectionSet = new Set<EntityId>(selection);
 
-  // Render-only local layer-hide filter — never touches the document (PRIME DIRECTIVE).
+  // Render-only hide filters — never touch the document (PRIME DIRECTIVE).
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
+  const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
 
   return (
     <group name="entities-2d">
@@ -79,19 +78,9 @@ export function Entities2D({ document }: Entities2DProps): React.ReactElement {
         // Building annotations are drawn per level by BuildingPlan2D.
         if (entity.tags?.includes('bim') === true) return null;
 
-        // Respect layer visibility (document) and the local layer-hide filter (UI).
-        const layer = layers[entity.layerId];
-        if (layer && !layer.visible) return null;
-        if (hiddenLayerIds.has(entity.layerId)) return null;
+        if (!isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds)) return null;
 
-        return (
-          <Entity2DRenderer
-            key={id}
-            entity={entity}
-            selected={selectionSet.has(id)}
-            document={document}
-          />
-        );
+        return <Entity2DRenderer key={id} entity={entity} selected={selectionSet.has(id)} />;
       })}
     </group>
   );

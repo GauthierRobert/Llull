@@ -3,7 +3,7 @@
  */
 
 import type { WallElement } from '@core/model/building';
-import { elementsOf, fromMm, getBuilding, orderedElements } from './model';
+import { elementsOf, existingLevelId, fromMm, getBuilding, orderedElements } from './model';
 import { wallFrame } from './wallGeometry';
 import {
   type PlanDrawing,
@@ -36,7 +36,7 @@ export function buildPlanDrawing(
   options: { dimensions?: boolean } = {},
 ): PlanDrawing | null {
   const building = getBuilding(doc);
-  const resolvedId = levelId ?? building.activeLevelId ?? building.levelOrder[0];
+  const resolvedId = existingLevelId(building, levelId);
   const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;
   if (!level) return null;
   const cutHeight = fromMm(doc, 1200);

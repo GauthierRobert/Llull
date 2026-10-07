@@ -6,7 +6,7 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementsOf, fileSlug, getBuilding, toMetres } from './model';
+import { elementsOf, fileSlug, getBuilding, toMetres, toMm } from './model';
 import { noop } from '@core/commands/noop';
 import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';
@@ -64,7 +64,7 @@ function buildElevationSheet(
     width: outer.width - ANNOTATION_RIGHT,
     height: outer.height - ANNOTATION_TOP - 8,
   };
-  const millimetresPerUnit = toMetres(doc, 1) * 1000;
+  const millimetresPerUnit = toMm(doc, 1);
   const [minU, minZ, maxU, maxZ] = drawing.bounds;
   const scale =
     options.scale ??

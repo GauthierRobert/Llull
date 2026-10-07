@@ -194,6 +194,8 @@ describe('phase 3 review regressions', () => {
     const role = execute(doc, 'update_steel_member', { memberId: 'member-1', role: 'beam' });
     expect(role.summary).toMatch(/Moment connection\(s\) connection-1 removed/);
     expect(connections(role.document).map((c) => c.id)).toEqual(['connection-2', 'connection-3']);
+    expect(role.affected).toContain('connection-1');
+    expect(role.affected).toContain('connection-1:plate');
     const moved = execute(doc, 'update_steel_member', {
       memberId: 'member-3',
       start: [0, 0, 5000],
@@ -208,7 +210,10 @@ describe('phase 3 review regressions', () => {
     const doc = execute(frame(), 'add_moment_connections', {}).document;
     expect(
       execute(doc, 'move_building_element', { elementIds: ['member-1'], delta: [3000, 0] }).summary,
-    ).toMatch(/connection-1 tie the moved member\(s\) to rafters/);
+    ).toMatch(/connection-1 join a moved member to a member that is not moved/);
+    expect(
+      execute(doc, 'move_building_element', { elementIds: ['member-3'], delta: [3000, 0] }).summary,
+    ).toMatch(/connection-1, connection-2 join a moved member/);
     const together = execute(doc, 'move_building_element', {
       elementIds: ['member-1', 'member-2', 'member-3', 'member-4'],
       delta: [3000, 0],

@@ -25,7 +25,8 @@ import {
   stairVolume,
   wallQuantities,
 } from './takeoffBasics';
-import { memberLength, memberMass, panelArea, pipeLength } from './takeoffCompute';
+import { memberLength, memberMass, panelArea } from './takeoffCompute';
+import { routeLength } from './industrial/routeSupport';
 
 export const SCHEDULE_KINDS = [
   'wall',
@@ -352,7 +353,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
           pipe.service,
           pipe.diameter,
           pipe.material,
-          round(scale.length(pipeLength(pipe)), 2),
+          round(scale.length(routeLength(pipe.points)), 2),
           Math.max(0, pipe.points.length - 2),
           pipe.from ?? '',
           pipe.to ?? '',
@@ -433,16 +434,4 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
         ]),
       };
   }
-}
-
-/** RFC 4180 CSV. */
-export function toCsv(
-  columns: ReadonlyArray<string>,
-  rows: ReadonlyArray<ReadonlyArray<string | number>>,
-): string {
-  const cell = (value: string | number): string => {
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-  return [columns, ...rows].map((row) => row.map(cell).join(',')).join('\n') + '\n';
 }

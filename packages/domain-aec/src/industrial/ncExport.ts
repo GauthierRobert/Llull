@@ -13,6 +13,7 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding, orderedElements, toMm } from '../model';
+import { round } from '../numeric';
 import { noop } from '@core/commands/noop';
 import { sweepFrame } from '../mesh';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
@@ -30,7 +31,6 @@ import {
   type NcPiece,
   memberPiece,
   outlineMean,
-  round2,
 } from './ncMemberPieces';
 
 export interface NcExport {
@@ -51,9 +51,9 @@ function platePiece(
   },
 ): NcPiece {
   const [length, width, thickness] = [
-    round2(toMm(doc, parts.length)),
-    round2(toMm(doc, parts.width)),
-    round2(toMm(doc, parts.thickness)),
+    round(toMm(doc, parts.length)),
+    round(toMm(doc, parts.width)),
+    round(toMm(doc, parts.thickness)),
   ];
   return {
     kind: 'plate',
@@ -66,8 +66,8 @@ function platePiece(
     flangeWidth: width,
     flangeThickness: thickness,
     webThickness: thickness,
-    massPerMetre: round2((width / 1000) * (thickness / 1000) * STEEL_DENSITY_KG_PER_M3),
-    paintPerMetre: round2((2 * (width + thickness)) / 1000),
+    massPerMetre: round((width / 1000) * (thickness / 1000) * STEEL_DENSITY_KG_PER_M3),
+    paintPerMetre: round((2 * (width + thickness)) / 1000),
     cuts: [0, 0, 0, 0],
     holes: parts.holes,
     contour: [
@@ -96,9 +96,9 @@ function basePlatePiece(doc: CadDocument, plate: BasePlateElement, layout: Plate
       const [dx, dy] = [bolt[0] - foot[0], bolt[1] - foot[1]];
       return {
         face: 'o',
-        x: round2(mm(dx * cos + dy * sin + plate.length / 2)),
-        y: round2(mm(-dx * sin + dy * cos + plate.width / 2)),
-        diameter: round2(mm(plate.boltDiameter) + ANCHOR_HOLE_CLEARANCE_MM),
+        x: round(mm(dx * cos + dy * sin + plate.length / 2)),
+        y: round(mm(-dx * sin + dy * cos + plate.width / 2)),
+        diameter: round(mm(plate.boltDiameter) + ANCHOR_HOLE_CLEARANCE_MM),
       };
     }),
   });
@@ -122,9 +122,9 @@ function endPlatePieces(
       const [cx, cy] = outlineMean(solid.outline);
       return {
         face: 'o',
-        x: round2(mm(cy - minY)),
-        y: round2(mm(cx - minX)),
-        diameter: round2(mm(connection.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM),
+        x: round(mm(cy - minY)),
+        y: round(mm(cx - minX)),
+        diameter: round(mm(connection.boltDiameter) + END_PLATE_HOLE_CLEARANCE_MM),
       };
     });
   return solids

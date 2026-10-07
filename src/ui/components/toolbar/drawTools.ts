@@ -7,7 +7,7 @@
 import type { DrawToolKind } from '@ui/store';
 import type { IconName } from '@ui/components/Icon';
 
-export interface DrawToolSpec {
+interface DrawToolSpec {
   tool: DrawToolKind;
   label: string;
   icon: IconName;

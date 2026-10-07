@@ -5,6 +5,7 @@ import { nextId } from '../lib/id';
 import { commitEntity } from './commitEntity';
 import { noop } from './noop';
 import { newEntity } from './newEntity';
+import { ROTATION_CONVENTION } from './geometryShared';
 
 /** Default stroke color of every drafted 2D shape. */
 export const DEFAULT_DRAW_COLOR = '#4a90d9';
@@ -16,13 +17,11 @@ export function workPlanePositionField(): z.ZodOptional<z.ZodType<Vec3>> {
   ).optional();
 }
 
-/** Optional `rotation` param: extrinsic XYZ Euler angles of the 2D work plane. */
+/** Optional `rotation` param: three.js intrinsic XYZ Euler angles of the 2D work plane. */
 export function workPlaneRotationField(): z.ZodOptional<z.ZodArray<z.ZodNumber>> {
   return z
     .array(z.number())
-    .describe(
-      'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the work plane. Defaults to [0,0,0].',
-    )
+    .describe(`${ROTATION_CONVENTION} for the work plane. Defaults to [0,0,0].`)
     .optional();
 }
 

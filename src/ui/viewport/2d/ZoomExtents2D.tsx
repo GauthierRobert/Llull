@@ -12,6 +12,7 @@ import { useThree } from '@react-three/fiber';
 import type { MapControls as MapControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
+import { isBoundsData } from '@ui/resultData';
 
 const PADDING = 1.15;
 
@@ -22,10 +23,8 @@ export function ZoomExtents2D(): null {
   useEffect(() => {
     const { document, renderOrigin } = useStore.getState();
     if (document.order.length === 0) return;
-    const bounds = execute(document, 'measure_bounding_box', {}).data as
-      | { min: [number, number, number]; max: [number, number, number] }
-      | undefined;
-    if (!bounds) return;
+    const { data: bounds } = execute(document, 'measure_bounding_box', {});
+    if (!isBoundsData(bounds)) return;
     const width = Math.max(bounds.max[0] - bounds.min[0], 1e-6);
     const height = Math.max(bounds.max[1] - bounds.min[1], 1e-6);
     const centerX = (bounds.min[0] + bounds.max[0]) / 2 - renderOrigin[0];

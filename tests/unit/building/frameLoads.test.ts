@@ -20,7 +20,9 @@ import { baseReactions } from '@aec/industrial/frameModelSolve';
 import { frameRoofAverage } from '@aec/industrial/windCoefficients';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
 import type { SteelMemberElement } from '@core/model/building';
+import { GRAVITY } from '@aec/numeric';
 
+const HOIST_10T = 10 * GRAVITY * 1000;
 const HALL = { span: 24000, length: 30000 };
 
 function hall(params: Record<string, unknown> = {}): CadDocument {
@@ -206,7 +208,7 @@ describe('load combinations', () => {
   });
 
   it('derives the EN 1991-3 crane actions by statics (hand check)', () => {
-    const [hoist, span] = [98100, 24000];
+    const [hoist, span] = [10 * GRAVITY * 1000, 24000];
     const actions = craneActions(10, span);
     const self = 0.5 * hoist + 20000;
     const [near, far] = [23 / 24, 1 / 24];
@@ -249,8 +251,8 @@ describe('load combinations', () => {
     });
     expect(heavy.phi2).toBeCloseTo(1.2 + 0.68 * 0.5, 9);
     expect(heavy.selfWeight).toBe(100000);
-    expect(heavy.staticMax + heavy.staticMin).toBeCloseTo(100000 + 98100, 3);
-    expect(heavy.staticMin).toBeCloseTo(0.4 * 100000 + (20000 + 98100) * (2 / 24), 3);
+    expect(heavy.staticMax + heavy.staticMin).toBeCloseTo(100000 + HOIST_10T, 3);
+    expect(heavy.staticMin).toBeCloseTo(0.4 * 100000 + (20000 + HOIST_10T) * (2 / 24), 3);
     expect(heavy.group1.transverseMax).toBeLessThan(
       craneActions(10, 24000).group1.transverseMax * 2,
     );
@@ -269,9 +271,10 @@ describe('load combinations', () => {
       reactions.reduce((sum, reaction) => sum + (reaction.cases[key]?.vertical ?? 0), 0);
     const horizontal = (key: 'CL' | 'CL5' | 'CR'): number =>
       reactions.reduce((sum, reaction) => sum + (reaction.cases[key]?.horizontal ?? 0), 0);
-    // Gc = 69.05 kN, Q = 98.1 kN: group 1 φ1 Gc + φ2 Q, group 5 φ4 (Gc + Q).
-    expect(vertical('CL')).toBeCloseTo(1.1 * 69050 + 1.134 * 98100, -1);
-    expect(vertical('CL5')).toBeCloseTo(69050 + 98100, -1);
+    // Gc = 0.5 Q + 20 kN, Q = 10 t × g: group 1 φ1 Gc + φ2 Q, group 5 φ4 (Gc + Q).
+    const craneSelf = 0.5 * HOIST_10T + 20000;
+    expect(vertical('CL')).toBeCloseTo(1.1 * craneSelf + 1.134 * HOIST_10T, -1);
+    expect(vertical('CL5')).toBeCloseTo(craneSelf + HOIST_10T, -1);
     expect(vertical('CR')).toBeCloseTo(vertical('CL'), -1);
     expect(vertical('CR5')).toBeCloseTo(vertical('CL5'), -1);
     // Group 1 transverse HT = both rails in +x (CL) / −x (CR); skewing HS (group 5) is a couple.

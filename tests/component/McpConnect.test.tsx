@@ -353,3 +353,19 @@ describe('McpConnect — copy buttons', () => {
     });
   });
 });
+
+describe('copy button robustness', () => {
+  it('survives a rejected clipboard write and an unmount during the reset timer', async () => {
+    writeTextMock.mockRejectedValueOnce(new Error('denied'));
+    const { unmount } = render(<McpConnectButton />);
+    fireEvent.click(screen.getByRole('button', { name: /connect/i }));
+    const copyButtons = screen.getAllByRole('button', { name: /^copy /i });
+    fireEvent.click(copyButtons[0] as HTMLElement);
+    await waitFor(() => expect(writeTextMock).toHaveBeenCalled());
+    fireEvent.click(screen.getAllByRole('button', { name: /^copy /i })[1] as HTMLElement);
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /copied$/i })).toHaveLength(1),
+    );
+    unmount();
+  });
+});

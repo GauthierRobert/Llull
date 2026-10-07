@@ -35,3 +35,21 @@ export function findClickAnimationsForEntity(
   }
   return result;
 }
+
+/**
+ * Ids of every entity targeted by any animation, directly or through a group. The AnimationPlayer
+ * moves these by scene-object name, so they must not be folded into an InstancedMesh batch.
+ *
+ * @pure
+ */
+export function animatedEntityIds(
+  animations: Record<string, Animation>,
+  groups: Record<string, EntityGroup>,
+): Set<EntityId> {
+  const result = new Set<EntityId>();
+  for (const anim of Object.values(animations)) {
+    if (anim.targetKind === 'entity') result.add(anim.targetId);
+    else for (const memberId of groups[anim.targetId]?.memberIds ?? []) result.add(memberId);
+  }
+  return result;
+}

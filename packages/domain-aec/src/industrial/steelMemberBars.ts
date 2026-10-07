@@ -8,13 +8,12 @@
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BaseFixity, BuildingModel, JointFixity, MemberRole } from '@core/model/building';
 import { elementsOf, fromMm, getBuilding } from '../model';
+import { GRAVITY } from '../numeric';
 import { findProfile, sectionProperties, type SteelProfile } from '../steel/profiles';
 import { yieldStrength } from './steelDesign';
+import { distance3 } from '@lib/vec3';
 
-/** m/s², converts kg to kN. */
-export const GRAVITY = 9.80665;
-
-export type BarKind = 'column' | 'beam' | 'brace' | 'skipped';
+type BarKind = 'column' | 'beam' | 'brace' | 'skipped';
 
 export interface SteelBar {
   readonly id: string;
@@ -124,7 +123,7 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
     ];
     const start = point(element.start);
     const end = point(element.end);
-    const length = Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
+    const length = distance3(end, start);
     const profile = findProfile(element.profile) ?? null;
     const { kind, reason } = classify(
       element.role,

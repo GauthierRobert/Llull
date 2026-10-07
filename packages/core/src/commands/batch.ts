@@ -8,7 +8,7 @@ import type { CadDocument } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { MAX_BATCH_IDS } from './limits';
-import { withoutEntities } from './entityOps';
+import { referenceSuffix, withoutEntities } from './entityOps';
 import { translated } from './geometryShared';
 import { noop } from './noop';
 
@@ -81,7 +81,7 @@ export const deleteEntities = defineCommand({
     if (!batch.ok) return batch.result;
     const { existing, missing } = batch;
 
-    const { document, dissolvedGroups } = withoutEntities(doc, new Set(existing));
+    const { document, dissolvedGroups, prunedReferences } = withoutEntities(doc, new Set(existing));
 
     const dissolveSuffix =
       dissolvedGroups.length > 0
@@ -91,7 +91,7 @@ export const deleteEntities = defineCommand({
 
     return {
       document,
-      summary: `Deleted ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}].${dissolveSuffix}${missingSuffix}`,
+      summary: `Deleted ${existing.length} entit${existing.length === 1 ? 'y' : 'ies'} [${existing.join(', ')}].${dissolveSuffix}${referenceSuffix(prunedReferences)}${missingSuffix}`,
       affected: existing,
     };
   },

@@ -25,7 +25,7 @@ import {
 /** A support whose pipe underside is within this of the column top sits on it (concentric), mm. */
 const COLUMN_TOP_TOLERANCE = 25;
 
-export interface SupportedPipeLoad {
+interface SupportedPipeLoad {
   /** Weight delivered to steel members, kN. */
   readonly carriedKn: number;
   /** Attached supports used. */
@@ -35,7 +35,7 @@ export interface SupportedPipeLoad {
   readonly columnNodes: Array<readonly [string, ColumnNode]>;
 }
 
-export interface TributaryRules {
+interface TributaryRules {
   /** Supports closer than this share one station, mm. Default: the pipe-support placement spacing. */
   readonly groupDistance?: number;
   /** The run start rests on equipment or a header (half span instead of the overhang). Default false. */

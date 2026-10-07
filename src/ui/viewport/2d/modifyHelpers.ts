@@ -12,6 +12,9 @@
 import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
 
+/** Pick radius in screen pixels (selection and modify-tool picks). */
+export const PICK_RADIUS_PX = 10;
+
 interface NearestVertexResult {
   /** 0-based index of the nearest vertex. */
   vertexIndex: number;
@@ -32,25 +35,14 @@ interface NearestVertexResult {
 export function nearestVertex(points: ReadonlyArray<Vec2>, pick: Vec2): NearestVertexResult | null {
   if (points.length === 0) return null;
 
-  let bestIdx = 0;
-  let bestDistSq = Infinity;
-
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i]!;
-    const dx = p[0] - pick[0];
-    const dy = p[1] - pick[1];
-    const dSq = dx * dx + dy * dy;
-    if (dSq < bestDistSq) {
-      bestDistSq = dSq;
-      bestIdx = i;
-    }
-  }
-
-  return {
-    vertexIndex: bestIdx,
-    point: points[bestIdx]!,
-    distSq: bestDistSq,
-  };
+  let best: NearestVertexResult | null = null;
+  points.forEach((point, vertexIndex) => {
+    const dx = point[0] - pick[0];
+    const dy = point[1] - pick[1];
+    const distSq = dx * dx + dy * dy;
+    if (best === null || distSq < best.distSq) best = { vertexIndex, point, distSq };
+  });
+  return best;
 }
 
 /**
@@ -169,10 +161,14 @@ const ELLIPSE_PICK_SAMPLES = 48;
 function chainDistSq(pick: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): number {
   let best = Infinity;
   for (let i = 0; i < points.length - 1; i++) {
-    best = Math.min(best, pointToSegDistSq(pick, points[i]!, points[i + 1]!));
+    const a = points[i];
+    const b = points[i + 1];
+    if (a && b) best = Math.min(best, pointToSegDistSq(pick, a, b));
   }
-  if (closed && points.length > 1) {
-    best = Math.min(best, pointToSegDistSq(pick, points[points.length - 1]!, points[0]!));
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (closed && points.length > 1 && first && last) {
+    best = Math.min(best, pointToSegDistSq(pick, last, first));
   }
   return best;
 }

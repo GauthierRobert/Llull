@@ -43,6 +43,7 @@ export function collectSnapCandidates(
   const doTangents = opts.tangents !== false;
   const doExtensions = opts.extensions === true;
   const doNearest = opts.nearest === true;
+  const isVisible = opts.isVisible ?? (() => true);
 
   const from = fromPoint ?? null;
   const cursor = cursorPoint ?? null;
@@ -90,7 +91,7 @@ export function collectSnapCandidates(
 
   for (const id of document.order) {
     const entity = document.entities[id];
-    if (!entity || !is2D(entity)) continue;
+    if (!entity || !is2D(entity) || !isVisible(entity)) continue;
 
     const ox = entity.position[0];
     const oy = entity.position[1];
@@ -113,20 +114,17 @@ export function collectSnapCandidates(
 
       case 'polyline': {
         const pts = entity.points;
-        for (let i = 0; i < pts.length; i++) {
-          const p = pts[i]!;
+        pts.forEach((p, i) => {
           const px = p[0] + ox;
           const py = p[1] + oy;
 
           if (doEndpoints) add('endpoint', px, py);
-          if (doMidpoints && i < pts.length - 1) {
-            const q = pts[i + 1]!;
-            add('midpoint', ...mid(px, py, q[0] + ox, q[1] + oy));
-          }
-        }
-        if (entity.closed && doMidpoints && pts.length >= 2) {
-          const first = pts[0]!;
-          const last = pts[pts.length - 1]!;
+          const q = pts[i + 1];
+          if (doMidpoints && q) add('midpoint', ...mid(px, py, q[0] + ox, q[1] + oy));
+        });
+        const first = pts[0];
+        const last = pts[pts.length - 1];
+        if (entity.closed && doMidpoints && pts.length >= 2 && first && last) {
           add('midpoint', ...mid(first[0] + ox, first[1] + oy, last[0] + ox, last[1] + oy));
         }
         addSegmentSnaps(entityToSegments(entity));
@@ -210,9 +208,9 @@ export function collectSnapCandidates(
   if (doIntersections) {
     for (let i = 0; i < allSegments.length; i++) {
       for (let j = i + 1; j < allSegments.length; j++) {
-        const a = allSegments[i]!;
-        const b = allSegments[j]!;
-        const pt = segmentIntersection(...a, ...b);
+        const a = allSegments[i];
+        const b = allSegments[j];
+        const pt = a && b ? segmentIntersection(...a, ...b) : null;
         if (pt) add('intersection', ...pt);
       }
     }

@@ -122,8 +122,8 @@ function triangulateExtrusion(e: Kind<'extrusion'>): Triangle[] {
   if (e.profile.length < 3) return [];
   const { bottom, top } = extrusionRings(e);
   return [
-    // Ear clipping handles non-convex profiles; the bottom cap is reversed (face down).
-    ...earClipTriangulateVerts([...bottom].reverse()),
+    // Ear clipping handles non-convex profiles; its triangles face +Z, so the bottom cap is flipped.
+    ...earClipTriangulateVerts([...bottom]).map(([a, b, c]): Triangle => [a, c, b]),
     ...earClipTriangulateVerts([...top]),
     ...sideQuads(bottom, top).flatMap(fanTriangulate),
   ];

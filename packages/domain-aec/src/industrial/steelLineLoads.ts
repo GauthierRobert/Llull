@@ -8,7 +8,7 @@
 
 import type { CableTrayElement, PipeElement } from '@core/model/building';
 import { orderedElements } from '../model';
-import { round } from '../numeric';
+import { GRAVITY, round } from '../numeric';
 import { type ModelUnits, type SteelBar } from './steelMemberBars';
 import { addPointLoad, type BeamLoads } from './steelBeamLoads';
 import type { ColumnNode } from './steelFraming';
@@ -16,7 +16,7 @@ import { pipeWeightPerMetre } from './pipeWeight';
 import { carriedByEnds, pipeRunOf, weightSupportsOf } from './pipeSupportLayout';
 import { applySupportedPipe, tributaryLengths } from './steelSupportLoads';
 
-export interface LineLoadParams {
+interface LineLoadParams {
   /** kg/m³ of the pipe contents (1000 = water, 0 = empty). */
   readonly pipeContentDensity: number;
   /** kg/m of a cable tray including its cables. */
@@ -38,7 +38,7 @@ export interface LineRunReport {
   readonly carriedKn: number;
 }
 
-export interface LineLoadResult {
+interface LineLoadResult {
   readonly runs: LineRunReport[];
   readonly warnings: string[];
   /** Pipe loads delivered to columns by supports: column id → nodes for the column check. */
@@ -107,7 +107,7 @@ function runOf(
     label: `${element.system} tray ${Math.round(toMm(element.width))} wide`,
     points,
     halfDepth: toMm(element.height) / 2,
-    weightPerMetre: (params.cableTrayWeight * 9.80665) / 1000,
+    weightPerMetre: (params.cableTrayWeight * GRAVITY) / 1000,
   };
 }
 

@@ -8,7 +8,7 @@
  */
 
 import type { CadDocument, FeatureStep } from '../model/types';
-import type { CommandLookup } from './context';
+import type { CommandLookup, ExecutionContext } from './context';
 import { currentContext } from './context';
 
 function recipeSteps(doc: Pick<CadDocument, 'recipes'>, step: FeatureStep): FeatureStep[] {
@@ -42,10 +42,10 @@ function kernelStepIn(
 export function kernelRefusal(
   doc: Pick<CadDocument, 'recipes'>,
   steps: readonly FeatureStep[],
-  registry: CommandLookup = currentContext().registry,
+  ctx: ExecutionContext = currentContext(),
 ): string | null {
-  if (currentContext().kernel !== null) return null;
-  const step = kernelStepIn(doc, steps, registry);
+  if (ctx.kernel !== null) return null;
+  const step = kernelStepIn(doc, steps, ctx.registry);
   return step === null
     ? null
     : `step '${step}' needs the geometry kernel, which is not available yet; document unchanged — retry once the kernel is ready.`;

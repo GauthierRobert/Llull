@@ -30,6 +30,7 @@ import { openingFitIssues } from './walls';
 import { nextMemberMark } from './industrial/memberSupport';
 import { copyPipeSupports } from './industrial/pipeSupportCopy';
 import { reconcilePipeSupports, reconciliationNote } from './industrial/pipeSupportAttach';
+import { levelIdParam } from './levelParams';
 
 /**
  * @command add_room
@@ -54,7 +55,7 @@ export const addRoom = defineCommand({
       .array(z.string())
       .optional()
       .describe('Alternative to boundary: ids of walls enclosing the room (closed loop).'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: levelIdParam,
   }),
   run: (doc, { name, number, boundary, wallIds, levelId }): CommandResult => {
     if (name.trim() === '') {
@@ -220,17 +221,16 @@ export const moveBuildingElement = defineCommand({
         `move_building_element refused: ${strayOpenings.join(', ')} follow their host (a wall, a steel column or a rafter) — slide openings with update_opening (offset) or move the host.`,
       );
     }
-    // A column moved without its rafter would leave the eaves connection detached.
+    // Moving only one side of a moment connection would leave it floating.
     const detached = Object.values(building.elements).filter(
       (element) =>
         element.category === 'connection' &&
-        known.includes(element.otherId) &&
-        !known.includes(element.rafterId),
+        known.includes(element.otherId) !== known.includes(element.rafterId),
     );
     if (detached.length > 0) {
       return noop(
         doc,
-        `move_building_element refused: moment connection(s) ${detached.map((element) => element.id).join(', ')} tie the moved member(s) to rafters that are not moved — move the rafters too, or delete the connections first.`,
+        `move_building_element refused: moment connection(s) ${detached.map((element) => element.id).join(', ')} join a moved member to a member that is not moved — move both members, or delete the connections first.`,
       );
     }
     let next = building;
@@ -331,13 +331,20 @@ export const copyLevelElements = defineCommand({
       .optional()
       .describe(`Subset of categories to copy (${COPYABLE.join(', ')}). Default all.`),
   }),
-  run: (doc, { sourceLevelId, targetLevelIds, categories }): CommandResult => {
+  run: (doc, { sourceLevelId, targetLevelIds: requestedTargetIds, categories }): CommandResult => {
     const building = getBuilding(doc);
-    const missing = [sourceLevelId, ...targetLevelIds].filter((id) => !building.levels[id]);
-    if (missing.length > 0 || targetLevelIds.length === 0) {
+    const missing = [sourceLevelId, ...requestedTargetIds].filter((id) => !building.levels[id]);
+    if (missing.length > 0 || requestedTargetIds.length === 0) {
       return noop(
         doc,
         `copy_level_elements failed: unknown or missing level(s) ${missing.join(', ') || '(no targets)'}.`,
+      );
+    }
+    const targetLevelIds = [...new Set(requestedTargetIds)].filter((id) => id !== sourceLevelId);
+    if (targetLevelIds.length === 0) {
+      return noop(
+        doc,
+        `copy_level_elements: every target level is the source level ${sourceLevelId}; nothing to copy.`,
       );
     }
     // Hosted elements (doors, windows, base plates) are copied with their host only.
@@ -356,7 +363,6 @@ export const copyLevelElements = defineCommand({
     let next = building;
     const created: string[] = [];
     for (const targetLevelId of targetLevelIds) {
-      if (targetLevelId === sourceLevelId) continue;
       const levelIndex = next.levelOrder.indexOf(targetLevelId);
       const targetHeight = next.levels[targetLevelId]?.height ?? sourceHeight;
       const copiedIds = new Map<string, string>();

@@ -11,6 +11,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { errorMessage } from '@lib/errorMessage';
 import type { CadDocument } from '@core/model/types';
 
 interface Autosaver {
@@ -39,7 +40,7 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
       fs.writeFileSync(tempPath, serialize(doc), 'utf8');
       fs.renameSync(tempPath, filePath);
     } catch (err) {
-      console.warn(`[autosave] write failed: ${(err as Error).message}`);
+      console.warn(`[autosave] write failed: ${errorMessage(err)}`);
       try {
         fs.rmSync(tempPath, { force: true });
       } catch {

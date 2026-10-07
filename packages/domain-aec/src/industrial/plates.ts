@@ -7,12 +7,13 @@ import type { BasePlateElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementAffected, fromMm, getBuilding } from '../model';
+import { elementAffected, existingLevelId, fromMm, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
 import { STEEL_DENSITY_KG_PER_M3 } from '../steel/profiles';
 import { boltSize } from './evaluate';
 import { appendBasePlates, columnsWithoutPlates } from './plateSupport';
+import { existingLevelIdParam } from '../levelParams';
 
 /** Plate mass in kg (sizes in document units). */
 export function plateMass(doc: Pick<CadDocument, 'units'>, plate: BasePlateElement): number {
@@ -42,7 +43,7 @@ export const addBasePlates = defineCommand({
       .array(z.string())
       .optional()
       .describe('Steel column ids. Default: every unplated steel column of the level.'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: existingLevelIdParam,
     margin: z.number().optional().describe('Plate overhang beyond the profile. Default 100 mm.'),
     thickness: z
       .number()
@@ -64,7 +65,7 @@ export const addBasePlates = defineCommand({
       return noop(doc, 'add_base_plates failed: boltCount must be an even number 2–12.');
     }
     const building = getBuilding(doc);
-    const levelId = params.levelId ?? building.activeLevelId ?? building.levelOrder[0] ?? null;
+    const levelId = existingLevelId(building, params.levelId) ?? null;
     if (params.levelId !== undefined && !building.levels[params.levelId]) {
       return noop(doc, `add_base_plates failed: no level '${params.levelId}'.`);
     }

@@ -213,6 +213,34 @@ function checkDanglingComponentRef(entity: Entity, doc: CadDocument): Issue[] {
     : [];
 }
 
+/** Constraints, joints and drive relations pointing at entities/joints that no longer exist. */
+function checkDanglingRelations(doc: CadDocument): Issue[] {
+  const missing = (kind: string, id: string, refKind: string, refId: string): Issue =>
+    issue(
+      'error',
+      'dangling_reference',
+      `${kind} '${id}' references ${refKind} '${refId}' which does not exist in the document.`,
+      refId,
+    );
+  return [
+    ...Object.values(doc.constraints ?? {}).flatMap((c) =>
+      [c.a.entityId, c.b.entityId]
+        .filter((refId) => !Object.hasOwn(doc.entities, refId))
+        .map((refId) => missing('Constraint', c.id, 'entity', refId)),
+    ),
+    ...Object.values(doc.joints ?? {}).flatMap((j) =>
+      [j.a.instanceId, j.b.instanceId]
+        .filter((refId) => !Object.hasOwn(doc.entities, refId))
+        .map((refId) => missing('Joint', j.id, 'instance', refId)),
+    ),
+    ...Object.values(doc.driveRelations ?? {}).flatMap((r) =>
+      [r.driver, r.driven]
+        .filter((refId) => !Object.hasOwn(doc.joints, refId))
+        .map((refId) => missing('Drive relation', r.id, 'joint', refId)),
+    ),
+  ];
+}
+
 function checkParameterErrors(doc: CadDocument): Issue[] {
   return Object.values(doc.parameters).flatMap((param) =>
     param.error
@@ -240,6 +268,7 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
     ...checkOrphanedGroupMembers(doc),
     ...Object.values(doc.entities).flatMap((entity) => checkDanglingDimensionRefs(entity, doc)),
     ...Object.values(doc.entities).flatMap((entity) => checkDanglingComponentRef(entity, doc)),
+    ...checkDanglingRelations(doc),
     ...checkParameterErrors(doc),
   ];
   return { ok: !issues.some((i) => i.severity === 'error'), issues };
@@ -266,6 +295,7 @@ export const checkModel = defineCommand({
     'far_from_origin (entity center > farThreshold units from world origin), ' +
     'empty_layer (layer with no entities), orphaned_group_member (group references missing entity id), ' +
     'dangling_dimension_ref (dimension entity references a missing entity id), ' +
+    'dangling_reference (constraint/joint/drive relation references a missing entity or joint), ' +
     'parameter_error (a named parameter has an evaluation error).',
   params: z.object({
     farThreshold: z

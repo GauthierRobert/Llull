@@ -33,9 +33,10 @@ async function shutdown(server: Server): Promise<void> {
 
 /**
  * Listen on host:port and install SIGTERM/SIGINT/uncaughtException handlers.
- * @failure unsafe bind (see `checkBindSafety`) -> throws
+ * Resolves once the geometry kernel is installed and the port is bound.
+ * @failure unsafe bind (see `checkBindSafety`) -> rejects
  */
-export function startServer(app: Express, port: number, host: string): Server {
+export async function startServer(app: Express, port: number, host: string): Promise<Server> {
   const refusal = checkBindSafety(host);
   if (refusal !== null) throw new Error(refusal);
   if (!isLoopbackAddress(host) && !process.env['MCP_AUTH_TOKEN']) {
@@ -43,7 +44,7 @@ export function startServer(app: Express, port: number, host: string): Server {
       '[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).',
     );
   }
-  void installGeometryKernel();
+  await installGeometryKernel();
   const server = app.listen(port, host, () => {
     console.warn(`[llull-server] listening on http://${host}:${port}`);
   });

@@ -167,11 +167,11 @@ export const deleteConstraint = defineCommand({
       ),
   }),
   run: (doc, { id }): CommandResult => {
-    if (!(id in doc.constraints)) {
+    const constraint = Object.hasOwn(doc.constraints, id) ? doc.constraints[id] : undefined;
+    if (!constraint) {
       return noop(doc, `delete_constraint: constraint '${id}' does not exist — no change made.`);
     }
 
-    const constraint = doc.constraints[id]!;
     const newConstraints = { ...doc.constraints };
     delete newConstraints[id];
 
@@ -235,11 +235,11 @@ export const updateConstraint = defineCommand({
       ),
   }),
   run: (doc, { id, patch }): CommandResult => {
-    if (!(id in doc.constraints)) {
+    const existing = Object.hasOwn(doc.constraints, id) ? doc.constraints[id] : undefined;
+    if (!existing) {
       return noop(doc, `update_constraint: constraint '${id}' does not exist — no change made.`);
     }
 
-    const existing = doc.constraints[id]!;
     const updates: Record<string, unknown> = {};
 
     for (const key of ['a', 'b'] as const) {

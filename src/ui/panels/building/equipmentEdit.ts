@@ -24,7 +24,7 @@ export type EquipmentEditKey =
 
 export type EquipmentEditValues = Readonly<Record<EquipmentEditKey, string>>;
 
-export interface EquipmentEditField {
+interface EquipmentEditField {
   readonly key: EquipmentEditKey;
   readonly label: string;
   readonly kind: 'text' | 'number';

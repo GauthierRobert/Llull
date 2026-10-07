@@ -26,6 +26,7 @@ import {
   craneWallForce,
   near,
 } from './bracingModel';
+import { distance3 } from '@lib/vec3';
 
 interface BracingInputs {
   readonly windPressure: number;
@@ -44,8 +45,7 @@ export function locateMembers(doc: CadDocument, levelId: string): Located[] {
   );
 }
 
-const axisLength = ({ start, end }: Located): number =>
-  Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
+const axisLength = ({ start, end }: Located): number => distance3(end, start);
 
 /** Gable wind posts: columns in a gable plane that do not meet a rafter end (frame columns do). */
 function gablePostRows(

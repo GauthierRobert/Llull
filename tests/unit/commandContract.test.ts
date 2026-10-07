@@ -31,7 +31,8 @@ vi.mock('@core/commands/registry', () => ({
         data: { distance: 5, unit: 'mm' },
       };
     }
-    return { document, summary: 'no-op', affected: [] };
+    if (name === 'fake_noop') return { document, summary: 'no-op', affected: [] };
+    return { document, summary: `Unknown command: ${name}`, affected: [], rejected: true };
   },
 }));
 

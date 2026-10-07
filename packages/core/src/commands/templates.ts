@@ -21,6 +21,7 @@ import { ORIGIN } from '../lib/vec3';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
 import { circlePoints } from './tessellation';
 import { noop } from './noop';
+import { DEFAULT_DRAW_COLOR } from './draw2dShared';
 
 /** Build a circle entity at a given 2D center on the given work-plane position. */
 function makeCircle(center: Vec2, radius: number, position: Vec3, color: string): Entity {
@@ -247,10 +248,13 @@ export const instantiateTemplate = defineCommand({
       .string()
       .optional()
       .describe(
-        'Hex color string for all created entities, e.g. "#4a90d9". Defaults to "#4a90d9".',
+        `Hex color string for all created entities, e.g. "${DEFAULT_DRAW_COLOR}". Defaults to "${DEFAULT_DRAW_COLOR}".`,
       ),
   }),
-  run: (doc, { template, params, position = ORIGIN, color = '#4a90d9' }): CommandResult => {
+  run: (
+    doc,
+    { template, params, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
+  ): CommandResult => {
     const entry = TEMPLATE_REGISTRY[template];
     const validationError = entry.validate(params as never);
     if (validationError !== null) return noop(doc, validationError);

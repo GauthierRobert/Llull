@@ -43,6 +43,8 @@ export function runLocally(
   name: string,
   params: unknown,
   options?: DispatchOptions,
+  /** Idempotency key of a POST that may already have reached the server; reused for the outbox. */
+  commandId: string = newCommandId(),
 ): void {
   const state = get();
   const result = execute(state.document, name, params);
@@ -63,10 +65,7 @@ export function runLocally(
     lastMeasure,
     localUndoStack: [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT),
     localRedoStack: [],
-    localOutbox: [
-      ...state.localOutbox,
-      { commandId: newCommandId(), name, params, affected: result.affected },
-    ],
+    localOutbox: [...state.localOutbox, { commandId, name, params, affected: result.affected }],
     localRedoOutbox: [],
     canUndo: true,
     canRedo: false,

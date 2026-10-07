@@ -1,7 +1,7 @@
 /**
  * @layer server
- * GET /export/{stl,code,step} — file downloads of the shared live document. Mounted outside the
- * /mcp bearer auth (browser downloads cannot send Authorization headers).
+ * GET /export/{stl,code,step} — file downloads of the shared live document. Guarded by `guardRead`
+ * (bearer or `?access_token=`; browser downloads cannot send Authorization headers).
  */
 
 import { Router, type Response } from 'express';
@@ -11,7 +11,8 @@ import { errorMessage } from '@lib/errorMessage';
 import { applyCommand } from './commandBus';
 import { getLiveDoc } from './liveDocument';
 import type { ExchangeOptions } from './pythonExchange';
-import { sanitizeFilename } from './security';
+import { safeFileName } from '@lib/safeFileName';
+import { guardRead } from './security';
 
 /** Attachment headers + a text (send) or binary (end) body. */
 function sendDownload(
@@ -30,17 +31,25 @@ function sendDownload(
   res.status(200).end(body);
 }
 
-const exportLanguage = (raw: unknown): 'cadquery' | 'build123d' | 'openscad' | 'freecad' =>
-  raw === 'build123d' || raw === 'openscad' || raw === 'freecad' ? raw : 'cadquery';
+type CodeLanguage = 'cadquery' | 'build123d' | 'openscad' | 'freecad';
+
+/** Absent -> cadquery; unknown value -> null (caller answers 400). */
+function exportLanguage(raw: unknown): CodeLanguage | null {
+  if (raw === undefined) return 'cadquery';
+  return raw === 'cadquery' || raw === 'build123d' || raw === 'openscad' || raw === 'freecad'
+    ? raw
+    : null;
+}
 
 /** @param exchange Python bridge shared with the MCP exchange tools (STEP needs it). */
 export function buildExportRouter(exchange: ExchangeOptions): Router {
   const router = Router();
+  router.use(guardRead());
 
   /** Query: format = ascii (default) | binary; name = file base name. */
   router.get('/stl', (req, res) => {
     const format = req.query['format'] === 'binary' ? 'binary' : 'ascii';
-    const name = sanitizeFilename(req.query['name']);
+    const name = safeFileName(req.query['name']);
     const data = applyCommand('export_stl', { format, name }).data as ExportStlData | undefined;
     if (!data) {
       res.status(500).json({ error: 'export_stl returned no data.' });
@@ -60,9 +69,16 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
 
   /** Query: language = cadquery (default) | build123d | openscad | freecad; name = file base name. */
   router.get('/code', (req, res) => {
-    const name = sanitizeFilename(req.query['name'], 'model');
+    const name = safeFileName(req.query['name'], 'model');
+    const language = exportLanguage(req.query['language']);
+    if (language === null) {
+      res.status(400).json({
+        error: 'Unknown language; use cadquery, build123d, openscad or freecad.',
+      });
+      return;
+    }
     const result = applyCommand('export_code', {
-      language: exportLanguage(req.query['language']),
+      language,
       name,
     });
     const data = result.data as { text?: string; fileName?: string } | undefined;
@@ -80,7 +96,7 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
       res.status(503).json({ error: 'STEP export needs the Python bridge (LLULL_PYTHON is off).' });
       return;
     }
-    const name = sanitizeFilename(req.query['name'], 'model');
+    const name = safeFileName(req.query['name'], 'model');
     exportStepFile(getLiveDoc, port, { name, language: req.query['language'], save: false })
       .then((file) => {
         if ('error' in file) {

@@ -141,7 +141,7 @@ describe('MCP tool discovery (default core-only exposure)', () => {
 
   it('a disabled tool call points at enable_toolset, and works once enabled', async () => {
     const sessionId = await openCoreSession();
-    const call = { name: 'add_box', arguments: { width: 1, depth: 1, height: 1 } };
+    const call = { name: 'add_box', arguments: { size: [1, 1, 1] } };
     const refused = (await coreRpc(sessionId, 'tools/call', call)) as {
       isError?: boolean;
       content: { text?: string }[];

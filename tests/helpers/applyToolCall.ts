@@ -1,5 +1,5 @@
 import type { CadDocument } from '@core/model/types';
-import { execute, getCommand } from '@core/commands/registry';
+import { execute } from '@core/commands/registry';
 import { shapeToolCallContent, type McpShapedResult } from '@mcp/dispatch';
 
 /** `execute` + MCP result shaping on a document, for tests (the server runs the same via the command bus). */
@@ -13,7 +13,7 @@ export function applyToolCall(
     ...shapeToolCallContent({
       summary: result.summary,
       affected: result.affected,
-      isError: getCommand(toolName) === undefined,
+      isError: result.rejected === true,
       data: result.data,
     }),
     affected: result.affected,

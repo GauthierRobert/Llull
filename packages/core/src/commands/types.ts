@@ -24,6 +24,12 @@ export interface CommandResult {
    * mutating commands. Passes through `execute` and the MCP layer.
    */
   data?: unknown;
+  /**
+   * Set by `execute`/`guardCommand` only when the call was refused before or around `run`
+   * (unknown command, invalid params, kernel unavailable, derivation guard, `run` threw, corrupt
+   * result). Absent on success and on a command's own graceful no-op. Surfaces map it to an error.
+   */
+  rejected?: true;
 }
 
 /** Safety annotations; emitted as MCP tool annotations (readOnlyHint, destructiveHint, idempotentHint). */

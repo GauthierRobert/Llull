@@ -16,7 +16,7 @@ export interface BearingLimits {
   readonly planTolerance: number;
 }
 
-export interface BearingHit {
+interface BearingHit {
   readonly memberId: string;
   /** Vertical gap pipe underside → member top (below) or pipe top → member underside (hanger), mm. */
   readonly gap: number;
@@ -124,7 +124,7 @@ export function bearingOf(
 }
 
 /** Steel a riser support (clamp with a bracket) bears on: its bracket length and direction. */
-export interface RiserHit extends BearingHit {
+interface RiserHit extends BearingHit {
   /** Horizontal gap pipe surface → member face, mm (the bracket length). */
   readonly standoff: number;
   /** Plan direction from the pipe toward the member axis, radians. */

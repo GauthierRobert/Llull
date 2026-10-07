@@ -10,7 +10,7 @@ import { noop } from '@core/commands/noop';
 import { isPositiveNumber, isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { getBuilding } from '../model';
 import { round } from '../numeric';
-import { toCsv } from '../scheduleBuild';
+import { toCsv } from '../csv';
 import { briefList } from './utilisation';
 import { collectSteelBars, modelUnits, type ModelUnits } from './steelMemberBars';
 import { spanCoordinate } from './routeSupport';

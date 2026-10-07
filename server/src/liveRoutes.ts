@@ -3,7 +3,7 @@
  * The shared live document over REST + SSE (protocol: `@mcp/liveSync`).
  *
  *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation.
- *                        Unauthenticated: EventSource cannot send Authorization headers.
+ *                        guardRead: Bearer or `?access_token=` (EventSource cannot set headers).
  *   GET  /live/snapshot  `{ seq, stateHash, document }` for resync after a gap or hash mismatch
  *   POST /command        `{ name, params?, commandId? }`; a repeated `commandId` is idempotent
  *   POST /undo, /redo    "Nothing to undo/redo." is a normal result, not an error
@@ -12,8 +12,13 @@
 import { Router, type RequestHandler } from 'express';
 import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
-import { subscribeLive, getLiveSnapshot } from './liveDocument';
-import { guardMutation } from './security';
+import {
+  subscribeLive,
+  getLiveSnapshot,
+  liveSubscriberCount,
+  MAX_LIVE_SUBSCRIBERS,
+} from './liveDocument';
+import { guardMutation, guardRead } from './security';
 
 const KEEPALIVE_MS = 25_000;
 
@@ -21,8 +26,13 @@ const KEEPALIVE_MS = 25_000;
 export function buildLiveRouter(restLimiter: RequestHandler): Router {
   const router = Router();
   const mutationGuard = guardMutation();
+  const readGuard = guardRead();
 
-  router.get('/live', (req, res) => {
+  router.get('/live', restLimiter, readGuard, (req, res) => {
+    if (liveSubscriberCount() >= MAX_LIVE_SUBSCRIBERS) {
+      res.status(503).json({ error: 'Too many live subscribers.' });
+      return;
+    }
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -36,7 +46,7 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     });
   });
 
-  router.get('/live/snapshot', restLimiter, (_req, res) => {
+  router.get('/live/snapshot', restLimiter, readGuard, (_req, res) => {
     res.status(200).json(getLiveSnapshot());
   });
 

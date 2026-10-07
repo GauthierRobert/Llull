@@ -19,7 +19,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
@@ -229,6 +229,36 @@ describe('MechanismsPanel — joints section', () => {
     fireEvent.change(input, { target: { value: '1.57' } });
     fireEvent.blur(input);
     expect(dispatchSpy).toHaveBeenCalledWith('set_joint_value', { id: jointId, value: 1.57 });
+  });
+
+  it('does not re-dispatch an unchanged value on blur', () => {
+    const { jointId } = buildFullDoc();
+    const dispatchSpy = vi.fn();
+    patchDispatch(dispatchSpy);
+    render(<MechanismsPanel />);
+    fireEvent.blur(screen.getByTestId(`joint-value-${jointId}`));
+    expect(dispatchSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the new document value after an external change (undo / agent edit)', () => {
+    const { jointId } = buildFullDoc();
+    render(<MechanismsPanel />);
+    act(() => {
+      localDispatch('set_joint_value', { id: jointId, value: 0.5 });
+    });
+    const input = screen.getByTestId(`joint-value-${jointId}`) as HTMLInputElement;
+    expect(input.value).toBe('0.5');
+  });
+
+  it('highlight is a keyboard-operable toggle button, not a listbox option', () => {
+    const { jointId } = buildFullDoc();
+    render(<MechanismsPanel />);
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    const button = screen.getByTestId(`joint-highlight-${jointId}`);
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(button);
+    expect(useViewportStore.getState().mechanismSelection).toEqual({ kind: 'joint', id: jointId });
+    expect(button.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('"Delete" button dispatches delete_joint with the correct id', () => {

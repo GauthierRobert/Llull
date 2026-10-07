@@ -7,6 +7,7 @@ import { resolvePolyline } from './modify2dGeometry';
 import { replaceEntity, withEntity } from './entityOps';
 import { newEntity } from './newEntity';
 import { noop } from './noop';
+import { elementAt } from '../lib/elementAt';
 
 interface Corner {
   poly: PolylineEntity;
@@ -65,9 +66,9 @@ function resolveCorner(
   }
   const prevIdx = poly.closed ? (vertexIndex - 1 + n) % n : vertexIndex - 1;
   const nextIdx = poly.closed ? (vertexIndex + 1) % n : vertexIndex + 1;
-  const prev = poly.points[prevIdx]!;
-  const vertex = poly.points[vertexIndex]!;
-  const next = poly.points[nextIdx]!;
+  const prev = elementAt(poly.points, prevIdx);
+  const vertex = elementAt(poly.points, vertexIndex);
+  const next = elementAt(poly.points, nextIdx);
   const toPrev = sub2(prev, vertex);
   const toNext = sub2(next, vertex);
   const lenPrev = len2(toPrev);
@@ -137,13 +138,11 @@ export const fillet2D = defineCommand({
     const tangentDist = radius / tanHalf;
 
     if (tangentDist > lenPrev - 1e-9 || tangentDist > lenNext - 1e-9) {
-      return {
-        document: doc,
-        summary:
-          `fillet_2d: radius ${radius} is too large for the adjacent segments at vertex ${vertexIndex} ` +
+      return noop(
+        doc,
+        `fillet_2d: radius ${radius} is too large for the adjacent segments at vertex ${vertexIndex} ` +
           `(need tangent distance ${tangentDist.toFixed(4)}, available: prev=${lenPrev.toFixed(4)}, next=${lenNext.toFixed(4)}).`,
-        affected: [],
-      };
+      );
     }
 
     const tangentPrev = add2(vertex, scale2(dirPrev, tangentDist));

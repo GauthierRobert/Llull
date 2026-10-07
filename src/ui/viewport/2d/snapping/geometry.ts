@@ -6,6 +6,7 @@
  */
 
 import type { Entity, Vec2 } from '@core/model/types';
+import { projectOntoSegment } from '@lib/polygon';
 import type { SnapPoint } from './types';
 
 /** Line segment as [x1, y1, x2, y2]. */
@@ -68,13 +69,13 @@ export function entityToSegments(entity: Entity): Segment[] {
       const segs: Segment[] = [];
       const pts = entity.points;
       for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i]!;
-        const b = pts[i + 1]!;
-        segs.push([a[0] + ox, a[1] + oy, b[0] + ox, b[1] + oy]);
+        const a = pts[i];
+        const b = pts[i + 1];
+        if (a && b) segs.push([a[0] + ox, a[1] + oy, b[0] + ox, b[1] + oy]);
       }
-      if (entity.closed && pts.length >= 2) {
-        const first = pts[0]!;
-        const last = pts[pts.length - 1]!;
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+      if (entity.closed && first && last && pts.length >= 2) {
         segs.push([last[0] + ox, last[1] + oy, first[0] + ox, first[1] + oy]);
       }
       return segs;
@@ -225,9 +226,7 @@ export function nearestOnSegment(
   bx: number,
   by: number,
 ): [number, number] {
-  const rawT = footParameter(px, py, ax, ay, bx, by);
-  if (rawT === null) return [ax, ay];
-  const t = Math.max(0, Math.min(1, rawT));
+  const { t } = projectOntoSegment([px, py], [ax, ay], [bx, by]);
   return [ax + t * (bx - ax), ay + t * (by - ay)];
 }
 

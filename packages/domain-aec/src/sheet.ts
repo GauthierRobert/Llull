@@ -7,7 +7,7 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, toMetres } from './model';
+import { fileSlug, getBuilding, toMm } from './model';
 import { noop } from '@core/commands/noop';
 import { type PlanDrawing, type PlanPrimitive } from './planModel';
 import { buildPlanDrawing } from './planDrawing';
@@ -343,7 +343,7 @@ function buildPlanSheet(
   if (!drawing || (requestedScale !== undefined && requestedScale <= 0)) return null;
   const [width, height] = PAPER_MM[paper];
   const viewport = sheetDrawingArea(width, height);
-  const millimetresPerUnit = toMetres(doc, 1) * 1000;
+  const millimetresPerUnit = toMm(doc, 1);
   const [minX, minY, maxX, maxY] = drawing.bounds;
   const scale =
     requestedScale ??

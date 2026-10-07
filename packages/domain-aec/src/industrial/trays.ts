@@ -19,6 +19,7 @@ import {
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
 import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
+import { levelIdParam } from '../levelParams';
 
 export const trayLength = (tray: CableTrayElement): number => routeLength(tray.points);
 
@@ -41,7 +42,7 @@ export const addCableTray = defineCommand({
     width: z.number().optional().describe('Tray width. Default 300 mm.'),
     height: z.number().optional().describe('Side height. Default 60 mm.'),
     system: z.string().optional().describe('Cable system. Default "power".'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: levelIdParam,
   }),
   run: (doc, { points, width, height, system, levelId }): CommandResult => {
     const path = parseRoute(points);

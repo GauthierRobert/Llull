@@ -6,7 +6,6 @@ import type { Vec2 } from '@core/model/types';
 import type {
   BuildingModel,
   CurvedWallElement,
-  GridElement,
   OpeningElement,
   WallElement,
 } from '@core/model/building';
@@ -43,15 +42,6 @@ export function pointAlong(
   return [
     wall.start[0] + frame.direction[0] * s + frame.normal[0] * n,
     wall.start[1] + frame.direction[1] * s + frame.normal[1] * n,
-  ];
-}
-
-/** Bubble centres of a grid axis: one `radius` beyond each end, along the axis. */
-export function gridBubbleCenters(grid: GridElement, radius: number): [start: Vec2, end: Vec2] {
-  const { direction } = wallFrame(grid);
-  return [
-    [grid.start[0] - direction[0] * radius, grid.start[1] - direction[1] * radius],
-    [grid.end[0] + direction[0] * radius, grid.end[1] + direction[1] * radius],
   ];
 }
 

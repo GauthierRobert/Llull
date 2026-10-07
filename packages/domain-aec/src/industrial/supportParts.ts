@@ -13,7 +13,7 @@ import { fromMm } from '../model';
 import { hangerRodDiameter, pipeSpanLimit } from './pipeSpans';
 import { RISER_SLOPE, nearestOnRoute } from './routeSupport';
 
-export type SupportPart =
+type SupportPart =
   | {
       readonly kind: 'box';
       readonly name: string;
@@ -34,7 +34,7 @@ export type SupportPart =
       readonly height: number;
     };
 
-export interface SupportShape {
+interface SupportShape {
   /** Plan direction of the pipe at the support, radians. */
   readonly angle: number;
   readonly parts: SupportPart[];

@@ -3,10 +3,11 @@
  * @layer domain-aec
  */
 
-import { z } from '@core/commands/schema';
+import { vec2, z } from '@core/commands/schema';
+import { levelIdParam } from '../levelParams';
 
 export const portalFrameParams = z.object({
-  origin: z.array(z.number()).optional().describe('Corner (gridline A1) [x, y]. Default [0, 0].'),
+  origin: vec2('Corner (gridline A1) [x, y]. Default [0, 0].').optional(),
   span: z.number().optional().describe('Clear span between column axes (X). Default 24000 mm.'),
   spans: z
     .array(z.number())
@@ -70,5 +71,5 @@ export const portalFrameParams = z.object({
     })
     .optional()
     .describe('Optional crane runway on both sides: { capacity (t), railHeight, profile }.'),
-  levelId: z.string().optional().describe('Level id. Default: the active level.'),
+  levelId: levelIdParam,
 });

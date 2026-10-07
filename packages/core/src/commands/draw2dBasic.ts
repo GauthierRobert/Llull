@@ -35,7 +35,7 @@ export const drawLine = defineCommand({
     const entity = newEntity(
       'line',
       id,
-      { start: [start[0]!, start[1]!], end: [end[0]!, end[1]!] },
+      { start: [start[0] ?? 0, start[1] ?? 0], end: [end[0] ?? 0, end[1] ?? 0] },
       position,
       color,
     );

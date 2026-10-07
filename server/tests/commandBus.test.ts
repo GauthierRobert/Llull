@@ -171,6 +171,15 @@ describe('applyCommand — unknown command', () => {
     expect(getLiveDoc()).toBe(docBefore);
     expect(result.canUndo).toBe(false);
   });
+
+  it('returns isError true when execute rejects schema-invalid params', () => {
+    const docBefore = getLiveDoc();
+    const result = applyCommand('add_box', { size: 'big' });
+
+    expect(result.isError).toBe(true);
+    expect(result.summary).toMatch(/rejected: invalid params/);
+    expect(getLiveDoc()).toBe(docBefore);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -305,7 +314,7 @@ describe('applyCommand — idempotent commandId', () => {
   it('the cache is a bounded LRU: the oldest id is evicted after 1000 entries', () => {
     applyCommand('add_box', { size: [1, 1, 1] }, 'first');
     for (let index = 0; index < 1000; index++) {
-      applyCommand('measure_volume', { id: 'none' }, `q-${index}`);
+      applyCommand('add_box', { size: [1, 1, index + 2] }, `q-${index}`);
     }
     const before = getLiveDoc().order.length;
     applyCommand('add_box', { size: [1, 1, 1] }, 'first'); // evicted -> applies again
@@ -323,6 +332,28 @@ describe('applyCommand — idempotent commandId', () => {
     const before = getLiveDoc().order.length;
     applyCommand('add_box', { size: [1, 1, 1] }, 'keep');
     expect(getLiveDoc().order.length).toBe(before);
+  });
+});
+
+describe('applyCommand — changed flag', () => {
+  it('is true for set_parameter even though affected is empty', () => {
+    const result = applyCommand('set_parameter', { name: 'width', expression: '10' });
+    expect(result.affected).toEqual([]);
+    expect(result.changed).toBe(true);
+    expect(result.isError).toBe(false);
+  });
+
+  it('is carried by a cached idempotent replay', () => {
+    applyCommand('set_parameter', { name: 'width', expression: '10' }, 'param-1');
+    const repeat = applyCommand('set_parameter', { name: 'width', expression: '10' }, 'param-1');
+    expect(repeat.changed).toBe(true);
+  });
+
+  it('is false for a query and for an empty undo, true for a real undo', () => {
+    expect(applyCommand('measure_volume', { id: 'none' }).changed).toBe(false);
+    expect(undo().changed).toBe(false);
+    applyCommand('add_box', { size: [1, 1, 1] });
+    expect(undo().changed).toBe(true);
   });
 });
 

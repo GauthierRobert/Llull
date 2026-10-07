@@ -5,12 +5,11 @@
  * xyz vertex list.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { Vec3 } from '@core/model/types';
 import { SELECTION_COLOR } from '../../viewportPalette';
 import { positionsGeometry } from '../../lineGeometry';
-import { PlacedLineObject } from './PlacedLineObject';
 
 interface ShapeLineProps {
   /** Flat xyz vertices; a line strip, or independent segment pairs when `segments` is set. */
@@ -30,16 +29,20 @@ export function ShapeLine({
   color,
   selected,
 }: ShapeLineProps): React.ReactElement {
-  const object = useMemo(() => {
-    const geometry = positionsGeometry(positions);
-    const material = new THREE.LineBasicMaterial({
-      color: selected ? SELECTION_COLOR : color,
-      linewidth,
-    });
-    return segments
-      ? new THREE.LineSegments(geometry, material)
-      : new THREE.Line(geometry, material);
-  }, [positions, segments, linewidth, color, selected]);
+  const geometry = useMemo(() => positionsGeometry(positions), [positions]);
+  const material = useMemo(
+    () => new THREE.LineBasicMaterial({ color: selected ? SELECTION_COLOR : color, linewidth }),
+    [color, selected, linewidth],
+  );
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => () => material.dispose(), [material]);
 
-  return <PlacedLineObject object={object} position={position} />;
+  // Wrapper only: geometry and material are owned (and disposed) above.
+  const object = useMemo(
+    () =>
+      segments ? new THREE.LineSegments(geometry, material) : new THREE.Line(geometry, material),
+    [geometry, material, segments],
+  );
+
+  return <primitive object={object} position={position} />;
 }

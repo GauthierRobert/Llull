@@ -22,6 +22,5 @@ export function PlacedLineObject({ object, position }: PlacedLineObjectProps): R
     };
   }, [object]);
 
-  object.position.set(position[0], position[1], position[2]);
-  return <primitive object={object} />;
+  return <primitive object={object} position={position} />;
 }

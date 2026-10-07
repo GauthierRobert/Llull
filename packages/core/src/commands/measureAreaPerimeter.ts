@@ -3,6 +3,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { formatLength } from './units';
 import { noop } from './noop';
+import { elementAt } from '../lib/elementAt';
 interface MeasureAreaData {
   area: number;
   unit: string;
@@ -134,7 +135,10 @@ export const measurePerimeter = defineCommand({
       case 'polyline':
         perimeter = e.closed
           ? polygonPerimeter(e.points)
-          : e.points.reduce((sum, p, i, pts) => (i === 0 ? 0 : sum + distance(pts[i - 1]!, p)), 0);
+          : e.points.reduce(
+              (sum, p, i, pts) => (i === 0 ? 0 : sum + distance(elementAt(pts, i - 1), p)),
+              0,
+            );
         break;
       case 'rectangle':
         perimeter = 2 * (e.width + e.height);

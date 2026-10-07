@@ -7,6 +7,7 @@
 
 import type { CadDocument, EntityId } from '@core/model/types';
 import { postCommand, postRedo, postUndo, ServerCommandError } from './serverCommands';
+import type { ServerCommandResponse } from './serverCommands';
 import { newCommandId } from './outbox';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
@@ -67,6 +68,11 @@ function selectAffectedIn(
   return selection === doc.selection ? doc : { ...doc, selection };
 }
 
+/** `changed` from the server; older servers omit it, so fall back to a non-error with affected ids. */
+function responseChanged(response: ServerCommandResponse): boolean {
+  return response.changed ?? (!response.isError && response.affected.length > 0);
+}
+
 /** Fire-and-forget: the document update comes from the /live SSE stream. */
 export function postDispatch(
   set: StoreSet,
@@ -76,7 +82,8 @@ export function postDispatch(
   options?: DispatchOptions,
 ): void {
   const selectionAtDispatch = get().document.selection;
-  void postCommand(name, params, newCommandId())
+  const commandId = newCommandId();
+  void postCommand(name, params, commandId)
     .then((response) => {
       set((state) => ({
         document: selectAffectedIn(state.document, selectionAtDispatch, response.affected, options),
@@ -86,7 +93,7 @@ export function postDispatch(
         lastMeasure:
           response.data !== undefined ? { command: name, data: response.data } : state.lastMeasure,
       }));
-      options?.onResult?.({ summary: response.summary, changed: response.affected.length > 0 });
+      options?.onResult?.({ summary: response.summary, changed: responseChanged(response) });
     })
     .catch((err: unknown) => {
       handlePostFailure(
@@ -94,7 +101,7 @@ export function postDispatch(
         get,
         err,
         `Command '${name}'`,
-        () => runLocally(set, get, name, params, options),
+        () => runLocally(set, get, name, params, options, commandId),
         (summary) => options?.onResult?.({ summary, changed: false }),
       );
     });

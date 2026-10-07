@@ -13,6 +13,7 @@ import { extractSvgInner, r2, svgDocument } from './renderSvg';
 import { computeSceneSnapshot } from './scene';
 import { boundsCenter, boundsExtent } from './sceneBounds';
 import { ORIGIN } from '../lib/vec3';
+import { rotateEulerAboutWorldZ } from '../lib/eulerRotation';
 
 /** Render only the entities of `doc` whose id satisfies `keep` (document order preserved). */
 function renderSubset(
@@ -39,7 +40,7 @@ function rotateAroundZ(doc: CadDocument, cx: number, cy: number, angleRad: numbe
     entities[id] = {
       ...entity,
       position: [cx + cos * dx - sin * dy, cy + sin * dx + cos * dy, entity.position[2]],
-      rotation: [entity.rotation[0], entity.rotation[1], entity.rotation[2] + angleRad],
+      rotation: rotateEulerAboutWorldZ(entity.rotation, angleRad),
     };
   }
   return { ...doc, entities };

@@ -8,6 +8,7 @@ import { commitEntity } from './commitEntity';
 import { newEntity } from './newEntity';
 import { noop } from './noop';
 import { compactNumber } from '../lib/compactNumber';
+import { isVec2 } from '../lib/vec2';
 
 /** `entity` with its position offset by `delta` (the one translation used by every move command). */
 export function translated(entity: Entity, delta: Vec3): Entity {
@@ -81,6 +82,13 @@ export function boundsText(b: { min: Vec3; max: Vec3 }): string {
 /** Default color of every placed primitive solid. */
 export const DEFAULT_SOLID_COLOR = '#6b8f9c';
 
+/** Default color of extrusions and component instances. */
+export const EXTRUSION_COLOR = '#c8553d';
+
+/** Shared `.describe()` lead-in naming the rotation convention of every `rotation` param. */
+export const ROTATION_CONVENTION =
+  'three.js intrinsic XYZ Euler angles in RADIANS [rx, ry, rz] (equivalent to rotating about world Z first, then world Y, then world X)';
+
 /** `position` param of a placed primitive; `note` is inserted before the default sentence. */
 export function positionField(note = ''): z.ZodOptional<z.ZodType<Vec3>> {
   return looseVec3(
@@ -108,7 +116,7 @@ export function rotationField(
 ): z.ZodOptional<z.ZodCatch<z.ZodType<Vec3>>> {
   return tolerant(
     looseVec3(
-      'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz]. ' +
+      `${ROTATION_CONVENTION}. ` +
         `${note} Defaults to [0, 0, 0]. ` +
         'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
     ),
@@ -134,10 +142,33 @@ export function rejectNonPositive(
 
 /** Same as `rejectNonPositive` for a `[w, h, d]` size vector (one combined summary). */
 export function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandResult | null {
-  if (size.every((component) => Number.isFinite(component) && component > 0)) return null;
+  if (
+    Array.isArray(size) &&
+    size.length === 3 &&
+    size.every((component) => Number.isFinite(component) && component > 0)
+  ) {
+    return null;
+  }
   return noop(
     doc,
-    `${command} failed: all size components must be finite and > 0, got [${size.join(', ')}].`,
+    `${command} failed: size must be 3 components [w, h, d], all finite and > 0, got [${Array.isArray(size) ? size.join(', ') : String(size)}].`,
+  );
+}
+
+/**
+ * Reject a 2D profile whose points are not all finite `[x, y]` pairs: the failing no-op naming
+ * the first bad point, or `null` when valid (length is checked by the caller).
+ */
+export function rejectBadProfile(
+  doc: CadDocument,
+  command: string,
+  profile: ReadonlyArray<unknown>,
+): CommandResult | null {
+  const index = profile.findIndex((point) => !isVec2(point));
+  if (index < 0) return null;
+  return noop(
+    doc,
+    `${command} failed: profile point ${index} must be a finite [x, y] pair, got ${JSON.stringify(profile[index])}; no-op.`,
   );
 }
 

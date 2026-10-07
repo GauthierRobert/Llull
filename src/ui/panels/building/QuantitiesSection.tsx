@@ -14,6 +14,7 @@ import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
 import { capitalize } from '@ui/panels/capitalize';
 import { downloadText } from '@ui/download';
+import { isCsvData, isEstimateData } from '@ui/resultData';
 
 const UNIT_LABEL: Readonly<Record<string, string>> = {
   m: 'm',
@@ -41,13 +42,6 @@ const SCHEDULES = [
   'connection',
   'support',
 ] as const;
-
-interface EstimateData {
-  readonly currency: string;
-  readonly lines: CostLine[];
-  readonly total: number;
-  readonly csv: string;
-}
 
 function RateForm({ lines }: { lines: ReadonlyArray<CostLine> }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
@@ -93,27 +87,39 @@ function RateForm({ lines }: { lines: ReadonlyArray<CostLine> }): React.ReactEle
 }
 
 export function QuantitiesSection(): React.ReactElement {
-  const document = useStore((s) => s.document);
+  // The takeoff reads only the building model and the document units: re-run on those alone.
+  const building = useStore((s) => s.document.building);
+  const units = useStore((s) => s.document.units);
   const [schedule, setSchedule] = useState<(typeof SCHEDULES)[number]>('wall');
-  const estimate = useMemo(
-    () => execute(document, 'estimate_cost', {}).data as EstimateData,
-    [document],
+  const [status, setStatus] = useState('');
+  const estimateResult = useMemo(
+    () => execute(useStore.getState().document, 'estimate_cost', {}),
+    // building + units are the only document slices the takeoff reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [building, units],
   );
-  const priced = estimate.lines.filter((line) => line.amount !== null);
+  const estimate = isEstimateData(estimateResult.data) ? estimateResult.data : null;
+  const priced = estimate?.lines.filter((line) => line.amount !== null) ?? [];
 
-  const downloadTakeoff = (): void => {
-    const data = execute(document, 'quantity_takeoff', {}).data as { csv: string };
-    downloadText(data.csv, 'quantity-takeoff.csv', 'text/csv');
+  const downloadCsv = (command: string, params: object, fileName: string): void => {
+    const result = execute(useStore.getState().document, command, params);
+    if (isCsvData(result.data)) downloadText(result.data.csv, fileName, 'text/csv');
+    else setStatus(result.summary);
   };
-  const downloadEstimate = (): void => downloadText(estimate.csv, 'cost-estimate.csv', 'text/csv');
-  const downloadSchedule = (): void => {
-    const data = execute(document, 'building_schedule', { kind: schedule }).data as { csv: string };
-    downloadText(data.csv, `${schedule}-schedule.csv`, 'text/csv');
+  const downloadTakeoff = (): void => downloadCsv('quantity_takeoff', {}, 'quantity-takeoff.csv');
+  const downloadEstimate = (): void => {
+    if (estimate !== null) downloadText(estimate.csv, 'cost-estimate.csv', 'text/csv');
   };
+  const downloadSchedule = (): void =>
+    downloadCsv('building_schedule', { kind: schedule }, `${schedule}-schedule.csv`);
 
   return (
     <PanelSection title="Quantities & cost" collapsible testId="building-quantities">
-      {estimate.lines.length === 0 ? (
+      {estimate === null ? (
+        <p className="panel__empty-hint" role="status">
+          {estimateResult.summary}
+        </p>
+      ) : estimate.lines.length === 0 ? (
         <p className="panel__empty-hint">Add walls, slabs or columns to get quantities.</p>
       ) : (
         <>
@@ -172,6 +178,11 @@ export function QuantitiesSection(): React.ReactElement {
           Schedule CSV
         </button>
       </div>
+      {status !== '' && (
+        <p className="panel__empty-hint" role="status">
+          {status}
+        </p>
+      )}
     </PanelSection>
   );
 }

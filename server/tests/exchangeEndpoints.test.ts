@@ -104,15 +104,17 @@ describe('GET /export/code', () => {
     expect(res.text).toContain(marker);
   });
 
-  it('unknown language falls back to cadquery; name is sanitized into the filename', async () => {
+  it('unknown language is a 400; name is sanitized into the filename', async () => {
     const server = await loadServer({ LLULL_PYTHON: 'off' });
     server.applyCommand('add_box', { size: [1, 2, 3] });
     const res = await request(server.app)
       .get('/export/code')
       .query({ language: 'cobol', name: 'my part/../x' });
-    expect(res.status).toBe(200);
-    expect(res.text).toContain('import cadquery as cq');
-    const disposition = String(res.headers['content-disposition']);
+    expect(res.status).toBe(400);
+    const ok = await request(server.app).get('/export/code').query({ name: 'my part/../x' });
+    expect(ok.status).toBe(200);
+    expect(ok.text).toContain('import cadquery as cq');
+    const disposition = String(ok.headers['content-disposition']);
     expect(disposition).toMatch(/^attachment; filename="[A-Za-z0-9._-]+\.py"$/);
     expect(disposition).not.toContain('/');
   });

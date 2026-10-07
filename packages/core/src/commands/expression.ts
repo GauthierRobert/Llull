@@ -15,7 +15,7 @@
  * Limitations (intentional for v1):
  *   - No exponentiation, modulo, or built-in functions.
  *   - References must be resolved names in the supplied `env` map.
- *   - Divide-by-zero yields Infinity (IEEE 754); callers may treat as an error.
+ *   - Non-finite results (e.g. divide-by-zero) are reported as errors.
  */
 
 import type { Parameter } from '../model/types';
@@ -128,10 +128,10 @@ function parsePrimary(s: ParseState): EvalResult {
 
   if (t.kind === 'ident') {
     consume(s);
-    const value = s.env[t.text];
-    return value === undefined
-      ? { ok: false, error: `unknown parameter: ${t.text}` }
-      : { ok: true, value };
+    const value = Object.hasOwn(s.env, t.text) ? s.env[t.text] : undefined;
+    return typeof value === 'number'
+      ? { ok: true, value }
+      : { ok: false, error: `unknown parameter: ${t.text}` };
   }
 
   if (t.kind === 'lparen') {
@@ -161,8 +161,8 @@ function parsePrimary(s: ParseState): EvalResult {
  *
  * @pure — no side effects; returns a typed result rather than throwing.
  * @invariant Does not mutate `env`.
- * @failure Returns EvalErr with a descriptive message on any parse/eval error.
- *   Divide-by-zero produces Infinity (IEEE 754), reported as ok:true.
+ * @failure Returns EvalErr with a descriptive message on any parse/eval error, or when the
+ *   result is not finite (divide-by-zero, overflow).
  *
  * @param expression  The expression string, e.g. `"width * 2 + 5"`.
  * @param env         Map of parameter name → current numeric value.
@@ -190,6 +190,9 @@ export function evaluateExpression(
     return { ok: false, error: `unexpected token '${peek(state).text}' after expression` };
   }
 
+  if (!Number.isFinite(result.value)) {
+    return { ok: false, error: 'expression result is not a finite number (divide by zero?)' };
+  }
   return result;
 }
 

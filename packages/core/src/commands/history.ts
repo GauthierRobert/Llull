@@ -6,7 +6,7 @@
  */
 
 import type { CadDocument, FeatureStep } from '../model/types';
-import { currentContext } from './context';
+import { currentContext, type ExecutionContext } from './context';
 import type { CommandDefinition, CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { kernelRefusal } from './kernelRefusal';
@@ -20,11 +20,13 @@ function regenerateWith(
   command: string,
   newHistory: FeatureStep[],
   done: (entityCount: string) => string,
+  ctx: ExecutionContext | undefined,
   nextStepNumber?: number,
 ): CommandResult {
-  const refused = kernelRefusal(doc, newHistory);
+  const context = ctx ?? currentContext();
+  const refused = kernelRefusal(doc, newHistory, context);
   if (refused !== null) return noop(doc, `${command}: ${refused}`);
-  const replayed = replayHistory(doc, newHistory, currentContext().registry);
+  const replayed = replayHistory(doc, newHistory, context.registry);
   const regenerated = nextStepNumber === undefined ? replayed : { ...replayed, nextStepNumber };
   const count = Object.keys(regenerated.entities).length;
   return {
@@ -43,13 +45,14 @@ function editStep(
     idx: number,
     step: FeatureStep,
   ) => string | { history: FeatureStep[]; done: (entityCount: string) => string },
+  ctx?: ExecutionContext,
 ): CommandResult {
   const idx = doc.featureHistory.findIndex((s) => s.id === stepId);
   const step = doc.featureHistory[idx];
   if (!step) return noop(doc, `${command}: step '${stepId}' not found in featureHistory.`);
   const edited = edit(idx, step);
   if (typeof edited === 'string') return noop(doc, `${command}: ${edited}`);
-  return regenerateWith(doc, command, edited.history, edited.done);
+  return regenerateWith(doc, command, edited.history, edited.done, ctx);
 }
 
 /**
@@ -68,16 +71,17 @@ const replayHistoryCommand = defineCommand({
     'verify the document is consistent with its feature recipe.',
   params: z.object({}),
   annotations: { metaHistory: true, idempotent: true },
-  run: (doc, _params): CommandResult => {
+  run: (doc, _params, ctx): CommandResult => {
+    const context = ctx ?? currentContext();
     if (doc.featureHistory.length === 0) {
       return noop(doc, 'replay_history: featureHistory is empty — nothing to replay.');
     }
     const warnings: string[] = [];
-    const refused = kernelRefusal(doc, doc.featureHistory);
+    const refused = kernelRefusal(doc, doc.featureHistory, context);
     if (refused !== null) {
       return noop(doc, `replay_history: ${refused}`);
     }
-    const regenerated = replayHistory(doc, doc.featureHistory, currentContext().registry, warnings);
+    const regenerated = replayHistory(doc, doc.featureHistory, context.registry, warnings);
     const count = Object.keys(regenerated.entities).length;
     return {
       document: regenerated,
@@ -110,11 +114,17 @@ const setStepSuppressed = defineCommand({
     suppressed: z.boolean().describe('true to suppress (skip during replay), false to restore.'),
   }),
   annotations: { metaHistory: true, idempotent: true },
-  run: (doc, { stepId, suppressed }): CommandResult =>
-    editStep(doc, 'set_step_suppressed', stepId, (idx, step) => ({
-      history: doc.featureHistory.map((s, i) => (i === idx ? { ...step, suppressed } : s)),
-      done: (n) => `step '${stepId}' suppressed=${String(suppressed)}; regenerated ${n}.`,
-    })),
+  run: (doc, { stepId, suppressed }, ctx): CommandResult =>
+    editStep(
+      doc,
+      'set_step_suppressed',
+      stepId,
+      (idx, step) => ({
+        history: doc.featureHistory.map((s, i) => (i === idx ? { ...step, suppressed } : s)),
+        done: (n) => `step '${stepId}' suppressed=${String(suppressed)}; regenerated ${n}.`,
+      }),
+      ctx,
+    ),
 });
 
 /**
@@ -145,11 +155,17 @@ const editStepParams = defineCommand({
       ),
   }),
   annotations: { metaHistory: true, idempotent: true },
-  run: (doc, { stepId, params: newParams }): CommandResult =>
-    editStep(doc, 'edit_step_params', stepId, (idx, step) => ({
-      history: doc.featureHistory.map((s, i) => (i === idx ? { ...step, params: newParams } : s)),
-      done: (n) => `step '${stepId}' params updated; regenerated ${n}.`,
-    })),
+  run: (doc, { stepId, params: newParams }, ctx): CommandResult =>
+    editStep(
+      doc,
+      'edit_step_params',
+      stepId,
+      (idx, step) => ({
+        history: doc.featureHistory.map((s, i) => (i === idx ? { ...step, params: newParams } : s)),
+        done: (n) => `step '${stepId}' params updated; regenerated ${n}.`,
+      }),
+      ctx,
+    ),
 });
 
 /**
@@ -175,16 +191,22 @@ const reorderStep = defineCommand({
       ),
   }),
   annotations: { metaHistory: true, idempotent: true },
-  run: (doc, { stepId, newIndex }): CommandResult => {
-    return editStep(doc, 'reorder_step', stepId, (idx, step) => {
-      const clamped = Math.max(0, Math.min(newIndex, doc.featureHistory.length - 1));
-      if (clamped === idx) return `step '${stepId}' is already at index ${idx}.`;
-      const without = doc.featureHistory.filter((_, i) => i !== idx);
-      return {
-        history: [...without.slice(0, clamped), step, ...without.slice(clamped)],
-        done: (n) => `step '${stepId}' moved from index ${idx} to ${clamped}; regenerated ${n}.`,
-      };
-    });
+  run: (doc, { stepId, newIndex }, ctx): CommandResult => {
+    return editStep(
+      doc,
+      'reorder_step',
+      stepId,
+      (idx, step) => {
+        const clamped = Math.max(0, Math.min(newIndex, doc.featureHistory.length - 1));
+        if (clamped === idx) return `step '${stepId}' is already at index ${idx}.`;
+        const without = doc.featureHistory.filter((_, i) => i !== idx);
+        return {
+          history: [...without.slice(0, clamped), step, ...without.slice(clamped)],
+          done: (n) => `step '${stepId}' moved from index ${idx} to ${clamped}; regenerated ${n}.`,
+        };
+      },
+      ctx,
+    );
   },
 });
 
@@ -206,11 +228,17 @@ const deleteStep = defineCommand({
     stepId: z.string().describe('Id of the FeatureStep to delete (from doc.featureHistory[*].id).'),
   }),
   annotations: { metaHistory: true, destructive: true },
-  run: (doc, { stepId }): CommandResult =>
-    editStep(doc, 'delete_step', stepId, () => ({
-      history: doc.featureHistory.filter((s) => s.id !== stepId),
-      done: (n) => `step '${stepId}' deleted; regenerated ${n}.`,
-    })),
+  run: (doc, { stepId }, ctx): CommandResult =>
+    editStep(
+      doc,
+      'delete_step',
+      stepId,
+      () => ({
+        history: doc.featureHistory.filter((s) => s.id !== stepId),
+        done: (n) => `step '${stepId}' deleted; regenerated ${n}.`,
+      }),
+      ctx,
+    ),
 });
 
 /**
@@ -251,8 +279,8 @@ const insertStep = defineCommand({
       .optional()
       .describe('Optional human/AI-readable label for this step, e.g. "Base plate".'),
   }),
-  annotations: { metaHistory: true, idempotent: true },
-  run: (doc, { afterStepId, name: cmdName, params: stepParams, label }): CommandResult => {
+  annotations: { metaHistory: true },
+  run: (doc, { afterStepId, name: cmdName, params: stepParams, label }, ctx): CommandResult => {
     const insertIdx =
       afterStepId === undefined
         ? doc.featureHistory.length - 1
@@ -279,6 +307,7 @@ const insertStep = defineCommand({
       'insert_step',
       newHistory,
       (n) => `step '${newStep.id}' (${cmdName}) inserted; regenerated ${n}.`,
+      ctx,
       stepNumber + 1,
     );
   },

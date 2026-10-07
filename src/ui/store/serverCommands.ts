@@ -27,6 +27,8 @@ export interface ServerCommandResponse {
   summary: string;
   affected: string[];
   isError: boolean;
+  /** The live document was replaced (also when `affected` is empty). Absent from older servers. */
+  changed?: boolean;
   data?: unknown;
   canUndo: boolean;
   canRedo: boolean;

@@ -11,27 +11,26 @@
  * scaleBarLength() for the math. No document mutation (R1).
  */
 
-import type { CadDocument } from '@core/model/types';
-import { formatLength } from '@core/commands/units';
+import { useStore } from '@ui/store';
 import { scaleBarLength } from './gridHelpers';
 
 interface ScaleBarProps {
   /** OrthographicCamera.zoom value (pixels per world unit). */
   zoom: number;
-  /** The live CAD document — used for units + displayPrecision. */
-  document: CadDocument;
 }
 
 /**
  * Renders as an absolutely-positioned HTML element.
  * Must be placed OUTSIDE the r3f <Canvas> (HTML overlay).
  */
-export function ScaleBar({ zoom, document }: ScaleBarProps): React.ReactElement {
+export function ScaleBar({ zoom }: ScaleBarProps): React.ReactElement {
+  const units = useStore((s) => s.document.units);
+  const displayPrecision = useStore((s) => s.document.displayPrecision);
   const { worldLength, pixelLength } = scaleBarLength(zoom);
 
   return (
     <div className="vp-scalebar vp-scalebar--2d">
-      <span className="vp-scalebar__label">{formatLength(document, worldLength)}</span>
+      <span className="vp-scalebar__label">{`${worldLength.toFixed(displayPrecision)} ${units}`}</span>
       <div className="vp-scalebar__bar" style={{ width: Math.round(pixelLength) }}>
         <div className="vp-scalebar__tick vp-scalebar__tick--start" />
         <div className="vp-scalebar__tick vp-scalebar__tick--end" />

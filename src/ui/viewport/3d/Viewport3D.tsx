@@ -77,19 +77,20 @@ function SceneContents({
   gizmoMode,
   onDraggingChanged,
 }: SceneContentsProps): React.ReactElement {
-  const document = useStore((s) => s.document);
   const renderOrigin = useStore((s) => s.renderOrigin);
-  const { camera: cam } = document;
 
   // R3 narrow selector: quality settings derived from entity count + user override.
   const quality = useRenderQuality();
   const palette = useViewportPalette();
 
   // Initial camera only: later camera changes are applied imperatively by CameraReactor.
-  const [initialCamera] = useState(() => ({
-    position: sphericalToCartesian(cam.target, cam.azimuth, cam.polar, cam.distance),
-    target: new THREE.Vector3(cam.target[0], cam.target[1], cam.target[2]),
-  }));
+  const [initialCamera] = useState(() => {
+    const cam = useStore.getState().document.camera;
+    return {
+      position: sphericalToCartesian(cam.target, cam.azimuth, cam.polar, cam.distance),
+      target: new THREE.Vector3(cam.target[0], cam.target[1], cam.target[2]),
+    };
+  });
 
   // The entities + gizmo group is offset by -renderOrigin so that all entity
   // positions (expressed in document world coords) become relative to the
@@ -166,7 +167,7 @@ function SceneContents({
            Raycasts work correctly: three.js resolves hits via matrixWorld which
            includes the group transform. */}
       <group position={groupOffset}>
-        <Entities document={document} />
+        <Entities />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         {/* Measurement bbox wireframe — shown when measure_bounding_box result is present */}
         <MeasureBBoxWireframe />

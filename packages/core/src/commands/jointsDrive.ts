@@ -135,14 +135,14 @@ export const deleteDriveRelation = defineCommand({
       ),
   }),
   run: (doc, { id }): CommandResult => {
-    if (!(id in doc.driveRelations)) {
+    const dr = Object.hasOwn(doc.driveRelations, id) ? doc.driveRelations[id] : undefined;
+    if (!dr) {
       return noop(
         doc,
         `delete_drive_relation: drive relation '${String(id)}' does not exist — no change made.`,
       );
     }
 
-    const dr = doc.driveRelations[id]!;
     const newDriveRelations = { ...doc.driveRelations };
     delete newDriveRelations[id];
 
@@ -246,10 +246,11 @@ export const bakeMotion = defineCommand({
     const newEntities = { ...doc.entities };
     for (const instanceId of movedIds) {
       const existing = newEntities[instanceId];
-      if (!existing) continue;
+      const position = instancePositions[instanceId];
+      if (!existing || !position) continue;
       newEntities[instanceId] = {
         ...existing,
-        position: instancePositions[instanceId]!,
+        position,
         rotation: instanceRotations[instanceId] ?? existing.rotation,
       };
     }

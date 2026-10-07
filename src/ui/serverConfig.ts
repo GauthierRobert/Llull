@@ -24,3 +24,9 @@ const API_TOKEN: string | undefined = readEnvString(import.meta.env['VITE_LLULL_
 export function serverAuthHeaders(): Record<string, string> {
   return API_TOKEN === undefined ? {} : { Authorization: `Bearer ${API_TOKEN}` };
 }
+
+/** `/live` SSE URL; carries `?access_token=` when a token is set (EventSource cannot send headers). */
+export function liveStreamUrl(): string {
+  const base = `${SERVER_BASE}/live`;
+  return API_TOKEN === undefined ? base : `${base}?access_token=${encodeURIComponent(API_TOKEN)}`;
+}

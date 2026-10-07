@@ -16,10 +16,36 @@ export const sessions = new Map<string, SessionEntry>();
 
 const DEFAULT_TTL_MS = 30 * 60_000;
 const DEFAULT_SWEEP_MS = 60_000;
+const DEFAULT_MAX_SESSIONS = 256;
 
 function parsePosInt(value: string | undefined, fallback: number): number {
   const n = parseInt(value ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/** `MCP_MAX_SESSIONS` (default 256): a new session evicts the least recently used one when full. */
+export function maxSessions(): number {
+  return parsePosInt(process.env['MCP_MAX_SESSIONS'], DEFAULT_MAX_SESSIONS);
+}
+
+/** Make room for one more session by closing the oldest-idle ones while at/over the cap. */
+export function evictForCapacity(): void {
+  const limit = maxSessions();
+  while (sessions.size >= limit) {
+    let oldestId: string | undefined;
+    let oldestSeen = Infinity;
+    for (const [id, entry] of sessions) {
+      if (entry.lastSeenMs < oldestSeen) {
+        oldestSeen = entry.lastSeenMs;
+        oldestId = id;
+      }
+    }
+    if (oldestId === undefined) return;
+    const entry = sessions.get(oldestId);
+    sessions.delete(oldestId);
+    console.warn(`[mcp] session cap ${limit} reached; evicting oldest idle session ${oldestId}`);
+    entry?.transport.close().catch(() => {});
+  }
 }
 
 let sweepStarted = false;

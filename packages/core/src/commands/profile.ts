@@ -1,13 +1,20 @@
-import type { RevolutionEntity, Vec3 } from '../model/types';
+import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z, looseVec3, tolerant, untypedArray } from './schema';
+import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from './schema';
 import { axisVector, isValidAxis } from '../lib/axis';
 import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
 import { noop } from './noop';
 import { newEntity } from './newEntity';
 import { nextId } from '../lib/id';
 import { compactNumber } from '../lib/compactNumber';
-import { commitSolid } from './geometryShared';
+import {
+  DEFAULT_SOLID_COLOR,
+  EXTRUSION_COLOR,
+  ROTATION_CONVENTION,
+  commitSolid,
+  rejectBadProfile,
+} from './geometryShared';
+import { DEFAULT_LAYER_ID } from '../model/types';
 import { circlePoints } from './tessellation';
 
 /** Number of polygon segments used to approximate a circle. */
@@ -16,6 +23,11 @@ const CIRCLE_SEGMENTS = 32;
 /**
  * @command extrude_sketch
  * @pure
+ * @layer core/commands
+ * @affects creates 1 extrusion entity at the source position; source entity kept
+ * @invariant depth > 0; resulting rotation = `rotation` param only (source rotation not inherited)
+ * @failure missing id / unsupported or open source / depth <= 0 -> no-op, affected:[]
+ *
  * Derives a polygon profile from the given closed 2D shape entity and builds a
  * new extrusion solid. The source entity is kept in the document (non-destructive).
  *
@@ -30,7 +42,8 @@ export const extrudeSketch = defineCommand({
   description:
     'Extrude a closed 2D shape entity (circle, rectangle, or closed polyline) into a 3D extrusion solid. ' +
     'Right-handed world frame, +Z up. The solid is placed at the source entity position and extends depth ' +
-    'units along +Z. Keeps the source entity in the document. depth must be > 0.',
+    'units along +Z (before the optional rotation); the source entity rotation is not inherited. ' +
+    'Keeps the source entity in the document. depth must be > 0.',
   params: z.object({
     id: z
       .string()
@@ -45,7 +58,7 @@ export const extrudeSketch = defineCommand({
     rotation: z
       .array(z.number())
       .describe(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] for the resulting extrusion solid. ' +
+        `${ROTATION_CONVENTION} for the resulting extrusion solid. ` +
           'Matches rotate_entity convention. Defaults to [0, 0, 0]. ' +
           'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
       )
@@ -105,7 +118,7 @@ export const extrudeSketch = defineCommand({
       extId,
       { profile, depth },
       source.position,
-      '#c8553d',
+      EXTRUSION_COLOR,
       {
         rotation: finiteVec3OrZero(rotation),
       },
@@ -137,7 +150,9 @@ function resolveAxis(raw: unknown): Vec3 | null {
  * @layer core/commands
  * @affects creates 1 revolution entity — surface of revolution from a closed 2D polygon profile
  * @invariant profile.length >= 3; angle in (0, 2π]; segments >= 3
- * @failure profile < 3 points -> no-op, affected:[]
+ * @failure profile < 3 points or any point not a finite [x,y] pair -> no-op, affected:[]
+ * @failure explicit id already in doc.entities -> no-op, affected:[]
+ * @failure unknown layerId -> default layer
  * @failure angle <= 0 or non-finite -> no-op, affected:[]
  * @failure invalid axis (not 'x'/'y'/'z' and not a valid Vec3) -> no-op, affected:[]
  * @failure segments < 3 -> clamped to 3, no no-op
@@ -185,7 +200,7 @@ export const revolveProfile = defineCommand({
     ).optional(),
     rotation: tolerant(
       looseVec3(
-        'Extrinsic XYZ Euler angles in RADIANS [rx, ry, rz] applied after revolution. Default: [0, 0, 0]. ' +
+        `${ROTATION_CONVENTION} applied after revolution. Default: [0, 0, 0]. ` +
           'Malformed or non-length-3 values are ignored and [0,0,0] is used.',
       ),
     ).optional(),
@@ -193,7 +208,7 @@ export const revolveProfile = defineCommand({
       .string()
       .describe('Layer id to assign the entity to. Defaults to the document default layer.')
       .optional(),
-    color: z.string().describe('Hex color string, e.g. "#c8553d". Default: "#6b8f9c".').optional(),
+    color: colorField(DEFAULT_SOLID_COLOR),
     id: z
       .string()
       .describe('Optional explicit entity id. If omitted a unique id is generated.')
@@ -209,7 +224,7 @@ export const revolveProfile = defineCommand({
       position = ORIGIN,
       rotation,
       layerId,
-      color = '#6b8f9c',
+      color = DEFAULT_SOLID_COLOR,
       id: explicitId,
     },
   ): CommandResult => {
@@ -217,6 +232,18 @@ export const revolveProfile = defineCommand({
       return noop(
         doc,
         `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${profile.length}); no-op.`,
+      );
+    }
+    const badProfile = rejectBadProfile(doc, 'revolve_profile', profile);
+    if (badProfile) return badProfile;
+    if (
+      explicitId !== undefined &&
+      explicitId.length > 0 &&
+      Object.hasOwn(doc.entities, explicitId)
+    ) {
+      return noop(
+        doc,
+        `revolve_profile: entity id "${explicitId}" already exists; choose another id or omit it; no-op.`,
       );
     }
 
@@ -239,24 +266,19 @@ export const revolveProfile = defineCommand({
 
     const segments = Math.max(3, Math.round(rawSegments ?? 32));
 
-    const resolvedLayerId =
-      typeof layerId === 'string' && doc.layers[layerId] !== undefined
-        ? layerId
-        : (Object.keys(doc.layers)[0] ?? 'layer-default');
-
-    const id = typeof explicitId === 'string' && explicitId.length > 0 ? explicitId : nextId('rev');
-    const entity: RevolutionEntity = {
+    const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('rev');
+    const entity = newEntity(
+      'revolution',
       id,
-      kind: 'revolution',
-      profile,
-      axis,
-      angle: Math.min(angle, TWO_PI),
-      segments,
+      { profile, axis, angle: Math.min(angle, TWO_PI), segments },
       position,
-      rotation: finiteVec3OrZero(rotation),
-      layerId: resolvedLayerId,
       color,
-    };
+      {
+        rotation: finiteVec3OrZero(rotation),
+        layerId:
+          layerId !== undefined && Object.hasOwn(doc.layers, layerId) ? layerId : DEFAULT_LAYER_ID,
+      },
+    );
 
     const axisLabel =
       rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z'

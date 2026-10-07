@@ -5,7 +5,7 @@
 
 import type { EquipmentElement, PipeElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import {
   elementAffected,
   fromMm,
@@ -20,9 +20,9 @@ import {
 } from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
-import { toVec3 } from './memberSupport';
 import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from './pipeSizes';
 import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
+import { levelIdParam } from '../levelParams';
 
 /**
  * @command add_equipment
@@ -38,31 +38,31 @@ export const addEquipment = defineCommand({
     'operating weight in kg (for floor loads). Shown as a block in 3D and with its clearance zone in plan.',
   params: z.object({
     name: z.string().describe('Equipment name, e.g. "CNC lathe", "Compressor".'),
-    location: z.array(z.number()).describe('Footprint centre [x, y].'),
-    size: z.array(z.number()).describe('[length (local x), width (local y), height], all > 0.'),
+    location: looseVec2('Footprint centre [x, y] (a trailing z is ignored).'),
+    size: vec3('[length (local x), width (local y), height], all > 0.'),
     angle: z.number().optional().describe('Plan rotation in radians. Default 0.'),
     clearance: z
       .number()
       .optional()
       .describe('Maintenance / operating clearance around it. Default 800 mm.'),
     weight: z.number().optional().describe('Operating weight in kg. Default 0 (unknown).'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: levelIdParam,
     mark: z.string().optional().describe('Equipment tag. Default EQn.'),
   }),
   run: (
     doc,
     { name, location, size, angle = 0, clearance, weight = 0, levelId, mark },
   ): CommandResult => {
-    const dimensions = toVec3(size);
-    if (name.trim() === '' || !isVec2(location)) {
-      return noop(doc, 'add_equipment failed: name and location [x, y] are required.');
+    if (name.trim() === '') return noop(doc, 'add_equipment failed: name is required.');
+    if (!isVec2(location)) {
+      return noop(doc, 'add_equipment failed: location must be [x, y] with finite numbers.');
     }
-    if (!dimensions || size.length !== 3 || dimensions.some((value) => !(value > 0))) {
+    if (size.some((value) => !(value > 0))) {
       return noop(doc, 'add_equipment failed: size must be [length, width, height], all > 0.');
     }
     const resolvedClearance = clearance ?? fromMm(doc, 800);
     if (resolvedClearance < 0 || weight < 0) {
-      return noop(doc, 'add_equipment failed: angle finite, clearance >= 0 and weight >= 0.');
+      return noop(doc, 'add_equipment failed: clearance >= 0 and weight >= 0.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_equipment failed: ${resolution.reason}.`);
@@ -75,7 +75,7 @@ export const addEquipment = defineCommand({
       name: name.trim(),
       location: toVec2(location),
       angle,
-      size: dimensions,
+      size,
       clearance: resolvedClearance,
       weight,
     };
@@ -83,7 +83,7 @@ export const addEquipment = defineCommand({
     return {
       document,
       summary:
-        `Added equipment ${equipment.mark} "${equipment.name}" (${equipment.id}) ${dimensions.join(' × ')} ${doc.units}, ` +
+        `Added equipment ${equipment.mark} "${equipment.name}" (${equipment.id}) ${size.join(' × ')} ${doc.units}, ` +
         `clearance ${resolvedClearance}${weight > 0 ? `, ${weight} kg` : ''}.`,
       affected: elementAffected(document, [equipment.id]),
       data: { elementId: equipment.id },
@@ -138,7 +138,7 @@ export const addPipeRun = defineCommand({
       .describe('Line destination: equipment tag or battery-limit / tie-in id.'),
     service: z.string().optional().describe('Fluid / service. Default "process".'),
     material: z.string().optional().describe('Default steel.'),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: levelIdParam,
   }),
   run: (
     doc,

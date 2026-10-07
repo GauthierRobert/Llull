@@ -19,6 +19,7 @@ import { MAX_ITERATIONS, nextProfile } from './frameDesign';
 import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
 import { type PurlinRow } from './purlinModel';
 import { checkPurlins } from './purlinCheckRun';
+import { existingLevelIdParam } from '../levelParams';
 
 /**
  * Next heavier secondary-steel profile: the next cold-formed C by mass, then the lightest IPE with a
@@ -72,7 +73,7 @@ export const designPurlins = defineCommand({
       .describe(
         'Roof build-up dead load per m² of roof carried by the purlins, kN/m², >= 0. Default 0.3.',
       ),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: existingLevelIdParam,
     targetUtilisation: z
       .number()
       .optional()

@@ -174,11 +174,12 @@ export const addSlabOpening = defineCommand({
     const updated: SlabElement = { ...slab, openings: [...(slab.openings ?? []), outline] };
     const document = regenerateBuilding(doc, withElement(building, updated));
     const area = polygonArea(outline) * toMetres(doc, 1) ** 2;
+    const openingIndex = (updated.openings?.length ?? 1) - 1;
     return {
       document,
-      summary: `Cut opening #${updated.openings?.length ?? 0} (${area.toFixed(2)} m²) in slab ${slab.mark} (${slab.id}).`,
+      summary: `Cut opening index ${openingIndex} (${area.toFixed(2)} m²) in slab ${slab.mark} (${slab.id}).`,
       affected: elementAffected(document, [slab.id]),
-      data: { slabId: slab.id, openingIndex: (updated.openings?.length ?? 1) - 1 },
+      data: { slabId: slab.id, openingIndex },
     };
   },
 });

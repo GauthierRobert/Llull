@@ -6,7 +6,7 @@ import type { GridElement } from '@core/model/building';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { elementsOf, fileSlug, getBuilding, toMetres } from '../model';
+import { elementsOf, existingLevelId, fileSlug, getBuilding, toMetres } from '../model';
 import { noop } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
 import {
@@ -109,7 +109,7 @@ export const exportAnchorPlan = defineCommand({
       return noop(doc, 'export_anchor_plan failed: embedment must be a number > 0.');
     }
     const building = getBuilding(doc);
-    const resolvedId = levelId ?? building.activeLevelId ?? building.levelOrder[0];
+    const resolvedId = existingLevelId(building, levelId);
     const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;
     if (!level) {
       return noop(

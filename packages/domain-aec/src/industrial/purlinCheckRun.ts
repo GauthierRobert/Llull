@@ -5,19 +5,14 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { getBuilding } from '../model';
+import { existingLevelId, getBuilding } from '../model';
 import { noop } from '@core/commands/noop';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import type { PurlinRow } from './purlinModel';
 import { analysePurlins, locatePurlinMembers } from './purlinAnalysis';
 import { round } from '../numeric';
-import {
-  LIMIT_COLUMNS,
-  checkTable,
-  existingLevelId,
-  failureSummary,
-  limitCells,
-} from './checkReport';
+import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from './checkReport';
+import { existingLevelIdParam } from '../levelParams';
 
 /**
  * @command check_purlins
@@ -70,7 +65,7 @@ export const checkPurlins = defineCommand({
       .describe(
         'Roof build-up dead load carried by the purlins (sheeting, insulation, services) per m² of roof, kN/m², >= 0. Purlin self-weight is added automatically. Default 0.3.',
       ),
-    levelId: z.string().optional().describe('Level id. Default: the active level.'),
+    levelId: existingLevelIdParam,
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, snowLoad = 0.8, roofDeadLoad = 0.3 } = params;

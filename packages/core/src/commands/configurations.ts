@@ -109,7 +109,7 @@ export const activateConfiguration = defineCommand({
       ),
   }),
   annotations: { idempotent: true, metaHistory: true },
-  run: (doc, { name }): CommandResult => {
+  run: (doc, { name }, ctx): CommandResult => {
     if (name.trim() === '') {
       return noop(doc, 'activate_configuration failed: name must be a non-empty string.');
     }
@@ -138,17 +138,13 @@ export const activateConfiguration = defineCommand({
     );
     const baseDoc: CadDocument = { ...doc, parameters: reEvaluateAll(updatedParameters) };
 
+    const context = ctx ?? currentContext();
     const warnings: string[] = [];
-    const refused = kernelRefusal(baseDoc, doc.featureHistory);
+    const refused = kernelRefusal(baseDoc, doc.featureHistory, context);
     if (refused !== null) {
       return noop(doc, `activate_configuration: ${refused}`);
     }
-    const regenerated = replayHistory(
-      baseDoc,
-      doc.featureHistory,
-      currentContext().registry,
-      warnings,
-    );
+    const regenerated = replayHistory(baseDoc, doc.featureHistory, context.registry, warnings);
 
     const entityCount = Object.keys(regenerated.entities).length;
 

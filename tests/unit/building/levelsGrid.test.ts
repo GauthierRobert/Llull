@@ -165,6 +165,17 @@ describe('structural grid', () => {
     const doc = createEmptyDocument();
     expect(execute(doc, 'add_grid_system', { xSpacings: [0], ySpacings: [] }).document).toBe(doc);
     expect(execute(doc, 'add_grid_system', { xSpacings: [], ySpacings: [] }).document).toBe(doc);
+    const flat = execute(doc, 'add_grid_system', {
+      xSpacings: [5000],
+      ySpacings: [],
+      extension: 0,
+    });
+    expect(flat.document).toBe(doc);
+    expect(flat.summary).toMatch(/zero length/);
+    expect(
+      execute(doc, 'add_grid_system', { xSpacings: [5000], ySpacings: [], extension: 100 })
+        .affected,
+    ).not.toEqual([]);
     expect(
       execute(doc, 'add_grid_system', { xSpacings: [1], ySpacings: [1], origin: 'x' }).summary,
     ).toMatch(/origin/);

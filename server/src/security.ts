@@ -2,7 +2,7 @@
  * @layer server
  *
  * HTTP hardening helpers for the non-MCP routes: origin allowlist, mutation guard,
- * filename sanitizer, JSON error handler. No business logic (architecture L6).
+ * JSON error handler. No business logic (architecture L6).
  */
 
 import crypto from 'crypto';
@@ -40,6 +40,13 @@ export function hasValidBearer(req: Request, token: string): boolean {
   return crypto.timingSafeEqual(sha256(presented), sha256(token));
 }
 
+/** Constant-time check of the `?access_token=` query parameter (EventSource cannot set headers). */
+export function hasValidAccessToken(req: Request, token: string): boolean {
+  const presented = req.query['access_token'];
+  if (typeof presented !== 'string' || presented.length === 0) return false;
+  return crypto.timingSafeEqual(sha256(presented), sha256(token));
+}
+
 /** True for 127.0.0.0/8, ::1, ::ffff:127.*, and `localhost`. */
 export function isLoopbackAddress(address: string | undefined): boolean {
   if (address === undefined) return false;
@@ -50,6 +57,17 @@ export function isLoopbackAddress(address: string | undefined): boolean {
     value.startsWith('127.') ||
     value.startsWith('::ffff:127.')
   );
+}
+
+/**
+ * True when the TCP peer is loopback AND the request was not relayed by a proxy: behind a local
+ * reverse proxy every client looks like loopback, so `X-Forwarded-For` / `Forwarded` demote it.
+ */
+export function isLocalPeer(req: Request): boolean {
+  if (req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined) {
+    return false;
+  }
+  return isLoopbackAddress(req.socket?.remoteAddress);
 }
 
 /**
@@ -118,23 +136,39 @@ export function hostAllowlist(): RequestHandler {
  * Policy (evaluated per request):
  *   1. valid `Authorization: Bearer <MCP_AUTH_TOKEN>`              -> allow
  *   2. `LLULL_REQUIRE_TOKEN_FOR_REST=true` and a token is set       -> 401
- *   3. token set and peer socket is NOT loopback                    -> 401 (Origin is not trusted)
+ *   3. token set and peer is NOT loopback (or came via a proxy)     -> 401 (Origin is not trusted)
  *   4. `Origin` header present and not in the allowlist             -> 403 (blocks CSRF from other sites)
  *   5. token set, no `Origin` header (non-browser client, no token) -> 401
  *   6. otherwise (allowed browser origin, or no token configured)   -> allow
  */
 export function guardMutation(): RequestHandler {
+  return buildGuard(false);
+}
+
+/**
+ * Guard for the read routes (/live, /live/snapshot, /export/*). Same policy as `guardMutation`
+ * once a token is configured (so whatever lets the local UI mutate lets it read), plus
+ * `?access_token=<token>` for EventSource / plain browser downloads. No token configured -> open.
+ */
+export function guardRead(): RequestHandler {
+  return buildGuard(true);
+}
+
+function buildGuard(acceptQueryToken: boolean): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
     const token = process.env['MCP_AUTH_TOKEN'];
-    if (token && hasValidBearer(req, token)) {
+    if (!token && acceptQueryToken) {
       next();
       return;
     }
     if (
       token &&
-      (process.env['LLULL_REQUIRE_TOKEN_FOR_REST'] === 'true' ||
-        !isLoopbackAddress(req.socket?.remoteAddress))
+      (hasValidBearer(req, token) || (acceptQueryToken && hasValidAccessToken(req, token)))
     ) {
+      next();
+      return;
+    }
+    if (token && (process.env['LLULL_REQUIRE_TOKEN_FOR_REST'] === 'true' || !isLocalPeer(req))) {
       res.status(401).json(UNAUTHORIZED_BODY);
       return;
     }
@@ -168,16 +202,6 @@ export function buildRateLimiter(maxVariable: string, windowVariable: string): R
 /** Per-IP limiter for REST routes (`LLULL_REST_RATE_LIMIT_MAX` / `_WINDOW_MS`). */
 export function buildRestRateLimiter(): RequestHandler {
   return buildRateLimiter('LLULL_REST_RATE_LIMIT_MAX', 'LLULL_REST_RATE_LIMIT_WINDOW_MS');
-}
-
-/** Reduce a user string to a safe download basename: [A-Za-z0-9._-], max 64 chars, no leading dot. */
-export function sanitizeFilename(raw: unknown, fallback = 'llull'): string {
-  if (typeof raw !== 'string') return fallback;
-  const cleaned = raw
-    .replace(/[^A-Za-z0-9._-]+/g, '_')
-    .replace(/^[._]+/, '')
-    .slice(0, 64);
-  return cleaned.length > 0 ? cleaned : fallback;
 }
 
 interface HttpParseError extends Error {

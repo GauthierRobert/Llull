@@ -133,7 +133,7 @@ export const drawInvolute = defineCommand({
     'At t=0 the curve originates at (baseRadius, 0); radial distance from origin at t is baseRadius*sqrt(1+t²). ' +
     'The curve is open (not closed) and can be fed to other commands or used standalone as a reference curve. ' +
     'position is [x,y,z] world-space placement of the work-plane origin (default [0,0,0]). ' +
-    'rotation is extrinsic XYZ Euler angles in radians (default [0,0,0]).',
+    'rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X; default [0,0,0]).',
   params: z.object({
     baseRadius: z
       .number()

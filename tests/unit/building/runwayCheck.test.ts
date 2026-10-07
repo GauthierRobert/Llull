@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { GRAVITY } from '@aec/numeric';
 import { runwayCheck } from '@aec/industrial/runwayCheckRun';
 import {
   bufferForce,
@@ -266,10 +267,10 @@ describe('metre documents', () => {
 
 describe('check_crane_runways longitudinal actions (EN 1991-3 groups 7 and 8)', () => {
   it('hand-checks HB,1 = φ7 v1 √(mc SB) for a 10 t crane', () => {
-    // Gc = 0.5·98.1 + 20 = 69.05 kN, mc = 7038.7 kg, v1 = 0.7·0.63, SB = 1000 kN/m
-    const expected = 1.25 * 0.441 * Math.sqrt((69050 / 9.81) * 1e6);
-    expect(bufferForce(69050, 0.63, 1000)).toBeCloseTo(expected, 6);
-    expect(bufferForce(69050, 0.63, 1000)).toBeCloseTo(46250, -1);
+    // Gc = 0.5·98.0665 + 20 = 69.03 kN, mc = Gc / g, v1 = 0.7·0.63, SB = 1000 kN/m
+    const expected = 1.25 * 0.441 * Math.sqrt((69033.25 / GRAVITY) * 1e6);
+    expect(bufferForce(69033.25, 0.63, 1000)).toBeCloseTo(expected, 6);
+    expect(bufferForce(69033.25, 0.63, 1000)).toBeCloseTo(46250, -1);
     const rows = rowsOf(hall());
     const stop = find(rows, 'strength', 'buffer stop HB,1/nr');
     expect(stop.value).toBeCloseTo(expected / 2, -1);

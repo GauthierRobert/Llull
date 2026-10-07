@@ -5,7 +5,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import { isVec2, fromMm } from '../model';
+import { fromMm } from '../model';
 import { findProfile, type SteelProfile } from '../steel/profiles';
 import type { PortalProfiles } from './portalGeometry';
 import type { portalFrameParams } from './portalParams';
@@ -56,8 +56,8 @@ export function portalInputs(
   }
   const spanCount = params.spans?.length ?? 1;
   const sizes = [span, hallLength, targetBay, eave, purlinSpacing, railSpacing];
-  if (!isVec2(origin) || sizes.some((value) => value <= 0)) {
-    return fail('origin [x, y] and all sizes > 0 required.');
+  if (sizes.some((value) => value <= 0)) {
+    return fail('all sizes > 0 required.');
   }
   if (pitchDegrees < 0 || pitchDegrees >= 45) {
     return fail('roofPitch must be in [0, 45) degrees.');

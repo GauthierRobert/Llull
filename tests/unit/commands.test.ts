@@ -557,10 +557,10 @@ describe('evaluateExpression', () => {
     if (!r.ok) expect(r.error).toContain('unknown parameter: unknown_var');
   });
 
-  it('divide by zero produces Infinity (IEEE 754)', () => {
+  it('divide by zero is an error (non-finite result)', () => {
     const r = evaluateExpression('1 / 0', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(Infinity);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('not a finite number');
   });
 
   it('empty expression returns EvalErr', () => {

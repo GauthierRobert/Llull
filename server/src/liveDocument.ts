@@ -13,6 +13,7 @@ import type { Response } from 'express';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence';
+import { errorMessage } from '@lib/errorMessage';
 import { documentHash } from '@mcp/liveSync';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 
@@ -24,7 +25,7 @@ const AUTOSAVE_PATH =
   process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
 
 const AUTOSAVE_ENABLED =
-  process.env['VITEST'] === undefined &&
+  !process.env['VITEST'] &&
   process.env['TEST'] !== 'true' &&
   process.env['LLULL_AUTOSAVE_DISABLED'] !== 'true';
 
@@ -35,10 +36,23 @@ function loadAutosave(): CadDocument {
     const json = fs.readFileSync(AUTOSAVE_PATH, 'utf8');
     return deserializeDocument(json);
   } catch (err) {
+    const quarantined = quarantineAutosave();
     console.warn(
-      `[liveDocument] autosave load failed (${(err as Error).message}); starting empty.`,
+      `[liveDocument] autosave load failed (${errorMessage(err)}); ` +
+        `${quarantined !== null ? `moved it to ${quarantined}; ` : ''}starting empty.`,
     );
     return createEmptyDocument();
+  }
+}
+
+/** Rename an unreadable autosave aside so the first autosave cannot overwrite it. */
+function quarantineAutosave(): string | null {
+  const target = `${AUTOSAVE_PATH}.unreadable-${Date.now()}`;
+  try {
+    fs.renameSync(AUTOSAVE_PATH, target);
+    return target;
+  } catch {
+    return null;
   }
 }
 
@@ -90,9 +104,19 @@ export function getLiveSnapshot(): LiveSnapshotEvent {
 /** Open SSE streams: added by `subscribeLive`, removed on client disconnect. */
 const _subscribers = new Set<Response>();
 
-/** One named SSE event (`event: <type>\ndata: <json>\n\n`); false when the connection is dead. */
+/** Max SSE subscribers; further `GET /live` get 503. */
+export const MAX_LIVE_SUBSCRIBERS = 64;
+
+/** A subscriber whose unsent buffer exceeds this is dropped (it resyncs via `/live/snapshot`). */
+const MAX_SSE_BACKLOG_BYTES = 8 * 1024 * 1024;
+
+/** One named SSE event (`event: <type>\ndata: <json>\n\n`); false when the connection is dead or too slow. */
 function writeSseEvent(res: Response, eventType: string, payload: unknown): boolean {
   try {
+    if (res.writableLength > MAX_SSE_BACKLOG_BYTES) {
+      res.destroy();
+      return false;
+    }
     res.write(`event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`);
     return true;
   } catch {
@@ -156,6 +180,11 @@ export function subscribeLive(res: Response): () => void {
 /** Replace the live document without broadcasting. @internal — exposed for tests only. */
 export function _resetLiveDoc(doc?: CadDocument): void {
   _liveDoc = doc ?? createEmptyDocument();
+}
+
+/** Open SSE streams right now. */
+export function liveSubscriberCount(): number {
+  return _subscribers.size;
 }
 
 /** @internal — exposed for tests only. */

@@ -4,7 +4,7 @@
 
 import type { SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, looseVec3, z } from '@core/commands/schema';
 import {
   elementAffected,
   fromMm,
@@ -15,7 +15,7 @@ import {
 } from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
-import { sub3 } from '@lib/vec3';
+import { distance3 } from '@lib/vec3';
 import { findProfile, type SteelProfile } from '../steel/profiles';
 import { refitPlates } from './plateSupport';
 import { dropStaleConnections } from './connectionSupport';
@@ -26,11 +26,11 @@ import {
   baseFixitySchema,
   fixityProblem,
   jointFixitySchema,
-  levelIdSchema,
   nextMemberMark,
   profileSummary,
   toVec3,
 } from './memberSupport';
+import { levelIdParam } from '../levelParams';
 
 const fixityText = (
   startJoint: string | undefined,
@@ -64,14 +64,14 @@ export const addSteelMember = defineCommand({
     'base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames.',
   params: z.object({
     profile: z.string().describe('Catalogue section name (list_steel_profiles).'),
-    start: z.array(z.number()).describe('Axis start [x, y, z], z relative to the level.'),
-    end: z.array(z.number()).describe('Axis end [x, y, z].'),
+    start: looseVec3('Axis start [x, y, z], z relative to the level; [x, y] means z = 0.'),
+    end: looseVec3('Axis end [x, y, z]; [x, y] means z = 0.'),
     role: z
       .enum([...MEMBER_ROLES])
       .optional()
       .describe('Structural role. Default beam.'),
     roll: z.number().optional().describe('Section rotation about the axis, radians. Default 0.'),
-    levelId: levelIdSchema,
+    levelId: levelIdParam,
     material: z.string().optional().describe('Steel grade. Default S355.'),
     note: z.string().optional().describe('Note carried to the member schedule.'),
     startJoint: jointFixitySchema
@@ -129,7 +129,7 @@ export const addSteelMember = defineCommand({
     const document = regenerateBuilding(doc, added.building);
     const member = document.building?.elements[added.ids[0] as string];
     const section = findProfile(profile) as SteelProfile;
-    const length = Math.hypot(...sub3(to, from));
+    const length = distance3(to, from);
     const metres = toMetres(doc, length);
     return {
       document,
@@ -155,8 +155,8 @@ export const updateSteelMember = defineCommand({
   params: z.object({
     memberId: z.string().describe('Member element id, e.g. "member-3".'),
     profile: z.string().optional().describe('New catalogue section.'),
-    start: z.array(z.number()).optional().describe('New axis start [x, y, z].'),
-    end: z.array(z.number()).optional().describe('New axis end [x, y, z].'),
+    start: looseVec3('New axis start [x, y, z]; [x, y] means z = 0.').optional(),
+    end: looseVec3('New axis end [x, y, z]; [x, y] means z = 0.').optional(),
     role: z
       .enum([...MEMBER_ROLES])
       .optional()
@@ -188,9 +188,12 @@ export const updateSteelMember = defineCommand({
     const from = start !== undefined ? toVec3(start) : member.start;
     const to = end !== undefined ? toVec3(end) : member.end;
     if (!from || !to) {
-      return noop(doc, 'update_steel_member failed: start/end must be [x, y, z] and roll finite.');
+      return noop(
+        doc,
+        'update_steel_member failed: start/end must be [x, y, z] (or [x, y] with z = 0).',
+      );
     }
-    if (Math.hypot(...sub3(to, from)) === 0) {
+    if (distance3(to, from) === 0) {
       return noop(doc, 'update_steel_member failed: start and end would coincide.');
     }
     const nextRole = role ?? member.role;
@@ -221,6 +224,7 @@ export const updateSteelMember = defineCommand({
     const stale = dropStaleConnections(refit.building, memberId, fromMm(doc, 10));
     const supports = reconcilePipeSupports(doc, stale.building);
     const document = regenerateBuilding(doc, supports.building);
+    const removedIds = [...refit.removed, ...stale.removed];
     const plateNote =
       refit.resized.length > 0
         ? ` Base plate(s) ${refit.resized.join(', ')} re-sized.`
@@ -232,11 +236,15 @@ export const updateSteelMember = defineCommand({
       summary:
         `Updated ${updated.role} ${updated.mark} (${memberId}): ${profileSummary(section)}.${plateNote}` +
         `${stale.removed.length > 0 ? ` Moment connection(s) ${stale.removed.join(', ')} removed (joint no longer exists).` : ''}${reconciliationNote(supports)}`,
-      affected: elementAffected(document, [
-        memberId,
-        ...refit.resized,
-        ...[...supports.reattached, ...supports.detached].map((change) => change.id),
-      ]),
+      affected: [
+        ...elementAffected(document, [
+          memberId,
+          ...refit.resized,
+          ...[...supports.reattached, ...supports.detached].map((change) => change.id),
+        ]),
+        ...removedIds,
+        ...removedIds.flatMap((id) => building.elements[id]?.entityIds ?? []),
+      ],
     };
   },
 });

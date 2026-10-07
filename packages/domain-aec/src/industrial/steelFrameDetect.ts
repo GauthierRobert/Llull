@@ -28,7 +28,7 @@ export interface FrameCoverage {
   readonly beamTops: number[];
 }
 
-export interface FrameDetection {
+interface FrameDetection {
   readonly frames: MomentFrame[];
   /** Beam id → why its rigid joint(s) cannot be modelled (the beam is not analysed). */
   readonly rejected: Map<string, string>;

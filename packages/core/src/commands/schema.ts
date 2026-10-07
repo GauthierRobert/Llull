@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import { isHexColor } from '../lib/isHexColor';
 import type { CadDocument, Vec2, Vec3 } from '../model/types';
 import type { ExecutionContext } from './context';
 import type {
@@ -246,7 +247,8 @@ export function tolerant<T extends z.ZodType>(schema: T): z.ZodCatch<T> {
 export function colorField(defaultColor: string): z.ZodOptional<z.ZodString> {
   return z
     .string()
-    .describe(`Hex color string, e.g. "#c8553d". Defaults to "${defaultColor}".`)
+    .refine(isHexColor, { message: 'must be a #rrggbb hex color' })
+    .describe(`Hex color string #rrggbb, e.g. "#c8553d". Defaults to "${defaultColor}".`)
     .optional();
 }
 

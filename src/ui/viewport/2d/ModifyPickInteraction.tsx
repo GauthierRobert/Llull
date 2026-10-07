@@ -12,24 +12,25 @@
 
 import { useThree } from '@react-three/fiber';
 import type { Vec2 } from '@core/model/types';
-import { useStore } from '@ui/store';
-import { nearestEntityId } from './modifyHelpers';
+import { useStore, useViewportStore } from '@ui/store';
+import { PICK_RADIUS_PX, nearestEntityId } from './modifyHelpers';
+import { isEntityVisible } from '../entityVisibility';
 import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
 
-/** Pick tolerance in world units — entities farther than this are ignored. */
-const PICK_TOLERANCE = 1;
-
 interface ModifyPickInteractionProps {
   activeTool: ModifyToolKind;
   phase: ModifyToolPhase;
+  /** Current ortho camera zoom (px per world unit) — scales the pick radius. */
+  zoom: number;
   onEntityPick: (entityId: string, worldPoint: Vec2, entityPoints?: ReadonlyArray<Vec2>) => void;
 }
 
 export function ModifyPickInteraction({
   activeTool,
   phase,
+  zoom,
   onEntityPick,
 }: ModifyPickInteractionProps): React.ReactElement | null {
   const invalidate = useThree((s) => s.invalidate);
@@ -50,7 +51,11 @@ export function ModifyPickInteraction({
 
         const { document } = useStore.getState();
         const worldPick = toDocumentPoint(e.point);
-        const bestId = nearestEntityId(document, worldPick, PICK_TOLERANCE);
+        const tolerance = PICK_RADIUS_PX / (zoom > 0 ? zoom : 1);
+        const { hiddenLayerIds, hiddenEntityIds } = useViewportStore.getState();
+        const bestId = nearestEntityId(document, worldPick, tolerance, (entity) =>
+          isEntityVisible(entity, document.layers, hiddenLayerIds, hiddenEntityIds),
+        );
         if (bestId === null) return;
 
         const bestEntity = document.entities[bestId];

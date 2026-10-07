@@ -6,7 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import type { BuildingElement, BuildingLevel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { fileSlug, getBuilding, orderedElements, toMetres } from './model';
+import { fileSlug, getBuilding, orderedElements, toMm } from './model';
 import { noop } from '@core/commands/noop';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
 import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
@@ -79,7 +79,7 @@ function exportElement(
 function buildIfc(doc: CadDocument, timestamp: string): IfcExport {
   const building = getBuilding(doc);
   const writer = new StepWriter();
-  const factor = toMetres(doc, 1) * 1000;
+  const factor = toMm(doc, 1);
   const origin = writer.add('IFCCARTESIANPOINT((0.,0.,0.))');
   const zAxis = writer.add('IFCDIRECTION((0.,0.,1.))');
   const xAxis = writer.add('IFCDIRECTION((1.,0.,0.))');

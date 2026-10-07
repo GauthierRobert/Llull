@@ -37,9 +37,15 @@ type LiveApplyResult =
   | { readonly ok: true; readonly document: CadDocument }
   | { readonly ok: false; readonly reason: 'gap' | 'mismatch' };
 
-/** Hash of everything clients must agree on (selection excluded). */
+const hashByDocument = new WeakMap<CadDocument, string>();
+
+/** Hash of everything clients must agree on (selection excluded); memoized per (immutable) document. */
 export function documentHash(doc: CadDocument): string {
-  return hashText(serializeDocument({ ...doc, selection: [] }, { includeDerived: true }));
+  const known = hashByDocument.get(doc);
+  if (known !== undefined) return known;
+  const hash = hashText(serializeDocument({ ...doc, selection: [] }, { includeDerived: true }));
+  hashByDocument.set(doc, hash);
+  return hash;
 }
 
 /** Apply one broadcast command to the client's copy of the server document at `baseSeq`. */

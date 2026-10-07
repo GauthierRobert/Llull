@@ -176,7 +176,7 @@ describe('ConfigurationsPanel — create form', () => {
 
   it('Create button remains disabled when only the name is filled', () => {
     render(<ConfigurationsPanel />);
-    const nameInput = screen.getByRole('textbox', { name: /new configuration name/i });
+    const nameInput = screen.getByRole('textbox', { name: /^configuration name$/i });
     fireEvent.change(nameInput, { target: { value: 'myconfig' } });
 
     const createBtn = screen.getByRole('button', {
@@ -188,7 +188,7 @@ describe('ConfigurationsPanel — create form', () => {
   it('Create button is enabled when name and one param row are filled', () => {
     render(<ConfigurationsPanel />);
 
-    const nameInput = screen.getByRole('textbox', { name: /new configuration name/i });
+    const nameInput = screen.getByRole('textbox', { name: /^configuration name$/i });
     fireEvent.change(nameInput, { target: { value: 'myconfig' } });
 
     const paramNameInput = screen.getByRole('textbox', { name: /parameter name for row 1/i });
@@ -209,7 +209,7 @@ describe('ConfigurationsPanel — create form', () => {
     render(<ConfigurationsPanel />);
 
     const form = screen.getByTestId('config-create-form');
-    const nameInput = within(form).getByRole('textbox', { name: /new configuration name/i });
+    const nameInput = within(form).getByRole('textbox', { name: /^configuration name$/i });
     const paramNameInput = within(form).getByRole('textbox', { name: /parameter name for row 1/i });
     const exprInput = within(form).getByRole('textbox', { name: /expression for row 1/i });
 
@@ -218,10 +218,11 @@ describe('ConfigurationsPanel — create form', () => {
     fireEvent.change(exprInput, { target: { value: '30' } });
     fireEvent.submit(form);
 
-    expect(dispatchSpy).toHaveBeenCalledWith('create_configuration', {
-      name: 'compact',
-      parameterValues: { width: '30' },
-    });
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      'create_configuration',
+      { name: 'compact', parameterValues: { width: '30' } },
+      expect.anything(),
+    );
   });
 
   it('dispatches create_configuration with multiple parameter rows', () => {
@@ -231,7 +232,7 @@ describe('ConfigurationsPanel — create form', () => {
     render(<ConfigurationsPanel />);
 
     const form = screen.getByTestId('config-create-form');
-    const nameInput = within(form).getByRole('textbox', { name: /new configuration name/i });
+    const nameInput = within(form).getByRole('textbox', { name: /^configuration name$/i });
     fireEvent.change(nameInput, { target: { value: 'full' } });
 
     // Fill first row
@@ -252,21 +253,28 @@ describe('ConfigurationsPanel — create form', () => {
 
     fireEvent.submit(form);
 
-    expect(dispatchSpy).toHaveBeenCalledWith('create_configuration', {
-      name: 'full',
-      parameterValues: { w: '40', h: '20' },
-    });
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      'create_configuration',
+      {
+        name: 'full',
+        parameterValues: { w: '40', h: '20' },
+      },
+      expect.anything(),
+    );
   });
 
   it('clears form fields after successful submit', () => {
-    const dispatchSpy = vi.fn();
+    const dispatchSpy = vi.fn(
+      (_name: string, _params: unknown, options?: { onResult?: (r: unknown) => void }) =>
+        options?.onResult?.({ summary: 'ok', changed: true }),
+    );
     patchDispatch(dispatchSpy);
 
     render(<ConfigurationsPanel />);
 
     const form = screen.getByTestId('config-create-form');
     const nameInput = within(form).getByRole('textbox', {
-      name: /new configuration name/i,
+      name: /^configuration name$/i,
     }) as HTMLInputElement;
     const paramNameInput = within(form).getByRole('textbox', {
       name: /parameter name for row 1/i,
@@ -280,9 +288,44 @@ describe('ConfigurationsPanel — create form', () => {
     fireEvent.change(exprInput, { target: { value: '5' } });
     fireEvent.submit(form);
 
+    // The reset row is a fresh React key, so re-query rather than reuse the old elements.
     expect(nameInput.value).toBe('');
-    expect(paramNameInput.value).toBe('');
-    expect(exprInput.value).toBe('');
+    const freshName = within(form).getByRole('textbox', {
+      name: /parameter name for row 1/i,
+    }) as HTMLInputElement;
+    const freshExpr = within(form).getByRole('textbox', {
+      name: /expression for row 1/i,
+    }) as HTMLInputElement;
+    expect(freshName.value).toBe('');
+    expect(freshExpr.value).toBe('');
+  });
+});
+
+describe('ConfigurationsPanel — rejected create', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  it('keeps the typed values when the command was rejected', () => {
+    patchDispatch(
+      vi.fn((_name: string, _params: unknown, options?: { onResult?: (r: unknown) => void }) =>
+        options?.onResult?.({ summary: 'rejected', changed: false }),
+      ),
+    );
+    render(<ConfigurationsPanel />);
+    const form = screen.getByTestId('config-create-form');
+    const nameInput = within(form).getByRole('textbox', {
+      name: /^configuration name$/i,
+    }) as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: 'keep' } });
+    fireEvent.change(within(form).getByRole('textbox', { name: /parameter name for row 1/i }), {
+      target: { value: 'r' },
+    });
+    fireEvent.change(within(form).getByRole('textbox', { name: /expression for row 1/i }), {
+      target: { value: '5' },
+    });
+    fireEvent.submit(form);
+    expect(nameInput.value).toBe('keep');
   });
 });
 

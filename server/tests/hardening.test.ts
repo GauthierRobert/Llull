@@ -18,12 +18,8 @@ import {
   closeAllSubscribers,
 } from '../src/liveDocument';
 import { _resetHistory, applyCommand } from '../src/commandBus';
-import {
-  sanitizeFilename,
-  guardMutation,
-  buildRestRateLimiter,
-  getAllowedOrigins,
-} from '../src/security';
+import { guardMutation, buildRestRateLimiter, getAllowedOrigins } from '../src/security';
+import { safeFileName as sanitizeFilename } from '@lib/safeFileName';
 import { createAutosaver } from '../src/autosave';
 import { closeAllSessions, sessions } from '../src/mcp/sessions';
 import { createEmptyDocument } from '@core/model/types';

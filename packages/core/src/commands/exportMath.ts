@@ -1,5 +1,6 @@
 import type { Vec3 } from '../model/types';
 import { earClipTriangulate } from './tessellation';
+import { elementAt } from '../lib/elementAt';
 
 export type Triangle = readonly [Vec3, Vec3, Vec3];
 
@@ -11,7 +12,7 @@ export type Triangle = readonly [Vec3, Vec3, Vec3];
 export function fanTriangulate(verts: Vec3[]): Triangle[] {
   const tris: Triangle[] = [];
   for (let i = 1; i + 1 < verts.length; i++) {
-    tris.push([verts[0]!, verts[i]!, verts[i + 1]!]);
+    tris.push([elementAt(verts, 0), elementAt(verts, i), elementAt(verts, i + 1)]);
   }
   return tris;
 }
@@ -23,5 +24,8 @@ export function fanTriangulate(verts: Vec3[]): Triangle[] {
  */
 export function earClipTriangulateVerts(verts: Vec3[]): Triangle[] {
   const indexTris = earClipTriangulate(verts.map((v) => [v[0], v[1]] as const));
-  return indexTris.map(([ia, ib, ic]) => [verts[ia]!, verts[ib]!, verts[ic]!] as Triangle);
+  return indexTris.map(
+    ([ia, ib, ic]) =>
+      [elementAt(verts, ia), elementAt(verts, ib), elementAt(verts, ic)] as Triangle,
+  );
 }
