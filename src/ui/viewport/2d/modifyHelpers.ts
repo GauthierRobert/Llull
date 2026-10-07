@@ -11,6 +11,7 @@
 
 import { distance, pointInPolygon, polygonArea, projectOntoSegment } from '@lib/polygon';
 import type { CadDocument, Entity, EntityId, Vec2 } from '@core/model/types';
+import { nearestOnArc } from './snapping/geometry';
 
 /** Pick radius in screen pixels (selection and modify-tool picks). */
 export const PICK_RADIUS_PX = 10;
@@ -96,7 +97,7 @@ function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
  * is the work-plane origin in world space. The world-space pick is shifted into
  * the entity's local frame and all geometry is compared in that frame.
  *
- * Handles: line, polyline, circle, rectangle, point, arc (as its full circle),
+ * Handles: line, polyline, circle, rectangle, point, arc (swept range only),
  * ellipse (sampled), spline (through its control points).
  * Returns Infinity for unsupported kinds.
  *
@@ -121,9 +122,19 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
       return d * d;
     }
     case 'arc': {
-      // An arc is picked as its full circle.
-      const d = distance(pick, entity.center) - entity.radius;
-      return d * d;
+      // Distance to the nearest point on the swept arc (not its full circle).
+      const [cx, cy] = entity.center;
+      const [nx, ny] = nearestOnArc(
+        pick[0],
+        pick[1],
+        cx,
+        cy,
+        entity.radius,
+        entity.startAngle,
+        entity.endAngle,
+        false,
+      );
+      return distance(pick, [nx, ny]) ** 2;
     }
     case 'rectangle': {
       // Rectangle corners are in local space (lower-left at local origin).
