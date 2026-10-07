@@ -9,7 +9,7 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { Vec3 } from '@core/model/types';
 import { SELECTION_COLOR } from '../../viewportPalette';
-import { positionsGeometry } from '../../lineGeometry';
+import { positionsGeometry, rebaseToAnchor } from '../../lineGeometry';
 
 interface ShapeLineProps {
   /** Flat xyz vertices; a line strip, or independent segment pairs when `segments` is set. */
@@ -32,7 +32,10 @@ export function ShapeLine({
   color,
   selected,
 }: ShapeLineProps): React.ReactElement {
-  const geometry = useMemo(() => positionsGeometry(positions), [positions]);
+  // Vertices are stored relative to an anchor (float32 precision far from the origin); the anchor
+  // is applied through the object transform, which three.js composes in float64.
+  const rebased = useMemo(() => rebaseToAnchor(positions), [positions]);
+  const geometry = useMemo(() => positionsGeometry(rebased.local), [rebased]);
   const material = useMemo(
     () => new THREE.LineBasicMaterial({ color: selected ? SELECTION_COLOR : color, linewidth }),
     [color, selected, linewidth],
@@ -47,5 +50,9 @@ export function ShapeLine({
     [geometry, material, segments],
   );
 
-  return <primitive object={object} position={position} rotation={[0, 0, rotation?.[2] ?? 0]} />;
+  return (
+    <group position={position} rotation={[0, 0, rotation?.[2] ?? 0]}>
+      <primitive object={object} position={rebased.anchor} />
+    </group>
+  );
 }
