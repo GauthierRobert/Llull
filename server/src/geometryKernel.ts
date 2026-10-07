@@ -6,7 +6,8 @@
  * OpenCascade (falls back to Manifold on failure); anything else is Manifold.
  */
 
-import { setGeometryKernel } from '@core/geometry/kernel';
+import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
+import { createIsolatedKernel, defaultWorkerEntry } from './isolatedKernel';
 import { parseKernelChoice, type KernelChoice } from '@core/geometry/kernelChoice';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { errorMessage } from '@lib/errorMessage';
@@ -22,12 +23,29 @@ function warnUnavailable(label: string, error: unknown): void {
   console.warn(`[server] ${label}:`, errorMessage(error));
 }
 
+/**
+ * OCC in a worker thread, so a WASM abort kills the worker, not the server. Null (in-process OCC is
+ * used instead, with a warning) when `LLULL_OCC_ISOLATION=off`, when the worker entry is not
+ * shipped (the esbuild bundle) or when the worker cannot start.
+ */
+function startIsolatedOcct(): GeometryKernel | null {
+  if (process.env['LLULL_OCC_ISOLATION'] === 'off' || defaultWorkerEntry() === null) return null;
+  const isolated = createIsolatedKernel();
+  if (isolated.start()) return isolated;
+  isolated.dispose();
+  warnUnavailable(
+    'OCC worker unavailable; running OCC in-process',
+    'a WASM abort would stop the server',
+  );
+  return null;
+}
+
 /** Load the configured kernel; on failure commands keep their graceful "no kernel" no-op. */
 export async function installGeometryKernel(): Promise<boolean> {
   if (parseKernelChoice(process.env['LLULL_KERNEL']) === 'occt') {
     try {
       const { createNodeOcctKernel } = await import('./occtNode');
-      setGeometryKernel(await createNodeOcctKernel());
+      setGeometryKernel(startIsolatedOcct() ?? (await createNodeOcctKernel()));
       activeKernel = 'occt';
       return true;
     } catch (error) {
