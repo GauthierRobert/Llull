@@ -110,6 +110,22 @@ describe('enable_toolset', () => {
     expect([...enabled]).toEqual(['core']);
   });
 
+  it('"all" enables every toolset once, then reports no change', () => {
+    const enabled = coreOnly();
+    const first = applyDiscoveryToolCall('enable_toolset', { toolset: 'ALL' }, enabled);
+    expect(first?.result.isError).toBe(false);
+    expect(first?.toolsListChanged).toBe(true);
+    expect([...enabled].sort()).toEqual([...TOOLSET_NAMES].sort());
+    const again = applyDiscoveryToolCall('enable_toolset', { toolset: 'all' }, enabled);
+    expect(again?.toolsListChanged).toBe(false);
+    expect(again?.result.content[0]?.text).toContain('already enabled');
+  });
+
+  it('a missing toolset argument says so instead of quoting an empty name', () => {
+    const outcome = applyDiscoveryToolCall('enable_toolset', {}, coreOnly());
+    expect(outcome?.result.content[0]?.text).toContain('a "toolset" string argument');
+  });
+
   it('returns null for any other tool name', () => {
     expect(applyDiscoveryToolCall('add_box', {}, coreOnly())).toBeNull();
   });

@@ -67,7 +67,7 @@ export function buildDiscoveryToolDefinitions(): McpToolDefinition[] {
         properties: {
           toolset: {
             type: 'string',
-            description: `Toolset name: ${TOOLSET_NAMES.join(', ')} (see search_tools results).`,
+            description: `Toolset name: ${TOOLSET_NAMES.join(', ')}, or "all" (see search_tools results).`,
           },
         },
         required: ['toolset'],
@@ -180,10 +180,25 @@ function runEnableToolset(
   enabledToolsets: Set<ToolsetName>,
 ): DiscoveryOutcome {
   const requested = typeof args.toolset === 'string' ? args.toolset.trim().toLowerCase() : '';
+  if (requested === 'all') {
+    const added = TOOLSET_NAMES.filter((name) => !enabledToolsets.has(name));
+    added.forEach((name) => enabledToolsets.add(name));
+    const summary =
+      added.length > 0
+        ? `enable_toolset: enabled all toolsets (${added.join(', ')} added); re-list tools to load their schemas.`
+        : 'enable_toolset: all toolsets were already enabled.';
+    return outcome(
+      summary,
+      false,
+      { toolset: 'all', changed: added.length > 0, enabled: [...enabledToolsets] },
+      added.length > 0,
+    );
+  }
   const toolset = TOOLSET_NAMES.find((name) => name === requested);
   if (toolset === undefined) {
+    const shown = requested === '' ? 'a "toolset" string argument' : `"${requested}"`;
     return outcome(
-      `enable_toolset: unknown toolset "${requested}". Valid toolsets: ${TOOLSET_NAMES.join(', ')}.`,
+      `enable_toolset: unknown toolset ${shown}. Valid toolsets: ${TOOLSET_NAMES.join(', ')}, or "all".`,
       true,
     );
   }
