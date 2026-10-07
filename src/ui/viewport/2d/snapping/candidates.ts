@@ -12,6 +12,7 @@ import {
   segmentCurveIntersections,
   type CircularCurve,
 } from './curveIntersections';
+import { allSegmentIntersections } from './segmentSweep';
 import {
   entityToSegments,
   isAngleOnArc,
@@ -20,7 +21,6 @@ import {
   nearestOnArc,
   nearestOnSegment,
   normalizeAngle,
-  segmentIntersection,
   snapExtension,
   snapPerpendicular,
   snapTangentToCircle,
@@ -235,14 +235,7 @@ export function collectSnapCandidates(
 
   // Segment × segment intersections.
   if (doIntersections) {
-    for (let i = 0; i < allSegments.length; i++) {
-      for (let j = i + 1; j < allSegments.length; j++) {
-        const a = allSegments[i];
-        const b = allSegments[j];
-        const pt = a && b ? segmentIntersection(...a, ...b) : null;
-        if (pt) add('intersection', ...pt);
-      }
-    }
+    for (const pt of allSegmentIntersections(allSegments)) add('intersection', ...pt);
     for (const [i, curve] of allCurves.entries()) {
       for (const segment of allSegments) {
         for (const pt of segmentCurveIntersections(segment, curve)) add('intersection', ...pt);
