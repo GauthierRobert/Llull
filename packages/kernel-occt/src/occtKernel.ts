@@ -20,13 +20,13 @@ interface OccShape extends OccHandle {
   ShapeType(): unknown;
 }
 
-interface OccTriangulation {
+interface OccTriangulation extends OccHandle {
   IsNull(): boolean;
   get(): {
     NbTriangles(): number;
     NbNodes(): number;
-    Node(i: number): { X(): number; Y(): number; Z(): number };
-    Triangle(i: number): { Value(j: number): number };
+    Node(i: number): OccHandle & { X(): number; Y(): number; Z(): number };
+    Triangle(i: number): OccHandle & { Value(j: number): number };
   };
 }
 
@@ -148,7 +148,8 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   const exp = explorer(api, shape, 'TopAbs_FACE');
 
   while (exp.More()) {
-    const face = (api.TopoDS as OccTopoDS).Face_1(exp.Current());
+    const current = exp.Current();
+    const face = (api.TopoDS as OccTopoDS).Face_1(current);
     const loc: OccHandle = new api.TopLoc_Location_1();
     const triangulation = api.BRep_Tool.Triangulation(face, loc) as OccTriangulation;
 
@@ -160,6 +161,7 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
       for (let i = 1; i <= nNodes; i++) {
         const node = tri.Node(i);
         positions.push(node.X(), node.Y(), node.Z());
+        release(node);
       }
 
       for (let i = 1; i <= nTris; i++) {
@@ -169,11 +171,15 @@ function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
           vertexOffset + t.Value(2) - 1,
           vertexOffset + t.Value(3) - 1,
         );
+        release(t);
       }
 
       vertexOffset += nNodes;
     }
 
+    release(triangulation);
+    release(face);
+    release(current);
     loc.delete();
     exp.Next();
   }
