@@ -17,7 +17,7 @@ import {
   type AnimationSummary,
   type SceneSnapshot,
 } from './sceneTypes';
-import { instanceBoundsFromDoc, mergeBounds } from './sceneBounds';
+import { entityBoundsInDoc, mergeBounds } from './sceneBounds';
 import { rotatedEntityBounds } from './sceneRotatedBounds';
 /** Structured snapshot of the document. @pure */
 export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
@@ -29,7 +29,10 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     const e = doc.entities[id];
     if (!e) continue;
     // Instances have no own geometry: their AABB comes from the referenced component.
-    const bounds = e.kind === 'instance' ? instanceBoundsFromDoc(e, doc) : rotatedEntityBounds(e);
+    const bounds =
+      e.kind === 'instance' || e.kind === 'dimension'
+        ? entityBoundsInDoc(doc, e)
+        : rotatedEntityBounds(e);
     entities.push({ id: e.id, kind: e.kind, layerId: e.layerId, position: e.position, bounds });
     sceneBounds = sceneBounds ? mergeBounds(sceneBounds, bounds) : bounds;
     layerCounts[e.layerId] = (layerCounts[e.layerId] ?? 0) + 1;

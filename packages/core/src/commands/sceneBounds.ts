@@ -1,4 +1,4 @@
-import type { CadDocument, Entity, InstanceEntity, Vec3 } from '../model/types';
+import type { CadDocument, DimensionEntity, Entity, InstanceEntity, Vec3 } from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { ORIGIN, add3, sub3 } from '../lib/vec3';
 import { type Bounds } from './sceneTypes';
@@ -210,7 +210,30 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
  * @pure
  */
 export function entityBoundsInDoc(doc: CadDocument, e: Entity): Bounds {
-  return e.kind === 'instance' ? instanceBoundsFromDoc(e, doc) : entityBounds(e);
+  if (e.kind === 'instance') return instanceBoundsFromDoc(e, doc);
+  if (e.kind === 'dimension') return dimensionBoundsFromDoc(e, doc);
+  return entityBounds(e);
+}
+
+/**
+ * A dimension has no geometry of its own: its extent is the referenced geometry grown by the
+ * witness-line `offset` (default 5) in X and Y. With no resolvable reference it falls back to
+ * `entityBounds` (a small box around its own position).
+ * @pure
+ */
+function dimensionBoundsFromDoc(dimension: DimensionEntity, doc: CadDocument): Bounds {
+  const referenced = dimension.entityIds.flatMap((id): Bounds[] => {
+    const target = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
+    return target && target.kind !== 'dimension' ? [entityBoundsInDoc(doc, target)] : [];
+  });
+  const [first, ...rest] = referenced;
+  if (!first) return entityBounds(dimension);
+  const { min, max } = rest.reduce(mergeBounds, first);
+  const offset = Math.abs(dimension.offset ?? 5);
+  return bounds(
+    [min[0] - offset, min[1] - offset, min[2]],
+    [max[0] + offset, max[1] + offset, max[2]],
+  );
 }
 
 /** True when two AABBs overlap (touching counts) on every axis. */
