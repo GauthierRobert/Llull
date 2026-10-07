@@ -35,7 +35,7 @@
           "type": "string"
         },
         "margin": {
-          "description": "Plate overhang beyond the profile. Default 100 mm.",
+          "description": "Plate overhang beyond the profile, in document units. Default 100 mm.",
           "type": "number"
         },
         "memberIds": {
@@ -60,7 +60,7 @@
     "input_schema": {
       "properties": {
         "depth": {
-          "description": "Section depth. Default 500 mm.",
+          "description": "Section depth, in document units. Default 500 mm.",
           "type": "number"
         },
         "end": {
@@ -90,7 +90,7 @@
           "type": "number"
         },
         "width": {
-          "description": "Section width. Default 300 mm.",
+          "description": "Section width, in document units. Default 300 mm.",
           "type": "number"
         }
       },
@@ -180,7 +180,7 @@
     "input_schema": {
       "properties": {
         "height": {
-          "description": "Side height. Default 60 mm.",
+          "description": "Side height, in document units. Default 60 mm.",
           "type": "number"
         },
         "levelId": {
@@ -202,7 +202,7 @@
           "type": "string"
         },
         "width": {
-          "description": "Tray width. Default 300 mm.",
+          "description": "Tray width, in document units. Default 300 mm.",
           "type": "number"
         }
       },
@@ -253,7 +253,7 @@
           "type": "string"
         },
         "width": {
-          "description": "Section width (diameter if circular). Default 300 mm.",
+          "description": "Section width (diameter if circular), in document units. Default 300 mm.",
           "type": "number"
         }
       },
@@ -486,7 +486,7 @@
           "type": "array"
         },
         "thickness": {
-          "description": "Wall thickness. Default 200 mm.",
+          "description": "Wall thickness, in document units. Default 200 mm.",
           "type": "number"
         },
         "through": {
@@ -692,7 +692,7 @@
           "type": "number"
         },
         "clearance": {
-          "description": "Maintenance / operating clearance around it. Default 800 mm.",
+          "description": "Maintenance / operating clearance around it, in document units. Default 800 mm.",
           "type": "number"
         },
         "levelId": {
@@ -788,11 +788,11 @@
           "type": "string"
         },
         "thickness": {
-          "description": "Depth of the pad. Default 600 mm.",
+          "description": "Depth of the pad, in document units. Default 600 mm.",
           "type": "number"
         },
         "topOffset": {
-          "description": "Top of footing relative to the level. Default −300 mm.",
+          "description": "Top of footing relative to the level, in document units. Default −300 mm.",
           "type": "number"
         },
         "underColumns": {
@@ -800,7 +800,7 @@
           "type": "boolean"
         },
         "width": {
-          "description": "Size along X. Default 1500 mm.",
+          "description": "Size along X, in document units. Default 1500 mm.",
           "type": "number"
         }
       },
@@ -1302,7 +1302,7 @@
           "type": "string"
         },
         "thickness": {
-          "description": "Panel thickness. Default 80 mm.",
+          "description": "Panel thickness, in document units. Default 80 mm.",
           "type": "number"
         }
       },
@@ -1434,7 +1434,7 @@
           "type": "boolean"
         },
         "baySpacing": {
-          "description": "Target frame spacing; adjusted to divide the length. Default 6000 mm.",
+          "description": "Target frame spacing; adjusted to divide the length, in document units. Default 6000 mm.",
           "type": "number"
         },
         "braceProfile": {
@@ -1483,7 +1483,7 @@
           "type": "object"
         },
         "eaveHeight": {
-          "description": "Column height to the eaves. Default 7000 mm.",
+          "description": "Column height to the eaves, in document units. Default 7000 mm.",
           "type": "number"
         },
         "floorSlab": {
@@ -1499,7 +1499,7 @@
           "type": "string"
         },
         "length": {
-          "description": "Hall length (Y). Default 48000 mm.",
+          "description": "Hall length (Y), in document units. Default 48000 mm.",
           "type": "number"
         },
         "levelId": {
@@ -1518,7 +1518,7 @@
           "type": "string"
         },
         "purlinSpacing": {
-          "description": "Along the slope. Default 1800 mm.",
+          "description": "Along the slope, in document units. Default 1800 mm.",
           "type": "number"
         },
         "rafterProfile": {
@@ -1530,7 +1530,7 @@
           "type": "string"
         },
         "railSpacing": {
-          "description": "Vertical. Default 1800 mm.",
+          "description": "Vertical, in document units. Default 1800 mm.",
           "type": "number"
         },
         "roofPitch": {
@@ -1546,7 +1546,7 @@
           "type": "string"
         },
         "span": {
-          "description": "Clear span between column axes (X). Default 24000 mm.",
+          "description": "Clear span between column axes (X), in document units. Default 24000 mm.",
           "type": "number"
         },
         "spans": {
@@ -1692,7 +1692,7 @@
           "type": "string"
         },
         "thickness": {
-          "description": "Slab thickness (> 0). Default 200 mm.",
+          "description": "Slab thickness (> 0), in document units. Default 200 mm.",
           "type": "number"
         },
         "wallFace": {
@@ -1732,7 +1732,7 @@
           "type": "array"
         },
         "margin": {
-          "description": "With stairId: clearance around the stair footprint. Default 100 mm.",
+          "description": "With stairId: clearance around the stair footprint, in document units. Default 100 mm.",
           "type": "number"
         },
         "slabId": {
@@ -1876,11 +1876,11 @@
           "type": "array"
         },
         "treadDepth": {
-          "description": "Tread (going) depth. Default 280 mm.",
+          "description": "Tread (going) depth, in document units. Default 280 mm.",
           "type": "number"
         },
         "width": {
-          "description": "Stair width. Default 1000 mm.",
+          "description": "Stair width, in document units. Default 1000 mm.",
           "type": "number"
         }
       },

@@ -38,7 +38,7 @@ export const addCurvedWall = defineCommand({
     start: vec2('Arc start [x, y].'),
     through: vec2('Any point on the arc between start and end [x, y] (sets the curvature).'),
     end: vec2('Arc end [x, y].'),
-    thickness: z.number().optional().describe('Wall thickness. Default 200 mm.'),
+    thickness: z.number().optional().describe('Wall thickness, in document units. Default 200 mm.'),
     height: z.number().optional().describe('Wall height. Default: the level height.'),
     baseOffset: z.number().optional().describe('Base above the level. Default 0.'),
     material: z.string().optional().describe('Default concrete.'),

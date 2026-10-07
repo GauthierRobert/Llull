@@ -146,7 +146,10 @@ export const addSlab = defineCommand({
         'With wallIds: slab edge at the outer wall faces, the wall centerlines (default — the slab bears into the walls), or the inner faces.',
       ),
     levelId: levelIdParam(),
-    thickness: z.number().optional().describe('Slab thickness (> 0). Default 200 mm.'),
+    thickness: z
+      .number()
+      .optional()
+      .describe('Slab thickness (> 0), in document units. Default 200 mm.'),
     offset: z
       .number()
       .optional()
@@ -259,7 +262,10 @@ export const addColumn = defineCommand({
       .enum(['rectangular', 'circular'])
       .optional()
       .describe('Section shape. Default rectangular.'),
-    width: z.number().optional().describe('Section width (diameter if circular). Default 300 mm.'),
+    width: z
+      .number()
+      .optional()
+      .describe('Section width (diameter if circular), in document units. Default 300 mm.'),
     depth: z.number().optional().describe('Section depth (rectangular). Default = width.'),
     height: z.number().optional().describe('Column height. Default: the level height.'),
     levelId: levelIdParam(),
@@ -331,8 +337,8 @@ export const addBeam = defineCommand({
   params: z.object({
     start: vec2('Beam axis start [x, y].'),
     end: vec2('Beam axis end [x, y].'),
-    width: z.number().optional().describe('Section width. Default 300 mm.'),
-    depth: z.number().optional().describe('Section depth. Default 500 mm.'),
+    width: z.number().optional().describe('Section width, in document units. Default 300 mm.'),
+    depth: z.number().optional().describe('Section depth, in document units. Default 500 mm.'),
     topOffset: z
       .number()
       .optional()
@@ -394,9 +400,12 @@ export const addStair = defineCommand({
       .describe(
         'Run direction in radians, counter-clockwise from +X. Default 0 (climbs toward +X).',
       ),
-    width: z.number().optional().describe('Stair width. Default 1000 mm.'),
+    width: z.number().optional().describe('Stair width, in document units. Default 1000 mm.'),
     riserCount: z.number().optional().describe('Number of risers (integer ≥ 2).'),
-    treadDepth: z.number().optional().describe('Tread (going) depth. Default 280 mm.'),
+    treadDepth: z
+      .number()
+      .optional()
+      .describe('Tread (going) depth, in document units. Default 280 mm.'),
     levelId: levelIdParam(),
     material: z.string().optional().describe('Material. Default concrete.'),
   }),

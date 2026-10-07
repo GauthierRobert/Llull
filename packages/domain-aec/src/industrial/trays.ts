@@ -39,8 +39,8 @@ export const addCableTray = defineCommand({
     points: z
       .array(z.array(z.number()))
       .describe('Tray centreline [[x, y, z], …], at least 2 points.'),
-    width: z.number().optional().describe('Tray width. Default 300 mm.'),
-    height: z.number().optional().describe('Side height. Default 60 mm.'),
+    width: z.number().optional().describe('Tray width, in document units. Default 300 mm.'),
+    height: z.number().optional().describe('Side height, in document units. Default 60 mm.'),
     system: z.string().optional().describe('Cable system. Default "power".'),
     levelId: levelIdParam,
   }),

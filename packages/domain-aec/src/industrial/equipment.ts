@@ -56,7 +56,7 @@ export const addEquipment = defineCommand({
     clearance: z
       .number()
       .optional()
-      .describe('Maintenance / operating clearance around it. Default 800 mm.'),
+      .describe('Maintenance / operating clearance around it, in document units. Default 800 mm.'),
     weight: z.number().optional().describe('Operating weight in kg. Default 0 (unknown).'),
     levelId: levelIdParam,
     mark: z.string().optional().describe('Equipment tag. Default EQn.'),

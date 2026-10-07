@@ -44,7 +44,10 @@ export const addBasePlates = defineCommand({
       .optional()
       .describe('Steel column ids. Default: every unplated steel column of the level.'),
     levelId: existingLevelIdParam,
-    margin: z.number().optional().describe('Plate overhang beyond the profile. Default 100 mm.'),
+    margin: z
+      .number()
+      .optional()
+      .describe('Plate overhang beyond the profile, in document units. Default 100 mm.'),
     thickness: z
       .number()
       .optional()

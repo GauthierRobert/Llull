@@ -27,13 +27,16 @@ export const addFooting = defineCommand({
   params: z.object({
     location: vec2('Footing centre [x, y].').optional(),
     underColumns: z.boolean().optional().describe('Place one under each column of the level.'),
-    width: z.number().optional().describe('Size along X. Default 1500 mm.'),
+    width: z.number().optional().describe('Size along X, in document units. Default 1500 mm.'),
     length: z.number().optional().describe('Size along Y. Default = width.'),
-    thickness: z.number().optional().describe('Depth of the pad. Default 600 mm.'),
+    thickness: z
+      .number()
+      .optional()
+      .describe('Depth of the pad, in document units. Default 600 mm.'),
     topOffset: z
       .number()
       .optional()
-      .describe('Top of footing relative to the level. Default −300 mm.'),
+      .describe('Top of footing relative to the level, in document units. Default −300 mm.'),
     levelId: levelIdParam,
     material: z.string().optional().describe('Default concrete.'),
   }),
@@ -95,7 +98,7 @@ export const addPanel = defineCommand({
   params: z.object({
     corners: z.array(z.array(z.number())).describe('Coplanar corners [[x, y, z], …], at least 3.'),
     role: z.enum(['roof', 'wall']).optional().describe('Roofing or wall cladding. Default wall.'),
-    thickness: z.number().optional().describe('Panel thickness. Default 80 mm.'),
+    thickness: z.number().optional().describe('Panel thickness, in document units. Default 80 mm.'),
     levelId: levelIdParam,
     material: z.string().optional().describe('Default sandwich-panel (or steel-sheet, …).'),
   }),
