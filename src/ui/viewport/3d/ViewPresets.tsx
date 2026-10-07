@@ -75,12 +75,18 @@ export function ViewPresetsOverlay(): React.ReactElement {
   const selection = useStore((s) => s.document.selection);
   const allEntityIds = useStore((s) => s.document.order);
 
-  const fit = (ids: string[]): void => {
+  /** View `ids` from `direction`, framed to fit; nothing to frame -> origin from distance 10. */
+  const frame = (direction: PresetDirection, ids: string[]): void => {
     const framing = computeFitFraming(useStore.getState().document, ids);
-    if (framing) {
-      const [x, y, z] = framing.center;
-      bridge.applyPreset?.(PRESET_DIRECTIONS.iso, new THREE.Vector3(x, y, z), framing.distance);
+    if (!framing) {
+      bridge.applyPreset?.(direction, new THREE.Vector3(), 10);
+      return;
     }
+    const [x, y, z] = framing.center;
+    bridge.applyPreset?.(direction, new THREE.Vector3(x, y, z), framing.distance);
+  };
+  const fit = (ids: string[]): void => {
+    if (ids.length > 0) frame(PRESET_DIRECTIONS.iso, ids);
   };
 
   return (
@@ -92,8 +98,7 @@ export function ViewPresetsOverlay(): React.ReactElement {
               key={name}
               type="button"
               className="vp-btn"
-              // Look at the origin from distance 10.
-              onClick={() => bridge.applyPreset?.(PRESET_DIRECTIONS[name], new THREE.Vector3(), 10)}
+              onClick={() => frame(PRESET_DIRECTIONS[name], allEntityIds)}
               title={`${label} view`}
               aria-label={`${label} view`}
             >
