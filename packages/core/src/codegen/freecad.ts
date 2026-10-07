@@ -14,6 +14,7 @@ import {
   parameterLines,
   provenance,
   quote,
+  sectionBanner,
 } from './format';
 import { placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 
@@ -153,7 +154,7 @@ export function emitFreeCad(program: FeatureProgram): string {
     '',
     `doc = App.newDocument("llull")`,
     '',
-    `# ── PARAMETERS ${'─'.repeat(50)}`,
+    sectionBanner('PARAMETERS'),
   ];
   lines.push(
     ...parameterLines(
@@ -162,9 +163,9 @@ export function emitFreeCad(program: FeatureProgram): string {
       (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}  # ${commentText(p.name)}`,
     ),
   );
-  lines.push('', `# ── MODEL ${'─'.repeat(55)}`);
+  lines.push('', sectionBanner('MODEL'));
   lines.push(...featureLinesWithHeadings(program, '#', featureLine));
-  lines.push('', `# ── RESULT ${'─'.repeat(54)}`);
+  lines.push('', sectionBanner('RESULT'));
   program.outputs.forEach((output, i) => {
     const name = output.name ?? `solid_${i + 1}`;
     lines.push(`show(${output.variable}, ${quote(name)}, ${quote(output.color)})`);

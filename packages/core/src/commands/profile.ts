@@ -2,7 +2,7 @@ import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from './schema';
 import { axisVector, isValidAxis } from '../lib/axis';
-import { ORIGIN, finiteVec3OrZero } from '../lib/vec3';
+import { ORIGIN, finiteVec3OrZero, len3 } from '../lib/vec3';
 import { noop } from './noop';
 import { newEntity } from './newEntity';
 import { nextId } from '../lib/id';
@@ -140,7 +140,7 @@ function resolveAxis(raw: unknown): Vec3 | null {
   if (raw === undefined) return [0, 0, 1];
   if (!isValidAxis(raw)) return null;
   const [ax, ay, az] = axisVector(raw);
-  const len = Math.sqrt(ax ** 2 + ay ** 2 + az ** 2);
+  const len = len3([ax, ay, az]);
   return len < 1e-10 ? null : [ax / len, ay / len, az / len];
 }
 

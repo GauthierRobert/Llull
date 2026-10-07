@@ -2314,7 +2314,7 @@
     "name": "bill_of_materials"
   },
   {
-    "description": "Compute the intersection of two 3D solid entities, producing a mesh entity that covers only the volume shared by both solids. Both operand entities are consumed (removed) and replaced by the intersection mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).",
+    "description": "Compute the intersection of two 3D solid entities, producing a mesh entity that covers only the volume shared by both solids. Both operand entities are consumed (removed) and replaced by the intersection mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.",
     "input_schema": {
       "properties": {
         "a": {
@@ -2335,7 +2335,7 @@
     "name": "boolean_intersect"
   },
   {
-    "description": "Subtract the volume of 3D solid b from 3D solid a, producing a mesh entity. Order matters: result = a minus b. Both operand entities are consumed (removed) and replaced by the result mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).",
+    "description": "Subtract the volume of 3D solid b from 3D solid a, producing a mesh entity. Order matters: result = a minus b. Both operand entities are consumed (removed) and replaced by the result mesh. Requires a geometry kernel to be injected. Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.",
     "input_schema": {
       "properties": {
         "a": {
@@ -2356,7 +2356,7 @@
     "name": "boolean_subtract"
   },
   {
-    "description": "Merge two 3D solid entities into a single mesh entity using a CSG union operation. Both operand entities are consumed (removed) and replaced by the union mesh. Requires a geometry kernel to be injected (available after app initialization). Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).",
+    "description": "Merge two 3D solid entities into a single mesh entity using a CSG union operation. Both operand entities are consumed (removed) and replaced by the union mesh. Requires a geometry kernel to be injected (available after app initialization). Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.",
     "input_schema": {
       "properties": {
         "a": {

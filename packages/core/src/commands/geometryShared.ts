@@ -97,16 +97,34 @@ export function positionField(note = ''): z.ZodOptional<z.ZodType<Vec3>> {
   ).optional();
 }
 
-/** `anchor` param of a placed primitive; `description` names the shape and its default anchor. */
-export function anchorField(description: string): z.ZodOptional<
-  z.ZodCatch<
-    z.ZodEnum<{
-      center: 'center';
-      min: 'min';
-      'base-center': 'base-center';
-    }>
-  >
+type AnchorName = 'center' | 'min' | 'base-center';
+
+const STANDARD_ANCHOR_TEXT: Record<AnchorName, string> = {
+  center: 'geometric center',
+  min: 'min-XYZ corner of the AABB',
+  'base-center': 'center of the bottom face (mid X/Y, min Z)',
+};
+
+/** `anchor` param of a placed primitive; lists `defaultAnchor` first, `details` overrides per-anchor text. */
+export function anchorField(
+  shape: string,
+  defaultAnchor: AnchorName,
+  details: Partial<Record<AnchorName, string>> = {},
+): z.ZodOptional<
+  z.ZodCatch<z.ZodEnum<{ center: 'center'; min: 'min'; 'base-center': 'base-center' }>>
 > {
+  const order: AnchorName[] = [
+    defaultAnchor,
+    ...(['center', 'min', 'base-center'] as const).filter((name) => name !== defaultAnchor),
+  ];
+  const lines = order.map(
+    (name) =>
+      `"${name}"${name === defaultAnchor ? ' (default)' : ''}: ${details[name] ?? STANDARD_ANCHOR_TEXT[name]}. `,
+  );
+  const description =
+    `Which point on the ${shape} the position refers to. ${lines.join('')}` +
+    `Unknown values fall back to "${defaultAnchor}". ` +
+    'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.';
   return tolerant(z.enum(['center', 'min', 'base-center']).describe(description)).optional();
 }
 

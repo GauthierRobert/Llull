@@ -39,14 +39,7 @@ export const addBox = defineCommand({
   params: z.object({
     size: looseVec3('[width, height, depth] in document units. All three components must be > 0.'),
     position: positionField(),
-    anchor: anchorField(
-      'Which point on the box the position refers to. ' +
-        '"center" (default): geometric center. ' +
-        '"min": min-XYZ corner of the AABB. ' +
-        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-        'Unknown values fall back to "center". ' +
-        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-    ),
+    anchor: anchorField('box', 'center'),
     rotation: rotationField(),
     color: colorField(DEFAULT_SOLID_COLOR),
   }),

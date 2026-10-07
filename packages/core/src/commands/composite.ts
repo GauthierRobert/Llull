@@ -10,7 +10,7 @@ import type { CommandResult } from './types';
 import { newEntity } from './newEntity';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
-import { add3, cross3, dot3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { add3, cross3, dot3, normalize3, scale3, sub3, len3 } from '../lib/vec3';
 import { commitEntity } from './commitEntity';
 import { noop } from './noop';
 import { DEFAULT_SOLID_COLOR } from './geometryShared';
@@ -101,7 +101,7 @@ export const makeTubeBetween = defineCommand({
     }
 
     const delta = sub3(p2, p1);
-    const length = Math.sqrt(dot3(delta, delta));
+    const length = len3(delta);
     if (length < 1e-9) {
       return noop(
         doc,
