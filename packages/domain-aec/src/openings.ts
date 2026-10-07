@@ -117,12 +117,20 @@ function openingShape(kind: OpeningKind): OpeningShape {
         'Distance along the wall from its start to the opening CENTER. Default: wall midpoint.',
       ),
     at: vec2('Alternative to offset: a plan point [x, y] projected onto the wall.').optional(),
-    width: z.number().optional().describe(`Opening width. Default ${defaults.width} mm.`),
-    height: z.number().optional().describe(`Opening height. Default ${defaults.height} mm.`),
+    width: z
+      .number()
+      .optional()
+      .describe(`Opening width in document units (> 0). Default ${defaults.width} mm.`),
+    height: z
+      .number()
+      .optional()
+      .describe(`Opening height in document units (> 0). Default ${defaults.height} mm.`),
     sillHeight: z
       .number()
       .optional()
-      .describe(`Height of the opening bottom above the wall base. Default ${defaults.sill} mm.`),
+      .describe(
+        `Height of the opening bottom above the wall base, in document units (>= 0). Default ${defaults.sill} mm.`,
+      ),
     material: z.string().optional().describe(`Material. Default ${defaults.material}.`),
     mark: z
       .string()

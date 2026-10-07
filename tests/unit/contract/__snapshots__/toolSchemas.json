@@ -427,7 +427,7 @@
           "type": "string"
         },
         "railHeight": {
-          "description": "Top of the runway beam above the level (> 0).",
+          "description": "Top of the runway beam above the level, in document units (> 0).",
           "type": "number"
         },
         "start": {
@@ -438,7 +438,7 @@
           "type": "array"
         },
         "supportSpacing": {
-          "description": "Distance between supports. Default 6000 mm.",
+          "description": "Distance between supports, in document units (> 0). Default 6000 mm.",
           "type": "number"
         }
       },
@@ -606,7 +606,7 @@
           "type": "array"
         },
         "height": {
-          "description": "Opening height. Default 2100 mm.",
+          "description": "Opening height in document units (> 0). Default 2100 mm.",
           "type": "number"
         },
         "mark": {
@@ -622,7 +622,7 @@
           "type": "number"
         },
         "sillHeight": {
-          "description": "Height of the opening bottom above the wall base. Default 0 mm.",
+          "description": "Height of the opening bottom above the wall base, in document units (>= 0). Default 0 mm.",
           "type": "number"
         },
         "swing": {
@@ -638,7 +638,7 @@
           "type": "string"
         },
         "width": {
-          "description": "Opening width. Default 900 mm.",
+          "description": "Opening width in document units (> 0). Default 900 mm.",
           "type": "number"
         }
       },
@@ -2177,7 +2177,7 @@
           "type": "array"
         },
         "height": {
-          "description": "Opening height. Default 1200 mm.",
+          "description": "Opening height in document units (> 0). Default 1200 mm.",
           "type": "number"
         },
         "mark": {
@@ -2193,7 +2193,7 @@
           "type": "number"
         },
         "sillHeight": {
-          "description": "Height of the opening bottom above the wall base. Default 900 mm.",
+          "description": "Height of the opening bottom above the wall base, in document units (>= 0). Default 900 mm.",
           "type": "number"
         },
         "wallId": {
@@ -2201,7 +2201,7 @@
           "type": "string"
         },
         "width": {
-          "description": "Opening width. Default 1200 mm.",
+          "description": "Opening width in document units (> 0). Default 1200 mm.",
           "type": "number"
         }
       },
