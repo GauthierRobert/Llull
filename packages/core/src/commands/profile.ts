@@ -14,6 +14,7 @@ import {
   ROTATION_CONVENTION,
   commitSolid,
   rejectBadProfile,
+  rejectZeroAreaProfile,
 } from './geometryShared';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { circlePoints } from './tessellation';
@@ -250,6 +251,8 @@ export const revolveProfile = defineCommand({
     }
     const badProfile = rejectBadProfile(doc, 'revolve_profile', profile);
     if (badProfile) return badProfile;
+    const flatProfile = rejectZeroAreaProfile(doc, 'revolve_profile', profile);
+    if (flatProfile) return flatProfile;
     if (
       explicitId !== undefined &&
       explicitId.length > 0 &&

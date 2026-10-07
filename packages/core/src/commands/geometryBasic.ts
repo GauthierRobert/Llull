@@ -11,6 +11,7 @@ import {
   placeSolid,
   positionField,
   rejectBadProfile,
+  rejectZeroAreaProfile,
   rejectBadSize,
   rotationField,
   translated,
@@ -114,6 +115,8 @@ export const extrude = defineCommand({
     }
     const badProfile = rejectBadProfile(doc, 'extrude_profile', profile);
     if (badProfile) return badProfile;
+    const flatProfile = rejectZeroAreaProfile(doc, 'extrude_profile', profile);
+    if (flatProfile) return flatProfile;
     if (depth <= 0) {
       return noop(
         doc,
