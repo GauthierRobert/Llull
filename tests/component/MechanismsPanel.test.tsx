@@ -234,9 +234,13 @@ describe('MechanismsPanel — joints section', () => {
     patchDispatch(dispatchSpy);
     render(<MechanismsPanel />);
     const input = screen.getByTestId(`joint-value-${jointId}`);
-    fireEvent.change(input, { target: { value: '1.57' } });
+    // The field is in degrees; the command receives radians.
+    fireEvent.change(input, { target: { value: '90' } });
     fireEvent.blur(input);
-    expect(dispatchSpy).toHaveBeenCalledWith('set_joint_value', { id: jointId, value: 1.57 });
+    expect(dispatchSpy).toHaveBeenCalledWith('set_joint_value', {
+      id: jointId,
+      value: Math.PI / 2,
+    });
   });
 
   it('does not re-dispatch an unchanged value on blur', () => {
@@ -255,7 +259,9 @@ describe('MechanismsPanel — joints section', () => {
       localDispatch('set_joint_value', { id: jointId, value: 0.5 });
     });
     const input = screen.getByTestId(`joint-value-${jointId}`) as HTMLInputElement;
-    expect(input.value).toBe('0.5');
+    // 0.5 rad shown in degrees
+    expect(input.value).toBe('28.64789');
+    expect(screen.getByLabelText(`Joint value for ${jointId} (°)`)).toBeDefined();
   });
 
   it('highlight is a keyboard-operable toggle button, not a listbox option', () => {
