@@ -193,6 +193,26 @@ export function collectSnapCandidates(
         break;
       }
 
+      case 'ellipse': {
+        const cx = entity.center[0] + ox;
+        const cy = entity.center[1] + oy;
+        const { radiusX, radiusY } = entity;
+
+        if (doCenters) add('center', cx, cy);
+        if (doEndpoints) {
+          add('endpoint', cx + radiusX, cy);
+          add('endpoint', cx - radiusX, cy);
+          add('endpoint', cx, cy + radiusY);
+          add('endpoint', cx, cy - radiusY);
+        }
+        break;
+      }
+
+      case 'spline': {
+        if (doEndpoints) for (const p of entity.points) add('endpoint', p[0] + ox, p[1] + oy);
+        break;
+      }
+
       case 'point': {
         if (doEndpoints) add('endpoint', ox, oy);
         break;
