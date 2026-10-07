@@ -57,6 +57,12 @@ export function DrawInteraction({
           setOrthoHeld(e.shiftKey);
           setRawCursor(toDocumentPoint(e.point));
         }}
+        // Touch/pen taps deliver no preceding pointermove: take the cursor from the press so the
+        // click lands where the pointer is, not at the last hover position.
+        onPointerDown={(e) => {
+          setOrthoHeld(e.shiftKey);
+          setRawCursor(toDocumentPoint(e.point));
+        }}
         onPointerLeave={() => setRawCursor(null)}
         onClick={(e) => {
           e.stopPropagation();
