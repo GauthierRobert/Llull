@@ -152,6 +152,14 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
     }
     case 'point':
       return distance(pick, [0, 0]) ** 2;
+    case 'text': {
+      // Estimated text box (no font metrics here): ~0.6 em per character, one line tall.
+      const width = entity.content.length * entity.height * TEXT_PICK_EM_WIDTH;
+      const left = entity.anchor === 'center' ? -width / 2 : entity.anchor === 'right' ? -width : 0;
+      const dx = Math.max(left - pick[0], 0, pick[0] - (left + width));
+      const dy = Math.max(Math.abs(pick[1]) - entity.height / 2, 0);
+      return dx * dx + dy * dy;
+    }
     case 'ellipse': {
       const { center, radiusX, radiusY } = entity;
       const samples = Array.from({ length: ELLIPSE_PICK_SAMPLES + 1 }, (_, i): Vec2 => {
@@ -164,6 +172,9 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
       return Infinity;
   }
 }
+
+/** Average glyph advance as a fraction of the text height, used to estimate a text pick box. */
+const TEXT_PICK_EM_WIDTH = 0.6;
 
 /** Segments used to approximate an ellipse outline for picking. */
 const ELLIPSE_PICK_SAMPLES = 48;
