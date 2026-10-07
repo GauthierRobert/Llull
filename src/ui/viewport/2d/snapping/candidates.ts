@@ -30,7 +30,7 @@ import {
  * @pure deterministic, no side effects
  */
 export function collectSnapCandidates(
-  document: CadDocument,
+  document: Pick<CadDocument, 'entities' | 'order'>,
   opts: CollectOpts = {},
   fromPoint?: Vec2 | null,
   cursorPoint?: Vec2 | null,

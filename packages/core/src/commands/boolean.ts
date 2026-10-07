@@ -80,7 +80,7 @@ export const booleanUnion = defineCommand({
     'Merge two 3D solid entities into a single mesh entity using a CSG union operation. ' +
     'Both operand entities are consumed (removed) and replaced by the union mesh. ' +
     'Requires a geometry kernel to be injected (available after app initialization). ' +
-    'Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).',
+    'Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.',
   params: z.object({
     a: z.string().describe('Id of the first 3D solid operand.'),
     b: z.string().describe('Id of the second 3D solid operand.'),
@@ -103,7 +103,7 @@ export const booleanSubtract = defineCommand({
     'Order matters: result = a minus b. ' +
     'Both operand entities are consumed (removed) and replaced by the result mesh. ' +
     'Requires a geometry kernel to be injected. ' +
-    'Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).',
+    'Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.',
   params: z.object({
     a: z.string().describe('Id of the base 3D solid (the solid to subtract from).'),
     b: z.string().describe('Id of the tool 3D solid (the solid to subtract with).'),
@@ -127,7 +127,7 @@ export const booleanIntersect = defineCommand({
     'only the volume shared by both solids. ' +
     'Both operand entities are consumed (removed) and replaced by the intersection mesh. ' +
     'Requires a geometry kernel to be injected. ' +
-    'Both operands must be 3D solids (box, cylinder, sphere, extrusion, or mesh).',
+    'Both operands must be 3D solids (any solid kind: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, mesh); 2D shapes are rejected.',
   params: z.object({
     a: z.string().describe('Id of the first 3D solid operand.'),
     b: z.string().describe('Id of the second 3D solid operand.'),

@@ -23,6 +23,7 @@ import { entityIdFromInstanceId } from './grouping';
 import { buildCylinderGeometry, buildSphereGeometry } from './entities/primitiveGeometry';
 import { useDisposable } from '../useDisposable';
 import { isAdditiveSelect } from '../selectClick';
+import { useStableByKey } from '../useStableByKey';
 
 /**
  * Creates the THREE geometry for a given batchable kind + representative entity.
@@ -136,8 +137,8 @@ function InstanceBatchMesh({
   const count = batch.entities.length;
 
   // Batch objects are rebuilt every grouping pass; batch.key is the content identity.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const geometry = useDisposable(() => makeGeometry(batch), [batch.key]);
+  const geometryBatch = useStableByKey(batch, batch.key);
+  const geometry = useDisposable(() => makeGeometry(geometryBatch), [geometryBatch]);
 
   // Uses batch.pbrMaterial for roughness/metalness in shaded mode.
   const material = useDisposable(

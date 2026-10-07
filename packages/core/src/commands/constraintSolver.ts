@@ -1,4 +1,5 @@
 import type { CadDocument, Constraint, EntityRef, Vec3 } from '../model/types';
+import { len2 } from '../lib/vec2';
 import { resolveNumeric } from './expression';
 
 type Point = readonly [number, number];
@@ -37,7 +38,7 @@ function resolveDirection(doc: CadDocument, ref: EntityRef): [number, number] | 
   if (entity?.kind !== 'line') return null;
   const dx = entity.end[0] - entity.start[0];
   const dy = entity.end[1] - entity.start[1];
-  const len = Math.sqrt(dx * dx + dy * dy);
+  const len = len2([dx, dy]);
   if (len < 1e-12) return [1, 0];
   return [dx / len, dy / len];
 }
@@ -82,7 +83,7 @@ function applyConstraintGradient(
   ): number {
     const dx = pa[0] - pb[0];
     const dy = pa[1] - pb[1];
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const dist = len2([dx, dy]);
     if (dist < 1e-12) return 0;
     const err = dist - target;
     const ux = dx / dist;
@@ -179,7 +180,7 @@ function applyConstraintGradient(
       const [bx, by] = resolvePoint(doc, { entityId: lineRef.entityId, kind: 'end' }) as Point;
       const ldx = bx - ax;
       const ldy = by - ay;
-      const llen = Math.sqrt(ldx * ldx + ldy * ldy);
+      const llen = len2([ldx, ldy]);
       if (llen < 1e-12) return 0;
       const nx = -ldy / llen;
       const ny = ldx / llen;

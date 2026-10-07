@@ -7,43 +7,28 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, getBuilding, withElement, fromMm } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
 import { refitPlates } from './plateSupport';
 import { designFixedPlates } from './plateDesign';
-import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
-import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
+import { findProfile } from '../steel/profiles';
+import {
+  addProfileGroup,
+  isValidTargetUtilisation,
+  MAX_ITERATIONS,
+  nextProfile,
+  resizeProfileGroup,
+  targetUtilisationParam,
+  upsizeProfileGroups,
+  type ProfileGroups,
+} from './profileGroups';
 import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 import { sizeBoltGroups } from './frameBoltDesign';
 import { checkFrames } from './frameCheckFrames';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
+import { finalUtilisationText, noChangeResult, utilisationStats } from './designReport';
 import { sweepFrame } from '../mesh';
-
-/** Iteration cap of the design loops of design_portal_frames and design_purlins. */
-export const MAX_ITERATIONS = 15;
-
-/**
- * Next heavier profile of the same family; at the top of the family, the lightest I-section
- * (IPE / HEA / HEB) with a larger plastic modulus. Null when nothing larger exists.
- */
-export function nextProfile(name: string): string | null {
-  const profile = findProfile(name);
-  if (!profile) return null;
-  const sameFamily = lightestProfile(
-    (candidate) =>
-      candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre,
-  );
-  if (sameFamily) return sameFamily.name;
-  if (profile.shape !== 'I') return null;
-  const modulus = sectionProperties(profile).plasticModulus;
-  const stronger = lightestProfile(
-    (candidate) =>
-      candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
-  );
-  return stronger?.name ?? null;
-}
 
 /**
  * @command design_portal_frames
@@ -63,16 +48,11 @@ export const designPortalFrames = defineCommand({
     'connection type for every combination. Reports every change and the final utilisations.',
   params: z.object({
     ...FRAME_LOAD_SHAPE,
-    targetUtilisation: z
-      .number()
-      .optional()
-      .describe('Maximum accepted utilisation (0.5–1). Default 0.95.'),
+    targetUtilisation: targetUtilisationParam,
   }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95 } = params;
-    if (
-      !(isFiniteNumber(targetUtilisation) && targetUtilisation >= 0.5 && targetUtilisation <= 1)
-    ) {
+    if (!isValidTargetUtilisation(targetUtilisation)) {
       return noop(doc, 'design_portal_frames failed: targetUtilisation must be in [0.5, 1].');
     }
     const resolved = resolveFrameLoads(doc, params);
@@ -106,33 +86,31 @@ export const designPortalFrames = defineCommand({
         }
       }
       if (groups.size === 0) break;
-      let next = building;
-      let progressed = false;
-      for (const { role, profile } of groups.values()) {
-        const larger = nextProfile(profile);
-        if (!larger) {
-          limited = true;
-          continue;
-        }
-        progressed = true;
-        changes.push(`${role}s ${profile} → ${larger}`);
+      const step = upsizeProfileGroups(building, groups, nextProfile, (next, group, larger) => {
         const resizedGroup = resizeProfileGroup(
           next,
-          { role, profile },
+          group,
           larger,
           (element) => analysed.has(element.id),
           (building, resized) =>
-            refitPlates(current, withElement(building, resized), resized, profile).building,
+            refitPlates(current, withElement(building, resized), resized, group.profile).building,
         );
-        next = resizedGroup.building;
-        const resizedIds = resizedGroup.resizedIds;
-        for (const id of resizedIds) changed.add(id);
-        const reseated = reseatDependents(current, next, resizedIds, profile, larger, analysed);
-        next = reseated.building;
-        for (const id of reseated.moved) changed.add(id);
-      }
-      current = { ...current, building: next };
-      if (!progressed) break;
+        const { resizedIds } = resizedGroup;
+        const reseated = reseatDependents(
+          current,
+          resizedGroup.building,
+          resizedIds,
+          group.profile,
+          larger,
+          analysed,
+        );
+        return { building: reseated.building, changedIds: [...resizedIds, ...reseated.moved] };
+      });
+      changes.push(...step.changes);
+      for (const id of step.changedIds) changed.add(id);
+      if (step.limited) limited = true;
+      current = { ...current, building: step.building };
+      if (!step.progressed) break;
       if (iteration === MAX_ITERATIONS - 1) limited = true;
     }
     const { rows } = checkFrames(current, levelId, loads);
@@ -148,17 +126,7 @@ export const designPortalFrames = defineCommand({
     if (plates.unresolved > 0) limited = true;
     if (changed.size === 0) {
       const final = checkFrames(doc, levelId, loads);
-      const worst = Math.max(0, ...final.rows.map((row) => row.utilisation));
-      return {
-        document: doc,
-        summary: `Designed ${final.frames} frame(s): no change needed (max utilisation ${worst.toFixed(2)}${limited ? '; largest available size reached for some elements' : ''}).`,
-        affected: [],
-        data: {
-          changes: [],
-          maxUtilisation: worst,
-          failures: final.rows.filter((row) => row.utilisation > 1).length,
-        },
-      };
+      return noChangeResult(doc, `${final.frames} frame(s)`, final.rows, limited);
     }
     const document = regenerateBuilding(doc, building);
     const final = checkFrames(document, levelId, loads);
@@ -169,19 +137,17 @@ export const designPortalFrames = defineCommand({
         element.role === 'column' &&
         !analysed.has(element.id),
     );
-    const worst = Math.max(0, ...final.rows.map((row) => row.utilisation));
-    const failures = final.rows.filter((row) => row.utilisation > 1).length;
+    const stats = utilisationStats(final.rows);
     return {
       document,
       summary:
         `Designed ${final.frames} frame(s) for ${final.combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
         `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ` +
-        `Max utilisation now ${worst.toFixed(2)}${failures > 0 ? `, ${failures} element(s) still failing` : ''}` +
-        `${limited ? ' (largest available size reached for some elements)' : ''}. ` +
+        `${finalUtilisationText(stats, 'element(s)', limited)} ` +
         `Frames only (verify bracing, foundations and runways with their checks)` +
         `${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
       affected: elementAffected(document, [...changed]),
-      data: { changes, maxUtilisation: worst, failures },
+      data: { changes, ...stats },
     };
   },
 });

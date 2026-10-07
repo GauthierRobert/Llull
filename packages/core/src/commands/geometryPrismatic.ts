@@ -43,14 +43,10 @@ export const addWedge = defineCommand({
         'depth=Z extent (ramp direction). All must be > 0.',
     ),
     position: positionField(),
-    anchor: anchorField(
-      'Which point on the wedge the position refers to. ' +
-        '"min" (default): lower-front-left corner of the bounding box (min-XYZ). ' +
-        '"center": geometric center of the AABB. ' +
-        '"base-center": center of the bottom face (mid X/Y, min Z). ' +
-        'Unknown values fall back to "min". ' +
-        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-    ),
+    anchor: anchorField('wedge', 'min', {
+      min: 'lower-front-left corner of the bounding box (min-XYZ)',
+      center: 'geometric center of the AABB',
+    }),
     rotation: rotationField(),
     color: colorField(DEFAULT_SOLID_COLOR),
   }),
@@ -114,14 +110,10 @@ export const addPyramid = defineCommand({
         'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
       ),
     position: positionField(),
-    anchor: anchorField(
-      'Which point on the pyramid the position refers to. ' +
-        '"base-center" (default): center of the rectangular base; apex at position+[0,0,height]. ' +
-        '"center": geometric center of the AABB (mid X/Y/Z). ' +
-        '"min": min-XYZ corner of the AABB. ' +
-        'Unknown values fall back to "base-center". ' +
-        'Offset is applied in the local UNROTATED frame; viewport rotates about the stored origin.',
-    ),
+    anchor: anchorField('pyramid', 'base-center', {
+      'base-center': 'center of the rectangular base; apex at position+[0,0,height]',
+      center: 'geometric center of the AABB (mid X/Y/Z)',
+    }),
     rotation: rotationField(),
     color: colorField(DEFAULT_SOLID_COLOR),
   }),

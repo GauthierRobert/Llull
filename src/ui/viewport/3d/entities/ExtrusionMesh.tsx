@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { ExtrusionEntity } from '@core/model/types';
 import { SolidMeshShell, type SolidMeshKindProps } from './SolidMeshShell';
+import { useStableByKey } from '../../useStableByKey';
 
 /** Stable serialization key for the profile array. */
 function profileKey(profile: ExtrusionEntity['profile']): string {
@@ -20,10 +21,10 @@ export function ExtrusionMesh({
   entity,
   ...shell
 }: SolidMeshKindProps<ExtrusionEntity>): React.ReactElement {
-  const { profile, depth } = entity;
+  const { depth } = entity;
 
   // Rebuild geometry only when the profile points or depth change.
-  const pKey = profileKey(profile);
+  const profile = useStableByKey(entity.profile, profileKey(entity.profile));
 
   const geometry = useMemo(() => {
     const first = profile[0];
@@ -36,8 +37,7 @@ export function ExtrusionMesh({
     }
     shape.closePath();
     return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pKey, depth]);
+  }, [profile, depth]);
 
   return <SolidMeshShell entity={entity} geometry={geometry} {...shell} />;
 }

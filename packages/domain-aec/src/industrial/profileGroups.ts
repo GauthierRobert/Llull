@@ -4,8 +4,25 @@
  * @layer domain-aec
  */
 
+import { z } from '@core/commands/schema';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
+import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { withElement } from '../model';
+import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
+
+/** Iteration cap of the design loops of design_portal_frames and design_purlins. */
+export const MAX_ITERATIONS = 15;
+
+/** Shared `targetUtilisation` parameter of the design commands. */
+export const targetUtilisationParam = z
+  .number()
+  .optional()
+  .describe('Maximum accepted utilisation (0.5–1). Default 0.95.');
+
+/** @invariant accepted target utilisations lie in [0.5, 1] */
+export function isValidTargetUtilisation(value: number): boolean {
+  return isFiniteNumber(value) && value >= 0.5 && value <= 1;
+}
 
 interface ProfileGroup {
   role: string;
@@ -45,4 +62,67 @@ export function resizeProfileGroup(
     resizedIds.push(element.id);
   }
   return { building: next, resizedIds };
+}
+
+/**
+ * One design iteration: up-size every group to `nextSize(profile)` via `resizeGroup` (which also
+ * re-seats dependents). Groups without a larger size set `limited`; `progressed` is false when no
+ * group could grow.
+ * @pure
+ */
+export function upsizeProfileGroups(
+  building: BuildingModel,
+  groups: ProfileGroups,
+  nextSize: (profile: string) => string | null,
+  resizeGroup: (
+    building: BuildingModel,
+    group: ProfileGroup,
+    larger: string,
+  ) => { building: BuildingModel; changedIds: string[] },
+): {
+  building: BuildingModel;
+  progressed: boolean;
+  limited: boolean;
+  changes: string[];
+  changedIds: string[];
+} {
+  let next = building;
+  let progressed = false;
+  let limited = false;
+  const changes: string[] = [];
+  const changedIds: string[] = [];
+  for (const group of groups.values()) {
+    const larger = nextSize(group.profile);
+    if (!larger) {
+      limited = true;
+      continue;
+    }
+    progressed = true;
+    changes.push(`${group.role}s ${group.profile} → ${larger}`);
+    const resized = resizeGroup(next, group, larger);
+    next = resized.building;
+    changedIds.push(...resized.changedIds);
+  }
+  return { building: next, progressed, limited, changes, changedIds };
+}
+
+/**
+ * Next heavier profile of the same family; at the top of the family, the lightest I-section
+ * (IPE / HEA / HEB) with a larger plastic modulus. Null when nothing larger exists.
+ */
+export function nextProfile(name: string): string | null {
+  const profile = findProfile(name);
+  if (!profile) return null;
+  const sameFamily = lightestProfile(
+    (candidate) =>
+      candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre,
+  );
+  if (sameFamily) return sameFamily.name;
+  if (profile.shape !== 'I') return null;
+  const modulus = sectionProperties(profile).plasticModulus;
+  const stronger = lightestProfile(
+    (candidate) =>
+      candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
+  );
+  return stronger?.name ?? null;
 }

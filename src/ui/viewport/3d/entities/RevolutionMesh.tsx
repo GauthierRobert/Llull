@@ -15,6 +15,7 @@
 import { useMemo } from 'react';
 import type { RevolutionEntity } from '@core/model/types';
 import { SolidMeshShell, type SolidMeshKindProps } from './SolidMeshShell';
+import { useStableByKey } from '../../useStableByKey';
 import { buildRevolutionGeometry } from './primitiveGeometry';
 
 /** Stable string key for the profile array (used as useMemo dep). */
@@ -31,14 +32,13 @@ function RevolutionSolid({
   entity,
   ...shell
 }: SolidMeshKindProps<RevolutionEntity>): React.ReactElement {
-  const { profile, axis, angle, segments } = entity;
-  const pKey = profileKey(profile);
-  const aKey = axisKey(axis);
+  const { angle, segments } = entity;
+  const profile = useStableByKey(entity.profile, profileKey(entity.profile));
+  const axis = useStableByKey(entity.axis, axisKey(entity.axis));
 
   const geometry = useMemo(
     () => buildRevolutionGeometry(profile, axis, angle, segments),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pKey, aKey, angle, segments],
+    [profile, axis, angle, segments],
   );
 
   return (

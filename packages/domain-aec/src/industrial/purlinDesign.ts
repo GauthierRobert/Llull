@@ -6,20 +6,29 @@
 
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
+import { PURLIN_LOAD_SHAPE } from './purlinLoadParams';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, fromMm, getBuilding, withElement } from '../model';
 import { noop } from '@core/commands/noop';
-import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../evaluateElements';
+import { finalUtilisationText, noChangeResult, utilisationStats } from './designReport';
 import { sweepFrame } from '../mesh';
 import { findProfile, lightestProfile, sectionProperties } from '../steel/profiles';
-import { MAX_ITERATIONS, nextProfile } from './frameDesign';
-import { addProfileGroup, resizeProfileGroup, type ProfileGroups } from './profileGroups';
+
+import {
+  addProfileGroup,
+  isValidTargetUtilisation,
+  MAX_ITERATIONS,
+  nextProfile,
+  resizeProfileGroup,
+  targetUtilisationParam,
+  upsizeProfileGroups,
+  type ProfileGroups,
+} from './profileGroups';
 import { type PurlinRow } from './purlinModel';
 import { checkPurlins } from './purlinCheckRun';
-import { existingLevelIdParam } from '../levelParams';
 
 /**
  * Next heavier secondary-steel profile: the next cold-formed C by mass, then the lightest IPE with a
@@ -62,28 +71,12 @@ export const designPurlins = defineCommand({
     'change and the final maximum utilisation; no change returns the document untouched. ' +
     'Bracing eaves struts are not sized (see check_bracing).',
   params: z.object({
-    windPressure: z
-      .number()
-      .optional()
-      .describe('Peak velocity pressure qp, kN/m² (EN 1991-1-4), >= 0. Default 0.6.'),
-    snowLoad: z.number().optional().describe('Roof snow load on plan, kN/m², >= 0. Default 0.8.'),
-    roofDeadLoad: z
-      .number()
-      .optional()
-      .describe(
-        'Roof build-up dead load per m² of roof carried by the purlins, kN/m², >= 0. Default 0.3.',
-      ),
-    levelId: existingLevelIdParam,
-    targetUtilisation: z
-      .number()
-      .optional()
-      .describe('Maximum accepted utilisation (0.5–1). Default 0.95.'),
+    ...PURLIN_LOAD_SHAPE,
+    targetUtilisation: targetUtilisationParam,
   }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95, ...loadParams } = params;
-    if (
-      !(isFiniteNumber(targetUtilisation) && targetUtilisation >= 0.5 && targetUtilisation <= 1)
-    ) {
+    if (!isValidTargetUtilisation(targetUtilisation)) {
       return noop(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
     }
     const analyse = (document: CadDocument): { rows: PurlinRow[]; summary: string } => {
@@ -111,59 +104,44 @@ export const designPurlins = defineCommand({
         addProfileGroup(groups, member);
       }
       if (groups.size === 0) break;
-      let next = building;
-      let progressed = false;
-      for (const { role, profile } of groups.values()) {
-        const larger = nextSecondaryProfile(profile);
-        if (!larger) {
-          limited = true;
-          continue;
-        }
-        progressed = true;
-        changes.push(`${role}s ${profile} → ${larger}`);
-        const resizedGroup = resizeProfileGroup(
-          next,
-          { role, profile },
-          larger,
-          (element) => element.levelId === levelId,
-        );
-        next = resizedGroup.building;
-        const resizedIds = resizedGroup.resizedIds;
-        for (const id of resizedIds) changed.add(id);
-        next = reseatResized(current, next, resizedIds, profile, larger);
-      }
-      current = { ...current, building: next };
-      if (!progressed) break;
+      const step = upsizeProfileGroups(
+        building,
+        groups,
+        nextSecondaryProfile,
+        (next, group, larger) => {
+          const { building: resizedBuilding, resizedIds } = resizeProfileGroup(
+            next,
+            group,
+            larger,
+            (element) => element.levelId === levelId,
+          );
+          return {
+            building: reseatResized(current, resizedBuilding, resizedIds, group.profile, larger),
+            changedIds: resizedIds,
+          };
+        },
+      );
+      changes.push(...step.changes);
+      for (const id of step.changedIds) changed.add(id);
+      if (step.limited) limited = true;
+      current = { ...current, building: step.building };
+      if (!step.progressed) break;
       if (iteration === MAX_ITERATIONS - 1) limited = true;
     }
     if (changed.size === 0) {
-      const worst = Math.max(0, ...first.rows.map((row) => row.utilisation));
-      return {
-        document: doc,
-        summary:
-          `Designed ${first.rows.length} purlin / rail row(s): no change needed (max utilisation ${worst.toFixed(2)}` +
-          `${limited ? '; largest available size reached for some elements' : ''}).`,
-        affected: [],
-        data: {
-          changes: [],
-          maxUtilisation: worst,
-          failures: first.rows.filter((row) => row.utilisation > 1).length,
-        },
-      };
+      return noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited);
     }
     const document = regenerateBuilding(doc, getBuilding(current));
     const final = analyse(document).rows;
-    const worst = Math.max(0, ...final.map((row) => row.utilisation));
-    const failures = final.filter((row) => row.utilisation > 1).length;
+    const stats = utilisationStats(final);
     return {
       document,
       summary:
         `Designed ${final.length} purlin / rail row(s): ${changes.join('; ')}. ` +
-        `Max utilisation now ${worst.toFixed(2)}${failures > 0 ? `, ${failures} row(s) still failing` : ''}` +
-        `${limited ? ' (largest available size reached for some elements)' : ''}. ` +
+        `${finalUtilisationText(stats, 'row(s)', limited)} ` +
         `Re-seated on rafters / columns; verify bracing eaves struts with check_bracing.`,
       affected: elementAffected(document, [...changed]),
-      data: { changes, maxUtilisation: worst, failures },
+      data: { changes, ...stats },
     };
   },
 });

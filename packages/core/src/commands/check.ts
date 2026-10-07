@@ -8,7 +8,7 @@ import type { CadDocument, Entity } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { boundsCenter, entityBounds } from './sceneBounds';
-import { dot3 } from '../lib/vec3';
+import { len3 } from '../lib/vec3';
 
 /** Severity of a model issue. */
 type IssueSeverity = 'error' | 'warning' | 'info';
@@ -142,7 +142,7 @@ function checkInsufficientPoints(e: Entity): Issue[] {
 /** Far from origin: bounding-box centre beyond `farThreshold` (viewport precision issues). */
 function checkFarFromOrigin(e: Entity, farThreshold: number): Issue[] {
   const center = boundsCenter(entityBounds(e));
-  const dist = Math.sqrt(dot3(center, center));
+  const dist = len3(center);
   return dist > farThreshold
     ? [
         issue(

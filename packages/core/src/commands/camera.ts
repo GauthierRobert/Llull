@@ -7,7 +7,7 @@
  */
 
 import type { CameraState } from '../model/types';
-import { dot3, scale3, sub3 } from '../lib/vec3';
+import { scale3, sub3, len3 } from '../lib/vec3';
 import { boundsCenter } from './sceneBounds';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
@@ -214,7 +214,7 @@ export const fitView = defineCommand({
 
     const target = boundsCenter(bounds);
     const half = scale3(sub3(bounds.max, bounds.min), 0.5);
-    const boundsRadius = Math.sqrt(dot3(half, half));
+    const boundsRadius = len3(half);
     // A lone point has no extent: avoid a degenerate distance.
     const safeRadius = boundsRadius < 0.001 ? 1 : boundsRadius;
     const distance = (safeRadius / Math.sin(HALF_FOV_RAD)) * padding;

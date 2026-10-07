@@ -43,6 +43,51 @@ function fmtEntityRef(ref: Constraint['a'] | Constraint['b']): string {
   return shortId;
 }
 
+interface MechanismRowProps {
+  noun: 'constraint' | 'joint';
+  id: string;
+  kind: string;
+  tone: ChipTone;
+  highlighted: boolean;
+  onHighlight: (id: string) => void;
+  info: React.ReactNode;
+  /** Controls between the info text and the action buttons. */
+  inline?: React.ReactNode;
+  /** Buttons after the highlight toggle. */
+  actions: React.ReactNode;
+}
+
+function MechanismRow({
+  noun,
+  id,
+  kind,
+  tone,
+  highlighted,
+  onHighlight,
+  info,
+  inline,
+  actions,
+}: MechanismRowProps): React.ReactElement {
+  return (
+    <li className={mechanismRowClass(highlighted)} data-testid={`${noun}-row-${id}`}>
+      <span className={`chip chip--${tone}`}>{kind}</span>
+      <span className="panel__row-main mechanisms-row-info">{info}</span>
+      {inline}
+      <div className="panel__row-actions">
+        <IconButton
+          icon="eye"
+          testId={`${noun}-highlight-${id}`}
+          pressed={highlighted}
+          onClick={() => onHighlight(id)}
+          title="Highlight in the viewport"
+          label={`Highlight ${noun} ${id}`}
+        />
+        {actions}
+      </div>
+    </li>
+  );
+}
+
 interface ConstraintRowProps {
   constraint: Constraint;
   highlighted: boolean;
@@ -66,44 +111,45 @@ function ConstraintRow({
       : '';
 
   return (
-    <li className={mechanismRowClass(highlighted)} data-testid={`constraint-row-${constraint.id}`}>
-      <span className={`chip chip--${chipTone}`}>{constraint.kind}</span>
-      <span className="panel__row-main mechanisms-row-info">
-        {aRef} → {bRef}
-        {value}
-      </span>
-      <div className="panel__row-actions">
-        <IconButton
-          icon="eye"
-          testId={`constraint-highlight-${constraint.id}`}
-          pressed={highlighted}
-          onClick={() => onHighlight(constraint.id)}
-          title="Highlight in the viewport"
-          label={`Highlight constraint ${constraint.id}`}
-        />
-        <IconButton
-          icon="zap"
-          testId={`constraint-solve-${constraint.id}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            dispatch('solve_constraints', {});
-          }}
-          title="Solve all constraints"
-          label="Solve constraints"
-        />
-        <IconButton
-          icon="trash"
-          danger
-          testId={`constraint-delete-${constraint.id}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            dispatch('delete_constraint', { id: constraint.id });
-          }}
-          title="Delete this constraint"
-          label={`Delete constraint ${constraint.id}`}
-        />
-      </div>
-    </li>
+    <MechanismRow
+      noun="constraint"
+      id={constraint.id}
+      kind={constraint.kind}
+      tone={chipTone}
+      highlighted={highlighted}
+      onHighlight={onHighlight}
+      info={
+        <>
+          {aRef} → {bRef}
+          {value}
+        </>
+      }
+      actions={
+        <>
+          <IconButton
+            icon="zap"
+            testId={`constraint-solve-${constraint.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              dispatch('solve_constraints', {});
+            }}
+            title="Solve all constraints"
+            label="Solve constraints"
+          />
+          <IconButton
+            icon="trash"
+            danger
+            testId={`constraint-delete-${constraint.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              dispatch('delete_constraint', { id: constraint.id });
+            }}
+            title="Delete this constraint"
+            label={`Delete constraint ${constraint.id}`}
+          />
+        </>
+      }
+    />
   );
 }
 
@@ -131,35 +177,34 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   const unit = joint.kind === 'revolute' ? 'rad' : 'mm';
 
   return (
-    <li className={mechanismRowClass(highlighted)} data-testid={`joint-row-${joint.id}`}>
-      <span className={`chip chip--${chipTone}`}>{joint.kind}</span>
-      <span className="panel__row-main mechanisms-row-info">
-        {joint.a.instanceId.slice(-6)} → {joint.b.instanceId.slice(-6)} · axis {axisLabel}
-      </span>
-      <input
-        type="number"
-        className="mechanisms-joint-input"
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onBlur={commitInput}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commitInput();
-          else if (e.key === 'Escape') setInputValue(String(currentValue));
-        }}
-        aria-label={`Joint value for ${joint.id} (${unit})`}
-        data-testid={`joint-value-${joint.id}`}
-        title={`Current ${joint.kind === 'revolute' ? 'angle' : 'displacement'} in ${unit}`}
-      />
-      <span className="panel__row-meta">{unit}</span>
-      <div className="panel__row-actions">
-        <IconButton
-          icon="eye"
-          testId={`joint-highlight-${joint.id}`}
-          pressed={highlighted}
-          onClick={() => onHighlight(joint.id)}
-          title="Highlight in the viewport"
-          label={`Highlight joint ${joint.id}`}
-        />
+    <MechanismRow
+      noun="joint"
+      id={joint.id}
+      kind={joint.kind}
+      tone={chipTone}
+      highlighted={highlighted}
+      onHighlight={onHighlight}
+      info={`${joint.a.instanceId.slice(-6)} → ${joint.b.instanceId.slice(-6)} · axis ${axisLabel}`}
+      inline={
+        <>
+          <input
+            type="number"
+            className="mechanisms-joint-input"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onBlur={commitInput}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitInput();
+              else if (e.key === 'Escape') setInputValue(String(currentValue));
+            }}
+            aria-label={`Joint value for ${joint.id} (${unit})`}
+            data-testid={`joint-value-${joint.id}`}
+            title={`Current ${joint.kind === 'revolute' ? 'angle' : 'displacement'} in ${unit}`}
+          />
+          <span className="panel__row-meta">{unit}</span>
+        </>
+      }
+      actions={
         <IconButton
           icon="trash"
           danger
@@ -171,8 +216,8 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
           title="Delete this joint"
           label={`Delete joint ${joint.id}`}
         />
-      </div>
-    </li>
+      }
+    />
   );
 }
 

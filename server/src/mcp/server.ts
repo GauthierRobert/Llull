@@ -38,7 +38,7 @@ import type { ExchangeOptions } from '../pythonExchange';
 import { buildImageBlock, stripSvgFromData } from '../renderImage';
 
 function makeErrorResult(message: string): CallToolResult {
-  return shapeToolCallContent({ summary: message, affected: [], isError: true }) as CallToolResult;
+  return shapeToolCallContent({ summary: message, affected: [], isError: true });
 }
 
 /** Tool list for a session: registry tools + exchange/discovery meta-tools, filtered by toolset. */
@@ -85,7 +85,7 @@ export function buildMcpServer(
     const discovery = applyDiscoveryToolCall(name, args, enabledToolsets);
     if (discovery !== null) {
       if (discovery.toolsListChanged) server.sendToolListChanged().catch(() => {});
-      return discovery.result as unknown as CallToolResult;
+      return discovery.result;
     }
 
     // export_step / import_step / import_code: Python I/O behind the injected port; document
@@ -96,7 +96,7 @@ export function buildMcpServer(
       applyCommand,
       allowCodeExecution: exchange.allowCodeExecution,
     });
-    if (exchangeResult !== null) return exchangeResult as unknown as CallToolResult;
+    if (exchangeResult !== null) return exchangeResult;
 
     const busResult = applyCommand(name, args ?? {});
 
@@ -104,9 +104,8 @@ export function buildMcpServer(
     const imageBlock = buildImageBlock(busResult.data);
     const shaped = shapeToolCallContent(
       imageBlock !== null ? { ...busResult, data: stripSvgFromData(busResult.data) } : busResult,
-    ) as CallToolResult;
-    if (imageBlock !== null) (shaped.content as unknown[]).push(imageBlock);
-    return shaped;
+    );
+    return imageBlock !== null ? { ...shaped, content: [...shaped.content, imageBlock] } : shaped;
   };
 
   // Tool failures are returned as MCP isError results, never thrown as JSON-RPC errors.

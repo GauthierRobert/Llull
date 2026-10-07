@@ -29,7 +29,7 @@ export function cross3(a: Vec3, b: Vec3): Vec3 {
 }
 
 /** @pure Euclidean length */
-function len3(a: Vec3): number {
+export function len3(a: Vec3): number {
   return Math.sqrt(dot3(a, a));
 }
 

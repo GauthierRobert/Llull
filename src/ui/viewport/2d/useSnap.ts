@@ -44,11 +44,12 @@ interface UseSnapOpts {
  * Advanced snaps (perpendicular, tangent) use `drawOrigin` as the reference
  * point; extension and nearest snaps use the adjusted cursor position.
  */
-export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
-  const document = useStore((s) => s.document);
+function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null {
+  const entities = useStore((s) => s.document.entities);
+  const order = useStore((s) => s.document.order);
+  const layers = useStore((s) => s.document.layers);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
-  const { layers } = document;
   // Hidden geometry must not attract snaps.
   const isVisible = useCallback(
     (entity: Entity): boolean => isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
@@ -65,11 +66,7 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
       return applyOrthoPolar(drawOrigin, cursor, orthoPolar);
     }
     return cursor;
-    // orthoPolar is typically a stable literal object from the draw-tool component;
-    // depending on object identity is intentional — callers must memoise it or accept
-    // the extra (cheap) recompute. Primitive-field deps would require spreading the
-    // object here and would be noisier without measurable benefit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // orthoPolar is compared by identity: callers must memoise it or accept a cheap recompute.
   }, [cursor, orthoPolar, drawOrigin]);
 
   // Cursor-INDEPENDENT candidates: endpoint / midpoint / center / intersection
@@ -83,13 +80,12 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
   const staticCandidates = useMemo(
     () =>
       collectSnapCandidates(
-        document,
+        { entities, order },
         { ...collectOpts, extensions: false, nearest: false, isVisible },
         drawOrigin ?? null,
         null,
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [document.entities, document.order, collectOpts, drawOrigin, isVisible],
+    [entities, order, collectOpts, drawOrigin, isVisible],
   );
 
   // Cursor-DEPENDENT candidates: extension + nearest only. These do follow the
@@ -97,29 +93,25 @@ export function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult
   // is skipped entirely unless a caller opts in — no current caller does.
   const wantExtensions = collectOpts?.extensions === true;
   const wantNearest = collectOpts?.nearest === true;
-  const cursorCandidates = useMemo(
-    (): readonly SnapPoint[] => {
-      if ((!wantExtensions && !wantNearest) || adjustedCursor === null) return NO_CANDIDATES;
-      return collectSnapCandidates(
-        document,
-        {
-          endpoints: false,
-          midpoints: false,
-          centers: false,
-          intersections: false,
-          perpendiculars: false,
-          tangents: false,
-          extensions: wantExtensions,
-          nearest: wantNearest,
-          isVisible,
-        },
-        null,
-        adjustedCursor,
-      );
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [document.entities, document.order, wantExtensions, wantNearest, adjustedCursor, isVisible],
-  );
+  const cursorCandidates = useMemo((): readonly SnapPoint[] => {
+    if ((!wantExtensions && !wantNearest) || adjustedCursor === null) return NO_CANDIDATES;
+    return collectSnapCandidates(
+      { entities, order },
+      {
+        endpoints: false,
+        midpoints: false,
+        centers: false,
+        intersections: false,
+        perpendiculars: false,
+        tangents: false,
+        extensions: wantExtensions,
+        nearest: wantNearest,
+        isVisible,
+      },
+      null,
+      adjustedCursor,
+    );
+  }, [entities, order, wantExtensions, wantNearest, adjustedCursor, isVisible]);
 
   if (adjustedCursor === null) return null;
 
