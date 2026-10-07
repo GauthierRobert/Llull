@@ -44,7 +44,12 @@ function offsetPolyline(points: ReadonlyArray<Vec2>, half: number): Vec2[][] {
 }
 
 /** Corners of a `2·hx × 2·hy` rectangle centred on `center`, rotated by `angle` (counter-clockwise). */
-function rectangleAt(center: readonly number[], hx: number, hy: number, angle = 0): Vec2[] {
+function rectangleAt(
+  center: readonly [number, number, ...number[]],
+  hx: number,
+  hy: number,
+  angle = 0,
+): Vec2[] {
   const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
   return (
     [
@@ -53,12 +58,7 @@ function rectangleAt(center: readonly number[], hx: number, hy: number, angle = 
       [hx, hy],
       [-hx, hy],
     ] as const
-  ).map(
-    ([x, y]): Vec2 => [
-      (center[0] as number) + x * cos - y * sin,
-      (center[1] as number) + x * sin + y * cos,
-    ],
-  );
+  ).map(([x, y]): Vec2 => [center[0] + x * cos - y * sin, center[1] + x * sin + y * cos]);
 }
 
 /** Plan symbols of industrial elements (cut at `cutHeight` above the level). */
@@ -70,7 +70,7 @@ export function industrialPrimitives(
   >,
   cutHeight: number,
 ): PlanPrimitive[] {
-  const flat = (point: readonly number[]): Vec2 => [point[0] as number, point[1] as number];
+  const flat = (point: readonly [number, number, ...number[]]): Vec2 => [point[0], point[1]];
   switch (element.category) {
     case 'member': {
       const layer = MEMBER_LAYER[element.role].name;
@@ -126,7 +126,9 @@ export function industrialPrimitives(
       if (element.role !== 'wall') return [];
       // A wall panel seen from above is a line: its two plan points farthest apart.
       const points = element.corners.map(flat);
-      let [a, b, longest] = [points[0] as Vec2, points[0] as Vec2, -1];
+      const first = points[0];
+      if (!first) return [];
+      let [a, b, longest] = [first, first, -1];
       for (const p of points) {
         for (const q of points) {
           const separation = distance(p, q);
@@ -141,7 +143,7 @@ export function industrialPrimitives(
         rectangleAt(element.location, hx, hy, element.angle);
       const layer = layerName('equipment');
       const round = shapeOf(element) === 'vertical_vessel';
-      const [cx, cy] = [element.location[0] as number, element.location[1] as number];
+      const [cx, cy] = element.location;
       const arm = length / 2;
       const outline: PlanPrimitive[] = round
         ? [
@@ -185,7 +187,8 @@ export function industrialPrimitives(
     case 'pipe': {
       const points = element.points.map(flat);
       const layer = layerName('pipe');
-      const [a, b] = [points[0] as Vec2, points[1] as Vec2];
+      const [a, b] = points;
+      if (!a || !b) return [];
       return [
         { type: 'polyline', layer, style: 'thin', points },
         annotationText(
@@ -227,21 +230,22 @@ export function industrialPrimitives(
       const points = element.points
         .map(flat)
         .filter(
-          (point, index, all) => index === 0 || distance(point, all[index - 1] as Vec2) > 1e-9,
+          (point, index, all) => index === 0 || distance(point, all[index - 1] ?? point) > 1e-9,
         );
       const layer = layerName('tray');
-      if (points.length < 2) {
+      const [a, b] = points;
+      if (!a || !b) {
         const half = element.width / 2;
+        if (!a) return [];
         return [
           {
             type: 'polygon',
             layer,
             style: 'thin',
-            points: rectangleAt(points[0] as Vec2, half, half),
+            points: rectangleAt(a, half, half),
           },
         ];
       }
-      const [a, b] = [points[0] as Vec2, points[1] as Vec2];
       return [
         ...offsetPolyline(points, element.width / 2).map(
           (side): PlanPrimitive => ({ type: 'polyline', layer, style: 'hidden', points: side }),

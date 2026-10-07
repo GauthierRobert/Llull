@@ -143,7 +143,7 @@ export const addSteelMember = defineCommand({
 
 const shiftZ = (point: Vec3, dz: number): Vec3 => [point[0], point[1], point[2] + dz];
 
-/** Axis z change that keeps the top of a horizontal member when its section depth changes. */
+/** Axis z change that keeps the top of a horizontal member when its section depth changes; 0 unless roll is 0 or π (mod 2π). */
 function topOfSteelShift(
   doc: Pick<CadDocument, 'units'>,
   member: SteelMemberElement,
@@ -151,7 +151,9 @@ function topOfSteelShift(
 ): number {
   const old = findProfile(member.profile);
   const horizontal = Math.abs(member.end[2] - member.start[2]) < 1e-9;
-  if (!old || !horizontal) return 0;
+  const turns = Math.abs(member.roll) / Math.PI;
+  const flat = Math.abs(turns - Math.round(turns)) < 1e-6;
+  if (!old || !horizontal || !flat) return 0;
   return fromMm(doc, (old.h - section.h) / 2);
 }
 
@@ -163,7 +165,7 @@ function topOfSteelShift(
 export const updateSteelMember = defineCommand({
   name: 'update_steel_member',
   description:
-    'Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, ' +
+    'Edit a steel member: change its section (e.g. upsize IPE400 → IPE450; a horizontal member with roll 0 or π keeps its top of steel, other rolls keep the axis height), end points, role, roll, grade, note, ' +
     'beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports ' +
     'bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or ' +
     'unattached (the summary says which).',

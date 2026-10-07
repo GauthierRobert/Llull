@@ -27,6 +27,10 @@ import {
 } from './gridFraming';
 import { levelIdParam } from '../levelParams';
 
+/** Length text with a precision suited to the unit: whole mm, otherwise up to 3 decimals. */
+const lengthText = (doc: Pick<CadDocument, 'units'>, value: number): string =>
+  `${doc.units === 'mm' ? value.toFixed(0) : String(Math.round(value * 1000) / 1000)} ${doc.units}`;
+
 const tonnes = (kg: number): string => (kg / 1000).toFixed(1);
 
 const profileText = (profile: string): string => {
@@ -93,7 +97,7 @@ const selected = (
  * @command add_grid_columns
  * @pure
  * @affects creates one column member per grid intersection (exact section meshes)
- * @invariant skips intersections already holding a column on the level (same plan xy, 1 mm)
+ * @invariant skips intersections already holding a column on the level or a column of any level whose vertical span covers the base level elevation (same plan xy, 1 mm)
  * @failure no grid / unknown profile, axis, level / topLevel not above base / no intersections -> no-op
  */
 export const addGridColumns = defineCommand({
@@ -103,7 +107,7 @@ export const addGridColumns = defineCommand({
     'way to start framing a building. The column runs from the base level FFL up to topLevelId (a ' +
     'continuous column through intermediate floors) or, by default, to the top of the base level. ' +
     'Restrict with axes (both crossing lines must be listed) and exclude. Intersections that already ' +
-    'hold a column on that level are skipped. Mark SC, role column; follow with add_grid_beams / add_grid_bracing.',
+    'hold a column on that level, or a continuous column from a lower level passing through it, are skipped. Mark SC, role column; follow with add_grid_beams / add_grid_bracing.',
   params: z.object({
     profile: z.string().describe('Catalogue section name, e.g. "HEB300" (list_steel_profiles).'),
     levelId: levelIdParam.describe(
@@ -173,9 +177,15 @@ export const addGridColumns = defineCommand({
       }
     }
     const allowed = selected(lines, params.axes);
-    const existing = elementsOf(building, 'member').filter(
-      (member) => member.role === 'column' && member.levelId === prepared.levelId,
-    );
+    const existing = elementsOf(building, 'member').filter((member) => {
+      if (member.role !== 'column') return false;
+      if (member.levelId === prepared.levelId) return true;
+      const memberLevel = building.levels[member.levelId];
+      if (!memberLevel) return false;
+      const low = memberLevel.elevation + Math.min(member.start[2], member.end[2]);
+      const high = memberLevel.elevation + Math.max(member.start[2], member.end[2]);
+      return low <= prepared.elevation + tolerance && high > prepared.elevation + tolerance;
+    });
     const specs: MemberSpec[] = [];
     const names: string[] = [];
     const planned: Vec2[] = [];
@@ -209,7 +219,14 @@ export const addGridColumns = defineCommand({
         names.push(`${a.mark}/${b.mark}`);
       }
     });
-    if (found === 0) return noop(doc, `${tool} failed: no grid intersections to place columns on.`);
+    if (found === 0) {
+      return noop(
+        doc,
+        planned.length > 0
+          ? `${tool} failed: all ${planned.length} intersection(s) excluded; no columns placed.`
+          : `${tool} failed: no grid intersections to place columns on.`,
+      );
+    }
     if (specs.length === 0) {
       return noop(
         doc,
@@ -223,7 +240,7 @@ export const addGridColumns = defineCommand({
       document: done.document,
       summary:
         `Added ${specs.length} columns ${profileText(params.profile)} at grid intersections ${names[0]} … ${names[names.length - 1]} ` +
-        `on level "${prepared.levelName}", ${top.toFixed(0)} ${doc.units} high, ${tonnes(kg)} t; skipped ${skipped} existing.`,
+        `on level "${prepared.levelName}", ${lengthText(doc, top)} high, ${tonnes(kg)} t; skipped ${skipped} existing.`,
       affected: elementAffected(done.document, done.ids),
       data: { elementIds: done.ids, skipped },
     };
@@ -257,7 +274,7 @@ export const addGridBeams = defineCommand({
       .number()
       .optional()
       .describe(
-        'Top of steel relative to the level FFL, document units. Default 0; e.g. -30 under a 30 mm grating.',
+        'Top of steel relative to the level FFL, in DOCUMENT UNITS (not necessarily mm). Default 0 (top of steel at FFL); negative puts it below the FFL, e.g. minus the grating thickness.',
       ),
     startJoint: jointFixitySchema
       .optional()
@@ -294,8 +311,9 @@ export const addGridBeams = defineCommand({
     for (const line of targets) {
       const crossings = crossingsOnLine(line, lines, tolerance);
       for (let index = 1; index < crossings.length; index++) {
-        const from = crossings[index - 1]?.point as Vec2;
-        const to = crossings[index]?.point as Vec2;
+        const from = crossings[index - 1]?.point;
+        const to = crossings[index]?.point;
+        if (!from || !to) continue;
         const duplicate = existing.some(
           (m) =>
             Math.abs(topOfSteel(m) - (params.topOffset ?? 0)) <= sameTopTolerance &&
@@ -332,7 +350,7 @@ export const addGridBeams = defineCommand({
       document: done.document,
       summary:
         `Added ${specs.length} beams ${profileText(params.profile)} along ${targets.length} grid line(s) on level "${prepared.levelName}", ` +
-        `top of steel ${(params.topOffset ?? 0).toFixed(0)} ${doc.units} from FFL, total length ${length.toFixed(0)} ${doc.units}, ${kg.toFixed(0)} kg; skipped ${skipped} existing.`,
+        `top of steel ${lengthText(doc, params.topOffset ?? 0)} from FFL, total length ${lengthText(doc, length)}, ${kg.toFixed(0)} kg; skipped ${skipped} existing.`,
       affected: elementAffected(done.document, done.ids),
       data: { elementIds: done.ids, skipped },
     };
@@ -343,7 +361,8 @@ export const addGridBeams = defineCommand({
  * @command add_grid_bracing
  * @pure
  * @affects creates 2 (x) or 1 (diagonal) brace members in one bay of one grid line
- * @failure unknown profile / label / level, from == to, axis parallel or not crossing, zero height -> no-op
+ * @invariant skips braces whose end points (either direction, 1 mm) already exist on the level
+ * @failure unknown profile / label / level, from == to, axis parallel or not crossing, zero height, all braces exist -> no-op
  */
 export const addGridBracing = defineCommand({
   name: 'add_grid_bracing',
@@ -377,12 +396,14 @@ export const addGridBracing = defineCommand({
     bottomOffset: z
       .number()
       .optional()
-      .describe('Bottom node height relative to the base level FFL, document units. Default 0.'),
+      .describe(
+        'Bottom node height relative to the base level FFL, in DOCUMENT UNITS (not necessarily mm). Default 0 (at the FFL).',
+      ),
     topOffset: z
       .number()
       .optional()
       .describe(
-        'Top node height relative to the NEXT storey FFL (base elevation + level height), document units. Default 0; negative puts the node under the floor beams.',
+        'Top node height relative to the NEXT storey FFL (base elevation + level height), in DOCUMENT UNITS (not necessarily mm). Default 0 (at the next FFL); negative puts the node under the floor beams.',
       ),
     material: z.string().optional().describe('Steel grade. Default S355.'),
   }),
@@ -398,11 +419,13 @@ export const addGridBracing = defineCommand({
     if (params.from === params.to) {
       return noop(doc, `${tool} failed: from and to must be different grid lines.`);
     }
-    const find = (label: string): GridElement => lines.find((l) => l.mark === label) as GridElement;
+    const find = (label: string): GridElement | undefined => lines.find((l) => l.mark === label);
     const axis = find(params.axis);
-    const [p, q] = [params.from, params.to].map((label) =>
-      label === params.axis ? null : crossGridLines(axis, find(label), tolerance),
-    );
+    const crossWith = (label: string): ReturnType<typeof crossGridLines> => {
+      const other = find(label);
+      return axis && other && label !== params.axis ? crossGridLines(axis, other, tolerance) : null;
+    };
+    const [p, q] = [crossWith(params.from), crossWith(params.to)];
     if (!p || !q) {
       return noop(
         doc,
@@ -415,7 +438,26 @@ export const addGridBracing = defineCommand({
     const node = (point: Vec2, height: number): Vec3 => [point[0], point[1], height];
     const pairs: Array<[Vec3, Vec3]> = [[node(p.point, bottom), node(q.point, top)]];
     if (params.pattern !== 'diagonal') pairs.push([node(q.point, bottom), node(p.point, top)]);
-    const specs: MemberSpec[] = pairs.map(([start, end]) => ({
+    const atPoint = (a: Vec3, b: Vec3): boolean =>
+      Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= tolerance;
+    const existingBraces = elementsOf(prepared.building, 'member').filter(
+      (member) => member.role === 'brace' && member.levelId === prepared.levelId,
+    );
+    const isDuplicate = ([start, end]: [Vec3, Vec3]): boolean =>
+      existingBraces.some(
+        (m) =>
+          (atPoint(m.start, start) && atPoint(m.end, end)) ||
+          (atPoint(m.start, end) && atPoint(m.end, start)),
+      );
+    const fresh = pairs.filter((pair) => !isDuplicate(pair));
+    const skipped = pairs.length - fresh.length;
+    if (fresh.length === 0) {
+      return noop(
+        doc,
+        `${tool}: ${skipped} brace(s) with the same end points already exist in grid ${params.axis} between ${params.from} and ${params.to} on level "${prepared.levelName}"; nothing added.`,
+      );
+    }
+    const specs: MemberSpec[] = fresh.map(([start, end]) => ({
       role: 'brace',
       profile: params.profile,
       start,
@@ -430,9 +472,9 @@ export const addGridBracing = defineCommand({
       document: done.document,
       summary:
         `Added ${specs.length} ${params.pattern === 'diagonal' ? 'diagonal' : 'X'} brace(s) ${marks.join(', ')} ${profileText(params.profile)} ` +
-        `in grid ${params.axis} between ${params.from} and ${params.to} (bay ${bay.toFixed(0)} ${doc.units}) on level "${prepared.levelName}".`,
+        `in grid ${params.axis} between ${params.from} and ${params.to} (bay ${lengthText(doc, bay)}) on level "${prepared.levelName}"${skipped > 0 ? `; skipped ${skipped} existing` : ''}.`,
       affected: elementAffected(done.document, done.ids),
-      data: { elementIds: done.ids },
+      data: { elementIds: done.ids, skipped },
     };
   },
 });

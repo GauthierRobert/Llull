@@ -8,13 +8,9 @@ import type { Vec3 } from '@core/model/types';
 import { z } from '@core/commands/schema';
 import { toVec3 } from './memberSupport';
 
-export const EQUIPMENT_SHAPES: ReadonlyArray<string> = [
-  'box',
-  'vertical_vessel',
-  'horizontal_vessel',
-];
-
 export const equipmentShapeSchema = z.enum(['box', 'vertical_vessel', 'horizontal_vessel']);
+
+export const EQUIPMENT_SHAPES: ReadonlyArray<string> = equipmentShapeSchema.options;
 
 export const SHAPE_PARAM_TEXT =
   'Shape: "box" (default), "vertical_vessel" (cylinder, axis along Z: size = [diameter, ignored, ' +

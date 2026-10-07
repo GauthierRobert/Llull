@@ -753,7 +753,7 @@
           "type": "string"
         },
         "margin": {
-          "description": "Free gap around the footprint (toe plate / access). Default 300 mm.",
+          "description": "Free gap around the footprint (toe plate / access), in document units; must be >= 0. Default: 300 mm converted to document units.",
           "type": "number"
         }
       },
@@ -849,7 +849,7 @@
           "type": "string"
         },
         "topOffset": {
-          "description": "Top of steel relative to the level FFL, document units. Default 0; e.g. -30 under a 30 mm grating.",
+          "description": "Top of steel relative to the level FFL, in DOCUMENT UNITS (not necessarily mm). Default 0 (top of steel at FFL); negative puts it below the FFL, e.g. minus the grating thickness.",
           "type": "number"
         }
       },
@@ -869,7 +869,7 @@
           "type": "string"
         },
         "bottomOffset": {
-          "description": "Bottom node height relative to the base level FFL, document units. Default 0.",
+          "description": "Bottom node height relative to the base level FFL, in DOCUMENT UNITS (not necessarily mm). Default 0 (at the FFL).",
           "type": "number"
         },
         "from": {
@@ -901,7 +901,7 @@
           "type": "string"
         },
         "topOffset": {
-          "description": "Top node height relative to the NEXT storey FFL (base elevation + level height), document units. Default 0; negative puts the node under the floor beams.",
+          "description": "Top node height relative to the NEXT storey FFL (base elevation + level height), in DOCUMENT UNITS (not necessarily mm). Default 0 (at the next FFL); negative puts the node under the floor beams.",
           "type": "number"
         }
       },
@@ -916,7 +916,7 @@
     "name": "add_grid_bracing"
   },
   {
-    "description": "Place one vertical steel column at every intersection of the structural grid (add_grid_line): the way to start framing a building. The column runs from the base level FFL up to topLevelId (a continuous column through intermediate floors) or, by default, to the top of the base level. Restrict with axes (both crossing lines must be listed) and exclude. Intersections that already hold a column on that level are skipped. Mark SC, role column; follow with add_grid_beams / add_grid_bracing.",
+    "description": "Place one vertical steel column at every intersection of the structural grid (add_grid_line): the way to start framing a building. The column runs from the base level FFL up to topLevelId (a continuous column through intermediate floors) or, by default, to the top of the base level. Restrict with axes (both crossing lines must be listed) and exclude. Intersections that already hold a column on that level, or a continuous column from a lower level passing through it, are skipped. Mark SC, role column; follow with add_grid_beams / add_grid_bracing.",
     "input_schema": {
       "properties": {
         "axes": {
@@ -6594,7 +6594,7 @@
     "name": "update_opening"
   },
   {
-    "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450), end points, role, roll, grade, note, beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or unattached (the summary says which).",
+    "description": "Edit a steel member: change its section (e.g. upsize IPE400 → IPE450; a horizontal member with roll 0 or π keeps its top of steel, other rolls keep the axis height), end points, role, roll, grade, note, beam joints (startJoint / endJoint pinned | rigid) or column baseFixity (pinned | fixed). Pipe supports bearing on the member re-check their reach: kept (pedestal / rod updated), re-attached to other steel, or unattached (the summary says which).",
     "input_schema": {
       "properties": {
         "baseFixity": {

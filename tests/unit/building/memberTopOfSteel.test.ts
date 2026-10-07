@@ -29,6 +29,29 @@ describe('update_steel_member keepTopOfSteel', () => {
     expect(member(doc).start[2]).toBe(-255);
   });
 
+  it('does not shift a rolled beam (roll not 0 or π)', () => {
+    const rolled = execute(withMember([0, 0, -255], [6000, 0, -255]), 'update_steel_member', {
+      memberId: 'member-1',
+      roll: Math.PI / 2,
+    }).document;
+    const result = execute(rolled, 'update_steel_member', {
+      memberId: 'member-1',
+      profile: 'IPE600',
+      keepTopOfSteel: true,
+    });
+    expect(member(result.document).start[2]).toBe(-255);
+    const flipped = execute(withMember([0, 0, -255], [6000, 0, -255]), 'update_steel_member', {
+      memberId: 'member-1',
+      roll: Math.PI,
+    }).document;
+    const shifted = execute(flipped, 'update_steel_member', {
+      memberId: 'member-1',
+      profile: 'IPE600',
+      keepTopOfSteel: true,
+    });
+    expect(member(shifted.document).start[2]).toBeCloseTo(-330);
+  });
+
   it('raises the axis when the section gets shallower', () => {
     const doc = withMember([0, 0, -255], [6000, 0, -255]);
     const result = execute(doc, 'update_steel_member', {

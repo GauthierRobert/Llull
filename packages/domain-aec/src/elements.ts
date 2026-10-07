@@ -294,7 +294,7 @@ export function copiedRoomNumber(
   return candidate;
 }
 
-const COPYABLE = [
+export const COPYABLE = [
   'wall',
   'curvedWall',
   'slab',

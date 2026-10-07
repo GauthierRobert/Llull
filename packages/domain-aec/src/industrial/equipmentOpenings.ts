@@ -32,7 +32,9 @@ export const addEquipmentOpenings = defineCommand({
     margin: z
       .number()
       .optional()
-      .describe('Free gap around the footprint (toe plate / access). Default 300 mm.'),
+      .describe(
+        'Free gap around the footprint (toe plate / access), in document units; must be >= 0. Default: 300 mm converted to document units.',
+      ),
   }),
   run: (doc, { equipmentId, margin }): CommandResult => {
     const building = getBuilding(doc);

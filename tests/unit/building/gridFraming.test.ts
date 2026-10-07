@@ -109,6 +109,45 @@ describe('add_grid_columns', () => {
     ).toMatch(/already hold a column/);
   });
 
+  it('skips crossings covered by a continuous column from a lower level', () => {
+    const doc = step(gridded(), 'add_level', { name: 'Roof', elevation: 6000, height: 3000 });
+    const tall = execute(doc, 'add_grid_columns', {
+      profile: 'HEB300',
+      levelId: 'level-1',
+      topLevelId: 'level-3',
+    });
+    expect(data(tall).elementIds).toHaveLength(6);
+    expect(
+      rejects(tall.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-2' }),
+    ).toMatch(/all 6 intersection\(s\) already hold a column/);
+    const top = execute(tall.document, 'add_grid_columns', {
+      profile: 'HEB300',
+      levelId: 'level-3',
+    });
+    expect(data(top).elementIds).toHaveLength(6);
+  });
+
+  it('reports all-excluded intersections distinctly', () => {
+    expect(
+      rejects(gridded(), 'add_grid_columns', {
+        profile: 'HEB300',
+        levelId: 'level-1',
+        axes: ['A', '1'],
+        exclude: ['A/1'],
+      }),
+    ).toMatch(/all 1 intersection\(s\) excluded/);
+  });
+
+  it('formats lengths per unit in summaries', () => {
+    const metres = { ...gridded(), units: 'm' as const };
+    const result = execute(metres, 'add_grid_columns', {
+      profile: 'HEB300',
+      levelId: 'level-1',
+      axes: ['A', '1'],
+    });
+    expect(result.summary).toMatch(/3000 m high/);
+  });
+
   it('works on non-orthogonal grid lines', () => {
     let doc = twoLevels();
     doc = step(doc, 'add_grid_line', { start: [0, 0], end: [10000, 10000], label: 'D' });
@@ -244,6 +283,31 @@ describe('add_grid_bracing', () => {
       ],
     ]);
     expect(result.summary).toMatch(/Added 2 X brace\(s\) BR1, BR2 .* in grid A between 1 and 2/);
+  });
+
+  it('skips braces that already exist (either direction), individually for x', () => {
+    const params = {
+      profile: 'CHS76.1x3.6',
+      axis: 'A',
+      from: '1',
+      to: '2',
+      levelId: 'level-1',
+    };
+    const diagonal = execute(gridded(), 'add_grid_bracing', { ...params, pattern: 'diagonal' });
+    const both = execute(diagonal.document, 'add_grid_bracing', params);
+    expect(data(both).elementIds).toHaveLength(1);
+    expect(both.summary).toMatch(/skipped 1 existing/);
+    expect(members(both.document)).toHaveLength(2);
+    const reversed = execute(diagonal.document, 'add_grid_bracing', {
+      ...params,
+      from: '2',
+      to: '1',
+      pattern: 'diagonal',
+    });
+    expect(data(reversed).elementIds).toHaveLength(1);
+    expect(rejects(both.document, 'add_grid_bracing', params)).toMatch(
+      /2 brace\(s\) with the same end points already exist/,
+    );
   });
 
   it('adds one diagonal from bottom at from to top at to with offsets', () => {
