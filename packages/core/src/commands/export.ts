@@ -31,6 +31,11 @@ function buildAsciiStl(tris: Triangle[], solidName: string): string {
   return lines.join('\n');
 }
 
+/** Single-line solid name: control characters and line breaks would corrupt the ASCII records. */
+function cleanSolidName(name: string | undefined): string {
+  return (name ?? '').replace(/[\p{Cc}\u2028\u2029]+/gu, ' ').trim() || 'llull';
+}
+
 /** Binary STL: 80-byte label header (never "solid ...", which trips ASCII sniffers), u32 count, 50 bytes per facet. */
 function buildBinaryStl(tris: Triangle[], headerText: string): Uint8Array {
   const buf = new Uint8Array(84 + tris.length * 50);
@@ -120,7 +125,7 @@ export const exportStl = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const fmt: 'ascii' | 'binary' = params.format === 'binary' ? 'binary' : 'ascii';
-    const solidName = params.name ?? 'llull';
+    const solidName = cleanSolidName(params.name);
     const collected = collectExportTriangles(doc, params.entityIds);
     const triangleCount = collected.tris.length;
     const summary = exportSummary('export_stl', fmt, collected);
@@ -130,7 +135,12 @@ export const exportStl = defineCommand({
         : {
             format: 'binary',
             triangleCount,
-            stlBase64: uint8ArrayToBase64(buildBinaryStl(collected.tris, solidName)),
+            stlBase64: uint8ArrayToBase64(
+              buildBinaryStl(
+                collected.tris,
+                /^solid/i.test(solidName) ? `llull ${solidName}` : solidName,
+              ),
+            ),
           };
     return { document: doc, summary, affected: [], data };
   },
