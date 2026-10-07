@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { listCommands } from '@core/commands/registry';
 import { SERVER_BASE } from '@ui/serverConfig';
 import { Icon } from '@ui/components/Icon';
 import { focusableElements, trapTab } from '@ui/focusTrap';
@@ -15,12 +16,15 @@ const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server r
 const SERVER_START_CMD = 'npm --prefix server run dev';
 const ENDPOINT_URL = `${SERVER_BASE}/mcp`;
 
-const CAPABILITY_BADGES: readonly string[] = [
-  '60 tools',
-  'structuredContent',
-  'prompts (EN2)',
-  'session isolation',
-];
+/** Capability badges; the command count is read from the live registry, never hard-coded. */
+function capabilityBadges(): readonly string[] {
+  return [
+    `${listCommands().length} commands`,
+    'structuredContent',
+    'prompts (EN2)',
+    'session isolation',
+  ];
+}
 
 interface AgentLoopStep {
   readonly tool: string;
@@ -202,7 +206,7 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
 
         <div className="mcp-connect__body">
           <div className="mcp-connect__badges" aria-label="Capabilities">
-            {CAPABILITY_BADGES.map((badge) => (
+            {capabilityBadges().map((badge) => (
               <span key={badge} className="mcp-connect__badge">
                 {badge}
               </span>

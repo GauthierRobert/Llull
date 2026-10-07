@@ -17,6 +17,7 @@
 
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { listCommands } from '@core/commands/registry';
 import { McpConnect, McpConnectButton } from '@ui/components/McpConnect';
 
 // ---------------------------------------------------------------------------
@@ -75,9 +76,9 @@ describe('McpConnect — structure', () => {
     expect(screen.getByText('http://localhost:3001/mcp')).toBeDefined();
   });
 
-  it('shows the "60 tools" capability badge', () => {
+  it('shows the live registry command count as a capability badge', () => {
     render(<McpConnect onClose={() => undefined} />);
-    expect(screen.getByText('60 tools')).toBeDefined();
+    expect(screen.getByText(`${listCommands().length} commands`)).toBeDefined();
   });
 
   it('shows the "structuredContent" capability badge', () => {
