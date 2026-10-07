@@ -17,6 +17,7 @@ import type { CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { execute, getCommand } from '@core/commands/registry';
 import { errorMessage } from '@lib/errorMessage';
+import { hashText } from '@lib/hash';
 import { getLiveDoc, setLiveDoc } from './liveDocument';
 
 /** Maximum undo/redo depth — mirrors MAX_UNDO_DEPTH in the UI store. */
@@ -24,7 +25,19 @@ const MAX_UNDO_DEPTH = 100;
 
 /** Idempotency cache size: commandId -> result, least recently used evicted first. */
 const MAX_IDEMPOTENCY_ENTRIES = 1000;
-const _resultsByCommandId = new Map<string, CommandBusResult>();
+interface CachedResult {
+  readonly requestHash: string;
+  readonly result: CommandBusResult;
+}
+const _resultsByCommandId = new Map<string, CachedResult>();
+
+function requestHashOf(name: string, params: unknown): string {
+  try {
+    return hashText(JSON.stringify([name, params ?? null]));
+  } catch {
+    return '';
+  }
+}
 
 type HistoryDirection = 'undo' | 'redo';
 const history: Record<HistoryDirection, CadDocument[]> = { undo: [], redo: [] };
@@ -62,18 +75,28 @@ function withHistoryFlags(result: Omit<CommandBusResult, 'canUndo' | 'canRedo'>)
  * @param name   - snake_case command name (== MCP tool name).
  * @param params - raw params object forwarded to execute().
  * @param commandId - optional client id; a repeated id returns the cached result without re-applying
- *   (network retries are safe). Bounded LRU of MAX_IDEMPOTENCY_ENTRIES.
+ *   (network retries are safe). Only document-changing, non-readOnly results are cached; reuse with
+ *   a different name/params is an error result. Bounded LRU of MAX_IDEMPOTENCY_ENTRIES.
  */
 export function applyCommand(name: string, params: unknown, commandId?: string): CommandBusResult {
-  if (commandId === undefined) return runCommand(name, params);
+  if (commandId === undefined) return runCommand(name, params).result;
+  const requestHash = requestHashOf(name, params);
   const cached = _resultsByCommandId.get(commandId);
   if (cached !== undefined) {
+    if (cached.requestHash !== requestHash) {
+      return withHistoryFlags({
+        summary: `commandId ${commandId} was already used for a different command; use a fresh commandId.`,
+        affected: [],
+        isError: true,
+      });
+    }
     _resultsByCommandId.delete(commandId);
     _resultsByCommandId.set(commandId, cached); // refresh LRU position
-    return cached;
+    return withHistoryFlags(cached.result);
   }
-  const result = runCommand(name, params);
-  _resultsByCommandId.set(commandId, result);
+  const { result, changed } = runCommand(name, params);
+  if (!changed || getCommand(name)?.annotations?.readOnly === true) return result;
+  _resultsByCommandId.set(commandId, { requestHash, result });
   if (_resultsByCommandId.size > MAX_IDEMPOTENCY_ENTRIES) {
     const oldest = _resultsByCommandId.keys().next();
     if (!oldest.done) _resultsByCommandId.delete(oldest.value);
@@ -81,7 +104,8 @@ export function applyCommand(name: string, params: unknown, commandId?: string):
   return result;
 }
 
-function runCommand(name: string, params: unknown): CommandBusResult {
+/** `changed` = the live document was replaced by this call. */
+function runCommand(name: string, params: unknown): { result: CommandBusResult; changed: boolean } {
   const isError = getCommand(name) === undefined;
   const prior = getLiveDoc();
   let result: ReturnType<typeof execute>;
@@ -89,25 +113,30 @@ function runCommand(name: string, params: unknown): CommandBusResult {
     result = execute(prior, name, params);
   } catch (err) {
     // A throwing command must surface as an error result, never a transport failure.
-    return withHistoryFlags({
-      summary: `Command ${name} failed: ${errorMessage(err)}`,
-      affected: [],
-      isError: true,
-    });
+    return {
+      result: withHistoryFlags({
+        summary: `Command ${name} failed: ${errorMessage(err)}`,
+        affected: [],
+        isError: true,
+      }),
+      changed: false,
+    };
   }
 
-  if (result.document !== prior) {
+  const changed = result.document !== prior;
+  if (changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];
     setLiveDoc(result.document, { name, params });
   }
 
-  return withHistoryFlags({
+  const busResult = withHistoryFlags({
     summary: result.summary,
     affected: result.affected,
     isError,
     ...(result.data !== undefined ? { data: result.data } : {}),
   });
+  return { result: busResult, changed };
 }
 
 /**

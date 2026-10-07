@@ -35,3 +35,11 @@ describe('live sync protocol', () => {
     expect(documentHash(createEmptyDocument())).not.toBe(documentHash(doc));
   });
 });
+
+describe('documentHash memoization', () => {
+  it('returns the same value for the same document object and recomputes for a new one', () => {
+    const doc = execute(createEmptyDocument(), 'add_box', {}).document;
+    expect(documentHash(doc)).toBe(documentHash(doc));
+    expect(documentHash({ ...doc })).toBe(documentHash(doc));
+  });
+});

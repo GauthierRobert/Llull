@@ -18,8 +18,9 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { parseToolsets } from '@mcp/index';
 import type { ToolsetName } from '@mcp/index';
+import { errorMessage } from '@lib/errorMessage';
 import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
-import { sessions, startSessionSweep } from './mcp/sessions';
+import { evictForCapacity, sessions, startSessionSweep } from './mcp/sessions';
 import { buildAuthMiddleware, buildMcpRateLimiter } from './mcp/middleware';
 import { buildMcpServer } from './mcp/server';
 
@@ -33,9 +34,6 @@ export function toolsetsFromEnv(
   }
   return enabled;
 }
-
-const errorMessage = (err: unknown): string =>
-  err instanceof Error ? err.message : 'Unknown MCP error';
 
 /**
  * @param exchange - STEP/code exchange port (defaults to the environment-configured Python bridge).
@@ -92,6 +90,7 @@ export function buildMcpRouter(
   router.post('/', (req: Request, res: Response) => {
     void (async () => {
       if (await routeToExistingSession(req, res)) return;
+      evictForCapacity();
       const transport = allocateSession();
       try {
         await buildMcpServer(exchange, enabledToolsets).connect(transport as Transport);

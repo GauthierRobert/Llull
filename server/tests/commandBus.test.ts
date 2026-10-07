@@ -305,7 +305,7 @@ describe('applyCommand — idempotent commandId', () => {
   it('the cache is a bounded LRU: the oldest id is evicted after 1000 entries', () => {
     applyCommand('add_box', { size: [1, 1, 1] }, 'first');
     for (let index = 0; index < 1000; index++) {
-      applyCommand('measure_volume', { id: 'none' }, `q-${index}`);
+      applyCommand('add_box', { size: [1, 1, index + 2] }, `q-${index}`);
     }
     const before = getLiveDoc().order.length;
     applyCommand('add_box', { size: [1, 1, 1] }, 'first'); // evicted -> applies again
