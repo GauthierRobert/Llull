@@ -22,6 +22,7 @@ import { prismMesh, sweepMesh } from '../mesh';
 import { findProfile, profileOutline } from '../steel/profiles';
 import { cross3, dot3, sub3 } from '@lib/vec3';
 import { normalize } from '../vec3';
+import { shapeOf } from './equipmentShape';
 
 const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
   column: 'Column',
@@ -138,18 +139,53 @@ export function evaluatePanel(panel: PanelElement, level: BuildingLevel): Entity
   ];
 }
 
+const VESSEL_SEGMENTS = 40;
+const EQUIPMENT_COLOR = '#c27c2c';
+
+/**
+ * @invariant box -> oriented box; vessels -> watertight cylinder mesh inscribed in `size`
+ * (vertical: axis +Z from the level; horizontal: axis along local x at mid-height, bottom on the level)
+ */
 export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLevel): Entity[] {
   const [length, width, height] = equipment.size;
-  return [
-    orientedBox(
-      equipment,
-      { part: 'body', label: `${equipment.name} ${equipment.mark}` },
-      [equipment.location[0], equipment.location[1], level.elevation + height / 2],
-      equipment.angle,
-      [length, width, height],
-      '#c27c2c',
-    ),
-  ];
+  const stub = { part: 'body', label: `${equipment.name} ${equipment.mark}` };
+  const shape = shapeOf(equipment);
+  if (shape === 'box') {
+    return [
+      orientedBox(
+        equipment,
+        stub,
+        [equipment.location[0], equipment.location[1], level.elevation + height / 2],
+        equipment.angle,
+        [length, width, height],
+        EQUIPMENT_COLOR,
+      ),
+    ];
+  }
+  const [cx, cy] = equipment.location;
+  const radius = (shape === 'vertical_vessel' ? length : width) / 2;
+  const circle = Array.from({ length: VESSEL_SEGMENTS }, (_, index): Vec2 => {
+    const theta = (index / VESSEL_SEGMENTS) * Math.PI * 2;
+    return [radius * Math.cos(theta), radius * Math.sin(theta)];
+  });
+  const [cos, sin] = [Math.cos(equipment.angle), Math.sin(equipment.angle)];
+  const mesh =
+    shape === 'vertical_vessel'
+      ? prismMesh(
+          circle,
+          [],
+          ([x, y], side): Vec3 => [cx + x, cy + y, level.elevation + side * height],
+        )
+      : prismMesh(
+          circle,
+          [],
+          ([x, y], side): Vec3 => [
+            cx + cos * (side - 0.5) * length - sin * x,
+            cy + sin * (side - 0.5) * length + cos * x,
+            level.elevation + radius + y,
+          ],
+        );
+  return mesh ? [meshEntity(equipment, stub, mesh, EQUIPMENT_COLOR)] : [];
 }
 
 /** One swept mesh per segment of a polyline run (pipe, cable tray); degenerate segments are skipped. */

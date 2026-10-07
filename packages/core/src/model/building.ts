@@ -215,6 +215,8 @@ export interface PanelElement extends LevelElementBase {
   material: string;
 }
 
+export type EquipmentShape = 'box' | 'vertical_vessel' | 'horizontal_vessel';
+
 /** A machine / process equipment footprint with its maintenance clearance zone. */
 export interface EquipmentElement extends LevelElementBase {
   readonly category: 'equipment';
@@ -222,8 +224,10 @@ export interface EquipmentElement extends LevelElementBase {
   location: Vec2;
   /** Plan rotation (radians). */
   angle: number;
-  /** [length along its x, width along its y, height]. */
+  /** [length along its x, width along its y, height]; always the bounding box (vessels: normalised). */
   size: Vec3;
+  /** Absent = box. Vessels are cylinders inscribed in `size`. */
+  shape?: EquipmentShape;
   /** Free space required around the footprint for operation / maintenance. */
   clearance: number;
   /** Operating weight in kg (0 when unknown). */

@@ -9,7 +9,13 @@ import { elementAffected, getBuilding, isVec2, resolveLevel, toVec2, withElement
 import { noop } from '@core/commands/noop';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { regenerateBuilding } from '../evaluateElements';
-import { toVec3 } from './memberSupport';
+import {
+  SHAPE_PARAM_TEXT,
+  describeEquipmentShape,
+  equipmentShapeSchema,
+  normaliseEquipmentSize,
+  shapeOf,
+} from './equipmentShape';
 
 /**
  * @command update_equipment
@@ -22,7 +28,7 @@ export const updateEquipment = defineCommand({
   name: 'update_equipment',
   description:
     'Edit an existing equipment in place (revision): name, tag (mark), plan centre, size, plan rotation, ' +
-    'maintenance clearance, operating weight or level. Identify it by `elementId` (e.g. "equipment-2") or by ' +
+    'maintenance clearance, operating weight, shape (box / vertical_vessel / horizontal_vessel) or level. Identify it by `elementId` (e.g. "equipment-2") or by ' +
     'its current tag `currentMark` (e.g. "EQ3"). The element id is kept, so schedules, plan tags and IFC ' +
     'GlobalIds stay stable across the revision. Fields you omit are unchanged.',
   params: z.object({
@@ -34,7 +40,13 @@ export const updateEquipment = defineCommand({
     name: z.string().optional().describe('New equipment name.'),
     mark: z.string().optional().describe('New equipment tag (must not clash with another tag).'),
     location: z.array(z.number()).optional().describe('New footprint centre [x, y].'),
-    size: z.array(z.number()).optional().describe('New [length, width, height], all > 0.'),
+    size: z
+      .array(z.number())
+      .optional()
+      .describe(
+        'New size, three numbers. box: [length, width, height], all > 0. vertical_vessel: [diameter, ignored, height]. horizontal_vessel: [length along local x, diameter, ignored]. Vessel sizes are normalised to their bounding box.',
+      ),
+    shape: equipmentShapeSchema.optional().describe(`New shape. ${SHAPE_PARAM_TEXT}`),
     angle: z.number().optional().describe('New plan rotation in radians.'),
     clearance: z.number().optional().describe('New maintenance clearance (>= 0).'),
     weight: z.number().optional().describe('New operating weight in kg (>= 0).'),
@@ -42,7 +54,19 @@ export const updateEquipment = defineCommand({
   }),
   run: (
     doc,
-    { elementId, currentMark, name, mark, location, size, angle, clearance, weight, levelId },
+    {
+      elementId,
+      currentMark,
+      name,
+      mark,
+      location,
+      size,
+      shape,
+      angle,
+      clearance,
+      weight,
+      levelId,
+    },
   ): CommandResult => {
     const building = getBuilding(doc);
     const equipments = Object.values(building.elements).filter(
@@ -76,13 +100,13 @@ export const updateEquipment = defineCommand({
       return noop(doc, 'update_equipment failed: give elementId or currentMark.');
     }
     const equipment = target;
-    const dimensions = size !== undefined ? toVec3(size) : equipment.size;
-    if (
-      !dimensions ||
-      (size !== undefined && size.length !== 3) ||
-      dimensions.some((v) => !(v > 0))
-    ) {
-      return noop(doc, 'update_equipment failed: size must be [length, width, height], all > 0.');
+    const newShape = shape ?? shapeOf(equipment);
+    const dimensions = normaliseEquipmentSize(newShape, size ?? equipment.size);
+    if (!dimensions) {
+      return noop(
+        doc,
+        `update_equipment failed: size must be 3 numbers valid for shape ${newShape} (box: all > 0; vertical_vessel: diameter and height > 0; horizontal_vessel: length and diameter > 0).`,
+      );
     }
     if (location !== undefined && !isVec2(location)) {
       return noop(doc, 'update_equipment failed: location must be [x, y].');
@@ -112,8 +136,11 @@ export const updateEquipment = defineCommand({
     }
     const resolution = resolveLevel(doc, building, levelId ?? equipment.levelId);
     if (!resolution.ok) return noop(doc, `update_equipment failed: ${resolution.reason}.`);
+    const withoutShape: EquipmentElement = { ...equipment };
+    delete withoutShape.shape;
     const updated: EquipmentElement = {
-      ...equipment,
+      ...withoutShape,
+      ...(newShape !== 'box' ? { shape: newShape } : {}),
       name: newName,
       mark: newMark,
       location: location !== undefined ? toVec2(location) : equipment.location,
@@ -126,7 +153,7 @@ export const updateEquipment = defineCommand({
       document,
       summary:
         `Updated equipment ${updated.mark} "${updated.name}" (${updated.id}): ` +
-        `[${updated.location.join(', ')}] on ${updated.levelId}, ${updated.size.join(' × ')} ${doc.units}, ` +
+        `[${updated.location.join(', ')}] on ${updated.levelId}, ${describeEquipmentShape(newShape, updated.size, doc.units)}, ` +
         `clearance ${updated.clearance}, ${updated.weight} kg.`,
       affected: elementAffected(document, [updated.id]),
       data: { elementId: updated.id },

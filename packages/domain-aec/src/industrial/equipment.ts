@@ -20,14 +20,20 @@ import {
 } from '../model';
 import { noop } from '@core/commands/noop';
 import { regenerateBuilding } from '../evaluateElements';
-import { toVec3 } from './memberSupport';
+import {
+  SHAPE_PARAM_TEXT,
+  describeEquipmentShape,
+  equipmentShapeSchema,
+  normaliseEquipmentSize,
+} from './equipmentShape';
 import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from './pipeSizes';
 import { hasRepeatedPoint, parseRoute, routeLength } from './routeSupport';
 
 /**
  * @command add_equipment
  * @pure
- * @affects creates 1 equipment footprint (box on layer Q-EQPM; clearance drawn in plan)
+ * @affects creates 1 equipment (box or cylindrical vessel on layer Q-EQPM; clearance drawn in plan)
+ * @invariant vessel `size` is normalised to its bounding box; shape absent = box
  * @failure missing name / bad location / size <= 0 / clearance < 0 -> no-op
  */
 export const addEquipment = defineCommand({
@@ -35,11 +41,18 @@ export const addEquipment = defineCommand({
   description:
     'Place a machine / process equipment on a level: name, plan centre, size [length, width, height], ' +
     'plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and ' +
-    'operating weight in kg (for floor loads). Shown as a block in 3D and with its clearance zone in plan.',
+    'operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or ' +
+    'horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan.',
   params: z.object({
     name: z.string().describe('Equipment name, e.g. "CNC lathe", "Compressor".'),
     location: z.array(z.number()).describe('Footprint centre [x, y].'),
-    size: z.array(z.number()).describe('[length (local x), width (local y), height], all > 0.'),
+    size: z
+      .array(z.number())
+      .describe(
+        'Three numbers. box: [length (local x), width (local y), height], all > 0. vertical_vessel: ' +
+          '[diameter, ignored, height]. horizontal_vessel: [length along local x, diameter, ignored].',
+      ),
+    shape: equipmentShapeSchema.optional().describe(SHAPE_PARAM_TEXT),
     angle: z.number().optional().describe('Plan rotation in radians. Default 0.'),
     clearance: z
       .number()
@@ -51,14 +64,17 @@ export const addEquipment = defineCommand({
   }),
   run: (
     doc,
-    { name, location, size, angle = 0, clearance, weight = 0, levelId, mark },
+    { name, location, size, shape = 'box', angle = 0, clearance, weight = 0, levelId, mark },
   ): CommandResult => {
-    const dimensions = toVec3(size);
+    const dimensions = normaliseEquipmentSize(shape, size);
     if (name.trim() === '' || !isVec2(location)) {
       return noop(doc, 'add_equipment failed: name and location [x, y] are required.');
     }
-    if (!dimensions || size.length !== 3 || dimensions.some((value) => !(value > 0))) {
-      return noop(doc, 'add_equipment failed: size must be [length, width, height], all > 0.');
+    if (!dimensions) {
+      return noop(
+        doc,
+        `add_equipment failed: size must be 3 numbers valid for shape ${shape} (box: all > 0; vertical_vessel: diameter and height > 0; horizontal_vessel: length and diameter > 0).`,
+      );
     }
     const resolvedClearance = clearance ?? fromMm(doc, 800);
     if (resolvedClearance < 0 || weight < 0) {
@@ -76,6 +92,7 @@ export const addEquipment = defineCommand({
       location: toVec2(location),
       angle,
       size: dimensions,
+      ...(shape !== 'box' ? { shape } : {}),
       clearance: resolvedClearance,
       weight,
     };
@@ -83,7 +100,7 @@ export const addEquipment = defineCommand({
     return {
       document,
       summary:
-        `Added equipment ${equipment.mark} "${equipment.name}" (${equipment.id}) ${dimensions.join(' × ')} ${doc.units}, ` +
+        `Added equipment ${equipment.mark} "${equipment.name}" (${equipment.id}) ${describeEquipmentShape(shape, dimensions, doc.units)}, ` +
         `clearance ${resolvedClearance}${weight > 0 ? `, ${weight} kg` : ''}.`,
       affected: elementAffected(document, [equipment.id]),
       data: { elementId: equipment.id },
