@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import type { BuildingElement, PipeElement } from '@core/model/building';
+import type { BuildingElement, EquipmentElement, PipeElement } from '@core/model/building';
 import { buildPlanDrawing } from '@aec/planDrawing';
 import { outsideDiameterMm } from '@aec/industrial/pipeSizes';
 import { buildingErrors } from '@aec/validate';
@@ -278,12 +278,29 @@ describe('update_equipment', () => {
       size: [1, 1, 1],
       mark: 'DUP',
     });
-    const twin = run(doc, 'add_equipment', {
+    const refused = execute(doc, 'add_equipment', {
       name: 'Twin2',
       location: [0, 5],
       size: [1, 1, 1],
       mark: 'DUP',
     });
+    expect(refused.document).toBe(doc);
+    expect(refused.summary).toMatch(/tag 'DUP' is already used by equipment-3/);
+    // Duplicate tags can still arrive from a loaded file: forge one to cover the ambiguity branch.
+    const withSecond = run(doc, 'add_equipment', {
+      name: 'Twin2',
+      location: [0, 5],
+      size: [1, 1, 1],
+      mark: 'DUP2',
+    });
+    const forged = withSecond.building!.elements['equipment-4'] as EquipmentElement;
+    const twin: CadDocument = {
+      ...withSecond,
+      building: {
+        ...withSecond.building!,
+        elements: { ...withSecond.building!.elements, 'equipment-4': { ...forged, mark: 'DUP' } },
+      },
+    };
     const cases: Array<[Record<string, unknown>, RegExp]> = [
       [{}, /give elementId or currentMark/],
       [{ elementId: 'nope' }, /no element 'nope'/],

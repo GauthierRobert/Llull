@@ -707,7 +707,7 @@
           "type": "array"
         },
         "mark": {
-          "description": "Equipment tag. Default EQn.",
+          "description": "Equipment tag, unique among equipment (duplicates are refused). Default EQn.",
           "type": "string"
         },
         "name": {
@@ -1338,7 +1338,7 @@
           "type": "string"
         },
         "material": {
-          "description": "Default steel.",
+          "description": "Pipe material. Default \"steel\".",
           "type": "string"
         },
         "points": {

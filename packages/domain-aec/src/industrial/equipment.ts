@@ -59,7 +59,10 @@ export const addEquipment = defineCommand({
       .describe('Maintenance / operating clearance around it, in document units. Default 800 mm.'),
     weight: z.number().optional().describe('Operating weight in kg. Default 0 (unknown).'),
     levelId: levelIdParam,
-    mark: z.string().optional().describe('Equipment tag. Default EQn.'),
+    mark: z
+      .string()
+      .optional()
+      .describe('Equipment tag, unique among equipment (duplicates are refused). Default EQn.'),
   }),
   run: (
     doc,
@@ -82,10 +85,20 @@ export const addEquipment = defineCommand({
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_equipment failed: ${resolution.reason}.`);
+    const requestedMark = mark?.trim();
+    const taken = Object.values(resolution.building.elements).find(
+      (element) => element.category === 'equipment' && element.mark === requestedMark,
+    );
+    if (requestedMark && taken) {
+      return noop(
+        doc,
+        `add_equipment failed: tag '${requestedMark}' is already used by ${taken.id}; line-list from/to references need unique tags.`,
+      );
+    }
     const equipment: EquipmentElement = {
       id: nextElementId(resolution.building, 'equipment'),
       category: 'equipment',
-      mark: mark?.trim() || nextMark(resolution.building, 'equipment'),
+      mark: requestedMark || nextMark(resolution.building, 'equipment'),
       entityIds: [],
       levelId: resolution.level.id,
       name: name.trim(),
@@ -154,7 +167,7 @@ export const addPipeRun = defineCommand({
       .optional()
       .describe('Line destination: equipment tag or battery-limit / tie-in id.'),
     service: z.string().optional().describe('Fluid / service. Default "process".'),
-    material: z.string().optional().describe('Default steel.'),
+    material: z.string().optional().describe('Pipe material. Default "steel".'),
     levelId: levelIdParam,
   }),
   run: (
