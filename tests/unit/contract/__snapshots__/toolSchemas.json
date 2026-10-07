@@ -222,11 +222,11 @@
           "type": "boolean"
         },
         "depth": {
-          "description": "Section depth (rectangular). Default = width.",
+          "description": "Section depth (rectangular), in document units. Default = width.",
           "type": "number"
         },
         "height": {
-          "description": "Column height. Default: the level height.",
+          "description": "Column height, in document units. Default: the level height.",
           "type": "number"
         },
         "levelId": {

@@ -266,8 +266,14 @@ export const addColumn = defineCommand({
       .number()
       .optional()
       .describe('Section width (diameter if circular), in document units. Default 300 mm.'),
-    depth: z.number().optional().describe('Section depth (rectangular). Default = width.'),
-    height: z.number().optional().describe('Column height. Default: the level height.'),
+    depth: z
+      .number()
+      .optional()
+      .describe('Section depth (rectangular), in document units. Default = width.'),
+    height: z
+      .number()
+      .optional()
+      .describe('Column height, in document units. Default: the level height.'),
     levelId: levelIdParam(),
     material: z.string().optional().describe('Material. Default concrete.'),
   }),
@@ -296,7 +302,26 @@ export const addColumn = defineCommand({
     if (!resolution.ok) return noop(doc, `add_column failed: ${resolution.reason}.`);
     let next = resolution.building;
     const ids: string[] = [];
+    const existing = Object.values(next.elements).filter(
+      (element): element is ColumnElement =>
+        element.category === 'column' && element.levelId === resolution.level.id,
+    );
+    const occupied = (location: Vec2): ColumnElement | undefined =>
+      existing.find(
+        (column) => column.location[0] === location[0] && column.location[1] === location[1],
+      );
+    const skipped = locations.flatMap((location) => {
+      const twin = occupied(location);
+      return twin ? [`[${location.join(', ')}] (${twin.id})`] : [];
+    });
+    if (skipped.length === locations.length) {
+      return noop(
+        doc,
+        `add_column: ${skipped.length === 1 ? 'a column already stands' : 'columns already stand'} at ${skipped.join(', ')} on ${resolution.level.id}; nothing added (use update/delete_building_element to change them).`,
+      );
+    }
     for (const location of locations) {
+      if (occupied(location)) continue;
       const column: ColumnElement = {
         id: nextElementId(next, 'column'),
         category: 'column',
@@ -316,7 +341,11 @@ export const addColumn = defineCommand({
     const document = regenerateBuilding(doc, next);
     return {
       document,
-      summary: `Added ${ids.length} ${shape} column(s) ${ids.join(', ')} on ${resolution.level.name}.`,
+      summary:
+        `Added ${ids.length} ${shape} column(s) ${ids.join(', ')} on ${resolution.level.name}.` +
+        (skipped.length > 0
+          ? ` Skipped ${skipped.length} occupied location(s): ${skipped.join(', ')}.`
+          : ''),
       affected: elementAffected(document, ids),
       data: { elementIds: ids },
     };

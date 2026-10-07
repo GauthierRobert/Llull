@@ -90,6 +90,19 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(elsewhere.affected.length).toBeGreaterThan(0);
   });
 
+  it('add_column skips occupied locations and refuses when all are occupied', () => {
+    let doc = execute(createEmptyDocument(), 'add_column', { location: [1000, 1000] }).document;
+    const same = execute(doc, 'add_column', { location: [1000, 1000] });
+    expect(same.document).toBe(doc);
+    expect(same.summary).toMatch(/a column already stands at \[1000, 1000\] \(column-1\)/);
+    doc = execute(doc, 'add_grid_system', { xSpacings: [4000], ySpacings: [4000] }).document;
+    const grid = execute(doc, 'add_column', { atGridIntersections: true });
+    expect(grid.affected.length).toBeGreaterThan(0);
+    const again = execute(grid.document, 'add_column', { atGridIntersections: true });
+    expect(again.document).toBe(grid.document);
+    expect(again.summary).toMatch(/columns already stand at/);
+  });
+
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
     expectNoOp(doc, 'set_project_info', { name: 'Hall' });
