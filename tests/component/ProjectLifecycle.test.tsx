@@ -9,6 +9,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { createEmptyDocument } from '@core/model/types';
+import { execute } from '@core/commands/registry';
 import { TopBar } from '@ui/components/TopBar';
 import { ProjectIO } from '@ui/components/ProjectIO';
 import { EmptyState } from '@ui/components/EmptyState';
@@ -116,6 +117,37 @@ describe('useAutoFrame', () => {
 
     act(() => dispatch('add_box', { size: [1, 1, 1] }));
     expect(useStore.getState().document.camera).toEqual(framed);
+  });
+
+  it('joins the framing to the undo step of the content: one Undo empties the model', () => {
+    render(<Harness />);
+    const before = useStore.getState().document.camera;
+    act(() => dispatch('add_box', { size: [5000, 5000, 5000], position: [20000, 20000, 0] }));
+    expect(useStore.getState().localOutbox.map((entry) => entry.name)).toEqual([
+      'add_box',
+      'fit_view',
+    ]);
+    act(() => useStore.getState().undo());
+    expect(useStore.getState().document.order).toHaveLength(0);
+    expect(useStore.getState().document.camera).toEqual(before);
+    expect(useStore.getState().localOutbox).toHaveLength(0);
+    act(() => useStore.getState().redo());
+    expect(useStore.getState().document.order).toHaveLength(1);
+    expect(useStore.getState().document.camera).not.toEqual(before);
+    expect(useStore.getState().localOutbox[0]?.name).toBe('add_box');
+    act(() => useStore.getState().undo());
+    expect(useStore.getState().document.order).toHaveLength(0);
+    expect(useStore.getState().localOutbox).toHaveLength(0);
+  });
+
+  it('does not frame while connected to a live server (the camera is shared)', () => {
+    useStore.setState({ liveStatus: 'connected' });
+    render(<Harness />);
+    const before = useStore.getState().document.camera;
+    const snapshot = execute(useStore.getState().document, 'add_box', { size: [1, 1, 1] }).document;
+    act(() => useStore.setState({ document: snapshot }));
+    expect(useStore.getState().document.camera).toEqual(before);
+    expect(useStore.getState().localOutbox).toHaveLength(0);
   });
 });
 

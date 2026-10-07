@@ -30,6 +30,11 @@ export interface DispatchOptions {
   onResult?: (result: DispatchResult) => void;
   /** Leave the status-bar summary untouched (automatic UI-initiated commands such as framing). */
   quiet?: boolean;
+  /**
+   * Local mode: fold this change into the previous undo step instead of adding one (automatic
+   * follow-ups such as framing new content), so one Undo reverts both.
+   */
+  coalesce?: boolean;
 }
 
 export interface CadStoreState {

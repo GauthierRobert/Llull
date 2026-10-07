@@ -57,6 +57,8 @@ export function runLocally(
     options?.onResult?.({ summary, changed: false });
     return;
   }
+  const coalesce =
+    options?.coalesce === true && state.localUndoStack.length > 0 && state.localOutbox.length > 0;
   set({
     document: {
       ...result.document,
@@ -64,9 +66,20 @@ export function runLocally(
     },
     lastSummary: shown,
     lastMeasure,
-    localUndoStack: [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT),
+    localUndoStack: coalesce
+      ? state.localUndoStack
+      : [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT),
     localRedoStack: [],
-    localOutbox: [...state.localOutbox, { commandId, name, params, affected: result.affected }],
+    localOutbox: [
+      ...state.localOutbox,
+      {
+        commandId,
+        name,
+        params,
+        affected: result.affected,
+        ...(coalesce ? { coalesced: true } : {}),
+      },
+    ],
     localRedoOutbox: [],
     canUndo: true,
     canRedo: false,

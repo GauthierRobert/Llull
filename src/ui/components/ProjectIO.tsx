@@ -64,7 +64,7 @@ export function ProjectIO(): React.ReactElement {
     if (!changed) return;
     useSessionStore.getState().markSaved();
     useSessionStore.getState().setRestoredAt(null);
-    dispatch('fit_view', { direction: 'iso' }, { quiet: true });
+    dispatch('fit_view', { direction: 'iso' }, { quiet: true, coalesce: true });
   };
 
   const handleOpenClick = (): void => {
