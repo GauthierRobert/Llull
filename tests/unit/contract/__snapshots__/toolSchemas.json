@@ -6162,7 +6162,7 @@
           "type": "string"
         },
         "date": {
-          "description": "Issue date, e.g. \"2026-10-01\".",
+          "description": "Issue date as YYYY-MM-DD, e.g. \"2026-10-01\" (other formats are not used for the IFC header).",
           "type": "string"
         },
         "drawingNumber": {

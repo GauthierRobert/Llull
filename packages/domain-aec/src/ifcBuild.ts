@@ -224,13 +224,17 @@ export const exportIfc = defineCommand({
         'export_ifc: the building model has no levels (add_level / add_wall first).',
       );
     }
+    const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(building.project.date);
     const stamp =
-      timestamp ??
-      (building.project.date ? `${building.project.date}T00:00:00` : '1970-01-01T00:00:00');
+      timestamp ?? (isoDate ? `${building.project.date}T00:00:00` : '1970-01-01T00:00:00');
     const result = buildIfc(doc, stamp);
+    const dateNote =
+      timestamp === undefined && building.project.date !== '' && !isoDate
+        ? ` Project date "${building.project.date}" is not YYYY-MM-DD, so the header uses ${stamp}.`
+        : '';
     return {
       document: doc,
-      summary: `IFC4 ${result.filename}: ${result.productCount} building element(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.`,
+      summary: `IFC4 ${result.filename}: ${result.productCount} building element(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${dateNote}`,
       affected: [],
       data: result,
     };

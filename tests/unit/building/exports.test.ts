@@ -326,6 +326,21 @@ describe('DXF drafting text and extents', () => {
   });
 });
 
+describe('export_ifc header timestamp', () => {
+  it('uses an ISO project date, and falls back (saying so) for a free-text date', () => {
+    const iso = execute(house(), 'export_ifc', {});
+    expect((iso.data as IfcExport).ifc).toContain("'2026-10-01T00:00:00'");
+    expect(iso.summary).not.toMatch(/not YYYY-MM-DD/);
+    const prose = run(house(), 'set_project_info', { date: '1 Oct 2026' });
+    const fallback = execute(prose, 'export_ifc', {});
+    expect((fallback.data as IfcExport).ifc).toContain("'1970-01-01T00:00:00'");
+    expect((fallback.data as IfcExport).ifc).not.toContain('1 Oct 2026T00');
+    expect(fallback.summary).toMatch(/Project date "1 Oct 2026" is not YYYY-MM-DD/);
+    const explicit = execute(prose, 'export_ifc', { timestamp: '2027-01-02T03:04:05' });
+    expect(explicit.summary).not.toMatch(/not YYYY-MM-DD/);
+  });
+});
+
 describe('cut fills (hatches)', () => {
   it('marks wall and column cuts as hatched and steel sections as solid with holes', () => {
     let doc = house();

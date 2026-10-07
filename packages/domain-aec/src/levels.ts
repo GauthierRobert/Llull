@@ -239,7 +239,12 @@ export const setProjectInfo = defineCommand({
     author: z.string().optional().describe('Drawn by (company or person).'),
     drawingNumber: z.string().optional().describe('Drawing number, e.g. "A-101".'),
     revision: z.string().optional().describe('Revision, e.g. "B".'),
-    date: z.string().optional().describe('Issue date, e.g. "2026-10-01".'),
+    date: z
+      .string()
+      .optional()
+      .describe(
+        'Issue date as YYYY-MM-DD, e.g. "2026-10-01" (other formats are not used for the IFC header).',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const building = getBuilding(doc);
