@@ -112,6 +112,27 @@ describe('check_clashes: modelled walls', () => {
   });
 });
 
+describe('check_clashes: summary depth', () => {
+  it('reports a sub-millimetre penetration with decimals and rejects a negative tolerance', () => {
+    let doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+      thickness: 200,
+    }).document;
+    doc = execute(doc, 'add_equipment', {
+      mark: 'P-1',
+      name: 'Pump',
+      location: [2000, 599.5],
+      size: [1000, 1000, 1000],
+    }).document;
+    const result = execute(doc, 'check_clashes', { tolerance: 0 });
+    expect(result.summary).toMatch(/\(0\.50 mm\)/);
+    const bad = execute(doc, 'check_clashes', { tolerance: -1 });
+    expect(bad.summary).toMatch(/tolerance must be >= 0/);
+    expect(bad.document).toBe(doc);
+  });
+});
+
 describe('add_equipment_openings', () => {
   it('cuts the floor around a vessel and clears the clash', () => {
     const doc = vesselThroughFloor();

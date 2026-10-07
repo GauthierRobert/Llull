@@ -116,6 +116,11 @@ function connected(
   return endsIn(a, b, boxB) || endsIn(b, a, boxA);
 }
 
+/** Whole mm from 1 mm up; two decimals below, so a sub-millimetre penetration never reads "0 mm". */
+function formatDepthMm(depthMm: number): string {
+  return depthMm >= 1 ? String(Math.round(depthMm)) : depthMm.toFixed(2);
+}
+
 /** All clashes on the given levels (or every level). @pure */
 function findClashes(
   doc: CadDocument,
@@ -203,7 +208,7 @@ export const checkClashes = defineCommand({
     tolerance: z
       .number()
       .optional()
-      .describe('Ignore penetrations up to this depth. Default 5 mm.'),
+      .describe('Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.'),
   }),
   run: (doc, { levelId, tolerance }): CommandResult => {
     const building = getBuilding(doc);
@@ -220,7 +225,7 @@ export const checkClashes = defineCommand({
     );
     const describe = (clash: Clash): string => {
       const [a, b] = [building.elements[clash.a], building.elements[clash.b]];
-      return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${Math.round(toMm(doc, clash.depth))} mm)`;
+      return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${formatDepthMm(toMm(doc, clash.depth))} mm)`;
     };
     const hard = clashes.filter((clash) => clash.kind === 'hard').length;
     return {

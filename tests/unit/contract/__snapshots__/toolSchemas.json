@@ -2748,7 +2748,7 @@
           "type": "string"
         },
         "tolerance": {
-          "description": "Ignore penetrations up to this depth. Default 5 mm.",
+          "description": "Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.",
           "type": "number"
         }
       },
