@@ -141,7 +141,18 @@ function SectionPopover(): React.ReactElement | null {
           aria-valuemax={50}
           aria-valuenow={clipPlane.offset}
         />
-        <span className="vp-value">{clipPlane.offset.toFixed(1)}</span>
+        <input
+          type="number"
+          className="vp-value vp-value--input"
+          step={0.5}
+          value={clipPlane.offset}
+          onChange={(e) => {
+            const offset = parseFloat(e.target.value);
+            if (Number.isFinite(offset)) setClipPlane({ offset });
+          }}
+          aria-label="Exact section distance"
+          title="Exact offset in document units (the slider spans -50 to 50)"
+        />
       </div>
 
       <label className="vp-field-label vp-flip">
