@@ -8,10 +8,12 @@
  * Uses entity `id` as React key (R8).
  */
 
-import type { Entity, EntityId } from '@core/model/types';
+import { useMemo } from 'react';
+import type { Entity, EntityId, LineEntity } from '@core/model/types';
 import { is2D } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { isEntityVisible } from '../entityVisibility';
+import { BatchedLines2D } from './BatchedLines2D';
 import { LineRenderer } from './entities/LineRenderer';
 import { PolylineRenderer } from './entities/PolylineRenderer';
 import { CircleRenderer } from './entities/CircleRenderer';
@@ -63,25 +65,36 @@ export function Entities2D(): React.ReactElement {
   const entities = useStore((s) => s.document.entities);
   const layers = useStore((s) => s.document.layers);
   const selection = useStore((s) => s.document.selection);
-  const selectionSet = new Set<EntityId>(selection);
 
   // Render-only hide filters — never touch the document (PRIME DIRECTIVE).
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
 
+  // Unselected lines are drawn in ONE batched draw call; everything else (and selected lines, for
+  // their highlight) keeps its own renderer.
+  const { batchedLines, individual } = useMemo(() => {
+    const selectionSet = new Set<EntityId>(selection);
+    const lines: LineEntity[] = [];
+    const rest: Array<{ entity: Entity; selected: boolean }> = [];
+    for (const id of order) {
+      const entity = entities[id];
+      if (!entity || !is2D(entity)) continue;
+      // Building annotations are drawn per level by BuildingPlan2D.
+      if (entity.tags?.includes('bim') === true) continue;
+      if (!isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds)) continue;
+      const selected = selectionSet.has(id);
+      if (entity.kind === 'line' && !selected) lines.push(entity);
+      else rest.push({ entity, selected });
+    }
+    return { batchedLines: lines, individual: rest };
+  }, [order, entities, layers, selection, hiddenLayerIds, hiddenEntityIds]);
+
   return (
     <group name="entities-2d">
-      {order.map((id) => {
-        const entity = entities[id];
-        if (!entity) return null;
-        if (!is2D(entity)) return null;
-        // Building annotations are drawn per level by BuildingPlan2D.
-        if (entity.tags?.includes('bim') === true) return null;
-
-        if (!isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds)) return null;
-
-        return <Entity2DRenderer key={id} entity={entity} selected={selectionSet.has(id)} />;
-      })}
+      <BatchedLines2D lines={batchedLines} />
+      {individual.map(({ entity, selected }) => (
+        <Entity2DRenderer key={entity.id} entity={entity} selected={selected} />
+      ))}
     </group>
   );
 }
