@@ -6550,19 +6550,19 @@
     "input_schema": {
       "properties": {
         "height": {
-          "description": "New height (> 0).",
+          "description": "New height in document units (> 0).",
           "type": "number"
         },
         "mark": {
-          "description": "New schedule mark.",
+          "description": "New schedule mark; blank keeps the current one.",
           "type": "string"
         },
         "material": {
-          "description": "New material.",
+          "description": "New material; blank keeps the current one.",
           "type": "string"
         },
         "offset": {
-          "description": "New center distance from the wall start.",
+          "description": "New distance from the wall start to the opening center, in document units.",
           "type": "number"
         },
         "openingId": {
@@ -6570,11 +6570,11 @@
           "type": "string"
         },
         "sillHeight": {
-          "description": "New sill height (>= 0).",
+          "description": "New sill height above the level floor, in document units (>= 0).",
           "type": "number"
         },
         "swing": {
-          "description": "Door hinge side.",
+          "description": "Door hinge side (doors only).",
           "enum": [
             "left",
             "right"
@@ -6582,7 +6582,7 @@
           "type": "string"
         },
         "width": {
-          "description": "New width (> 0).",
+          "description": "New width in document units (> 0).",
           "type": "number"
         }
       },

@@ -188,13 +188,19 @@ export const updateOpening = defineCommand({
     'material or mark. The host wall is re-cut.',
   params: z.object({
     openingId: z.string().describe('Door/window element id, e.g. "door-1".'),
-    offset: z.number().optional().describe('New center distance from the wall start.'),
-    width: z.number().optional().describe('New width (> 0).'),
-    height: z.number().optional().describe('New height (> 0).'),
-    sillHeight: z.number().optional().describe('New sill height (>= 0).'),
-    swing: z.enum(['left', 'right']).optional().describe('Door hinge side.'),
-    material: z.string().optional().describe('New material.'),
-    mark: z.string().optional().describe('New schedule mark.'),
+    offset: z
+      .number()
+      .optional()
+      .describe('New distance from the wall start to the opening center, in document units.'),
+    width: z.number().optional().describe('New width in document units (> 0).'),
+    height: z.number().optional().describe('New height in document units (> 0).'),
+    sillHeight: z
+      .number()
+      .optional()
+      .describe('New sill height above the level floor, in document units (>= 0).'),
+    swing: z.enum(['left', 'right']).optional().describe('Door hinge side (doors only).'),
+    material: z.string().optional().describe('New material; blank keeps the current one.'),
+    mark: z.string().optional().describe('New schedule mark; blank keeps the current one.'),
   }),
   run: (
     doc,
@@ -221,6 +227,9 @@ export const updateOpening = defineCommand({
     };
     if (updated.width <= 0 || updated.height <= 0 || updated.sillHeight < 0) {
       return noop(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
+    }
+    if (JSON.stringify(updated) === JSON.stringify(opening)) {
+      return noop(doc, `update_opening: ${openingId} already has these values; nothing changed.`);
     }
     const fitError = openingFitError(
       wall,

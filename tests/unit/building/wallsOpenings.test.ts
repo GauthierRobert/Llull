@@ -167,6 +167,14 @@ describe('add_door / add_window', () => {
     expect(execute(doc, 'add_door', { wallId: 'wall-1', at: 'x' }).document).toBe(doc);
   });
 
+  it('update_opening with no effective change is a no-op', () => {
+    const doc = run(oneWall(), 'add_window', { wallId: 'wall-1' });
+    const none = execute(doc, 'update_opening', { openingId: 'window-1' });
+    expect(none.document).toBe(doc);
+    expect(none.affected).toEqual([]);
+    expect(none.summary).toMatch(/already has these values/);
+  });
+
   it('update_opening slides and resizes; refuses misfits', () => {
     const doc = run(oneWall(), 'add_window', { wallId: 'wall-1' });
     const moved = execute(doc, 'update_opening', {
