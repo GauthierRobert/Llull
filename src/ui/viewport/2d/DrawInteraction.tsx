@@ -79,9 +79,10 @@ export function DrawInteraction({
         activeTool={activeTool}
         collectedPoints={collectedPoints}
         cursor={snappedCursor}
+        zoom={zoom}
       />
 
-      <CollectedPointMarkers points={collectedPoints} />
+      <CollectedPointMarkers points={collectedPoints} zoom={zoom} />
     </>
   );
 }

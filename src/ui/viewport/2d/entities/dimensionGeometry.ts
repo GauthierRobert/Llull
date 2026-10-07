@@ -15,7 +15,7 @@ import type {
   PointEntity,
   Vec2,
 } from '@core/model/types';
-import { chainSegments, segmentsGeometry } from '../../lineGeometry';
+import { anchoredGeometry, chainSegments } from '../../lineGeometry';
 
 const ARROWHEAD_SIZE = 0.3;
 const ANGULAR_ARC_SEGMENTS = 32;
@@ -68,7 +68,10 @@ function arrowhead(tip: Vec2, dx: number, dy: number): Vec2[] {
 }
 
 function drawLines(vertices: ReadonlyArray<Vec2>, color: string): THREE.LineSegments {
-  return new THREE.LineSegments(segmentsGeometry(vertices), new THREE.LineBasicMaterial({ color }));
+  const { geometry, anchor } = anchoredGeometry(vertices);
+  const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color }));
+  lines.position.set(...anchor);
+  return lines;
 }
 
 /** Linear: horizontal distance, line above the higher ref. Aligned: true distance, line parallel. */

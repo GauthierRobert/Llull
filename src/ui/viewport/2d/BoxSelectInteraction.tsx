@@ -11,14 +11,14 @@
  * Presentation only — selection is view state set through the store's `select` (R1).
  */
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import type { Entity, Vec2 } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { isEntityVisible } from '../entityVisibility';
 import { useDisposable } from '../useDisposable';
 import { useOverlayMaterial } from '../useOverlayMaterial';
-import { flattenPoints, positionsGeometry } from '../lineGeometry';
+import { anchoredGeometry } from '../lineGeometry';
 import { boxSelectMode, entitiesInBox } from './boxSelect';
 import { pixelsToWorld } from './gridHelpers';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
@@ -53,9 +53,9 @@ function RubberBand({ start, end, zoom }: RubberBandProps): React.ReactElement {
       }),
     [dash],
   );
-  const geometry = useDisposable(() => {
-    const built = positionsGeometry(
-      flattenPoints(
+  const anchored = useMemo(
+    () =>
+      anchoredGeometry(
         [
           [start[0], start[1]],
           [end[0], start[1]],
@@ -64,12 +64,13 @@ function RubberBand({ start, end, zoom }: RubberBandProps): React.ReactElement {
         ],
         0.2,
       ),
-    );
-    return built;
-  }, [start, end]);
+    [start, end],
+  );
+  useEffect(() => () => anchored.geometry.dispose(), [anchored]);
   return (
     <lineLoop
-      geometry={geometry}
+      geometry={anchored.geometry}
+      position={anchored.anchor}
       material={crossing ? dashed : solid}
       renderOrder={999}
       onUpdate={(line: THREE.LineLoop) => line.computeLineDistances()}

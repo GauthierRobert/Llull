@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { positionsGeometry, rebaseToAnchor } from '../../src/ui/viewport/lineGeometry';
+import {
+  anchoredGeometry,
+  positionsGeometry,
+  rebaseToAnchor,
+} from '../../src/ui/viewport/lineGeometry';
 
 describe('rebaseToAnchor', () => {
   it('keeps full precision for geometry far from the origin', () => {
@@ -21,6 +25,23 @@ describe('rebaseToAnchor', () => {
     expect(local).toEqual([0, 0, 3, 4, 6, 4]);
     expect(local[3]! + anchor[0]).toBe(14);
     expect(local[4]! + anchor[1]).toBe(26);
+  });
+
+  it('anchoredGeometry stores segment vertices relative to the first vertex at the given z', () => {
+    const base = 2_000_000;
+    const { geometry, anchor } = anchoredGeometry(
+      [
+        [base + 0.5, 7],
+        [base + 0.53, 7.25],
+      ],
+      0.2,
+    );
+    expect(anchor).toEqual([base + 0.5, 7, 0]);
+    const stored = Array.from(geometry.getAttribute('position').array);
+    expect(stored[0]).toBe(0);
+    expect(stored[3]).toBeCloseTo(0.03, 6);
+    expect(stored[4]).toBeCloseTo(0.25, 6);
+    expect(stored[5]).toBeCloseTo(0.2, 6);
   });
 
   it('handles an empty vertex list', () => {
