@@ -146,6 +146,42 @@ describe('feature history replay reproduces the building', () => {
   });
 });
 
+describe('corrupt building data in a file is rejected gracefully', () => {
+  it('never throws on load for any single-field corruption of the building model', () => {
+    type Stored = { document: { building: Record<string, unknown> } };
+    const stored = JSON.parse(serializeDocument(build())) as Stored;
+    const bad: unknown[] = [null, 'x', -1, 0, [], {}, true, undefined];
+    const failures: string[] = [];
+    const paths: string[][] = Object.keys(stored.document.building).map((key) => [key]);
+    for (const group of ['elements', 'levels'] as const) {
+      const members = stored.document.building[group] as Record<string, Record<string, unknown>>;
+      for (const [id, member] of Object.entries(members)) {
+        for (const field of Object.keys(member)) paths.push([group, id, field]);
+      }
+    }
+    for (const path of paths) {
+      for (const value of bad) {
+        const copy = JSON.parse(JSON.stringify(stored)) as Stored;
+        let target = copy.document.building;
+        for (const key of path.slice(0, -1)) target = target[key] as Record<string, unknown>;
+        target[path[path.length - 1] as string] = value;
+        try {
+          deserializeDocument(JSON.stringify(copy));
+        } catch (error) {
+          if (
+            !(error instanceof Error) ||
+            error instanceof TypeError ||
+            error instanceof RangeError
+          ) {
+            failures.push(`${path.join('.')}=${JSON.stringify(value)}: ${String(error)}`);
+          }
+        }
+      }
+    }
+    expect(failures.slice(0, 10)).toEqual([]);
+  });
+});
+
 describe('save -> load round trip of derived building geometry', () => {
   it('restores every derived entity of a mixed model exactly', () => {
     const doc = build();
