@@ -17,6 +17,8 @@ import {
   type ElementTool,
   type ToolField,
 } from './elementToolForm';
+import { BuildingForm } from './BuildingForm';
+import { useFormValues } from './useFormValues';
 import { INDUSTRIAL_TOOLS } from './industrialTools';
 
 const ALL_TOOLS: ReadonlyArray<ElementTool> = [...ELEMENT_TOOLS, ...INDUSTRIAL_TOOLS];
@@ -164,17 +166,10 @@ interface ToolFormProps {
 function ToolForm({ tool }: ToolFormProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const building = useStore((s) => s.document.building);
-  const [values, setValues] = useState<Record<string, string>>(() => defaultValues(tool));
-  const [error, setError] = useState('');
+  const { values, error, setError, change } = useFormValues(() => defaultValues(tool));
   const lists = useMemo(() => elementOptions(building), [building]);
 
-  const handleChange = (key: string, value: string): void => {
-    setValues((previous) => ({ ...previous, [key]: value }));
-    setError('');
-  };
-
-  const handleSubmit = (event: React.FormEvent): void => {
-    event.preventDefault();
+  const handleSubmit = (): void => {
     const outcome = tool.build(values, {
       levelId: building?.activeLevelId ?? null,
       wallIds: lists.walls.map((wall) => wall.id),
@@ -187,10 +182,12 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
   };
 
   return (
-    <form
-      className="panel__form building-form"
+    <BuildingForm
+      ariaLabel={`Add ${tool.label}`}
+      error={error}
+      submitLabel={`Add ${tool.label.toLowerCase()}`}
+      submitTestId="tool-submit"
       onSubmit={handleSubmit}
-      aria-label={`Add ${tool.label}`}
     >
       {tool.fields
         .filter((field) => isFieldShown(field, values))
@@ -200,18 +197,10 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
             field={field}
             value={values[field.key] ?? ''}
             lists={lists}
-            onChange={handleChange}
+            onChange={change}
           />
         ))}
-      {error !== '' && (
-        <p className="panel__error" role="alert">
-          {error}
-        </p>
-      )}
-      <button type="submit" className="btn btn--primary btn--sm" data-testid="tool-submit">
-        Add {tool.label.toLowerCase()}
-      </button>
-    </form>
+    </BuildingForm>
   );
 }
 

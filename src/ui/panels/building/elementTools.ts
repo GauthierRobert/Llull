@@ -51,6 +51,25 @@ function wallSection(reader: FieldReader): {
   };
 }
 
+/** Host wall / offset / size shared by door and window; `null` when no host wall is picked. */
+function hostedOpening(reader: FieldReader): {
+  wallId: string;
+  offset: number | undefined;
+  width: number;
+  height: number;
+} | null {
+  const wallId = reader.text('wallId');
+  if (wallId === '') return null;
+  return {
+    wallId,
+    offset: reader.optionalNumber('offset'),
+    width: reader.number('width'),
+    height: reader.number('height'),
+  };
+}
+
+const NO_HOST_WALL = { ok: false, reason: 'Pick a host wall first.' } as const;
+
 function rectangle(reader: FieldReader): Array<[number, number]> {
   const [x1, y1] = reader.point('x1', 'y1');
   const [x2, y2] = reader.point('x2', 'y2');
@@ -209,14 +228,9 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     build: (values) => {
       const reader = new FieldReader(values);
-      if (reader.text('wallId') === '') return { ok: false, reason: 'Pick a host wall first.' };
-      return result(reader, 'add_door', {
-        wallId: reader.text('wallId'),
-        offset: reader.optionalNumber('offset'),
-        width: reader.number('width'),
-        height: reader.number('height'),
-        swing: reader.text('swing'),
-      });
+      const opening = hostedOpening(reader);
+      if (opening === null) return NO_HOST_WALL;
+      return result(reader, 'add_door', { ...opening, swing: reader.text('swing') });
     },
   },
   {
@@ -231,14 +245,9 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     build: (values) => {
       const reader = new FieldReader(values);
-      if (reader.text('wallId') === '') return { ok: false, reason: 'Pick a host wall first.' };
-      return result(reader, 'add_window', {
-        wallId: reader.text('wallId'),
-        offset: reader.optionalNumber('offset'),
-        width: reader.number('width'),
-        height: reader.number('height'),
-        sillHeight: reader.number('sillHeight'),
-      });
+      const opening = hostedOpening(reader);
+      if (opening === null) return NO_HOST_WALL;
+      return result(reader, 'add_window', { ...opening, sillHeight: reader.number('sillHeight') });
     },
   },
   {

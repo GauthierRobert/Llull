@@ -17,10 +17,12 @@ import { isBoundsData } from '@ui/resultData';
 const PADDING = 1.15;
 
 export function ZoomExtents2D(): null {
-  const { camera, controls, size, invalidate } = useThree();
+  const readThree = useThree((state) => state.get);
+  const controls = useThree((state) => state.controls);
   const docCamera = useStore((s) => s.document.camera);
 
   useEffect(() => {
+    const { camera, size, invalidate } = readThree();
     const { document, renderOrigin } = useStore.getState();
     if (document.order.length === 0) return;
     const { data: bounds } = execute(document, 'measure_bounding_box', {});
@@ -39,9 +41,8 @@ export function ZoomExtents2D(): null {
       map.update();
     }
     invalidate();
-    // Re-fit only on mount and on document-camera changes, not on every edit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docCamera, controls]);
+    // Re-fit only on mount and on document-camera changes, not on every edit or resize.
+  }, [docCamera, controls, readThree]);
 
   return null;
 }

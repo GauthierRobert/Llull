@@ -11,11 +11,12 @@ import { useStore } from '@ui/store';
 import type { BuildingLevel, EquipmentElement } from '@core/model/building';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { orderedValues } from '@ui/panels/orderedValues';
+import { BuildingForm } from './BuildingForm';
+import { useFormValues } from './useFormValues';
 import {
   EQUIPMENT_EDIT_FIELDS,
   buildEquipmentUpdate,
   equipmentValues,
-  type EquipmentEditKey,
   type EquipmentEditValues,
 } from './equipmentEdit';
 
@@ -27,16 +28,9 @@ interface EquipmentEditorProps {
 function EquipmentEditor({ element, levels }: EquipmentEditorProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const initial = equipmentValues(element);
-  const [values, setValues] = useState<EquipmentEditValues>(initial);
-  const [error, setError] = useState('');
+  const { values, error, setError, change } = useFormValues<EquipmentEditValues>(() => initial);
 
-  const handleChange = (key: EquipmentEditKey, value: string): void => {
-    setValues((previous) => ({ ...previous, [key]: value }));
-    setError('');
-  };
-
-  const handleSubmit = (event: React.FormEvent): void => {
-    event.preventDefault();
+  const handleSubmit = (): void => {
     const outcome = buildEquipmentUpdate(element.id, initial, values);
     if (!outcome.ok) {
       setError(outcome.reason);
@@ -46,11 +40,13 @@ function EquipmentEditor({ element, levels }: EquipmentEditorProps): React.React
   };
 
   return (
-    <form
-      className="panel__form building-form"
+    <BuildingForm
+      ariaLabel={`Equipment ${element.mark} properties`}
+      error={error}
+      submitLabel="Save equipment"
+      submitTestId="equipment-save"
+      testId="equipment-editor"
       onSubmit={handleSubmit}
-      aria-label={`Equipment ${element.mark} properties`}
-      data-testid="equipment-editor"
     >
       {EQUIPMENT_EDIT_FIELDS.map((field) => (
         <label key={field.key} className="field">
@@ -58,7 +54,7 @@ function EquipmentEditor({ element, levels }: EquipmentEditorProps): React.React
           <input
             type={field.kind}
             value={values[field.key]}
-            onChange={(event) => handleChange(field.key, event.target.value)}
+            onChange={(event) => change(field.key, event.target.value)}
             data-testid={`equipment-edit-${field.key}`}
           />
         </label>
@@ -67,7 +63,7 @@ function EquipmentEditor({ element, levels }: EquipmentEditorProps): React.React
         <span className="field__label">Level</span>
         <select
           value={values.levelId}
-          onChange={(event) => handleChange('levelId', event.target.value)}
+          onChange={(event) => change('levelId', event.target.value)}
           data-testid="equipment-edit-levelId"
         >
           {levels.map((level) => (
@@ -77,15 +73,7 @@ function EquipmentEditor({ element, levels }: EquipmentEditorProps): React.React
           ))}
         </select>
       </label>
-      {error !== '' && (
-        <p className="panel__error" role="alert">
-          {error}
-        </p>
-      )}
-      <button type="submit" className="btn btn--primary btn--sm" data-testid="equipment-save">
-        Save equipment
-      </button>
-    </form>
+    </BuildingForm>
   );
 }
 
