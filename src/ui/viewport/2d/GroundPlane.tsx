@@ -13,7 +13,7 @@ import { useDisposable } from '../useDisposable';
 
 type GroundPlaneProps = Pick<
   MeshProps,
-  'onPointerMove' | 'onPointerDown' | 'onPointerLeave' | 'onClick' | 'onDoubleClick'
+  'onPointerMove' | 'onPointerDown' | 'onPointerUp' | 'onPointerLeave' | 'onClick' | 'onDoubleClick'
 > & { z?: number };
 
 export function GroundPlane({ z = 0, ...handlers }: GroundPlaneProps): React.ReactElement {

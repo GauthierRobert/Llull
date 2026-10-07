@@ -25,6 +25,7 @@ import { useModifyTool } from './useModifyTool';
 import type { ModifyToolPhase } from './useModifyTool';
 import { ModifyPickInteraction } from './ModifyPickInteraction';
 import { SelectPickInteraction } from './SelectPickInteraction';
+import { BoxSelectInteraction } from './BoxSelectInteraction';
 import { ScaleBar } from './ScaleBar';
 import { AdaptiveGrid2D } from './AdaptiveGrid2D';
 import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
@@ -121,6 +122,7 @@ function SceneContents2D({
         {/* Snap indicator + click-to-select: shown when no draw or modify tool is active */}
         {!isDrawing && !isModifying && <SnapIndicator zoom={zoom} />}
         {!isDrawing && !isModifying && <SelectPickInteraction zoom={zoom} />}
+        {!isDrawing && !isModifying && <BoxSelectInteraction zoom={zoom} />}
 
         {/* Draw interaction: click-capture + rubber-band preview */}
         <DrawInteraction

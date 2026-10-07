@@ -176,7 +176,7 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
 }
 
 /** Average glyph advance as a fraction of the text height, used to estimate a text pick box. */
-const TEXT_PICK_EM_WIDTH = 0.6;
+export const TEXT_PICK_EM_WIDTH = 0.6;
 
 /** Segments used to approximate an ellipse outline for picking. */
 const ELLIPSE_PICK_SAMPLES = 48;
@@ -200,23 +200,29 @@ function chainDistSq(pick: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): 
 /** Dimension label height (world units) used for picking — matches DimensionRenderer2D. */
 const DIMENSION_LABEL_HEIGHT = 0.5;
 
+interface LabelBox {
+  /** World-space centre of the label. */
+  readonly center: Vec2;
+  readonly halfWidth: number;
+  readonly halfHeight: number;
+}
+
 /**
- * Squared distance from `worldPick` to a dimension's label box (estimated from the label text).
+ * World-space box of a dimension's label (width estimated from the label text).
  * Dimensions are associative, so the label position comes from the referenced entities.
- * @failure dangling or wrong-kind references -> Infinity (not pickable)
+ * @failure dangling or wrong-kind references -> null
  */
-export function dimensionLabelDistSq(
+export function dimensionLabelBox(
   document: CadDocument,
   dimension: DimensionEntity,
-  worldPick: Vec2,
-): number {
+): LabelBox | null {
   const drawing = dimensionDrawing(
     dimension.dimensionKind,
     dimension.entityIds.map((id) => document.entities[id]),
     dimension.offset ?? DEFAULT_OFFSET,
     dimension.color,
   );
-  if (drawing === null) return Infinity;
+  if (drawing === null) return null;
   drawing.lines?.geometry.dispose();
   (drawing.lines?.material as THREE.Material | undefined)?.dispose();
   const text =
@@ -224,15 +230,26 @@ export function dimensionLabelDistSq(
     (dimension.dimensionKind === 'angular'
       ? `${drawing.value.toFixed(1)}°`
       : drawing.value.toFixed(dimension.precision ?? document.displayPrecision));
-  const halfWidth = (text.length * DIMENSION_LABEL_HEIGHT * TEXT_PICK_EM_WIDTH) / 2;
-  const dx = Math.max(
-    Math.abs(worldPick[0] - dimension.position[0] - drawing.textX) - halfWidth,
-    0,
-  );
-  const dy = Math.max(
-    Math.abs(worldPick[1] - dimension.position[1] - drawing.textY) - DIMENSION_LABEL_HEIGHT / 2,
-    0,
-  );
+  return {
+    center: [dimension.position[0] + drawing.textX, dimension.position[1] + drawing.textY],
+    halfWidth: (text.length * DIMENSION_LABEL_HEIGHT * TEXT_PICK_EM_WIDTH) / 2,
+    halfHeight: DIMENSION_LABEL_HEIGHT / 2,
+  };
+}
+
+/**
+ * Squared distance from `worldPick` to a dimension's label box.
+ * @failure dangling or wrong-kind references -> Infinity (not pickable)
+ */
+export function dimensionLabelDistSq(
+  document: CadDocument,
+  dimension: DimensionEntity,
+  worldPick: Vec2,
+): number {
+  const box = dimensionLabelBox(document, dimension);
+  if (box === null) return Infinity;
+  const dx = Math.max(Math.abs(worldPick[0] - box.center[0]) - box.halfWidth, 0);
+  const dy = Math.max(Math.abs(worldPick[1] - box.center[1]) - box.halfHeight, 0);
   return dx * dx + dy * dy;
 }
 
