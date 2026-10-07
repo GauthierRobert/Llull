@@ -1,0 +1,433 @@
+/**
+ * @layer domain-aec
+ */
+
+import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
+import type { BuildingModel, GridElement } from '@core/model/building';
+import type { CommandResult } from '@core/commands/types';
+import { defineCommand, z } from '@core/commands/schema';
+import { noop } from '@core/commands/noop';
+import { elementAffected, elementsOf, fromMm, getBuilding, resolveLevel, toMetres } from '../model';
+import { regenerateBuilding } from '../evaluateElements';
+import { findProfile } from '../steel/profiles';
+import {
+  appendMembers,
+  baseFixitySchema,
+  jointFixitySchema,
+  levelIdSchema,
+  profileSummary,
+  type MemberSpec,
+} from './memberSupport';
+import {
+  crossGridLines,
+  crossingsOnLine,
+  gridLinesOf,
+  parseCrossingName,
+  samePlanPoint,
+  unknownLabels,
+} from './gridFraming';
+
+const tonnes = (kg: number): string => (kg / 1000).toFixed(1);
+
+const profileText = (profile: string): string => {
+  const section = findProfile(profile);
+  return section ? profileSummary(section) : profile;
+};
+
+interface FramingSetup {
+  building: BuildingModel;
+  levelId: string;
+  levelName: string;
+  elevation: number;
+  height: number;
+  lines: GridElement[];
+  tolerance: number;
+}
+
+function setup(
+  doc: CadDocument,
+  tool: string,
+  profile: string,
+  levelId: string | undefined,
+): FramingSetup | string {
+  if (!findProfile(profile)) {
+    return `${tool} failed: unknown steel profile '${profile}' (see list_steel_profiles).`;
+  }
+  const resolution = resolveLevel(doc, getBuilding(doc), levelId);
+  if (!resolution.ok) return `${tool} failed: ${resolution.reason}.`;
+  const lines = gridLinesOf(resolution.building);
+  if (lines.length < 2) {
+    return `${tool} failed: needs at least 2 grid lines (add_grid_line); the building has ${lines.length}.`;
+  }
+  const { level } = resolution;
+  return {
+    building: resolution.building,
+    levelId: level.id,
+    levelName: level.name,
+    elevation: level.elevation,
+    height: level.height,
+    lines,
+    tolerance: fromMm(doc, 1),
+  };
+}
+
+function commit(
+  doc: CadDocument,
+  tool: string,
+  building: BuildingModel,
+  levelId: string,
+  specs: MemberSpec[],
+): { document: CadDocument; ids: string[] } | string {
+  const added = appendMembers(building, levelId, specs);
+  if ('reason' in added) return `${tool} failed: ${added.reason}.`;
+  return { document: regenerateBuilding(doc, added.building), ids: added.ids };
+}
+
+const selected = (
+  lines: ReadonlyArray<GridElement>,
+  axes: ReadonlyArray<string> | undefined,
+): GridElement[] =>
+  axes === undefined ? [...lines] : lines.filter((line) => axes.includes(line.mark));
+
+/**
+ * @command add_grid_columns
+ * @pure
+ * @affects creates one column member per grid intersection (exact section meshes)
+ * @invariant skips intersections already holding a column on the level (same plan xy, 1 mm)
+ * @failure no grid / unknown profile, axis, level / topLevel not above base / no intersections -> no-op
+ */
+export const addGridColumns = defineCommand({
+  name: 'add_grid_columns',
+  description:
+    'Place one vertical steel column at every intersection of the structural grid (add_grid_line): the ' +
+    'way to start framing a building. The column runs from the base level FFL up to topLevelId (a ' +
+    'continuous column through intermediate floors) or, by default, to the top of the base level. ' +
+    'Restrict with axes (both crossing lines must be listed) and exclude. Intersections that already ' +
+    'hold a column on that level are skipped. Mark SC, role column; follow with add_grid_beams / add_grid_bracing.',
+  params: z.object({
+    profile: z.string().describe('Catalogue section name, e.g. "HEB300" (list_steel_profiles).'),
+    levelId: levelIdSchema.describe(
+      'Base level id: columns start at its finished floor level. Default: the active level.',
+    ),
+    topLevelId: z
+      .string()
+      .optional()
+      .describe(
+        'Level id whose FFL is the column top; must be above the base level. Default: base level elevation + base level height.',
+      ),
+    axes: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Grid line labels (e.g. ["A","B","1","2"]); an intersection is used only when BOTH its lines are listed. Default: all grid lines.',
+      ),
+    exclude: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Intersections to skip, written "A/1" (the order of the two labels does not matter).',
+      ),
+    roll: z
+      .number()
+      .optional()
+      .describe('Section rotation about the vertical axis, radians. Default 0.'),
+    baseFixity: baseFixitySchema
+      .optional()
+      .describe(
+        '"pinned" (default) or "fixed": the column foot restrains rotation in check_steel_members.',
+      ),
+    material: z.string().optional().describe('Steel grade. Default S355.'),
+  }),
+  run: (doc, params): CommandResult => {
+    const tool = 'add_grid_columns';
+    const prepared = setup(doc, tool, params.profile, params.levelId);
+    if (typeof prepared === 'string') return noop(doc, prepared);
+    const { building, lines, tolerance } = prepared;
+    const bad = unknownLabels(lines, params.axes ?? []);
+    if (bad.length > 0) {
+      return noop(doc, `${tool} failed: unknown grid axis label(s) ${bad.join(', ')}.`);
+    }
+    const excluded: Array<[string, string]> = [];
+    for (const name of params.exclude ?? []) {
+      const pair = parseCrossingName(name);
+      if (!pair) return noop(doc, `${tool} failed: exclude entry '${name}' must look like "A/1".`);
+      const unknown = unknownLabels(lines, pair);
+      if (unknown.length > 0) {
+        return noop(
+          doc,
+          `${tool} failed: exclude '${name}' has unknown grid label(s) ${unknown.join(', ')}.`,
+        );
+      }
+      excluded.push(pair);
+    }
+    let top = prepared.height;
+    if (params.topLevelId !== undefined) {
+      const topLevel = building.levels[params.topLevelId];
+      if (!topLevel) return noop(doc, `${tool} failed: unknown top level '${params.topLevelId}'.`);
+      top = topLevel.elevation - prepared.elevation;
+      if (!(top > 0)) {
+        return noop(
+          doc,
+          `${tool} failed: top level '${topLevel.name}' is not above the base level '${prepared.levelName}'.`,
+        );
+      }
+    }
+    const allowed = selected(lines, params.axes);
+    const existing = elementsOf(building, 'member').filter(
+      (member) => member.role === 'column' && member.levelId === prepared.levelId,
+    );
+    const specs: MemberSpec[] = [];
+    const names: string[] = [];
+    const planned: Vec2[] = [];
+    let skipped = 0;
+    let found = 0;
+    allowed.forEach((a, index) => {
+      for (const b of allowed.slice(index + 1)) {
+        const crossing = crossGridLines(a, b, tolerance);
+        if (!crossing) continue;
+        if (planned.some((point) => samePlanPoint(point, crossing.point, tolerance))) continue;
+        planned.push(crossing.point);
+        const isExcluded = excluded.some(
+          ([p, q]) => (p === a.mark && q === b.mark) || (p === b.mark && q === a.mark),
+        );
+        if (isExcluded) continue;
+        found += 1;
+        const [x, y] = crossing.point;
+        if (existing.some((m) => samePlanPoint([m.start[0], m.start[1]], [x, y], tolerance))) {
+          skipped += 1;
+          continue;
+        }
+        specs.push({
+          role: 'column',
+          profile: params.profile,
+          start: [x, y, 0],
+          end: [x, y, top],
+          roll: params.roll,
+          material: params.material,
+          baseFixity: params.baseFixity,
+        });
+        names.push(`${a.mark}/${b.mark}`);
+      }
+    });
+    if (found === 0) return noop(doc, `${tool} failed: no grid intersections to place columns on.`);
+    if (specs.length === 0) {
+      return noop(
+        doc,
+        `${tool}: all ${skipped} intersection(s) already hold a column; nothing added.`,
+      );
+    }
+    const done = commit(doc, tool, building, prepared.levelId, specs);
+    if (typeof done === 'string') return noop(doc, done);
+    const kg = toMetres(doc, top) * (findProfile(params.profile)?.massPerMetre ?? 0) * specs.length;
+    return {
+      document: done.document,
+      summary:
+        `Added ${specs.length} columns ${profileText(params.profile)} at grid intersections ${names[0]} … ${names[names.length - 1]} ` +
+        `on level "${prepared.levelName}", ${top.toFixed(0)} ${doc.units} high, ${tonnes(kg)} t; skipped ${skipped} existing.`,
+      affected: elementAffected(done.document, done.ids),
+      data: { elementIds: done.ids, skipped },
+    };
+  },
+});
+
+/**
+ * @command add_grid_beams
+ * @pure
+ * @affects creates one beam member per bay between consecutive intersections on each grid line
+ * @invariant beam axis z = topOffset - section depth / 2 relative to the level FFL
+ * @failure no grid / unknown profile, axis, level / nothing to frame -> no-op
+ */
+export const addGridBeams = defineCommand({
+  name: 'add_grid_beams',
+  description:
+    'Frame beams along the structural grid (add_grid_line): along every listed grid line, one beam per ' +
+    'bay between consecutive intersections with the other lines (so it frames column to column when ' +
+    'add_grid_columns was run first). The beam top sits at the level FFL + topOffset. Bays that already ' +
+    'hold a beam with the same end points are skipped. Mark SB, role beam.',
+  params: z.object({
+    profile: z.string().describe('Catalogue section name, e.g. "IPE400" (list_steel_profiles).'),
+    levelId: levelIdSchema.describe(
+      'Level id: the beams sit at its finished floor level. Default: the active level.',
+    ),
+    axes: z
+      .array(z.string())
+      .optional()
+      .describe('Grid line labels to frame along (e.g. ["A","B"]). Default: every grid line.'),
+    topOffset: z
+      .number()
+      .optional()
+      .describe(
+        'Top of steel relative to the level FFL, document units. Default 0; e.g. -30 under a 30 mm grating.',
+      ),
+    startJoint: jointFixitySchema
+      .optional()
+      .describe('Joint at each beam start: "pinned" (default) or "rigid" (moment connection).'),
+    endJoint: jointFixitySchema
+      .optional()
+      .describe('Joint at each beam end: "pinned" (default) or "rigid".'),
+    material: z.string().optional().describe('Steel grade. Default S355.'),
+  }),
+  run: (doc, params): CommandResult => {
+    const tool = 'add_grid_beams';
+    const prepared = setup(doc, tool, params.profile, params.levelId);
+    if (typeof prepared === 'string') return noop(doc, prepared);
+    const { building, lines, tolerance } = prepared;
+    const bad = unknownLabels(lines, params.axes ?? []);
+    if (bad.length > 0) {
+      return noop(doc, `${tool} failed: unknown grid axis label(s) ${bad.join(', ')}.`);
+    }
+    const section = findProfile(params.profile);
+    const z = (params.topOffset ?? 0) - fromMm(doc, section?.h ?? 0) / 2;
+    const existing = elementsOf(building, 'member').filter(
+      (member) => member.role === 'beam' && member.levelId === prepared.levelId,
+    );
+    const at = (p: Vec3, q: Vec2): boolean => samePlanPoint([p[0], p[1]], q, tolerance);
+    const targets = selected(lines, params.axes);
+    const specs: MemberSpec[] = [];
+    let skipped = 0;
+    let length = 0;
+    for (const line of targets) {
+      const crossings = crossingsOnLine(line, lines, tolerance);
+      for (let index = 1; index < crossings.length; index++) {
+        const from = crossings[index - 1]?.point as Vec2;
+        const to = crossings[index]?.point as Vec2;
+        const duplicate = existing.some(
+          (m) =>
+            Math.abs(m.start[2] - z) <= tolerance &&
+            ((at(m.start, from) && at(m.end, to)) || (at(m.start, to) && at(m.end, from))),
+        );
+        if (duplicate) {
+          skipped += 1;
+          continue;
+        }
+        length += Math.hypot(to[0] - from[0], to[1] - from[1]);
+        specs.push({
+          role: 'beam',
+          profile: params.profile,
+          start: [from[0], from[1], z],
+          end: [to[0], to[1], z],
+          material: params.material,
+          startJoint: params.startJoint,
+          endJoint: params.endJoint,
+        });
+      }
+    }
+    if (specs.length === 0) {
+      return noop(
+        doc,
+        skipped > 0
+          ? `${tool}: all ${skipped} bay(s) already hold a beam; nothing added.`
+          : `${tool} failed: no bays (fewer than 2 intersections on every selected grid line).`,
+      );
+    }
+    const done = commit(doc, tool, building, prepared.levelId, specs);
+    if (typeof done === 'string') return noop(doc, done);
+    const kg = toMetres(doc, length) * (section?.massPerMetre ?? 0);
+    return {
+      document: done.document,
+      summary:
+        `Added ${specs.length} beams ${profileText(params.profile)} along ${targets.length} grid line(s) on level "${prepared.levelName}", ` +
+        `top of steel ${(params.topOffset ?? 0).toFixed(0)} ${doc.units} from FFL, total length ${length.toFixed(0)} ${doc.units}, ${kg.toFixed(0)} kg; skipped ${skipped} existing.`,
+      affected: elementAffected(done.document, done.ids),
+      data: { elementIds: done.ids, skipped },
+    };
+  },
+});
+
+/**
+ * @command add_grid_bracing
+ * @pure
+ * @affects creates 2 (x) or 1 (diagonal) brace members in one bay of one grid line
+ * @failure unknown profile / label / level, from == to, axis parallel or not crossing, zero height -> no-op
+ */
+export const addGridBracing = defineCommand({
+  name: 'add_grid_bracing',
+  description:
+    'Add vertical bracing in one bay of one grid line for one storey: the bay lies in the plane of grid ' +
+    'line axis between the crossing lines from and to. pattern "x" gives two crossing diagonals, "diagonal" ' +
+    'one from bottom at from to top at to. Bottom nodes sit at the base level FFL + bottomOffset, top nodes ' +
+    'at the next storey FFL (base elevation + level height) + topOffset. Mark BR, role brace.',
+  params: z.object({
+    profile: z
+      .string()
+      .describe('Catalogue section name, e.g. "L100x10" or "CHS114.3x4" (list_steel_profiles).'),
+    axis: z.string().describe('Label of the grid line the bracing lies in, e.g. "A".'),
+    from: z
+      .string()
+      .describe('Label of the grid line crossing axis that bounds the bay at one side, e.g. "1".'),
+    to: z
+      .string()
+      .describe(
+        'Label of the grid line crossing axis that bounds the bay at the other side, e.g. "2".',
+      ),
+    levelId: levelIdSchema.describe(
+      'Storey base level id: bracing starts at its FFL and rises one level height. Default: the active level.',
+    ),
+    pattern: z
+      .enum(['x', 'diagonal'])
+      .optional()
+      .describe(
+        '"x" (default): two crossing diagonals; "diagonal": one, from bottom at from to top at to.',
+      ),
+    bottomOffset: z
+      .number()
+      .optional()
+      .describe('Bottom node height relative to the base level FFL, document units. Default 0.'),
+    topOffset: z
+      .number()
+      .optional()
+      .describe(
+        'Top node height relative to the NEXT storey FFL (base elevation + level height), document units. Default 0; negative puts the node under the floor beams.',
+      ),
+    material: z.string().optional().describe('Steel grade. Default S355.'),
+  }),
+  run: (doc, params): CommandResult => {
+    const tool = 'add_grid_bracing';
+    const prepared = setup(doc, tool, params.profile, params.levelId);
+    if (typeof prepared === 'string') return noop(doc, prepared);
+    const { lines, tolerance } = prepared;
+    const bad = unknownLabels(lines, [params.axis, params.from, params.to]);
+    if (bad.length > 0) {
+      return noop(doc, `${tool} failed: unknown grid label(s) ${bad.join(', ')}.`);
+    }
+    if (params.from === params.to) {
+      return noop(doc, `${tool} failed: from and to must be different grid lines.`);
+    }
+    const find = (label: string): GridElement => lines.find((l) => l.mark === label) as GridElement;
+    const axis = find(params.axis);
+    const [p, q] = [params.from, params.to].map((label) =>
+      label === params.axis ? null : crossGridLines(axis, find(label), tolerance),
+    );
+    if (!p || !q) {
+      return noop(
+        doc,
+        `${tool} failed: grid lines '${params.from}' and '${params.to}' must both cross axis '${params.axis}' within the drawn lines.`,
+      );
+    }
+    const bottom = params.bottomOffset ?? 0;
+    const top = prepared.height + (params.topOffset ?? 0);
+    if (!(top - bottom > 0)) return noop(doc, `${tool} failed: bay height is zero or negative.`);
+    const node = (point: Vec2, height: number): Vec3 => [point[0], point[1], height];
+    const pairs: Array<[Vec3, Vec3]> = [[node(p.point, bottom), node(q.point, top)]];
+    if (params.pattern !== 'diagonal') pairs.push([node(q.point, bottom), node(p.point, top)]);
+    const specs: MemberSpec[] = pairs.map(([start, end]) => ({
+      role: 'brace',
+      profile: params.profile,
+      start,
+      end,
+      material: params.material,
+    }));
+    const done = commit(doc, tool, prepared.building, prepared.levelId, specs);
+    if (typeof done === 'string') return noop(doc, done);
+    const bay = Math.hypot(p.point[0] - q.point[0], p.point[1] - q.point[1]);
+    const marks = done.ids.map((id) => done.document.building?.elements[id]?.mark ?? id);
+    return {
+      document: done.document,
+      summary:
+        `Added ${specs.length} ${params.pattern === 'diagonal' ? 'diagonal' : 'X'} brace(s) ${marks.join(', ')} ${profileText(params.profile)} ` +
+        `in grid ${params.axis} between ${params.from} and ${params.to} (bay ${bay.toFixed(0)} ${doc.units}) on level "${prepared.levelName}".`,
+      affected: elementAffected(done.document, done.ids),
+      data: { elementIds: done.ids },
+    };
+  },
+});
