@@ -202,7 +202,9 @@ function triangleFace(api: OccApi, corners: [Vec3, Vec3, Vec3]): OccShape | null
     poly.delete();
     return null;
   }
-  const makeFace = new api.BRepBuilderAPI_MakeFace_15(poly.Wire(), false) as OccMakeFace;
+  const wire = poly.Wire();
+  const makeFace = new api.BRepBuilderAPI_MakeFace_15(wire, false) as OccMakeFace;
+  release(wire);
   poly.delete();
   const face = makeFace.IsDone() ? makeFace.Face() : null;
   makeFace.delete();
@@ -233,7 +235,10 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
     const normal = cross3(sub3(corners[1], corners[0]), sub3(corners[2], corners[0]));
     if (dot3(normal, normal) < 1e-24) continue;
     const face = triangleFace(api, corners);
-    if (face) sewing.Add(face);
+    if (face) {
+      sewing.Add(face);
+      release(face);
+    }
   }
 
   const noProgress = new api.Handle_Message_ProgressIndicator_1();
@@ -249,11 +254,16 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   const shellExp = explorer(api, sewn, 'TopAbs_SHELL');
   let shellCount = 0;
   while (shellExp.More()) {
-    makeSolid.Add((api.TopoDS as OccTopoDS).Shell_1(shellExp.Current()));
+    const current = shellExp.Current();
+    const shell = (api.TopoDS as OccTopoDS).Shell_1(current);
+    makeSolid.Add(shell);
+    release(shell);
+    release(current);
     shellCount++;
     shellExp.Next();
   }
   shellExp.delete();
+  release(sewn);
   sewing.delete();
 
   if (shellCount > 0) makeSolid.Build();
@@ -343,15 +353,19 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
         const edgeSet = edgeIndices.length > 0 ? new Set(edgeIndices) : null;
         for (let edgeIdx = 0; edgeExp.More(); edgeIdx++, edgeExp.Next()) {
           if (edgeSet && !edgeSet.has(edgeIdx)) continue;
+          const current = edgeExp.Current();
+          const edge = (api.TopoDS as OccTopoDS).Edge_1(current);
           try {
-            filletMaker.Add_2(radius, (api.TopoDS as OccTopoDS).Edge_1(edgeExp.Current()));
+            filletMaker.Add_2(radius, edge);
           } catch {
             // Degenerate or seam edge: skip.
           }
+          release(edge);
+          release(current);
         }
         edgeExp.delete();
         filletMaker.Build();
-        return filletMaker.IsDone() ? extractMeshData(api, filletMaker.Shape()) : null;
+        return filletMaker.IsDone() ? extractMeshData(api, own(filletMaker.Shape())) : null;
       });
     },
 

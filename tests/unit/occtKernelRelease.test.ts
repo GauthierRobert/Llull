@@ -1,9 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Entity } from '@core/model/types';
-import { createOcctKernel, type OcctFactory } from '@kernel-occt/occtKernel';
+import type { GeometryKernel } from '@core/geometry/kernel';
+import type { OcctFactory } from '@kernel-occt/occtKernel';
 
-/** Fake OCC API: records every constructed handle and which of them were `delete()`d. */
-function makeFakeApi(): { factory: OcctFactory; created: object[]; deleted: Set<object> } {
+interface Fake {
+  readonly kernel: GeometryKernel;
+  readonly leaked: () => number;
+}
+
+/** Fake OCC API: every handle it hands out is tracked; `leaked()` counts the ones never deleted. */
+async function makeFakeKernel(): Promise<Fake> {
+  vi.resetModules(); // the real module caches the first API it loads
+  const { createOcctKernel } = await import('@kernel-occt/occtKernel');
   const created: object[] = [];
   const deleted = new Set<object>();
   const handle = <T extends object>(fields: T): T & { delete(): void } => {
@@ -16,6 +24,20 @@ function makeFakeApi(): { factory: OcctFactory; created: object[]; deleted: Set<
     created.push(object);
     return object;
   };
+  const construct = (fields: object = {}) =>
+    function (): object {
+      return handle(fields);
+    };
+  const oneShotExplorer = function (): object {
+    let visited = false;
+    return handle({
+      More: (): boolean => !visited,
+      Current: () => handle({}),
+      Next: (): void => {
+        visited = true;
+      },
+    });
+  };
   const triangulation = {
     IsNull: (): boolean => false,
     get: () => ({
@@ -26,46 +48,54 @@ function makeFakeApi(): { factory: OcctFactory; created: object[]; deleted: Set<
     }),
     delete: (): void => undefined,
   };
-  let faceVisited = false;
+  const builder = (extra: object = {}) =>
+    function (): object {
+      return handle({
+        Build: (): void => undefined,
+        IsDone: (): boolean => true,
+        Shape: () => handle({}),
+        Add_2: (): void => undefined,
+        ...extra,
+      });
+    };
   const api = {
     TopAbs_ShapeEnum: { TopAbs_FACE: 'face', TopAbs_SHAPE: 'shape' },
-    gp_Pnt_3: function (): object {
-      return handle({});
+    ChFi3d_FilletShape: { ChFi3d_Rational: 0 },
+    gp_Pnt_3: construct(),
+    BRepPrimAPI_MakeBox_2: construct({ Shape: () => handle({}) }),
+    BRepMesh_IncrementalMesh_2: construct({ Perform: (): void => undefined }),
+    TopExp_Explorer_2: oneShotExplorer,
+    TopLoc_Location_1: construct(),
+    TopoDS: {
+      Face_1: () => handle({}),
+      Shell_1: () => handle({}),
+      Edge_1: () => handle({}),
     },
-    BRepPrimAPI_MakeBox_2: function (): object {
-      return handle({ Shape: () => handle({ ShapeType: (): string => 'solid' }) });
-    },
-    BRepMesh_IncrementalMesh_2: function (): object {
-      return handle({ Perform: (): void => undefined });
-    },
-    TopExp_Explorer_2: function (): object {
-      faceVisited = false;
-      return handle({
-        More: (): boolean => !faceVisited,
-        Current: () => handle({ ShapeType: (): string => 'face' }),
-        Next: (): void => {
-          faceVisited = true;
-        },
-      });
-    },
-    TopLoc_Location_1: function (): object {
-      return handle({});
-    },
-    TopoDS: { Face_1: () => handle({ ShapeType: (): string => 'face' }) },
-    BRep_Tool: {
-      Triangulation: () => {
-        const wrapped = handle(triangulation);
-        return wrapped;
-      },
-    },
+    BRep_Tool: { Triangulation: () => handle(triangulation) },
+    BRepBuilderAPI_MakePolygon_1: construct({
+      Add_1: (): void => undefined,
+      Close: (): void => undefined,
+      IsDone: (): boolean => true,
+      Wire: () => handle({}),
+    }),
+    BRepBuilderAPI_MakeFace_15: construct({ IsDone: (): boolean => true, Face: () => handle({}) }),
+    BRepBuilderAPI_Sewing: construct({
+      Add: (): void => undefined,
+      Perform: (): void => undefined,
+      SewedShape: () => handle({}),
+    }),
+    Handle_Message_ProgressIndicator_1: construct(),
+    BRepBuilderAPI_MakeSolid_1: builder({ Add: (): void => undefined }),
+    BRepFilletAPI_MakeFillet: builder(),
   };
-  return { factory: () => Promise.resolve(api as never), created, deleted };
+  const factory: OcctFactory = () => Promise.resolve(api as never);
+  const kernel = await createOcctKernel({ factory });
+  return { kernel, leaked: () => created.filter((object) => !deleted.has(object)).length };
 }
 
 describe('occt kernel releases WASM handles', () => {
   it('deletes the nodes, triangles, faces and triangulations read while meshing', async () => {
-    const fake = makeFakeApi();
-    const kernel = await createOcctKernel({ factory: fake.factory });
+    const fake = await makeFakeKernel();
     const box = {
       id: 'b',
       kind: 'box',
@@ -76,11 +106,20 @@ describe('occt kernel releases WASM handles', () => {
       color: '#888888',
     } as unknown as Entity;
 
-    const mesh = kernel.tessellate(box);
+    const mesh = fake.kernel.tessellate(box);
 
     expect(mesh?.positions).toEqual([1, 0, 0, 2, 0, 0, 3, 0, 0]);
     expect(mesh?.indices).toEqual([0, 1, 2]);
-    const leaked = fake.created.filter((object) => !fake.deleted.has(object));
-    expect(leaked).toHaveLength(0);
+    expect(fake.leaked()).toBe(0);
+  });
+
+  it('deletes the faces, wires, shells, edges and result shapes of a fillet', async () => {
+    const fake = await makeFakeKernel();
+    const triangle = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+
+    const mesh = fake.kernel.filletEdges(triangle, [], 0.1);
+
+    expect(mesh?.indices).toEqual([0, 1, 2]);
+    expect(fake.leaked()).toBe(0);
   });
 });
