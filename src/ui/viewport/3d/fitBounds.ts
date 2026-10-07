@@ -33,13 +33,15 @@ function boundsOf(entity: Entity, document: CadDocument): ReturnType<typeof enti
 }
 
 /**
+ * World AABB of the existing entities among `ids` (instances expanded through their component).
+ *
  * @pure
  * @failure no ids, or none that exist -> null
  */
-export function computeFitFraming(
+export function mergedEntityBounds(
   document: CadDocument,
   ids: readonly string[],
-): FitFraming | null {
+): ReturnType<typeof entityBounds> | null {
   let merged: ReturnType<typeof entityBounds> | null = null;
   for (const id of ids) {
     const entity = document.entities[id];
@@ -47,6 +49,18 @@ export function computeFitFraming(
     const bounds = boundsOf(entity, document);
     merged = merged ? mergeBounds(merged, bounds) : bounds;
   }
+  return merged;
+}
+
+/**
+ * @pure
+ * @failure no ids, or none that exist -> null
+ */
+export function computeFitFraming(
+  document: CadDocument,
+  ids: readonly string[],
+): FitFraming | null {
+  const merged = mergedEntityBounds(document, ids);
   if (!merged) return null;
 
   const sphereRadius = Math.max(

@@ -3,11 +3,66 @@
  * Environment, shadows and light rig scaled by the render-quality tier. Presentation only.
  */
 
+import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useThree } from '@react-three/fiber';
 import { Environment, Lightformer, ContactShadows, SoftShadows } from '@react-three/drei';
+import type * as THREE from 'three';
+import { useStore } from '@ui/store';
+import { mergedEntityBounds } from './fitBounds';
+import { computeKeyLightRig } from './keyLightRig';
 import type { RenderQualitySettings } from './useRenderQuality';
 
 /** drei ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
 export const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
+
+/** Shadow-casting key light that follows the scene's extent (see keyLightRig.ts). */
+function SceneKeyLight({ shadowMapSize }: { shadowMapSize: number }): React.ReactElement {
+  const entities = useStore((s) => s.document.entities);
+  const components = useStore((s) => s.document.components);
+  const order = useStore((s) => s.document.order);
+  const renderOrigin = useStore((s) => s.renderOrigin);
+  const invalidate = useThree((s) => s.invalidate);
+  const lightRef = useRef<THREE.DirectionalLight>(null);
+  const targetRef = useRef<THREE.Object3D>(null);
+
+  const rig = useMemo(() => {
+    const bounds = mergedEntityBounds(useStore.getState().document, order);
+    return computeKeyLightRig(bounds, renderOrigin);
+    // entities/components are the content identity; order alone misses in-place edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entities, components, order, renderOrigin]);
+
+  useLayoutEffect(() => {
+    const light = lightRef.current;
+    const target = targetRef.current;
+    if (!light || !target) return;
+    const camera = light.shadow.camera as THREE.OrthographicCamera;
+    camera.left = -rig.halfExtent;
+    camera.right = rig.halfExtent;
+    camera.top = rig.halfExtent;
+    camera.bottom = -rig.halfExtent;
+    camera.near = rig.near;
+    camera.far = rig.far;
+    camera.updateProjectionMatrix();
+    light.target = target;
+    target.updateMatrixWorld();
+    invalidate();
+  }, [rig, invalidate]);
+
+  return (
+    <>
+      <object3D ref={targetRef} position={rig.target} />
+      <directionalLight
+        ref={lightRef}
+        position={rig.position}
+        intensity={1.8}
+        castShadow
+        shadow-mapSize={[shadowMapSize, shadowMapSize]}
+        shadow-bias={-0.0004}
+      />
+    </>
+  );
+}
 
 interface SceneLightingProps {
   quality: RenderQualitySettings;
@@ -47,19 +102,7 @@ export function SceneLighting({
              shadow-mapSize scales with quality tier (2048 High / 1024 Medium+Low).
            directional rim: cool back-left counter fill.  */}
       <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} position={[0, 0, 1]} />
-      <directionalLight
-        position={[8, -6, 14]}
-        intensity={1.8}
-        castShadow
-        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
-        shadow-camera-near={0.5}
-        shadow-camera-far={200}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
-        shadow-bias={-0.0004}
-      />
+      <SceneKeyLight shadowMapSize={quality.shadowMapSize} />
       <directionalLight position={[-6, 8, 4]} intensity={0.4} color="#a8c8ff" />
 
       {/* ---- Contact shadows: rendered once (frames=1) — safe under demand frameloop.
