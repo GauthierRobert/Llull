@@ -292,8 +292,9 @@ export const solveConstraints = defineCommand({
   name: 'solve_constraints',
   description:
     'Run the constraint solver and update entity positions so that all declared ' +
-    'constraints are satisfied. The solver uses gradient descent on the 2D XY plane ' +
-    '(position Z is unchanged). It iterates up to 64 steps, stopping early when the ' +
+    'constraints are satisfied. The solver works on the 2D XY plane (position Z is unchanged): ' +
+    'point constraints (coincident, distance, tangent) move entity positions; angle, parallel and ' +
+    'perpendicular turn line b about its midpoint (line a is the reference). It iterates up to 64 steps, stopping early when the ' +
     'total constraint residual is below 1e-8. Returns convergence info in data: ' +
     '{ residual: number, iterations: number, converged: boolean }. ' +
     'Non-convergent results are returned with the best-effort positions and converged:false. ' +
