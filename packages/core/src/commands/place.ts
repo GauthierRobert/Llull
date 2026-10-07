@@ -20,7 +20,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { noop } from './noop';
 import { entityBoundsInDoc } from './sceneBounds';
-import { replaceEntity } from './entityOps';
+import { replaceEntitiesById, replaceEntity } from './entityOps';
 
 type AxisIndex = 0 | 1 | 2;
 
@@ -111,7 +111,7 @@ export const align = defineCommand({
       );
     }
     return {
-      document: moved.reduce(replaceEntity, doc),
+      document: replaceEntitiesById(doc, moved),
       summary: `align: moved ${moved.length} entit${plural(moved.length)} to ${edge} of "${referenceId}".`,
       affected: moved.map((e) => e.id),
     };
@@ -212,7 +212,7 @@ export const distribute = defineCommand({
       );
     }
     return {
-      document: moved.reduce(replaceEntity, doc),
+      document: replaceEntitiesById(doc, moved),
       summary: `distribute: repositioned ${moved.length} entit${plural(moved.length)} along ${axis} (mode: ${mode}).`,
       affected: moved.map((e) => e.id),
     };

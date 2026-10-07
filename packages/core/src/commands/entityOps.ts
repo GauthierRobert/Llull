@@ -25,6 +25,18 @@ export function withEntities(doc: CadDocument, created: ReadonlyArray<Entity>): 
 }
 
 /**
+ * `doc` with every entity of `changed` stored under its id (order unchanged); one pass, equal to
+ * folding `replaceEntity`.
+ * @pure
+ */
+export function replaceEntitiesById(doc: CadDocument, changed: ReadonlyArray<Entity>): CadDocument {
+  if (changed.length === 0) return doc;
+  const entities: CadDocument['entities'] = { ...doc.entities };
+  for (const entity of changed) entities[entity.id] = entity;
+  return { ...doc, entities };
+}
+
+/**
  * `doc` with `entity` stored under its id (order unchanged).
  * @pure
  */

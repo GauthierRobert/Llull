@@ -13,7 +13,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { noop } from './noop';
 import { isHexColor } from '../lib/isHexColor';
-import { replaceEntity } from './entityOps';
+import { replaceEntitiesById, replaceEntity } from './entityOps';
 
 const withLayer = (doc: CadDocument, layer: Layer): CadDocument => ({
   ...doc,
@@ -261,9 +261,9 @@ export const deleteLayer = defineCommand({
 
     return {
       document: {
-        ...orphans.reduce(
-          (next, entity) => replaceEntity(next, { ...entity, layerId: DEFAULT_LAYER_ID }),
+        ...replaceEntitiesById(
           doc,
+          orphans.map((entity) => ({ ...entity, layerId: DEFAULT_LAYER_ID })),
         ),
         layers: nextLayers,
         layerOrder: doc.layerOrder.filter((lid) => lid !== id),
