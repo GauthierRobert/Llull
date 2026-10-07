@@ -225,7 +225,7 @@ export const distribute = defineCommand({
  * @layer core/commands
  * @affects moves movingId so its min face along axis meets baseId's max face
  * @invariant +Z up convention; default axis is 'z'
- * @failure missing id -> no-op, affected:[]
+ * @failure missing id or movingId === baseId -> no-op, affected:[]
  */
 export const stackOn = defineCommand({
   name: 'stack_on',
@@ -242,6 +242,12 @@ export const stackOn = defineCommand({
       .optional(),
   }),
   run: (doc, { movingId, baseId, axis = 'z' }): CommandResult => {
+    if (movingId === baseId) {
+      return noop(
+        doc,
+        `stack_on: movingId and baseId are both "${movingId}"; cannot stack an entity on itself.`,
+      );
+    }
     const movingEntity = doc.entities[movingId];
     if (!movingEntity) return noop(doc, `stack_on: moving entity "${movingId}" not found.`);
     const baseEntity = doc.entities[baseId];
