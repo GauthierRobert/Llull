@@ -13,11 +13,11 @@ interface McpTextContent {
 }
 
 /** MCP CallToolResult minus the document. `structuredContent` only for record-typed `data`. */
-export interface McpShapedResult {
+export type McpShapedResult = {
   content: McpTextContent[];
   isError: boolean;
   structuredContent?: Record<string, unknown>;
-}
+};
 
 /** The `text` of a `{ format: 'code', text }` data record, else null. */
 function codeText(data: unknown): string | null {

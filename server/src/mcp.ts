@@ -17,6 +17,7 @@ import { type Request, type Response, type Router, Router as createRouter } from
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { parseToolsets } from '@mcp/index';
+import { errorMessage } from '@lib/errorMessage';
 import type { ToolsetName } from '@mcp/index';
 import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
 import { sessions, startSessionSweep } from './mcp/sessions';
@@ -33,9 +34,6 @@ export function toolsetsFromEnv(
   }
   return enabled;
 }
-
-const errorMessage = (err: unknown): string =>
-  err instanceof Error ? err.message : 'Unknown MCP error';
 
 /**
  * @param exchange - STEP/code exchange port (defaults to the environment-configured Python bridge).
