@@ -180,6 +180,23 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(other.affected.length).toBeGreaterThan(0);
   });
 
+  it('add_building_template counts only the levels it added; repeating at the same origin fails cleanly', () => {
+    const first = execute(createEmptyDocument(), 'add_building_template', { template: 'house' });
+    expect(first.summary).toMatch(
+      /Added house template: 3 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./,
+    );
+    const second = execute(first.document, 'add_building_template', {
+      template: 'house',
+      origin: [30000, 0],
+    });
+    expect(second.summary).toMatch(
+      /6 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./,
+    );
+    const again = execute(first.document, 'add_building_template', { template: 'house' });
+    expect(again.document).toBe(first.document);
+    expect(again.summary).toMatch(/failed at step/);
+  });
+
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
     expectNoOp(doc, 'set_project_info', { name: 'Hall' });
