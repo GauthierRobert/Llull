@@ -146,7 +146,11 @@ function weldedManifold(
     const prim = m.Manifold.ofMesh(mesh);
     // Tessellated primitives are already world-space; a mesh entity still honours its transform.
     if (entity.kind !== 'mesh') return prim;
-    return applyTransform(prim, entity.position, entity.rotation);
+    try {
+      return applyTransform(prim, entity.position, entity.rotation);
+    } finally {
+      release(prim);
+    }
   } catch {
     return null;
   }
