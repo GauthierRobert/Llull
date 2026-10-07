@@ -2077,7 +2077,7 @@
     "input_schema": {
       "properties": {
         "baseOffset": {
-          "description": "Base offset above the level elevation. Default 0.",
+          "description": "Base offset above the level elevation, in document units. Default 0.",
           "type": "number"
         },
         "end": {
@@ -4260,7 +4260,7 @@
     "input_schema": {
       "properties": {
         "baseOffset": {
-          "description": "Base offset above the level elevation. Default 0.",
+          "description": "Base offset above the level elevation, in document units. Default 0.",
           "type": "number"
         },
         "closed": {

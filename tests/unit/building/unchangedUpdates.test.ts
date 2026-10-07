@@ -59,6 +59,37 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     );
   });
 
+  it('add_wall / draw_walls refuse a duplicate of an existing wall (either direction)', () => {
+    const doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+    }).document;
+    for (const [start, end] of [
+      [
+        [0, 0],
+        [4000, 0],
+      ],
+      [
+        [4000, 0],
+        [0, 0],
+      ],
+    ]) {
+      const again = execute(doc, 'add_wall', { start, end });
+      expect(again.document).toBe(doc);
+      expect(again.summary).toMatch(/duplicates wall wall-1 on level-1/);
+    }
+    const chain = execute(doc, 'draw_walls', {
+      points: [
+        [4000, 3000],
+        [4000, 0],
+        [0, 0],
+      ],
+    });
+    expect(chain.document).toBe(doc);
+    const elsewhere = execute(doc, 'add_wall', { start: [0, 0], end: [4000, 0], baseOffset: 100 });
+    expect(elsewhere.affected.length).toBeGreaterThan(0);
+  });
+
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
     expectNoOp(doc, 'set_project_info', { name: 'Hall' });

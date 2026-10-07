@@ -68,7 +68,10 @@ const WALL_OPTION_SHAPE = {
     .describe(
       'Level to place the wall on. Default: active level (a "Level 0" is created if none).',
     ),
-  baseOffset: z.number().optional().describe('Base offset above the level elevation. Default 0.'),
+  baseOffset: z
+    .number()
+    .optional()
+    .describe('Base offset above the level elevation, in document units. Default 0.'),
   material: z
     .string()
     .optional()
@@ -76,6 +79,9 @@ const WALL_OPTION_SHAPE = {
       'Material name used by quantities/cost: concrete (default), masonry, brick, block, timber, steel, gypsum…',
     ),
 };
+
+const sameVec2 = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): boolean =>
+  a[0] === b[0] && a[1] === b[1];
 
 type WallOptions = z.output<z.ZodObject<typeof WALL_OPTION_SHAPE>>;
 
@@ -106,6 +112,20 @@ function buildWalls(
       return {
         ok: false,
         reason: `segment [${start.join(', ')}]→[${end.join(', ')}] has zero length`,
+      };
+    }
+    const twin = Object.values(building.elements).find(
+      (element) =>
+        element.category === 'wall' &&
+        element.levelId === resolution.level.id &&
+        element.baseOffset === baseOffset &&
+        ((sameVec2(element.start, start) && sameVec2(element.end, end)) ||
+          (sameVec2(element.start, end) && sameVec2(element.end, start))),
+    );
+    if (twin) {
+      return {
+        ok: false,
+        reason: `segment [${start.join(', ')}]→[${end.join(', ')}] duplicates wall ${twin.id} on ${resolution.level.id} (use update_wall to change it)`,
       };
     }
     const wall: WallElement = {
@@ -150,7 +170,7 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
  * @command add_wall
  * @pure
  * @affects creates 1 wall element (evaluated into box pieces on layer A-WALL)
- * @failure zero length / thickness <= 0 / unknown level -> no-op
+ * @failure zero length / thickness <= 0 / unknown level / duplicate of an existing wall -> no-op
  */
 export const addWall = defineCommand({
   name: 'add_wall',
