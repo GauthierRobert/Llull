@@ -10,7 +10,7 @@ import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { addCopies } from './transform';
-import { add3, cross3, dot3, normalize3, scale3, sub3, distance3 } from '../lib/vec3';
+import { add3, cross3, dot3, len3, normalize3, scale3, sub3, distance3 } from '../lib/vec3';
 import { noop } from './noop';
 import { elementAt } from '../lib/elementAt';
 
@@ -127,8 +127,8 @@ export const arrayAlongPath = defineCommand({
  * @pure
  * @layer core/commands
  * @affects creates `count` new entities placed on a circular arc; each is rotated to face radially outward
- * @invariant count >= 1; radius > 0; source entity must exist
- * @failure count < 1 -> no-op; radius <= 0 -> no-op; missing sourceId -> no-op
+ * @invariant count >= 1; radius > 0; normal non-zero; source entity must exist
+ * @failure count < 1 -> no-op; radius <= 0 or zero normal -> no-op; missing sourceId -> no-op
  */
 export const distributeOnArc = defineCommand({
   name: 'distribute_on_arc',
@@ -172,6 +172,10 @@ export const distributeOnArc = defineCommand({
     }
     if (normal.length < 3) {
       return noop(doc, 'distribute_on_arc: normal must be a [x,y,z] triple.');
+    }
+
+    if (len3([normal[0] as number, normal[1] as number, normal[2] as number]) < 1e-10) {
+      return noop(doc, 'distribute_on_arc: normal must be a non-zero vector.');
     }
 
     const c: Vec3 = [center[0] as number, center[1] as number, center[2] as number];
