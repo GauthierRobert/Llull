@@ -12,6 +12,7 @@ import { defineCommand, z, looseVec3 as vec3 } from './schema';
 import { nextId } from '../lib/id';
 import { commitEntity } from './commitEntity';
 import { noop } from './noop';
+import { MAX_DISPLAY_PRECISION } from './limits';
 
 type TextAnchor = NonNullable<TextEntity['anchor']>;
 
@@ -159,7 +160,7 @@ export const addDimension = defineCommand({
     precision: z
       .number()
       .describe(
-        'Number of decimal places to display for this dimension, overriding the document displayPrecision. Omit to use the document default.',
+        'Number of decimal places to display for this dimension, overriding the document displayPrecision. Must be an integer in [0, 20]. Omit to use the document default.',
       )
       .optional(),
     label: z
@@ -179,6 +180,15 @@ export const addDimension = defineCommand({
       return noop(
         doc,
         `add_dimension: unknown dimensionKind '${dimensionKind}'. Must be one of: ${Object.keys(DIMENSION_RULES).join(', ')}.`,
+      );
+    }
+    if (
+      precision !== undefined &&
+      (!Number.isInteger(precision) || precision < 0 || precision > MAX_DISPLAY_PRECISION)
+    ) {
+      return noop(
+        doc,
+        `add_dimension: precision must be an integer in [0, ${MAX_DISPLAY_PRECISION}] (got ${precision}).`,
       );
     }
     if (entityIds.length === 0) {

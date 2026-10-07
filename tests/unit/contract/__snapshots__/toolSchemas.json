@@ -582,7 +582,7 @@
           "type": "number"
         },
         "precision": {
-          "description": "Number of decimal places to display for this dimension, overriding the document displayPrecision. Omit to use the document default.",
+          "description": "Number of decimal places to display for this dimension, overriding the document displayPrecision. Must be an integer in [0, 20]. Omit to use the document default.",
           "type": "number"
         }
       },
@@ -6215,7 +6215,7 @@
     "input_schema": {
       "properties": {
         "displayPrecision": {
-          "description": "Number of decimal places to show when formatting length values (e.g. 2 → \"12.50 mm\"). Must be a non-negative integer.",
+          "description": "Number of decimal places to show when formatting length values (e.g. 2 → \"12.50 mm\"). Must be an integer in [0, 20].",
           "type": "number"
         },
         "units": {
