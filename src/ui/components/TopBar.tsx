@@ -10,6 +10,8 @@ import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useLayoutStore, usePaletteStore, useStore } from '@ui/store';
 import type { LiveStatus } from '@ui/store';
+import { useSessionStore } from '@ui/store/sessionStore';
+import { projectNameOf } from '@ui/components/projectName';
 import { Icon } from '@ui/components/Icon';
 import { ThemeToggle } from '@ui/components/ThemeToggle';
 import { ProjectIO } from '@ui/components/ProjectIO';
@@ -96,6 +98,8 @@ function SearchTrigger(): React.ReactElement {
 
 export function TopBar(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
+  const projectName = useStore((s) => projectNameOf(s.document));
+  const isDirty = useSessionStore((s) => s.dirty);
 
   return (
     <header className="topbar" role="banner">
@@ -124,7 +128,12 @@ export function TopBar(): React.ReactElement {
           <span className="file-crumb-sep" aria-hidden="true">
             /
           </span>
-          <span className="file-crumb file-crumb--active">Untitled</span>
+          <span className="file-crumb file-crumb--active">{projectName ?? 'Untitled'}</span>
+          {isDirty && (
+            <span className="unsaved-dot" role="status" title="Unsaved changes">
+              ● unsaved
+            </span>
+          )}
         </nav>
       </div>
 
