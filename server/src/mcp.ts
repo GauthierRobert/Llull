@@ -17,6 +17,7 @@ import { type Request, type Response, type Router, Router as createRouter } from
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { parseToolsets } from '@mcp/index';
+import { errorMessage } from '@lib/errorMessage';
 import type { ToolsetName } from '@mcp/index';
 import { errorMessage } from '@lib/errorMessage';
 import { exchangeOptionsFromEnv, type ExchangeOptions } from './pythonExchange';
