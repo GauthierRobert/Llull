@@ -472,6 +472,19 @@ describe('MCP tools/call — unknown tool name', () => {
     expect(result.content[0]!.type).toBe('text');
     expect(result.content[0]!.text).toMatch(/unknown command/i);
   });
+
+  it('suggests the closest real tools and points at search_tools', async () => {
+    const sessionId = await mcpInitialize();
+    await mcpNotifyInitialized(sessionId);
+
+    const result = await mcpCallTool(sessionId, 'make_box', {});
+
+    expect(result.isError).toBe(true);
+    const text = result.content[0]!.text ?? '';
+    expect(text).toContain('Unknown command: make_box.');
+    expect(text).toMatch(/Closest tools: .*add_box/);
+    expect(text).toContain('search_tools');
+  });
 });
 
 describe('MCP tools/call — throwing command', () => {
