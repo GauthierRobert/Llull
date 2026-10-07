@@ -745,6 +745,26 @@
     "name": "add_equipment"
   },
   {
+    "description": "Cut the floors around an equipment that passes through them (e.g. a 12 m desolventizer crossing two gratings): every slab whose top lies inside the equipment height and is solid under its footprint gets an opening = the equipment plan rectangle + margin. Clears the matching check_clashes hard clashes. A slab where the opening would not fit (outside the slab, touching another opening) is reported and left.",
+    "input_schema": {
+      "properties": {
+        "equipmentId": {
+          "description": "Equipment element id, e.g. \"equipment-2\".",
+          "type": "string"
+        },
+        "margin": {
+          "description": "Free gap around the footprint (toe plate / access). Default 300 mm.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "equipmentId"
+      ],
+      "type": "object"
+    },
+    "name": "add_equipment_openings"
+  },
+  {
     "description": "Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and concrete column foot of the level. Top of footing at level + topOffset (default −300 mm); default 1500 × 1500 × 600 mm.",
     "input_schema": {
       "properties": {
@@ -790,7 +810,7 @@
     "name": "add_footing"
   },
   {
-    "description": "Frame beams along the structural grid (add_grid_line): along every listed grid line, one beam per bay between consecutive intersections with the other lines (so it frames column to column when add_grid_columns was run first). The beam top sits at the level FFL + topOffset. Bays that already hold a beam with the same end points are skipped. Mark SB, role beam.",
+    "description": "Frame beams along the structural grid (add_grid_line): along every listed grid line, one beam per bay between consecutive intersections with the other lines (so it frames column to column when add_grid_columns was run first). The beam top sits at the level FFL + topOffset. Bays that already hold a beam with the same end points and a top of steel within 100 mm are skipped (any section). Mark SB, role beam.",
     "input_schema": {
       "properties": {
         "axes": {
@@ -2720,7 +2740,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, concrete columns, beams and stairs, plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind and penetration depth (document units; summary in mm).",
+    "description": "Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, concrete columns, beams and stairs, equipment passing through a floor / grating that has no opening around it (add_slab_opening), plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind and penetration depth (document units; summary in mm).",
     "input_schema": {
       "properties": {
         "levelId": {
@@ -6599,6 +6619,10 @@
             "rigid"
           ],
           "type": "string"
+        },
+        "keepTopOfSteel": {
+          "description": "Horizontal members with a new profile and no new start / end: shift the axis down by half the depth increase (up for a decrease) so the top of steel stays where it was, e.g. under a grating. Default false (the axis stays).",
+          "type": "boolean"
         },
         "material": {
           "description": "New steel grade.",

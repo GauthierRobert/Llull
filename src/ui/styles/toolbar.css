@@ -217,7 +217,8 @@
 
 .restored-banner {
   position: absolute;
-  top: var(--space-3);
+  /* below the viewport view-mode / view-preset toolbars */
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;

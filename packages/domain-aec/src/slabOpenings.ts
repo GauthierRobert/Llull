@@ -57,7 +57,7 @@ function polygonsTouch(a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): boolean 
  * Why `opening` cannot be cut in `slab`, or null.
  * @invariant strictly inside the boundary, not touching another opening
  */
-function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>): string | null {
+export function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>): string | null {
   if (!isValidPolygon(opening)) return 'the opening needs ≥ 3 non-collinear points';
   const inside =
     opening.every((point) => pointInPolygon(point, slab.boundary)) &&

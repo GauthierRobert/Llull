@@ -33,7 +33,7 @@ describe('building element tools', () => {
     });
     if (!slab.ok) throw new Error(slab.reason);
     const result = execute(walled, slab.command, slab.params);
-    expect(result.summary).toMatch(/floor slab SL1.*area 80000000\.000/);
+    expect(result.summary).toMatch(/floor slab SL1.*area 80\.00 m²/);
   });
 
   it('slab and room outlines switch between walls and rectangle', () => {

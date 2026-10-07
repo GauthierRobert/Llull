@@ -24,7 +24,7 @@ describe('add_slab', () => {
     const result = execute(createEmptyDocument(), 'add_slab', { boundary: SQUARE, thickness: 250 });
     const body = result.document.entities['slab-1:body'];
     expect(body).toMatchObject({ kind: 'extrusion', depth: 250, position: [0, 0, -250] });
-    expect(result.summary).toMatch(/floor slab SL1.*24000000\.000 mm²/);
+    expect(result.summary).toMatch(/floor slab SL1.*area 24\.00 m²/);
   });
 
   it('builds the slab to the outer faces of a closed wall loop, as a roof on top', () => {
@@ -74,12 +74,12 @@ describe('add_slab', () => {
     const result = execute(doc, 'add_slab', {
       wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4', 'wall-5', 'wall-6'],
     });
-    expect(result.summary).toMatch(/area 24000000\.000/);
+    expect(result.summary).toMatch(/area 24\.00 m²/);
     const inner = execute(doc, 'add_slab', {
       wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'],
       wallFace: 'inner',
     });
-    expect(inner.summary).toMatch(/area 22040000\.000/);
+    expect(inner.summary).toMatch(/area 22\.04 m²/);
   });
 
   it('wallLoop rejects disconnected walls', () => {

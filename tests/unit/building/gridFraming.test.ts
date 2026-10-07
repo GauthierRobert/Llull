@@ -184,6 +184,15 @@ describe('add_grid_beams', () => {
     });
     const third = execute(reversed, 'add_grid_beams', { profile: 'IPE300', axes: ['A'] });
     expect(data(third)).toMatchObject({ skipped: 1 });
+    // Another section with the same top of steel is the same beam; a lower tier is not.
+    const resized = execute(first.document, 'add_grid_beams', { profile: 'IPE500', axes: ['A'] });
+    expect(resized.summary).toMatch(/all 2 bay\(s\) already hold a beam/);
+    const lowerTier = execute(first.document, 'add_grid_beams', {
+      profile: 'IPE300',
+      axes: ['A'],
+      topOffset: -1000,
+    });
+    expect(data(lowerTier)).toMatchObject({ skipped: 0 });
   });
 
   it('rejects bad input without changing the document', () => {

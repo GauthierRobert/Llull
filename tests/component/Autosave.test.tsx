@@ -123,6 +123,18 @@ describe('useAutosave', () => {
     expect(screen.queryByText(/restored your unsaved work/i)).toBeNull();
   });
 
+  it('hides the restore notice by itself after a while, keeping the work', () => {
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: Date.now(), json: savedBoxJson() });
+    render(<Harness storage={storage} />);
+    expect(screen.getByText(/restored your unsaved work/i)).toBeDefined();
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
+    expect(screen.queryByText(/restored your unsaved work/i)).toBeNull();
+    expect(useStore.getState().document.order.length).toBe(1);
+  });
+
   it('does not restore when a live server is connected', () => {
     useStore.setState({ liveStatus: 'connected' });
     const storage = fakeStorage();

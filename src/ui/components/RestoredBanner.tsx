@@ -5,16 +5,25 @@
  * "Start fresh" (dispatches `clear_document`, drops the autosave). Presentation only.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { clearAutosave } from '@ui/store/autosave';
 import { Icon } from '@ui/components/Icon';
 
+/** The notice hides itself after this long; the restored work stays. */
+const AUTO_DISMISS_MS = 20_000;
+
 export function RestoredBanner(): React.ReactElement | null {
   const restoredAt = useSessionStore((s) => s.restoredAt);
   const setRestoredAt = useSessionStore((s) => s.setRestoredAt);
   const dispatch = useStore((s) => s.dispatch);
+
+  useEffect(() => {
+    if (restoredAt === null) return undefined;
+    const timer = window.setTimeout(() => setRestoredAt(null), AUTO_DISMISS_MS);
+    return () => window.clearTimeout(timer);
+  }, [restoredAt, setRestoredAt]);
 
   if (restoredAt === null) return null;
 

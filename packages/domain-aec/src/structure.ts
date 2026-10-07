@@ -22,6 +22,7 @@ import {
   nextElementId,
   nextMark,
   resolveLevel,
+  toMetres,
   toMm,
   toVec2,
   withElement,
@@ -206,7 +207,7 @@ export const addSlab = defineCommand({
     const document = regenerateBuilding(doc, withElement(resolution.building, slab));
     return {
       document,
-      summary: `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${polygonArea(outline).toFixed(3)} ${doc.units}², thickness ${resolvedThickness}.`,
+      summary: `Added ${slab.role} slab ${slab.mark} (${slab.id}) on ${resolution.level.name}: area ${(polygonArea(outline) * toMetres(doc, 1) ** 2).toFixed(2)} m², thickness ${resolvedThickness} ${doc.units}.`,
       affected: elementAffected(document, [slab.id]),
       data: { elementId: slab.id },
     };

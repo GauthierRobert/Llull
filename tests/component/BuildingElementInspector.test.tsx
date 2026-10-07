@@ -68,7 +68,11 @@ describe('building element inspector', () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
     const [name, params] = dispatch.mock.calls[0] as [string, Record<string, unknown>];
     expect(name).toBe('update_steel_member');
-    expect(params).toEqual({ memberId: expect.any(String), profile: 'HEB320' });
+    expect(params).toEqual({
+      memberId: expect.any(String),
+      profile: 'HEB320',
+      keepTopOfSteel: true,
+    });
   });
 
   it('does not dispatch when nothing changed', () => {
@@ -184,9 +188,9 @@ describe('grid framing tools', () => {
     expect(name).toBe('add_slab');
     expect(params.boundary).toHaveLength(4);
     const xs = params.boundary.map((point) => point[0]);
-    expect(Math.max(...(xs as number[])) - Math.min(...(xs as number[]))).toBeGreaterThanOrEqual(
-      12000,
-    );
+    const ys = params.boundary.map((point) => point[1]);
+    expect(Math.max(...(xs as number[])) - Math.min(...(xs as number[]))).toBe(12000);
+    expect(Math.max(...(ys as number[])) - Math.min(...(ys as number[]))).toBe(5000);
   });
 });
 

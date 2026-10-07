@@ -53,5 +53,7 @@ export function buildSteelMemberUpdate(
     if (text === '' && key !== 'note') continue;
     changes[key] = key === 'note' ? values[key] : text;
   }
-  return Object.keys(changes).length === 0 ? null : { memberId, ...changes };
+  if (Object.keys(changes).length === 0) return null;
+  // A new section keeps the top of steel of a horizontal member (the command ignores it otherwise).
+  return { memberId, ...changes, ...('profile' in changes ? { keepTopOfSteel: true } : {}) };
 }

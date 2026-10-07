@@ -46,24 +46,22 @@ function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactE
           </span>
         </button>
         <span className="panel__row-actions">
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            aria-label={`Edit level ${level.name}`}
-            aria-pressed={mode === 'edit'}
+          <IconButton
+            icon="parameters"
+            size={12}
+            label={`Edit level ${level.name}`}
+            title="Edit name, elevation, height"
+            pressed={mode === 'edit'}
             onClick={() => toggle('edit')}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            aria-label={`Copy level ${level.name} to levels`}
-            aria-pressed={mode === 'copy'}
+          />
+          <IconButton
+            icon="copy"
+            size={12}
+            label={`Copy level ${level.name} to levels`}
+            title="Copy this level's elements to other levels"
+            pressed={mode === 'copy'}
             onClick={() => toggle('copy')}
-          >
-            Copy to…
-          </button>
+          />
           <IconButton
             icon="close"
             danger

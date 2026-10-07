@@ -81,6 +81,15 @@ export function EquipmentEditor({ element, levels }: EquipmentEditorProps): Reac
           ))}
         </select>
       </label>
+      <button
+        type="button"
+        className="btn btn--ghost btn--sm"
+        data-testid="equipment-cut-openings"
+        title="Cut an opening (footprint + 300 mm) in every floor this equipment passes through"
+        onClick={() => dispatch('add_equipment_openings', { equipmentId: element.id })}
+      >
+        Cut floor openings
+      </button>
     </BuildingForm>
   );
 }

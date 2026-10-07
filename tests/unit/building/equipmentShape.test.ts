@@ -99,13 +99,19 @@ describe('equipment shape', () => {
       ['vertical_vessel', [0, 5, 100]],
       ['vertical_vessel', [100, 5, 0]],
       ['horizontal_vessel', [100, 0, 5]],
-      ['horizontal_vessel', [100, 50]],
     ] as const) {
       const result = execute(doc, 'add_equipment', { ...base, size, shape });
       expect(result.affected, `${shape} ${size}`).toEqual([]);
       expect(result.document).toBe(doc);
       expect(result.summary).toMatch(new RegExp(`shape ${shape}`));
     }
+    const short = execute(doc, 'add_equipment', {
+      ...base,
+      size: [100, 50],
+      shape: 'horizontal_vessel',
+    });
+    expect(short.document).toBe(doc);
+    expect(short.summary).toMatch(/rejected: invalid params — size/);
   });
 
   it('is pure', () => {

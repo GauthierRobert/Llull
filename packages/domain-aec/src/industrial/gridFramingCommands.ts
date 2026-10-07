@@ -3,7 +3,7 @@
  */
 
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import type { BuildingModel, GridElement } from '@core/model/building';
+import type { BuildingModel, GridElement, SteelMemberElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
@@ -243,7 +243,7 @@ export const addGridBeams = defineCommand({
     'Frame beams along the structural grid (add_grid_line): along every listed grid line, one beam per ' +
     'bay between consecutive intersections with the other lines (so it frames column to column when ' +
     'add_grid_columns was run first). The beam top sits at the level FFL + topOffset. Bays that already ' +
-    'hold a beam with the same end points are skipped. Mark SB, role beam.',
+    'hold a beam with the same end points and a top of steel within 100 mm are skipped (any section). Mark SB, role beam.',
   params: z.object({
     profile: z.string().describe('Catalogue section name, e.g. "IPE400" (list_steel_profiles).'),
     levelId: levelIdParam.describe(
@@ -282,6 +282,11 @@ export const addGridBeams = defineCommand({
       (member) => member.role === 'beam' && member.levelId === prepared.levelId,
     );
     const at = (p: Vec3, q: Vec2): boolean => samePlanPoint([p[0], p[1]], q, tolerance);
+    // A bay holds a beam already when one spans it with its top of steel within 100 mm, whatever its
+    // section: re-running the tool with another profile must not double the framing.
+    const sameTopTolerance = fromMm(doc, 100);
+    const topOfSteel = (member: SteelMemberElement): number =>
+      member.start[2] + fromMm(doc, findProfile(member.profile)?.h ?? 0) / 2;
     const targets = selected(lines, params.axes);
     const specs: MemberSpec[] = [];
     let skipped = 0;
@@ -293,7 +298,7 @@ export const addGridBeams = defineCommand({
         const to = crossings[index]?.point as Vec2;
         const duplicate = existing.some(
           (m) =>
-            Math.abs(m.start[2] - z) <= tolerance &&
+            Math.abs(topOfSteel(m) - (params.topOffset ?? 0)) <= sameTopTolerance &&
             ((at(m.start, from) && at(m.end, to)) || (at(m.start, to) && at(m.end, from))),
         );
         if (duplicate) {
