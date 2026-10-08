@@ -16,6 +16,13 @@ import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './store
 const isHttpError = (err: unknown): boolean =>
   err instanceof ServerCommandError && err.kind === 'http';
 
+/**
+ * Before the /live stream has connected once, a POST gets this long to answer; past it the command
+ * runs locally under the same commandId (replayed idempotently on connect). A refused connection
+ * can take seconds to fail, which would otherwise leave the document unchanged that long.
+ */
+export const CONNECT_GRACE_MS = 400;
+
 /** True when a failed POST means "server never reachable": safe to run locally. */
 function sseIsDown(state: CadStoreState): boolean {
   return (
@@ -84,8 +91,21 @@ export function postDispatch(
 ): void {
   const selectionAtDispatch = get().document.selection;
   const commandId = newCommandId();
+  let ranLocally = false;
+  const runLocalOnce = (): void => {
+    if (ranLocally) return;
+    ranLocally = true;
+    runLocally(set, get, name, params, options, commandId);
+  };
+  const graceTimer = sseIsDown(get())
+    ? setTimeout(() => {
+        if (sseIsDown(get())) runLocalOnce();
+      }, CONNECT_GRACE_MS)
+    : undefined;
   void postCommand(name, params, commandId)
     .then((response) => {
+      clearTimeout(graceTimer);
+      if (ranLocally) return;
       set((state) => ({
         document: selectAffectedIn(state.document, selectionAtDispatch, response.affected, options),
         lastSummary: statusSummaryFor(name, response.summary, options) ?? state.lastSummary,
@@ -96,13 +116,10 @@ export function postDispatch(
       options?.onResult?.({ summary: response.summary, changed: responseChanged(response) });
     })
     .catch((err: unknown) => {
-      handlePostFailure(
-        set,
-        get,
-        err,
-        `Command '${name}'`,
-        () => runLocally(set, get, name, params, options, commandId),
-        (summary) => options?.onResult?.({ summary, changed: false }),
+      clearTimeout(graceTimer);
+      if (ranLocally) return;
+      handlePostFailure(set, get, err, `Command '${name}'`, runLocalOnce, (summary) =>
+        options?.onResult?.({ summary, changed: false }),
       );
     });
 }

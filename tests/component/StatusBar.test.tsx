@@ -128,6 +128,14 @@ describe('StatusBar — selection count', () => {
     render(<StatusBar />);
     expect(screen.getByText('2 entities')).toBeDefined();
   });
+
+  it('does not count selected ids that are not entities (building element ids)', () => {
+    const id = createBox();
+    useStore.getState().select([id, 'wall-1', 'level-2']);
+
+    render(<StatusBar />);
+    expect(screen.getByText('1 entity')).toBeDefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

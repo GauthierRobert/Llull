@@ -16,57 +16,12 @@ import React, { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import type { Vec3 } from '@core/model/types';
-import { ORIGIN, add3 } from '@lib/vec3';
 import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
 import { NamedViewsOverlay } from './NamedViews';
+import { computeFitFraming } from './fitBounds';
 import { toRenderPosition } from './floatingOrigin';
 import { PRESET_DIRECTIONS, type PresetDirection, type PresetName } from './viewPresetDirections';
-
-type EntityPositions = Record<string, { position: Vec3 }>;
-
-/** Rough estimate of each entity's mesh half-size to add to the position-only radius. */
-const MESH_HALF_SIZE_ESTIMATE = 3;
-/** Half the default three.js PerspectiveCamera FOV (75°). */
-const HALF_FOV_TAN = Math.tan((75 / 2) * (Math.PI / 180)); // tan(37.5°) ≈ 0.767
-/** Margin applied on top of the exact fit distance. */
-const FIT_MARGIN = 1.35;
-
-/**
- * Framing for `ids`: the centroid of their positions and the camera distance that fits a
- * bounding sphere (position spread + MESH_HALF_SIZE_ESTIMATE) inside the frustum with
- * FIT_MARGIN to spare. Entity positions stand in for mesh extents.
- *
- * @failure no ids, or none with a known position -> null
- */
-function computeSceneBounds(
-  entities: EntityPositions,
-  ids: string[],
-): { center: THREE.Vector3; radius: number } | null {
-  const positions = ids
-    .map((id) => entities[id]?.position)
-    .filter((p): p is Vec3 => p !== undefined);
-  if (positions.length === 0) return null;
-
-  const sum = positions.reduce(add3, ORIGIN);
-  const center = new THREE.Vector3(
-    sum[0] / positions.length,
-    sum[1] / positions.length,
-    sum[2] / positions.length,
-  );
-
-  // Max spread of positions from the centroid, plus a mesh-half-size addend so a single entity
-  // never collapses to radius 0.
-  const positionSpread = Math.max(
-    0,
-    ...positions.map((p) => new THREE.Vector3(p[0], p[1], p[2]).distanceTo(center)),
-  );
-  const boundingSphereRadius = positionSpread + MESH_HALF_SIZE_ESTIMATE;
-
-  // Camera distance that fits the bounding sphere in the frustum, with a comfortable margin.
-  return { center, radius: (boundingSphereRadius / HALF_FOV_TAN) * FIT_MARGIN };
-}
 
 const PRESETS: ReadonlyArray<{ name: PresetName; label: string }> = [
   { name: 'front', label: 'Front' },
@@ -80,11 +35,14 @@ type ApplyPreset = (direction: PresetDirection, target: THREE.Vector3, distance:
 // Module-level bridge between the inner (Canvas) and outer (DOM) layers: r3f has no portals or
 // context across the Canvas boundary. Holds ONLY the camera driver registered by
 // ViewPresetsInner; it never touches the document.
-const bridge: { applyPreset: ApplyPreset | null } = { applyPreset: null };
+const bridge: { applyPreset: ApplyPreset | null; getAspect: (() => number) | null } = {
+  applyPreset: null,
+  getAspect: null,
+};
 
 /** Mounted INSIDE the r3f Canvas (useThree); registers the camera driver for the overlay. */
 export function ViewPresetsInner(): null {
-  const { camera, controls, invalidate } = useThree();
+  const { camera, controls, invalidate, get } = useThree();
 
   useEffect(() => {
     bridge.applyPreset = (direction, target, distance) => {
@@ -106,11 +64,16 @@ export function ViewPresetsInner(): null {
       orbit.update();
       invalidate();
     };
+    bridge.getAspect = () => {
+      const { width, height } = get().size;
+      return height > 0 ? width / height : 1;
+    };
     // Unregister on unmount so a stale closure over a disposed camera cannot fire after teardown.
     return () => {
       bridge.applyPreset = null;
+      bridge.getAspect = null;
     };
-  }, [camera, controls, invalidate]);
+  }, [camera, controls, invalidate, get]);
 
   return null;
 }
@@ -120,9 +83,18 @@ export function ViewPresetsOverlay(): React.ReactElement {
   const selection = useStore((s) => s.document.selection);
   const allEntityIds = useStore((s) => s.document.order);
 
+  /** View `ids` from `direction`, framed to fit; nothing to frame -> origin from distance 10. */
+  const frame = (direction: PresetDirection, ids: string[]): void => {
+    const framing = computeFitFraming(useStore.getState().document, ids, bridge.getAspect?.() ?? 1);
+    if (!framing) {
+      bridge.applyPreset?.(direction, new THREE.Vector3(), 10);
+      return;
+    }
+    const [x, y, z] = framing.center;
+    bridge.applyPreset?.(direction, new THREE.Vector3(x, y, z), framing.distance);
+  };
   const fit = (ids: string[]): void => {
-    const bounds = computeSceneBounds(useStore.getState().document.entities, ids);
-    if (bounds) bridge.applyPreset?.(PRESET_DIRECTIONS.iso, bounds.center, bounds.radius);
+    if (ids.length > 0) frame(PRESET_DIRECTIONS.iso, ids);
   };
 
   return (
@@ -134,8 +106,7 @@ export function ViewPresetsOverlay(): React.ReactElement {
               key={name}
               type="button"
               className="vp-btn"
-              // Look at the origin from distance 10.
-              onClick={() => bridge.applyPreset?.(PRESET_DIRECTIONS[name], new THREE.Vector3(), 10)}
+              onClick={() => frame(PRESET_DIRECTIONS[name], allEntityIds)}
               title={`${label} view`}
               aria-label={`${label} view`}
             >

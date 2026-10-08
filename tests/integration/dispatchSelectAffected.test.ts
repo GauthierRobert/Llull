@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
+import { MAX_AUTO_SELECT } from '@ui/store/localMode';
 
 async function flushPromises(): Promise<void> {
   for (let i = 0; i < 10; i++) await new Promise<void>((resolve) => resolve());
@@ -26,6 +27,34 @@ describe('dispatch selectAffected', () => {
     const { document } = useStore.getState();
     expect(document.order).toHaveLength(1);
     expect(document.selection).toEqual(document.order);
+  });
+
+  it('does not auto-select a very large result (policy threshold), keeping the selection', () => {
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
+    const first = useStore.getState().document.order[0]!;
+    useStore
+      .getState()
+      .dispatch(
+        'array_linear',
+        { id: first, count: MAX_AUTO_SELECT + 20, offset: [2, 0, 0] },
+        { selectAffected: true },
+      );
+    const { document } = useStore.getState();
+    expect(document.order.length).toBeGreaterThan(MAX_AUTO_SELECT);
+    expect(document.selection).toEqual([first]);
+  });
+
+  it('still auto-selects a result right at the threshold', () => {
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
+    const first = useStore.getState().document.order[0]!;
+    useStore
+      .getState()
+      .dispatch(
+        'array_linear',
+        { id: first, count: MAX_AUTO_SELECT + 1, offset: [2, 0, 0] },
+        { selectAffected: true },
+      );
+    expect(useStore.getState().document.selection).toHaveLength(MAX_AUTO_SELECT);
   });
 
   it('keeps the selection without the option', () => {

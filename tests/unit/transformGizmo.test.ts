@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { computeDelta, computeScaleFactor } from '@ui/viewport/3d/TransformGizmo';
+import { computeDelta, computeScaleFactor } from '@ui/viewport/3d/gizmoCommit';
 
 describe('TransformGizmo pure delta helpers', () => {
   it('computeDelta returns the signed component difference (next - prev)', () => {

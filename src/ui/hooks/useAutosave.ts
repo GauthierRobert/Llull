@@ -35,7 +35,14 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       }
       pending = false;
       if (state.document.order.length === 0) clearAutosave(storage);
-      else writeAutosave(storage, { savedAt: Date.now(), json: serializeDocument(state.document) });
+      else {
+        const clean = !useSessionStore.getState().dirty;
+        writeAutosave(storage, {
+          savedAt: Date.now(),
+          json: serializeDocument(state.document),
+          ...(clean ? { clean: true } : {}),
+        });
+      }
     };
 
     const restoreOnce = (): void => {
@@ -57,7 +64,12 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
               clearAutosave(storage);
               return;
             }
-            useSessionStore.getState().setRestoredAt(record.savedAt);
+            if (record.clean === true) {
+              // Identical to the last saved file: nothing unsaved to announce.
+              useSessionStore.getState().markSaved();
+            } else {
+              useSessionStore.getState().setRestoredAt(record.savedAt);
+            }
           },
         },
       );

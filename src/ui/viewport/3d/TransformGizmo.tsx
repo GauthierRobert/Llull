@@ -37,6 +37,7 @@ import { toRenderPosition } from './floatingOrigin';
 import { collectSnapCandidates3D, snap3d } from './snap3d';
 import type { Snap3DType, SnapPoint3D } from './snap3d';
 import { SnapIndicator3D } from './SnapIndicator3D';
+import { gizmoDragCommit, snapBackHint } from './gizmoCommit';
 
 // TransformControlsImpl fires a 'dragging-changed' event that is not in
 // three.js's Object3DEventMap. We cast the ref to a minimal interface to
@@ -52,29 +53,6 @@ const SNAP3D_TOLERANCE = 0.8;
 /** Grid step in world units (matches the viewport Grid cellSize = 1). */
 const SNAP3D_GRID_STEP = 1;
 
-type XYZ = Pick<THREE.Vector3, 'x' | 'y' | 'z'>;
-
-/** Component-wise `next - prev`: a translation delta (Vector3) or rotation delta (Euler, radians). */
-export function computeDelta(prev: XYZ, next: XYZ): [number, number, number] {
-  return [next.x - prev.x, next.y - prev.y, next.z - prev.z];
-}
-
-/**
- * Derive a single uniform scale factor from a THREE.Vector3 scale.
- * Uses the arithmetic mean of the three axes.
- */
-export function computeScaleFactor(scale: THREE.Vector3): number {
-  return (scale.x + scale.y + scale.z) / 3;
-}
-
-/** Deltas below this length are drags that did not move anything. */
-const MIN_DELTA = 1e-6;
-
-function isNegligible(delta: readonly [number, number, number]): boolean {
-  return Math.sqrt(delta[0] ** 2 + delta[1] ** 2 + delta[2] ** 2) < MIN_DELTA;
-}
-
-/** Snap marker shown while dragging; `position` is in render space. */
 interface Indicator {
   position: readonly [number, number, number];
   type: Snap3DType;
@@ -216,28 +194,36 @@ export function TransformGizmo({
 
       if (!selectedId || !target) return;
 
+      const rawEnd = target.position.clone();
+      let snapApplied = false;
       if (mode === 'translate') {
         // Apply the snapped position to the gizmo target before computing the delta.
         const snap = activeSnapRef.current;
         if (snap && snap3dEnabled) {
           target.position.set(...toRenderPosition([snap.x, snap.y, snap.z], renderOrigin));
+          snapApplied = true;
         }
-        const delta = computeDelta(preDragPos.current, target.position);
-        if (!isNegligible(delta)) dispatch('move_entity', { id: selectedId, delta });
-      } else if (mode === 'rotate') {
-        const delta = computeDelta(preDragRot.current, target.rotation);
-        if (!isNegligible(delta)) dispatch('rotate_entity', { id: selectedId, delta });
-      } else {
-        // scale — derive the uniform factor relative to the pre-drag scale baseline.
-        const prevAvg =
-          (preDragScale.current.x + preDragScale.current.y + preDragScale.current.z) / 3;
-        const nextFactor = computeScaleFactor(target.scale);
-        const factor = prevAvg > 0 ? nextFactor / prevAvg : nextFactor;
-        if (Math.abs(factor - 1) < 1e-6 || factor <= 0) return;
-        dispatch('scale_entity', { id: selectedId, factor });
-        // Reset gizmo scale to neutral; geometry dimensions live in the entity.
-        target.scale.set(1, 1, 1);
       }
+      const commit = gizmoDragCommit(
+        mode,
+        selectedId,
+        { position: preDragPos.current, rotation: preDragRot.current, scale: preDragScale.current },
+        { position: target.position, rotation: target.rotation, scale: target.scale },
+      );
+      if (commit !== null) dispatch(commit.name, commit.params);
+      else if (mode === 'translate') {
+        const hint = snapBackHint(
+          preDragPos.current,
+          rawEnd,
+          false,
+          snapApplied,
+          SNAP3D_GRID_STEP,
+          useStore.getState().document.units,
+        );
+        if (hint !== null) useStore.getState().setStatusMessage(hint);
+      }
+      // Reset gizmo scale to neutral; geometry dimensions live in the entity.
+      if (mode === 'scale') target.scale.set(1, 1, 1);
     },
     [selectedId, mode, dispatch, onDraggingChanged, snap3dEnabled, renderOrigin, showIndicator],
   );

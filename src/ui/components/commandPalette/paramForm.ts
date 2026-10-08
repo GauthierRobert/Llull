@@ -105,6 +105,47 @@ export function initialValues(
   return values;
 }
 
+/**
+ * Option picked by typing into a select: an exact (case-insensitive) match wins over the first
+ * prefix match, so "m" selects "m" rather than "mm". @pure
+ */
+export function matchTypeahead(options: readonly string[], query: string): string | undefined {
+  const needle = query.toLowerCase();
+  if (needle === '') return undefined;
+  return (
+    options.find((option) => option.toLowerCase() === needle) ??
+    options.find((option) => option.toLowerCase().startsWith(needle))
+  );
+}
+
+/** Text for one existing param value, the inverse of `parseField`; unusable values become blank. */
+function formatParam(field: FormField, value: unknown): string {
+  switch (field.kind) {
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
+    case 'boolean':
+      return typeof value === 'boolean' ? String(value) : '';
+    case 'numberList':
+    case 'textList':
+      return Array.isArray(value) ? value.map(String).join(', ') : '';
+    case 'json':
+      return value === undefined ? '' : JSON.stringify(value);
+    case 'enum':
+    case 'text':
+      return typeof value === 'string' ? value : '';
+  }
+}
+
+/** Pre-fill the form from an existing params object (editing a recorded step). @pure */
+export function valuesFromParams(
+  fields: readonly FormField[],
+  params: Readonly<Record<string, unknown>>,
+): FormValues {
+  return Object.fromEntries(
+    fields.map((field) => [field.name, formatParam(field, params[field.name])]),
+  );
+}
+
 function splitList(raw: string): string[] {
   return raw
     .split(/[,\s]+/)

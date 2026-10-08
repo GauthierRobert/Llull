@@ -33,22 +33,22 @@ describe('Sidebar', () => {
   it('renders one rail tab per browser panel', () => {
     render(<Sidebar />);
     for (const label of TAB_LABELS) {
-      expect(screen.getByRole('tab', { name: label })).toBeDefined();
+      expect(screen.getByRole('tab', { name: new RegExp('^' + label) })).toBeDefined();
     }
   });
 
   it('shows the Layers panel by default', () => {
     render(<Sidebar />);
-    expect(screen.getByRole('tab', { name: 'Layers' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /^Layers/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tabpanel')).toBeDefined();
     expect(screen.getByLabelText('Layer list')).toBeDefined();
   });
 
   it('switches panel when another tab is selected', () => {
     render(<Sidebar />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Parameters' }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Parameters/ }));
     expect(useLayoutStore.getState().sidebarTab).toBe('parameters');
-    expect(screen.getByRole('tab', { name: 'Parameters' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: /^Parameters/ })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -57,7 +57,7 @@ describe('Sidebar', () => {
 
   it('collapses when the open tab is selected again', () => {
     render(<Sidebar />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Layers' }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Layers/ }));
     expect(useLayoutStore.getState().sidebarOpen).toBe(false);
     expect(screen.queryByRole('tabpanel')).toBeNull();
   });
@@ -65,7 +65,7 @@ describe('Sidebar', () => {
   it('shows a count badge from the document', () => {
     render(<Sidebar />);
     // Empty document has the default layer.
-    expect(screen.getByRole('tab', { name: 'Layers' }).textContent).toContain('1');
+    expect(screen.getByRole('tab', { name: /^Layers/ }).textContent).toContain('1');
   });
 });
 
@@ -77,23 +77,23 @@ describe('Sidebar — keyboard', () => {
 
   it('only the current tab is in the Tab order (roving tabindex)', () => {
     render(<Sidebar />);
-    expect(screen.getByRole('tab', { name: 'Layers' })).toHaveAttribute('tabindex', '0');
-    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('tab', { name: /^Layers/ })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tab', { name: /^History/ })).toHaveAttribute('tabindex', '-1');
   });
 
   it('arrow keys and Home/End move focus between tabs', () => {
     render(<Sidebar />);
-    const layers = screen.getByRole('tab', { name: 'Layers' });
+    const layers = screen.getByRole('tab', { name: /^Layers/ });
     layers.focus();
     fireEvent.keyDown(layers, { key: 'ArrowDown' });
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Assembly' }));
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Assembly/ }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'End' });
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Materials' }));
-    const building = screen.getByRole('tab', { name: 'Building' });
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Materials/ }));
+    const building = screen.getByRole('tab', { name: /^Building/ });
     fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(building);
     fireEvent.keyDown(building, { key: 'ArrowUp' });
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Materials' }));
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Materials/ }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'Home' });
     expect(document.activeElement).toBe(building);
   });

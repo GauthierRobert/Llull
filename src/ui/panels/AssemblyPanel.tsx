@@ -78,22 +78,24 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
     <li
       className={`panel__row assembly-instance-row${selected ? ' panel__row--selected assembly-instance-row--selected' : ''}`}
       data-testid={`assembly-instance-${instance.id}`}
-      aria-label={`Instance of ${componentName}`}
-      aria-selected={selected}
       onClick={() => select([instance.id])}
-      role="option"
     >
       <span className="panel__row-icon" aria-hidden="true">
         <Icon name="assembly" size={14} />
       </span>
-      <span className="assembly-instance-info">
+      <button
+        type="button"
+        className="assembly-instance-info"
+        aria-pressed={selected}
+        aria-label={`Select instance of ${componentName}`}
+      >
         <span className="assembly-instance-name" title={componentName}>
           {componentName}
         </span>
         <span className="assembly-instance-pos" title={`Position: ${posLabel}`}>
           {posLabel}
         </span>
-      </span>
+      </button>
       <button
         type="button"
         className="btn btn--ghost btn--sm btn--danger"
@@ -153,7 +155,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
         {instanceList.length === 0 ? (
           <PanelEmpty compact icon="assembly" message="No instances in the scene." />
         ) : (
-          <ul className="panel__list" aria-label="Instance list" role="listbox">
+          <ul className="panel__list" aria-label="Instance list">
             {instanceList.map((inst) => {
               const comp = components[inst.componentId];
               const compName = comp ? comp.name : inst.componentId;

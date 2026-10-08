@@ -12,6 +12,11 @@ import type { Material } from '@core/model/types';
 import { PanelEmpty, PanelHeader } from '@ui/panels/PanelParts';
 import { isHexColor } from '@lib/isHexColor';
 
+/** 3 significant digits without exponent notation for ordinary magnitudes (7850, not "7.85e+3"). */
+export function formatDensity(density: number): string {
+  return String(Number(density.toPrecision(3)));
+}
+
 interface MaterialRowProps {
   material: Material;
   selectedEntityIds: string[];
@@ -37,11 +42,11 @@ function MaterialRow({
       className={`panel__row material-row${isSelected ? ' panel__row--selected material-row--selected' : ''}`}
       data-testid={`material-row-${material.name}`}
       aria-label={`Material: ${material.name}`}
-      aria-selected={isSelected}
     >
       <button
         type="button"
         className="material-row-btn"
+        aria-pressed={isSelected}
         onClick={() => onSelect(material.name)}
         aria-label={`Select material ${material.name}`}
         title={material.name}
@@ -56,7 +61,7 @@ function MaterialRow({
           {material.name}
         </span>
         <span className="material-density" title={`Density: ${material.density}`}>
-          {material.density.toPrecision(3)}
+          {formatDensity(material.density)}
         </span>
       </button>
 
@@ -112,14 +117,22 @@ function CreateMaterialForm(): React.ReactElement {
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     if (!isValid) return;
-    dispatch('create_material', {
-      name: name.trim(),
-      density: densityNum,
-      color,
-      metalness: metalnessNum,
-      roughness: roughnessNum,
-    });
-    setForm(EMPTY_FORM);
+    dispatch(
+      'create_material',
+      {
+        name: name.trim(),
+        density: densityNum,
+        color,
+        metalness: metalnessNum,
+        roughness: roughnessNum,
+      },
+      {
+        // A rejected create (e.g. duplicate name) keeps the typed values for correction.
+        onResult: ({ changed }) => {
+          if (changed) setForm(EMPTY_FORM);
+        },
+      },
+    );
   };
 
   return (

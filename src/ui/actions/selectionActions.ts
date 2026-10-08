@@ -20,7 +20,16 @@ export function deleteSelection(): void {
   if (state.document.selection.length === 0) return;
   const { elementIds, entityIds } = partitionSelection();
   if (elementIds.length > 0) state.dispatch('delete_building_element', { elementIds });
-  if (entityIds.length > 0) state.dispatch('delete_entities', { ids: entityIds });
+  // A mixed selection is two commands but one local undo step.
+  if (entityIds.length > 0)
+    dispatchStep('delete_entities', { ids: entityIds }, elementIds.length > 0);
+}
+
+/** Dispatch one command of a multi-command action; `joinPrevious` folds it into the last local undo step. */
+function dispatchStep(name: string, params: unknown, joinPrevious: boolean): void {
+  const { dispatch } = useStore.getState();
+  if (joinPrevious) dispatch(name, params, { coalesce: true });
+  else dispatch(name, params);
 }
 
 /** Gap (document units) between a duplicated selection and its originals. */
@@ -65,9 +74,10 @@ export function duplicateSelection(): void {
   if (selection.length === 0) return;
   const offset = duplicateOffset();
   const selectAffected = selection.length === 1;
-  for (const id of selection) {
-    state.dispatch('duplicate_entity', { id, offset }, { selectAffected });
-  }
+  // One duplicate command per entity; locally they fold into one undo step.
+  selection.forEach((id, index) => {
+    state.dispatch('duplicate_entity', { id, offset }, { selectAffected, coalesce: index > 0 });
+  });
 }
 
 /**
@@ -75,12 +85,22 @@ export function duplicateSelection(): void {
  * generated building geometry via its element (plan move — skipped when delta has a Z component).
  * @affects dispatches move_entities and/or move_building_element; no-op on empty selection
  */
-export function moveSelection(delta: Vec3): void {
+export function moveSelection(delta: Vec3, options: { joinPrevious?: boolean } = {}): void {
   const state = useStore.getState();
   if (state.document.selection.length === 0) return;
   const { elementIds, entityIds } = partitionSelection();
+  const joinPrevious = options.joinPrevious === true;
+  let dispatched = false;
   if (elementIds.length > 0 && delta[2] === 0) {
-    state.dispatch('move_building_element', { elementIds, delta: [delta[0], delta[1]] });
+    dispatchStep(
+      'move_building_element',
+      { elementIds, delta: [delta[0], delta[1]] },
+      joinPrevious,
+    );
+    dispatched = true;
   }
-  if (entityIds.length > 0) state.dispatch('move_entities', { ids: entityIds, delta });
+  // Local undo: a mixed move is one step; a held arrow key (`joinPrevious`) is one step too.
+  if (entityIds.length > 0) {
+    dispatchStep('move_entities', { ids: entityIds, delta }, joinPrevious || dispatched);
+  }
 }

@@ -18,7 +18,9 @@ describe('hintText', () => {
 
   it('explains selection when nothing is selected', () => {
     expect(hintText(base)).toMatch(/click an object/i);
-    expect(hintText({ ...base, viewMode: '2d' })).toMatch(/click a shape/i);
+    const hint = hintText({ ...base, viewMode: '2d' });
+    expect(hint).toMatch(/click a shape/i);
+    expect(hint).toMatch(/shift\+drag to box-select/i);
   });
 
   it('explains the gizmo for a single 3D selection', () => {

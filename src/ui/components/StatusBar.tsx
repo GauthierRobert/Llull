@@ -59,7 +59,10 @@ export function StatusBar(): React.ReactElement {
   const units = useStore((s) => s.document.units);
   const displayPrecision = useStore((s) => s.document.displayPrecision);
   const entityCount = useStore((s) => s.document.order.length);
-  const selectionCount = useStore((s) => s.document.selection.length);
+  // Building commands also put element ids in the selection; count only real entities.
+  const selectionCount = useStore(
+    (s) => s.document.selection.filter((id) => id in s.document.entities).length,
+  );
   const lastSummary = useStore((s) => s.lastSummary);
 
   const unitLabel = `${units} (${displayPrecision}dp)`;

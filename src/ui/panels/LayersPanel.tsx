@@ -1,17 +1,21 @@
 /**
  * @layer ui/panels
  *
- * LayersPanel — read-only layer list: name, visibility, lock state, color swatch, entity count.
+ * LayersPanel — layer list (name, visibility, lock, color swatch, entity count) with controls that
+ * dispatch the layer commands: add_layer, rename_layer, set_layer_lock, delete_layer.
  * The eye toggle is a LOCAL viewport filter (`useViewportStore.hiddenLayerIds`): it dispatches no
  * command and never changes the document's `layer.visible`.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
+import { DEFAULT_LAYER_ID } from '@core/model/types';
 import type { Layer } from '@core/model/types';
 import { Icon } from '@ui/components/Icon';
-import { PanelHeader } from '@ui/panels/PanelParts';
+import { ConfirmDialog } from '@ui/components/ConfirmDialog';
+import { IconButton, PanelHeader } from '@ui/panels/PanelParts';
+import { CommitInput } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
 
 function useLayerEntityCounts(): Record<string, number> {
@@ -31,13 +35,17 @@ interface LayerRowProps {
 }
 
 function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
+  const dispatch = useStore((s) => s.dispatch);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const toggleLayerVisibility = useViewportStore((s) => s.toggleLayerVisibility);
+  const [renaming, setRenaming] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Local viewport visibility: starts from the document's layer.visible, then
   // the user can toggle it locally without touching the server document.
   const isLocallyHidden = hiddenLayerIds.has(layer.id);
   const effectivelyVisible = layer.visible && !isLocallyHidden;
+  const isDefaultLayer = layer.id === DEFAULT_LAYER_ID;
 
   return (
     <li
@@ -62,18 +70,20 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
         <Icon name={effectivelyVisible ? 'eye' : 'eyeOff'} size={14} />
       </button>
 
-      <span
-        className={`layer-lock${layer.locked ? ' layer-lock--locked' : ''}`}
-        aria-label={
-          layer.locked ? `Layer ${layer.name} is locked` : `Layer ${layer.name} is unlocked`
-        }
-        title={layer.locked ? 'Locked (set by MCP agent)' : 'Unlocked'}
+      <button
+        type="button"
+        className={`icon-btn layer-lock${layer.locked ? ' layer-lock--locked' : ''}`}
+        onClick={() => dispatch('set_layer_lock', { id: layer.id, locked: !layer.locked })}
+        aria-pressed={layer.locked}
+        aria-label={layer.locked ? `Unlock layer ${layer.name}` : `Lock layer ${layer.name}`}
+        title={layer.locked ? 'Locked — click to unlock' : 'Unlocked — click to lock'}
       >
         <Icon name={layer.locked ? 'lock' : 'unlock'} size={12} />
-      </span>
+      </button>
 
       {layer.color != null ? (
         <span
+          role="img"
           className="layer-color-swatch"
           style={{ background: layer.color }}
           title={`Layer color: ${layer.color}`}
@@ -83,18 +93,111 @@ function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
         <span className="layer-color-swatch layer-color-swatch--none" aria-hidden="true" />
       )}
 
-      <span className="panel__row-main layer-name" aria-label={`Layer name: ${layer.name}`}>
-        {layer.name}
-      </span>
+      {renaming ? (
+        <CommitInput
+          className="layer-name-input"
+          label={`Rename layer ${layer.name}`}
+          value={layer.name}
+          autoFocus
+          onCommit={(name) => {
+            if (name.trim() !== '') dispatch('rename_layer', { id: layer.id, name: name.trim() });
+          }}
+          onFinish={() => setRenaming(false)}
+        />
+      ) : (
+        <span className="panel__row-main layer-name">{layer.name}</span>
+      )}
 
       <span
         className="panel__row-meta"
         title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'} on this layer`}
-        aria-label={`${entityCount} entities`}
       >
         {entityCount}
+        <span className="visually-hidden">{entityCount === 1 ? ' entity' : ' entities'}</span>
       </span>
+
+      <span className="panel__row-actions">
+        <IconButton
+          icon="parameters"
+          size={12}
+          label={`Rename layer ${layer.name}`}
+          title="Rename layer"
+          onClick={() => setRenaming(true)}
+        />
+        <IconButton
+          icon="trash"
+          size={12}
+          danger
+          disabled={isDefaultLayer}
+          label={`Delete layer ${layer.name}`}
+          title={isDefaultLayer ? 'The default layer cannot be deleted' : 'Delete layer'}
+          onClick={() => setConfirmingDelete(true)}
+        />
+      </span>
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          title={`Delete layer "${layer.name}"?`}
+          message={
+            entityCount === 0
+              ? 'The layer is empty.'
+              : `${entityCount} ${entityCount === 1 ? 'entity moves' : 'entities move'} to the default layer.`
+          }
+          confirmLabel="Delete layer"
+          onCancel={() => setConfirmingDelete(false)}
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            dispatch('delete_layer', { id: layer.id });
+          }}
+        />
+      )}
     </li>
+  );
+}
+
+function AddLayerForm(): React.ReactElement {
+  const dispatch = useStore((s) => s.dispatch);
+  const [name, setName] = useState('');
+  const trimmed = name.trim();
+
+  return (
+    <form
+      className="panel__form"
+      aria-label="Add layer"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (trimmed === '') return;
+        dispatch(
+          'add_layer',
+          { name: trimmed },
+          {
+            onResult: ({ changed }) => {
+              if (changed) setName('');
+            },
+          },
+        );
+      }}
+    >
+      <div className="param-add-fields">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="new layer name"
+          aria-label="New layer name"
+          autoComplete="off"
+        />
+        <button
+          type="submit"
+          className="btn btn--primary"
+          disabled={trimmed === ''}
+          aria-label="Add layer"
+          title="Add layer"
+        >
+          <Icon name="plus" size={14} />
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -120,6 +223,8 @@ export function LayersPanel({ className }: LayersPanelProps): React.ReactElement
           <LayerRow key={layer.id} layer={layer} entityCount={entityCounts[layer.id] ?? 0} />
         ))}
       </ul>
+
+      <AddLayerForm />
     </aside>
   );
 }

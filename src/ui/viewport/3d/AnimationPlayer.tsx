@@ -18,7 +18,7 @@
  * - When multiple animations target the same object they are composed in document
  *   order by `composeAnimatedPoseInto` (animationMath).
  * - Per-frame work reuses pooled vectors / contributions (rule R9: no per-frame allocation).
- * - If the target object is not found in the scene (scene.getObjectByName) the
+ * - If the target object is not found in the scene (SceneObjectCache, a memoized getObjectByName) the
  *   animation is silently skipped that frame.
  *
  * @pure   N/A — imperative three.js mutation; by design (render-time overlay).
@@ -37,6 +37,7 @@ import {
   type AnimatedPose,
   type AnimationContribution,
 } from './animationMath';
+import { SceneObjectCache } from './sceneObjectCache';
 
 /** Write the unit direction of `v` into `target`; falls back to the Z axis (Z-up) for a near-zero vector. */
 function writeUnitAxis(target: THREE.Vector3, v: Vec3): void {
@@ -98,6 +99,7 @@ export function AnimationPlayer(): null {
   const lastResetNonce = useRef<number>(useViewportStore.getState().animationResetNonce);
 
   const buffers = useMemo(createFrameBuffers, []);
+  const objectCache = useMemo(() => new SceneObjectCache(), []);
 
   useFrame(({ scene, invalidate }, delta) => {
     const viewport = useViewportStore.getState();
@@ -158,7 +160,7 @@ export function AnimationPlayer(): null {
 
     for (const [entityId, parts] of contributionsByEntity) {
       const entity = entities[entityId];
-      const object = scene.getObjectByName(entityId);
+      const object = objectCache.get(scene, entityId);
       if (!entity || !object || parts.length === 0) continue;
       composeAnimatedPoseInto(pose, entity.position, entity.rotation, parts, scratch);
       object.position.copy(pose.position);

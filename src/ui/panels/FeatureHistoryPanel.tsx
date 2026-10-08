@@ -6,7 +6,10 @@
  * The step label is read-only: no rename_step command exists yet.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
+import { getCommand } from '@core/commands/registry';
+import { stepEditRefusal } from '@ui/panels/stepEditGuard';
+import { CommandParamForm } from '@ui/components/commandPalette/CommandParamForm';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
 import type { FeatureStep } from '@core/model/types';
@@ -21,67 +24,118 @@ interface FeatureStepRowProps {
 
 function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const [editing, setEditing] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const command = getCommand(step.name);
 
   const isSuppressed = step.suppressed === true;
   const displayLabel = step.label ?? step.name;
 
+  const submitEdit = (params: Record<string, unknown>): void => {
+    const refused = stepEditRefusal(useStore.getState().document, step, params);
+    if (refused !== null) {
+      setRefusal(refused);
+      return;
+    }
+    setRefusal(null);
+    dispatch(
+      'edit_step_params',
+      { stepId: step.id, params },
+      {
+        onResult: ({ summary, changed }) => {
+          if (changed) setEditing(false);
+          else setRefusal(summary);
+        },
+      },
+    );
+  };
+
   return (
-    <li
-      className={classNames(
-        'panel__row panel__row--overlay-actions history-step',
-        isSuppressed && 'history-step--suppressed',
-      )}
-      data-testid={`history-step-${step.id}`}
-      aria-label={`Step ${index + 1}: ${displayLabel}${isSuppressed ? ' (suppressed)' : ''}`}
-    >
-      <span className="history-step-index" aria-hidden="true">
-        {index + 1}
-      </span>
-
-      <span className="history-step-name" title={step.name}>
-        <span className="history-step-cmd">{step.name}</span>
-        {step.label != null && <span className="history-step-label">{step.label}</span>}
-      </span>
-
-      {isSuppressed && <span className="chip chip--warning">off</span>}
-
-      <div className="panel__row-actions">
-        <IconButton
-          icon="arrowUp"
-          onClick={() => dispatch('reorder_step', { stepId: step.id, newIndex: index - 1 })}
-          disabled={index === 0}
-          label={`Move step ${displayLabel} up`}
-          title="Move up"
-        />
-        <IconButton
-          icon="arrowDown"
-          onClick={() => dispatch('reorder_step', { stepId: step.id, newIndex: index + 1 })}
-          disabled={index >= totalCount - 1}
-          label={`Move step ${displayLabel} down`}
-          title="Move down"
-        />
-        <IconButton
-          icon="trash"
-          danger
-          onClick={() => dispatch('delete_step', { stepId: step.id })}
-          label={`Delete step ${displayLabel}`}
-          title="Delete step"
-        />
-      </div>
-
-      <button
-        type="button"
-        className={`icon-btn history-suppress-btn${isSuppressed ? ' history-suppress-btn--suppressed' : ''}`}
-        onClick={() =>
-          dispatch('set_step_suppressed', { stepId: step.id, suppressed: !step.suppressed })
-        }
-        aria-pressed={isSuppressed}
-        aria-label={isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`}
-        title={isSuppressed ? 'Restore (un-suppress)' : 'Suppress (skip during replay)'}
+    <>
+      <li
+        className={classNames(
+          'panel__row panel__row--overlay-actions history-step',
+          isSuppressed && 'history-step--suppressed',
+        )}
+        data-testid={`history-step-${step.id}`}
+        aria-label={`Step ${index + 1}: ${displayLabel}${isSuppressed ? ' (suppressed)' : ''}`}
       >
-        <Icon name={isSuppressed ? 'eyeOff' : 'eye'} size={14} />
-      </button>
-    </li>
+        <span className="history-step-index" aria-hidden="true">
+          {index + 1}
+        </span>
+
+        <span className="history-step-name" title={step.name}>
+          <span className="history-step-cmd">{step.name}</span>
+          {step.label != null && <span className="history-step-label">{step.label}</span>}
+        </span>
+
+        {isSuppressed && <span className="chip chip--warning">off</span>}
+
+        <div className="panel__row-actions">
+          {command !== undefined && (
+            <IconButton
+              icon="parameters"
+              onClick={() => {
+                setRefusal(null);
+                setEditing((open) => !open);
+              }}
+              pressed={editing}
+              label={`Edit parameters of step ${displayLabel}`}
+              title="Edit parameters"
+            />
+          )}
+          <IconButton
+            icon="arrowUp"
+            onClick={() => dispatch('reorder_step', { stepId: step.id, newIndex: index - 1 })}
+            disabled={index === 0}
+            label={`Move step ${displayLabel} up`}
+            title="Move up"
+          />
+          <IconButton
+            icon="arrowDown"
+            onClick={() => dispatch('reorder_step', { stepId: step.id, newIndex: index + 1 })}
+            disabled={index >= totalCount - 1}
+            label={`Move step ${displayLabel} down`}
+            title="Move down"
+          />
+          <IconButton
+            icon="trash"
+            danger
+            onClick={() => dispatch('delete_step', { stepId: step.id })}
+            label={`Delete step ${displayLabel}`}
+            title="Delete step"
+          />
+        </div>
+
+        <button
+          type="button"
+          className={`icon-btn history-suppress-btn${isSuppressed ? ' history-suppress-btn--suppressed' : ''}`}
+          onClick={() =>
+            dispatch('set_step_suppressed', { stepId: step.id, suppressed: !step.suppressed })
+          }
+          aria-pressed={isSuppressed}
+          aria-label={
+            isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`
+          }
+          title={isSuppressed ? 'Restore (un-suppress)' : 'Suppress (skip during replay)'}
+        >
+          <Icon name={isSuppressed ? 'eyeOff' : 'eye'} size={14} />
+        </button>
+      </li>
+      {editing && command !== undefined && (
+        <li className="history-step-editor" data-testid={`history-edit-${step.id}`}>
+          <CommandParamForm
+            command={command}
+            initialParams={step.params as Record<string, unknown>}
+            submitLabel="Apply"
+            backLabel="Cancel editing"
+            statusMessage={refusal}
+            onBack={() => setEditing(false)}
+            onSubmit={submitEdit}
+          />
+        </li>
+      )}
+    </>
   );
 }
 
