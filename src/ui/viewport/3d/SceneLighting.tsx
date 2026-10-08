@@ -17,7 +17,9 @@ import type { RenderQualitySettings } from './useRenderQuality';
 export const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
 
 /** World AABB of the whole scene (null when empty); recomputed only when the content changes. */
-function useSceneBounds(): ReturnType<typeof mergedEntityBounds> {
+type SceneBounds = ReturnType<typeof mergedEntityBounds>;
+
+function useSceneBounds(): SceneBounds {
   const entities = useStore((s) => s.document.entities);
   const components = useStore((s) => s.document.components);
   const order = useStore((s) => s.document.order);
@@ -30,8 +32,13 @@ function useSceneBounds(): ReturnType<typeof mergedEntityBounds> {
 }
 
 /** Ground contact-shadow patch sized to the scene footprint (see contactShadowPlane.ts). */
-function SceneContactShadows({ opacity }: { opacity: number }): React.ReactElement {
-  const bounds = useSceneBounds();
+function SceneContactShadows({
+  opacity,
+  bounds,
+}: {
+  opacity: number;
+  bounds: SceneBounds;
+}): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
   const plane = useMemo(
     () => computeContactShadowPlane(bounds, renderOrigin),
@@ -55,8 +62,13 @@ function SceneContactShadows({ opacity }: { opacity: number }): React.ReactEleme
 }
 
 /** Shadow-casting key light that follows the scene's extent (see keyLightRig.ts). */
-function SceneKeyLight({ shadowMapSize }: { shadowMapSize: number }): React.ReactElement {
-  const bounds = useSceneBounds();
+function SceneKeyLight({
+  shadowMapSize,
+  bounds,
+}: {
+  shadowMapSize: number;
+  bounds: SceneBounds;
+}): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
   const invalidate = useThree((s) => s.invalidate);
   const lightRef = useRef<THREE.DirectionalLight>(null);
@@ -94,6 +106,29 @@ function SceneKeyLight({ shadowMapSize }: { shadowMapSize: number }): React.Reac
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.0004}
       />
+    </>
+  );
+}
+
+/**
+ * The scene-extent-dependent lights. Only this component subscribes to the document, so an edit
+ * never re-renders the environment / soft-shadow / fixed lights (an Environment re-render would
+ * re-bake its cube map). One O(entities) bounds pass serves both children.
+ */
+function SceneShadowRig({
+  shadowMapSize,
+  contactShadows,
+  contactShadowOpacity,
+}: {
+  shadowMapSize: number;
+  contactShadows: boolean;
+  contactShadowOpacity: number;
+}): React.ReactElement {
+  const bounds = useSceneBounds();
+  return (
+    <>
+      <SceneKeyLight shadowMapSize={shadowMapSize} bounds={bounds} />
+      {contactShadows && <SceneContactShadows opacity={contactShadowOpacity} bounds={bounds} />}
     </>
   );
 }
@@ -136,12 +171,15 @@ export function SceneLighting({
              shadow-mapSize scales with quality tier (2048 High / 1024 Medium+Low).
            directional rim: cool back-left counter fill.  */}
       <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} position={[0, 0, 1]} />
-      <SceneKeyLight shadowMapSize={quality.shadowMapSize} />
       <directionalLight position={[-6, 8, 4]} intensity={0.4} color="#a8c8ff" />
 
-      {/* ---- Contact shadows: rendered once (frames=1) — safe under demand frameloop.
-           Disabled in Low tier to avoid the extra render pass. ---- */}
-      {quality.contactShadowsEnabled && <SceneContactShadows opacity={contactShadowOpacity} />}
+      {/* ---- Key light + contact shadows follow the scene extent. Contact shadows are rendered
+           once (frames=1) — safe under demand frameloop — and are off in the Low tier. ---- */}
+      <SceneShadowRig
+        shadowMapSize={quality.shadowMapSize}
+        contactShadows={quality.contactShadowsEnabled}
+        contactShadowOpacity={contactShadowOpacity}
+      />
     </>
   );
 }
