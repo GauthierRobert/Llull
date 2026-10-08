@@ -89,7 +89,8 @@ export function useKeyboardShortcuts(): void {
         const [dx, dy] = ARROW_DIRECTIONS[e.key] ?? [0, 0];
         const step = e.shiftKey ? NUDGE_STEP * NUDGE_LARGE_FACTOR : NUDGE_STEP;
         const delta: Vec3 = [dx * step, dy * step, 0];
-        moveSelection(delta);
+        // Holding an arrow repeats the nudge: the repeats fold into the first press's undo step.
+        moveSelection(delta, { joinPrevious: e.repeat });
       } else {
         const action = resolveShortcut(tools.viewMode, e.key);
         if (action === null) return;
