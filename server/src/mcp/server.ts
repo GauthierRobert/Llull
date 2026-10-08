@@ -24,6 +24,7 @@ import {
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
+  SERVER_INSTRUCTIONS,
   applyExchangeToolCall,
   applyDiscoveryToolCall,
   isPromptEnabled,
@@ -82,7 +83,10 @@ export function buildMcpServer(
 ): Server {
   const server = new Server(
     { name: 'llull', version: '0.1.0' },
-    { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} } },
+    {
+      capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} },
+      instructions: SERVER_INSTRUCTIONS,
+    },
   );
   /** Per-session: the configured set, grown by the `enable_toolset` discovery tool. */
   const enabledToolsets = new Set<ToolsetName>(configuredToolsets);

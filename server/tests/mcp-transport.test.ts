@@ -82,6 +82,29 @@ function nextId(): number {
  * The first POST to /mcp (no mcp-session-id header) carries the `initialize`
  * method.  The server responds with the session id in the `mcp-session-id` header.
  */
+describe('MCP initialize instructions', () => {
+  it('returns the server instructions so agents learn the workflow up front', async () => {
+    const res = await request(app)
+      .post('/mcp')
+      .set('Content-Type', 'application/json')
+      .set('Accept', 'application/json, text/event-stream')
+      .send({
+        jsonrpc: '2.0',
+        id: 9001,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'test-client', version: '0.0.1' },
+        },
+      });
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('instructions');
+    expect(res.text).toContain('cad://conventions');
+    expect(res.text).toContain('search_tools');
+  });
+});
+
 async function mcpInitialize(): Promise<string> {
   const id = nextId();
   const res = await request(app)

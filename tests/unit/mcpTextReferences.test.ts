@@ -4,7 +4,14 @@
  * misleading agents.
  */
 import { describe, expect, it } from 'vitest';
-import { buildAllMcpTools, getMcpPrompt, listMcpPrompts, readMcpResource } from '@mcp/index';
+import {
+  buildAllMcpTools,
+  getMcpPrompt,
+  listMcpPrompts,
+  listMcpResources,
+  readMcpResource,
+  SERVER_INSTRUCTIONS,
+} from '@mcp/index';
 import { CONVENTIONS_GUIDE } from '@mcp/conventions';
 import { createEmptyDocument } from '@core/model/types';
 
@@ -152,6 +159,18 @@ describe('backticked names in prose', () => {
       (word) => !known.has(word) && !documentWords.has(word),
     );
     expect([...new Set(stale)]).toEqual([]);
+  });
+
+  it('the server instructions mention only real tools, parameters and resources', () => {
+    const known = vocabulary();
+    const stale = backtickedIdentifiers(SERVER_INSTRUCTIONS).filter(
+      (word) => !known.has(word) && !['structuredContent'].includes(word),
+    );
+    expect(stale).toEqual([]);
+    const uris = new Set(listMcpResources().map((resource) => resource.uri));
+    const mentioned = [...SERVER_INSTRUCTIONS.matchAll(/`(cad:\/\/[a-z]+)`/g)].map((m) => m[1]);
+    expect(mentioned.length).toBeGreaterThan(0);
+    for (const uri of mentioned) expect(uris.has(uri ?? ''), uri).toBe(true);
   });
 
   it('the scene resource exposes the snapshot fields prompts tell agents to read', () => {
