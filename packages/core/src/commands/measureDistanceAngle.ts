@@ -2,7 +2,7 @@ import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { formatLength } from './units';
-import { boundsCenter, entityBounds } from './sceneBounds';
+import { boundsCenter, entityBoundsInDoc } from './sceneBounds';
 import { dot3, sub3, len3, distance3 } from '../lib/vec3';
 import { noop } from './noop';
 interface MeasureDistanceData {
@@ -57,7 +57,7 @@ export const measureDistance = defineCommand({
       if (!e) {
         return noop(doc, `measure_distance: entity '${entityId1}' not found.`);
       }
-      locA = boundsCenter(entityBounds(e));
+      locA = boundsCenter(entityBoundsInDoc(doc, e));
     }
 
     let locB: Vec3 | undefined;
@@ -68,7 +68,7 @@ export const measureDistance = defineCommand({
       if (!e) {
         return noop(doc, `measure_distance: entity '${entityId2}' not found.`);
       }
-      locB = boundsCenter(entityBounds(e));
+      locB = boundsCenter(entityBoundsInDoc(doc, e));
     }
 
     if (!locA || !locB) {

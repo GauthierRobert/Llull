@@ -7,7 +7,7 @@
  * @failure invalid JSON / wrong format or version / structural or value validation error -> no-op, affected:[]
  */
 
-import type { CadDocument, FeatureStep } from '../model/types';
+import type { CadDocument } from '../model/types';
 import { DOCUMENT_UNITS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
@@ -64,10 +64,13 @@ const STEP_ID = /^step-(\d+)$/;
  */
 function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unknown> {
   let highest = 0;
-  const steps = Array.isArray(raw['featureHistory'])
-    ? (raw['featureHistory'] as FeatureStep[])
-    : [];
-  for (const step of steps) highest = Math.max(highest, Number(STEP_ID.exec(step.id)?.[1] ?? 0));
+  // Entries are not validated yet: skip anything that is not a record with a string id so the
+  // value validation below reports "featureHistory[i] is malformed" instead of a TypeError.
+  const steps: unknown[] = Array.isArray(raw['featureHistory']) ? raw['featureHistory'] : [];
+  for (const step of steps) {
+    if (!isRecord(step) || typeof step['id'] !== 'string') continue;
+    highest = Math.max(highest, Number(STEP_ID.exec(step['id'])?.[1] ?? 0));
+  }
   for (const id of Object.keys(isRecord(raw['entities']) ? raw['entities'] : {})) {
     highest = Math.max(highest, Number(STEP_SCOPED_ID.exec(id)?.[1] ?? 0));
   }

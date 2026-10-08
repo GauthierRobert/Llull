@@ -17,7 +17,8 @@ export const clearDocument = defineCommand({
   name: 'clear_document',
   description:
     'Reset the working document to an empty state, removing all entities, groups, ' +
-    'animations, parameters, configurations, materials, recipes, and components. ' +
+    'animations, parameters, configurations, materials, recipes, components, constraints, joints, ' +
+    'and drive relations. ' +
     'Preserves units, camera, and displayPrecision so view framing survives. ' +
     'Set keepLayers=true to also preserve layers and the active layer scheme; ' +
     'by default layers are reset to a single default "Layer 0".',
@@ -51,6 +52,9 @@ export const clearDocument = defineCommand({
         doc.materials,
         doc.recipes,
         doc.components,
+        doc.constraints,
+        doc.joints,
+        doc.driveRelations,
       ].every((table) => Object.keys(table).length === 0) &&
       doc.featureHistory.length === 0 &&
       doc.building === undefined &&
@@ -73,6 +77,12 @@ export const clearDocument = defineCommand({
       materials: {},
       recipes: {},
       components: {},
+      constraints: {},
+      constraintOrder: [],
+      joints: {},
+      jointOrder: [],
+      driveRelations: {},
+      driveRelationOrder: [],
       ...(keepLayers
         ? {}
         : {

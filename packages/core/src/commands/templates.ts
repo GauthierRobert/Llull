@@ -15,7 +15,7 @@ import type { Entity, Vec3, Vec2 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 } from './schema';
 import { nextId } from '../lib/id';
-import { withEntity } from './entityOps';
+import { withEntities } from './entityOps';
 import { newEntity } from './newEntity';
 import { ORIGIN } from '../lib/vec3';
 import { MAX_TEMPLATE_ENTITIES } from './limits';
@@ -262,7 +262,7 @@ export const instantiateTemplate = defineCommand({
     // Build entities — deterministic order guaranteed by each builder
     const entities = entry.build(params as never, position, color);
     const affected = entities.map((e) => e.id);
-    const newDoc = entities.reduce(withEntity, doc);
+    const newDoc = withEntities(doc, entities);
 
     return {
       document: newDoc,

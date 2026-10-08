@@ -117,10 +117,11 @@ export const motionStudy = defineCommand({
       ),
     steps: z
       .number()
+      .int()
       .optional()
       .describe(
         'Number of samples across the range (default 24, minimum 2, maximum 360). ' +
-          'Non-integers are rounded. Step k = start + (end - start) * k / (steps - 1).',
+          'Must be an integer. Step k = start + (end - start) * k / (steps - 1).',
       ),
     interferenceCheck: z
       .boolean()
@@ -150,7 +151,7 @@ export const motionStudy = defineCommand({
       };
     }
 
-    const rawSteps = steps !== undefined ? Math.round(steps) : 24;
+    const rawSteps = steps ?? 24;
     if (rawSteps < 2) {
       return {
         document: doc,

@@ -381,7 +381,7 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
     case 'dimension':
       return []; // not drawn in render_view SVG; the viewport renders dimensions
     case 'instance':
-      return []; // expanded form not yet tessellated; use explode_instance to export
+      return []; // drawn by renderScene, which bakes the instance into its component's entities first
     default: {
       const exhaustive: never = e;
       void exhaustive;

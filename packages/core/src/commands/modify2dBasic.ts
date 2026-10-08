@@ -4,7 +4,7 @@ import { defineCommand, z } from './schema';
 import { nextId } from '../lib/id';
 import { offsetSegment, miterJoin, resolvePolyline } from './modify2dGeometry';
 import { commitEntity } from './commitEntity';
-import { withEntity, withoutEntities } from './entityOps';
+import { referenceSuffix, withEntities, withoutEntities } from './entityOps';
 import { newEntity } from './newEntity';
 import { noop } from './noop';
 import { elementAt } from '../lib/elementAt';
@@ -42,8 +42,9 @@ export const explodePolyline = defineCommand({
     const segments = ring.slice(1).map((end, i): [Vec2, Vec2] => [elementAt(ring, i), end]);
 
     // Remove the polyline, add one line per segment
-    let newDoc = withoutEntities(doc, new Set([id])).document;
+    const { document: baseDoc, prunedReferences } = withoutEntities(doc, new Set([id]));
     const createdIds: string[] = [];
+    const lines: Entity[] = [];
     for (const [start, end] of segments) {
       const lineId = nextId('line');
       createdIds.push(lineId);
@@ -51,12 +52,13 @@ export const explodePolyline = defineCommand({
         rotation: polyline.rotation,
         layerId: polyline.layerId,
       });
-      newDoc = withEntity(newDoc, line);
+      lines.push(line);
     }
+    const newDoc = withEntities(baseDoc, lines);
 
     return {
       document: newDoc,
-      summary: `Exploded polyline ${id} into ${createdIds.length} line(s): [${createdIds.join(', ')}].`,
+      summary: `Exploded polyline ${id} into ${createdIds.length} line(s): [${createdIds.join(', ')}].${referenceSuffix(prunedReferences)}`,
       affected: createdIds,
     };
   },

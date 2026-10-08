@@ -15,7 +15,7 @@ import { rotatePoint2 } from '../lib/polygon';
 import { add2, len2, normalize2, scale2, sub2 } from '../lib/vec2';
 import { MAX_COPIES_PER_COMMAND } from './limits';
 import { noop } from './noop';
-import { withEntity } from './entityOps';
+import { withEntities } from './entityOps';
 import { instanceEntity } from './assemblies';
 
 /** Cumulative chord length at each point; a closed path gets one extra entry for the wrap-back chord. */
@@ -89,7 +89,10 @@ export const distributeAlongPath = defineCommand({
     componentId: z
       .string()
       .describe('Id of an existing Component in doc.components. Obtain one via create_component.'),
-    count: z.number().describe('Number of instances to create. Must be a positive integer (>= 1).'),
+    count: z
+      .number()
+      .int()
+      .describe('Number of instances to create. Must be a positive integer (>= 1).'),
     tangentAlign: z
       .boolean()
       .describe(
@@ -153,7 +156,7 @@ export const distributeAlongPath = defineCommand({
       );
     }
 
-    if (count < 1 || !Number.isInteger(count) || count > MAX_COPIES_PER_COMMAND) {
+    if (count < 1 || count > MAX_COPIES_PER_COMMAND) {
       return noop(
         doc,
         `distribute_along_path: count must be an integer in [1, ${MAX_COPIES_PER_COMMAND}] (got ${count}).`,
@@ -219,7 +222,7 @@ export const distributeAlongPath = defineCommand({
 
     const instanceName = name ?? component.name;
     const createdIds: string[] = [];
-    let newDoc = doc;
+    const created: InstanceEntity[] = [];
 
     for (const [i, s] of placements.entries()) {
       const { point, tangent } = samplePath(pathPoints, pathClosed, s);
@@ -235,7 +238,7 @@ export const distributeAlongPath = defineCommand({
         ),
         name: `${instanceName}_${i}`,
       };
-      newDoc = withEntity(newDoc, instance);
+      created.push(instance);
       createdIds.push(instanceId);
     }
 
@@ -251,7 +254,7 @@ export const distributeAlongPath = defineCommand({
     const rangeStr = createdIds.length > 1 ? `${firstId}..${lastId}` : firstId;
 
     return {
-      document: newDoc,
+      document: withEntities(doc, created),
       summary:
         `Distributed ${createdIds.length} instance${createdIds.length === 1 ? '' : 's'} of "${component.name}" ` +
         `along ${pathEntity.kind} "${pathId}" ` +

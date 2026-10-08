@@ -4,6 +4,7 @@ import { defineCommand, z, looseVec3, tolerant, untypedArray, colorField } from 
 import { axisVector, isValidAxis } from '../lib/axis';
 import { ORIGIN, finiteVec3OrZero, len3 } from '../lib/vec3';
 import { noop } from './noop';
+import { MAX_PROFILE_POINTS, MAX_REVOLVE_SEGMENTS } from './limits';
 import { newEntity } from './newEntity';
 import { nextId } from '../lib/id';
 import { compactNumber } from '../lib/compactNumber';
@@ -13,6 +14,7 @@ import {
   ROTATION_CONVENTION,
   commitSolid,
   rejectBadProfile,
+  rejectZeroAreaProfile,
 } from './geometryShared';
 import { DEFAULT_LAYER_ID } from '../model/types';
 import { circlePoints } from './tessellation';
@@ -112,6 +114,9 @@ export const extrudeSketch = defineCommand({
       );
     }
 
+    const flatProfile = rejectZeroAreaProfile(doc, 'extrude_sketch', profile);
+    if (flatProfile) return flatProfile;
+
     const extId = nextId('ext');
     const extrusion = newEntity(
       'extrusion',
@@ -191,8 +196,9 @@ export const revolveProfile = defineCommand({
       .optional(),
     segments: z
       .number()
+      .int()
       .describe(
-        'Number of radial subdivisions for tessellation. Higher = smoother surface. Default: 32. Minimum: 3.',
+        'Number of radial subdivisions for tessellation. Integer; higher = smoother surface. Default: 32. Minimum: 3 (smaller values are raised to 3).',
       )
       .optional(),
     position: looseVec3(
@@ -234,8 +240,22 @@ export const revolveProfile = defineCommand({
         `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${profile.length}); no-op.`,
       );
     }
+    if (profile.length > MAX_PROFILE_POINTS) {
+      return noop(
+        doc,
+        `revolve_profile: profile has ${profile.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}); no-op.`,
+      );
+    }
+    if (rawSegments !== undefined && rawSegments > MAX_REVOLVE_SEGMENTS) {
+      return noop(
+        doc,
+        `revolve_profile: segments ${rawSegments} exceeds MAX_REVOLVE_SEGMENTS (${MAX_REVOLVE_SEGMENTS}); no-op.`,
+      );
+    }
     const badProfile = rejectBadProfile(doc, 'revolve_profile', profile);
     if (badProfile) return badProfile;
+    const flatProfile = rejectZeroAreaProfile(doc, 'revolve_profile', profile);
+    if (flatProfile) return flatProfile;
     if (
       explicitId !== undefined &&
       explicitId.length > 0 &&
@@ -264,7 +284,7 @@ export const revolveProfile = defineCommand({
       );
     }
 
-    const segments = Math.max(3, Math.round(rawSegments ?? 32));
+    const segments = Math.max(3, rawSegments ?? 32);
 
     const id = explicitId !== undefined && explicitId.length > 0 ? explicitId : nextId('rev');
     const entity = newEntity(

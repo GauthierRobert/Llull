@@ -40,7 +40,7 @@ import { checkModel } from './check';
 import { renderView } from './render';
 import { makeTubeBetween } from './composite';
 import { addText, addDimension } from './annotate';
-import { filletEdge, chamferEdge } from './modify3d';
+import { filletEdge, chamferEdge, shellSolid } from './modify3d';
 import { instantiateTemplate } from './templates';
 import { historyCommands } from './history';
 import { createConfiguration, activateConfiguration } from './configurations';
@@ -78,7 +78,7 @@ import { addJoint, deleteJoint, setJointValue } from './jointsEdit';
 import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
-import { deleteEntities, moveEntities } from './batch';
+import { deleteEntities, duplicateEntities, moveEntities } from './batch';
 import { onPluginInstalled } from '../plugins/host';
 
 const rawDefinitions = [
@@ -150,6 +150,7 @@ const rawDefinitions = [
   addDimension,
   filletEdge,
   chamferEdge,
+  shellSolid,
   instantiateTemplate,
   ...historyCommands,
   createConfiguration,
@@ -196,6 +197,7 @@ const rawDefinitions = [
   distributeAlongPath,
   deleteEntities,
   moveEntities,
+  duplicateEntities,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 /** Core commands, then every installed plugin's commands in installation order. */

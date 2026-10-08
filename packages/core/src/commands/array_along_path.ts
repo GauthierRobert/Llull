@@ -8,9 +8,9 @@
 import type { Vec3 } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z, looseVec3 as vec3 } from './schema';
-import { MAX_COPIES_PER_COMMAND } from './limits';
+import { MAX_COPIES_PER_COMMAND, MAX_PROFILE_POINTS } from './limits';
 import { addCopies } from './transform';
-import { add3, cross3, dot3, normalize3, scale3, sub3, distance3 } from '../lib/vec3';
+import { add3, cross3, dot3, len3, normalize3, scale3, sub3, distance3 } from '../lib/vec3';
 import { noop } from './noop';
 import { elementAt } from '../lib/elementAt';
 
@@ -60,7 +60,7 @@ export const arrayAlongPath = defineCommand({
         'Polyline path as an array of [x,y,z] points. Minimum 2 points. ' +
           'Copies are placed at evenly-spaced arc-length positions from the first to the last point.',
       ),
-    count: z.number().describe('Number of copies to place. Must be >= 1.'),
+    count: z.number().int().describe('Number of copies to place. Must be an integer >= 1.'),
     mode: z
       .string()
       .optional()
@@ -77,6 +77,12 @@ export const arrayAlongPath = defineCommand({
       return noop(
         doc,
         `array_along_path: path must contain at least 2 points (got ${path.length}).`,
+      );
+    }
+    if (path.length > MAX_PROFILE_POINTS) {
+      return noop(
+        doc,
+        `array_along_path: path has ${path.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}).`,
       );
     }
     if (count < 1 || count > MAX_COPIES_PER_COMMAND) {
@@ -101,7 +107,7 @@ export const arrayAlongPath = defineCommand({
       validatedPath.push([pt[0] as number, pt[1] as number, pt[2] as number]);
     }
 
-    const intCount = Math.max(1, Math.round(count));
+    const intCount = count;
     const totalLen = polylineLength(validatedPath);
 
     const step = intCount === 1 ? 0 : totalLen / (intCount - 1);
@@ -127,8 +133,8 @@ export const arrayAlongPath = defineCommand({
  * @pure
  * @layer core/commands
  * @affects creates `count` new entities placed on a circular arc; each is rotated to face radially outward
- * @invariant count >= 1; radius > 0; source entity must exist
- * @failure count < 1 -> no-op; radius <= 0 -> no-op; missing sourceId -> no-op
+ * @invariant count >= 1; radius > 0; normal non-zero; source entity must exist
+ * @failure count < 1 -> no-op; radius <= 0 or zero normal -> no-op; missing sourceId -> no-op
  */
 export const distributeOnArc = defineCommand({
   name: 'distribute_on_arc',
@@ -151,7 +157,7 @@ export const distributeOnArc = defineCommand({
         "Start angle of the arc sweep in radians (measured from the plane's local +X axis).",
       ),
     endAngle: z.number().describe('End angle of the arc sweep in radians.'),
-    count: z.number().describe('Number of copies to place. Must be >= 1.'),
+    count: z.number().int().describe('Number of copies to place. Must be an integer >= 1.'),
   }),
   run: (doc, { sourceId, center, normal, radius, startAngle, endAngle, count }): CommandResult => {
     const source = doc.entities[sourceId];
@@ -174,6 +180,10 @@ export const distributeOnArc = defineCommand({
       return noop(doc, 'distribute_on_arc: normal must be a [x,y,z] triple.');
     }
 
+    if (len3([normal[0] as number, normal[1] as number, normal[2] as number]) < 1e-10) {
+      return noop(doc, 'distribute_on_arc: normal must be a non-zero vector.');
+    }
+
     const c: Vec3 = [center[0] as number, center[1] as number, center[2] as number];
     const n: Vec3 = normalize3([normal[0] as number, normal[1] as number, normal[2] as number]);
 
@@ -181,7 +191,7 @@ export const distributeOnArc = defineCommand({
     const u = buildPerpendicularInPlane(n);
     const v = cross3(n, u);
 
-    const intCount = Math.max(1, Math.round(count));
+    const intCount = count;
     const angleRange = endAngle - startAngle;
     // Full circle: step = range/count (first and last copies must not coincide).
     const isFullCircle = Math.abs(Math.abs(angleRange) - Math.PI * 2) < 1e-9;

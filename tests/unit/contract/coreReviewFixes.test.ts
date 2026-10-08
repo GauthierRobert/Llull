@@ -42,10 +42,17 @@ describe('expressions: own numeric names and finite results', () => {
     expect(Object.keys(result.document.parameters)).toEqual([]);
   });
 
-  it('set_parameter stores an error, never Infinity', () => {
+  it('set_parameter refuses a constant divide by zero, never storing Infinity', () => {
     const doc = run(createEmptyDocument(), 'set_parameter', { name: 'p', expression: '1/0' });
-    expect(doc.document.parameters.p?.error).toBeDefined();
-    expect(Number.isFinite(doc.document.parameters.p?.value)).toBe(true);
+    expect(doc.document.parameters.p).toBeUndefined();
+    expect(doc.summary).toContain('not a finite number');
+    const reference = run(
+      run(createEmptyDocument(), 'set_parameter', { name: 'z', expression: '0' }).document,
+      'set_parameter',
+      { name: 'q', expression: '1/z' },
+    );
+    expect(reference.document.parameters.q?.error).toBeDefined();
+    expect(Number.isFinite(reference.document.parameters.q?.value)).toBe(true);
     const ok = run(createEmptyDocument(), 'set_parameter', { name: 'p', expression: '6/3' });
     expect(ok.document.parameters.p?.value).toBe(2);
   });

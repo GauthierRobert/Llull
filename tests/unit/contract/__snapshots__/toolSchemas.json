@@ -582,7 +582,7 @@
           "type": "number"
         },
         "precision": {
-          "description": "Number of decimal places to display for this dimension, overriding the document displayPrecision. Omit to use the document default.",
+          "description": "Number of decimal places to display for this dimension, overriding the document displayPrecision. Must be an integer in [0, 20]. Omit to use the document default.",
           "type": "number"
         }
       },
@@ -1120,7 +1120,7 @@
     "input_schema": {
       "properties": {
         "color": {
-          "description": "Optional hex color string for the layer, e.g. \"#ff0000\". Used by the UI to tint layer contents. Omit to leave unset.",
+          "description": "Optional hex color string #rrggbb for the layer, e.g. \"#ff0000\"; any other format is rejected. Used by the UI to tint layer contents. Omit to leave unset.",
           "type": "string"
         },
         "name": {
@@ -2364,7 +2364,7 @@
     "input_schema": {
       "properties": {
         "count": {
-          "description": "Number of copies to place. Must be >= 1.",
+          "description": "Number of copies to place. Must be an integer >= 1.",
           "type": "number"
         },
         "mode": {
@@ -3150,7 +3150,7 @@
     "annotations": {
       "destructiveHint": true
     },
-    "description": "Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, and components. Preserves units, camera, and displayPrecision so view framing survives. Set keepLayers=true to also preserve layers and the active layer scheme; by default layers are reset to a single default \"Layer 0\".",
+    "description": "Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, components, constraints, joints, and drive relations. Preserves units, camera, and displayPrecision so view framing survives. Set keepLayers=true to also preserve layers and the active layer scheme; by default layers are reset to a single default \"Layer 0\".",
     "input_schema": {
       "properties": {
         "keepLayers": {
@@ -3214,7 +3214,7 @@
     "input_schema": {
       "properties": {
         "componentId": {
-          "description": "Optional explicit component id to assign. When omitted a fresh id is generated via nextId(\"comp\"). Useful for deterministic agent plans that reference the component id immediately after creation.",
+          "description": "Optional explicit component id to assign. When omitted a fresh id is generated via nextId(\"comp\"). Useful for deterministic agent plans that reference the component id immediately after creation. An id that already names a component is refused unless replace is true.",
           "type": "string"
         },
         "entityIds": {
@@ -3227,6 +3227,10 @@
         "name": {
           "description": "Human-readable name for the component, e.g. \"Wheel\". Used as the component label.",
           "type": "string"
+        },
+        "replace": {
+          "description": "Set true to overwrite the existing component named by componentId (every instance of it then shows the new definition). Default false: reusing an existing component id is refused.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3834,7 +3838,7 @@
           "type": "array"
         },
         "count": {
-          "description": "Number of copies to place. Must be >= 1.",
+          "description": "Number of copies to place. Must be an integer >= 1.",
           "type": "number"
         },
         "endAngle": {
@@ -4300,6 +4304,32 @@
       "type": "object"
     },
     "name": "draw_walls"
+  },
+  {
+    "description": "Clone several entities in one step (one undo), placing each copy at original.position + offset. Same semantics as duplicate_entity applied to each id; group membership is not copied. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. Returns the new entity ids in affected, in the order of the (de-duplicated) input ids.",
+    "input_schema": {
+      "properties": {
+        "ids": {
+          "description": "Entity ids to duplicate (non-empty, at most 10000). Missing ids are skipped.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "offset": {
+          "description": "Optional [dx, dy, dz] offset applied to every copy. Defaults to [0, 0, 0] (exact overlap).",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ids"
+      ],
+      "type": "object"
+    },
+    "name": "duplicate_entities"
   },
   {
     "description": "Clone an existing entity to a new id, placing the copy at original.position + offset. Returns the new entity id in affected. Original is untouched.",
@@ -4897,7 +4927,7 @@
           "type": "array"
         },
         "kind": {
-          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\". Omit to match all kinds.",
+          "description": "Filter by entity kind. One of: \"box\", \"cylinder\", \"sphere\", \"extrusion\", \"mesh\", \"cone\", \"torus\", \"wedge\", \"pyramid\", \"revolution\", \"line\", \"polyline\", \"arc\", \"circle\", \"rectangle\", \"point\", \"ellipse\", \"spline\", \"text\", \"dimension\", \"instance\". Omit to match all kinds.",
           "enum": [
             "box",
             "cylinder",
@@ -4908,6 +4938,7 @@
             "torus",
             "wedge",
             "pyramid",
+            "revolution",
             "line",
             "polyline",
             "arc",
@@ -4915,7 +4946,10 @@
             "rectangle",
             "point",
             "ellipse",
-            "spline"
+            "spline",
+            "text",
+            "dimension",
+            "instance"
           ],
           "type": "string"
         },
@@ -5238,7 +5272,7 @@
           "type": "number"
         },
         "polar": {
-          "description": "Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level). Omit to keep the current polar angle.",
+          "description": "Optional vertical orbit angle in radians (0 = overhead, π/2 = eye-level); clamped to (0.01, π−0.01). Omit to keep the current polar angle.",
           "type": "number"
         },
         "target": {
@@ -5296,7 +5330,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'. Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
+    "description": "Compute the mass of a 3D solid from its volume and density. Supported entity kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', and 'instance' (assembly: the sum over its component solids, each with its own material density, else the instance material, else the density param). Density resolution: if the entity has a material assigned (via assign_material) and that material exists in doc.materials, the material's density is used automatically — the density param is ignored for that entity. Otherwise the caller-supplied density param is used (back-compat). The density is in g/(document-unit)³ — e.g. for a document in mm: steel ≈ 0.00785, aluminium ≈ 0.0027. Returns data: { volume, density, mass, unit } where unit describes the mass unit (grams). Does not modify the document.",
     "input_schema": {
       "properties": {
         "density": {
@@ -5304,7 +5338,7 @@
           "type": "number"
         },
         "entityId": {
-          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid'.",
+          "description": "Id of the 3D solid entity to compute mass for. Supported kinds: 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution'.",
           "type": "string"
         }
       },
@@ -5453,7 +5487,7 @@
     "annotations": {
       "readOnlyHint": true
     },
-    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
+    "description": "Compute the volume of a 3D solid entity. Supported kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), 'mesh' (signed-tetrahedra sum — assumes closed, consistently wound mesh), 'cone' (π r² h / 3), 'torus' (2 π² · ringRadius · tubeRadius²), 'wedge' (w×h×d / 2 — half the enclosing box), 'pyramid' (baseWidth × baseDepth × height / 3), 'instance' (sum of its component's solid children, baked with the instance scale), 'revolution' (Pappus's centroid theorem: sweepAngle × |x_centroid| × profileArea; falls back to bounding-box approximation if the profile crosses the revolution axis). Returns data: { volume, unit } where unit is the cubed document unit (e.g. \"mm³\"). 2D shape entities are rejected. Does not modify the document.",
     "input_schema": {
       "properties": {
         "entityId": {
@@ -5517,7 +5551,7 @@
           "type": "number"
         },
         "steps": {
-          "description": "Number of samples across the range (default 24, minimum 2, maximum 360). Non-integers are rounded. Step k = start + (end - start) * k / (steps - 1).",
+          "description": "Number of samples across the range (default 24, minimum 2, maximum 360). Must be an integer. Step k = start + (end - start) * k / (steps - 1).",
           "type": "number"
         },
         "target": {
@@ -5769,7 +5803,7 @@
     "input_schema": {
       "properties": {
         "newIndex": {
-          "description": "Zero-based target index in featureHistory. Clamped to [0, history.length-1]. Moving to the same index is a no-op.",
+          "description": "Zero-based target index in featureHistory. Must be an integer; clamped to [0, history.length-1]. Moving to the same index is a no-op.",
           "type": "number"
         },
         "stepId": {
@@ -5840,7 +5874,7 @@
           "type": "array"
         },
         "segments": {
-          "description": "Number of radial subdivisions for tessellation. Higher = smoother surface. Default: 32. Minimum: 3.",
+          "description": "Number of radial subdivisions for tessellation. Integer; higher = smoother surface. Default: 32. Minimum: 3 (smaller values are raised to 3).",
           "type": "number"
         }
       },
@@ -5954,7 +5988,7 @@
           "type": "number"
         },
         "polar": {
-          "description": "Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. Clamped to (0.01, π−0.01) to avoid gimbal lock. Omit to keep current value.",
+          "description": "Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. Clamped to [0.01, π−0.01] to avoid gimbal lock. Omit to keep current value.",
           "type": "number"
         },
         "target": {
@@ -6215,7 +6249,7 @@
     "input_schema": {
       "properties": {
         "displayPrecision": {
-          "description": "Number of decimal places to show when formatting length values (e.g. 2 → \"12.50 mm\"). Must be a non-negative integer.",
+          "description": "Number of decimal places to show when formatting length values (e.g. 2 → \"12.50 mm\"). Must be an integer in [0, 20].",
           "type": "number"
         },
         "units": {
@@ -6288,7 +6322,28 @@
     "name": "set_wall_layers"
   },
   {
-    "description": "Run the constraint solver and update entity positions so that all declared constraints are satisfied. The solver uses gradient descent on the 2D XY plane (position Z is unchanged). It iterates up to 64 steps, stopping early when the total constraint residual is below 1e-8. Returns convergence info in data: { residual: number, iterations: number, converged: boolean }. Non-convergent results are returned with the best-effort positions and converged:false. No parameters required.",
+    "description": "Hollow out a closed 3D solid, leaving walls of the given thickness (grown inward), and replace it with a new mesh entity. The source entity is consumed. Requires a geometry kernel that supports shellSolid; a kernel without it (or a solid that is too thin for the thickness) makes this a graceful no-op that leaves the document unchanged. Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution or mesh).",
+    "input_schema": {
+      "properties": {
+        "id": {
+          "description": "Id of the closed 3D solid entity to hollow. Must exist and be a 3D solid.",
+          "type": "string"
+        },
+        "thickness": {
+          "description": "Wall thickness in document units. Must be > 0 and smaller than half the solid's thinnest dimension.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "thickness"
+      ],
+      "type": "object"
+    },
+    "name": "shell_solid"
+  },
+  {
+    "description": "Run the constraint solver and update entity positions so that all declared constraints are satisfied. The solver works on the 2D XY plane (position Z is unchanged): point constraints (coincident, distance, tangent) move entity positions; angle, parallel and perpendicular turn line b about its midpoint (line a is the reference). It iterates up to 64 steps, stopping early when the total constraint residual is below 1e-8. Returns convergence info in data: { residual: number, iterations: number, converged: boolean }. Non-convergent results are returned with the best-effort positions and converged:false. No parameters required.",
     "input_schema": {
       "properties": {},
       "required": [],

@@ -10,12 +10,16 @@
  */
 
 import type { EntityKind } from '../model/types';
+import { SHAPE2D_KINDS, SOLID_KINDS } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, vec3, z } from './schema';
 import { noop } from './noop';
-import { boundsCenter, boundsOverlap, entityBounds } from './sceneBounds';
+import { boundsCenter, boundsOverlap, entityBoundsInDoc } from './sceneBounds';
 import type { Bounds } from './sceneTypes';
 import { distanceSq3 } from '../lib/vec3';
+
+/** Every entity kind a `kind` filter can name. */
+const FILTERABLE_KINDS = [...SOLID_KINDS, ...SHAPE2D_KINDS, 'instance'] as const;
 
 /** A compact descriptor of one matched entity, safe to return in `data`. */
 interface EntityMatch {
@@ -66,30 +70,11 @@ export const findEntities = defineCommand({
     'Returns matched entity descriptors (id, kind, layerId, name, tags) in result.data. Does NOT modify the document.',
   params: z.object({
     kind: z
-      .enum([
-        'box',
-        'cylinder',
-        'sphere',
-        'extrusion',
-        'mesh',
-        'cone',
-        'torus',
-        'wedge',
-        'pyramid',
-        'line',
-        'polyline',
-        'arc',
-        'circle',
-        'rectangle',
-        'point',
-        'ellipse',
-        'spline',
-      ])
+      .enum(FILTERABLE_KINDS)
       .optional()
       .describe(
-        'Filter by entity kind. One of: "box", "cylinder", "sphere", "extrusion", "mesh", ' +
-          '"cone", "torus", "wedge", "pyramid", "line", "polyline", "arc", "circle", "rectangle", ' +
-          '"point", "ellipse", "spline". Omit to match all kinds.',
+        `Filter by entity kind. One of: ${FILTERABLE_KINDS.map((kind) => `"${kind}"`).join(', ')}. ` +
+          'Omit to match all kinds.',
       ),
     layerId: z
       .string()
@@ -204,7 +189,7 @@ export const findEntities = defineCommand({
     if (touchingId !== undefined && !touchingRef) {
       return fail(`find_entities: touchingId "${touchingId}" does not exist in the document.`);
     }
-    const touchingBounds = touchingRef ? entityBounds(touchingRef) : null;
+    const touchingBounds = touchingRef ? entityBoundsInDoc(doc, touchingRef) : null;
     const nearRadiusSq = nearPoint ? nearPoint.radius * nearPoint.radius : 0;
     const nameLc = name?.toLowerCase();
     const nameFuzzyLc = nameFuzzy?.toLowerCase();
@@ -229,7 +214,7 @@ export const findEntities = defineCommand({
 
       const needsBounds = bboxMin || nearPoint || insideBBox || overlapsBBox || touchingBounds;
       if (needsBounds) {
-        const b = entityBounds(e);
+        const b = entityBoundsInDoc(doc, e);
         if (bboxMin && bboxMax && !boundsOverlap(b, { min: bboxMin, max: bboxMax })) continue;
         if (nearPoint && distanceSq3(boundsCenter(b), nearPoint.point) > nearRadiusSq) continue;
         if (insideBBox && !insideAabb(b, insideBBox[0], insideBBox[1])) continue;

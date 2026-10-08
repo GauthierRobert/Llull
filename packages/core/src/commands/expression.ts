@@ -9,7 +9,7 @@
  *   term   = factor { ('*' | '/') factor }
  *   factor = ['-'] primary
  *   primary = NUMBER | IDENT | '(' expr ')'
- *   NUMBER  = digits with optional decimal fraction
+ *   NUMBER  = digits with optional decimal fraction and optional exponent (1e-3, .5, 2.5E+4)
  *   IDENT   = letter/underscore followed by alphanumerics/underscore
  *
  * Limitations (intentional for v1):
@@ -45,7 +45,7 @@ const EOF_TOKEN: Token = { kind: 'eof', text: '' };
 
 /** Optional whitespace, then one token (the group name is its kind) or the end of the input. */
 const TOKEN_PATTERN =
-  /[ \t\n\r]*(?:(?<number>\d+(?:\.\d*)?)|(?<ident>[A-Za-z_]\w*)|(?<op>[-+*/])|(?<lparen>\()|(?<rparen>\))|$)/y;
+  /[ \t\n\r]*(?:(?<number>(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)|(?<ident>[A-Za-z_]\w*)|(?<op>[-+*/])|(?<lparen>\()|(?<rparen>\))|$)/y;
 
 function tokenize(src: string): Token[] | string {
   const pattern = new RegExp(TOKEN_PATTERN);
@@ -194,6 +194,24 @@ export function evaluateExpression(
     return { ok: false, error: 'expression result is not a finite number (divide by zero?)' };
   }
   return result;
+}
+
+/**
+ * Syntax problem of `expression` independent of which parameters exist, else null. Unknown
+ * references are NOT a syntax problem (a parameter may be defined later); a non-finite result
+ * (divide by zero) only counts when the expression has no references to blame it on.
+ *
+ * @pure
+ */
+export function expressionSyntaxError(expression: string): string | null {
+  const refs = extractReferences(expression);
+  const probeEnv = Object.fromEntries([...refs].map((name) => [name, 1]));
+  const result = evaluateExpression(expression, probeEnv);
+  if (result.ok) return null;
+  if (result.error.startsWith('expression result is not a finite')) {
+    return refs.size === 0 ? result.error : null;
+  }
+  return result.error;
 }
 
 /**

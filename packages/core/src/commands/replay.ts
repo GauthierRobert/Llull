@@ -26,6 +26,8 @@ export interface ReplayStepEvent {
   readonly params: unknown;
   readonly before: CadDocument;
   readonly after: CadDocument;
+  /** The step changed nothing: it threw, was rejected, or returned the document unchanged. */
+  readonly inert: boolean;
 }
 
 /**
@@ -94,17 +96,20 @@ export function replayHistory(
     const before = doc;
     let key = cache ? nextStateKey(stateKey, step.id, step.name, remapped) : '';
     const hit = cache?.get(key);
+    let inert: boolean;
     if (hit !== undefined) {
       doc = { ...hit.doc, featureHistory: history };
       idMap = new Map(hit.idMap);
+      inert = hit.inert;
     } else {
       const uidBefore = doc.building?.uid;
       const result = runReplayStep(cmd, step, doc, remapped, idMap, context, true);
       // Accept the new geometry but keep OUR featureHistory intact.
+      inert = result === null || result.document === doc;
       if (result) doc = { ...result.document, featureHistory: history };
       const mintedUid = uidBefore === undefined ? doc.building?.uid : undefined;
       if (mintedUid === undefined) {
-        cache?.set(key, { doc, idMap: new Map(idMap) });
+        cache?.set(key, { doc, idMap: new Map(idMap), inert });
       } else if (cache) {
         // The step minted a globally unique id (uniqueId): never memoize it, and key every later
         // state by that id so no other document is served this document's identity.
@@ -118,6 +123,7 @@ export function replayHistory(
       params: remapped,
       before,
       after: doc,
+      inert,
     });
   }
 

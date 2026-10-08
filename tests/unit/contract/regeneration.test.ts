@@ -83,7 +83,7 @@ describe('replay prefix cache', () => {
 
   it('evicts the least recently used state beyond capacity', () => {
     const cache = createReplayCache(1);
-    const state = { doc: createEmptyDocument(), idMap: new Map<string, string>() };
+    const state = { doc: createEmptyDocument(), idMap: new Map<string, string>(), inert: false };
     cache.set('a', state);
     cache.set('b', state);
     expect(cache.get('a')).toBeUndefined();
