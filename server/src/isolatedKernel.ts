@@ -122,6 +122,9 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     });
     worker.on('error', () => undefined); // surfaced through the status word, not an event
     worker.unref();
+    worker.on('exit', () => {
+      if (live?.worker === worker) live = null; // died while idle: the next call respawns
+    });
     const outcome = Atomics.wait(status, 0, 0, startTimeoutMs);
     if (outcome === 'timed-out' || Atomics.load(status, 0) !== STATUS_READY) {
       port1.close();
@@ -143,6 +146,17 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
       );
       return null;
     }
+    if (Atomics.load(live.status, 0) === STATUS_DIED) {
+      kill(); // the worker died while idle (its exit event may not have run yet)
+      try {
+        live = spawn();
+      } catch (error) {
+        console.warn(
+          `[occt] ${error instanceof Error ? error.message : String(error)}; returning null`,
+        );
+        return null;
+      }
+    }
     const { port, status } = live;
     Atomics.store(status, 0, 0);
     port.postMessage({ op, args });
@@ -150,6 +164,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     const state = Atomics.load(status, 0);
     if (outcome !== 'timed-out' && state === STATUS_REPLY) {
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
+      Atomics.store(status, 0, 0); // idle: a later death can now flag STATUS_DIED
       if (reply?.error !== undefined) console.warn(`[occt] ${op} failed: ${reply.error}`);
       if (reply?.recycle === true) {
         recycles++;
