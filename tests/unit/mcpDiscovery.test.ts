@@ -28,6 +28,16 @@ describe('discovery tool definitions', () => {
   });
 });
 
+describe('search_tools summary hint', () => {
+  it('points at enable_toolset only when some result is in a disabled toolset', () => {
+    const everything = new Set<ToolsetName>(parseToolsets('all').enabled);
+    const open = applyDiscoveryToolCall('search_tools', { query: 'wall' }, everything);
+    expect(open?.result.content[0]?.text).not.toContain('Call enable_toolset');
+    const limited = applyDiscoveryToolCall('search_tools', { query: 'wall' }, coreOnly());
+    expect(limited?.result.content[0]?.text).toContain('Call enable_toolset for: building');
+  });
+});
+
 describe('search_tools on natural phrasing', () => {
   const top = (query: string, count = 3): string[] =>
     searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);

@@ -49,6 +49,13 @@ describe('cad://scene and cad://selection size limits', () => {
     expect(selection['entities']).toHaveLength(MAX_RESOURCE_ITEMS);
   });
 
+  it('serves the conventions guide as markdown and rejects unknown URIs', () => {
+    const guide = readMcpResource(createEmptyDocument(), 'cad://conventions');
+    expect(guide?.mimeType).toBe('text/markdown');
+    expect(guide?.text).toContain('Agent Modeling Conventions');
+    expect(readMcpResource(createEmptyDocument(), 'cad://nope')).toBeNull();
+  });
+
   it('cad://document stays complete for reloading the whole model', () => {
     const doc = documentWithBoxes(MAX_RESOURCE_ITEMS + 20);
     const envelope = read(doc, 'cad://document') as { document: { order: string[] } };
