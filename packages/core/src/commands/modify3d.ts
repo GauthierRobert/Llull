@@ -19,6 +19,10 @@ import { kernelUnavailable } from './kernelRefusal';
 import { newEntity } from './newEntity';
 import { noop } from './noop';
 
+/** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
+const OCC_KERNEL_HINT =
+  'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
+
 function validateSolidTarget(
   doc: CadDocument,
   opName: string,
@@ -70,7 +74,7 @@ function modifyEdges(
   if (!modified) {
     return noop(
       doc,
-      `${command}: kernel does not support ${command} for this operand (returned null). Try ?kernel=occt or a different operand.`,
+      `${command}: kernel does not support ${command} for this operand (returned null). Use ${OCC_KERNEL_HINT} or a different operand.`,
     );
   }
 
@@ -102,7 +106,7 @@ export const filletEdge = defineCommand({
     'The source entity is consumed and replaced by the filleted mesh result. ' +
     'edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges ' +
     '(OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). ' +
-    'Requires a geometry kernel that supports filletEdges (available with ?kernel=occt). ' +
+    `Requires a geometry kernel that supports filletEdges (available with ${OCC_KERNEL_HINT}). ` +
     'With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).',
   params: z.object({

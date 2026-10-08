@@ -20,6 +20,7 @@ import type {
   Vec2,
 } from '@core/model/types';
 import { is3D } from '@core/model/types';
+import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/commands/sceneBounds';
 import { DEFAULT_OFFSET, dimensionDrawing } from './entities/dimensionGeometry';
 import { nearestOnArc } from './snapping/geometry';
 import { ringsDistSq, solidOutline } from './solidOutline';
@@ -182,23 +183,14 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
   }
 }
 
-/** Average glyph advance as a fraction of the text height, used to estimate a text pick box. */
-const TEXT_PICK_EM_WIDTH = 0.6;
-
-/** Line pitch as a multiple of the text height (troika's default line height is about 1.2 em). */
-const TEXT_LINE_PITCH = 1.2;
-
 /**
- * Estimated entity-local box of a text entity (no font metrics here): the longest line at about
- * 0.6 em per character, lines stacked at 1.2 em, block centred vertically on the entity origin
- * (anchorY 'middle') and placed horizontally by the anchor.
+ * Entity-local pick box of a text entity, projected from core `textLocalBounds` (the one layout
+ * estimate); the block is centred vertically on the entity origin.
  * @pure
  */
 export function textLocalBox(entity: TextEntity): { left: number; width: number; height: number } {
-  const lines = entity.content.split('\n');
-  const width = Math.max(...lines.map((line) => line.length)) * entity.height * TEXT_PICK_EM_WIDTH;
-  const left = entity.anchor === 'center' ? -width / 2 : entity.anchor === 'right' ? -width : 0;
-  return { left, width, height: entity.height * (1 + (lines.length - 1) * TEXT_LINE_PITCH) };
+  const { min, max } = textLocalBounds(entity);
+  return { left: min[0], width: max[0] - min[0], height: max[1] - min[1] };
 }
 
 /** Segments used to approximate an ellipse outline for picking. */
@@ -255,7 +247,7 @@ export function dimensionLabelBox(
       : drawing.value.toFixed(dimension.precision ?? document.displayPrecision));
   return {
     center: [dimension.position[0] + drawing.textX, dimension.position[1] + drawing.textY],
-    halfWidth: (text.length * DIMENSION_LABEL_HEIGHT * TEXT_PICK_EM_WIDTH) / 2,
+    halfWidth: (text.length * DIMENSION_LABEL_HEIGHT * GLYPH_WIDTH_RATIO) / 2,
     halfHeight: DIMENSION_LABEL_HEIGHT / 2,
   };
 }

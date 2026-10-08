@@ -12,9 +12,8 @@ import {
   instanceBoundsFromDoc,
   mergeBounds,
 } from '@core/commands/sceneBounds';
+import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
 
-/** Vertical field of view of the 3D viewport camera, in degrees (single source: Viewport3D). */
-export const CAMERA_FOV_DEGREES = 45;
 /** Margin applied on top of the exact fit distance. */
 const FIT_MARGIN = 1.15;
 /** Framed radius for a zero-extent selection (a lone point), so it does not zoom to nothing. */
@@ -74,7 +73,7 @@ export function computeFitFraming(
   // Real size wins, however small (a 0.02 mm part must fill the view); only a point gets a default.
   const sphereRadius = extentRadius > 0 ? extentRadius : DEGENERATE_SPHERE_RADIUS;
   // The bounding sphere must fit the narrower of the vertical / horizontal half-angles.
-  const halfVertical = (CAMERA_FOV_DEGREES / 2) * (Math.PI / 180);
+  const halfVertical = (VIEWPORT_FOV_DEGREES / 2) * (Math.PI / 180);
   const halfHorizontal = Math.atan(Math.tan(halfVertical) * Math.max(aspect, 1e-3));
   const halfAngle = Math.min(halfVertical, halfHorizontal);
   return {

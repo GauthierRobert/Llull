@@ -1,4 +1,11 @@
-import type { CadDocument, DimensionEntity, Entity, InstanceEntity, Vec3 } from '../model/types';
+import type {
+  CadDocument,
+  DimensionEntity,
+  Entity,
+  InstanceEntity,
+  TextEntity,
+  Vec3,
+} from '../model/types';
 import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 import { ORIGIN, add3, sub3 } from '../lib/vec3';
 import { type Bounds } from './sceneTypes';
@@ -52,7 +59,7 @@ const bounds = (min: Vec3, max: Vec3): Bounds => ({ min, max });
 const centered = (x: number, y: number, z: number): Bounds => bounds([-x, -y, -z], [x, y, z]);
 
 /** Width of a glyph as a fraction of the text height (monospace estimate). */
-const GLYPH_WIDTH_RATIO = 0.6;
+export const GLYPH_WIDTH_RATIO = 0.6;
 /** Distance between consecutive text lines as a fraction of the text height. */
 const LINE_SPACING_RATIO = 1.2;
 
@@ -60,8 +67,10 @@ const LINE_SPACING_RATIO = 1.2;
  * Local AABB of a text block as the viewport lays it out: the longest line sets the width,
  * `anchor` (left by default) places that width relative to `position`, lines stack at 1.2 em and
  * the whole block is centred vertically on `position` (drei `anchorY="middle"`).
+ * Single source of the text layout estimate for core bounds and UI picking.
+ * @pure
  */
-function textLocalBounds(e: Extract<Entity, { kind: 'text' }>): Bounds {
+export function textLocalBounds(e: TextEntity): Bounds {
   const lines = e.content.split('\n');
   const width = Math.max(...lines.map((line) => line.length)) * e.height * GLYPH_WIDTH_RATIO;
   const blockHeight = e.height * (1 + (lines.length - 1) * LINE_SPACING_RATIO);

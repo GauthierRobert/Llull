@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { CAMERA_FOV_DEGREES, computeFitFraming } from '@ui/viewport/3d/fitBounds';
+import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
+import { computeFitFraming } from '@ui/viewport/3d/fitBounds';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 describe('computeFitFraming', () => {
@@ -34,7 +35,7 @@ describe('computeFitFraming', () => {
     const id = localDispatch('add_box', { size: [10, 10, 10] }).affected[0]!;
     const doc = useStore.getState().document;
     const radius = Math.hypot(10, 10, 10) / 2;
-    const half = (CAMERA_FOV_DEGREES / 2) * (Math.PI / 180);
+    const half = (VIEWPORT_FOV_DEGREES / 2) * (Math.PI / 180);
     const landscape = computeFitFraming(doc, [id], 1.6)!;
     // the sphere subtends less than the half-angle => it is fully visible
     expect(Math.asin(radius / landscape.distance)).toBeLessThan(half);

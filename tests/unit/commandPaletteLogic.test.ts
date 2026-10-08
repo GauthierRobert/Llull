@@ -96,6 +96,25 @@ describe('paramForm', () => {
     expect(fields.find((f) => f.name === 'anchor')?.options).toEqual(['center', 'min']);
   });
 
+  it('renders integer params and integer arrays exactly like number ones', () => {
+    const fields = fieldsFromSchema({
+      type: 'object',
+      properties: {
+        count: { type: 'integer', description: 'Count' },
+        indices: { type: 'array', description: 'Indices', items: { type: 'integer' } },
+      },
+      required: ['count'],
+    });
+    expect(fields.map((f) => [f.name, f.kind])).toEqual([
+      ['count', 'number'],
+      ['indices', 'numberList'],
+    ]);
+    expect(parseFormValues(fields, { count: '3', indices: '0, 2' })).toEqual({
+      ok: true,
+      params: { count: 3, indices: [0, 2] },
+    });
+  });
+
   it('pre-fills id fields from the selection and required enums with their first option', () => {
     const values = initialValues(fieldsFromSchema(SCHEMA), ['box-1.1', 'cyl-2.1']);
     expect(values).toMatchObject({

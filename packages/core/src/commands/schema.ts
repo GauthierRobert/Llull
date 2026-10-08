@@ -73,8 +73,7 @@ function paramType(core: z.ZodType): ParamType {
   const def = core.def as { type: string; options?: readonly z.ZodType[] };
   switch (def.type) {
     case 'number':
-    case 'int':
-      return 'number';
+      return core instanceof z.ZodNumber && core.isInt ? 'integer' : 'number';
     case 'boolean':
       return 'boolean';
     case 'array':

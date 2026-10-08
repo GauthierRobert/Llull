@@ -583,7 +583,7 @@
         },
         "precision": {
           "description": "Number of decimal places to display for this dimension, overriding the document displayPrecision. Must be an integer in [0, 20]. Omit to use the document default.",
-          "type": "number"
+          "type": "integer"
         }
       },
       "required": [
@@ -1836,7 +1836,7 @@
         },
         "teeth": {
           "description": "Number of teeth. Must be an integer >= 3. Below ~17 teeth undercut occurs; the profile is approximated by clamping the involute to the root circle.",
-          "type": "number"
+          "type": "integer"
         }
       },
       "required": [
@@ -2365,7 +2365,7 @@
       "properties": {
         "count": {
           "description": "Number of copies to place. Must be an integer >= 1.",
-          "type": "number"
+          "type": "integer"
         },
         "mode": {
           "description": "\"place\" (default): independent copies. \"instance\": treated as place in the current version.",
@@ -2398,7 +2398,7 @@
       "properties": {
         "count": {
           "description": "Total number of instances including the original. Must be an integer >= 2.",
-          "type": "number"
+          "type": "integer"
         },
         "id": {
           "description": "Id of the entity to array.",
@@ -2438,7 +2438,7 @@
         },
         "count": {
           "description": "Total number of instances including the original. Must be an integer >= 2.",
-          "type": "number"
+          "type": "integer"
         },
         "id": {
           "description": "Id of the entity to array.",
@@ -2649,7 +2649,7 @@
         },
         "vertexIndex": {
           "description": "0-based index of the polyline vertex to chamfer. For open polylines: valid range is 1 to N-2. For closed polylines: valid range is 0 to N-1.",
-          "type": "number"
+          "type": "integer"
         }
       },
       "required": [
@@ -3794,7 +3794,7 @@
         },
         "count": {
           "description": "Number of instances to create. Must be a positive integer (>= 1).",
-          "type": "number"
+          "type": "integer"
         },
         "endOffset": {
           "description": "Distance back from the path end where the last instance is placed. Ignored on closed paths. Default: 0. Must be finite and non-negative.",
@@ -3839,7 +3839,7 @@
         },
         "count": {
           "description": "Number of copies to place. Must be an integer >= 1.",
-          "type": "number"
+          "type": "integer"
         },
         "endAngle": {
           "description": "End angle of the arc sweep in radians.",
@@ -4855,7 +4855,7 @@
         },
         "vertexIndex": {
           "description": "0-based index of the polyline vertex to fillet. For open polylines: valid range is 1 to N-2 (interior vertices). For closed polylines: valid range is 0 to N-1.",
-          "type": "number"
+          "type": "integer"
         }
       },
       "required": [
@@ -4868,7 +4868,7 @@
     "name": "fillet_2d"
   },
   {
-    "description": "Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. The source entity is consumed and replaced by the filleted mesh result. edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges (OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). Requires a geometry kernel that supports filletEdges (available with ?kernel=occt). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).",
+    "description": "Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. The source entity is consumed and replaced by the filleted mesh result. edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges (OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). Requires a geometry kernel that supports filletEdges (available with the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).",
     "input_schema": {
       "properties": {
         "edgeIndices": {
@@ -5552,7 +5552,7 @@
         },
         "steps": {
           "description": "Number of samples across the range (default 24, minimum 2, maximum 360). Must be an integer. Step k = start + (end - start) * k / (steps - 1).",
-          "type": "number"
+          "type": "integer"
         },
         "target": {
           "description": "What to sweep. For mode=\"joint\": the joint id (must exist in doc.joints). For mode=\"parameter\": the parameter name (must exist in doc.parameters and resolve to a number).",
@@ -5764,7 +5764,7 @@
           "properties": {
             "frames": {
               "description": "Number of frames (1..12). Each frame is a separate rotated view stitched into one wide strip.",
-              "type": "number"
+              "type": "integer"
             }
           },
           "required": [
@@ -5804,7 +5804,7 @@
       "properties": {
         "newIndex": {
           "description": "Zero-based target index in featureHistory. Must be an integer; clamped to [0, history.length-1]. Moving to the same index is a no-op.",
-          "type": "number"
+          "type": "integer"
         },
         "stepId": {
           "description": "Id of the FeatureStep to move (from doc.featureHistory[*].id).",
@@ -5875,7 +5875,7 @@
         },
         "segments": {
           "description": "Number of radial subdivisions for tessellation. Integer; higher = smoother surface. Default: 32. Minimum: 3 (smaller values are raised to 3).",
-          "type": "number"
+          "type": "integer"
         }
       },
       "required": [
@@ -6250,7 +6250,7 @@
       "properties": {
         "displayPrecision": {
           "description": "Number of decimal places to show when formatting length values (e.g. 2 → \"12.50 mm\"). Must be an integer in [0, 20].",
-          "type": "number"
+          "type": "integer"
         },
         "units": {
           "description": "Unit of length for the document. Allowed values: 'mm' (millimetres), 'cm' (centimetres), 'm' (metres), 'in' (inches), 'ft' (feet).",

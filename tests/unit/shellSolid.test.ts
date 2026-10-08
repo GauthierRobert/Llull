@@ -57,6 +57,8 @@ describe('shell_solid', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(result.summary).toContain('does not support shell_solid');
+    expect(result.summary).toContain('?kernel=occt in the browser');
+    expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
   });
 
   it('refuses without a kernel', () => {
