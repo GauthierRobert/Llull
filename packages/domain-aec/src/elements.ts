@@ -44,7 +44,7 @@ export const addRoom = defineCommand({
   description:
     'Define a room (space) with a name and number from a plan boundary polygon, or from wallIds forming ' +
     'a closed loop (the room then follows the inner wall faces). Draws the outline and an area tag; ' +
-    'rooms feed the room schedule and IFC spaces.',
+    'rooms feed the room schedule and IFC spaces. Refused if a room with the same outline already exists on the level.',
   params: z.object({
     name: z.string().describe('Room name, e.g. "Kitchen".'),
     number: z

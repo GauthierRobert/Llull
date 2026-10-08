@@ -35,7 +35,8 @@ export const addCableTray = defineCommand({
   description:
     'Route a cable tray (open U section) through 3D points [[x, y, z], …] (z = tray centre above the ' +
     'level) with a width, side height and cable system (power, data, instrumentation…). Lengths feed ' +
-    'the takeoff; clashes with steel, pipes and equipment are reported by check_clashes.',
+    'the takeoff; clashes with steel, pipes and equipment are reported by check_clashes. Refused if a tray of the same ' +
+    'size already follows the same route (either direction) on the level.',
   params: z.object({
     points: z
       .array(z.array(z.number()))

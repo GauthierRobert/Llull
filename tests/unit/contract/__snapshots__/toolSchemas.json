@@ -56,7 +56,7 @@
     "name": "add_base_plates"
   },
   {
-    "description": "Add a horizontal beam from start to end (plan [x, y]). Its top sits at the top of the level (elevation + level height) + topOffset — i.e. under the next floor slab by default.",
+    "description": "Add a horizontal beam from start to end (plan [x, y]). Its top sits at the top of the level (elevation + level height) + topOffset — i.e. under the next floor slab by default. Refused if a beam over the same span (either direction) at the same topOffset already exists on the level.",
     "input_schema": {
       "properties": {
         "depth": {
@@ -176,7 +176,7 @@
     "name": "add_building_template"
   },
   {
-    "description": "Route a cable tray (open U section) through 3D points [[x, y, z], …] (z = tray centre above the level) with a width, side height and cable system (power, data, instrumentation…). Lengths feed the takeoff; clashes with steel, pipes and equipment are reported by check_clashes.",
+    "description": "Route a cable tray (open U section) through 3D points [[x, y, z], …] (z = tray centre above the level) with a width, side height and cable system (power, data, instrumentation…). Lengths feed the takeoff; clashes with steel, pipes and equipment are reported by check_clashes. Refused if a tray of the same size already follows the same route (either direction) on the level.",
     "input_schema": {
       "properties": {
         "height": {
@@ -214,7 +214,7 @@
     "name": "add_cable_tray"
   },
   {
-    "description": "Add a structural column standing on a level, at a plan location or (atGridIntersections: true) at every structural grid intersection. Rectangular width × depth, or circular with diameter = width.",
+    "description": "Add a structural column standing on a level, at a plan location or (atGridIntersections: true) at every structural grid intersection. Rectangular width × depth, or circular with diameter = width. Locations that already hold a column on the level are skipped (listed in the summary); refused when all are occupied.",
     "input_schema": {
       "properties": {
         "atGridIntersections": {
@@ -452,7 +452,7 @@
     "name": "add_crane_runway"
   },
   {
-    "description": "Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and material as for add_wall. Counted with the walls in quantities and schedules. Hosts doors and windows (add_door / add_window with its id; offset = distance along the arc).",
+    "description": "Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and material as for add_wall. Counted with the walls in quantities and schedules. Hosts doors and windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same arc (either direction) and base offset already exists on the level.",
     "input_schema": {
       "properties": {
         "baseOffset": {
@@ -599,14 +599,14 @@
     "input_schema": {
       "properties": {
         "at": {
-          "description": "Alternative to offset: a plan point [x, y] projected onto the wall.",
+          "description": "Alternative to offset: a plan point [x, y] projected onto the wall to place the opening center. Ignored when offset is given.",
           "items": {
             "type": "number"
           },
           "type": "array"
         },
         "height": {
-          "description": "Opening height in document units (> 0). Default 2100 mm.",
+          "description": "Opening height in document units (> 0). Default 2100 mm, limited to the wall height.",
           "type": "number"
         },
         "mark": {
@@ -618,7 +618,7 @@
           "type": "string"
         },
         "offset": {
-          "description": "Distance along the wall from its start to the opening CENTER. Default: wall midpoint.",
+          "description": "Distance along the wall from its start to the opening CENTER, in document units (arc length on a curved wall). Takes precedence over at. Default: wall midpoint.",
           "type": "number"
         },
         "sillHeight": {
@@ -684,7 +684,7 @@
     "name": "add_drive_relation"
   },
   {
-    "description": "Place a machine / process equipment on a level: name, plan centre, size [length, width, height], plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan.",
+    "description": "Place a machine / process equipment on a level: name, plan centre, size [length, width, height], plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan. An explicit `mark` must be unique among equipment.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -1314,7 +1314,7 @@
     "name": "add_panel"
   },
   {
-    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports.",
+    "description": "Route a pipe through 3D points [[x, y, z], …] (z above the level) with a service / fluid name (compressed air, cooling water, steam, gas…) and line-list data: line number, nominal size DN and from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind \"pipe\") is the line list; clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. Refused if a pipe of the same diameter already follows the same route (either direction) on the level.",
     "input_schema": {
       "properties": {
         "diameter": {
@@ -1616,7 +1616,7 @@
     "name": "add_pyramid"
   },
   {
-    "description": "Define a room (space) with a name and number from a plan boundary polygon, or from wallIds forming a closed loop (the room then follows the inner wall faces). Draws the outline and an area tag; rooms feed the room schedule and IFC spaces.",
+    "description": "Define a room (space) with a name and number from a plan boundary polygon, or from wallIds forming a closed loop (the room then follows the inner wall faces). Draws the outline and an area tag; rooms feed the room schedule and IFC spaces. Refused if a room with the same outline already exists on the level.",
     "input_schema": {
       "properties": {
         "boundary": {
@@ -1657,7 +1657,7 @@
     "name": "add_room"
   },
   {
-    "description": "Add a floor, roof or foundation slab whose TOP sits at the level elevation + offset. Give either a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace).",
+    "description": "Add a floor, roof or foundation slab whose TOP sits at the level elevation + offset. Give either a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace). Refused if a slab with the same outline, offset and role already exists on the level.",
     "input_schema": {
       "properties": {
         "boundary": {
@@ -1849,7 +1849,7 @@
     "name": "add_spur_gear"
   },
   {
-    "description": "Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are equal; tread default 280 mm. The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm).",
+    "description": "Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are equal; tread default 280 mm. The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm). Refused above 200 risers or if a stair with the same start and angle already exists on the level.",
     "input_schema": {
       "properties": {
         "angle": {
@@ -1892,7 +1892,7 @@
     "name": "add_stair"
   },
   {
-    "description": "Add a steel member with a catalogue section (e.g. \"HEA300\", \"IPE400\", \"CHS76.1x3.6\") between two 3D points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. Beams may declare startJoint / endJoint \"rigid\" (moment connection to the column they frame into; default pinned) and columns baseFixity \"fixed\" (column foot restrains rotation; default pinned or the base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames.",
+    "description": "Add a steel member with a catalogue section (e.g. \"HEA300\", \"IPE400\", \"CHS76.1x3.6\") between two 3D points [x, y, z] (z above the level). Role sets the layer, mark and IFC class: column, rafter, beam, brace, purlin, rail (side rail / girt) or crane (runway beam). Section depth points up for beams and along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. Beams may declare startJoint / endJoint \"rigid\" (moment connection to the column they frame into; default pinned) and columns baseFixity \"fixed\" (column foot restrains rotation; default pinned or the base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames. Refused if an identical member (section, role, roll, end points in either direction) already exists on the level.",
     "input_schema": {
       "properties": {
         "baseFixity": {
@@ -2073,7 +2073,7 @@
     "name": "add_torus"
   },
   {
-    "description": "Add a straight wall along its plan centerline from start to end ([x, y], document units) on a building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and windows are then hosted with add_door / add_window.",
+    "description": "Add a straight wall along its plan centerline from start to end ([x, y], document units) on a building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and windows are then hosted with add_door / add_window. Refused if a wall with the same end points (either direction) and base offset already exists on the level.",
     "input_schema": {
       "properties": {
         "baseOffset": {
@@ -2170,14 +2170,14 @@
     "input_schema": {
       "properties": {
         "at": {
-          "description": "Alternative to offset: a plan point [x, y] projected onto the wall.",
+          "description": "Alternative to offset: a plan point [x, y] projected onto the wall to place the opening center. Ignored when offset is given.",
           "items": {
             "type": "number"
           },
           "type": "array"
         },
         "height": {
-          "description": "Opening height in document units (> 0). Default 1200 mm.",
+          "description": "Opening height in document units (> 0). Default 1200 mm, limited to the wall height.",
           "type": "number"
         },
         "mark": {
@@ -2189,7 +2189,7 @@
           "type": "string"
         },
         "offset": {
-          "description": "Distance along the wall from its start to the opening CENTER. Default: wall midpoint.",
+          "description": "Distance along the wall from its start to the opening CENTER, in document units (arc length on a curved wall). Takes precedence over at. Default: wall midpoint.",
           "type": "number"
         },
         "sillHeight": {
@@ -4256,7 +4256,7 @@
     "name": "draw_spline"
   },
   {
-    "description": "Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter). Same options as add_wall.",
+    "description": "Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter). Same options as add_wall; the whole chain is refused if any segment duplicates an existing wall.",
     "input_schema": {
       "properties": {
         "baseOffset": {

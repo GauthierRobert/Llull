@@ -44,7 +44,8 @@ export const addEquipment = defineCommand({
     'Place a machine / process equipment on a level: name, plan centre, size [length, width, height], ' +
     'plan rotation (radians), maintenance clearance around the footprint (checked by check_clashes) and ' +
     'operating weight in kg (for floor loads). Optional `shape` makes it a cylindrical vessel (vertical or ' +
-    'horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan.',
+    'horizontal). Shown as a block / cylinder in 3D and with its clearance zone in plan. An explicit `mark` ' +
+    'must be unique among equipment.',
   params: z.object({
     name: z.string().describe('Equipment name, e.g. "CNC lathe", "Compressor".'),
     location: looseVec2('Footprint centre [x, y] (a trailing z is ignored).'),
@@ -137,7 +138,8 @@ export const addPipeRun = defineCommand({
     'from / to ends. Give `dn` (e.g. 100) and the outside diameter is taken from the EN 10220 / ASME ' +
     'B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. ' +
     'Pipe lengths feed the takeoff; the pipe schedule (building_schedule kind "pipe") is the line list; ' +
-    'clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports.',
+    'clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. ' +
+    'Refused if a pipe of the same diameter already follows the same route (either direction) on the level.',
   params: z.object({
     points: z
       .array(z.array(z.number()))

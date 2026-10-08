@@ -130,7 +130,8 @@ export const addSlab = defineCommand({
   name: 'add_slab',
   description:
     'Add a floor, roof or foundation slab whose TOP sits at the level elevation + offset. Give either ' +
-    'a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace).',
+    'a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace). ' +
+    'Refused if a slab with the same outline, offset and role already exists on the level.',
   params: z.object({
     boundary: z
       .array(z.array(z.number()))
@@ -261,7 +262,8 @@ export const addColumn = defineCommand({
   name: 'add_column',
   description:
     'Add a structural column standing on a level, at a plan location or (atGridIntersections: true) ' +
-    'at every structural grid intersection. Rectangular width × depth, or circular with diameter = width.',
+    'at every structural grid intersection. Rectangular width × depth, or circular with diameter = width. ' +
+    'Locations that already hold a column on the level are skipped (listed in the summary); refused when all are occupied.',
   params: z.object({
     location: vec2('Column center [x, y].').optional(),
     atGridIntersections: z
@@ -372,7 +374,8 @@ export const addBeam = defineCommand({
   name: 'add_beam',
   description:
     'Add a horizontal beam from start to end (plan [x, y]). Its top sits at the top of the level ' +
-    '(elevation + level height) + topOffset — i.e. under the next floor slab by default.',
+    '(elevation + level height) + topOffset — i.e. under the next floor slab by default. Refused if a ' +
+    'beam over the same span (either direction) at the same topOffset already exists on the level.',
   params: z.object({
     start: vec2('Beam axis start [x, y].'),
     end: vec2('Beam axis end [x, y].'),
@@ -440,7 +443,8 @@ export const addStair = defineCommand({
   description:
     'Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm ' +
     '(rounded up), so risers are equal; tread default 280 mm. The summary reports the Blondel rule ' +
-    '(2R + G, comfortable between 600 and 650 mm).',
+    '(2R + G, comfortable between 600 and 650 mm). Refused above 200 risers or if a stair with the same ' +
+    'start and angle already exists on the level.',
   params: z.object({
     start: vec2('Plan point [x, y] at the middle of the first riser.'),
     angle: z

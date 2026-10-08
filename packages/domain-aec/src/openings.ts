@@ -114,9 +114,11 @@ function openingShape(kind: OpeningKind): OpeningShape {
       .number()
       .optional()
       .describe(
-        'Distance along the wall from its start to the opening CENTER. Default: wall midpoint.',
+        'Distance along the wall from its start to the opening CENTER, in document units (arc length on a curved wall). Takes precedence over at. Default: wall midpoint.',
       ),
-    at: vec2('Alternative to offset: a plan point [x, y] projected onto the wall.').optional(),
+    at: vec2(
+      'Alternative to offset: a plan point [x, y] projected onto the wall to place the opening center. Ignored when offset is given.',
+    ).optional(),
     width: z
       .number()
       .optional()
@@ -124,7 +126,9 @@ function openingShape(kind: OpeningKind): OpeningShape {
     height: z
       .number()
       .optional()
-      .describe(`Opening height in document units (> 0). Default ${defaults.height} mm.`),
+      .describe(
+        `Opening height in document units (> 0). Default ${defaults.height} mm, limited to the wall height.`,
+      ),
     sillHeight: z
       .number()
       .optional()

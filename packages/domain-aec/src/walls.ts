@@ -174,7 +174,8 @@ export const addWall = defineCommand({
   description:
     'Add a straight wall along its plan centerline from start to end ([x, y], document units) on a ' +
     'building level. Walls meeting at endpoints (L/T/X corners) are joined automatically. Doors and ' +
-    'windows are then hosted with add_door / add_window.',
+    'windows are then hosted with add_door / add_window. Refused if a wall with the same end points ' +
+    '(either direction) and base offset already exists on the level.',
   params: z.object({
     start: vec2('Centerline start [x, y].'),
     end: vec2('Centerline end [x, y].'),
@@ -198,7 +199,8 @@ export const drawWalls = defineCommand({
   name: 'draw_walls',
   description:
     'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing ' +
-    'wall (e.g. a building perimeter). Same options as add_wall.',
+    'wall (e.g. a building perimeter). Same options as add_wall; the whole chain is refused if any ' +
+    'segment duplicates an existing wall.',
   params: z.object({
     points: z.array(z.array(z.number())).describe('Centerline vertices [[x, y], …], 2 to 500.'),
     closed: z

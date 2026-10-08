@@ -63,7 +63,8 @@ export const addSteelMember = defineCommand({
     'along +X for vertical columns (roll π/2 turns it along +Y); roll (radians) turns it about the axis. ' +
     'Beams may declare startJoint / endJoint "rigid" (moment connection to the column they frame into; ' +
     'default pinned) and columns baseFixity "fixed" (column foot restrains rotation; default pinned or the ' +
-    'base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames.',
+    'base plate fixity): check_steel_members analyses rigidly connected beams and columns as planar moment frames. ' +
+    'Refused if an identical member (section, role, roll, end points in either direction) already exists on the level.',
   params: z.object({
     profile: z.string().describe('Catalogue section name (list_steel_profiles).'),
     start: looseVec3('Axis start [x, y, z], z relative to the level; [x, y] means z = 0.'),
