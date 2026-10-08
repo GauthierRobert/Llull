@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import type { DrawToolKind, ModifyToolKind } from '@ui/store';
-import { cameraGestures } from './cameraControlsPolicy';
+import { cameraGestures, MAP_CONTROLS_CONFIG } from './cameraControlsPolicy';
 import { ZoomExtents2D } from './ZoomExtents2D';
 import { Entities2D } from './Entities2D';
 import { BuildingPlan2D } from './BuildingPlan2D';
@@ -88,12 +88,8 @@ function SceneContents2D({
 
       <MapControls
         makeDefault
+        {...MAP_CONTROLS_CONFIG}
         {...cameraGestures(isDrawing || isModifying)}
-        enableRotate={false}
-        screenSpacePanning={true}
-        zoomToCursor
-        zoomSpeed={1.6}
-        panSpeed={1.0}
       />
 
       <StoreInvalidator />
