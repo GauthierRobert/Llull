@@ -6,10 +6,16 @@
  */
 
 import type { CadDocument, EntityId } from '@core/model/types';
-import { postCommand, postRedo, postUndo, ServerCommandError } from './serverCommands';
+import {
+  isPermanentHttpError,
+  postCommand,
+  postRedo,
+  postUndo,
+  ServerCommandError,
+} from './serverCommands';
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
-import { newCommandId } from './outbox';
+import { newCommandId, removeOutboxEntry } from './outbox';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
@@ -81,6 +87,43 @@ function responseChanged(response: ServerCommandResponse): boolean {
   return response.changed ?? (!response.isError && response.affected.length > 0);
 }
 
+/**
+ * A grace-run command the server then refused permanently would be re-POSTed forever by the
+ * flush: drop its outbox entry and tell the user (the post-flush snapshot reconciles the document).
+ */
+function dropRefusedGraceRun(set: StoreSet, commandId: string, message: string): void {
+  set((state) => ({
+    localOutbox: removeOutboxEntry(state.localOutbox, commandId),
+    lastSummary: `${message} — the server refused the command; it will not be synced.`,
+  }));
+}
+
+/** A dispatch whose grace timer is armed and whose POST has not settled yet. */
+interface PendingGraceRun {
+  readonly dispatchSeq: number;
+  /** Cancel the grace timer and run the command locally now (no-op if it already ran). */
+  readonly runNow: () => void;
+}
+
+let lastDispatchSeq = 0;
+/** In dispatch order. */
+const pendingGraceRuns: PendingGraceRun[] = [];
+
+function forgetGraceRun(dispatchSeq: number): void {
+  const index = pendingGraceRuns.findIndex((pending) => pending.dispatchSeq === dispatchSeq);
+  if (index >= 0) pendingGraceRuns.splice(index, 1);
+}
+
+/**
+ * @invariant local run order = dispatch order: before a command falls back locally, every
+ * earlier dispatch still inside its grace period runs first (a hung POST must not reorder them).
+ */
+function runEarlierGraceRuns(dispatchSeq: number): void {
+  while (pendingGraceRuns[0] !== undefined && pendingGraceRuns[0].dispatchSeq < dispatchSeq) {
+    pendingGraceRuns.shift()?.runNow();
+  }
+}
+
 /** Fire-and-forget: the document update comes from the /live SSE stream. */
 export function postDispatch(
   set: StoreSet,
@@ -91,20 +134,34 @@ export function postDispatch(
 ): void {
   const selectionAtDispatch = get().document.selection;
   const commandId = newCommandId();
+  const dispatchSeq = (lastDispatchSeq += 1);
   let ranLocally = false;
   const runLocalOnce = (): void => {
     if (ranLocally) return;
     ranLocally = true;
     runLocally(set, get, name, params, options, commandId);
   };
+  const fallBackLocally = (): void => {
+    runEarlierGraceRuns(dispatchSeq);
+    runLocalOnce();
+  };
   const graceTimer = sseIsDown(get())
     ? setTimeout(() => {
-        if (sseIsDown(get())) runLocalOnce();
+        forgetGraceRun(dispatchSeq);
+        if (sseIsDown(get())) fallBackLocally();
       }, CONNECT_GRACE_MS)
     : undefined;
+  if (graceTimer !== undefined) {
+    const runNow = (): void => {
+      clearTimeout(graceTimer);
+      runLocalOnce();
+    };
+    pendingGraceRuns.push({ dispatchSeq, runNow });
+  }
   void postCommand(name, params, commandId)
     .then((response) => {
       clearTimeout(graceTimer);
+      forgetGraceRun(dispatchSeq);
       if (ranLocally) return;
       set((state) => ({
         document: selectAffectedIn(state.document, selectionAtDispatch, response.affected, options),
@@ -117,8 +174,12 @@ export function postDispatch(
     })
     .catch((err: unknown) => {
       clearTimeout(graceTimer);
-      if (ranLocally) return;
-      handlePostFailure(set, get, err, `Command '${name}'`, runLocalOnce, (summary) =>
+      forgetGraceRun(dispatchSeq);
+      if (ranLocally) {
+        if (isPermanentHttpError(err)) dropRefusedGraceRun(set, commandId, err.message);
+        return;
+      }
+      handlePostFailure(set, get, err, `Command '${name}'`, fallBackLocally, (summary) =>
         options?.onResult?.({ summary, changed: false }),
       );
     });

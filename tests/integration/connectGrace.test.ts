@@ -86,6 +86,24 @@ describe('dispatch while connecting', () => {
     expect(useStore.getState().document.order).toHaveLength(0);
   });
 
+  it('keeps dispatch order when a later POST fails fast while an earlier one hangs', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise(() => undefined))
+      .mockImplementationOnce(() => Promise.reject(new Error('refused')));
+    vi.stubGlobal('fetch', fetchMock);
+    useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
+    useStore.getState().dispatch('add_sphere', { radius: 1 });
+    await vi.advanceTimersByTimeAsync(10);
+
+    const { document, localOutbox } = useStore.getState();
+    expect(localOutbox.map((entry) => entry.name)).toEqual(['add_box', 'add_sphere']);
+    expect(document.order.map((id) => document.entities[id]?.kind)).toEqual(['box', 'sphere']);
+
+    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+    expect(useStore.getState().document.order).toHaveLength(2);
+  });
+
   it('never starts the grace timer once connected (a slow POST is waited for)', async () => {
     resetStore('connected');
     useStore.setState({ sseEverConnected: true });

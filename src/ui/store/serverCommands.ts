@@ -47,6 +47,22 @@ export class ServerCommandError extends Error {
   }
 }
 
+/**
+ * The server answered with a 4xx that retrying cannot fix (413, 400, 403, …): drop the request.
+ * 408 (timeout) and 429 (rate limit) are transient, like 5xx and network errors.
+ */
+export function isPermanentHttpError(err: unknown): err is ServerCommandError {
+  return (
+    err instanceof ServerCommandError &&
+    err.kind === 'http' &&
+    err.status !== undefined &&
+    err.status >= 400 &&
+    err.status < 500 &&
+    err.status !== 408 &&
+    err.status !== 429
+  );
+}
+
 /** GET `path`, or POST it with `postBody` as JSON when given. Resolves to the parsed JSON response. */
 async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
   let response: Response;

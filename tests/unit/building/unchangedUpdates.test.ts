@@ -59,7 +59,7 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     );
   });
 
-  it('add_wall / draw_walls refuse a duplicate of an existing wall (either direction)', () => {
+  it('add_wall refuses a duplicate of an existing wall (either direction)', () => {
     const doc = execute(createEmptyDocument(), 'add_wall', {
       start: [0, 0],
       end: [4000, 0],
@@ -78,6 +78,16 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
       expect(again.document).toBe(doc);
       expect(again.summary).toMatch(/duplicates wall wall-1 on level-1/);
     }
+    const elsewhere = execute(doc, 'add_wall', { start: [0, 0], end: [4000, 0], baseOffset: 100 });
+    expect(elsewhere.affected.length).toBeGreaterThan(0);
+  });
+
+  it('draw_walls skips a segment duplicating an existing wall and builds the rest', () => {
+    const doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [4000, 0],
+    }).document;
+    const before = structuredClone(doc);
     const chain = execute(doc, 'draw_walls', {
       points: [
         [4000, 3000],
@@ -85,9 +95,64 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
         [0, 0],
       ],
     });
-    expect(chain.document).toBe(doc);
-    const elsewhere = execute(doc, 'add_wall', { start: [0, 0], end: [4000, 0], baseOffset: 100 });
-    expect(elsewhere.affected.length).toBeGreaterThan(0);
+    expect(doc).toEqual(before);
+    expect(chain.data).toEqual({ wallIds: ['wall-2'], skippedDuplicatesOf: ['wall-1'] });
+    expect(chain.summary).toMatch(/Added 1 wall\(s\) \S+ \(wall-2\)/);
+    expect(chain.summary).toMatch(/Skipped 1 segment already built as wall-1\./);
+    const wall = chain.document.building?.elements['wall-2'];
+    expect(wall?.category === 'wall' && [wall.start, wall.end]).toEqual([
+      [4000, 3000],
+      [4000, 0],
+    ]);
+  });
+
+  it('draw_walls: two rooms drawn as closed loops share one wall on their common edge', () => {
+    const roomA = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+        [4000, 3000],
+        [0, 3000],
+      ],
+      closed: true,
+    });
+    const roomB = execute(roomA.document, 'draw_walls', {
+      points: [
+        [4000, 0],
+        [8000, 0],
+        [8000, 3000],
+        [4000, 3000],
+      ],
+      closed: true,
+    });
+    const walls = Object.values(roomB.document.building?.elements ?? {}).filter(
+      (element) => element.category === 'wall',
+    );
+    expect(walls).toHaveLength(7);
+    expect(roomB.summary).toMatch(/Added 3 wall\(s\)/);
+    expect(roomB.summary).toMatch(/Skipped 1 segment already built as wall-2\./);
+  });
+
+  it('draw_walls refuses when every segment duplicates an existing wall', () => {
+    const doc = execute(createEmptyDocument(), 'draw_walls', {
+      points: [
+        [0, 0],
+        [4000, 0],
+        [4000, 3000],
+      ],
+    }).document;
+    const again = execute(doc, 'draw_walls', {
+      points: [
+        [4000, 3000],
+        [4000, 0],
+        [0, 0],
+      ],
+    });
+    expect(again.document).toBe(doc);
+    expect(again.affected).toEqual([]);
+    expect(again.summary).toMatch(
+      /draw_walls failed: every segment duplicates an existing wall on level-1 \(wall-2, wall-1\)/,
+    );
   });
 
   it('add_column skips occupied locations and refuses when all are occupied', () => {
