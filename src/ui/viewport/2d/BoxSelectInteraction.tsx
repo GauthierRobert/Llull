@@ -80,6 +80,21 @@ function RubberBand({ start, end, zoom }: RubberBandProps): React.ReactElement {
 
 export function BoxSelectInteraction({ zoom }: BoxSelectInteractionProps): React.ReactElement {
   const [drag, setDrag] = useState<{ start: Vec2; end: Vec2 } | null>(null);
+  const dragging = drag !== null;
+
+  // Esc cancels the box in progress (and only that): the release then selects nothing.
+  useEffect(() => {
+    if (!dragging) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDrag(null);
+    };
+    // Capture phase: runs before the global shortcut handler, which skips consumed keys.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [dragging]);
 
   return (
     <>
