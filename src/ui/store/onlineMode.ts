@@ -17,6 +17,7 @@ import {
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
 import { newCommandId, poisonDroppedEntry, removeOutboxEntry } from './outbox';
+import { forgetGraceRun, nextDispatchSeq, runEarlierGraceRuns, trackGraceRun } from './graceRuns';
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
@@ -108,32 +109,6 @@ function dropRefusedGraceRun(
   }));
 }
 
-/** A dispatch whose grace timer is armed and whose POST has not settled yet. */
-interface PendingGraceRun {
-  readonly dispatchSeq: number;
-  /** Cancel the grace timer and run the command locally now (no-op if it already ran). */
-  readonly runNow: () => void;
-}
-
-let lastDispatchSeq = 0;
-/** In dispatch order. */
-const pendingGraceRuns: PendingGraceRun[] = [];
-
-function forgetGraceRun(dispatchSeq: number): void {
-  const index = pendingGraceRuns.findIndex((pending) => pending.dispatchSeq === dispatchSeq);
-  if (index >= 0) pendingGraceRuns.splice(index, 1);
-}
-
-/**
- * @invariant local run order = dispatch order: before a command falls back locally, every
- * earlier dispatch still inside its grace period runs first (a hung POST must not reorder them).
- */
-function runEarlierGraceRuns(dispatchSeq: number): void {
-  while (pendingGraceRuns[0] !== undefined && pendingGraceRuns[0].dispatchSeq < dispatchSeq) {
-    pendingGraceRuns.shift()?.runNow();
-  }
-}
-
 /** Fire-and-forget: the document update comes from the /live SSE stream. */
 export function postDispatch(
   set: StoreSet,
@@ -144,10 +119,12 @@ export function postDispatch(
 ): void {
   const selectionAtDispatch = get().document.selection;
   const commandId = newCommandId();
-  const dispatchSeq = (lastDispatchSeq += 1);
+  const dispatchSeq = nextDispatchSeq();
   let ranLocally = false;
+  /** The document was replaced while this dispatch was in its grace period (`resetGraceRuns`). */
+  let cancelled = false;
   const runLocalOnce = (): void => {
-    if (ranLocally) return;
+    if (ranLocally || cancelled) return;
     ranLocally = true;
     runLocally(set, get, name, params, options, commandId);
   };
@@ -166,10 +143,15 @@ export function postDispatch(
       clearTimeout(graceTimer);
       runLocalOnce();
     };
-    pendingGraceRuns.push({ dispatchSeq, runNow });
+    const cancel = (): void => {
+      clearTimeout(graceTimer);
+      cancelled = true;
+    };
+    trackGraceRun({ dispatchSeq, runNow, cancel });
   }
   void postCommand(name, params, commandId)
     .then((response) => {
+      if (cancelled) return;
       clearTimeout(graceTimer);
       forgetGraceRun(dispatchSeq);
       if (ranLocally) return;
@@ -183,6 +165,7 @@ export function postDispatch(
       options?.onResult?.({ summary: response.summary, changed: responseChanged(response) });
     })
     .catch((err: unknown) => {
+      if (cancelled) return;
       clearTimeout(graceTimer);
       forgetGraceRun(dispatchSeq);
       if (ranLocally) {

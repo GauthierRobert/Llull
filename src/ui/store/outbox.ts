@@ -15,6 +15,7 @@ import {
   postCommand,
 } from './serverCommands';
 import type { CadStoreState, StoreGet, StoreSet } from './storeTypes';
+import { resetGraceRuns } from './graceRuns';
 
 const SYNC_RETRY_BASE_MS = 1000;
 const SYNC_RETRY_MAX_MS = 30000;
@@ -64,6 +65,7 @@ export function resetSyncBookkeeping(): void {
   syncAttempt = 0;
   flushIdMap = new Map();
   poisonedIds = new Map();
+  resetGraceRuns();
 }
 
 /**
