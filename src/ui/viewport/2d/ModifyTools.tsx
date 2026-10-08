@@ -13,6 +13,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Icon } from '@ui/components/Icon';
+import { NumberField } from '@ui/components/NumberField';
 import type { IconName } from '@ui/components/Icon';
 import type { ModifyToolKind } from '@ui/store';
 import type { ModifyToolPhase } from './useModifyTool';
@@ -124,22 +125,14 @@ export function ModifyTools({
             <label className="vp-field-label" htmlFor="modify-value-input">
               {valueLabel(activeTool)}
             </label>
-            <input
+            <NumberField
               id="modify-value-input"
               ref={inputRef}
               className="modify-tool-input"
-              type="number"
               min={0.001}
               step={0.1}
-              // Uncontrolled: a controlled number input rewrites "0." to "0" mid-typing, so a
-              // decimal such as 0.5 could never be entered. The input only exists in this phase,
-              // so `defaultValue` is always the freshly reset pending value.
-              key={activeTool}
-              defaultValue={pendingValue}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value);
-                if (!isNaN(value)) onSetValue(value);
-              }}
+              value={pendingValue}
+              onValueChange={onSetValue}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();

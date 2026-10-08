@@ -38,9 +38,10 @@ function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactE
           type="button"
           className="building-row-btn"
           onClick={() => dispatch('set_active_level', { levelId: level.id })}
-          aria-label={`Activate level ${level.name}`}
         >
-          <span className="panel__row-main">{level.name}</span>
+          {/* The accessible name is the visible text plus this prefix (WCAG label-in-name). */}
+          <span className="visually-hidden">Activate level </span>
+          <span className="panel__row-main">{level.name}</span>{' '}
           <span className="panel__row-meta">
             +{level.elevation} {units} · h {level.height}
           </span>

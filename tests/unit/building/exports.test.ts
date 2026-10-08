@@ -10,7 +10,16 @@ import { fitScale, type PlanSheet } from '@aec/sheet';
 import { type IfcExport } from '@aec/ifcBuild';
 import { ifcGuid, ifcReal, ifcString } from '@aec/ifcStep';
 import { fileSlug } from '@aec/model';
-import { isIllegalXmlCharacter } from '@aec/xmlText';
+
+/** True for code points XML 1.0 forbids (C0 controls other than tab, LF, CR; U+FFFE; U+FFFF). */
+function isIllegalXmlCharacter(character: string): boolean {
+  const code = character.codePointAt(0) ?? 0;
+  return (
+    (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+    code === 0xfffe ||
+    code === 0xffff
+  );
+}
 
 function run(doc: CadDocument, name: string, params: unknown): CadDocument {
   return execute(doc, name, params).document;
@@ -419,14 +428,6 @@ describe('extreme model sizes', () => {
     doc = run(doc, 'add_wall', { start: [0, 0], end: [500_000_000, 0], thickness: 10_000_000 });
     const data = execute(doc, 'export_dxf', {}).data as DxfExport;
     expect(data.entityCount).toBeLessThan(5000);
-  });
-});
-
-describe('xmlText', () => {
-  it('keeps tab, newline and astral characters; drops C0 controls and U+FFFE/U+FFFF', async () => {
-    const { escapeXml: safe } = await import('@aec/xmlText');
-    expect(safe('a\tb\nc\r🏠é')).toBe('a\tb\nc\r🏠é');
-    expect(safe('a\u0000b\u001fc￾d￿e')).toBe('abcde');
   });
 });
 

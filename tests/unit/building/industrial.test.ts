@@ -163,6 +163,16 @@ describe('add_footing / add_panel', () => {
     expect(element(result.document, 'footing-2')).toMatchObject({ location: [5000, 0] });
   });
 
+  it('refuses an explicit-location footing that duplicates one on the level (10 mm tolerance)', () => {
+    const doc = run(createEmptyDocument(), 'add_footing', { location: [1000, 2000] });
+    const duplicate = execute(doc, 'add_footing', { location: [1005, 2000], width: 2000 });
+    expect(duplicate.document).toBe(doc);
+    expect(duplicate.affected).toEqual([]);
+    expect(duplicate.summary).toMatch(/already has a footing at \[1005, 2000\]/);
+    const beside = execute(doc, 'add_footing', { location: [1020, 2000] });
+    expect(beside.summary).toMatch(/Added 1 pad footing/);
+  });
+
   it('rejects bad footings', () => {
     const doc = createEmptyDocument();
     expect(execute(doc, 'add_footing', {}).summary).toMatch(/give location/);

@@ -51,7 +51,12 @@ describe('BuildingPanel', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     expect(screen.getByTestId('level-row-level-1')).toHaveAttribute('aria-current', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Activate level Upper' }));
+    const upper = useStore.getState().document.building!.levels['level-2']!;
+    const activateUpper = screen.getByRole('button', {
+      name: `Activate level Upper +${upper.elevation} mm · h ${upper.height}`,
+    });
+    expect(activateUpper).toHaveTextContent(`+${upper.elevation} mm · h ${upper.height}`);
+    fireEvent.click(activateUpper);
     expect(dispatch).toHaveBeenCalledWith('set_active_level', { levelId: 'level-2' });
     fireEvent.click(screen.getByRole('button', { name: 'Select Wall W1' }));
     expect(useStore.getState().document.selection).toEqual(['wall-1:body-0']);
