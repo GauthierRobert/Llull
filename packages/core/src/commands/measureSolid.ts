@@ -3,7 +3,7 @@ import { cross3, dot3 } from '../lib/vec3';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
 import { entityBounds, entityBoundsInDoc, mergeBounds } from './sceneBounds';
-import { expandInstance } from './assemblies';
+import { expandInstance } from './instanceExpansion';
 import type { Bounds } from './sceneTypes';
 import { formatLength } from './units';
 import { polygonArea, polygonCentroid } from '../lib/polygon';

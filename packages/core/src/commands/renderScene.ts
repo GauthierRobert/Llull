@@ -6,7 +6,7 @@ import type { RenderViewData, Polygon3D } from './renderTypes';
 import { type ViewName, cameraForView, cameraBasis, projectPoint } from './renderCamera';
 import { tessellateEntity } from './renderTessellation';
 import { MAX_POLYGONS, buildSvg } from './renderSvg';
-import { expandInstance } from './assemblies';
+import { expandInstance } from './instanceExpansion';
 
 /** Component instances nested deeper than this are not drawn (guards against reference cycles). */
 const MAX_INSTANCE_DEPTH = 4;

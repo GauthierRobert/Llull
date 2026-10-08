@@ -10,7 +10,7 @@ import type {
   Vec3,
 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { expandInstance } from '@core/commands/assemblies';
+import { expandInstance } from '@core/commands/instanceExpansion';
 
 function withComponent(): { doc: ReturnType<typeof createEmptyDocument>; componentId: string } {
   const box = execute(createEmptyDocument(), 'add_box', { size: [2, 4, 6], position: [1, 0, 0] });

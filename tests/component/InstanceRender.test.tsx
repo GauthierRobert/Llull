@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import type { InstanceEntity } from '@core/model/types';
-import { expandInstance } from '@core/commands/assemblies';
+import { expandInstance } from '@core/commands/instanceExpansion';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 function resetStore(): void {
