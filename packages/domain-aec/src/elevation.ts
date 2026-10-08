@@ -207,7 +207,9 @@ export const exportElevationSheet = defineCommand({
     scale: z
       .number()
       .optional()
-      .describe('Scale denominator N for 1:N. Default: smallest standard scale that fits.'),
+      .describe(
+        'Scale denominator N for 1:N. Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
+      ),
     title: z.string().optional().describe('Drawing title. Default "<Direction> elevation".'),
   }),
   run: (

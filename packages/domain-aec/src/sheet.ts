@@ -233,6 +233,8 @@ export interface PlanSheet {
   readonly paper: PaperSize;
   readonly scale: number;
   readonly levelId: string;
+  /** False when the drawing extents exceed the drawing area of the paper at this scale. */
+  readonly fits: boolean;
 }
 
 function titleBlock(
@@ -374,6 +376,9 @@ function buildPlanSheet(
     paper,
     scale,
     levelId: drawing.level.id,
+    fits:
+      ((maxX - minX) * millimetresPerUnit) / scale <= viewport.width &&
+      ((maxY - minY) * millimetresPerUnit) / scale <= viewport.height,
   };
 }
 
@@ -398,7 +403,7 @@ export const exportPlanSheet = defineCommand({
       .number()
       .optional()
       .describe(
-        'Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits.',
+        'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
       ),
     title: z.string().optional().describe('Drawing title. Default "<level> — Floor plan".'),
   }),
@@ -412,7 +417,7 @@ export const exportPlanSheet = defineCommand({
     }
     return {
       document: doc,
-      summary: `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.`,
+      summary: `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheet.fits ? '' : ' WARNING: the drawing is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.'}`,
       affected: [],
       data: sheet,
     };

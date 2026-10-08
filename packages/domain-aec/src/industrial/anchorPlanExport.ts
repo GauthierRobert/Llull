@@ -88,7 +88,7 @@ export const exportAnchorPlan = defineCommand({
       .number()
       .optional()
       .describe(
-        'Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits the paper.',
+        'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits the paper (1-2-5 steps beyond 1:2000).',
       ),
     paper: z
       .enum(Object.keys(PAPER_MM) as [PaperSize, ...PaperSize[]])

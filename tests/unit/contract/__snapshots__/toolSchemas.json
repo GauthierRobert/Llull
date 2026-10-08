@@ -4444,7 +4444,7 @@
           "type": "string"
         },
         "scale": {
-          "description": "Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits the paper.",
+          "description": "Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits the paper (1-2-5 steps beyond 1:2000).",
           "type": "number"
         }
       },
@@ -4546,7 +4546,7 @@
           "type": "string"
         },
         "scale": {
-          "description": "Scale denominator N for 1:N. Default: smallest standard scale that fits.",
+          "description": "Scale denominator N for 1:N. Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).",
           "type": "number"
         },
         "title": {
@@ -4678,7 +4678,7 @@
           "type": "string"
         },
         "scale": {
-          "description": "Scale denominator N for 1:N (e.g. 100). Default: smallest standard scale that fits.",
+          "description": "Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).",
           "type": "number"
         },
         "title": {
