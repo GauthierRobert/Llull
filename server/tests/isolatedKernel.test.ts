@@ -142,6 +142,19 @@ describe('isolated OCC kernel', () => {
     }, 120_000);
   });
 
+  it('a worker that exits with an unconsumed REPLY wakes the server as DIED, not at the timeout', () => {
+    const kernel = createIsolatedKernel({
+      entry: path.join(__dirname, 'fixtures', 'replyThenExitWorker.cjs'),
+      execArgv: [],
+      callTimeoutMs: 20_000,
+    });
+    kernels.push(kernel);
+    const started = Date.now();
+    expect(kernel.tessellate(box(2))).toBeNull();
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(kernel.crashCount()).toBe(1);
+  }, 60_000);
+
   it('returns null promptly instead of throwing when the worker cannot load', () => {
     const kernel = createIsolatedKernel({
       entry: path.join(__dirname, 'missing-worker.js'),

@@ -66,14 +66,15 @@ export function defaultWorkerEntry(): string | null {
 /**
  * Worker bootstrap (evaluated): flags a death in the shared status word from the first
  * instant, then loads the real entry, so even a failed load wakes the blocked server thread.
+ * @invariant the exit hook always writes STATUS_DIED and notifies, whatever the status was
+ *   (READY / REPLY not yet consumed): the server only ever clears it via compareExchange.
  */
 const BOOTSTRAP = `
 const { workerData } = require('node:worker_threads');
 const status = new Int32Array(workerData.statusBuffer);
 process.on('exit', () => {
-  const previous = Atomics.compareExchange(status, 0, 0, ${STATUS_DIED});
-  if (previous === ${STATUS_READY}) Atomics.compareExchange(status, 0, ${STATUS_READY}, ${STATUS_DIED});
-  if (previous === 0 || previous === ${STATUS_READY}) Atomics.notify(status, 0);
+  Atomics.store(status, 0, ${STATUS_DIED});
+  Atomics.notify(status, 0);
 });
 try {
   require(workerData.entry);
@@ -149,7 +150,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
         outcome === 'timed-out' ? 'OCC worker start timed out' : 'OCC worker died on start',
       );
     }
-    Atomics.store(status, 0, 0);
+    Atomics.compareExchange(status, 0, STATUS_READY, 0); // a death since the load stays flagged
     candidate.ready = true;
   };
 
@@ -182,13 +183,12 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
       return null;
     }
     const { port, status } = target;
-    Atomics.store(status, 0, 0);
     port.postMessage({ op, args });
     const outcome = Atomics.wait(status, 0, 0, callTimeoutMs);
     const state = Atomics.load(status, 0);
     if (outcome !== 'timed-out' && state === STATUS_REPLY) {
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
-      Atomics.store(status, 0, 0); // idle: a later death can now flag STATUS_DIED
+      Atomics.compareExchange(status, 0, STATUS_REPLY, 0); // idle; a death since the reply stays flagged
       if (reply?.error !== undefined) console.warn(`[occt] ${op} failed: ${reply.error}`);
       if (reply?.recycle === true) {
         recycles++;
