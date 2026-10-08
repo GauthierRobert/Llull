@@ -22,4 +22,6 @@ export interface KernelRequest {
 export interface KernelReply {
   readonly result: unknown;
   readonly error?: string;
+  /** The operation ended in a native OCC exception: the module may be degraded, restart it. */
+  readonly recycle?: boolean;
 }

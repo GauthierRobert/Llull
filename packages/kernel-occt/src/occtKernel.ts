@@ -146,14 +146,27 @@ function withHandles(
       return handle;
     });
   } catch (error) {
-    // A number is a native C++ exception pointer (OCC rejecting the input: expected, silent); an
-    // Error is a binding or programming fault worth surfacing.
+    // Any exception means OCC rejected the input (a native C++ exception is not an Error and is
+    // expected, silent). It can leave the WASM module degraded, see `nativeFailureCount`. An Error
+    // is a binding or programming fault worth surfacing too.
+    nativeFailures++;
     if (error instanceof Error)
       console.warn(`[occtKernel] OCC operation failed: ${errorMessage(error)}`);
     return null;
   } finally {
     owned.forEach(release);
   }
+}
+
+let nativeFailures = 0;
+
+/**
+ * Operations that ended in a native C++ exception since load. After one, later booleans on the same
+ * module can fail spuriously (observed: identical calls succeed once, then return null), so a host
+ * that can restart the module (the worker-thread kernel) should do so when this count grows.
+ */
+export function nativeFailureCount(): number {
+  return nativeFailures;
 }
 
 /**
@@ -215,8 +228,9 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
         const shapeB = shapeA && own(entityToOccShape(api, operandB));
         if (!shapeA || !shapeB) return null;
         const builder = own(new api[BOOLEAN_BUILDERS[op]](shapeA, shapeB) as OccBuilder);
-        builder.Build();
-        return builder.IsDone() ? extractMeshData(api, own(builder.Shape())) : null;
+        if (builder.IsDone()) return extractMeshData(api, own(builder.Shape()));
+        nativeFailures++; // OCC gave up on this pair (typically near-tangent input)
+        return null;
       });
     },
 

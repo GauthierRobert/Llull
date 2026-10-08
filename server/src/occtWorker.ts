@@ -10,6 +10,7 @@
 import { workerData, type MessagePort } from 'node:worker_threads';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { errorMessage } from '@lib/errorMessage';
+import { nativeFailureCount } from '@kernel-occt/occtKernel';
 import { createNodeOcctKernel } from './occtNode';
 import {
   STATUS_READY,
@@ -35,12 +36,14 @@ async function main(): Promise<void> {
   const kernel = await createNodeOcctKernel();
 
   init.port.on('message', (request: KernelRequest) => {
+    const failuresBefore = nativeFailureCount();
     let reply: KernelReply;
     try {
       reply = { result: run(kernel, request, init.testHooks) };
     } catch (error) {
       reply = { result: null, error: errorMessage(error) };
     }
+    if (nativeFailureCount() > failuresBefore) reply = { ...reply, recycle: true };
     init.port.postMessage(reply);
     signal(status, STATUS_REPLY);
   });

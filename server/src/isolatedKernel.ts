@@ -44,6 +44,8 @@ export interface IsolatedKernelOptions {
 export interface IsolatedKernel extends GeometryKernel {
   /** Number of times a worker died or was killed mid-call. */
   crashCount(): number;
+  /** Number of times the worker was replaced after a native OCC exception (module degraded). */
+  recycleCount(): number;
   /** Test hook: ask the worker to run `__abort` or `__hang`. */
   forceFailure(hook: TestHook): void;
   /** Spawn the worker now; false (with a warning) when it cannot start. Idempotent. */
@@ -99,6 +101,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   const startTimeoutMs = options.startTimeoutMs ?? 60_000;
   let live: LiveWorker | null = null;
   let crashes = 0;
+  let recycles = 0;
 
   const kill = (): void => {
     if (live === null) return;
@@ -148,6 +151,10 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     if (outcome !== 'timed-out' && state === STATUS_REPLY) {
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
       if (reply?.error !== undefined) console.warn(`[occt] ${op} failed: ${reply.error}`);
+      if (reply?.recycle === true) {
+        recycles++;
+        kill(); // a native OCC exception leaves the module degraded; the next call gets a fresh one
+      }
       return reply?.result ?? null;
     }
     crashes++;
@@ -172,6 +179,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     tessellate: (entity) =>
       call('tessellate', [entity]) as ReturnType<GeometryKernel['tessellate']>,
     crashCount: () => crashes,
+    recycleCount: () => recycles,
     forceFailure: (hook) => void call(hook, []),
     start: () => {
       try {

@@ -60,6 +60,32 @@ describe('isolated OCC kernel', () => {
     expect(kernel.tessellate(box(2))).not.toBeNull();
   }, 180_000);
 
+  it('replaces a worker whose OCC call failed natively, so later calls are not poisoned', () => {
+    // A cone apex exactly on a box face makes OCC fail; without a restart the module then returns
+    // spurious nulls for the next several (even trivial) calls.
+    const kernel = make();
+    const cone = (height: number): Entity =>
+      ({
+        id: 'k',
+        kind: 'cone',
+        radius: 1,
+        height,
+        position: [0, 0, -3],
+        rotation: [0, 0, 0],
+        layerId: 'layer-default',
+        color: '#888888',
+      }) as Entity;
+    const floor = { ...box(8), position: [0, 0, -4] } as Entity;
+    kernel.booleanOp('union', cone(3), floor);
+    kernel.booleanOp('intersect', cone(3), floor);
+    expect(kernel.recycleCount()).toBeGreaterThanOrEqual(1);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      expect(kernel.tessellate(box(2)), 'tessellate').not.toBeNull();
+      expect(kernel.booleanOp('union', cone(2.99), floor), 'union').not.toBeNull();
+      expect(kernel.booleanOp('intersect', cone(2.99), floor), 'intersect').not.toBeNull();
+    }
+  }, 180_000);
+
   it('returns null promptly instead of throwing when the worker cannot load', () => {
     const kernel = createIsolatedKernel({
       entry: path.join(__dirname, 'missing-worker.js'),
