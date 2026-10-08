@@ -44,6 +44,23 @@ export type GizmoCommit =
     }
   | { readonly name: 'scale_entity'; readonly params: { id: string; factor: number } };
 
+/**
+ * Status hint for a translate drag that grid snap returned to its start: the user clearly dragged
+ * (`rawEnd` differs from `start`) but nothing was committed. Null in every other case.
+ * @pure
+ */
+export function snapBackHint(
+  start: Xyz,
+  rawEnd: Xyz,
+  committed: boolean,
+  snapApplied: boolean,
+  gridStep: number,
+  units: string,
+): string | null {
+  if (committed || !snapApplied || isNegligible(computeDelta(start, rawEnd))) return null;
+  return `Snapped back to grid (Snap on, step ${gridStep} ${units}) — turn Snap off for finer moves.`;
+}
+
 /** @param start transform at drag start; @param end transform at drag end (after any snapping). */
 export function gizmoDragCommit(
   mode: GizmoMode,

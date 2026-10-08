@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import { gizmoDragCommit, type GizmoTransform } from '@ui/viewport/3d/gizmoCommit';
+import { gizmoDragCommit, snapBackHint, type GizmoTransform } from '@ui/viewport/3d/gizmoCommit';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 const rest: GizmoTransform = {
@@ -51,6 +51,30 @@ describe('gizmoDragCommit', () => {
     });
     expect(gizmoDragCommit('scale', 'b', rest, moved({}))).toBeNull();
     expect(gizmoDragCommit('scale', 'b', rest, moved({ scale: { x: 0, y: 0, z: 0 } }))).toBeNull();
+  });
+});
+
+describe('snapBackHint', () => {
+  const origin = { x: 0, y: 0, z: 1 };
+  const dragged = { x: 0.34, y: 0, z: 1 };
+
+  it('explains a drag that grid snap returned to its start', () => {
+    expect(snapBackHint(origin, dragged, false, true, 1, 'mm')).toBe(
+      'Snapped back to grid (Snap on, step 1 mm) — turn Snap off for finer moves.',
+    );
+  });
+
+  it('stays silent when something was committed, snap was not applied, or nothing was dragged', () => {
+    expect(snapBackHint(origin, dragged, true, true, 1, 'mm')).toBeNull();
+    expect(snapBackHint(origin, dragged, false, false, 1, 'mm')).toBeNull();
+    expect(snapBackHint(origin, origin, false, true, 1, 'mm')).toBeNull();
+  });
+
+  it('setStatusMessage shows the message in the status line without touching the document', () => {
+    const before = useStore.getState().document;
+    useStore.getState().setStatusMessage('hello');
+    expect(useStore.getState().lastSummary).toBe('hello');
+    expect(useStore.getState().document).toBe(before);
   });
 });
 

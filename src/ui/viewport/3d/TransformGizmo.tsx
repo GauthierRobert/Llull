@@ -37,7 +37,7 @@ import { toRenderPosition } from './floatingOrigin';
 import { collectSnapCandidates3D, snap3d } from './snap3d';
 import type { Snap3DType, SnapPoint3D } from './snap3d';
 import { SnapIndicator3D } from './SnapIndicator3D';
-import { gizmoDragCommit } from './gizmoCommit';
+import { gizmoDragCommit, snapBackHint } from './gizmoCommit';
 
 // TransformControlsImpl fires a 'dragging-changed' event that is not in
 // three.js's Object3DEventMap. We cast the ref to a minimal interface to
@@ -194,11 +194,14 @@ export function TransformGizmo({
 
       if (!selectedId || !target) return;
 
+      const rawEnd = target.position.clone();
+      let snapApplied = false;
       if (mode === 'translate') {
         // Apply the snapped position to the gizmo target before computing the delta.
         const snap = activeSnapRef.current;
         if (snap && snap3dEnabled) {
           target.position.set(...toRenderPosition([snap.x, snap.y, snap.z], renderOrigin));
+          snapApplied = true;
         }
       }
       const commit = gizmoDragCommit(
@@ -208,6 +211,17 @@ export function TransformGizmo({
         { position: target.position, rotation: target.rotation, scale: target.scale },
       );
       if (commit !== null) dispatch(commit.name, commit.params);
+      else if (mode === 'translate') {
+        const hint = snapBackHint(
+          preDragPos.current,
+          rawEnd,
+          false,
+          snapApplied,
+          SNAP3D_GRID_STEP,
+          useStore.getState().document.units,
+        );
+        if (hint !== null) useStore.getState().setStatusMessage(hint);
+      }
       // Reset gizmo scale to neutral; geometry dimensions live in the entity.
       if (mode === 'scale') target.scale.set(1, 1, 1);
     },

@@ -117,6 +117,9 @@ export interface CadStoreState {
   /** Dismiss the last measurement result (clears `lastMeasure` to null). */
   clearLastMeasure(): void;
 
+  /** Show a UI-only message in the status bar (never touches the document). */
+  setStatusMessage(message: string): void;
+
   /** Replace the document with a snapshot pushed by the server-side SSE stream. */
   hydrateLiveDocument(snapshot: LiveSnapshotEvent): void;
 
