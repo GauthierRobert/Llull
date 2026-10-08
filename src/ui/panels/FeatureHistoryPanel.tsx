@@ -2,13 +2,13 @@
  * @layer ui/panels
  *
  * FeatureHistoryPanel — timeline of `document.featureHistory` steps.
- * Dispatches: set_step_suppressed, reorder_step, delete_step, replay_history.
+ * Dispatches: set_step_suppressed, reorder_step, delete_step, replay_history, edit_step_params
+ * (a refused edit keeps the form open and shows the command's summary).
  * The step label is read-only: no rename_step command exists yet.
  */
 
 import React, { useState } from 'react';
 import { getCommand } from '@core/commands/registry';
-import { stepEditRefusal } from '@ui/panels/stepEditGuard';
 import { CommandParamForm } from '@ui/components/commandPalette/CommandParamForm';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
@@ -32,11 +32,6 @@ function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React
   const displayLabel = step.label ?? step.name;
 
   const submitEdit = (params: Record<string, unknown>): void => {
-    const refused = stepEditRefusal(useStore.getState().document, step, params);
-    if (refused !== null) {
-      setRefusal(refused);
-      return;
-    }
     setRefusal(null);
     dispatch(
       'edit_step_params',

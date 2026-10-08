@@ -304,13 +304,24 @@ describe('FeatureHistoryPanel — per-step params editor', () => {
     expect(screen.queryByRole('form', { name: /add box parameters/i })).toBeNull();
   });
 
-  it('keeps the form open and shows the refusal message when the edit is rejected', () => {
+  it('keeps the form open and shows the command refusal summary when the edit is rejected', () => {
     const form = openEditor();
     fireEvent.change(within(form).getByLabelText(/^Size/), { target: { value: '0, 0, 0' } });
     fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
 
     expect(screen.getByRole('form', { name: /add box parameters/i })).toBeDefined();
-    expect(screen.getAllByRole('alert').length).toBeGreaterThan(0);
+    const alerts = screen.getAllByRole('alert').map((alert) => alert.textContent ?? '');
+    expect(alerts.some((text) => /changed nothing when replayed/.test(text))).toBe(true);
+    const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
+    expect(box?.kind === 'box' ? box.size : null).toEqual([2, 2, 2]);
+  });
+
+  it('dispatches a schema-invalid edit and shows the core refusal instead of pre-validating', () => {
+    const form = openEditor();
+    fireEvent.change(within(form).getByLabelText(/^Size/), { target: { value: '1, 2' } });
+    fireEvent.click(within(form).getByRole('button', { name: /^Apply/ }));
+
+    expect(screen.getByRole('form', { name: /add box parameters/i })).toBeDefined();
     const box = Object.values(useStore.getState().document.entities).find((e) => e?.kind === 'box');
     expect(box?.kind === 'box' ? box.size : null).toEqual([2, 2, 2]);
   });
