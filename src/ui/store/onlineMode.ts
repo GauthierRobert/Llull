@@ -102,7 +102,7 @@ function dropRefusedGraceRun(
 ): void {
   const { localOutbox, liveBase } = get();
   const entry = localOutbox.find((queued) => queued.commandId === commandId);
-  if (entry !== undefined) poisonDroppedEntry(entry, liveBase);
+  if (entry !== undefined) poisonDroppedEntry(entry, liveBase, localOutbox);
   set((state) => ({
     localOutbox: removeOutboxEntry(state.localOutbox, commandId),
     lastSummary: `${message} — the server refused the command; it will not be synced.`,

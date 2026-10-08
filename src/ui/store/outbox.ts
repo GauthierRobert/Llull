@@ -49,6 +49,9 @@ let flushIdMap = new Map<string, string>();
  */
 let poisonedIds = new Map<string, string>();
 
+/** Local ids of entries the server accepted during this flush (cleared with `flushIdMap`). */
+let ackedLocalIds = new Set<string>();
+
 export function newCommandId(): string {
   const cryptoApi = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
   if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID();
@@ -65,21 +68,30 @@ export function resetSyncBookkeeping(): void {
   syncAttempt = 0;
   flushIdMap = new Map();
   poisonedIds = new Map();
+  ackedLocalIds = new Set();
   resetGraceRuns();
 }
 
 /**
  * Record the ids a dropped entry created locally (its `affected` ids the server document
  * `serverBase` does not hold) as poisoned, labelled `refusedName`.
- * @invariant ids the server already holds are not poisoned (a refused edit of them leaves them valid).
+ * @invariant ids the server already holds are not poisoned (a refused edit of them leaves them valid):
+ *   in `serverBase`, acked earlier in this flush, or introduced by an earlier entry of `localOutbox`.
  */
 export function poisonDroppedEntry(
   entry: OutboxCommand,
   serverBase: CadDocument,
+  localOutbox: readonly OutboxCommand[],
   refusedName: string = entry.name,
 ): void {
+  const entryIndex = localOutbox.findIndex((queued) => queued.commandId === entry.commandId);
+  const earlierIds = new Set<string>();
+  for (const earlier of entryIndex < 0 ? [] : localOutbox.slice(0, entryIndex)) {
+    for (const id of earlier.affected) earlierIds.add(id);
+  }
   for (const id of entry.affected) {
-    if (!(id in serverBase.entities) && !poisonedIds.has(id)) poisonedIds.set(id, refusedName);
+    if (id in serverBase.entities || ackedLocalIds.has(id) || earlierIds.has(id)) continue;
+    if (!poisonedIds.has(id)) poisonedIds.set(id, refusedName);
   }
 }
 
@@ -166,7 +178,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
       const refusedDependency = refusedDependencyOf(next.params);
       if (refusedDependency !== undefined) {
         rejected.push(`'${next.name}' (depends on refused '${refusedDependency}')`);
-        poisonDroppedEntry(next, get().liveBase, refusedDependency);
+        poisonDroppedEntry(next, get().liveBase, get().localOutbox, refusedDependency);
         set((state) => ({ localOutbox: removeOutboxEntry(state.localOutbox, next.commandId) }));
         continue;
       }
@@ -178,10 +190,11 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
         );
         sent.push(response.summary);
         extendIdMap(flushIdMap, next.affected, response.affected);
+        for (const id of next.affected) ackedLocalIds.add(id);
       } catch (err: unknown) {
         if (!isCommandRefusal(err)) throw err;
         rejected.push(`'${next.name}' (${err.message})`);
-        poisonDroppedEntry(next, get().liveBase);
+        poisonDroppedEntry(next, get().liveBase, get().localOutbox);
       }
       set((state) => ({ localOutbox: removeOutboxEntry(state.localOutbox, next.commandId) }));
     }
@@ -190,6 +203,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
     const state = get();
     flushIdMap = new Map();
     poisonedIds = new Map();
+    ackedLocalIds = new Set();
     set({
       hasUnsyncedLocalEdits: false,
       syncState: 'idle',

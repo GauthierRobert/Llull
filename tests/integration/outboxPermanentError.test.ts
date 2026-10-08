@@ -245,6 +245,65 @@ describe('outbox — permanent HTTP errors', () => {
     expect(state().lastSummary).toContain('refused 1');
   });
 
+  it('a refused edit does not poison an entity an earlier entry of the same flush delivered', async () => {
+    resetStore('disconnected');
+    state().dispatch('add_box', { size: [1, 1, 1] });
+    const localBoxId = state().localOutbox[0]?.affected[0];
+    state().dispatch('move_entity', { id: localBoxId, delta: [1, 0, 0] });
+    state().dispatch('move_entity', { id: localBoxId, delta: [0, 1, 0] });
+    const server = scriptedServer((name, attempt) =>
+      name === 'move_entity' && attempt === 1 ? 422 : undefined,
+    );
+    vi.stubGlobal('fetch', server.fetch);
+
+    state().setLiveStatus('connected');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(server.applied()).toEqual(['add_box', 'move_entity']);
+    expect(state().lastSummary).toContain('refused 1');
+    expect(state().lastSummary).not.toContain('depends on refused');
+  });
+
+  it('a refused grace-run edit does not poison the box an earlier grace run created', async () => {
+    resetStore('connecting');
+    const settle: Array<(response: FakeResponse) => void> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<FakeResponse>((resolve) => settle.push(resolve))),
+    );
+    state().dispatch('add_box', { size: [1, 1, 1] });
+    const boxId = 'box-1.1';
+    state().dispatch('move_entity', { id: boxId, delta: [1, 0, 0] });
+    await vi.advanceTimersByTimeAsync(CONNECT_GRACE_MS);
+    expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box', 'move_entity']);
+    expect(state().localOutbox[0]?.affected).toEqual([boxId]);
+
+    settle[0]?.({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          summary: 'ok',
+          affected: [boxId],
+          isError: false,
+          canUndo: true,
+          canRedo: false,
+        }),
+    });
+    settle[1]?.(httpFail(422));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(state().localOutbox.map((entry) => entry.name)).toEqual(['add_box']);
+
+    state().dispatch('move_entity', { id: boxId, delta: [0, 1, 0] });
+    const server = scriptedServer(() => undefined);
+    vi.stubGlobal('fetch', server.fetch);
+    state().setLiveStatus('connected');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(server.applied()).toEqual(['add_box', 'move_entity']);
+    expect(state().lastSummary).not.toContain('depends on refused');
+  });
+
   it.each([403, 401, 404])(
     'a %i on every POST keeps both entries and the local document',
     async (status) => {
