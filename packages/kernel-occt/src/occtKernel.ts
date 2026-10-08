@@ -135,8 +135,29 @@ const BOOLEAN_BUILDERS: Readonly<Record<BooleanOp, string>> = {
   intersect: 'BRepAlgoAPI_Common_3',
 };
 
+/**
+ * Whether `error` (thrown by an OCC call) means the WASM module itself is degraded, as opposed to
+ * OCC gracefully refusing the input. This build has no C++ exception support, so ANY thrown C++
+ * exception (StdFail_NotDone, e.g. a fillet radius that is too large) surfaces as a JS
+ * `ReferenceError` for a missing `___cxa_*` import; those are graceful refusals for fillet/chamfer/
+ * shell. Booleans on near-tangent input are different: the same `___cxa_*` failure there leaves the
+ * module returning spurious nulls (cone apex on a face), so it counts. A WASM trap
+ * (`WebAssembly.RuntimeError`) or a thrown non-Error always counts; other JS Errors are
+ * binding/programming faults that do not touch module state.
+ */
+function degradesModule(error: unknown, operation: OperationClass): boolean {
+  if (!(error instanceof Error)) return true;
+  if (error.constructor.name === 'RuntimeError') return true; // WebAssembly.RuntimeError (a trap)
+  return (
+    operation === 'boolean' && error instanceof ReferenceError && /___cxa_/.test(error.message)
+  );
+}
+
+type OperationClass = 'boolean' | 'round';
+
 /** Run `body`, mapping any OCC exception to null and releasing every handle it registered. */
 function withHandles(
+  operation: OperationClass,
   body: (own: <T extends OccHandle | null>(handle: T) => T) => MeshData | null,
 ): MeshData | null {
   const owned: Array<OccHandle | null> = [];
@@ -146,10 +167,7 @@ function withHandles(
       return handle;
     });
   } catch (error) {
-    // Any exception means OCC rejected the input (a native C++ exception is not an Error and is
-    // expected, silent). It can leave the WASM module degraded, see `nativeFailureCount`. An Error
-    // is a binding or programming fault worth surfacing too.
-    nativeFailures++;
+    if (degradesModule(error, operation)) nativeFailures++;
     if (error instanceof Error)
       console.warn(`[occtKernel] OCC operation failed: ${errorMessage(error)}`);
     return null;
@@ -161,9 +179,10 @@ function withHandles(
 let nativeFailures = 0;
 
 /**
- * Operations that ended in a native C++ exception since load. After one, later booleans on the same
- * module can fail spuriously (observed: identical calls succeed once, then return null), so a host
- * that can restart the module (the worker-thread kernel) should do so when this count grows.
+ * Operations that left the WASM module degraded since load (a trap, a non-Error throw, or a boolean
+ * that died in a C++ exception). After one, later booleans on the same module can fail spuriously,
+ * so a host that can restart the module (the worker-thread kernel) should do so when this count
+ * grows. Graceful refusals (fillet radius too large, boolean `IsDone() == false`) are not counted.
  */
 export function nativeFailureCount(): number {
   return nativeFailures;
@@ -183,7 +202,7 @@ function roundEdges(
   makeBuilder: (solid: OccShape) => OccFilletMaker,
 ): MeshData | null {
   if (!(size > 0) || mesh.positions.length === 0) return null;
-  return withHandles((own) => {
+  return withHandles('round', (own) => {
     const solid = own(meshDataToTopoDSShape(api, mesh));
     if (!solid) {
       console.warn(
@@ -223,14 +242,12 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
   return {
     booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null {
       const [operandA, operandB] = clearTangentContact(a, b);
-      return withHandles((own) => {
+      return withHandles('boolean', (own) => {
         const shapeA = own(entityToOccShape(api, operandA));
         const shapeB = shapeA && own(entityToOccShape(api, operandB));
         if (!shapeA || !shapeB) return null;
         const builder = own(new api[BOOLEAN_BUILDERS[op]](shapeA, shapeB) as OccBuilder);
-        if (builder.IsDone()) return extractMeshData(api, own(builder.Shape()));
-        nativeFailures++; // OCC gave up on this pair (typically near-tangent input)
-        return null;
+        return builder.IsDone() ? extractMeshData(api, own(builder.Shape())) : null;
       });
     },
 
@@ -251,7 +268,7 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
     /** Closed hollow: the solid minus its inward offset by `thickness` (a sealed internal cavity). */
     shellSolid(shape: MeshData, thickness: number): MeshData | null {
       if (!(thickness > 0) || shape.positions.length === 0) return null;
-      return withHandles((own) => {
+      return withHandles('round', (own) => {
         const solid = own(meshDataToTopoDSShape(api, shape));
         if (!solid) return null;
         const offset = own(new api.BRepOffsetAPI_MakeOffsetShape_1() as OccOffsetMaker);
@@ -274,7 +291,7 @@ export async function createOcctKernel(options: OcctKernelOptions = {}): Promise
     },
 
     tessellate(entity: Entity): MeshData | null {
-      return withHandles((own) => {
+      return withHandles('round', (own) => {
         const shape = own(entityToOccShape(api, entity));
         return shape && extractMeshData(api, shape);
       });

@@ -86,6 +86,37 @@ describe('isolated OCC kernel', () => {
     }
   }, 180_000);
 
+  it('does not recycle the worker for a graceful refusal such as an oversized fillet', () => {
+    const kernel = make();
+    const mesh = kernel.tessellate(box(10));
+    expect(mesh).not.toBeNull();
+    expect(kernel.filletEdges(mesh!, [], 50)).toBeNull();
+    expect(kernel.recycleCount()).toBe(0);
+    expect(kernel.crashCount()).toBe(0);
+    expect(kernel.tessellate(box(2))).not.toBeNull();
+  }, 120_000);
+
+  it('reloads a recycled worker in the background so the next call is not slow', async () => {
+    const kernel = make();
+    const cone = {
+      id: 'k',
+      kind: 'cone',
+      radius: 1,
+      height: 3,
+      position: [0, 0, -3],
+      rotation: [0, 0, 0],
+      layerId: 'layer-default',
+      color: '#888888',
+    } as Entity;
+    const floor = { ...box(8), position: [0, 0, -4] } as Entity;
+    kernel.booleanOp('union', cone, floor);
+    expect(kernel.recycleCount()).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 15_000)); // the replacement loads meanwhile
+    const started = Date.now();
+    expect(kernel.tessellate(box(2))).not.toBeNull();
+    expect(Date.now() - started).toBeLessThan(1_000);
+  }, 120_000);
+
   describe('a worker that dies while idle', () => {
     const sleepSync = (ms: number): void =>
       void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
