@@ -183,7 +183,7 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
 }
 
 /** Average glyph advance as a fraction of the text height, used to estimate a text pick box. */
-export const TEXT_PICK_EM_WIDTH = 0.6;
+const TEXT_PICK_EM_WIDTH = 0.6;
 
 /** Line pitch as a multiple of the text height (troika's default line height is about 1.2 em). */
 const TEXT_LINE_PITCH = 1.2;

@@ -30,7 +30,7 @@ interface SampledGeometry {
 const CURVE_SAMPLES = 64;
 
 /** Box spanned by two opposite corners. @pure */
-export function boxFromCorners(a: Vec2, b: Vec2): Box {
+function boxFromCorners(a: Vec2, b: Vec2): Box {
   return {
     minX: Math.min(a[0], b[0]),
     minY: Math.min(a[1], b[1]),
