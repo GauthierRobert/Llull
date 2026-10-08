@@ -38,9 +38,13 @@ was mostly decorative.
 - Edge indices mean something now: a box has 12 edges, not 18 triangle edges. Seam edges (a
   cylinder's) and degenerate edges (a sphere's poles) are flagged, and `fillet_edge` rejects
   them along with out-of-range or repeated indices.
-- Open issue (topological naming): an index is stable only for an unchanged source recipe. After an
-  upstream parametric edit (a box resized, steps reordered) a stored `edges: [3]` can name a
-  different edge. Persistent naming, for example selecting by geometric query, is future work.
+- Topological naming: an index is stable only for an unchanged source recipe; after an upstream
+  parametric edit a stored `edgeIndices: [3]` can name a different edge. `fillet_edge` and
+  `chamfer_edge` therefore also take `edgesNear` (points). The feature history keeps the points, and
+  each replay re-resolves them to the roundable edge with the nearest mid point on the regenerated
+  B-rep, so a fillet follows its edge through a resize (`server/tests/occtParametricEdges.test.ts`).
+  A full persistent-naming scheme (face/edge history from OCC's BRepTools_History) remains future
+  work.
 - Replay is cheap: the kernel cache spans steps, so editing step k rebuilds only the nodes whose
   recipe changed.
 - Fallback to triangles happens only for a capability gap (`GeometryKernel.supports`), never
@@ -55,5 +59,13 @@ was mostly decorative.
 - Documents grow: a result embeds its operands' definitions. That is the recipe, by design (L8).
 - Manifold stays mesh-only: fillet/chamfer/shell recipes, `topology` and `exportStep` return
   null, and the commands no-op as before.
+- Code export (`export_code`, and through it the Python `export_step`) rebuilds kernel results
+  from their construction too. History steps become `fillet(…)`, `chamfer(…)` and `shell(…)` calls,
+  and a stored `brep` (snapshot export) is lowered node by node (`codegen/recipeLowering.ts`). Fillet
+  and chamfer edges travel as indices plus their exact mid points; the runtime selects edges by
+  nearest mid point, which is robust to edge-order differences between OCC builds (opencascade.js vs
+  CadQuery's OCP). OpenSCAD has no fillets, so it receives the exact result's triangles. The trace
+  round-trips: `apply_code_trace` replays `fillet_edge` / `chamfer_edge` / `shell_solid`. This is
+  verified against real CadQuery (`server/tests/brepCodeExchange.integration.test.ts`).
 - Gotcha: this opencascade.js build corrupts `STEPControl_Writer.Write` paths longer than about
   12 characters, so the writer uses a fixed `/out.step`.

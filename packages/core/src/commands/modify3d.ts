@@ -6,12 +6,12 @@
  * @layer core/commands
  */
 
-import type { CadDocument, Entity } from '../model/types';
+import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { ShapeRecipe } from '../geometry/shapeRecipe';
-import type { ShapeTopology } from '../geometry/kernel';
 import { is3D } from '../model/types';
 import type { CommandResult } from './types';
-import { defineCommand, z } from './schema';
+import { defineCommand, vec3, z } from './schema';
+import { selectEdges } from './edgeSelection';
 import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
@@ -62,33 +62,10 @@ interface EdgeModification {
   readonly id: string;
   /** Selected unique-edge indices (fillet / chamfer); checked against the exact topology. */
   readonly edges?: readonly number[];
-  /** The modification node over the operand's exact recipe. */
-  readonly recipe: (source: ShapeRecipe) => ShapeRecipe;
-}
-
-/**
- * Why `edges` cannot be selected on a shape of `topology` (out of range, repeated, seam or degenerate),
- * or null; a kernel without exact topology (null) cannot check, so it accepts.
- */
-function edgeSelectionProblem(
-  topology: ShapeTopology | null,
-  edges: readonly number[],
-): string | null {
-  if (topology === null) return null;
-  const count = topology.edges.length;
-  const outOfRange = edges.filter((index) => index >= count);
-  if (outOfRange.length > 0) {
-    return `edge index ${outOfRange.join(', ')} out of range (the solid has ${count} edges, 0..${count - 1}; inspect_topology lists them)`;
-  }
-  const repeated = edges.filter((index, at) => edges.indexOf(index) !== at);
-  if (repeated.length > 0) return `edge index ${[...new Set(repeated)].join(', ')} selected twice`;
-  const unroundable = edges.filter((index) => {
-    const edge = topology.edges[index];
-    return edge !== undefined && (edge.seam || edge.degenerate);
-  });
-  return unroundable.length > 0
-    ? `edge ${unroundable.join(', ')} is a seam or degenerate edge (no corner to round)`
-    : null;
+  /** Points naming edges by their nearest mid point (`edgesNear`), resolved on the current solid. */
+  readonly near?: readonly Vec3[];
+  /** The modification node over the operand's exact recipe and the resolved edges. */
+  readonly recipe: (source: ShapeRecipe, edges: readonly number[]) => ShapeRecipe;
 }
 
 /**
@@ -98,7 +75,7 @@ function edgeSelectionProblem(
 function modifyEdges(
   doc: CadDocument,
   ctx: ExecutionContext | undefined,
-  { command, pastTense, amountName, amount, id, edges = [], recipe }: EdgeModification,
+  { command, pastTense, amountName, amount, id, edges = [], near = [], recipe }: EdgeModification,
 ): CommandResult {
   if (amount <= 0) return noop(doc, `${command}: ${amountName} must be > 0 (got ${amount}).`);
   const validation = validateSolidTarget(doc, command, id);
@@ -115,10 +92,10 @@ function modifyEdges(
       `${command}: kernel could not build entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
     );
   }
-  const badEdges = edgeSelectionProblem(kernel.topology(sourceShape), edges);
-  if (badEdges !== null)
-    return noop(doc, `${command}: ${badEdges} on '${id}'; document unchanged.`);
-  const result = evaluateRecipe(kernel, recipe(source));
+  const selection = selectEdges(kernel.topology(sourceShape), edges, near);
+  if ('problem' in selection)
+    return noop(doc, `${command}: ${selection.problem} on '${id}'; document unchanged.`);
+  const result = evaluateRecipe(kernel, recipe(source, selection.edges));
   if (typeof result === 'string') {
     return noop(
       doc,
@@ -131,7 +108,7 @@ function modifyEdges(
   const document = replaceEntities(doc, [id], meshEntity);
   return {
     document,
-    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${fallbackSuffix(kernel, [entity])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
+    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : ''}${fallbackSuffix(kernel, [entity])}${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
     affected: [newId],
   };
 }
@@ -151,7 +128,8 @@ export const filletEdge = defineCommand({
     'Round (fillet) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity ' +
     'that keeps the exact construction (its brep recipe), so booleans, further fillets and STEP export ' +
     'still see true faces and edges. The source entity is consumed. ' +
-    'edgeIndices selects which edges to fillet (indices from inspect_topology); omit or pass [] to fillet ALL edges. ' +
+    'Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, ' +
+    'robust to parametric edits); with neither, ALL edges are filleted. ' +
     `Requires a geometry kernel that supports fillets (${OCC_KERNEL_HINT}). ` +
     'With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
@@ -163,12 +141,24 @@ export const filletEdge = defineCommand({
       .array(z.number().int().nonnegative())
       .describe(
         '0-based indices of the unique B-rep edges to fillet, as listed by inspect_topology on the same entity ' +
-          '(each edge counted once). Pass [] or omit to fillet ALL edges.',
+          '(each edge counted once). Pass [] or omit (with no edgesNear) to fillet ALL edges.',
+      )
+      .optional(),
+    edgesNear: z
+      .array(
+        vec3(
+          'A point [x, y, z] near the edge to fillet (e.g. its mid point from inspect_topology).',
+        ),
+      )
+      .describe(
+        'Select edges by location: each point picks the roundable edge whose mid point is nearest. ' +
+          'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
+          're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )
       .optional(),
     radius: z.number().describe('Fillet radius in document units. Must be > 0.'),
   }),
-  run: (doc, { id, edgeIndices = [], radius }, ctx): CommandResult =>
+  run: (doc, { id, edgeIndices = [], edgesNear = [], radius }, ctx): CommandResult =>
     modifyEdges(doc, ctx, {
       command: 'fillet_edge',
       pastTense: 'filleted',
@@ -176,7 +166,8 @@ export const filletEdge = defineCommand({
       amount: radius,
       id,
       edges: edgeIndices,
-      recipe: (source) => ({ op: 'fillet', source, edges: edgeIndices, size: radius }),
+      near: edgesNear,
+      recipe: (source, edges) => ({ op: 'fillet', source, edges: [...edges], size: radius }),
     }),
 });
 
@@ -194,7 +185,8 @@ export const chamferEdge = defineCommand({
   description:
     'Bevel (chamfer) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity ' +
     'that keeps the exact construction (its brep recipe). The source entity is consumed. ' +
-    'edgeIndices selects which edges to chamfer (indices from inspect_topology); omit or pass [] to chamfer ALL edges. ' +
+    'Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, ' +
+    'robust to parametric edits); with neither, ALL edges are chamfered. ' +
     `Requires a geometry kernel that supports chamfers (${OCC_KERNEL_HINT}); ` +
     'with the default Manifold kernel this command gracefully no-ops. ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
@@ -206,12 +198,24 @@ export const chamferEdge = defineCommand({
       .array(z.number().int().nonnegative())
       .describe(
         '0-based indices of the unique B-rep edges to chamfer, as listed by inspect_topology on the same entity ' +
-          '(each edge counted once). Pass [] or omit to chamfer ALL edges.',
+          '(each edge counted once). Pass [] or omit (with no edgesNear) to chamfer ALL edges.',
+      )
+      .optional(),
+    edgesNear: z
+      .array(
+        vec3(
+          'A point [x, y, z] near the edge to chamfer (e.g. its mid point from inspect_topology).',
+        ),
+      )
+      .describe(
+        'Select edges by location: each point picks the roundable edge whose mid point is nearest. ' +
+          'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
+          're-selected after an upstream edit renumbers edges. Combines with edgeIndices.',
       )
       .optional(),
     distance: z.number().describe('Chamfer distance in document units. Must be > 0.'),
   }),
-  run: (doc, { id, edgeIndices = [], distance }, ctx): CommandResult =>
+  run: (doc, { id, edgeIndices = [], edgesNear = [], distance }, ctx): CommandResult =>
     modifyEdges(doc, ctx, {
       command: 'chamfer_edge',
       pastTense: 'chamfered',
@@ -219,7 +223,8 @@ export const chamferEdge = defineCommand({
       amount: distance,
       id,
       edges: edgeIndices,
-      recipe: (source) => ({ op: 'chamfer', source, edges: edgeIndices, size: distance }),
+      near: edgesNear,
+      recipe: (source, edges) => ({ op: 'chamfer', source, edges: [...edges], size: distance }),
     }),
 });
 

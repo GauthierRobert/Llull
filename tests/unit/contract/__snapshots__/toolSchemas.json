@@ -2662,7 +2662,7 @@
     "name": "chamfer_2d"
   },
   {
-    "description": "Bevel (chamfer) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity that keeps the exact construction (its brep recipe). The source entity is consumed. edgeIndices selects which edges to chamfer (indices from inspect_topology); omit or pass [] to chamfer ALL edges. Requires a geometry kernel that supports chamfers (the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)); with the default Manifold kernel this command gracefully no-ops. Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).",
+    "description": "Bevel (chamfer) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity that keeps the exact construction (its brep recipe). The source entity is consumed. Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, robust to parametric edits); with neither, ALL edges are chamfered. Requires a geometry kernel that supports chamfers (the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)); with the default Manifold kernel this command gracefully no-ops. Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).",
     "input_schema": {
       "properties": {
         "distance": {
@@ -2670,9 +2670,20 @@
           "type": "number"
         },
         "edgeIndices": {
-          "description": "0-based indices of the unique B-rep edges to chamfer, as listed by inspect_topology on the same entity (each edge counted once). Pass [] or omit to chamfer ALL edges.",
+          "description": "0-based indices of the unique B-rep edges to chamfer, as listed by inspect_topology on the same entity (each edge counted once). Pass [] or omit (with no edgesNear) to chamfer ALL edges.",
           "items": {
             "type": "integer"
+          },
+          "type": "array"
+        },
+        "edgesNear": {
+          "description": "Select edges by location: each point picks the roundable edge whose mid point is nearest. Prefer this in parametric models: the feature history keeps the points, so the same edge is re-selected after an upstream edit renumbers edges. Combines with edgeIndices.",
+          "items": {
+            "description": "A point [x, y, z] near the edge to chamfer (e.g. its mid point from inspect_topology).",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
           },
           "type": "array"
         },
@@ -4488,7 +4499,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Export the model as parametric source code: CadQuery or build123d (Python), OpenSCAD, or a FreeCAD macro. Parameters become named variables, parameter-driven dimensions stay expressions, and every feature (primitive, boolean, move, delete, rename) appears in feature-history order, so the code states exact dimensions and build order. CadQuery/build123d output can be edited and re-imported with import_code. Read-only: returns data.text (plus fileName, language, source, counts).",
+    "description": "Export the model as parametric source code: CadQuery or build123d (Python), OpenSCAD, or a FreeCAD macro. Parameters become named variables, parameter-driven dimensions stay expressions, and every feature (primitive, boolean, fillet, chamfer, shell, move, delete, rename) appears in feature-history order — kernel results are rebuilt from their exact construction, not triangles — so the code states exact dimensions and build order. CadQuery/build123d output can be edited and re-imported with import_code. Read-only: returns data.text (plus fileName, language, source, counts).",
     "input_schema": {
       "properties": {
         "language": {
@@ -4888,13 +4899,24 @@
     "name": "fillet_2d"
   },
   {
-    "description": "Round (fillet) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity that keeps the exact construction (its brep recipe), so booleans, further fillets and STEP export still see true faces and edges. The source entity is consumed. edgeIndices selects which edges to fillet (indices from inspect_topology); omit or pass [] to fillet ALL edges. Requires a geometry kernel that supports fillets (the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).",
+    "description": "Round (fillet) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity that keeps the exact construction (its brep recipe), so booleans, further fillets and STEP export still see true faces and edges. The source entity is consumed. Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, robust to parametric edits); with neither, ALL edges are filleted. Requires a geometry kernel that supports fillets (the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).",
     "input_schema": {
       "properties": {
         "edgeIndices": {
-          "description": "0-based indices of the unique B-rep edges to fillet, as listed by inspect_topology on the same entity (each edge counted once). Pass [] or omit to fillet ALL edges.",
+          "description": "0-based indices of the unique B-rep edges to fillet, as listed by inspect_topology on the same entity (each edge counted once). Pass [] or omit (with no edgesNear) to fillet ALL edges.",
           "items": {
             "type": "integer"
+          },
+          "type": "array"
+        },
+        "edgesNear": {
+          "description": "Select edges by location: each point picks the roundable edge whose mid point is nearest. Prefer this in parametric models: the feature history keeps the points, so the same edge is re-selected after an upstream edit renumbers edges. Combines with edgeIndices.",
+          "items": {
+            "description": "A point [x, y, z] near the edge to fillet (e.g. its mid point from inspect_topology).",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
           },
           "type": "array"
         },

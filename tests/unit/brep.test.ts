@@ -134,6 +134,52 @@ describe('kernel results keep their exact construction', () => {
     ).toHaveLength(1);
   });
 
+  it('edgesNear picks the roundable edge with the nearest mid point and merges with indices', () => {
+    const { doc, a } = twoBoxes();
+    const near = TOPOLOGY.edges.map((edge, index) => ({ ...edge, mid: [index, 0, 0] as const }));
+    const kernel = fakeKernel({ fillet: TETRA, topology: { ...TOPOLOGY, edges: near } });
+    const result = run(
+      doc,
+      'fillet_edge',
+      {
+        id: a,
+        edgeIndices: [2],
+        edgesNear: [
+          [7.2, 0.1, 0],
+          [2.1, 0, 0],
+          [40, 0, 0],
+        ],
+        radius: 0.1,
+      },
+      kernel,
+    );
+    expect(result.summary).toContain('edgesNear selected edges 2, 7, 28');
+    const mesh = result.document.entities[result.affected[0]!] as MeshSolidEntity;
+    expect(mesh.brep).toMatchObject({ op: 'fillet', edges: [2, 7, 28] });
+    expect(result.document.featureHistory.at(-1)?.params).toMatchObject({
+      edgesNear: [
+        [7.2, 0.1, 0],
+        [2.1, 0, 0],
+        [40, 0, 0],
+      ],
+    });
+  });
+
+  it('edgesNear needs exact topology and a roundable edge', () => {
+    const { doc, a } = twoBoxes();
+    const params = { id: a, edgesNear: [[0, 0, 0]], distance: 0.1 };
+    expect(run(doc, 'chamfer_edge', params, fakeKernel({ chamfer: TETRA })).summary).toMatch(
+      /edgesNear needs the exact B-rep topology/,
+    );
+    const seamsOnly = {
+      ...TOPOLOGY,
+      edges: TOPOLOGY.edges.map((edge) => ({ ...edge, seam: true })),
+    };
+    expect(
+      run(doc, 'chamfer_edge', params, fakeKernel({ chamfer: TETRA, topology: seamsOnly })).summary,
+    ).toMatch(/found no roundable edge/);
+  });
+
   it('fillet_edge on a component instance asks to explode it first', () => {
     const { doc, a } = twoBoxes();
     const instance = { ...doc.entities[a]!, id: 'inst', kind: 'instance', componentId: 'c' };
