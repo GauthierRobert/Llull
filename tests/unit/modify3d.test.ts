@@ -281,6 +281,8 @@ describe('modify3d commands', () => {
       expect(result.document).toBe(doc);
       expect(result.document.entities[boxId]).toBeDefined();
       expect(result.summary).toContain('returned null');
+      expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
+      expect(result.summary).not.toContain('Try ?kernel=occt');
     });
 
     // -----------------------------------------------------------------------
@@ -447,6 +449,8 @@ describe('modify3d commands', () => {
       expect(result.document).toBe(doc);
       expect(result.document.entities[boxId]).toBeDefined();
       expect(result.summary).toContain('returned null');
+      expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
+      expect(result.summary).not.toContain('Try ?kernel=occt');
     });
 
     // -----------------------------------------------------------------------

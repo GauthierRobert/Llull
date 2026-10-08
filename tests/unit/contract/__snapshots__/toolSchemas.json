@@ -4868,7 +4868,7 @@
     "name": "fillet_2d"
   },
   {
-    "description": "Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. The source entity is consumed and replaced by the filleted mesh result. edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges (OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). Requires a geometry kernel that supports filletEdges (available with ?kernel=occt). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).",
+    "description": "Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. The source entity is consumed and replaced by the filleted mesh result. edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges (OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). Requires a geometry kernel that supports filletEdges (available with the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).",
     "input_schema": {
       "properties": {
         "edgeIndices": {
