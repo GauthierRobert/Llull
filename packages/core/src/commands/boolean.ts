@@ -1,6 +1,8 @@
 /**
  * Boolean solid commands (union, subtract, intersect): two 3D solid operands become one mesh
- * entity evaluated by the injected GeometryKernel; a missing kernel or a null result is a no-op.
+ * entity whose `brep` is the boolean recipe of their exact shapes (so later fillets/booleans see real
+ * edges and faces); the mesh is the kernel's display tessellation. A missing kernel or a null result
+ * is a no-op.
  *
  * @layer core/commands
  */
@@ -9,13 +11,13 @@ import type { CadDocument, Entity } from '../model/types';
 import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
-import type { BooleanOp } from '../geometry/kernel';
+import type { BooleanOp, ShapeRecipe } from '../geometry/shapeRecipe';
 import type { ExecutionContext } from './context';
 import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
-import { newEntity } from './newEntity';
+import { evaluateRecipe, kernelResultEntity, operandRecipe, topologySuffix } from './kernelShape';
 import { noop } from './noop';
 
 function runBoolean(
@@ -49,18 +51,23 @@ function runBoolean(
   }
   const [entA, entB] = operands as [Entity, Entity];
 
-  const k = (ctx ?? currentContext()).kernel;
-  if (!k) return noop(doc, kernelUnavailable(opName));
+  const kernel = (ctx ?? currentContext()).kernel;
+  if (!kernel) return noop(doc, kernelUnavailable(opName));
 
-  const meshData = k.booleanOp(op, entA, entB);
-  if (!meshData) {
+  const recipe: ShapeRecipe = {
+    op: 'boolean',
+    boolean: op,
+    a: operandRecipe(kernel, entA),
+    b: operandRecipe(kernel, entB),
+  };
+  const result = evaluateRecipe(kernel, recipe);
+  if (result === 'refused') {
     return noop(
       doc,
       `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`,
     );
   }
-
-  if (meshData.indices.length === 0) {
+  if (result === 'empty') {
     return noop(
       doc,
       `${opName}: the result of '${a}' and '${b}' is empty (no volume remains, e.g. disjoint solids for an intersection); operands kept.`,
@@ -68,15 +75,12 @@ function runBoolean(
   }
 
   const newId = nextId('mesh');
-  const meshEntity = newEntity('mesh', newId, { mesh: meshData }, [0, 0, 0], entA.color, {
-    layerId: entA.layerId,
-  });
-
-  const triangleCount = meshData.indices.length / 3;
+  const meshEntity = kernelResultEntity(newId, result, entA);
+  const triangleCount = result.mesh.indices.length / 3;
   const document = replaceEntities(doc, [a, b], meshEntity);
   return {
     document,
-    summary: `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.${referenceLossSuffix(doc, document)}`,
+    summary: `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangleCount} triangles). Operands consumed.${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
     affected: [newId],
   };
 }

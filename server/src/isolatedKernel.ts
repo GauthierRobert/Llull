@@ -7,6 +7,8 @@
  * and the next call respawns it.
  *
  * @invariant the interface stays synchronous (`packages/core` is unchanged)
+ * @invariant shape handles cross the thread boundary as plain data (they carry their recipe), so a
+ *   handle minted by a worker that has since been recycled is rebuilt by its successor
  * @failure worker died / timed out / failed to start -> null result + console.warn, never a throw
  */
 
@@ -226,16 +228,11 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   };
 
   return {
-    booleanOp: (op, a, b) =>
-      call('booleanOp', [op, a, b]) as ReturnType<GeometryKernel['booleanOp']>,
-    filletEdges: (shape, edges, radius) =>
-      call('filletEdges', [shape, edges, radius]) as ReturnType<GeometryKernel['filletEdges']>,
-    chamferEdges: (shape, edges, distance) =>
-      call('chamferEdges', [shape, edges, distance]) as ReturnType<GeometryKernel['chamferEdges']>,
-    shellSolid: (shape, thickness) =>
-      call('shellSolid', [shape, thickness]) as ReturnType<GeometryKernel['shellSolid']>,
-    tessellate: (entity) =>
-      call('tessellate', [entity]) as ReturnType<GeometryKernel['tessellate']>,
+    evaluate: (recipe) => call('evaluate', [recipe]) as ReturnType<GeometryKernel['evaluate']>,
+    tessellate: (shape) => call('tessellate', [shape]) as ReturnType<GeometryKernel['tessellate']>,
+    topology: (shape) => call('topology', [shape]) as ReturnType<GeometryKernel['topology']>,
+    exportStep: (shapes) =>
+      call('exportStep', [shapes]) as ReturnType<GeometryKernel['exportStep']>,
     crashCount: () => crashes,
     recycleCount: () => recycles,
     forceFailure: (hook) => void call(hook, []),

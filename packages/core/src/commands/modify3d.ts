@@ -1,13 +1,13 @@
 /**
- * Fillet, chamfer and shell: the injected GeometryKernel tessellates a 3D solid and rounds/bevels its
- * edges (or hollows it); the source entity is replaced by the resulting `mesh` entity. A null kernel
- * result is a no-op.
+ * Fillet, chamfer and shell: the injected GeometryKernel rounds/bevels the exact edges of a 3D solid
+ * (or hollows it) — on its B-rep, never on triangles; the source entity is replaced by a `mesh` entity
+ * whose `brep` records the modification recipe. A null kernel result is a no-op.
  *
  * @layer core/commands
  */
 
 import type { CadDocument, Entity } from '../model/types';
-import type { GeometryKernel, MeshData } from '../geometry/kernel';
+import type { ShapeRecipe } from '../geometry/shapeRecipe';
 import { is3D } from '../model/types';
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
@@ -16,7 +16,7 @@ import { currentContext } from './context';
 import { nextId } from '../lib/id';
 import { referenceLossSuffix, replaceEntities } from './entityOps';
 import { kernelUnavailable } from './kernelRefusal';
-import { newEntity } from './newEntity';
+import { evaluateRecipe, kernelResultEntity, operandRecipe, topologySuffix } from './kernelShape';
 import { noop } from './noop';
 
 /** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
@@ -47,14 +47,18 @@ interface EdgeModification {
   readonly amountName: 'radius' | 'distance' | 'thickness';
   readonly amount: number;
   readonly id: string;
-  readonly apply: (kernel: GeometryKernel, mesh: MeshData) => MeshData | null;
+  /** The modification node over the operand's exact recipe. */
+  readonly recipe: (source: ShapeRecipe) => ShapeRecipe;
 }
 
-/** Shared body of fillet_edge / chamfer_edge / shell_solid: validate, tessellate, modify edges, replace the source. */
+/**
+ * Shared body of fillet_edge / chamfer_edge / shell_solid: validate, build the modification recipe on
+ * the operand's exact shape (its real B-rep edges under OCC), replace the source by the result.
+ */
 function modifyEdges(
   doc: CadDocument,
   ctx: ExecutionContext | undefined,
-  { command, pastTense, amountName, amount, id, apply }: EdgeModification,
+  { command, pastTense, amountName, amount, id, recipe }: EdgeModification,
 ): CommandResult {
   if (amount <= 0) return noop(doc, `${command}: ${amountName} must be > 0 (got ${amount}).`);
   const validation = validateSolidTarget(doc, command, id);
@@ -63,15 +67,15 @@ function modifyEdges(
 
   const kernel = (ctx ?? currentContext()).kernel;
   if (!kernel) return noop(doc, kernelUnavailable(command));
-  const meshData = kernel.tessellate(entity);
-  if (!meshData) {
+  const source = operandRecipe(kernel, entity);
+  if (kernel.evaluate(source) === null) {
     return noop(
       doc,
-      `${command}: kernel could not tessellate entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
+      `${command}: kernel could not build entity '${id}' (kind '${entity.kind}'). The entity may have degenerate geometry or an unsupported kind for this kernel.`,
     );
   }
-  const modified = apply(kernel, meshData);
-  if (!modified) {
+  const result = evaluateRecipe(kernel, recipe(source));
+  if (typeof result === 'string') {
     return noop(
       doc,
       `${command}: kernel does not support ${command} for this operand (returned null). Use ${OCC_KERNEL_HINT} or a different operand.`,
@@ -79,13 +83,11 @@ function modifyEdges(
   }
 
   const newId = nextId('mesh');
-  const meshEntity = newEntity('mesh', newId, { mesh: modified }, [0, 0, 0], entity.color, {
-    layerId: entity.layerId,
-  });
+  const meshEntity = kernelResultEntity(newId, result, entity);
   const document = replaceEntities(doc, [id], meshEntity);
   return {
     document,
-    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${modified.indices.length / 3} triangles). Source entity consumed.${referenceLossSuffix(doc, document)}`,
+    summary: `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${result.mesh.indices.length / 3} triangles). Source entity consumed.${topologySuffix(kernel, result.shape)}${referenceLossSuffix(doc, document)}`,
     affected: [newId],
   };
 }
@@ -102,23 +104,22 @@ export const filletEdge = defineCommand({
   name: 'fillet_edge',
   annotations: { requiresKernel: true },
   description:
-    'Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. ' +
-    'The source entity is consumed and replaced by the filleted mesh result. ' +
-    'edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges ' +
-    '(OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). ' +
-    `Requires a geometry kernel that supports filletEdges (available with ${OCC_KERNEL_HINT}). ` +
+    'Round (fillet) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity ' +
+    'that keeps the exact construction (its brep recipe), so booleans, further fillets and STEP export ' +
+    'still see true faces and edges. The source entity is consumed. ' +
+    'edgeIndices selects which edges to fillet (indices from inspect_topology); omit or pass [] to fillet ALL edges. ' +
+    `Requires a geometry kernel that supports fillets (${OCC_KERNEL_HINT}). ` +
     'With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). ' +
-    'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).',
+    'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
   params: z.object({
     id: z
       .string()
       .describe('Id of the 3D solid entity to fillet. Must exist and be a 3D solid kind.'),
     edgeIndices: z
-      .array(z.number())
+      .array(z.number().int().nonnegative())
       .describe(
-        '0-based indices of the edges to fillet. Pass [] or omit to fillet ALL edges. ' +
-          'Edge numbering is kernel-defined (OCC enumerates edges in topology traversal order). ' +
-          'Ignored by kernels that do not support partial-edge selection.',
+        '0-based indices of the unique B-rep edges to fillet, as listed by inspect_topology on the same entity ' +
+          '(each edge counted once). Pass [] or omit to fillet ALL edges.',
       )
       .optional(),
     radius: z.number().describe('Fillet radius in document units. Must be > 0.'),
@@ -130,7 +131,7 @@ export const filletEdge = defineCommand({
       amountName: 'radius',
       amount: radius,
       id,
-      apply: (kernel, mesh) => kernel.filletEdges(mesh, edgeIndices, radius),
+      recipe: (source) => ({ op: 'fillet', source, edges: edgeIndices, size: radius }),
     }),
 });
 
@@ -146,23 +147,21 @@ export const chamferEdge = defineCommand({
   name: 'chamfer_edge',
   annotations: { requiresKernel: true },
   description:
-    'Bevel (chamfer) the edges of a 3D solid entity and replace it with a new mesh entity. ' +
-    'The source entity is consumed and replaced by the chamfered mesh result. ' +
-    'edgeIndices selects which edges to chamfer; omit or pass [] to chamfer ALL edges ' +
-    '(OCC convention: the kernel enumerates edges 0-based). ' +
-    'Requires a geometry kernel that supports chamferEdges. ' +
-    'Both the default Manifold kernel and the current OCC kernel gracefully no-op ' +
-    '(chamferEdges OCC spike is pending a separate batch). ' +
-    'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).',
+    'Bevel (chamfer) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity ' +
+    'that keeps the exact construction (its brep recipe). The source entity is consumed. ' +
+    'edgeIndices selects which edges to chamfer (indices from inspect_topology); omit or pass [] to chamfer ALL edges. ' +
+    `Requires a geometry kernel that supports chamfers (${OCC_KERNEL_HINT}); ` +
+    'with the default Manifold kernel this command gracefully no-ops. ' +
+    'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
   params: z.object({
     id: z
       .string()
       .describe('Id of the 3D solid entity to chamfer. Must exist and be a 3D solid kind.'),
     edgeIndices: z
-      .array(z.number())
+      .array(z.number().int().nonnegative())
       .describe(
-        '0-based indices of the edges to chamfer. Pass [] or omit to chamfer ALL edges. ' +
-          'Edge numbering is kernel-defined (OCC enumerates edges in topology traversal order).',
+        '0-based indices of the unique B-rep edges to chamfer, as listed by inspect_topology on the same entity ' +
+          '(each edge counted once). Pass [] or omit to chamfer ALL edges.',
       )
       .optional(),
     distance: z.number().describe('Chamfer distance in document units. Must be > 0.'),
@@ -174,7 +173,7 @@ export const chamferEdge = defineCommand({
       amountName: 'distance',
       amount: distance,
       id,
-      apply: (kernel, mesh) => kernel.chamferEdges(mesh, edgeIndices, distance),
+      recipe: (source) => ({ op: 'chamfer', source, edges: edgeIndices, size: distance }),
     }),
 });
 
@@ -212,6 +211,6 @@ export const shellSolid = defineCommand({
       amountName: 'thickness',
       amount: thickness,
       id,
-      apply: (kernel, mesh) => kernel.shellSolid(mesh, thickness),
+      recipe: (source) => ({ op: 'shell', source, thickness }),
     }),
 });

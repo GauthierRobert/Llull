@@ -2,10 +2,17 @@
  * Injected geometry kernel interface (architecture L9). Interface only: no WASM, no three.js, no async.
  * Commands read it from `ctx.kernel` and no-op when it is null; the composition root installs it.
  *
+ * The kernel boundary is a SHAPE, not a mesh: a command hands the kernel a `ShapeRecipe` (the
+ * construction tree) and gets back an opaque, kernel-owned `ShapeHandle` (an exact B-rep under OCC).
+ * Meshes only come OUT of the kernel (`tessellate`), for display and mesh exports.
+ *
  * @layer core/geometry
  */
 
-import type { Entity } from '../model/types';
+import type { Vec3 } from '../model/types';
+import type { ShapeRecipe } from './shapeRecipe';
+
+export type { BooleanOp, ShapeRecipe } from './shapeRecipe';
 
 /**
  * World-space triangle mesh.
@@ -16,30 +23,74 @@ export interface MeshData {
   readonly indices: ReadonlyArray<number>;
 }
 
-export type BooleanOp = 'union' | 'subtract' | 'intersect';
+declare const shapeHandleBrand: unique symbol;
 
 /**
- * Every operation returns null when it cannot be performed (unsupported kind, degenerate geometry,
+ * Opaque reference to a kernel-owned shape. Core never inspects it: it only passes it back to the
+ * kernel that minted it. It stays valid after the kernel evicts or restarts (it re-evaluates).
+ */
+export interface ShapeHandle {
+  readonly [shapeHandleBrand]: true;
+}
+
+export type EdgeCurve = 'line' | 'circle' | 'ellipse' | 'bspline' | 'other';
+export type FaceSurface =
+  | 'plane'
+  | 'cylinder'
+  | 'cone'
+  | 'sphere'
+  | 'torus'
+  | 'bspline'
+  | 'revolution'
+  | 'extrusion'
+  | 'other';
+
+/** One unique edge; `index` is what `fillet_edge` / `chamfer_edge` `edgeIndices` select. */
+export interface ShapeEdge {
+  readonly index: number;
+  readonly curve: EdgeCurve;
+  readonly length: number;
+  readonly start: Vec3;
+  readonly end: Vec3;
+  /** Point at the parameter midpoint (on the curve, not the chord). */
+  readonly mid: Vec3;
+}
+
+export interface ShapeFace {
+  readonly index: number;
+  readonly surface: FaceSurface;
+  readonly area: number;
+}
+
+/** Exact topology of a kernel shape (B-rep faces and edges, deduplicated, kernel order). */
+export interface ShapeTopology {
+  readonly solids: number;
+  readonly faces: readonly ShapeFace[];
+  readonly edges: readonly ShapeEdge[];
+  readonly vertices: number;
+  readonly volume: number;
+}
+
+/**
+ * Every operation returns null when it cannot be performed (unsupported op, degenerate geometry,
  * kernel limitation); commands treat null as a no-op. Implementors must not mutate arguments.
- * Support today: `filletEdges`, `chamferEdges` and `shellSolid` are OCC only (Manifold returns null).
+ * Exact topology and STEP: OCC only (Manifold is a mesh kernel: `topology` / `exportStep` -> null,
+ * and fillet / chamfer / shell recipes evaluate to null).
  *
  * @pure
  */
 export interface GeometryKernel {
-  /** `a` and `b` are 3D solids; 'subtract' yields a − b. */
-  booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null;
+  /** Build (or reuse, by `recipeKey`) the kernel shape of a recipe. */
+  evaluate(recipe: ShapeRecipe): ShapeHandle | null;
 
-  /** `edgeIndices` are 0-based (empty = all edges); `radius` > 0 in document units. */
-  filletEdges(shape: MeshData, edgeIndices: number[], radius: number): MeshData | null;
+  /** Display mesh of a shape (output only: never fed back into the kernel). */
+  tessellate(shape: ShapeHandle): MeshData | null;
 
-  /** `edgeIndices` are 0-based (empty = all edges); `distance` > 0 in document units. */
-  chamferEdges(shape: MeshData, edgeIndices: number[], distance: number): MeshData | null;
+  /** Exact faces/edges of a shape; null for kernels without a B-rep. */
+  topology(shape: ShapeHandle): ShapeTopology | null;
 
-  /** Hollow a closed solid inward; `thickness` > 0 in document units. */
-  shellSolid(shape: MeshData, thickness: number): MeshData | null;
-
-  /** Mesh of a 3D solid entity; null for 2D entities. */
-  tessellate(entity: Entity): MeshData | null;
+  /** ISO 10303-21 (STEP AP214) text of the shapes as exact B-rep solids; null when unsupported. */
+  exportStep(shapes: readonly ShapeHandle[]): string | null;
 }
 
 let _kernel: GeometryKernel | null = null;

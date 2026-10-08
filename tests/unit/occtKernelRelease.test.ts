@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Entity } from '@core/model/types';
-import type { GeometryKernel } from '@core/geometry/kernel';
+import type { CachingKernel } from '@core/geometry/shapeKernel';
 import type { OcctFactory } from '@kernel-occt/occtKernel';
 
 interface Fake {
-  readonly kernel: GeometryKernel;
+  readonly kernel: CachingKernel;
   readonly leaked: () => number;
 }
 
@@ -32,7 +32,7 @@ async function makeFakeKernel(): Promise<Fake> {
     let visited = false;
     return handle({
       More: (): boolean => !visited,
-      Current: () => handle({}),
+      Current: () => handle({ HashCode: (): number => 1, IsSame: (): boolean => true }),
       Next: (): void => {
         visited = true;
       },
@@ -65,7 +65,7 @@ async function makeFakeKernel(): Promise<Fake> {
       });
     };
   const api = {
-    TopAbs_ShapeEnum: { TopAbs_FACE: 'face', TopAbs_SHAPE: 'shape' },
+    TopAbs_ShapeEnum: { TopAbs_FACE: 'face', TopAbs_EDGE: 'edge', TopAbs_SHAPE: 'shape' },
     TopAbs_Orientation: { TopAbs_REVERSED: { value: 1 } },
     ChFi3d_FilletShape: { ChFi3d_Rational: 0 },
     gp_Pnt_3: construct(),
@@ -113,20 +113,42 @@ describe('occt kernel releases WASM handles', () => {
       color: '#888888',
     } as unknown as Entity;
 
-    const mesh = fake.kernel.tessellate(box);
+    const shape = fake.kernel.evaluate({ op: 'solid', entity: box });
+    const mesh = shape === null ? null : fake.kernel.tessellate(shape);
 
     expect(mesh?.positions).toEqual([1, 0, 0, 2, 0, 0, 3, 0, 0]);
     expect(mesh?.indices).toEqual([0, 1, 2]);
+    // The cache owns the built solid until it is cleared; everything else is already released.
+    expect(fake.kernel.cachedShapeCount()).toBe(1);
+    expect(fake.leaked()).toBe(1);
+    fake.kernel.clear();
     expect(fake.leaked()).toBe(0);
   });
 
-  it('deletes the faces, wires, shells, edges and result shapes of a fillet', async () => {
+  it('deletes the explorers, edges, builders and intermediate shapes of a fillet', async () => {
     const fake = await makeFakeKernel();
-    const triangle = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
+    const box = {
+      id: 'b',
+      kind: 'box',
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      size: [1, 1, 1],
+      layerId: 'layer-default',
+      color: '#888888',
+    } as unknown as Entity;
 
-    const mesh = fake.kernel.filletEdges(triangle, [], 0.1);
+    const shape = fake.kernel.evaluate({
+      op: 'fillet',
+      source: { op: 'solid', entity: box },
+      edges: [],
+      size: 0.1,
+    });
 
-    expect(mesh?.indices).toEqual([0, 1, 2]);
+    expect(shape).not.toBeNull();
+    // Only the two cached shapes (source box, fillet result) stay alive; builders/edges are freed.
+    expect(fake.kernel.cachedShapeCount()).toBe(2);
+    expect(fake.leaked()).toBe(2);
+    fake.kernel.clear();
     expect(fake.leaked()).toBe(0);
   });
 });

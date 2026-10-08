@@ -91,12 +91,27 @@ between steps never need rewriting. On top of that:
 
 ## Geometry kernel
 
-three.js renders meshes; it is not a CAD kernel. Booleans and fillets go through a
-`GeometryKernel` interface with two implementations: Manifold (default, small) and
-OpenCascade (exact B-rep, large WebAssembly). Commands receive the kernel through their
-execution context, wrapped in a cache keyed by the operands' definition, so regenerating
-an unchanged boolean is free. Commands that need a kernel declare it; while none is
-loaded they refuse with an explicit message instead of silently doing nothing.
+three.js renders meshes; it is not a CAD kernel. Booleans, fillets, chamfers and shells go
+through a `GeometryKernel` interface with two implementations: Manifold (default, small, mesh
+only) and OpenCascade (exact B-rep, large WebAssembly). Commands receive the kernel through
+their execution context.
+
+The kernel boundary is a shape, not a mesh. A command describes what it wants as a
+`ShapeRecipe` — a serializable construction tree (primitive leaves, then boolean, fillet,
+chamfer, shell, placement and scale nodes) — and the kernel evaluates it to an opaque,
+kernel-owned `ShapeHandle` (a TopoDS_Shape under OpenCascade). The kernel caches its native
+shapes by the recipe's content hash, so an unchanged prefix of the feature tree is never
+rebuilt; a handle carries its recipe, so a shape evicted from the cache, or lost with a
+restarted worker, is simply rebuilt. Meshes only come out of the kernel, for display and mesh
+exports. Each boolean/fillet result is stored as a `mesh` entity whose `brep` field is its
+recipe: the next operation on it resumes the exact tree (a fillet on a boolean result rounds
+a true edge), `inspect_topology` lists its real faces and edges, and `export_step_exact`
+writes it as an exact STEP solid. When a kernel cannot rebuild a stored tree (a fillet
+document opened under Manifold) the stored triangles are used instead. See
+`docs/decisions/KI5-shape-kernel-boundary.md`.
+
+Commands that need a kernel declare it; while none is loaded they refuse with an explicit
+message instead of silently doing nothing.
 
 The browser (`?kernel=occt`) and the server (`LLULL_KERNEL=occt`) use the same kernel
 choice, so a command produces the same result whichever surface called it.

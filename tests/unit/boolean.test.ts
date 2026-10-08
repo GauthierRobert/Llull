@@ -3,48 +3,16 @@ import { createEmptyDocument } from '@core/model/types';
 import type { MeshSolidEntity, CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel, getGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
-import type { Entity } from '@core/model/types';
-
-// ---------------------------------------------------------------------------
-// Canned mesh — a minimal tetrahedron (4 vertices, 4 triangles)
-// ---------------------------------------------------------------------------
+import type { MeshData } from '@core/geometry/kernel';
+import { fakeKernel, type FakeCall, type FakeKernel } from '../helpers/fakeKernel';
 
 const CANNED_MESH: MeshData = {
-  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], // 4 vertices × 3 = 12 floats
-  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3], // 4 triangles × 3 = 12 indices
+  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
 };
 
-// ---------------------------------------------------------------------------
-// Fake kernel factory — records last call for order-assertions
-// ---------------------------------------------------------------------------
-
-function makeFakeKernel(): GeometryKernel & {
-  lastOp: BooleanOp | null;
-  lastA: Entity | null;
-  lastB: Entity | null;
-  callCount: number;
-  returnNull: boolean;
-} {
-  const fake = {
-    lastOp: null as BooleanOp | null,
-    lastA: null as Entity | null,
-    lastB: null as Entity | null,
-    callCount: 0,
-    returnNull: false,
-    booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null {
-      fake.lastOp = op;
-      fake.lastA = a;
-      fake.lastB = b;
-      fake.callCount += 1;
-      return fake.returnNull ? null : CANNED_MESH;
-    },
-    filletEdges: (): MeshData | null => null,
-    chamferEdges: (): MeshData | null => null,
-    shellSolid: (): MeshData | null => null,
-    tessellate: (): MeshData | null => null,
-  };
-  return fake;
+function lastBoolean(fake: FakeKernel): FakeCall | undefined {
+  return [...fake.calls].reverse().find((call) => call.op === 'boolean');
 }
 
 // ---------------------------------------------------------------------------
@@ -65,10 +33,10 @@ function docWithTwoBoxes(): { doc: CadDocument; idA: string; idB: string } {
 // ---------------------------------------------------------------------------
 
 describe('boolean commands', () => {
-  let fake: ReturnType<typeof makeFakeKernel>;
+  let fake: FakeKernel;
 
   beforeEach(() => {
-    fake = makeFakeKernel();
+    fake = fakeKernel({ boolean: CANNED_MESH });
     setGeometryKernel(fake);
   });
 
@@ -99,6 +67,18 @@ describe('boolean commands', () => {
       const entity = result.document.entities[newId] as MeshSolidEntity;
       expect(entity.mesh.positions).toEqual(CANNED_MESH.positions);
       expect(entity.mesh.indices).toEqual(CANNED_MESH.indices);
+    });
+
+    it('stores the boolean recipe of both operands as brep', () => {
+      const { doc, idA, idB } = docWithTwoBoxes();
+      const result = execute(doc, 'boolean_union', { a: idA, b: idB });
+      const entity = result.document.entities[result.affected[0]!] as MeshSolidEntity;
+      expect(entity.brep).toMatchObject({
+        op: 'boolean',
+        boolean: 'union',
+        a: { op: 'solid', entity: doc.entities[idA] },
+        b: { op: 'solid', entity: doc.entities[idB] },
+      });
     });
 
     it('consumes both operands from entities', () => {
@@ -153,7 +133,7 @@ describe('boolean commands', () => {
     it('passes op = union to the kernel', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
       execute(doc, 'boolean_union', { a: idA, b: idB });
-      expect(fake.lastOp).toBe('union');
+      expect(lastBoolean(fake)?.boolean).toBe('union');
     });
   });
 
@@ -169,9 +149,10 @@ describe('boolean commands', () => {
 
       execute(doc, 'boolean_subtract', { a: idA, b: idB });
 
-      expect(fake.lastOp).toBe('subtract');
-      expect(fake.lastA!.id).toBe(entityA.id);
-      expect(fake.lastB!.id).toBe(entityB.id);
+      const call = lastBoolean(fake)!;
+      expect(call.boolean).toBe('subtract');
+      expect(call.operands[0]!.entity!.id).toBe(entityA.id);
+      expect(call.operands[1]!.entity!.id).toBe(entityB.id);
     });
 
     it('creates one mesh entity and consumes both operands', () => {
@@ -193,7 +174,7 @@ describe('boolean commands', () => {
       const { doc, idA, idB } = docWithTwoBoxes();
       const result = execute(doc, 'boolean_intersect', { a: idA, b: idB });
 
-      expect(fake.lastOp).toBe('intersect');
+      expect(lastBoolean(fake)?.boolean).toBe('intersect');
       expect(result.affected).toHaveLength(1);
       expect(result.document.entities[result.affected[0]!]!.kind).toBe('mesh');
     });
@@ -271,7 +252,7 @@ describe('boolean commands', () => {
     });
 
     it('no-op when kernel returns null (degenerate geometry)', () => {
-      fake.returnNull = true;
+      setGeometryKernel(fakeKernel({ boolean: null }));
       const { doc, idA, idB } = docWithTwoBoxes();
       const result = execute(doc, 'boolean_union', { a: idA, b: idB });
       expect(result.affected).toHaveLength(0);

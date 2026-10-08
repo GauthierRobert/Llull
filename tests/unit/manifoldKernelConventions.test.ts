@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import type { BooleanOp } from '@core/geometry/shapeRecipe';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 
@@ -10,6 +11,26 @@ let kernel: GeometryKernel;
 beforeAll(async () => {
   kernel = await createManifoldKernel();
 });
+
+function meshOf(kernel: GeometryKernel, entity: Entity): MeshData | null {
+  const shape = kernel.evaluate({ op: 'solid', entity });
+  return shape === null ? null : kernel.tessellate(shape);
+}
+
+function booleanMesh(
+  kernel: GeometryKernel,
+  boolean: BooleanOp,
+  a: Entity,
+  b: Entity,
+): MeshData | null {
+  const shape = kernel.evaluate({
+    op: 'boolean',
+    boolean,
+    a: { op: 'solid', entity: a },
+    b: { op: 'solid', entity: b },
+  });
+  return shape === null ? null : kernel.tessellate(shape);
+}
 
 const base = { layerId: 'layer-default', color: '#888888' };
 
@@ -89,7 +110,7 @@ const cases: Array<[string, Entity]> = [
 
 describe('manifold kernel follows llull geometry conventions', () => {
   it.each(cases)('%s: kernel solid has the bounds llull renders', (_label, entity) => {
-    const mesh = kernel.tessellate(entity);
+    const mesh = meshOf(kernel, entity);
     expect(mesh).not.toBeNull();
     const actual = meshBounds(mesh!);
     const expected = llullBounds(entity);
@@ -102,7 +123,7 @@ describe('manifold kernel follows llull geometry conventions', () => {
   it('cuts a +Z hole through a plate (cylinder axis is Z, not Y)', () => {
     const plate = solid({ kind: 'box', size: [20, 20, 2], position: [0, 0, 0] });
     const hole = solid({ kind: 'cylinder', radius: 3, height: 10, position: [0, 0, 0] });
-    const result = kernel.booleanOp('subtract', plate, hole);
+    const result = booleanMesh(kernel, 'subtract', plate, hole);
     expect(result).not.toBeNull();
     const expected = 20 * 20 * 2 - Math.PI * 9 * 2;
     expect(volume(result!)).toBeCloseTo(expected, -1);
@@ -122,7 +143,7 @@ describe('manifold kernel follows llull geometry conventions', () => {
       position: [0, 0, 0],
     });
     const other = solid({ kind: 'box', size: [2, 2, 2], position: [1, 0, 0] });
-    const union = kernel.booleanOp('union', soup, other);
+    const union = booleanMesh(kernel, 'union', soup, other);
     expect(union).not.toBeNull();
     expect(volume(union!)).toBeCloseTo(12, 3);
   });

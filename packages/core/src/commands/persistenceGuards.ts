@@ -3,6 +3,7 @@ import { SHAPE2D_KINDS, SOLID_KINDS } from '../model/types';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber, isPositiveNumber } from '../lib/isFiniteNumber';
 import { isHexColor } from '../lib/isHexColor';
+import { validateShapeRecipe } from '../geometry/shapeRecipe';
 
 export function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
@@ -99,6 +100,13 @@ export function validateEntityValue(v: unknown): string | null {
       const depth = v['depth'];
       if (!isFiniteNumber(depth))
         return `entity ${id} (extrusion): depth must be a finite number, got ${String(depth)}`;
+      break;
+    }
+    case 'mesh': {
+      const brep = v['brep'];
+      if (brep === undefined) break;
+      const problem = validateShapeRecipe(brep);
+      if (problem !== null) return `entity ${id} (mesh): brep recipe invalid — ${problem}`;
       break;
     }
     case 'instance': {

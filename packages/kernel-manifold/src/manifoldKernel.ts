@@ -1,6 +1,8 @@
 /**
  * Manifold (manifold-3d WASM) GeometryKernel: synchronous booleans and tessellation.
  *
+ * Shapes are cached Manifold solids keyed by recipe (`kernelFromOps`); no B-rep (see `manifoldOps`).
+ *
  * @layer kernel (concrete adapter injected by the app / server; commands see only GeometryKernel)
  * @invariant primitives are centred like three.js (box, cylinder along +Z, sphere) or extruded
  *   along +Z from z=0; entity transform = rotate Z, then Y, then X (M = Rx·Ry·Rz), then translate
@@ -8,7 +10,9 @@
  * @failure unsupported kind / degenerate size / non-closed mesh / Manifold error -> null
  */
 
-import type { GeometryKernel, MeshData, BooleanOp } from '@core/geometry/kernel';
+import type { MeshData } from '@core/geometry/kernel';
+import type { BooleanOp } from '@core/geometry/shapeRecipe';
+import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import type { Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { entityToTriangles } from '@core/commands/exportTriangulate';
@@ -27,6 +31,7 @@ interface ManifoldShape {
   subtract(other: ManifoldShape): ManifoldShape;
   intersect(other: ManifoldShape): ManifoldShape;
   translate(v: [number, number, number]): ManifoldShape;
+  scale(factor: number): ManifoldShape;
   /** Rotate by Euler angles in DEGREES (Manifold convention). */
   rotate(v: [number, number, number]): ManifoldShape;
   getMesh(): ManifoldMesh;
@@ -269,9 +274,9 @@ function release(solid: ManifoldShape | null): void {
 }
 
 /** Run `body`, mapping any Manifold exception to null and freeing every solid it registered. */
-function withSolids(
-  body: (own: <T extends ManifoldShape | null>(solid: T) => T) => MeshData | null,
-): MeshData | null {
+function withSolids<T>(
+  body: (own: <S extends ManifoldShape | null>(solid: S) => S) => T | null,
+): T | null {
   const owned: Array<ManifoldShape | null> = [];
   try {
     return body((solid) => {
@@ -285,37 +290,34 @@ function withSolids(
   }
 }
 
+const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } as const;
+
+/**
+ * Native Manifold operations behind the recipe evaluator. Manifold is a mesh kernel: no B-rep, so
+ * fillet / chamfer / shell, `topology` and `exportStep` are null.
+ */
+export function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
+  return {
+    solid: (entity) => withSolids(() => entityToManifold(mod, entity)),
+    boolean: (op: BooleanOp, a, b) => withSolids(() => a[COMBINE[op]](b)),
+    fillet: () => null,
+    chamfer: () => null,
+    shell: () => null,
+    place: (shape, position, rotation) =>
+      withSolids(() => applyTransform(shape, position, rotation)),
+    scale: (shape, factor) => (factor > 0 ? withSolids(() => shape.scale(factor)) : null),
+    tessellate: (shape) => withSolids(() => manifoldToMeshData(shape)),
+    topology: () => null,
+    exportStep: () => null,
+    release,
+  };
+}
+
 /**
  * Initialize the Manifold WASM module and return a synchronous GeometryKernel.
  * Call once at startup; install it as the process default (`setGeometryKernel`) or pass it
  * as an `ExecutionContext.kernel`.
  */
-export async function createManifoldKernel(): Promise<GeometryKernel> {
-  const mod = await getManifoldModule();
-
-  return {
-    booleanOp(op: BooleanOp, a: Entity, b: Entity): MeshData | null {
-      return withSolids((own) => {
-        const solidA = own(entityToManifold(mod, a));
-        const solidB = solidA && own(entityToManifold(mod, b));
-        if (!solidA || !solidB) return null;
-        const combine = { union: 'add', subtract: 'subtract', intersect: 'intersect' } as const;
-        return manifoldToMeshData(own(solidA[combine[op]](solidB)));
-      });
-    },
-
-    // Not supported by Manifold; the OCC kernel handles fillets.
-    filletEdges: () => null,
-
-    chamferEdges: () => null,
-
-    shellSolid: () => null,
-
-    tessellate(entity: Entity): MeshData | null {
-      return withSolids((own) => {
-        const solid = own(entityToManifold(mod, entity));
-        return solid && manifoldToMeshData(solid);
-      });
-    },
-  };
+export async function createManifoldKernel(): Promise<CachingKernel> {
+  return kernelFromOps(manifoldOps(await getManifoldModule()));
 }

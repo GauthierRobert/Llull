@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
+import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import type { BooleanOp } from '@core/geometry/shapeRecipe';
 
 interface Shape {
   delete(): void;
@@ -69,6 +71,26 @@ async function instrumentedKernel(): Promise<{
   };
 }
 
+function meshOf(kernel: GeometryKernel, entity: Entity): MeshData | null {
+  const shape = kernel.evaluate({ op: 'solid', entity });
+  return shape === null ? null : kernel.tessellate(shape);
+}
+
+function booleanMesh(
+  kernel: GeometryKernel,
+  boolean: BooleanOp,
+  a: Entity,
+  b: Entity,
+): MeshData | null {
+  const shape = kernel.evaluate({
+    op: 'boolean',
+    boolean,
+    a: { op: 'solid', entity: a },
+    b: { op: 'solid', entity: b },
+  });
+  return shape === null ? null : kernel.tessellate(shape);
+}
+
 const common = { layerId: 'layer-default', color: '#888888' };
 const placed = (
   position: Vec3,
@@ -131,17 +153,21 @@ describe('manifold kernel frees every WASM object', () => {
     const far = entities([100, 0, 0]);
     let operations = 0;
     for (const a of near) {
-      expect(kernel.tessellate(a), a.kind).not.toBeNull();
+      expect(meshOf(kernel, a), a.kind).not.toBeNull();
       operations++;
       for (const b of [...near, ...far].slice(0, 10)) {
         for (const op of ['union', 'subtract', 'intersect'] as const) {
-          kernel.booleanOp(op, a, b);
+          booleanMesh(kernel, op, a, b);
           operations++;
         }
       }
     }
     expect(operations).toBeGreaterThan(200);
     expect(created()).toBeGreaterThan(operations);
+    // The cache owns the live shapes (bounded, evicted ones are freed); nothing outside it leaks.
+    expect(kernel.cachedShapeCount()).toBeLessThanOrEqual(128);
+    expect(leaked()).toBeLessThanOrEqual(kernel.cachedShapeCount());
+    kernel.clear();
     expect(leaked()).toBe(0);
   }, 120_000);
 
@@ -168,10 +194,11 @@ describe('manifold kernel frees every WASM object', () => {
     } as unknown as Entity;
     const [box] = entities([0, 0, 0]);
     for (const bad of [openMesh, flat, line]) {
-      expect(kernel.tessellate(bad)).toBeNull();
-      expect(kernel.booleanOp('union', box!, bad)).toBeNull();
-      expect(kernel.booleanOp('union', bad, box!)).toBeNull();
+      expect(meshOf(kernel, bad)).toBeNull();
+      expect(booleanMesh(kernel, 'union', box!, bad)).toBeNull();
+      expect(booleanMesh(kernel, 'union', bad, box!)).toBeNull();
     }
+    kernel.clear();
     expect(leaked()).toBe(0);
   }, 60_000);
 });

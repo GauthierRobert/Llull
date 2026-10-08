@@ -64,7 +64,7 @@ export { z }                          // import z from './schema' (plugins: '@co
 
 ```ts
 interface ExecutionContext {
-  readonly kernel: GeometryKernel | null;   // memoized installed kernel (kernelCache.ts)
+  readonly kernel: GeometryKernel | null;   // installed kernel (caches shapes by recipe key itself)
   readonly ids: IdSource;                   // mints every id the command creates
   readonly registry: CommandLookup;         // (name) => CommandDefinition | undefined
   readonly projectDepth: number;            // build_project nesting guard

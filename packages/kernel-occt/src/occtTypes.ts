@@ -11,6 +11,15 @@ export interface OccHandle {
 export interface OccShape extends OccHandle {
   ShapeType(): unknown;
   Orientation_1(): { value: number };
+  IsSame(other: OccShape): boolean;
+  HashCode(upperBound: number): number;
+}
+
+/** gp_Pnt as returned by adaptors: read, then release. */
+export interface OccPoint extends OccHandle {
+  X(): number;
+  Y(): number;
+  Z(): number;
 }
 
 export interface OccTriangulation extends OccHandle {
@@ -38,6 +47,7 @@ export interface OccTopoDS {
   Face_1(shape: OccShape): OccShape;
   Edge_1(shape: OccShape): OccShape;
   Shell_1(shape: OccShape): OccShape;
+  Vertex_1(shape: OccShape): OccShape;
 }
 
 /** Boolean operation or fillet builder: `Build` then `Shape`. */
