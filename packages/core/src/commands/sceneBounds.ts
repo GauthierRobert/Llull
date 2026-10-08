@@ -189,6 +189,9 @@ export function boundsOfPoints(points: readonly Vec3[]): Bounds {
   return { min, max };
 }
 
+/** Deepest component-in-component nesting followed when computing instance bounds. */
+const MAX_NESTING = 8;
+
 /**
  * Compute the world AABB of an InstanceEntity by expanding it against its component's
  * child entities. Callers that have access to the document should prefer this over
@@ -198,9 +201,14 @@ export function boundsOfPoints(points: readonly Vec3[]): Bounds {
  *
  * @pure — reads only; does not mutate
  */
-export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument): Bounds {
+export function instanceBoundsFromDoc(
+  instance: InstanceEntity,
+  doc: CadDocument,
+  depth = 0,
+): Bounds {
   const component = doc.components[instance.componentId];
-  if (!component || component.order.length === 0) {
+  // Past MAX_NESTING a reference cycle is assumed: the instance counts as a point at its position.
+  if (!component || component.order.length === 0 || depth >= MAX_NESTING) {
     return { min: instance.position, max: instance.position };
   }
 
@@ -211,7 +219,7 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
   for (const cid of component.order) {
     const child = component.entities[cid];
     if (!child) continue;
-    for (const c of boundsCorners(entityBoundsInDoc(doc, child))) {
+    for (const c of boundsCorners(entityBoundsInDoc(doc, child, depth + 1))) {
       const scaled: Vec3 = [c[0] * scale[0], c[1] * scale[1], c[2] * scale[2]];
       // Rotate around the component origin, then translate.
       const rotated = hasRotation ? applyEulerXYZ(scaled, ORIGIN, rotation) : scaled;
@@ -226,8 +234,8 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
  * (a bare `entityBounds` call on an instance yields a zero-size box at the origin).
  * @pure
  */
-export function entityBoundsInDoc(doc: CadDocument, e: Entity): Bounds {
-  if (e.kind === 'instance') return instanceBoundsFromDoc(e, doc);
+export function entityBoundsInDoc(doc: CadDocument, e: Entity, depth = 0): Bounds {
+  if (e.kind === 'instance') return instanceBoundsFromDoc(e, doc, depth);
   if (e.kind === 'dimension') return dimensionBoundsFromDoc(e, doc);
   return entityBounds(e);
 }
