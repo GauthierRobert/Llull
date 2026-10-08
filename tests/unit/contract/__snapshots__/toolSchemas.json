@@ -610,7 +610,7 @@
           "type": "number"
         },
         "mark": {
-          "description": "Schedule mark. Default next Dn.",
+          "description": "Schedule mark, unique among doors. Default next Dn.",
           "type": "string"
         },
         "material": {
@@ -2181,7 +2181,7 @@
           "type": "number"
         },
         "mark": {
-          "description": "Schedule mark. Default next WNn.",
+          "description": "Schedule mark, unique among windows. Default next WNn.",
           "type": "string"
         },
         "material": {
@@ -6554,7 +6554,7 @@
           "type": "number"
         },
         "mark": {
-          "description": "New schedule mark; blank keeps the current one.",
+          "description": "New schedule mark, unique among doors / windows of the same kind; blank keeps the current one.",
           "type": "string"
         },
         "material": {

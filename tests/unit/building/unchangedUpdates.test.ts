@@ -247,6 +247,27 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(shifted.affected.length).toBeGreaterThan(0);
   });
 
+  it('door / window marks stay unique per kind on add and update', () => {
+    let doc = execute(createEmptyDocument(), 'add_wall', {
+      start: [0, 0],
+      end: [10000, 0],
+    }).document;
+    doc = execute(doc, 'add_door', { wallId: 'wall-1', offset: 1500, mark: 'D-A' }).document;
+    const dup = execute(doc, 'add_door', { wallId: 'wall-1', offset: 5000, mark: 'D-A' });
+    expect(dup.document).toBe(doc);
+    expect(dup.summary).toMatch(/mark 'D-A' is already used by door-1/);
+    doc = execute(doc, 'add_door', { wallId: 'wall-1', offset: 5000, mark: 'D-B' }).document;
+    const rename = execute(doc, 'update_opening', { openingId: 'door-2', mark: 'D-A' });
+    expect(rename.document).toBe(doc);
+    expect(rename.summary).toMatch(/mark 'D-A' is already used by door-1/);
+    expect(execute(doc, 'update_opening', { openingId: 'door-2', mark: 'D-B' }).summary).toMatch(
+      /already has these values/,
+    );
+    expect(
+      execute(doc, 'add_window', { wallId: 'wall-1', offset: 8000, mark: 'D-A' }).affected.length,
+    ).toBeGreaterThan(0);
+  });
+
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
     expectNoOp(doc, 'set_project_info', { name: 'Hall' });

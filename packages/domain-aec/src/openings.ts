@@ -4,7 +4,12 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type { CurvedWallElement, OpeningElement, WallElement } from '@core/model/building';
+import type {
+  BuildingModel,
+  CurvedWallElement,
+  OpeningElement,
+  WallElement,
+} from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { projectOntoSegment } from '@lib/polygon';
@@ -44,6 +49,19 @@ function resolveOffset(
   return at ? projectOntoSegment(at, wall.start, wall.end).t * length : length / 2;
 }
 
+/** Another door / window (same category) already carrying `mark`. */
+function markHolder(
+  building: BuildingModel,
+  category: OpeningKind,
+  mark: string,
+  exceptId?: string,
+): OpeningElement | undefined {
+  return Object.values(building.elements).find(
+    (element): element is OpeningElement =>
+      element.category === category && element.mark === mark && element.id !== exceptId,
+  );
+}
+
 function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParams): CommandResult {
   const name = `add_${kind}`;
   const building = getBuilding(doc);
@@ -62,10 +80,18 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
   if (width <= 0 || height <= 0 || sillHeight < 0) {
     return noop(doc, `${name} failed: width/height must be > 0, sillHeight >= 0.`);
   }
+  const requestedMark = params.mark?.trim();
+  const markOwner = requestedMark ? markHolder(building, kind, requestedMark) : undefined;
+  if (markOwner) {
+    return noop(
+      doc,
+      `${name} failed: mark '${requestedMark ?? ''}' is already used by ${markOwner.id}; schedule marks must be unique per category.`,
+    );
+  }
   const opening: OpeningElement = {
     id: nextElementId(building, kind),
     category: kind,
-    mark: params.mark?.trim() || nextMark(building, kind),
+    mark: requestedMark || nextMark(building, kind),
     entityIds: [],
     hostId: wall.id,
     offset,
@@ -139,7 +165,9 @@ function openingShape(kind: OpeningKind): OpeningShape {
     mark: z
       .string()
       .optional()
-      .describe(`Schedule mark. Default next ${kind === 'door' ? 'D' : 'WN'}n.`),
+      .describe(
+        `Schedule mark, unique among ${kind}s. Default next ${kind === 'door' ? 'D' : 'WN'}n.`,
+      ),
   };
 }
 
@@ -212,7 +240,12 @@ export const updateOpening = defineCommand({
       .describe('New sill height above the level floor, in document units (>= 0).'),
     swing: z.enum(['left', 'right']).optional().describe('Door hinge side (doors only).'),
     material: z.string().optional().describe('New material; blank keeps the current one.'),
-    mark: z.string().optional().describe('New schedule mark; blank keeps the current one.'),
+    mark: z
+      .string()
+      .optional()
+      .describe(
+        'New schedule mark, unique among doors / windows of the same kind; blank keeps the current one.',
+      ),
   }),
   run: (
     doc,
@@ -239,6 +272,13 @@ export const updateOpening = defineCommand({
     };
     if (updated.width <= 0 || updated.height <= 0 || updated.sillHeight < 0) {
       return noop(doc, 'update_opening failed: width/height must be > 0, sillHeight >= 0.');
+    }
+    const markOwner = markHolder(building, opening.category, updated.mark, opening.id);
+    if (markOwner) {
+      return noop(
+        doc,
+        `update_opening failed: mark '${updated.mark}' is already used by ${markOwner.id}; schedule marks must be unique per category.`,
+      );
     }
     if (JSON.stringify(updated) === JSON.stringify(opening)) {
       return noop(doc, `update_opening: ${openingId} already has these values; nothing changed.`);
