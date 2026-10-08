@@ -115,13 +115,11 @@ describe('useKeyboardShortcuts', () => {
     expect(clearSelection).not.toHaveBeenCalled();
   });
 
-  it('Ctrl+D duplicates every selected entity', () => {
+  it('Ctrl+D duplicates every selected entity in one command', () => {
     render(<Harness />);
     fireEvent.keyDown(window, { key: 'd', ctrlKey: true });
-    expect(dispatch.mock.calls.map((call) => call[0])).toEqual([
-      'duplicate_entity',
-      'duplicate_entity',
-    ]);
+    expect(dispatch.mock.calls.map((call) => call[0])).toEqual(['duplicate_entities']);
+    expect(dispatch.mock.calls[0]?.[1]).toMatchObject({ ids: ['a', 'b'] });
   });
 
   it('arrow keys nudge the whole selection in one command, by 1 or 10 with Shift, and repeat', () => {

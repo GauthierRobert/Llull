@@ -66,18 +66,17 @@ function duplicateOffset(): Vec3 {
 
 /**
  * Copy every selected entity beside the originals; a single copy becomes the new selection.
- * @affects dispatches duplicate_entity once per selected id; no-op on empty selection
+ * @affects dispatches one duplicate_entities (one undo step); no-op on empty selection
  */
 export function duplicateSelection(): void {
   const state = useStore.getState();
   const selection = state.document.selection;
   if (selection.length === 0) return;
-  const offset = duplicateOffset();
-  const selectAffected = selection.length === 1;
-  // One duplicate command per entity; locally they fold into one undo step.
-  selection.forEach((id, index) => {
-    state.dispatch('duplicate_entity', { id, offset }, { selectAffected, coalesce: index > 0 });
-  });
+  state.dispatch(
+    'duplicate_entities',
+    { ids: [...selection], offset: duplicateOffset() },
+    { selectAffected: selection.length === 1 },
+  );
 }
 
 /**
