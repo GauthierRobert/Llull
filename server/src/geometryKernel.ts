@@ -23,6 +23,15 @@ function warnUnavailable(label: string, error: unknown): void {
   console.warn(`[server] ${label}:`, errorMessage(error));
 }
 
+/** One OCC call blocks the whole server (HTTP, SSE keepalives) while it runs, so it is bounded. */
+const DEFAULT_OCC_CALL_TIMEOUT_MS = 30_000;
+
+/** `LLULL_OCC_TIMEOUT_MS`: positive milliseconds a single OCC call may run before its worker is killed. */
+export function occtCallTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const requested = Number(env['LLULL_OCC_TIMEOUT_MS']);
+  return Number.isFinite(requested) && requested > 0 ? requested : DEFAULT_OCC_CALL_TIMEOUT_MS;
+}
+
 /**
  * OCC in a worker thread, so a WASM abort kills the worker, not the server. Null (in-process OCC is
  * used instead, with a warning) when `LLULL_OCC_ISOLATION=off`, when the worker entry is not
@@ -30,7 +39,7 @@ function warnUnavailable(label: string, error: unknown): void {
  */
 function startIsolatedOcct(): GeometryKernel | null {
   if (process.env['LLULL_OCC_ISOLATION'] === 'off' || defaultWorkerEntry() === null) return null;
-  const isolated = createIsolatedKernel();
+  const isolated = createIsolatedKernel({ callTimeoutMs: occtCallTimeoutMs() });
   if (isolated.start()) return isolated;
   isolated.dispose();
   warnUnavailable(
