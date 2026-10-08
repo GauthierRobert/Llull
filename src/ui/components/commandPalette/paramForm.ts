@@ -105,6 +105,19 @@ export function initialValues(
   return values;
 }
 
+/**
+ * Option picked by typing into a select: an exact (case-insensitive) match wins over the first
+ * prefix match, so "m" selects "m" rather than "mm". @pure
+ */
+export function matchTypeahead(options: readonly string[], query: string): string | undefined {
+  const needle = query.toLowerCase();
+  if (needle === '') return undefined;
+  return (
+    options.find((option) => option.toLowerCase() === needle) ??
+    options.find((option) => option.toLowerCase().startsWith(needle))
+  );
+}
+
 /** Text for one existing param value, the inverse of `parseField`; unusable values become blank. */
 function formatParam(field: FormField, value: unknown): string {
   switch (field.kind) {
