@@ -78,7 +78,7 @@ import { addJoint, deleteJoint, setJointValue } from './jointsEdit';
 import { motionStudy } from './motion_study';
 import { addSpurGear } from './gears';
 import { distributeAlongPath } from './distribute';
-import { deleteEntities, moveEntities } from './batch';
+import { deleteEntities, duplicateEntities, moveEntities } from './batch';
 import { onPluginInstalled } from '../plugins/host';
 
 const rawDefinitions = [
@@ -197,6 +197,7 @@ const rawDefinitions = [
   distributeAlongPath,
   deleteEntities,
   moveEntities,
+  duplicateEntities,
 ] as ReadonlyArray<CommandDefinition<unknown>>;
 
 /** Core commands, then every installed plugin's commands in installation order. */

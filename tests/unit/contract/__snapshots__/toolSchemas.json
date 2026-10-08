@@ -4306,6 +4306,32 @@
     "name": "draw_walls"
   },
   {
+    "description": "Clone several entities in one step (one undo), placing each copy at original.position + offset. Same semantics as duplicate_entity applied to each id; group membership is not copied. Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. Returns the new entity ids in affected, in the order of the (de-duplicated) input ids.",
+    "input_schema": {
+      "properties": {
+        "ids": {
+          "description": "Entity ids to duplicate (non-empty, at most 10000). Missing ids are skipped.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "offset": {
+          "description": "Optional [dx, dy, dz] offset applied to every copy. Defaults to [0, 0, 0] (exact overlap).",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ids"
+      ],
+      "type": "object"
+    },
+    "name": "duplicate_entities"
+  },
+  {
     "description": "Clone an existing entity to a new id, placing the copy at original.position + offset. Returns the new entity id in affected. Original is untouched.",
     "input_schema": {
       "properties": {
