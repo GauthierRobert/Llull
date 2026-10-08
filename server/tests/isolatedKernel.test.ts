@@ -10,6 +10,7 @@ import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { Entity } from '@core/model/types';
 import { createIsolatedKernel, type IsolatedKernel } from '../src/isolatedKernel';
+import { handleOf } from '@core/geometry/shapeKernel';
 import { booleanMesh, leaf, meshOf } from './kernelTestSupport';
 
 const box = (size: number): Entity =>
@@ -183,10 +184,10 @@ describe('isolated OCC kernel', () => {
     });
     kernels.push(kernel);
     try {
-      expect(kernel.evaluate(leaf(box(2)))).toEqual({ loads: 0 });
+      expect(kernel.topology(handleOf(leaf(box(2))))).toEqual({ loads: 0 });
       kernel.forceFailure('__abort'); // the warm restart (load #1) dies on start
       expect(kernel.crashCount()).toBe(1);
-      expect(kernel.evaluate(leaf(box(2)))).toEqual({ loads: 2 });
+      expect(kernel.topology(handleOf(leaf(box(2))))).toEqual({ loads: 2 });
     } finally {
       rmSync(counterFile, { force: true });
     }
