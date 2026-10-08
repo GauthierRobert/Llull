@@ -119,8 +119,13 @@ NURBS surfaces, and STEP/IGES export need a B-rep/solid kernel.
 As built:
 - Interface `GeometryKernel` in `@core/geometry/kernel`; implementations in
   `packages/kernel-manifold` (default) and `packages/kernel-occt` (B-rep, `fillet_edge`).
+- The boundary is a SHAPE, not a mesh: commands pass a `ShapeRecipe` (`@core/geometry/shapeRecipe`)
+  and get an opaque `ShapeHandle`; kernels implement `KernelOps<S>` on their native shape and wrap it
+  with `kernelFromOps` (`@core/geometry/shapeKernel`: cache by `recipeKey`, rebuild on eviction).
+  Meshes only come OUT (`tessellate`). Results store their recipe as `mesh.brep`; never feed a mesh
+  back into the kernel when a recipe exists (`kernelShape.ts` `operandRecipe`).
 - Commands read the kernel ONLY from `ctx.kernel` (`ExecutionContext`, `@core/commands/context`),
-  memoized per installed kernel (`kernelCache.ts`). Never import a concrete kernel or call
+  which caches its own shapes by recipe key (`shapeKernel.ts`). Never import a concrete kernel or call
   `getGeometryKernel()` in a command.
 - A kernel-dependent command declares `annotations: { requiresKernel: true }`; `execute` refuses
   it with a "kernel not available" summary while `ctx.kernel` is null, and replay refuses rather

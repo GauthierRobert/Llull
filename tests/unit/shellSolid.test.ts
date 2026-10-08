@@ -3,27 +3,16 @@ import { createEmptyDocument } from '@core/model/types';
 import type { MeshSolidEntity } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import type { MeshData } from '@core/geometry/kernel';
+import { fakeKernel, type FakeKernel } from '../helpers/fakeKernel';
 
 const SHELL_MESH: MeshData = {
-  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+  positions: [0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1],
   indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
 };
-const BOX_MESH: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
 
-function kernel(shell: GeometryKernel['shellSolid']): GeometryKernel & { thicknesses: number[] } {
-  const thicknesses: number[] = [];
-  return {
-    thicknesses,
-    booleanOp: () => null,
-    filletEdges: () => null,
-    chamferEdges: () => null,
-    shellSolid: (shape, thickness) => {
-      thicknesses.push(thickness);
-      return shell(shape, thickness);
-    },
-    tessellate: () => BOX_MESH,
-  };
+function thicknessesOf(fake: FakeKernel): (number | undefined)[] {
+  return fake.calls.filter((call) => call.op === 'shell').map((call) => call.size);
 }
 
 describe('shell_solid', () => {
@@ -38,7 +27,7 @@ describe('shell_solid', () => {
   });
 
   it('replaces the solid with the kernel shell mesh', () => {
-    const fake = kernel(() => SHELL_MESH);
+    const fake = fakeKernel({ shell: SHELL_MESH });
     setGeometryKernel(fake);
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expect(result.affected).toHaveLength(1);
@@ -46,13 +35,18 @@ describe('shell_solid', () => {
     expect(shell.kind).toBe('mesh');
     expect(shell.mesh).toEqual(SHELL_MESH);
     expect(shell.color).toBe('#aabbcc');
+    expect(shell.brep).toMatchObject({
+      op: 'shell',
+      source: { op: 'solid', entity: doc.entities[id] },
+      thickness: 0.5,
+    });
     expect(result.document.entities[id]).toBeUndefined();
-    expect(fake.thicknesses).toEqual([0.5]);
+    expect(thicknessesOf(fake)).toEqual([0.5]);
     expect(result.summary).toContain('shelled');
   });
 
   it('is a no-op when the kernel cannot shell (e.g. Manifold)', () => {
-    setGeometryKernel(kernel(() => null));
+    setGeometryKernel(fakeKernel({ shell: null }));
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
@@ -61,22 +55,29 @@ describe('shell_solid', () => {
     expect(result.summary).toContain('LLULL_KERNEL=occt on the server');
   });
 
+  it('is a no-op when the kernel cannot build the source solid', () => {
+    setGeometryKernel(fakeKernel({ solid: null }));
+    const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('kernel could not build entity');
+  });
+
   it('refuses without a kernel', () => {
     const result = execute(doc, 'shell_solid', { id, thickness: 0.5 });
     expect(result.document).toBe(doc);
   });
 
   it.each([0, -1])('rejects thickness %s without calling the kernel', (thickness) => {
-    const fake = kernel(() => SHELL_MESH);
+    const fake = fakeKernel({ shell: SHELL_MESH });
     setGeometryKernel(fake);
     const result = execute(doc, 'shell_solid', { id, thickness });
     expect(result.document).toBe(doc);
     expect(result.summary).toContain('thickness must be > 0');
-    expect(fake.thicknesses).toEqual([]);
+    expect(thicknessesOf(fake)).toEqual([]);
   });
 
   it('rejects missing ids and 2D shapes', () => {
-    setGeometryKernel(kernel(() => SHELL_MESH));
+    setGeometryKernel(fakeKernel({ shell: SHELL_MESH }));
     expect(execute(doc, 'shell_solid', { id: 'ghost', thickness: 1 }).summary).toContain(
       'not found',
     );

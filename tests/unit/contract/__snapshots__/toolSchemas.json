@@ -2662,7 +2662,7 @@
     "name": "chamfer_2d"
   },
   {
-    "description": "Bevel (chamfer) the edges of a 3D solid entity and replace it with a new mesh entity. The source entity is consumed and replaced by the chamfered mesh result. edgeIndices selects which edges to chamfer; omit or pass [] to chamfer ALL edges (OCC convention: the kernel enumerates edges 0-based). Requires a geometry kernel that supports chamferEdges. Both the default Manifold kernel and the current OCC kernel gracefully no-op (chamferEdges OCC spike is pending a separate batch). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).",
+    "description": "Bevel (chamfer) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity that keeps the exact construction (its brep recipe). The source entity is consumed. Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, robust to parametric edits); with neither, ALL edges are chamfered. Requires a geometry kernel that supports chamfers (the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)); with the default Manifold kernel this command gracefully no-ops. Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).",
     "input_schema": {
       "properties": {
         "distance": {
@@ -2670,9 +2670,20 @@
           "type": "number"
         },
         "edgeIndices": {
-          "description": "0-based indices of the edges to chamfer. Pass [] or omit to chamfer ALL edges. Edge numbering is kernel-defined (OCC enumerates edges in topology traversal order).",
+          "description": "0-based indices of the unique B-rep edges to chamfer, as listed by inspect_topology on the same entity (each edge counted once). Pass [] or omit (with no edgesNear) to chamfer ALL edges.",
           "items": {
-            "type": "number"
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "edgesNear": {
+          "description": "Select edges by location: each point picks the roundable edge whose mid point is nearest. Prefer this in parametric models: the feature history keeps the points, so the same edge is re-selected after an upstream edit renumbers edges. Combines with edgeIndices.",
+          "items": {
+            "description": "A point [x, y, z] near the edge to chamfer (e.g. its mid point from inspect_topology).",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
           },
           "type": "array"
         },
@@ -4488,7 +4499,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Export the model as parametric source code: CadQuery or build123d (Python), OpenSCAD, or a FreeCAD macro. Parameters become named variables, parameter-driven dimensions stay expressions, and every feature (primitive, boolean, move, delete, rename) appears in feature-history order, so the code states exact dimensions and build order. CadQuery/build123d output can be edited and re-imported with import_code. Read-only: returns data.text (plus fileName, language, source, counts).",
+    "description": "Export the model as parametric source code: CadQuery or build123d (Python), OpenSCAD, or a FreeCAD macro. Parameters become named variables, parameter-driven dimensions stay expressions, and every feature (primitive, boolean, fillet, chamfer, shell, move, delete, rename) appears in feature-history order — kernel results are rebuilt from their exact construction, not triangles — so the code states exact dimensions and build order. CadQuery/build123d output can be edited and re-imported with import_code. Read-only: returns data.text (plus fileName, language, source, counts).",
     "input_schema": {
       "properties": {
         "language": {
@@ -4725,6 +4736,26 @@
     "annotations": {
       "readOnlyHint": true
     },
+    "description": "Export 3D solids to STEP (AP214, ISO 10303-21) directly from the geometry kernel's exact B-rep: primitives, booleans, fillets, chamfers and shells are written as true analytic/NURBS faces, not triangles. No Python needed. Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel gracefully no-ops (use export_step via the Python bridge, or export_stl, instead). Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Instances are skipped (explode_instance first). Does not modify the document.",
+    "input_schema": {
+      "properties": {
+        "entityIds": {
+          "description": "Ids of the 3D solids to export. Omit or pass [] to export every 3D solid of the document.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "export_step_exact"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true
+    },
     "description": "Export the document (or a subset of entities) to STL format — the standard triangle-mesh interchange format accepted by slicers, mesh editors, and 3D printers. Produces a triangle tessellation in world space for every exportable 3D solid entity. 2D shape entities (line, polyline, arc, circle, rectangle, text, dimension, etc.) are silently skipped — STL is a solid/mesh format. Returns the UNCHANGED document, affected:[], and a data object with:   format (\"ascii\"|\"binary\"), triangleCount (number of exported triangles),   stl (ASCII STL string — when format=\"ascii\"),   stlBase64 (base64-encoded binary STL bytes — when format=\"binary\"). Supported entity kinds: box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, mesh. entityIds: omit to export all 3D entities; provide an array to export a subset. format: \"ascii\" (default, human-readable) or \"binary\" (more compact, required by some importers). name: optional solid name embedded in the STL header (default \"llull\"). Does NOT modify the document.",
     "input_schema": {
       "properties": {
@@ -4868,13 +4899,24 @@
     "name": "fillet_2d"
   },
   {
-    "description": "Round (fillet) the edges of a 3D solid entity and replace it with a new mesh entity. The source entity is consumed and replaced by the filleted mesh result. edgeIndices selects which edges to fillet; omit or pass [] to fillet ALL edges (OCC convention: the kernel enumerates edges 0-based and applies radius to each selected edge). Requires a geometry kernel that supports filletEdges (available with the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, or mesh).",
+    "description": "Round (fillet) exact B-rep edges of a 3D solid entity and replace it with a new mesh entity that keeps the exact construction (its brep recipe), so booleans, further fillets and STEP export still see true faces and edges. The source entity is consumed. Select edges with edgeIndices (indices from inspect_topology) and/or edgesNear (points near the edges, robust to parametric edits); with neither, ALL edges are filleted. Requires a geometry kernel that supports fillets (the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)). With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).",
     "input_schema": {
       "properties": {
         "edgeIndices": {
-          "description": "0-based indices of the edges to fillet. Pass [] or omit to fillet ALL edges. Edge numbering is kernel-defined (OCC enumerates edges in topology traversal order). Ignored by kernels that do not support partial-edge selection.",
+          "description": "0-based indices of the unique B-rep edges to fillet, as listed by inspect_topology on the same entity (each edge counted once). Pass [] or omit (with no edgesNear) to fillet ALL edges.",
           "items": {
-            "type": "number"
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "edgesNear": {
+          "description": "Select edges by location: each point picks the roundable edge whose mid point is nearest. Prefer this in parametric models: the feature history keeps the points, so the same edge is re-selected after an upstream edit renumbers edges. Combines with edgeIndices.",
+          "items": {
+            "description": "A point [x, y, z] near the edge to fillet (e.g. its mid point from inspect_topology).",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
           },
           "type": "array"
         },
@@ -5157,6 +5199,25 @@
       "type": "object"
     },
     "name": "insert_step"
+  },
+  {
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "description": "List the exact B-rep topology of a 3D solid as the geometry kernel holds it: its faces (surface type, area) and its unique edges (curve type, length, start/end/mid points). The edge indices are the ones fillet_edge and chamfer_edge take in edgeIndices — inspect first, then pick edges by position (e.g. the edge whose mid point is at the top front). Works on primitives and on boolean / fillet / chamfer / shell results (they keep their exact construction). Requires the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server); the default Manifold kernel has no B-rep and gracefully no-ops. Does not modify the document.",
+    "input_schema": {
+      "properties": {
+        "id": {
+          "description": "Id of the 3D solid entity to inspect.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "inspect_topology"
   },
   {
     "description": "Replay a named recipe's steps ADDITIVELY on top of the current document, assigning fresh entity ids each time. Existing entities are never removed or changed. Each call is independent — instantiating the same recipe twice produces two separate copies, each with their own unique ids. The recipe must already exist (call save_recipe first). The step is recorded in featureHistory so replaying the history re-expands the recipe.",

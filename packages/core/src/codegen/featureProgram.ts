@@ -14,6 +14,9 @@ import { buildParamEnv } from '../commands/regenerate';
 import { evaluateExpression, extractReferences } from '../commands/expression';
 import { entityToTriangles } from '../commands/exportTriangulate';
 import { Namer, translateExpression } from './identifiers';
+import type { GeometryKernel } from '../geometry/kernel';
+import { recipeOf } from '../geometry/shapeRecipe';
+import { lowerRecipe, meshSoup, modificationFeature } from './recipeLowering';
 import type {
   Axis,
   Feature,
@@ -32,6 +35,8 @@ const EPSILON = 1e-9;
 interface LowerContext {
   readonly identifiers: ReadonlyMap<string, string>;
   readonly env: Readonly<Record<string, number>>;
+  /** Queried for exact edge mid points and fillet result triangles; null = indices only. */
+  readonly kernel: GeometryKernel | null;
 }
 
 /** Bind `value` to the raw `=expr` param when (and only when) the expression evaluates to it. */
@@ -150,6 +155,44 @@ function solidFeature(
     position: isMesh ? zero3() : term3(entity.position, child(raw, 'position'), ctx),
     rotation: isMesh ? zero3() : term3(entity.rotation, child(raw, 'rotation'), ctx),
     color: entity.color,
+  };
+}
+
+/**
+ * Features creating `entity` in `variables`: a kernel result rebuilds its exact recipe; anything else
+ * (or a recipe with a rotated placement / scale) is one solid feature.
+ * @returns the features and whether the entity was exported as a triangle mesh
+ */
+function entityFeatures(
+  entity: Entity,
+  doc: CadDocument,
+  raw: unknown,
+  ctx: LowerContext,
+  namer: Namer,
+  base: (variable: string) => FeatureBase,
+  variables: Map<string, string>,
+): { features: Feature[]; triangles: boolean } {
+  if (entity.kind === 'mesh' && entity.brep !== undefined) {
+    const lowered = lowerRecipe(recipeOf(entity), {
+      kernel: ctx.kernel,
+      take: (preferred) => namer.take(preferred),
+      solid: (leaf, variable) => solidFeature(leaf, doc, undefined, ctx, base(variable)),
+      base,
+    });
+    if (lowered !== null) {
+      variables.set(entity.id, lowered.variable);
+      const label: Feature[] =
+        entity.name !== undefined
+          ? [{ ...base(lowered.variable), op: 'label', name: entity.name }]
+          : [];
+      return { features: [...lowered.features, ...label], triangles: false };
+    }
+  }
+  const variable = namer.take(preferredVariable(entity));
+  variables.set(entity.id, variable);
+  return {
+    features: [solidFeature(entity, doc, raw, ctx, base(variable))],
+    triangles: entity.kind === 'mesh' || entity.kind === 'instance',
   };
 }
 
@@ -284,14 +327,23 @@ function lowerSnapshot(
   const variables = new Map<string, string>();
   const features: Feature[] = [];
   for (const entity of solids(doc)) {
-    const variable = namer.take(preferredVariable(entity));
-    variables.set(entity.id, variable);
-    const feature = solidFeature(entity, doc, undefined, ctx, {
+    const base = (variable: string): FeatureBase => ({
       step: null,
       command: entity.kind,
       variable,
     });
-    features.push(entity.name !== undefined ? { ...feature, name: entity.name } : feature);
+    const lowered = entityFeatures(entity, doc, undefined, ctx, namer, base, variables);
+    const [first, ...rest] = lowered.features;
+    const named =
+      lowered.features.length === 1 && first?.op === 'solid' && entity.name !== undefined
+        ? [{ ...first, name: entity.name }]
+        : [first, ...rest].filter((feature): feature is Feature => feature !== undefined);
+    features.push(...named);
+    if (lowered.triangles) {
+      notes.push(
+        `${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`,
+      );
+    }
   }
   return {
     units: doc.units,
@@ -301,6 +353,38 @@ function lowerSnapshot(
     outputs: outputsFor(doc, variables),
     notes,
   };
+}
+
+const MODIFICATION_COMMANDS: ReadonlySet<string> = new Set([
+  'fillet_edge',
+  'chamfer_edge',
+  'shell_solid',
+]);
+
+/** A fillet / chamfer / shell step that replaced one solid by its exact modification, in place. */
+function modificationStep(
+  event: ReplayStepEvent,
+  created: readonly Entity[],
+  removed: readonly string[],
+  variables: Map<string, string>,
+  ctx: LowerContext,
+  base: (variable: string) => FeatureBase,
+): Feature | null {
+  const [result] = created;
+  const sourceId = String(child(event.params, 'id'));
+  const variable = variables.get(sourceId);
+  if (!MODIFICATION_COMMANDS.has(event.step.name) || created.length !== 1 || removed.length !== 1)
+    return null;
+  if (removed[0] !== sourceId || variable === undefined || result?.kind !== 'mesh') return null;
+  const brep = result.brep;
+  if (brep === undefined || (brep.op !== 'fillet' && brep.op !== 'chamfer' && brep.op !== 'shell'))
+    return null;
+  variables.delete(sourceId);
+  variables.set(result.id, variable);
+  const sizeParam = { fillet: 'radius', chamfer: 'distance', shell: 'thickness' }[brep.op];
+  const value = brep.op === 'shell' ? brep.thickness : brep.size;
+  const size = term(value, child(event.rawParams, sizeParam), ctx);
+  return modificationFeature(brep, base(variable), ctx.kernel, meshSoup(result.mesh), size);
 }
 
 /** Lower one replayed step into features, keeping `variables` (entity id → variable) current. */
@@ -348,6 +432,9 @@ function lowerStep(
     return [{ ...base(left), op: 'boolean', kind: booleanKind, left, right }];
   }
 
+  const modification = modificationStep(event, created, removed, variables, ctx, base);
+  if (modification !== null) return [modification];
+
   const features: Feature[] = [];
   for (const id of removed) {
     const variable = variables.get(id);
@@ -376,10 +463,9 @@ function lowerStep(
     }
   }
   for (const entity of created) {
-    const variable = namer.take(preferredVariable(entity));
-    variables.set(entity.id, variable);
-    features.push(solidFeature(entity, after, rawParams, ctx, base(variable)));
-    if (entity.kind === 'mesh' || entity.kind === 'instance') {
+    const lowered = entityFeatures(entity, after, rawParams, ctx, namer, base, variables);
+    features.push(...lowered.features);
+    if (lowered.triangles) {
       notes.push(
         `step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`,
       );
@@ -415,10 +501,11 @@ function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null
 export function buildFeatureProgram(
   doc: CadDocument,
   getCommand: (name: string) => CommandDefinition<unknown> | undefined,
+  kernel: GeometryKernel | null = null,
 ): FeatureProgram {
   const namer = new Namer();
   const { parameters, identifiers } = lowerParameters(doc, namer);
-  const ctx: LowerContext = { identifiers, env: buildParamEnv(doc.parameters) };
+  const ctx: LowerContext = { identifiers, env: buildParamEnv(doc.parameters), kernel };
   const notes: string[] = [];
   const activeSteps: FeatureStep[] = doc.featureHistory.filter((s) => s.suppressed !== true);
   if (activeSteps.length === 0) return lowerSnapshot(doc, parameters, ctx, namer, notes);

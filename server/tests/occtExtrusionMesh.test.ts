@@ -9,6 +9,7 @@ import type { Entity, Vec3 } from '@core/model/types';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
+import { booleanMesh, meshOf } from './kernelTestSupport';
 
 const common = { layerId: 'layer-default', color: '#888888' };
 type Profile = Array<[number, number]>;
@@ -80,7 +81,7 @@ describe.each([
     'has the analytic volume and Manifold bounds (%s)',
     (_l, position, rotation) => {
       const entity = extrusion(profile, position, rotation);
-      const [fromOcct, fromManifold] = [occt.tessellate(entity), manifold.tessellate(entity)];
+      const [fromOcct, fromManifold] = [meshOf(occt, entity), meshOf(manifold, entity)];
       expect(fromOcct).not.toBeNull();
       expect(fromManifold).not.toBeNull();
       expect(volume(fromOcct!)).toBeCloseTo(L_AREA * 4, 4);
@@ -98,8 +99,8 @@ describe.each([
       const entity = extrusion(profile, [0, 0, 0], [0, 0, 0]);
       const other = box([1, 1, 2], [3, 3, 2.5]);
       const [fromOcct, fromManifold] = [
-        occt.booleanOp(op, entity, other),
-        manifold.booleanOp(op, entity, other),
+        booleanMesh(occt, op, entity, other),
+        booleanMesh(manifold, op, entity, other),
       ];
       expect(fromOcct).not.toBeNull();
       expect(fromManifold).not.toBeNull();
@@ -129,18 +130,18 @@ describe('occt extrusion rejects bad input', () => {
     ],
     ['non-positive depth', L_SHAPE, 0],
   ])('%s -> null', (_label, profile, depth) => {
-    expect(occt.tessellate(extrusion(profile, [0, 0, 0], [0, 0, 0], depth))).toBeNull();
+    expect(meshOf(occt, extrusion(profile, [0, 0, 0], [0, 0, 0], depth))).toBeNull();
   });
 });
 
 describe('occt mesh operands', () => {
   it('a mesh solid behaves like the box it was tessellated from', () => {
     const source = box([0, 0, 0], [4, 4, 4]);
-    const cube = manifold.tessellate(source)!;
+    const cube = meshOf(manifold, source)!;
     const cutter = box([2, 0, 0], [4, 4, 4]);
     for (const op of ['union', 'subtract', 'intersect'] as const) {
-      const viaMesh = occt.booleanOp(op, meshEntity(cube), cutter);
-      const viaBox = occt.booleanOp(op, source, cutter);
+      const viaMesh = booleanMesh(occt, op, meshEntity(cube), cutter);
+      const viaBox = booleanMesh(occt, op, source, cutter);
       expect(viaMesh, op).not.toBeNull();
       expect(viaBox, op).not.toBeNull();
       expect(volume(viaMesh!)).toBeCloseTo(volume(viaBox!), 3);
@@ -148,14 +149,14 @@ describe('occt mesh operands', () => {
   });
 
   it('honours a mesh entity transform', () => {
-    const cube = manifold.tessellate(box([0, 0, 0], [2, 2, 2]))!;
+    const cube = meshOf(manifold, box([0, 0, 0], [2, 2, 2]))!;
     const moved = { ...meshEntity(cube), position: [10, 0, 0] } as Entity;
-    const result = occt.booleanOp('union', moved, box([10, 0, 0], [2, 2, 2]));
+    const result = booleanMesh(occt, 'union', moved, box([10, 0, 0], [2, 2, 2]));
     expect(result).not.toBeNull();
     expect(volume(result!)).toBeCloseTo(8, 3);
   });
 
   it('an empty mesh is rejected', () => {
-    expect(occt.tessellate(meshEntity({ positions: [], indices: [] }))).toBeNull();
+    expect(meshOf(occt, meshEntity({ positions: [], indices: [] }))).toBeNull();
   });
 });

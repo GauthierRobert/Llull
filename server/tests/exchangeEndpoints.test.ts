@@ -150,6 +150,19 @@ describe('GET /export/step without Python', () => {
     expect(res.body.error).toMatch(/LLULL_PYTHON/);
   });
 
+  it('falls back to the exact OCC kernel: a STEP solid with analytic faces', async () => {
+    const server = await loadServer({ LLULL_PYTHON: 'off' });
+    const { setGeometryKernel } = await import('@core/geometry/kernel');
+    const { createNodeOcctKernel } = await import('../src/occtNode');
+    setGeometryKernel(await createNodeOcctKernel());
+    server.applyCommand('add_cylinder', { radius: 2, height: 5 });
+    const res = await request(server.app).get('/export/step?name=part');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('part.step');
+    expect(res.text).toMatch(/^ISO-10303-21;/);
+    expect(res.text).toMatch(/CYLINDRICAL_SURFACE/);
+  }, 120_000);
+
   it('returns a graceful 500 when the configured python cannot start', async () => {
     const server = await loadServer({ LLULL_PYTHON: '/nonexistent/python-xyz' });
     server.applyCommand('add_box', { size: [10, 10, 10] });

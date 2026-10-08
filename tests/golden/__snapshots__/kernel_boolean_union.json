@@ -180,6 +180,58 @@
             19
           ]
         },
+        "brep": {
+          "op": "boolean",
+          "boolean": "union",
+          "a": {
+            "op": "solid",
+            "entity": {
+              "id": "#2",
+              "kind": "box",
+              "size": [
+                2,
+                2,
+                2
+              ],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "layerId": "#3",
+              "color": "#6b8f9c"
+            }
+          },
+          "b": {
+            "op": "solid",
+            "entity": {
+              "id": "#4",
+              "kind": "box",
+              "size": [
+                2,
+                2,
+                2
+              ],
+              "position": [
+                1,
+                1,
+                1
+              ],
+              "rotation": [
+                0,
+                0,
+                0
+              ],
+              "layerId": "#3",
+              "color": "#6b8f9c"
+            }
+          }
+        },
         "position": [
           0,
           0,
@@ -190,7 +242,7 @@
           0,
           0
         ],
-        "layerId": "#2",
+        "layerId": "#3",
         "color": "#6b8f9c"
       }
     },
@@ -198,15 +250,15 @@
       "#1"
     ],
     "layers": {
-      "#2": {
-        "id": "#2",
+      "#3": {
+        "id": "#3",
         "name": "Layer 0",
         "visible": true,
         "locked": false
       }
     },
     "layerOrder": [
-      "#2"
+      "#3"
     ],
     "selection": [],
     "camera": {
@@ -226,7 +278,7 @@
     "animations": {},
     "featureHistory": [
       {
-        "id": "#3",
+        "id": "#5",
         "name": "add_box",
         "params": {
           "size": [
@@ -237,11 +289,11 @@
         },
         "suppressed": false,
         "affected": [
-          "#4"
+          "#2"
         ]
       },
       {
-        "id": "#5",
+        "id": "#6",
         "name": "add_box",
         "params": {
           "size": [
@@ -257,15 +309,15 @@
         },
         "suppressed": false,
         "affected": [
-          "#6"
+          "#4"
         ]
       },
       {
         "id": "#7",
         "name": "boolean_union",
         "params": {
-          "a": "#4",
-          "b": "#6"
+          "a": "#2",
+          "b": "#4"
         },
         "suppressed": false,
         "affected": [

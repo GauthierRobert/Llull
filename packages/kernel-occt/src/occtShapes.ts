@@ -106,7 +106,7 @@ export function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | n
 }
 
 /** llull placement M = Rx·Ry·Rz (Rz applied first, radians) followed by the translation. */
-function placementTransform(
+export function placementTransform(
   api: OccApi,
   rotation: Vec3,
   position: Vec3,
@@ -140,14 +140,20 @@ function placementTransform(
   return total;
 }
 
-/** Copy of `shape` moved by `placement`; the input shape is released. */
-function placed(api: OccApi, shape: OccShape, placement: OccHandle): OccShape {
-  const transformer = new api.BRepBuilderAPI_Transform_2(shape, placement, true) as {
+/** Copy of `shape` moved by `transform` (geometry copied); neither input is released. */
+export function transformedCopy(api: OccApi, shape: OccShape, transform: OccHandle): OccShape {
+  const transformer = new api.BRepBuilderAPI_Transform_2(shape, transform, true) as {
     Shape(): OccShape;
     delete(): void;
   };
   const moved = transformer.Shape();
   transformer.delete();
+  return moved;
+}
+
+/** Copy of `shape` moved by `placement`; the input shape and the placement are released. */
+function placed(api: OccApi, shape: OccShape, placement: OccHandle): OccShape {
+  const moved = transformedCopy(api, shape, placement);
   release(placement);
   release(shape);
   return moved;

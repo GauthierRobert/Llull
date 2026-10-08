@@ -67,6 +67,25 @@ export type Feature =
       readonly left: string;
       readonly right: string;
     })
+  /**
+   * Round (fillet) or bevel (chamfer) edges of `variable` in place. `edges`: unique-edge indices (OCC
+   * map order; [] = all); `near`: each selected edge's mid point, preferred over indices when present
+   * (robust to edge-order differences between OCC builds).
+   */
+  | (FeatureBase & {
+      readonly op: 'fillet' | 'chamfer';
+      readonly edges: readonly number[];
+      readonly near?: ReadonlyArray<readonly [number, number, number]>;
+      readonly size: Term;
+      /** Result triangles (world soup) for targets without fillets (OpenSCAD). */
+      readonly mesh?: readonly number[];
+    })
+  /** Hollow `variable` in place: the solid minus its inward offset by `thickness`. */
+  | (FeatureBase & {
+      readonly op: 'shell';
+      readonly thickness: Term;
+      readonly mesh?: readonly number[];
+    })
   | (FeatureBase & { readonly op: 'translate'; readonly delta: Term3 })
   | (FeatureBase & { readonly op: 'remove' })
   | (FeatureBase & { readonly op: 'label'; readonly name: string });

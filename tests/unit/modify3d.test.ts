@@ -3,8 +3,13 @@ import { createEmptyDocument } from '@core/model/types';
 import type { MeshSolidEntity, CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
-import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
-import type { Entity } from '@core/model/types';
+import type { MeshData } from '@core/geometry/kernel';
+import {
+  fakeKernel,
+  type FakeCall,
+  type FakeKernel,
+  type FakeKernelSpec,
+} from '../helpers/fakeKernel';
 
 // ---------------------------------------------------------------------------
 // Canned meshes
@@ -25,65 +30,16 @@ const CHAMFER_MESH: MeshData = {
   indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
 };
 
-// ---------------------------------------------------------------------------
-// Fake kernel factory
-// Records tessellate + filletEdges + chamferEdges calls so tests can assert.
-// ---------------------------------------------------------------------------
-
-interface FakeKernelState {
-  tessellateCallCount: number;
-  filletCallCount: number;
-  chamferCallCount: number;
-  lastFilletRadius: number | null;
-  lastFilletEdgeIndices: number[] | null;
-  lastChamferDistance: number | null;
-  lastChamferEdgeIndices: number[] | null;
-  tessellateReturnsNull: boolean;
-  filletReturnsNull: boolean;
-  chamferReturnsNull: boolean;
+function countOf(fake: FakeKernel, op: string): number {
+  return fake.calls.filter((call) => call.op === op).length;
 }
 
-function makeFakeKernel(): GeometryKernel & FakeKernelState {
-  const fake: GeometryKernel & FakeKernelState = {
-    tessellateCallCount: 0,
-    filletCallCount: 0,
-    chamferCallCount: 0,
-    lastFilletRadius: null,
-    lastFilletEdgeIndices: null,
-    lastChamferDistance: null,
-    lastChamferEdgeIndices: null,
-    tessellateReturnsNull: false,
-    filletReturnsNull: false,
-    chamferReturnsNull: false,
+function lastCall(fake: FakeKernel, op: string): FakeCall | undefined {
+  return [...fake.calls].reverse().find((call) => call.op === op);
+}
 
-    booleanOp(_op, _a: Entity, _b: Entity): MeshData | null {
-      return CANNED_MESH;
-    },
-
-    tessellate(_entity: Entity): MeshData | null {
-      fake.tessellateCallCount += 1;
-      return fake.tessellateReturnsNull ? null : CANNED_MESH;
-    },
-
-    filletEdges(_shape: MeshData, edgeIndices: number[], radius: number): MeshData | null {
-      fake.filletCallCount += 1;
-      fake.lastFilletRadius = radius;
-      fake.lastFilletEdgeIndices = edgeIndices;
-      return fake.filletReturnsNull ? null : FILLET_MESH;
-    },
-
-    chamferEdges(_shape: MeshData, edgeIndices: number[], distance: number): MeshData | null {
-      fake.chamferCallCount += 1;
-      fake.lastChamferDistance = distance;
-      fake.lastChamferEdgeIndices = edgeIndices;
-      return fake.chamferReturnsNull ? null : CHAMFER_MESH;
-    },
-
-    shellSolid(_shape: MeshData, _thickness: number): MeshData | null {
-      return null;
-    },
-  };
-  return fake;
+function freshKernel(spec: FakeKernelSpec = {}): FakeKernel {
+  return fakeKernel({ solid: CANNED_MESH, fillet: FILLET_MESH, chamfer: CHAMFER_MESH, ...spec });
 }
 
 // ---------------------------------------------------------------------------
@@ -107,10 +63,10 @@ function docWithLine(): { doc: CadDocument; lineId: string } {
 // ---------------------------------------------------------------------------
 
 describe('modify3d commands', () => {
-  let fake: ReturnType<typeof makeFakeKernel>;
+  let fake: FakeKernel;
 
   beforeEach(() => {
-    fake = makeFakeKernel();
+    fake = freshKernel();
     setGeometryKernel(fake);
   });
 
@@ -141,6 +97,18 @@ describe('modify3d commands', () => {
       const entity = result.document.entities[newId] as MeshSolidEntity;
       expect(entity.mesh.positions).toEqual(FILLET_MESH.positions);
       expect(entity.mesh.indices).toEqual(FILLET_MESH.indices);
+    });
+
+    it('stores the fillet recipe of the source as brep', () => {
+      const { doc, boxId } = docWithBox();
+      const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2, edgeIndices: [1, 2] });
+      const entity = result.document.entities[result.affected[0]!] as MeshSolidEntity;
+      expect(entity.brep).toMatchObject({
+        op: 'fillet',
+        source: { op: 'solid', entity: doc.entities[boxId] },
+        edges: [1, 2],
+        size: 0.2,
+      });
     });
 
     it('prunes the source entity from entities and order', () => {
@@ -179,19 +147,19 @@ describe('modify3d commands', () => {
     it('passes radius to the kernel', () => {
       const { doc, boxId } = docWithBox();
       execute(doc, 'fillet_edge', { id: boxId, radius: 0.5 });
-      expect(fake.lastFilletRadius).toBe(0.5);
+      expect(lastCall(fake, 'fillet')?.size).toBe(0.5);
     });
 
     it('passes edgeIndices to the kernel when provided', () => {
       const { doc, boxId } = docWithBox();
       execute(doc, 'fillet_edge', { id: boxId, radius: 0.2, edgeIndices: [0, 3, 7] });
-      expect(fake.lastFilletEdgeIndices).toEqual([0, 3, 7]);
+      expect(lastCall(fake, 'fillet')?.edges).toEqual([0, 3, 7]);
     });
 
     it('defaults edgeIndices to [] (all edges) when omitted', () => {
       const { doc, boxId } = docWithBox();
       execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      expect(fake.lastFilletEdgeIndices).toEqual([]);
+      expect(lastCall(fake, 'fillet')?.edges).toEqual([]);
     });
 
     it('summary includes source id, new id, radius, triangle count', () => {
@@ -205,11 +173,11 @@ describe('modify3d commands', () => {
       expect(result.summary).toContain(String(triCount));
     });
 
-    it('calls tessellate then filletEdges on the kernel', () => {
+    it('builds the source leaf then fillets it once', () => {
       const { doc, boxId } = docWithBox();
       execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
-      expect(fake.tessellateCallCount).toBe(1);
-      expect(fake.filletCallCount).toBe(1);
+      expect(countOf(fake, 'solid')).toBe(1);
+      expect(countOf(fake, 'fillet')).toBe(1);
     });
 
     // -----------------------------------------------------------------------
@@ -222,8 +190,8 @@ describe('modify3d commands', () => {
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('ghost');
-      expect(fake.tessellateCallCount).toBe(0);
-      expect(fake.filletCallCount).toBe(0);
+      expect(countOf(fake, 'solid')).toBe(0);
+      expect(countOf(fake, 'fillet')).toBe(0);
     });
 
     it('no-op when target is a 2D entity', () => {
@@ -232,8 +200,8 @@ describe('modify3d commands', () => {
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('2D');
-      expect(fake.tessellateCallCount).toBe(0);
-      expect(fake.filletCallCount).toBe(0);
+      expect(countOf(fake, 'solid')).toBe(0);
+      expect(countOf(fake, 'fillet')).toBe(0);
     });
 
     it('no-op when radius is zero', () => {
@@ -242,8 +210,8 @@ describe('modify3d commands', () => {
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('radius');
-      expect(fake.tessellateCallCount).toBe(0);
-      expect(fake.filletCallCount).toBe(0);
+      expect(countOf(fake, 'solid')).toBe(0);
+      expect(countOf(fake, 'fillet')).toBe(0);
     });
 
     it('no-op when radius is negative', () => {
@@ -251,7 +219,7 @@ describe('modify3d commands', () => {
       const result = execute(doc, 'fillet_edge', { id: boxId, radius: -1 });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
-      expect(fake.filletCallCount).toBe(0);
+      expect(countOf(fake, 'fillet')).toBe(0);
     });
 
     it('no-op when kernel is not injected', () => {
@@ -263,18 +231,18 @@ describe('modify3d commands', () => {
       expect(result.summary).toContain('kernel not available');
     });
 
-    it('no-op when tessellate returns null; source not pruned', () => {
-      fake.tessellateReturnsNull = true;
+    it('no-op when the kernel cannot build the source; source not pruned', () => {
+      setGeometryKernel((fake = freshKernel({ solid: null })));
       const { doc, boxId } = docWithBox();
       const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.document.entities[boxId]).toBeDefined();
-      expect(fake.filletCallCount).toBe(0);
+      expect(countOf(fake, 'fillet')).toBe(0);
     });
 
-    it('no-op when kernel filletEdges returns null; source not pruned', () => {
-      fake.filletReturnsNull = true;
+    it('no-op when kernel fillet returns null; source not pruned', () => {
+      setGeometryKernel((fake = freshKernel({ fillet: null })));
       const { doc, boxId } = docWithBox();
       const result = execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
       expect(result.affected).toHaveLength(0);
@@ -304,7 +272,7 @@ describe('modify3d commands', () => {
     });
 
     it('is pure — input doc not mutated when kernel returns null', () => {
-      fake.filletReturnsNull = true;
+      setGeometryKernel((fake = freshKernel({ fillet: null })));
       const { doc, boxId } = docWithBox();
       const snapshot = JSON.stringify(doc);
       execute(doc, 'fillet_edge', { id: boxId, radius: 0.2 });
@@ -337,6 +305,22 @@ describe('modify3d commands', () => {
       expect(entity.mesh.indices).toEqual(CHAMFER_MESH.indices);
     });
 
+    it('stores the chamfer recipe of the source as brep', () => {
+      const { doc, boxId } = docWithBox();
+      const result = execute(doc, 'chamfer_edge', {
+        id: boxId,
+        distance: 0.1,
+        edgeIndices: [1, 2],
+      });
+      const entity = result.document.entities[result.affected[0]!] as MeshSolidEntity;
+      expect(entity.brep).toMatchObject({
+        op: 'chamfer',
+        source: { op: 'solid', entity: doc.entities[boxId] },
+        edges: [1, 2],
+        size: 0.1,
+      });
+    });
+
     it('prunes the source entity from entities and order', () => {
       const { doc, boxId } = docWithBox();
       const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
@@ -347,19 +331,19 @@ describe('modify3d commands', () => {
     it('passes distance to the kernel', () => {
       const { doc, boxId } = docWithBox();
       execute(doc, 'chamfer_edge', { id: boxId, distance: 0.3 });
-      expect(fake.lastChamferDistance).toBe(0.3);
+      expect(lastCall(fake, 'chamfer')?.size).toBe(0.3);
     });
 
     it('passes edgeIndices to the kernel when provided', () => {
       const { doc, boxId } = docWithBox();
       execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1, edgeIndices: [1, 5] });
-      expect(fake.lastChamferEdgeIndices).toEqual([1, 5]);
+      expect(lastCall(fake, 'chamfer')?.edges).toEqual([1, 5]);
     });
 
     it('defaults edgeIndices to [] (all edges) when omitted', () => {
       const { doc, boxId } = docWithBox();
       execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      expect(fake.lastChamferEdgeIndices).toEqual([]);
+      expect(lastCall(fake, 'chamfer')?.edges).toEqual([]);
     });
 
     it('summary includes source id, new id, distance, triangle count', () => {
@@ -373,11 +357,11 @@ describe('modify3d commands', () => {
       expect(result.summary).toContain(String(triCount));
     });
 
-    it('calls tessellate then chamferEdges on the kernel', () => {
+    it('builds the source leaf then chamfers it once', () => {
       const { doc, boxId } = docWithBox();
       execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
-      expect(fake.tessellateCallCount).toBe(1);
-      expect(fake.chamferCallCount).toBe(1);
+      expect(countOf(fake, 'solid')).toBe(1);
+      expect(countOf(fake, 'chamfer')).toBe(1);
     });
 
     // -----------------------------------------------------------------------
@@ -390,8 +374,8 @@ describe('modify3d commands', () => {
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('ghost');
-      expect(fake.tessellateCallCount).toBe(0);
-      expect(fake.chamferCallCount).toBe(0);
+      expect(countOf(fake, 'solid')).toBe(0);
+      expect(countOf(fake, 'chamfer')).toBe(0);
     });
 
     it('no-op when target is a 2D entity', () => {
@@ -400,8 +384,8 @@ describe('modify3d commands', () => {
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('2D');
-      expect(fake.tessellateCallCount).toBe(0);
-      expect(fake.chamferCallCount).toBe(0);
+      expect(countOf(fake, 'solid')).toBe(0);
+      expect(countOf(fake, 'chamfer')).toBe(0);
     });
 
     it('no-op when distance is zero', () => {
@@ -410,8 +394,8 @@ describe('modify3d commands', () => {
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.summary).toContain('distance');
-      expect(fake.tessellateCallCount).toBe(0);
-      expect(fake.chamferCallCount).toBe(0);
+      expect(countOf(fake, 'solid')).toBe(0);
+      expect(countOf(fake, 'chamfer')).toBe(0);
     });
 
     it('no-op when distance is negative', () => {
@@ -419,7 +403,7 @@ describe('modify3d commands', () => {
       const result = execute(doc, 'chamfer_edge', { id: boxId, distance: -0.5 });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
-      expect(fake.chamferCallCount).toBe(0);
+      expect(countOf(fake, 'chamfer')).toBe(0);
     });
 
     it('no-op when kernel is not injected', () => {
@@ -431,18 +415,18 @@ describe('modify3d commands', () => {
       expect(result.summary).toContain('kernel not available');
     });
 
-    it('no-op when tessellate returns null; source not pruned', () => {
-      fake.tessellateReturnsNull = true;
+    it('no-op when the kernel cannot build the source; source not pruned', () => {
+      setGeometryKernel((fake = freshKernel({ solid: null })));
       const { doc, boxId } = docWithBox();
       const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(doc);
       expect(result.document.entities[boxId]).toBeDefined();
-      expect(fake.chamferCallCount).toBe(0);
+      expect(countOf(fake, 'chamfer')).toBe(0);
     });
 
-    it('no-op when kernel chamferEdges returns null; source not pruned', () => {
-      fake.chamferReturnsNull = true;
+    it('no-op when kernel chamfer returns null; source not pruned', () => {
+      setGeometryKernel((fake = freshKernel({ chamfer: null })));
       const { doc, boxId } = docWithBox();
       const result = execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });
       expect(result.affected).toHaveLength(0);
@@ -472,7 +456,7 @@ describe('modify3d commands', () => {
     });
 
     it('is pure — input doc not mutated when kernel returns null', () => {
-      fake.chamferReturnsNull = true;
+      setGeometryKernel((fake = freshKernel({ chamfer: null })));
       const { doc, boxId } = docWithBox();
       const snapshot = JSON.stringify(doc);
       execute(doc, 'chamfer_edge', { id: boxId, distance: 0.1 });

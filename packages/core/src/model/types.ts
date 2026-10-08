@@ -1,6 +1,7 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
 import type { MeshData } from '../geometry/kernel';
+import type { ShapeRecipe } from '../geometry/shapeRecipe';
 import type { BuildingModel } from './building';
 export type { MeshData };
 
@@ -90,10 +91,16 @@ export interface ExtrusionEntity extends BaseEntity {
   depth: number;
 }
 
-/** Triangle mesh in world space (`position` is [0,0,0]): boolean/fillet/chamfer results, imports, plugin geometry. */
+/**
+ * Triangle mesh in world space (`position` is [0,0,0]): boolean/fillet/chamfer results, imports, plugin geometry.
+ * @invariant `brep`, when present, is the exact construction tree the kernel tessellated into `mesh`
+ *   (before `position`/`rotation`); a command that rewrites `mesh` must rewrite or drop `brep`
+ */
 export interface MeshSolidEntity extends BaseEntity {
   readonly kind: 'mesh';
   mesh: MeshData;
+  /** Exact shape recipe of a kernel result; absent for imported / triangle-only meshes. */
+  brep?: ShapeRecipe;
 }
 
 /** Base circle in XY centered at `position`, apex at +Z. */

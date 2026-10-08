@@ -3,14 +3,9 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { GeometryKernel, MeshData } from '@core/geometry/kernel';
+import { fakeKernel } from '../helpers/fakeKernel';
 
-const kernelReturning = (mesh: MeshData | null): GeometryKernel => ({
-  booleanOp: () => mesh,
-  filletEdges: () => null,
-  chamferEdges: () => null,
-  shellSolid: () => null,
-  tessellate: () => null,
-});
+const kernelReturning = (mesh: MeshData | null): GeometryKernel => fakeKernel({ boolean: mesh });
 
 describe('boolean edge cases', () => {
   afterEach(() => setGeometryKernel(null));

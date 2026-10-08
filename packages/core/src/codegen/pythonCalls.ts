@@ -6,7 +6,7 @@
  * @pure
  */
 
-import type { ShapeSpec, Term, Term2, Term3 } from './program';
+import type { Feature, ShapeSpec, Term, Term2, Term3 } from './program';
 import { formatDegrees, formatNumber, formatTerm, isZero, numberRows, quote } from './format';
 
 /** `(a, b, c)` */
@@ -50,6 +50,15 @@ export function shapeCallOpen(shape: ShapeSpec): string {
     case 'mesh':
       return `mesh([\n    ${numberRows(shape.positions, 9).join(',\n    ')},\n]`;
   }
+}
+
+/** Call arguments of a fillet / chamfer: `[edges], size[, near=[(x, y, z), …]]`. */
+export function roundArguments(feature: Extract<Feature, { op: 'fillet' | 'chamfer' }>): string {
+  const near =
+    feature.near === undefined
+      ? ''
+      : `, near=[${feature.near.map((point) => `(${point.map(formatNumber).join(', ')})`).join(', ')}]`;
+  return `[${feature.edges.map(formatNumber).join(', ')}], ${formatTerm(feature.size)}${near}`;
 }
 
 /** `, position=(…), rotation=(…)` kwargs; omitted when zero. Meshes are already world-space. */

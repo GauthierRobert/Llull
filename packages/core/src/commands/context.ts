@@ -10,7 +10,6 @@
 
 import type { GeometryKernel } from '../geometry/kernel';
 import { getGeometryKernel } from '../geometry/kernel';
-import { memoizeKernel } from '../geometry/kernelCache';
 import type { ReplayCache } from './replayCache';
 import { createReplayCache } from './replayCache';
 import type { IdSource } from '../lib/id';
@@ -55,17 +54,15 @@ function getOrCreate<K extends object, V>(store: WeakMap<K, V>, key: K, create: 
   return value;
 }
 
-/** One memoized wrapper per installed kernel, so the cache survives across executes. */
-const memoizedKernels = new WeakMap<GeometryKernel, GeometryKernel>();
-
 const replayCaches = new WeakMap<object, ReplayCache>();
 const NO_KERNEL = {};
 
-/** Context built from the process defaults: installed kernel (memoized), counter ids, registry. */
+/**
+ * Context built from the process defaults: installed kernel, counter ids, registry. The kernel
+ * caches its own shapes by recipe key (`kernelFromOps`), so no wrapper is needed here.
+ */
 export function defaultContext(): ExecutionContext {
-  const installed = getGeometryKernel();
-  const kernel =
-    installed && getOrCreate(memoizedKernels, installed, () => memoizeKernel(installed));
+  const kernel = getGeometryKernel();
   return {
     kernel,
     ids: counterIdSource,

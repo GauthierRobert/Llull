@@ -38,7 +38,7 @@ BoxEntity        'box'        size: Vec3
 CylinderEntity   'cylinder'   radius; height
 SphereEntity     'sphere'     radius
 ExtrusionEntity  'extrusion'  profile: ReadonlyArray<[number, number]>; depth
-MeshSolidEntity  'mesh'       mesh: MeshData            // kernel result (boolean / fillet)
+MeshSolidEntity  'mesh'       mesh: MeshData; brep?: ShapeRecipe  // kernel result: display mesh + exact construction tree
 ConeEntity       'cone'       radius; height
 TorusEntity      'torus'      ringRadius; tubeRadius
 WedgeEntity      'wedge'      size: Vec3

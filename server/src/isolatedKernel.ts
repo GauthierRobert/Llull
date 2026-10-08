@@ -7,6 +7,8 @@
  * and the next call respawns it.
  *
  * @invariant the interface stays synchronous (`packages/core` is unchanged)
+ * @invariant shape handles cross the thread boundary as plain data (they carry their recipe), so a
+ *   handle minted by a worker that has since been recycled is rebuilt by its successor
  * @failure worker died / timed out / failed to start -> null result + console.warn, never a throw
  */
 
@@ -18,7 +20,8 @@ import {
   receiveMessageOnPort,
   type MessagePort,
 } from 'node:worker_threads';
-import type { GeometryKernel } from '@core/geometry/kernel';
+import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
+import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import {
   STATUS_DIED,
   STATUS_READY,
@@ -189,7 +192,11 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     }
   };
 
-  const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown => {
+  /** One synchronous request; null when the worker died, timed out or could not start. */
+  const exchange = (
+    op: KernelOperation | TestHook,
+    args: readonly unknown[],
+  ): KernelReply | null => {
     let target: LiveWorker;
     try {
       target = ensureLive();
@@ -208,12 +215,13 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     if (outcome !== 'timed-out' && state === STATUS_REPLY) {
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
       Atomics.compareExchange(status, 0, STATUS_REPLY, 0); // idle; a death since the reply stays flagged
-      if (reply?.error !== undefined) console.warn(`[occt] ${op} failed: ${reply.error}`);
+      if (reply?.error !== undefined && !reply.error.startsWith(SHAPE_NOT_CACHED))
+        console.warn(`[occt] ${op} failed: ${reply.error}`);
       if (reply?.recycle === true) {
         recycles++;
         recycle(); // a degraded module is replaced; the next call gets a fresh, pre-loaded one
       }
-      return reply?.result ?? null;
+      return reply ?? null;
     }
     crashes++;
     console.warn(
@@ -225,17 +233,33 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     return null;
   };
 
+  const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown =>
+    exchange(op, args)?.result ?? null;
+
+  /**
+   * An output call on shapes: first with key-only handles (no recipe cloned across the thread); if
+   * the worker no longer caches one (evicted, recycled), once more with the full handles.
+   */
+  const shapeCall = (
+    op: KernelOperation,
+    handles: readonly ShapeHandle[],
+    wrap: boolean,
+  ): unknown => {
+    const pack = (list: readonly ShapeHandle[]): unknown[] => (wrap ? [list] : [...list]);
+    const reply = exchange(op, pack(handles.map(keyOnlyHandle)));
+    if (reply?.error?.startsWith(SHAPE_NOT_CACHED) !== true) return reply?.result ?? null;
+    return call(op, pack(handles));
+  };
+
   return {
-    booleanOp: (op, a, b) =>
-      call('booleanOp', [op, a, b]) as ReturnType<GeometryKernel['booleanOp']>,
-    filletEdges: (shape, edges, radius) =>
-      call('filletEdges', [shape, edges, radius]) as ReturnType<GeometryKernel['filletEdges']>,
-    chamferEdges: (shape, edges, distance) =>
-      call('chamferEdges', [shape, edges, distance]) as ReturnType<GeometryKernel['chamferEdges']>,
-    shellSolid: (shape, thickness) =>
-      call('shellSolid', [shape, thickness]) as ReturnType<GeometryKernel['shellSolid']>,
-    tessellate: (entity) =>
-      call('tessellate', [entity]) as ReturnType<GeometryKernel['tessellate']>,
+    supports: () => true,
+    evaluate: (recipe) => (call('evaluate', [recipe]) === null ? null : handleOf(recipe)),
+    tessellate: (shape) =>
+      shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
+    topology: (shape) =>
+      shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
+    exportStep: (shapes) =>
+      shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
     crashCount: () => crashes,
     recycleCount: () => recycles,
     forceFailure: (hook) => void call(hook, []),

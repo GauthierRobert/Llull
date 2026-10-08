@@ -8,6 +8,7 @@
 
 import type { CommandResult } from './types';
 import { defineCommand, z } from './schema';
+import { currentContext } from './context';
 import { getCommand } from './registry';
 import { buildFeatureProgram } from '../codegen/featureProgram';
 import { emitPython } from '../codegen/python';
@@ -38,7 +39,8 @@ export const exportCode = defineCommand({
   description:
     'Export the model as parametric source code: CadQuery or build123d (Python), OpenSCAD, or a FreeCAD ' +
     'macro. Parameters become named variables, parameter-driven dimensions stay expressions, and every ' +
-    'feature (primitive, boolean, move, delete, rename) appears in feature-history order, so the code ' +
+    'feature (primitive, boolean, fillet, chamfer, shell, move, delete, rename) appears in feature-history ' +
+    'order — kernel results are rebuilt from their exact construction, not triangles — so the code ' +
     'states exact dimensions and build order. CadQuery/build123d output can be edited and re-imported ' +
     'with import_code. Read-only: returns data.text (plus fileName, language, source, counts).',
   params: z.object({
@@ -51,8 +53,8 @@ export const exportCode = defineCommand({
       .describe('Base file name without extension (sanitized). Default "model".'),
   }),
   annotations: { readOnly: true, idempotent: true },
-  run: (doc, { language, name }): CommandResult => {
-    const program = buildFeatureProgram(doc, getCommand);
+  run: (doc, { language, name }, ctx): CommandResult => {
+    const program = buildFeatureProgram(doc, getCommand, (ctx ?? currentContext()).kernel);
     const text =
       language === 'openscad'
         ? emitOpenScad(program)

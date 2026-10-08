@@ -134,8 +134,9 @@ export function scaleGeometry(e: Entity, f: number): { scaled: Entity; dims: str
         : { scaled: { ...e, offset: e.offset * f }, dims: `new offset ${e.offset * f}` };
     case 'mesh': {
       const positions = e.mesh.positions.map((v) => v * f);
+      const brep = e.brep && ({ op: 'scale', source: e.brep, factor: f } as const);
       return {
-        scaled: { ...e, mesh: { ...e.mesh, positions } },
+        scaled: { ...e, mesh: { ...e.mesh, positions }, ...(brep ? { brep } : {}) },
         dims: `scaled ${positions.length / 3} vertices`,
       };
     }
