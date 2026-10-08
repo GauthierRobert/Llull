@@ -22,13 +22,20 @@ export const addFooting = defineCommand({
   name: 'add_footing',
   description:
     'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and ' +
-    'concrete column foot of the level. Top of footing at level + topOffset (default −300 mm); default ' +
-    '1500 × 1500 × 600 mm.',
+    'concrete column foot of the level (underColumns wins over location). With underColumns, feet that ' +
+    'already carry a footing on the level (within 10 mm) are skipped and the command is refused when none ' +
+    'is left; an explicit location always adds a footing. Top of footing at level + topOffset ' +
+    '(default −300 mm); default 1500 × 1500 × 600 mm.',
   params: z.object({
     location: vec2('Footing centre [x, y].').optional(),
-    underColumns: z.boolean().optional().describe('Place one under each column of the level.'),
+    underColumns: z
+      .boolean()
+      .optional()
+      .describe(
+        'Place one under each steel or concrete column foot of the level (ignores location).',
+      ),
     width: z.number().optional().describe('Size along X, in document units. Default 1500 mm.'),
-    length: z.number().optional().describe('Size along Y. Default = width.'),
+    length: z.number().optional().describe('Size along Y, in document units. Default = width.'),
     thickness: z
       .number()
       .optional()

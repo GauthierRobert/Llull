@@ -208,6 +208,17 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(ok.affected.length).toBeGreaterThan(0);
   });
 
+  it('add_footing underColumns skips feet that already have a footing', () => {
+    let doc = execute(createEmptyDocument(), 'add_column', { location: [0, 0] }).document;
+    doc = execute(doc, 'add_column', { location: [5000, 0] }).document;
+    doc = execute(doc, 'add_footing', { location: [5005, 0] }).document;
+    const first = execute(doc, 'add_footing', { underColumns: true });
+    expect(first.summary).toMatch(/Added 1 pad footing\(s\)/);
+    const again = execute(first.document, 'add_footing', { underColumns: true });
+    expect(again.document).toBe(first.document);
+    expect(again.summary).toMatch(/every column already has a footing/);
+  });
+
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
     expectNoOp(doc, 'set_project_info', { name: 'Hall' });
