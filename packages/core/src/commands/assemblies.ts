@@ -56,6 +56,30 @@ function scaledChild(entity: Entity, scale: Vec3): Entity {
   return factor > 0 ? scaleGeometry(entity, factor).scaled : entity;
 }
 
+/**
+ * A component reference cycle reachable from `startId` (e.g. `['A', 'B', 'A']`: A contains an
+ * instance of B which contains an instance of A), or null when the component graph is acyclic.
+ * Missing components are ignored. @pure
+ */
+export function findComponentCycle(
+  components: Readonly<Record<string, Component>>,
+  startId: string,
+): string[] | null {
+  const visit = (id: string, path: string[]): string[] | null => {
+    const component = Object.hasOwn(components, id) ? components[id] : undefined;
+    if (!component) return null;
+    for (const child of Object.values(component.entities)) {
+      if (child.kind !== 'instance') continue;
+      if (child.componentId === startId) return [...path, id, startId];
+      if (path.includes(child.componentId) || child.componentId === id) continue;
+      const found = visit(child.componentId, [...path, id]);
+      if (found) return found;
+    }
+    return null;
+  };
+  return visit(startId, []);
+}
+
 function expandedId(instanceId: string, sourceEntityId: string): string {
   return `expanded::${instanceId}::${sourceEntityId}`;
 }
@@ -149,6 +173,14 @@ export const createComponent = defineCommand({
       entities: Object.fromEntries(entityIds.map((id) => [id, doc.entities[id] as Entity])),
       order: [...entityIds],
     };
+    const cycle = findComponentCycle({ ...doc.components, [compId]: component }, compId);
+    if (cycle) {
+      return noop(
+        doc,
+        `create_component: component "${compId}" would contain itself (${cycle.join(' -> ')}); ` +
+          'a component cannot (indirectly) hold an instance of itself. Document unchanged.',
+      );
+    }
     const instanceId = nextId('instance');
     const instance = instanceEntity(instanceId, compId, ORIGIN, ORIGIN);
     const replaced = replaceEntities(doc, entityIds, instance);
