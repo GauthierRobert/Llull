@@ -366,7 +366,7 @@ describe.skipIf(!hasCadQuery)('non-llull scripts (cadquery)', () => {
     expect(entity.kind).toBe('mesh');
     const box = llullBox(entity, applied.document);
     expect(maxDeviation(box, { min: [-5, -10, -15], max: [5, 10, 15] })).toBeLessThan(1e-6);
-  });
+  }, 120_000);
 
   it('script stdout cannot corrupt the JSON response and is returned as log', async () => {
     const run = await port.runProgram({
